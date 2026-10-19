@@ -4,6 +4,7 @@
 setlocal
 
 set SCRIPT_DIR=%~dp0
+if "%SCRIPT_DIR:~-1%"=="\" set SCRIPT_DIR=%SCRIPT_DIR:~0,-1%
 set APP_BASE_NAME=%~n0
 set APP_HOME=%SCRIPT_DIR%
 
@@ -23,4 +24,4 @@ if not exist "%WRAPPER_JAR%" (
 )
 
 @REM Execute Maven
-java %DEFAULT_JVM_OPTS% -classpath "%CLASSPATH%" org.apache.maven.wrapper.MavenWrapperMain %*
+java %DEFAULT_JVM_OPTS% -Dmaven.multiModuleProjectDirectory="%APP_HOME%" -classpath "%CLASSPATH%" org.apache.maven.wrapper.MavenWrapperMain %*

@@ -4,8 +4,13 @@ const MainLayout = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/eo', label: 'Event Organizer' },
-    { path: '/admin', label: 'Admin' },
+    { path: '/worker', label: '👷‍♂️ Worker' },
+    { path: '/eo', label: '🏢 Event Organizer' },
+    { path: '/cskh', label: '🎧 CSKH' },
+    { path: '/finance', label: '💰 Finance' },
+    { path: '/admin', label: '⚙️ Admin' },
+    { path: '/login', label: 'Đăng nhập' },
+    { path: '/register', label: 'Đăng ký' },
   ];
 
   return (

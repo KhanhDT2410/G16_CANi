@@ -22,6 +22,7 @@ web/dist-ssr/
 web/.env
 web/.env.local
 web/.env.*.local
+*.tsbuildinfo
 
 # Flutter / Dart - Mobile
 mobile/.dart_tool/

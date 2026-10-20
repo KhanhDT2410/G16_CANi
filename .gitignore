@@ -36,8 +36,12 @@ mobile/android/.gradle/
 mobile/android/app/build/
 mobile/ios/Pods/
 mobile/ios/.symlinks/
+mobile/ios/Flutter/ephemeral/
 mobile/macos/Pods/
 mobile/macos/.symlinks/
+mobile/macos/Flutter/ephemeral/
+mobile/windows/flutter/ephemeral/
+mobile/linux/flutter/ephemeral/
 
 # IDE & AI Tooling
 .idea/

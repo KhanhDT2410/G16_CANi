@@ -1,0 +1,35 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:cani/core/constants/api_constants.dart';
+
+/// Global Dio instance provider.
+///
+/// All features should inject this via Riverpod instead of
+/// creating their own Dio instances or using static singletons.
+final dioProvider = Provider<Dio>((ref) {
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: '${ApiConstants.baseUrl}${ApiConstants.apiPath}',
+      connectTimeout: ApiConstants.connectTimeout,
+      receiveTimeout: ApiConstants.receiveTimeout,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ),
+  );
+
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onError: (error, handler) {
+        // TODO: Add structured error logging when logger is set up
+        handler.next(error);
+      },
+    ),
+  );
+
+  ref.onDispose(() => dio.close());
+
+  return dio;
+});

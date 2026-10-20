@@ -38,9 +38,11 @@ mobile/ios/.symlinks/
 mobile/macos/Pods/
 mobile/macos/.symlinks/
 
-# IDE
+# IDE & AI Tooling
 .idea/
 .vscode/
+.agents/
+.claude/
 *.iml
 *.iws
 .project

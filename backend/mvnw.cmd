@@ -23,5 +23,13 @@ if not exist "%WRAPPER_JAR%" (
     powershell -Command "Invoke-WebRequest -Uri '%WRAPPER_URL%' -OutFile '%WRAPPER_JAR%'"
 )
 
+@REM Determine JAVA executable
+set JAVACMD=java
+if defined JAVA_HOME (
+    if exist "%JAVA_HOME%\bin\java.exe" set JAVACMD="%JAVA_HOME%\bin\java.exe"
+) else (
+    if exist "C:\Program Files (x86)\Java\jdk-21.0.2\bin\java.exe" set JAVACMD="C:\Program Files (x86)\Java\jdk-21.0.2\bin\java.exe"
+)
+
 @REM Execute Maven
-java %DEFAULT_JVM_OPTS% -Dmaven.multiModuleProjectDirectory="%APP_HOME%" -classpath "%CLASSPATH%" org.apache.maven.wrapper.MavenWrapperMain %*
+%JAVACMD% %DEFAULT_JVM_OPTS% -Dmaven.multiModuleProjectDirectory="%APP_HOME%" -classpath "%CLASSPATH%" org.apache.maven.wrapper.MavenWrapperMain %*

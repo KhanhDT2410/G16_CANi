@@ -2,7 +2,7 @@ package com.cani.entity.enums;
 
 public enum UserRole {
     ADMIN,
-    CSKH,
+    CUSTOMER_CARE,
     FINANCE,
     EVENT_ORGANIZER,
     WORKER

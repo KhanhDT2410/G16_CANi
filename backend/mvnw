@@ -30,7 +30,17 @@ if [ ! -f "$WRAPPER_JAR" ]; then
     fi
 fi
 
+# Determine JAVA executable
+JAVACMD="java"
+if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    JAVACMD="$JAVA_HOME/bin/java"
+elif [ -x "/c/Program Files (x86)/Java/jdk-21.0.2/bin/java" ]; then
+    JAVACMD="/c/Program Files (x86)/Java/jdk-21.0.2/bin/java"
+elif [ -x "C:/Program Files (x86)/Java/jdk-21.0.2/bin/java.exe" ]; then
+    JAVACMD="C:/Program Files (x86)/Java/jdk-21.0.2/bin/java.exe"
+fi
+
 # Execute Maven
-exec java $DEFAULT_JVM_OPTS \
+exec "$JAVACMD" $DEFAULT_JVM_OPTS \
     -classpath "$CLASSPATH" \
     org.apache.maven.wrapper.MavenWrapperMain "$@"

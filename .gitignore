@@ -90,5 +90,7 @@ coverage/
 *.temp
 .cache/
 
+# Local Development Tooling
+tools/
 
 CLAUDE.md

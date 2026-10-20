@@ -84,7 +84,51 @@ Mọi chức năng Backend trong `backend/src/main/java/...` phải đảm bảo
 
 ---
 
-## 4. Checklist Bắt Buộc Trước Khi Bàn Giao Code (Verification Gate)
+## 4. Chuẩn Phân Tầng Mobile Flutter (Clean Feature Architecture)
+
+Mọi chức năng Mobile trong `lib/features/[feature-name]/` phải tuân theo luồng phụ thuộc một chiều:
+
+```
+┌────────────────────────────────────────────────────────┐
+│  Presentation Layer: Screens + Widgets (.dart)         │
+│  - Compose widgets, đọc state từ Riverpod providers    │
+│  - CẤM: Không gọi Dio hoặc Repository trực tiếp       │
+└───────────────────────────┬────────────────────────────┘
+                            │ watch / read
+┌───────────────────────────▼────────────────────────────┐
+│  State Layer: Riverpod Providers                       │
+│  - Quản lý state (AsyncValue: loading, error, data)    │
+│  - Điều phối gọi Repository, xử lý side-effects       │
+└───────────────────────────┬────────────────────────────┘
+                            │ sử dụng
+┌───────────────────────────▼────────────────────────────┐
+│  Data Layer: Repositories + API Services               │
+│  - Sử dụng Dio client dùng chung (core/network/)      │
+│  - Map JSON → typed Models, xử lý DioException        │
+└───────────────────────────┬────────────────────────────┘
+                            │ sử dụng
+┌───────────────────────────▼────────────────────────────┐
+│  Domain / Contract Layer: Models & DTOs                │
+│  - Immutable data classes (fromJson / toJson)          │
+│  - CẤM TUYỆT ĐỐI kiểu `dynamic`                      │
+└────────────────────────────────────────────────────────┘
+```
+
+### Tiêu chuẩn Code Mobile:
+- **Kích thước file:** Tối đa 200 dòng cho 1 widget/screen. Nếu dài hơn, bóc tách ngay thành sub-widgets.
+- **Đặt tên (Naming Conventions):**
+  - File: `snake_case.dart` (ví dụ: `event_card.dart`, `auth_repository.dart`).
+  - Class / Widget: `PascalCase` (ví dụ: `EventCard`, `AuthRepository`).
+  - Provider: `camelCase` (ví dụ: `eventListProvider`, `authStateProvider`).
+  - Enum: `PascalCase` class + `camelCase` values (ví dụ: `EventStatus.draft`).
+- **Clean Code:**
+  - Dùng `const` constructor cho mọi widget khi có thể.
+  - Dùng `Theme.of(context)` cho colors/text styles, không hardcode.
+  - Import theo package path (`package:cani/...`), không dùng relative imports.
+
+---
+
+## 5. Checklist Bắt Buộc Trước Khi Bàn Giao Code (Verification Gate)
 
 Trước khi gửi code cho người dùng, AI Agent phải tự rà soát theo checklist này:
 - [ ] **Không code thừa:** Đã bỏ hết biến không dùng, import không dùng (`unused imports`), hàm rác?

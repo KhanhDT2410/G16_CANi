@@ -38,11 +38,34 @@ This repository is a monorepo for **CANi - Event Staffing Platform**:
 
 ---
 
-## 3. Team Consistency & Clean Architecture Skill
+## 3. Mobile Rules (`mobile/`)
 
-1. **Mandatory Skill:** Always apply the instructions defined in `.agents/skills/clean-architecture/SKILL.md`.
+### Architecture
+- **Pattern:** Feature-Driven Architecture (Vertical Slice), mirroring Web conventions.
+- **Location:** All business features MUST be placed in `lib/features/[feature-name]/`.
+- **Feature Structure:**
+  - `data/`: Dio API clients + Repository implementations.
+  - `models/`: Immutable data classes with `fromJson`/`toJson`.
+  - `providers/`: Riverpod providers (state management).
+  - `screens/`: Full-page screens (`ConsumerWidget`).
+  - `widgets/`: Feature-specific UI widgets.
+  - `[feature_name].dart`: Barrel export file (public interface of the feature).
+- **Shared Code:** Reusable widgets belong in `lib/shared/widgets/`. Infrastructure code belongs in `lib/core/`.
+
+### Dart & Code Standards
+- **No `dynamic`:** Strict Dart typings are mandatory. Always type API responses and widget props.
+- **Widget Size:** Keep widgets/screens under 200 lines. Extract sub-widgets when exceeded.
+- **State Management:** Use Riverpod. Screens read state via `ref.watch()`, never call Dio directly.
+- **Dependency Flow:** Screen → Provider → Repository → API (unidirectional, no shortcuts).
+- **Styling:** Use `Theme.of(context)` for all colors and text styles. Do not hardcode values.
+
+---
+
+## 4. Team Consistency & Clean Architecture Skill
+
+1. **Mandatory Skills:** Always apply the instructions defined in `.agents/skills/clean-architecture/SKILL.md`. For mobile work, also apply `.agents/skills/mobile-design/SKILL.md`.
 2. **Lean Code (No AI Bloat):** Apply YAGNI & KISS. Do not write placeholder methods, speculative abstractions, or unused utility functions.
-3. **Check Before Writing:** Before writing new helper functions, check `src/utils/` and `src/components/common/` to reuse existing code.
-4. **Never Overwrite Configs:** Do not change build tools, tsconfig, vite plugins, or root configs unless explicitly requested.
+3. **Check Before Writing:** Before writing new helper functions, check `src/utils/` and `src/components/common/` (web) or `lib/core/utils/` and `lib/shared/widgets/` (mobile) to reuse existing code.
+4. **Never Overwrite Configs:** Do not change build tools, tsconfig, vite plugins, pubspec.yaml, or root configs unless explicitly requested.
 5. **Plan First:** Provide a concise breakdown of files to be modified/created before generating large blocks of code.
 

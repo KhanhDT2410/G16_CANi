@@ -2,7 +2,7 @@
 
 This repository is a monorepo for **CANi - Event Staffing Platform**:
 - `backend/`: Java 21, Spring Boot 3.5.1, PostgreSQL, Flyway, Maven.
-- `web/`: React 18, TypeScript, Vite, React Router 7, Axios.
+- `web/`: React 18, JavaScript (JSX), Vite, React Router 7, Axios.
 - `mobile/`: Flutter 3.x, Dart, Dio.
 - `docs/`: Technical specifications & architectural guidelines.
 
@@ -14,15 +14,15 @@ This repository is a monorepo for **CANi - Event Staffing Platform**:
 - **Pattern:** Feature-Driven Architecture (Vertical Slice).
 - **Location:** All business features MUST be placed in `src/features/[feature-name]/`.
 - **Feature Structure:**
-  - `api/`: Axios API functions only (using shared `axiosClient`).
-  - `components/`: UI components exclusive to this feature.
-  - `hooks/`: Business logic, state management, and side-effects.
-  - `types/`: Domain-specific TypeScript interfaces/types.
-  - `index.ts`: Barrel export file (public interface of the feature).
+  - `api/`: Axios API functions only (using shared `apiClient` from `services/api`).
+  - `components/`: UI components exclusive to this feature (`.jsx`).
+  - `hooks/`: Business logic, state management, and side-effects (`.js`).
+  - `types/`: Domain-specific constants, enums, and helpers (`.constants.js`).
+  - `index.js`: Barrel export file (public interface of the feature).
 - **Shared Code:** Reusable UI components belong in `src/components/common/`. Cross-feature utilities belong in `src/utils/`.
 
-### TypeScript & Code Standards
-- **No `any`:** Strict TypeScript typings are mandatory. Always type API responses and component props.
+### JavaScript (JSX) & Code Standards
+- **Clean React JSX:** Write clean, readable React components (`.jsx`). Use prop destructuring and meaningful variable names.
 - **Component Size:** Keep components under 200 lines. Break large UI blocks into smaller subcomponents.
 - **State Management:** Keep state as local as possible. Use custom hooks to isolate complex state logic from UI rendering.
 - **Styling & Assets:** Follow existing CSS/styling conventions. Do not introduce ad-hoc CSS frameworks without explicit team agreement.

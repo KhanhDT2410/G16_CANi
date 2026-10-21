@@ -7,7 +7,7 @@ Monorepo for the CANi capstone project - a short-term event staffing and workfor
 ```
 G16_CANi/
 ├── backend/          # Java 21 + Spring Boot (Three-Layer Architecture)
-├── web/              # React + TypeScript + Vite
+├── web/              # React + JavaScript (JSX) + Vite
 ├── mobile/           # Flutter + Dart
 └── docs/             # Project documentation
 ```
@@ -24,7 +24,7 @@ G16_CANi/
 
 ### Web Frontend
 - **React 18**
-- **TypeScript**
+- **JavaScript (JSX)**
 - **Vite**
 - **React Router 7**
 - **Axios**
@@ -127,7 +127,7 @@ flutter test                       # Run tests
 > **Note:** This repository is in the initial scaffolding phase. No business features have been implemented yet.
 
 - Backend: Spring Boot application initialized with minimal security config and health endpoint
-- Web: React + TypeScript app with placeholder routes (`/eo`, `/admin`)
+- Web: React + JavaScript (JSX) app with placeholder routes (`/eo`, `/admin`)
 - Mobile: Flutter app with placeholder home screen
 
 ## Architecture

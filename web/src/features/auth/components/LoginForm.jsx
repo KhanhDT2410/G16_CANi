@@ -2,7 +2,7 @@ import React from 'react';
 import { useLogin } from '../hooks/useLogin';
 import '../auth.css';
 
-export const LoginForm: React.FC = () => {
+export const LoginForm = () => {
   const {
     formData,
     isLoading,

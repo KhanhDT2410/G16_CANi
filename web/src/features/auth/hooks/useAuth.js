@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authApi } from '../api/authApi';
-import type { UserDto } from '../types/auth.types';
 
 export const useAuth = () => {
-  const [user, setUser] = useState<UserDto | null>(() => authApi.getCurrentUser());
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState(() => authApi.getCurrentUser());
+  const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem('cani_token');

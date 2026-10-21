@@ -1,14 +1,14 @@
 # CANi Project Cursor Rules
 
-You are working on the CANi Monorepo project (Java Spring Boot backend, React Vite TS web, Flutter mobile).
+You are working on the CANi Monorepo project (Java Spring Boot backend, React Vite JavaScript web, Flutter mobile).
 
 Key Principles for Web (`web/`):
 - Architecture: Feature-driven architecture under `src/features/<feature-name>/`.
-  Each feature has: api/, components/, hooks/, types/, index.ts.
+  Each feature has: api/, components/ (.jsx), hooks/ (.js), types/ (.constants.js), index.js.
 - Reusability: Always check `src/components/common` before creating custom inputs, buttons, modals, or tables.
-- API Client: Always use shared `axiosClient` from `src/lib/axiosClient` or `src/services/api`. Do NOT create new axios instances or use raw fetch.
-- Types: Strict TypeScript is enabled. Never use `any`. Always define explicit interfaces for props and API responses.
-- Logic Separation: Isolate business logic & fetch calls into custom hooks (`hooks/use*.ts`). React components should only handle rendering.
+- API Client: Always use shared `apiClient` from `src/services/api`. Do NOT create new axios instances or use raw fetch.
+- JavaScript (JSX): Write clean React JSX. Keep functions pure and modular.
+- Logic Separation: Isolate business logic & fetch calls into custom hooks (`hooks/use*.js`). React components should only handle rendering.
 - File size: Keep components concise (<200 lines). Extract sub-components when needed.
 
 - Clean Architecture & Anti-Bloat:

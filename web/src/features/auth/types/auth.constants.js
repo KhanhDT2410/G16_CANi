@@ -1,0 +1,18 @@
+export const UserRole = {
+  ADMIN: 'ADMIN',
+  CUSTOMER_CARE: 'CUSTOMER_CARE',
+  EVENT_ORGANIZER: 'EVENT_ORGANIZER',
+  WORKER: 'WORKER',
+};
+
+export const UserStatus = {
+  ACTIVE: 'ACTIVE',
+  LOCKED: 'LOCKED',
+  SUSPENDED: 'SUSPENDED',
+  PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+};
+
+export const AccountType = {
+  EVENT_ORGANIZER: 'EVENT_ORGANIZER',
+  WORKER: 'WORKER',
+};

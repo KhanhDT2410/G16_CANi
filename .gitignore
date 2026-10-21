@@ -68,6 +68,7 @@ Desktop.ini
 # Secrets and sensitive files
 .env
 .env.*
+*.env
 !.env.example
 *.pem
 *.key
@@ -94,3 +95,7 @@ coverage/
 tools/
 
 CLAUDE.md
+
+# Temporary backup directories
+web_backup_*/
+

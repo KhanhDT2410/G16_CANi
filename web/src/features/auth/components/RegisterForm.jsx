@@ -2,7 +2,7 @@ import React from 'react';
 import { useRegister } from '../hooks/useRegister';
 import '../auth.css';
 
-export const RegisterForm: React.FC = () => {
+export const RegisterForm = () => {
   const {
     formData,
     isLoading,
@@ -26,7 +26,7 @@ export const RegisterForm: React.FC = () => {
 
       <div className="worker-perks-box" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
         <div className="worker-perks-title" style={{ color: '#15803d' }}>
-          <span>🏢 Quyền lợi Nhà Tổ Chức (Event Organizer):</span>
+          <span>Quyền lợi Nhà Tổ Chức (Event Organizer):</span>
         </div>
         <div>• Đăng tải không giới hạn ca làm, tuyển chọn nhân sự sự kiện linh hoạt và chất lượng cao.</div>
         <div>• Tự động khớp ca, quản lý điểm danh QR thời gian thực và thanh toán tự động, minh bạch.</div>
@@ -45,7 +45,6 @@ export const RegisterForm: React.FC = () => {
       )}
 
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        {/* Họ và tên người đại diện */}
         <div className="form-group">
           <label className="form-label" htmlFor="fullName">
             Họ và tên người đại diện
@@ -64,7 +63,6 @@ export const RegisterForm: React.FC = () => {
           />
         </div>
 
-        {/* Email & Số điện thoại */}
         <div className="form-row">
           <div className="form-group">
             <label className="form-label" htmlFor="email">
@@ -103,7 +101,6 @@ export const RegisterForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Tên công ty / tổ chức sự kiện */}
         <div className="form-group">
           <label className="form-label" htmlFor="companyName">
             Tên công ty / Đơn vị tổ chức sự kiện
@@ -121,7 +118,6 @@ export const RegisterForm: React.FC = () => {
           />
         </div>
 
-        {/* Mật khẩu & Xác nhận mật khẩu */}
         <div className="form-row">
           <div className="form-group">
             <label className="form-label" htmlFor="password">

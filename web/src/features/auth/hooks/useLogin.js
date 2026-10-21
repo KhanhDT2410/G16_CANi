@@ -1,22 +1,21 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
-import type { LoginRequest } from '../types/auth.types';
 
 export const useLogin = () => {
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState<LoginRequest & { rememberMe: boolean }>({
+  const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false,
   });
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -29,7 +28,7 @@ export const useLogin = () => {
     setShowPassword((prev) => !prev);
   };
 
-  const handleSubmit = async (e?: FormEvent) => {
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
 
     if (!formData.email.trim()) {
@@ -50,8 +49,7 @@ export const useLogin = () => {
         password: formData.password,
       });
 
-      // Nếu là tài khoản WORKER, chặn và yêu cầu dùng app mobile
-      if (data.user.role === 'WORKER') {
+      if (data.user && data.user.role === 'WORKER') {
         await authApi.logout();
         setErrorMessage('Tài khoản Nhân sự (Worker) vui lòng đăng nhập trên ứng dụng CANi Mobile!');
         return;
@@ -67,8 +65,7 @@ export const useLogin = () => {
         localStorage.setItem('cani_user', JSON.stringify(data.user));
       }
 
-      // Điều hướng theo các vai trò hợp lệ trên Web
-      switch (data.user.role) {
+      switch (data.user?.role) {
         case 'ADMIN':
           navigate('/admin');
           break;
@@ -80,7 +77,7 @@ export const useLogin = () => {
           navigate('/eo');
           break;
       }
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(err.message || 'Đăng nhập không thành công.');
     } finally {
       setIsLoading(false);
@@ -92,7 +89,7 @@ export const useLogin = () => {
     setErrorMessage('');
     try {
       await authApi.loginWithGoogle();
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(err.message || 'Không thể đăng nhập bằng Google.');
       setIsLoading(false);
     }

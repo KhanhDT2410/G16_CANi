@@ -1,6 +1,6 @@
 # CANi Web - Mẫu Chuẩn Cho Một Feature (Feature Golden Template)
 
-> **Mục tiêu:** Đây là **Khuôn Mẫu Mẫu (Golden Reference)**. Khi bất kỳ ai trong nhóm nhờ AI code một chức năng mới (ví dụ: `events`, `staffing`, `attendance`, `payroll`), hãy yêu cầu AI **bắt chước chính xác cấu trúc và phân tầng** của template này.
+> **Mục tiêu:** Đây là **Khuôn Mẫu Mẫu (Golden Reference)**. Khi bất kỳ ai trong nhóm nhờ AI code một chức năng mới (ví dụ: `events`, `staffing`, `attendance`, `payroll`), hãy yêu cầu AI **bắt chước chính xác cấu trúc và phân tầng** của template này bằng **React + Vite thuần JavaScript (JSX)**.
 
 ---
 
@@ -11,64 +11,51 @@ Giả sử chúng ta xây dựng tính năng Quản lý sự kiện (`features/e
 ```text
 src/features/events/
 ├── api/
-│   └── eventApi.ts          # Gọi backend API qua axios
+│   └── eventApi.js          # Gọi backend API qua axios
 ├── components/
-│   ├── EventCard.tsx        # UI hiển thị từng card sự kiện
-│   └── EventList.tsx        # UI danh sách sự kiện (ghép EventCard)
+│   ├── EventCard.jsx        # UI hiển thị từng card sự kiện
+│   └── EventList.jsx        # UI danh sách sự kiện (ghép EventCard)
 ├── hooks/
-│   └── useEvents.ts         # Quản lý state tải dữ liệu, loading, error
+│   └── useEvents.js         # Quản lý state tải dữ liệu, loading, error
 ├── types/
-│   └── index.ts             # Định nghĩa Type / Interface DTO
-└── index.ts                 # Barrel export (Cổng giao tiếp duy nhất ra ngoài)
+│   └── event.constants.js   # Định nghĩa hằng số / Enum trạng thái
+└── index.js                 # Barrel export (Cổng giao tiếp duy nhất ra ngoài)
 ```
 
 ---
 
 ## 2. Mã Nguồn Mẫu Chuẩn Từng Tầng
 
-### 📄 Tầng 1: `types/index.ts` (Định nghĩa kiểu dữ liệu)
-```typescript
-export type EventStatus = 'DRAFT' | 'PUBLISHED' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
-
-export interface EventItem {
-  id: string;
-  title: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  requiredStaff: number;
-  status: EventStatus;
-}
-
-export interface CreateEventDto {
-  title: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  requiredStaff: number;
-}
+### 📄 Tầng 1: `types/event.constants.js` (Hằng số trạng thái & Enum)
+```javascript
+export const EventStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  ONGOING: 'ONGOING',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+};
 ```
 
 ---
 
-### 📄 Tầng 2: `api/eventApi.ts` (Gọi API tập trung)
-```typescript
-import { api } from '@/services/api'; // Sử dụng instance dùng chung
-import { EventItem, CreateEventDto } from '../types';
+### 📄 Tầng 2: `api/eventApi.js` (Gọi API tập trung)
+```javascript
+import { apiClient } from '@/services/api'; // Sử dụng instance dùng chung
 
 export const eventApi = {
-  getEvents: async (): Promise<EventItem[]> => {
-    const response = await api.get<EventItem[]>('/events');
+  getEvents: async () => {
+    const response = await apiClient.get('/events');
     return response.data;
   },
 
-  getEventById: async (id: string): Promise<EventItem> => {
-    const response = await api.get<EventItem>(`/events/${id}`);
+  getEventById: async (id) => {
+    const response = await apiClient.get(`/events/${id}`);
     return response.data;
   },
 
-  createEvent: async (data: CreateEventDto): Promise<EventItem> => {
-    const response = await api.post<EventItem>('/events', data);
+  createEvent: async (data) => {
+    const response = await apiClient.post('/events', data);
     return response.data;
   },
 };
@@ -76,16 +63,15 @@ export const eventApi = {
 
 ---
 
-### 📄 Tầng 3: `hooks/useEvents.ts` (Tách logic nghiệp vụ & State)
-```typescript
+### 📄 Tầng 3: `hooks/useEvents.js` (Tách logic nghiệp vụ & State)
+```javascript
 import { useState, useEffect } from 'react';
 import { eventApi } from '../api/eventApi';
-import { EventItem } from '../types';
 
 export const useEvents = () => {
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchEvents = async () => {
     try {
@@ -93,8 +79,8 @@ export const useEvents = () => {
       setError(null);
       const data = await eventApi.getEvents();
       setEvents(data);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi không xác định khi tải sự kiện');
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Lỗi không xác định khi tải sự kiện');
     } finally {
       setLoading(false);
     }
@@ -110,12 +96,12 @@ export const useEvents = () => {
 
 ---
 
-### 📄 Tầng 4: `components/EventList.tsx` (Component UI thuần túy)
-```typescript
+### 📄 Tầng 4: `components/EventList.jsx` (Component UI thuần túy)
+```jsx
 import React from 'react';
 import { useEvents } from '../hooks/useEvents';
 
-export const EventList: React.FC = () => {
+export const EventList = () => {
   const { events, loading, error, refetch } = useEvents();
 
   if (loading) return <div>Đang tải danh sách sự kiện...</div>;
@@ -134,20 +120,22 @@ export const EventList: React.FC = () => {
     </div>
   );
 };
+
+export default EventList;
 ```
 
 ---
 
-### 📄 Tầng 5: `index.ts` (Public Barrel File)
-```typescript
+### 📄 Tầng 5: `index.js` (Public Barrel File)
+```javascript
 // Chỉ export những gì các page hoặc layout bên ngoài cần dùng
-export * from './types';
-export * from './components/EventList';
-export * from './hooks/useEvents';
+export * from './types/event.constants';
+export { EventList } from './components/EventList';
+export { useEvents } from './hooks/useEvents';
 ```
 
 ---
 
 ## 3. Cách Áp Dụng Khi Dùng AI
 Mỗi khi bạn muốn AI viết feature mới (ví dụ: `attendance`), chỉ cần nạp câu lệnh:
-> *"Hãy tạo feature `attendance` với các tính năng check-in/out. Cấu trúc thư mục, quy cách tách tầng và phân quyền API/Hook/Component PHẢI tuân thủ chính xác theo mẫu trong file `docs/web/feature-template-guide.md`."*
+> *"Hãy tạo feature `attendance` bằng React + Vite thuần JavaScript (JSX). Cấu trúc thư mục, quy cách tách tầng và phân quyền API/Hook/Component PHẢI tuân thủ chính xác theo mẫu trong file `docs/web/feature-template-guide.md`."*

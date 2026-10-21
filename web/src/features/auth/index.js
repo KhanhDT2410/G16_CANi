@@ -6,4 +6,4 @@ export { useRegister } from './hooks/useRegister';
 export { useAuthGuard } from './hooks/useAuthGuard';
 export { authApi } from './api/authApi';
 export { supabase } from './api/supabaseClient';
-export * from './types/auth.types';
+export * from './types/auth.constants';

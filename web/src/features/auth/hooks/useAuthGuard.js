@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './useAuth';
-import type { UserRole } from '../types/auth.types';
 
-export const useAuthGuard = (allowedRoles?: UserRole[]) => {
+export const useAuthGuard = (allowedRoles) => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

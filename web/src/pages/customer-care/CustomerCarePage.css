@@ -1,0 +1,156 @@
+.customer-care-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.cc-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.cc-subtitle {
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.9rem;
+}
+
+.cc-role-badge {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  padding: 0.4rem 0.8rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid #bfdbfe;
+}
+
+.cc-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.cc-stat-card {
+  padding: 1.25rem;
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cc-stat-label {
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.cc-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+}
+
+.cc-stat-value.danger {
+  color: #dc2626;
+}
+
+.cc-stat-value.warning {
+  color: #d97706;
+}
+
+.cc-stat-value.success {
+  color: #16a34a;
+}
+
+.cc-stat-desc {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  color: #6b7280;
+}
+
+.cc-stat-desc.success-text {
+  color: #16a34a;
+}
+
+.cc-table-section {
+  background-color: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cc-table-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #1f2937;
+}
+
+.cc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.cc-table th {
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  color: #4b5563;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+}
+
+.cc-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+
+.cc-code-cell {
+  font-family: monospace;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.cc-name-cell {
+  font-weight: 500;
+  color: #111827;
+}
+
+.cc-violation-tag {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.cc-status-in-review {
+  color: #d97706;
+  font-weight: 500;
+}
+
+.cc-btn-action {
+  padding: 0.35rem 0.75rem;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.cc-btn-action:hover {
+  background-color: #1d4ed8;
+}

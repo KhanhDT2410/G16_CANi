@@ -1,14 +1,11 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
-import type { RegisterRequest } from '../types/auth.types';
 
 export const useRegister = () => {
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState<
-    Omit<RegisterRequest, 'accountType'> & { confirmPassword: string }
-  >({
+  const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
@@ -17,12 +14,12 @@ export const useRegister = () => {
     confirmPassword: '',
   });
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [successMessage, setSuccessMessage] = useState<string>('');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -35,10 +32,9 @@ export const useRegister = () => {
     setShowPassword((prev) => !prev);
   };
 
-  const handleSubmit = async (e?: FormEvent) => {
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
 
-    // Validation cơ bản
     if (!formData.fullName.trim()) {
       setErrorMessage('Vui lòng nhập họ và tên.');
       return;
@@ -73,7 +69,6 @@ export const useRegister = () => {
     setSuccessMessage('');
 
     try {
-      // Trên Web, luôn đăng ký tài khoản với vai trò EVENT_ORGANIZER
       await authApi.register({
         fullName: formData.fullName,
         email: formData.email,
@@ -87,7 +82,7 @@ export const useRegister = () => {
       setTimeout(() => {
         navigate('/login');
       }, 1500);
-    } catch (err: any) {
+    } catch (err) {
       setErrorMessage(err.message || 'Đăng ký tài khoản không thành công. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);

@@ -54,7 +54,7 @@ Trước khi yêu cầu AI viết một giao diện hay tính năng mới, thàn
 
 Không thể dựa hoàn toàn vào ý thức tự giác, nhóm dùng **công cụ tự động phạt lỗi**:
 
-1. **TypeScript Strict Mode:** Bật cấu hình nghiêm ngặt (`noImplicitAny: true`). Bất kỳ đoạn code nào AI sinh ra dùng kiểu `any` đều bị gạch đỏ và không cho build.
+1. **ESLint & Code Quality:** Bật cấu hình kiểm tra cú pháp nghiêm ngặt. Bất kỳ đoạn code nào AI sinh ra có biến không dùng (unused vars), cú pháp sai chuẩn đều bị cảnh báo.
 2. **ESLint & Prettier thống nhất:**
    - Cài đặt plugin `prettier` và bật tính năng **"Format on Save"** trong VS Code/Cursor.
    - Nhờ đó, dù AI viết thụt đầu dòng 2 space hay 4 space, bấm Save một cái là toàn bộ code trở về cùng 1 định dạng chuẩn của nhóm.
@@ -62,9 +62,9 @@ Không thể dựa hoàn toàn vào ý thức tự giác, nhóm dùng **công c�
    - Trước khi lệnh `git commit` được thực thi, máy sẽ tự động chạy:
      ```bash
      npm run lint
-     npm run build (hoặc tsc --noEmit)
+     npm run build
      ```
-   - Nếu code của AI sinh ra bị lỗi type hoặc lỗi format, Git sẽ **từ chối commit**. Dev buộc phải sửa sạch lỗi mới được đẩy lên GitHub!
+   - Nếu code của AI sinh ra bị lỗi cú pháp hoặc lỗi build, Git sẽ **từ chối commit**. Dev buộc phải sửa sạch lỗi mới được đẩy lên GitHub!
 
 ---
 
@@ -74,14 +74,14 @@ Mọi thành viên trong nhóm cần tuân thủ **Quy trình 3 Bước (SOP)**:
 
 #### 🔹 Bước 1: Yêu cầu AI Lập Kế Hoạch (Plan First, Code Later)
 - **Không bao giờ:** Quăng nguyên yêu cầu lớn: *"Viết cho tôi trang quản lý sự kiện"*.
-- **Cách làm chuẩn:** *"Tôi cần làm chức năng danh sách sự kiện trong `features/events`. Hãy liệt kê các file cần tạo, cấu trúc type DTO và các bước thực hiện. Chưa được sinh code ngay."*
+- **Cách làm chuẩn:** *"Tôi cần làm chức năng danh sách sự kiện trong `features/events`. Hãy liệt kê các file cần tạo và các bước thực hiện bằng React JSX. Chưa được sinh code ngay."*
 
 #### 🔹 Bước 2: Kiểm soát Từng Lớp (Layer by Layer)
 Yêu cầu AI sinh code theo thứ tự:
-1. Viết `types/` trước (Định nghĩa rõ interface).
+1. Viết `types/` (Hằng số/Enum nếu có).
 2. Viết `api/` (Định nghĩa hàm gọi backend qua axios).
 3. Viết `hooks/` (Xử lý state & loading/error).
-4. Viết `components/` (Render giao diện dùng shared components).
+4. Viết `components/` (Render giao diện `.jsx` dùng shared components).
 
 #### 🔹 Bước 3: Tự Review Diff Trước Khi Commit
 - Không được tin tưởng AI 100%. Phải mở tab Git trong editor lên, đọc lại từng dòng thay đổi (diff):
@@ -96,12 +96,12 @@ Yêu cầu AI sinh code theo thứ tự:
 Các bạn có thể copy mẫu prompt dưới đây mỗi khi bắt đầu một tính năng mới để "nắn gân" AI ngay từ đầu:
 
 ```markdown
-Bạn là lập trình viên Frontend cao cấp cho dự án CANi (React 18 + TypeScript + Vite + Axios).
+Bạn là lập trình viên Frontend cao cấp cho dự án CANi (React 18 + JavaScript JSX + Vite + Axios).
 Hãy tuân thủ nghiêm ngặt các quy tắc sau:
 1. Cấu trúc thư mục: Tuân thủ Feature-Driven Architecture trong `src/features/[tên-feature]`.
 2. UI: Sử dụng các Shared Component có sẵn tại `@/components/common`. Tuyệt đối không tự bịa style tùy tiện.
-3. API: Sử dụng `axiosClient` từ `@/lib/axiosClient`. Định nghĩa kiểu dữ liệu trả về rõ ràng trong `types/`, cấm dùng `any`.
-4. Logic: Tách logic vào custom hook trong `hooks/`, component chỉ giữ vai trò hiển thị UI.
+3. API: Sử dụng `apiClient` từ `@/services/api`. Không viết hàm fetch trực tiếp trong component.
+4. Logic: Tách logic vào custom hook trong `hooks/`, component (`.jsx`) chỉ giữ vai trò hiển thị UI.
 
 Yêu cầu hiện tại của tôi: [Mô tả tính năng ở đây]
 Trước khi viết code, hãy tóm tắt các file bạn dự định tạo/sửa để tôi duyệt.

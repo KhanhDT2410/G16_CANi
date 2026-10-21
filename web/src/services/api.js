@@ -29,7 +29,6 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('cani_token');
       localStorage.removeItem('cani_user');
-      // Chỉ điều hướng nếu đang không ở trang login hoặc register
       if (
         !window.location.pathname.includes('/login') &&
         !window.location.pathname.includes('/register')

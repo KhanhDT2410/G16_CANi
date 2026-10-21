@@ -17,7 +17,7 @@ function App() {
           <Route path="eo" element={<EOPage />} />
           <Route path="admin" element={<AdminPage />} />
           <Route path="customer-care" element={<CustomerCarePage />} />
-          {/* Fallback route cho đường dẫn cũ /cskh */}
+          {/* Fallback route cho duong dan cu /cskh */}
           <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
         </Route>
       </Routes>

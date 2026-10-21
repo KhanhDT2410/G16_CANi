@@ -5,6 +5,8 @@ import com.cani.entity.enums.ProposalStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -21,7 +23,7 @@ public class DispatchProposal {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "proposal_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID proposalId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -39,7 +41,8 @@ public class DispatchProposal {
     private String scoreBreakdown;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status")
     @Builder.Default
     private ProposalStatus status = ProposalStatus.PENDING;
 

@@ -20,7 +20,7 @@ public class EoWorker {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "eo_worker_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID eoWorkerId;
 
     @ManyToOne(fetch = FetchType.LAZY)

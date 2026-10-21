@@ -4,7 +4,9 @@ import com.cani.entity.enums.AttendanceStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -21,7 +23,7 @@ public class AttendanceLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "attendance_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID attendanceId;
 
     @OneToOne(fetch = FetchType.LAZY)
@@ -59,7 +61,8 @@ public class AttendanceLog {
     private Boolean isOnTime = true;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "attendance_status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "attendance_status")
     @Builder.Default
     private AttendanceStatus attendanceStatus = AttendanceStatus.NOT_CHECKED_IN;
 

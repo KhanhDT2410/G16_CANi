@@ -10,7 +10,7 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "worker_availabilities")
+@Table(name = "worker_availability")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,7 +20,7 @@ public class WorkerAvailability {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "availability_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID availabilityId;
 
     @ManyToOne(fetch = FetchType.LAZY)

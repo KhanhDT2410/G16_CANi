@@ -5,7 +5,9 @@ import com.cani.entity.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -22,7 +24,7 @@ public class Subscription {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "subscription_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID subscriptionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -33,7 +35,8 @@ public class Subscription {
     private String planName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "plan_type", nullable = false, length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "plan_type", nullable = false)
     private PlanType planType;
 
     @Column(name = "duration_days", nullable = false)
@@ -63,7 +66,8 @@ public class Subscription {
     private Integer shiftsUsed = 0;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status")
     @Builder.Default
     private SubscriptionStatus status = SubscriptionStatus.ACTIVE;
 

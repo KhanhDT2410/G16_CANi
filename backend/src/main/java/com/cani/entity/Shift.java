@@ -5,7 +5,9 @@ import com.cani.entity.enums.ShiftStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -22,7 +24,7 @@ public class Shift {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "shift_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID shiftId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -65,7 +67,8 @@ public class Shift {
     private BigDecimal totalCost = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status")
     @Builder.Default
     private ShiftStatus status = ShiftStatus.DRAFT;
 
@@ -93,7 +96,8 @@ public class Shift {
     private Double maxDistanceKm;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "min_experience_level", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "min_experience_level")
     @Builder.Default
     private ExperienceLevel minExperienceLevel = ExperienceLevel.BEGINNER;
 

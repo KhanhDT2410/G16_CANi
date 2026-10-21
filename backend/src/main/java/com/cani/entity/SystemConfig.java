@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "system_configs")
+@Table(name = "system_config")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -18,7 +18,7 @@ public class SystemConfig {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "config_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID configId;
 
     @Column(name = "key", nullable = false, unique = true, length = 100)

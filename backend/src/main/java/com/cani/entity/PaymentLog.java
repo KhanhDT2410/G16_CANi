@@ -5,7 +5,6 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "payment_logs")
@@ -18,7 +17,7 @@ public class PaymentLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "log_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private Long logId;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -21,4 +21,5 @@ public class UserDto {
     private UserRole role;
     private UserStatus status;
     private String avatarUrl;
+    private Boolean emailVerified;
 }

@@ -5,7 +5,9 @@ import com.cani.entity.enums.EventStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,7 +25,7 @@ public class Event {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "event_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID eventId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -49,12 +51,14 @@ public class Event {
     private LocalDate eventDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "mode", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "mode")
     @Builder.Default
     private EventMode mode = EventMode.MATCHING;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status")
     @Builder.Default
     private EventStatus status = EventStatus.DRAFT;
 

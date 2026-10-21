@@ -18,7 +18,7 @@ public class ReliabilityLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "log_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID logId;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -5,7 +5,9 @@ import com.cani.entity.enums.DisputeType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -21,7 +23,7 @@ public class Dispute {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "dispute_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID disputeId;
 
     @Column(name = "assignment_id")
@@ -34,7 +36,8 @@ public class Dispute {
     private UUID respondentId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false, length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "type", nullable = false)
     private DisputeType type;
 
     @Column(name = "title", nullable = false)
@@ -50,7 +53,8 @@ public class Dispute {
     private String messages;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status")
     @Builder.Default
     private DisputeStatus status = DisputeStatus.SUBMITTED;
 

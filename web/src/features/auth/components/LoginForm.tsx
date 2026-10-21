@@ -2,12 +2,7 @@ import React from 'react';
 import { useLogin } from '../hooks/useLogin';
 import '../auth.css';
 
-/**
- * Component Form Đăng Nhập thuần túy (React JSX)
- * Áp dụng triết lý Clean Architecture: Chỉ đảm nhiệm hiển thị UI và nhận tương tác,
- * toàn bộ logic điều phối và gọi API được đóng gói trong hook useLogin.
- */
-export const LoginForm = () => {
+export const LoginForm: React.FC = () => {
   const {
     formData,
     isLoading,
@@ -16,7 +11,7 @@ export const LoginForm = () => {
     handleChange,
     handleSubmit,
     toggleShowPassword,
-    handleQuickDemoLogin,
+    handleGoogleLogin,
   } = useLogin();
 
   return (
@@ -24,7 +19,7 @@ export const LoginForm = () => {
       <div className="auth-header">
         <div className="auth-logo-badge">C</div>
         <h2 className="auth-title">Đăng Nhập</h2>
-        <p className="auth-subtitle">Nền tảng Quản lý & Tuyển dụng Nhân sự Sự kiện CANi</p>
+        <p className="auth-subtitle">Cổng Quản Trị & Tổ Chức Sự Kiện CANi</p>
       </div>
 
       {errorMessage && (
@@ -36,7 +31,7 @@ export const LoginForm = () => {
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
         <div className="form-group">
           <label className="form-label" htmlFor="email">
-            Email / Tên đăng nhập
+            Địa chỉ Email
           </label>
           <div className="input-wrapper">
             <input
@@ -44,7 +39,7 @@ export const LoginForm = () => {
               name="email"
               type="email"
               className="form-input"
-              placeholder="nhansu@cani.vn hoặc eo@cani.vn"
+              placeholder="admin@cani.vn hoặc eo@company.com"
               value={formData.email}
               onChange={handleChange}
               autoComplete="username"
@@ -75,7 +70,7 @@ export const LoginForm = () => {
               type="button"
               className="toggle-password-btn"
               onClick={toggleShowPassword}
-              tabIndex="-1"
+              tabIndex={-1}
             >
               {showPassword ? 'Ẩn' : 'Hiện'}
             </button>
@@ -91,7 +86,7 @@ export const LoginForm = () => {
               onChange={handleChange}
               disabled={isLoading}
             />
-            Ghi nhớ đăng nhập
+            Ghi nhớ phiên đăng nhập
           </label>
           <a href="#forgot" className="forgot-link" onClick={(e) => e.preventDefault()}>
             Quên mật khẩu?
@@ -110,61 +105,50 @@ export const LoginForm = () => {
         </button>
       </form>
 
-      {/* Phần hỗ trợ test nhanh giao diện cho nhóm khi Backend chưa khởi động */}
       <div className="auth-divider">
-        <span>Hoặc Test Nhanh Màn Hình</span>
+        <span>Hoặc</span>
       </div>
 
-      <div className="demo-buttons-group" style={{ flexDirection: 'column', gap: '0.5rem' }}>
-        <button
-          type="button"
-          className="btn-demo"
-          onClick={() => handleQuickDemoLogin('WORKER')}
-          disabled={isLoading}
-          style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8', fontWeight: '600' }}
-        >
-          👷‍♂️ Vào vai Nhân Sự Sự Kiện (Worker)
-        </button>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', width: '100%' }}>
-          <button
-            type="button"
-            className="btn-demo"
-            onClick={() => handleQuickDemoLogin('EO')}
-            disabled={isLoading}
-          >
-            🏢 Ban Tổ Chức (EO)
-          </button>
-          <button
-            type="button"
-            className="btn-demo"
-            onClick={() => handleQuickDemoLogin('ADMIN')}
-            disabled={isLoading}
-          >
-            ⚙️ Quản Trị (Admin)
-          </button>
-          <button
-            type="button"
-            className="btn-demo"
-            onClick={() => handleQuickDemoLogin('CSKH')}
-            disabled={isLoading}
-            style={{ backgroundColor: '#fffbeb', borderColor: '#fef3c7', color: '#b45309' }}
-          >
-            🎧 CSKH (Support)
-          </button>
-          <button
-            type="button"
-            className="btn-demo"
-            onClick={() => handleQuickDemoLogin('FINANCE')}
-            disabled={isLoading}
-            style={{ backgroundColor: '#ecfdf5', borderColor: '#d1fae5', color: '#047857' }}
-          >
-            💰 Tài Chính (Finance)
-          </button>
-        </div>
-      </div>
+      <button
+        type="button"
+        className="btn-demo"
+        onClick={handleGoogleLogin}
+        disabled={isLoading}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.75rem',
+          backgroundColor: '#ffffff',
+          color: '#374151',
+          border: '1px solid #d1d5db',
+          fontWeight: 500,
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path
+            fill="#4285F4"
+            d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"
+          />
+          <path
+            fill="#34A853"
+            d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"
+          />
+          <path
+            fill="#EA4335"
+            d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"
+          />
+        </svg>
+        Đăng nhập với Google
+      </button>
 
       <div className="auth-footer">
-        Chưa có tài khoản sự kiện? <a href="/register">Đăng ký ngay tại đây</a>
+        Đại diện Ban Tổ Chức? <a href="/register">Đăng ký tài khoản mới</a>
       </div>
     </div>
   );

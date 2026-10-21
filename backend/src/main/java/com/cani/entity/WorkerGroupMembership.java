@@ -5,7 +5,9 @@ import com.cani.entity.enums.MembershipStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -21,7 +23,7 @@ public class WorkerGroupMembership {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "membership_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID membershipId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -33,7 +35,8 @@ public class WorkerGroupMembership {
     private Worker worker;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role_in_group", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "role_in_group")
     @Builder.Default
     private GroupRole roleInGroup = GroupRole.MEMBER;
 
@@ -41,7 +44,8 @@ public class WorkerGroupMembership {
     private String roleTitle;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status")
     @Builder.Default
     private MembershipStatus status = MembershipStatus.PENDING;
 

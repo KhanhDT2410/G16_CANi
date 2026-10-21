@@ -20,7 +20,7 @@ public class WorkerGroup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "group_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID groupId;
 
     @Column(name = "name", nullable = false)

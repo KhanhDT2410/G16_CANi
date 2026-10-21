@@ -3,7 +3,9 @@ package com.cani.entity;
 import com.cani.entity.enums.SkillTier;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,7 +22,7 @@ public class WorkerSkillPoint {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "sp_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID spId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -47,7 +49,8 @@ public class WorkerSkillPoint {
     private Integer totalSp = 0;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tier", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "tier")
     @Builder.Default
     private SkillTier tier = SkillTier.STARTER;
 

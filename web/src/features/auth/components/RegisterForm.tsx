@@ -2,11 +2,7 @@ import React from 'react';
 import { useRegister } from '../hooks/useRegister';
 import '../auth.css';
 
-/**
- * Component Form Đăng Ký (React JSX)
- * Hỗ trợ tạo tài khoản cho Worker (Nhân sự sự kiện) và Event Organizer (EO)
- */
-export const RegisterForm = () => {
+export const RegisterForm: React.FC = () => {
   const {
     formData,
     isLoading,
@@ -14,56 +10,27 @@ export const RegisterForm = () => {
     successMessage,
     showPassword,
     handleChange,
-    setRole,
     handleSubmit,
     toggleShowPassword,
-    handleQuickDemoWorkerRegister,
   } = useRegister();
-
-  const isWorker = formData.role === 'WORKER';
 
   return (
     <div className="auth-card auth-card-wide">
       <div className="auth-header">
         <div className="auth-logo-badge">C</div>
-        <h2 className="auth-title">Đăng Ký Tài Khoản</h2>
+        <h2 className="auth-title">Đăng Ký Nhà Tổ Chức</h2>
         <p className="auth-subtitle">
-          {isWorker
-            ? 'Tham gia mạng lưới nhân sự sự kiện linh hoạt CANi'
-            : 'Đăng ký tài khoản dành cho Nhà tổ chức sự kiện'}
+          Tạo tài khoản dành riêng cho Ban Tổ Chức & Doanh Nghiệp Sự Kiện
         </p>
       </div>
 
-      {/* Bộ chuyển đổi Vai trò (Role Selector) */}
-      <div className="role-selector" role="tablist">
-        <button
-          type="button"
-          className={`role-tab ${isWorker ? 'active' : ''}`}
-          onClick={() => setRole('WORKER')}
-        >
-          <span className="role-tab-icon">👷‍♂️</span>
-          <span>Nhân Sự Sự Kiện (Worker)</span>
-        </button>
-        <button
-          type="button"
-          className={`role-tab ${!isWorker ? 'active' : ''}`}
-          onClick={() => setRole('EVENT_ORGANIZER')}
-        >
-          <span className="role-tab-icon">🏢</span>
-          <span>Nhà Tổ Chức (EO)</span>
-        </button>
-      </div>
-
-      {/* Hộp quyền lợi khi chọn Worker */}
-      {isWorker && (
-        <div className="worker-perks-box">
-          <div className="worker-perks-title">
-            <span>✨ Đặc quyền Worker CANi:</span>
-          </div>
-          <div>• Khởi đầu với <strong>100 điểm tin cậy</strong> & Hạng kỹ năng <strong>STARTER</strong>.</div>
-          <div>• Nhận thông báo ca làm linh hoạt theo giờ, điểm danh mã QR và nhận lương minh bạch.</div>
+      <div className="worker-perks-box" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
+        <div className="worker-perks-title" style={{ color: '#15803d' }}>
+          <span>🏢 Quyền lợi Nhà Tổ Chức (Event Organizer):</span>
         </div>
-      )}
+        <div>• Đăng tải không giới hạn ca làm, tuyển chọn nhân sự sự kiện linh hoạt và chất lượng cao.</div>
+        <div>• Tự động khớp ca, quản lý điểm danh QR thời gian thực và thanh toán tự động, minh bạch.</div>
+      </div>
 
       {errorMessage && (
         <div className="auth-error-banner" role="alert">
@@ -78,17 +45,17 @@ export const RegisterForm = () => {
       )}
 
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        {/* Họ và tên */}
+        {/* Họ và tên người đại diện */}
         <div className="form-group">
           <label className="form-label" htmlFor="fullName">
-            Họ và tên của bạn
+            Họ và tên người đại diện
           </label>
           <input
             id="fullName"
             name="fullName"
             type="text"
             className="form-input"
-            placeholder={isWorker ? 'Nguyễn Văn A' : 'Trần Thị Giám Đốc'}
+            placeholder="Nguyễn Văn Đại Diện"
             value={formData.fullName}
             onChange={handleChange}
             autoComplete="name"
@@ -97,18 +64,18 @@ export const RegisterForm = () => {
           />
         </div>
 
-        {/* Email & Số điện thoại (2 cột) */}
+        {/* Email & Số điện thoại */}
         <div className="form-row">
           <div className="form-group">
             <label className="form-label" htmlFor="email">
-              Địa chỉ Email
+              Địa chỉ Email doanh nghiệp
             </label>
             <input
               id="email"
               name="email"
               type="email"
               className="form-input"
-              placeholder="nhansu@cani.vn"
+              placeholder="contact@company.com"
               value={formData.email}
               onChange={handleChange}
               autoComplete="email"
@@ -119,7 +86,7 @@ export const RegisterForm = () => {
 
           <div className="form-group">
             <label className="form-label" htmlFor="phone">
-              Số điện thoại
+              Số điện thoại liên hệ
             </label>
             <input
               id="phone"
@@ -136,27 +103,25 @@ export const RegisterForm = () => {
           </div>
         </div>
 
-        {/* Nếu là EO: Yêu cầu thêm Tên công ty */}
-        {!isWorker && (
-          <div className="form-group">
-            <label className="form-label" htmlFor="companyName">
-              Tên công ty / Đơn vị tổ chức
-            </label>
-            <input
-              id="companyName"
-              name="companyName"
-              type="text"
-              className="form-input"
-              placeholder="Công ty TNHH Sự Kiện Sáng Tạo Á Châu"
-              value={formData.companyName}
-              onChange={handleChange}
-              disabled={isLoading}
-              required
-            />
-          </div>
-        )}
+        {/* Tên công ty / tổ chức sự kiện */}
+        <div className="form-group">
+          <label className="form-label" htmlFor="companyName">
+            Tên công ty / Đơn vị tổ chức sự kiện
+          </label>
+          <input
+            id="companyName"
+            name="companyName"
+            type="text"
+            className="form-input"
+            placeholder="Công ty Cổ phần Truyền thông & Sự kiện Á Châu"
+            value={formData.companyName}
+            onChange={handleChange}
+            disabled={isLoading}
+            required
+          />
+        </div>
 
-        {/* Mật khẩu & Xác nhận mật khẩu (2 cột) */}
+        {/* Mật khẩu & Xác nhận mật khẩu */}
         <div className="form-row">
           <div className="form-group">
             <label className="form-label" htmlFor="password">
@@ -199,7 +164,7 @@ export const RegisterForm = () => {
                 type="button"
                 className="toggle-password-btn"
                 onClick={toggleShowPassword}
-                tabIndex="-1"
+                tabIndex={-1}
               >
                 {showPassword ? 'Ẩn' : 'Hiện'}
               </button>
@@ -207,37 +172,25 @@ export const RegisterForm = () => {
           </div>
         </div>
 
-        {/* Nút Đăng ký chính */}
         <button type="submit" className="btn-submit" disabled={isLoading}>
           {isLoading ? (
             <>
               <span className="spinner" />
-              Đang tạo tài khoản...
+              Đang tạo tài khoản Nhà Tổ Chức...
             </>
           ) : (
-            isWorker ? 'Đăng Ký Làm Nhân Sự Sự Kiện (Worker)' : 'Đăng Ký Tài Khoản Nhà Tổ Chức'
+            'Đăng Ký Tài Khoản Nhà Tổ Chức'
           )}
         </button>
       </form>
 
-      {/* Nút Test Nhanh Luồng Worker */}
-      <div className="auth-divider">
-        <span>Trải Nghiệm Nhanh</span>
-      </div>
-
-      <div className="demo-buttons-group">
-        <button
-          type="button"
-          className="btn-demo"
-          onClick={handleQuickDemoWorkerRegister}
-          disabled={isLoading}
-        >
-          🚀 Test Nhanh: Vào Thẳng Portal Worker
-        </button>
-      </div>
-
-      <div className="auth-footer">
-        Đã có tài khoản? <a href="/login">Đăng nhập tại đây</a>
+      <div className="auth-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #f3f4f6' }}>
+        <div>
+          Bạn là <strong>Nhân sự sự kiện (Worker)</strong>? Hãy tải ứng dụng <strong>CANi Mobile</strong> trên điện thoại để nhận ca làm linh hoạt.
+        </div>
+        <div style={{ marginTop: '0.5rem' }}>
+          Đã có tài khoản? <a href="/login">Đăng nhập tại đây</a>
+        </div>
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ public class Invite {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "invite_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID inviteId;
 
     @ManyToOne(fetch = FetchType.LAZY)

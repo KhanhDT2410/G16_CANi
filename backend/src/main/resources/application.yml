@@ -17,11 +17,15 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         default_schema: public
+        type:
+          preferred_enum_jdbc_type: NAMED_ENUM
 
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: true
+    baseline-on-migrate: false
+    baseline-version: 0
+    clean-disabled: true
     schemas: public
     default-schema: public
 
@@ -41,3 +45,10 @@ logging:
   level:
     com.cani: INFO
     org.springframework.security: INFO
+
+cani:
+  auth:
+    supabase:
+      url: ${SUPABASE_URL:https://db.hgnilsojrauajmyslhug.supabase.co}
+      anon-key: ${SUPABASE_ANON_KEY:}
+      service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}

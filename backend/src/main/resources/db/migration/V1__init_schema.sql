@@ -1,43 +1,74 @@
 -- =============================================================================
 -- Flyway Migration: V1__init_schema.sql
 -- Description: Khởi tạo toàn bộ lược đồ cơ sở dữ liệu cho nền tảng CANi (27 Tables)
--- Dựa trên tài liệu thiết kế: DbDesign Note.txt
+-- Kiến trúc: 23 PG ENUMs, PK chuẩn `id`, bảng số ít, liên kết GoTrue auth.users
 -- =============================================================================
 
 -- 1. Bật extension tạo UUID
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Function trigger tự động cập nhật updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
 -- =============================================================================
--- 2. TẠO CÁC BẢNG NỀN TẢNG (USER & PROFILES)
+-- 2. TẠO 23 POSTGRES ENUM TYPES
 -- =============================================================================
 
--- Table 1: users
+CREATE TYPE user_role AS ENUM ('ADMIN', 'CUSTOMER_CARE', 'EVENT_ORGANIZER', 'WORKER');
+CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED', 'SUSPENDED', 'PENDING_VERIFICATION');
+CREATE TYPE assignment_status AS ENUM ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW');
+CREATE TYPE attendance_status AS ENUM ('NOT_CHECKED_IN', 'ON_TIME', 'LATE', 'CHECKED_OUT', 'NO_SHOW');
+CREATE TYPE city AS ENUM ('TP_HCM', 'HANOI', 'DANANG');
+CREATE TYPE dispute_status AS ENUM ('SUBMITTED', 'IN_REVIEW', 'RESOLVED', 'ESCALATED');
+CREATE TYPE dispute_type AS ENUM ('PAYMENT', 'CONDUCT', 'OVERTIME', 'SCOPE', 'APPEAL');
+CREATE TYPE event_mode AS ENUM ('MATCHING', 'INVITE');
+CREATE TYPE event_status AS ENUM ('DRAFT', 'ACTIVE', 'ONGOING', 'COMPLETED', 'CANCELLED', 'SUSPENDED');
+CREATE TYPE experience_level AS ENUM ('BEGINNER', 'INTERMEDIATE', 'ADVANCED');
+CREATE TYPE group_member_role AS ENUM ('LEADER', 'MEMBER');
+CREATE TYPE group_membership_status AS ENUM ('PENDING', 'ACTIVE', 'REMOVED');
+CREATE TYPE kyc_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'SUSPICIOUS');
+CREATE TYPE lead_time AS ENUM ('STANDARD', 'SOON', 'URGENT');
+CREATE TYPE notif_type AS ENUM ('PROPOSAL', 'ASSIGNMENT', 'REMINDER', 'PAYMENT', 'DISPUTE', 'RATING', 'SYSTEM', 'GROUP');
+CREATE TYPE payment_status AS ENUM ('NOT_DECLARED', 'DECLARED_PENDING_WORKER', 'CONFIRMED_FULL', 'CONFIRMED_PARTIAL', 'DISPUTED', 'UNVERIFIED');
+CREATE TYPE proposal_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED');
+CREATE TYPE shift_status AS ENUM ('DRAFT', 'ACTIVE', 'FULLY_STAFFED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
+CREATE TYPE skill_tier AS ENUM ('STARTER', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER');
+CREATE TYPE subscription_plan AS ENUM ('INVITE_ONLY', 'MATCHING_PLUS');
+CREATE TYPE subscription_status AS ENUM ('ACTIVE', 'EXPIRED', 'CANCELLED');
+CREATE TYPE time_slot AS ENUM ('DAYTIME_WEEKDAY', 'EVENING_WEEKDAY', 'NIGHT_WEEKDAY', 'DAYTIME_WEEKEND', 'EVENING_WEEKEND');
+CREATE TYPE verification_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+
+-- =============================================================================
+-- 3. TẠO CÁC BẢNG NỀN TẢNG (USER & PROFILES)
+-- =============================================================================
+
+-- Table 1: users (id là UUID khớp trực tiếp auth.users.id)
 CREATE TABLE users (
-    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(20) UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'CSKH', 'FINANCE', 'EVENT_ORGANIZER', 'WORKER')),
-    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'LOCKED', 'SUSPENDED', 'PENDING_VERIFICATION')),
+    role user_role NOT NULL,
+    status user_status NOT NULL DEFAULT 'ACTIVE',
     full_name VARCHAR(255) NOT NULL,
     avatar_url TEXT,
-    email_verified BOOLEAN DEFAULT FALSE,
-    email_otp VARCHAR(10),
-    email_otp_expires_at TIMESTAMPTZ,
-    password_reset_otp VARCHAR(10),
-    password_reset_otp_expires_at TIMESTAMPTZ,
-    failed_login_attempts INT DEFAULT 0,
-    locked_until TIMESTAMPTZ,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     fcm_token TEXT,
     language VARCHAR(10) DEFAULT 'vi',
     last_login_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 2: skills (Kỹ năng)
 CREATE TABLE skills (
-    skill_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL UNIQUE,
     category VARCHAR(100),
     description TEXT,
@@ -47,14 +78,14 @@ CREATE TABLE skills (
 
 -- Table 3: event_organizers (Nhà tổ chức sự kiện - EO)
 CREATE TABLE event_organizers (
-    eo_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     company_name VARCHAR(255),
     tax_id VARCHAR(50),
     address TEXT,
-    verification_status VARCHAR(50) DEFAULT 'PENDING' CHECK (verification_status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    verification_status verification_status DEFAULT 'PENDING',
     verified_at TIMESTAMPTZ,
-    verified_by UUID REFERENCES users(user_id),
+    verified_by UUID REFERENCES users(id),
     rating_avg NUMERIC(3, 2) DEFAULT 0.00,
     rating_count INT DEFAULT 0,
     total_events_completed INT DEFAULT 0,
@@ -63,19 +94,20 @@ CREATE TABLE event_organizers (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_event_organizers_updated_at BEFORE UPDATE ON event_organizers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 4: workers (Người lao động / Nhân sự sự kiện)
 CREATE TABLE workers (
-    worker_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     full_name VARCHAR(255) NOT NULL,
     cccd_number VARCHAR(20),
     cccd_front_url TEXT,
     cccd_back_url TEXT,
     selfie_url TEXT,
-    kyc_status VARCHAR(50) DEFAULT 'PENDING' CHECK (kyc_status IN ('PENDING', 'APPROVED', 'REJECTED', 'SUSPICIOUS')),
+    kyc_status kyc_status DEFAULT 'PENDING',
     kyc_submitted_at TIMESTAMPTZ,
-    kyc_reviewed_by UUID REFERENCES users(user_id),
+    kyc_reviewed_by UUID REFERENCES users(id),
     reliability_score INT DEFAULT 100,
     rating_avg NUMERIC(3, 2) DEFAULT 0.00,
     rating_count INT DEFAULT 0,
@@ -91,15 +123,16 @@ CREATE TABLE workers (
     bio TEXT,
     min_wage NUMERIC(12, 2) DEFAULT 0,
     max_distance_km DOUBLE PRECISION,
-    skill_tier VARCHAR(50) DEFAULT 'STARTER' CHECK (skill_tier IN ('STARTER', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER')),
+    skill_tier skill_tier DEFAULT 'STARTER',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_workers_updated_at BEFORE UPDATE ON workers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Table 5: worker_availabilities (Lịch rảnh của worker)
-CREATE TABLE worker_availabilities (
-    availability_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
+-- Table 5: worker_availability (Lịch rảnh của worker - đổi tên số ít)
+CREATE TABLE worker_availability (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
     day_of_week INT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
@@ -107,23 +140,24 @@ CREATE TABLE worker_availabilities (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_worker_availability_updated_at BEFORE UPDATE ON worker_availability FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================================================
--- 3. TẠO CÁC BẢNG QUẢN LÝ SỰ KIỆN & CA LÀM (EVENTS & SHIFTS)
+-- 4. TẠO CÁC BẢNG QUẢN LÝ SỰ KIỆN & CA LÀM (EVENTS & SHIFTS)
 -- =============================================================================
 
 -- Table 6: events
 CREATE TABLE events (
-    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    eo_id UUID NOT NULL REFERENCES event_organizers(eo_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    eo_id UUID NOT NULL REFERENCES event_organizers(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     venue_address TEXT,
     venue_lat DOUBLE PRECISION,
     venue_lng DOUBLE PRECISION,
     event_date DATE,
-    mode VARCHAR(50) DEFAULT 'MATCHING' CHECK (mode IN ('MATCHING', 'INVITE')),
-    status VARCHAR(50) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'ACTIVE', 'ONGOING', 'COMPLETED', 'CANCELLED', 'SUSPENDED')),
+    mode event_mode DEFAULT 'MATCHING',
+    status event_status DEFAULT 'DRAFT',
     readiness_score INT DEFAULT 0,
     total_shifts INT DEFAULT 0,
     total_required_workers INT DEFAULT 0,
@@ -134,11 +168,12 @@ CREATE TABLE events (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ
 );
+CREATE TRIGGER trg_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 7: shifts
 CREATE TABLE shifts (
-    shift_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_id UUID NOT NULL REFERENCES events(event_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     job_type VARCHAR(100) NOT NULL,
     description TEXT,
     start_time TIMESTAMPTZ NOT NULL,
@@ -149,7 +184,7 @@ CREATE TABLE shifts (
     hourly_wage NUMERIC(12, 2) NOT NULL,
     allowance NUMERIC(12, 2) DEFAULT 0,
     total_cost NUMERIC(15, 2) DEFAULT 0,
-    status VARCHAR(50) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'ACTIVE', 'FULLY_STAFFED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+    status shift_status DEFAULT 'DRAFT',
     risk_score INT DEFAULT 0,
     location_address TEXT,
     location_lat DOUBLE PRECISION,
@@ -157,25 +192,26 @@ CREATE TABLE shifts (
     required_skills UUID[],
     min_reliability_score INT DEFAULT 0,
     max_distance_km DOUBLE PRECISION,
-    min_experience_level VARCHAR(50) DEFAULT 'BEGINNER' CHECK (min_experience_level IN ('BEGINNER', 'INTERMEDIATE', 'ADVANCED')),
+    min_experience_level experience_level DEFAULT 'BEGINNER',
     arrival_time TIMESTAMPTZ,
     dress_code TEXT,
     checklist JSONB,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_shifts_updated_at BEFORE UPDATE ON shifts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================================================
--- 4. TẠO CÁC BẢNG NHÓM LAO ĐỘNG (WORKER GROUPS)
+-- 5. TẠO CÁC BẢNG NHÓM LAO ĐỘNG (WORKER GROUPS)
 -- =============================================================================
 
 -- Table 8: worker_groups
 CREATE TABLE worker_groups (
-    group_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
     skill_focus VARCHAR(100),
-    leader_worker_id UUID REFERENCES workers(worker_id),
+    leader_worker_id UUID REFERENCES workers(id),
     min_size INT DEFAULT 5,
     max_size INT DEFAULT 20,
     availability JSONB,
@@ -186,47 +222,49 @@ CREATE TABLE worker_groups (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_worker_groups_updated_at BEFORE UPDATE ON worker_groups FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 9: worker_group_memberships
 CREATE TABLE worker_group_memberships (
-    membership_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    group_id UUID NOT NULL REFERENCES worker_groups(group_id) ON DELETE CASCADE,
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
-    role_in_group VARCHAR(50) DEFAULT 'MEMBER' CHECK (role_in_group IN ('LEADER', 'MEMBER')),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES worker_groups(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    role_in_group group_member_role DEFAULT 'MEMBER',
     role_title VARCHAR(100),
-    status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACTIVE', 'REMOVED')),
-    invited_by UUID REFERENCES workers(worker_id),
+    status group_membership_status DEFAULT 'PENDING',
+    invited_by UUID REFERENCES workers(id),
     joined_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (group_id, worker_id)
 );
+CREATE TRIGGER trg_worker_group_memberships_updated_at BEFORE UPDATE ON worker_group_memberships FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================================================
--- 5. MATCHING, INVITE & PHÂN CÔNG (ASSIGNMENTS)
+-- 6. MATCHING, INVITE & PHÂN CÔNG (ASSIGNMENTS)
 -- =============================================================================
 
--- Table 10: dispatch_proposals (Đề xuất matching từ hệ thống)
+-- Table 10: dispatch_proposals
 CREATE TABLE dispatch_proposals (
-    proposal_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    shift_id UUID NOT NULL REFERENCES shifts(shift_id) ON DELETE CASCADE,
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
     match_score NUMERIC(5, 2),
     score_breakdown JSONB,
-    status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED')),
+    status proposal_status DEFAULT 'PENDING',
     expires_at TIMESTAMPTZ,
     responded_at TIMESTAMPTZ,
     source VARCHAR(50) DEFAULT 'MATCHING' CHECK (source IN ('MATCHING', 'DIRECT', 'BULK')),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table 11: invites (Lời mời trực tiếp từ EO)
+-- Table 11: invites
 CREATE TABLE invites (
-    invite_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_id UUID NOT NULL REFERENCES events(event_id) ON DELETE CASCADE,
-    shift_id UUID REFERENCES shifts(shift_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    shift_id UUID REFERENCES shifts(id) ON DELETE CASCADE,
     target_type VARCHAR(50) DEFAULT 'SHIFT' CHECK (target_type IN ('SHIFT', 'GROUP')),
-    group_id UUID REFERENCES worker_groups(group_id),
+    group_id UUID REFERENCES worker_groups(id),
     code VARCHAR(50) UNIQUE NOT NULL,
     max_uses INT DEFAULT 1,
     used_count INT DEFAULT 0,
@@ -235,34 +273,35 @@ CREATE TABLE invites (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table 12: shift_assignments (Phân công worker vào ca)
+-- Table 12: shift_assignments
 CREATE TABLE shift_assignments (
-    assignment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    shift_id UUID NOT NULL REFERENCES shifts(shift_id) ON DELETE CASCADE,
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
-    proposal_id UUID REFERENCES dispatch_proposals(proposal_id),
-    invite_id UUID REFERENCES invites(invite_id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    proposal_id UUID REFERENCES dispatch_proposals(id),
+    invite_id UUID REFERENCES invites(id),
     source VARCHAR(50) DEFAULT 'MATCHING' CHECK (source IN ('MATCHING', 'DIRECT', 'BULK', 'GROUP')),
-    group_id UUID REFERENCES worker_groups(group_id),
+    group_id UUID REFERENCES worker_groups(id),
     is_group_leader BOOLEAN DEFAULT FALSE,
-    status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW')),
+    status assignment_status DEFAULT 'PENDING',
     cancellation_reason TEXT,
-    cancelled_by UUID REFERENCES users(user_id),
+    cancelled_by UUID REFERENCES users(id),
     cancelled_at TIMESTAMPTZ,
     cancellation_type VARCHAR(50),
-    replaced_by UUID REFERENCES shift_assignments(assignment_id),
+    replaced_by UUID REFERENCES shift_assignments(id),
     is_replacement BOOLEAN DEFAULT FALSE,
     eo_confirmed BOOLEAN DEFAULT FALSE,
     eo_confirmed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_shift_assignments_updated_at BEFORE UPDATE ON shift_assignments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Table 13: attendance_logs (Điểm danh QR)
+-- Table 13: attendance_logs
 CREATE TABLE attendance_logs (
-    attendance_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    assignment_id UUID UNIQUE NOT NULL REFERENCES shift_assignments(assignment_id) ON DELETE CASCADE,
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id UUID UNIQUE NOT NULL REFERENCES shift_assignments(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
     checkin_time TIMESTAMPTZ,
     checkin_qr_hash VARCHAR(255),
     checkin_lat DOUBLE PRECISION,
@@ -271,23 +310,24 @@ CREATE TABLE attendance_logs (
     checkout_qr_hash VARCHAR(255),
     hours_worked NUMERIC(5, 2) DEFAULT 0,
     is_on_time BOOLEAN DEFAULT TRUE,
-    attendance_status VARCHAR(50) DEFAULT 'NOT_CHECKED_IN' CHECK (attendance_status IN ('NOT_CHECKED_IN', 'ON_TIME', 'LATE', 'CHECKED_OUT', 'NO_SHOW')),
+    attendance_status attendance_status DEFAULT 'NOT_CHECKED_IN',
     qr_generated_at TIMESTAMPTZ,
     qr_expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_attendance_logs_updated_at BEFORE UPDATE ON attendance_logs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================================================
--- 6. ĐÁNH GIÁ, KHIẾU NẠI & ĐIỂM TIN CẬY
+-- 7. ĐÁNH GIÁ, KHIẾU NẠI & ĐIỂM TIN CẬY
 -- =============================================================================
 
--- Table 14: reviews (Đánh giá 2 chiều)
+-- Table 14: reviews
 CREATE TABLE reviews (
-    review_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    assignment_id UUID REFERENCES shift_assignments(assignment_id),
-    reviewer_id UUID NOT NULL REFERENCES users(user_id),
-    reviewee_id UUID NOT NULL REFERENCES users(user_id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id UUID REFERENCES shift_assignments(id),
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    reviewee_id UUID NOT NULL REFERENCES users(id),
     rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     criteria_work_completion INT,
     criteria_punctuality INT,
@@ -305,29 +345,30 @@ CREATE TABLE reviews (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table 15: disputes (Khiếu nại)
+-- Table 15: disputes
 CREATE TABLE disputes (
-    dispute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    assignment_id UUID REFERENCES shift_assignments(assignment_id),
-    complainant_id UUID NOT NULL REFERENCES users(user_id),
-    respondent_id UUID NOT NULL REFERENCES users(user_id),
-    type VARCHAR(50) NOT NULL CHECK (type IN ('PAYMENT', 'CONDUCT', 'OVERTIME', 'SCOPE', 'APPEAL')),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id UUID REFERENCES shift_assignments(id),
+    complainant_id UUID NOT NULL REFERENCES users(id),
+    respondent_id UUID NOT NULL REFERENCES users(id),
+    type dispute_type NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     evidence JSONB,
     messages JSONB,
-    status VARCHAR(50) DEFAULT 'SUBMITTED' CHECK (status IN ('SUBMITTED', 'IN_REVIEW', 'RESOLVED', 'ESCALATED')),
+    status dispute_status DEFAULT 'SUBMITTED',
     resolution TEXT,
-    resolved_by UUID REFERENCES users(user_id),
+    resolved_by UUID REFERENCES users(id),
     resolved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_disputes_updated_at BEFORE UPDATE ON disputes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Table 16: reliability_logs (Lịch sử điểm tin cậy)
+-- Table 16: reliability_logs
 CREATE TABLE reliability_logs (
-    log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
     change_amount INT NOT NULL,
     reason TEXT NOT NULL,
     reference_type VARCHAR(50),
@@ -338,15 +379,15 @@ CREATE TABLE reliability_logs (
 );
 
 -- =============================================================================
--- 7. THANH TOÁN & SUBSCRIPTION
+-- 8. THANH TOÁN & SUBSCRIPTION
 -- =============================================================================
 
--- Table 17: subscriptions (Gói đăng ký của EO)
+-- Table 17: subscriptions
 CREATE TABLE subscriptions (
-    subscription_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organizer_id UUID NOT NULL REFERENCES event_organizers(eo_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organizer_id UUID NOT NULL REFERENCES event_organizers(id) ON DELETE CASCADE,
     plan_name VARCHAR(100) NOT NULL,
-    plan_type VARCHAR(50) NOT NULL CHECK (plan_type IN ('INVITE_ONLY', 'MATCHING_PLUS')),
+    plan_type subscription_plan NOT NULL,
     duration_days INT NOT NULL,
     price NUMERIC(15, 2) NOT NULL,
     features JSONB,
@@ -355,29 +396,30 @@ CREATE TABLE subscriptions (
     max_workers INT,
     events_used INT DEFAULT 0,
     shifts_used INT DEFAULT 0,
-    status VARCHAR(50) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'EXPIRED', 'CANCELLED')),
+    status subscription_status DEFAULT 'ACTIVE',
     starts_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_subscriptions_updated_at BEFORE UPDATE ON subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Thêm khóa ngoại cho subscription_id trong bảng event_organizers
+-- Khóa ngoại từ event_organizers sang subscriptions
 ALTER TABLE event_organizers 
     ADD CONSTRAINT fk_eo_subscription 
-    FOREIGN KEY (subscription_id) REFERENCES subscriptions(subscription_id) ON DELETE SET NULL;
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE SET NULL;
 
--- Table 18: payments (Ghi nhận trạng thái thanh toán)
+-- Table 18: payments
 CREATE TABLE payments (
-    payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_id UUID REFERENCES events(event_id),
-    shift_id UUID REFERENCES shifts(shift_id),
-    assignment_id UUID REFERENCES shift_assignments(assignment_id),
-    eo_id UUID NOT NULL REFERENCES event_organizers(eo_id),
-    worker_id UUID NOT NULL REFERENCES workers(worker_id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID REFERENCES events(id),
+    shift_id UUID REFERENCES shifts(id),
+    assignment_id UUID REFERENCES shift_assignments(id),
+    eo_id UUID NOT NULL REFERENCES event_organizers(id),
+    worker_id UUID NOT NULL REFERENCES workers(id),
     agreed_amount NUMERIC(15, 2) NOT NULL,
     declared_amount NUMERIC(15, 2),
-    status VARCHAR(50) DEFAULT 'NOT_DECLARED' CHECK (status IN ('NOT_DECLARED', 'DECLARED_PENDING_WORKER', 'CONFIRMED_FULL', 'CONFIRMED_PARTIAL', 'DISPUTED', 'UNVERIFIED')),
+    status payment_status DEFAULT 'NOT_DECLARED',
     payment_method VARCHAR(50),
     declared_at TIMESTAMPTZ,
     external_ref VARCHAR(255),
@@ -388,73 +430,76 @@ CREATE TABLE payments (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 19: payment_logs
 CREATE TABLE payment_logs (
-    log_id BIGSERIAL PRIMARY KEY,
-    payment_id UUID NOT NULL REFERENCES payments(payment_id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
     event VARCHAR(100) NOT NULL,
     payload JSONB,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =============================================================================
--- 8. BẢNG LƯƠNG & GỢI Ý (WAGE MATRIX & RECOMMENDATION)
+-- 9. BẢNG LƯƠNG & GỢI Ý (WAGE MATRIX & RECOMMENDATION)
 -- =============================================================================
 
 -- Table 20: wage_matrix
 CREATE TABLE wage_matrix (
-    matrix_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    city VARCHAR(50) NOT NULL CHECK (city IN ('TP.HCM', 'HANOI', 'DANANG')),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    city city NOT NULL,
     job_type VARCHAR(100) NOT NULL,
-    time_slot VARCHAR(50) NOT NULL CHECK (time_slot IN ('DAYTIME_WEEKDAY', 'EVENING_WEEKDAY', 'NIGHT_WEEKDAY', 'DAYTIME_WEEKEND', 'EVENING_WEEKEND')),
-    lead_time VARCHAR(50) NOT NULL CHECK (lead_time IN ('STANDARD', 'SOON', 'URGENT')),
+    time_slot time_slot NOT NULL,
+    lead_time lead_time NOT NULL,
     wage_per_hour NUMERIC(12, 2) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TRIGGER trg_wage_matrix_updated_at BEFORE UPDATE ON wage_matrix FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 21: wage_recommendations
 CREATE TABLE wage_recommendations (
-    recommendation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    city VARCHAR(50),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    city city,
     job_type VARCHAR(100),
-    time_slot VARCHAR(50),
-    lead_time VARCHAR(50),
+    time_slot time_slot,
+    lead_time lead_time,
     suggested_wage NUMERIC(12, 2) NOT NULL,
-    matched_row_id UUID REFERENCES wage_matrix(matrix_id),
+    matched_row_id UUID REFERENCES wage_matrix(id),
     fallback_level INT DEFAULT 0,
-    shift_id UUID REFERENCES shifts(shift_id),
+    shift_id UUID REFERENCES shifts(id),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =============================================================================
--- 9. QUẢN LÝ QUAN HỆ & HỖ TRỢ (SUPPORT, NOTIFICATION, AUDIT)
+-- 10. QUẢN LÝ QUAN HỆ & HỖ TRỢ (SUPPORT, NOTIFICATION, AUDIT)
 -- =============================================================================
 
 -- Table 22: worker_skill_points
 CREATE TABLE worker_skill_points (
-    sp_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
     job_type VARCHAR(100) NOT NULL,
     sp_verify INT DEFAULT 0,
     sp_experience INT DEFAULT 0,
     sp_rating INT DEFAULT 0,
     total_sp INT DEFAULT 0,
-    tier VARCHAR(50) DEFAULT 'STARTER' CHECK (tier IN ('STARTER', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER')),
+    tier skill_tier DEFAULT 'STARTER',
     total_shifts_completed INT DEFAULT 0,
     total_shifts_cancelled INT DEFAULT 0,
     avg_rating NUMERIC(3, 2) DEFAULT 0.00,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (worker_id, job_type)
 );
+CREATE TRIGGER trg_worker_skill_points_updated_at BEFORE UPDATE ON worker_skill_points FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Table 23: eo_workers (My Team của EO)
+-- Table 23: eo_workers
 CREATE TABLE eo_workers (
-    eo_worker_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    eo_id UUID NOT NULL REFERENCES event_organizers(eo_id) ON DELETE CASCADE,
-    worker_id UUID NOT NULL REFERENCES workers(worker_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    eo_id UUID NOT NULL REFERENCES event_organizers(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
     total_shifts_together INT DEFAULT 0,
     completion_rate NUMERIC(5, 2) DEFAULT 0.00,
     avg_rating_given NUMERIC(3, 2) DEFAULT 0.00,
@@ -466,14 +511,15 @@ CREATE TABLE eo_workers (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (eo_id, worker_id)
 );
+CREATE TRIGGER trg_eo_workers_updated_at BEFORE UPDATE ON eo_workers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 24: notifications
 CREATE TABLE notifications (
-    notification_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     body TEXT NOT NULL,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('PROPOSAL', 'ASSIGNMENT', 'REMINDER', 'PAYMENT', 'DISPUTE', 'RATING', 'SYSTEM', 'GROUP')),
+    type notif_type NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     reference_type VARCHAR(50),
     reference_id UUID,
@@ -481,30 +527,31 @@ CREATE TABLE notifications (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table 25: block_lists
-CREATE TABLE block_lists (
-    block_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    blocker_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    blocked_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+-- Table 25: block_list (đổi tên số ít)
+CREATE TABLE block_list (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     reason TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (blocker_id, blocked_id)
 );
 
--- Table 26: system_configs
-CREATE TABLE system_configs (
-    config_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Table 26: system_config (đổi tên số ít)
+CREATE TABLE system_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     key VARCHAR(100) NOT NULL UNIQUE,
     value TEXT NOT NULL,
     description TEXT,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID REFERENCES users(user_id)
+    updated_by UUID REFERENCES users(id)
 );
+CREATE TRIGGER trg_system_config_updated_at BEFORE UPDATE ON system_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Table 27: audit_logs
 CREATE TABLE audit_logs (
-    audit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(user_id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
     action VARCHAR(100) NOT NULL,
     entity_type VARCHAR(100) NOT NULL,
     entity_id UUID,
@@ -516,7 +563,7 @@ CREATE TABLE audit_logs (
 );
 
 -- =============================================================================
--- 10. CHỈ MỤC TỐI ƯU HIỆU NĂNG (INDEXES)
+-- 11. CHỈ MỤC TỐI ƯU HIỆU NĂNG (INDEXES)
 -- =============================================================================
 CREATE INDEX idx_users_role_status ON users(role, status);
 CREATE INDEX idx_events_eo_status ON events(eo_id, status);

@@ -5,7 +5,9 @@ import com.cani.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -20,8 +22,7 @@ import java.util.UUID;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "user_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID userId;
 
     @Column(name = "email", nullable = false, unique = true)
@@ -30,14 +31,13 @@ public class User {
     @Column(name = "phone", unique = true)
     private String phone;
 
-    @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
-
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "role", nullable = false)
     private UserRole role;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "status", nullable = false)
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
@@ -48,28 +48,9 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
-    @Column(name = "email_verified")
+    @Column(name = "email_verified", nullable = false)
     @Builder.Default
     private Boolean emailVerified = false;
-
-    @Column(name = "email_otp", length = 10)
-    private String emailOtp;
-
-    @Column(name = "email_otp_expires_at")
-    private Instant emailOtpExpiresAt;
-
-    @Column(name = "password_reset_otp", length = 10)
-    private String passwordResetOtp;
-
-    @Column(name = "password_reset_otp_expires_at")
-    private Instant passwordResetOtpExpiresAt;
-
-    @Column(name = "failed_login_attempts")
-    @Builder.Default
-    private Integer failedLoginAttempts = 0;
-
-    @Column(name = "locked_until")
-    private Instant lockedUntil;
 
     @Column(name = "fcm_token")
     private String fcmToken;

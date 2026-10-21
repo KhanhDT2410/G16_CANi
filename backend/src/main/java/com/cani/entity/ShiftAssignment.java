@@ -5,7 +5,9 @@ import com.cani.entity.enums.AssignmentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -21,7 +23,7 @@ public class ShiftAssignment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "assignment_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID assignmentId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -51,7 +53,8 @@ public class ShiftAssignment {
     private Boolean isGroupLeader = false;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status")
     @Builder.Default
     private AssignmentStatus status = AssignmentStatus.PENDING;
 

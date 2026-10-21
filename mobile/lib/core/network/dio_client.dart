@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/constants/api_constants.dart';
+import 'package:cani/core/network/auth_interceptor.dart';
 
 /// Global Dio instance provider.
 ///
@@ -20,14 +21,14 @@ final dioProvider = Provider<Dio>((ref) {
     ),
   );
 
-  dio.interceptors.add(
+  dio.interceptors.addAll([
+    AuthInterceptor(),
     InterceptorsWrapper(
       onError: (error, handler) {
-        // TODO: Add structured error logging when logger is set up
         handler.next(error);
       },
     ),
-  );
+  ]);
 
   ref.onDispose(() => dio.close());
 

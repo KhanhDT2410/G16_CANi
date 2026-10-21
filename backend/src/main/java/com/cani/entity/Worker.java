@@ -5,7 +5,9 @@ import com.cani.entity.enums.SkillTier;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -22,7 +24,7 @@ public class Worker {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "worker_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID workerId;
 
     @OneToOne(fetch = FetchType.LAZY)
@@ -45,6 +47,7 @@ public class Worker {
     private String selfieUrl;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "kyc_status")
     @Builder.Default
     private KycStatus kycStatus = KycStatus.PENDING;
@@ -110,6 +113,7 @@ public class Worker {
     private Double maxDistanceKm;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "skill_tier")
     @Builder.Default
     private SkillTier skillTier = SkillTier.STARTER;

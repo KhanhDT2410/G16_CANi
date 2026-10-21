@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "block_lists")
+@Table(name = "block_list")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -18,7 +18,7 @@ public class BlockList {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "block_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID blockId;
 
     @ManyToOne(fetch = FetchType.LAZY)

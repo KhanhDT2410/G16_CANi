@@ -22,6 +22,7 @@ web/dist-ssr/
 web/.env
 web/.env.local
 web/.env.*.local
+*.tsbuildinfo
 
 # Flutter / Dart - Mobile
 mobile/.dart_tool/
@@ -35,12 +36,18 @@ mobile/android/.gradle/
 mobile/android/app/build/
 mobile/ios/Pods/
 mobile/ios/.symlinks/
+mobile/ios/Flutter/ephemeral/
 mobile/macos/Pods/
 mobile/macos/.symlinks/
+mobile/macos/Flutter/ephemeral/
+mobile/windows/flutter/ephemeral/
+mobile/linux/flutter/ephemeral/
 
-# IDE
+# IDE & AI Tooling
 .idea/
 .vscode/
+.agents/
+.claude/
 *.iml
 *.iws
 .project
@@ -82,3 +89,8 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Local Development Tooling
+tools/
+
+CLAUDE.md

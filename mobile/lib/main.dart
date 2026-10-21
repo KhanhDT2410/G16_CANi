@@ -1,26 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:cani/screens/home_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
-  runApp(const CaniApp());
-}
+import 'package:cani/app/app.dart';
+import 'package:cani/core/constants/api_constants.dart';
 
-class CaniApp extends StatelessWidget {
-  const CaniApp({super.key});
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CANi',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3B82F6),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
-    );
-  }
+  await Supabase.initialize(
+    url: ApiConstants.supabaseUrl,
+    publishableKey: ApiConstants.supabaseAnonKey,
+  );
+
+  runApp(
+    const ProviderScope(
+      child: CaniApp(),
+    ),
+  );
 }

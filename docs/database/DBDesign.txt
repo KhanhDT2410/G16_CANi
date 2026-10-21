@@ -1,0 +1,624 @@
+-- ============================================================
+-- CANI SCHEMA - PHIÊN BẢN 2.0
+-- 27 bảng - Tối ưu cho MVP
+-- ============================================================
+-- Thay đổi chính so với phiên bản cũ:
+-- - Loại bỏ: wallet, escrow, withdrawal_requests
+-- - Loại bỏ: penalty_appeals (gộp vào disputes)
+-- - Loại bỏ: TeamOwner entity (Team Owner = Worker LEADER)
+-- - Loại bỏ: Cancellation, Replacement entity (gộp vào shift_assignments)
+-- - Loại bỏ: Admin entity (role trong users)
+-- - Thêm: subscriptions, wage_matrix, worker_groups, eo_workers, v.v.
+-- ============================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ENUMS
+CREATE TYPE user_role AS ENUM ('ADMIN', 'CSKH', 'EVENT_ORGANIZER', 'WORKER');
+CREATE TYPE user_status AS ENUM ('ACTIVE', 'LOCKED', 'SUSPENDED', 'PENDING_VERIFICATION');
+CREATE TYPE verification_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+CREATE TYPE kyc_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'SUSPICIOUS');
+CREATE TYPE event_mode AS ENUM ('MATCHING', 'INVITE');
+CREATE TYPE event_status AS ENUM ('DRAFT', 'ACTIVE', 'ONGOING', 'COMPLETED', 'CANCELLED', 'SUSPENDED');
+CREATE TYPE shift_status AS ENUM ('DRAFT', 'ACTIVE', 'FULLY_STAFFED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
+CREATE TYPE experience_level AS ENUM ('BEGINNER', 'INTERMEDIATE', 'ADVANCED');
+CREATE TYPE proposal_status AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED');
+CREATE TYPE assignment_status AS ENUM ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW');
+CREATE TYPE attendance_status AS ENUM ('NOT_CHECKED_IN', 'ON_TIME', 'LATE', 'CHECKED_OUT', 'NO_SHOW');
+CREATE TYPE dispute_type AS ENUM ('PAYMENT', 'CONDUCT', 'OVERTIME', 'SCOPE', 'APPEAL');
+CREATE TYPE dispute_status AS ENUM ('SUBMITTED', 'IN_REVIEW', 'RESOLVED', 'ESCALATED');
+CREATE TYPE notif_type AS ENUM ('PROPOSAL', 'ASSIGNMENT', 'REMINDER', 'PAYMENT', 'DISPUTE', 'RATING', 'SYSTEM', 'GROUP');
+CREATE TYPE payment_status AS ENUM ('NOT_DECLARED', 'DECLARED_PENDING_WORKER', 'CONFIRMED_FULL', 'CONFIRMED_PARTIAL', 'DISPUTED', 'UNVERIFIED');
+CREATE TYPE group_member_role AS ENUM ('LEADER', 'MEMBER');
+CREATE TYPE group_membership_status AS ENUM ('PENDING', 'ACTIVE', 'REMOVED');
+CREATE TYPE subscription_status AS ENUM ('ACTIVE', 'EXPIRED', 'CANCELLED');
+CREATE TYPE subscription_plan AS ENUM ('INVITE_ONLY', 'MATCHING_PLUS');
+CREATE TYPE time_slot AS ENUM ('DAYTIME_WEEKDAY', 'EVENING_WEEKDAY', 'NIGHT_WEEKDAY', 'DAYTIME_WEEKEND', 'EVENING_WEEKEND');
+CREATE TYPE lead_time AS ENUM ('STANDARD', 'SOON', 'URGENT');
+CREATE TYPE city AS ENUM ('TP.HCM', 'HANOI', 'DANANG');
+CREATE TYPE skill_tier AS ENUM ('STARTER', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND', 'MASTER');
+
+-- 1. USERS
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone VARCHAR(20) UNIQUE,
+    password_hash VARCHAR(255),
+    role user_role NOT NULL,
+    status user_status DEFAULT 'PENDING_VERIFICATION',
+    full_name VARCHAR(255),
+    avatar_url TEXT,
+    email_verified BOOLEAN DEFAULT FALSE,
+    email_otp VARCHAR(10),
+    email_otp_expires_at TIMESTAMPTZ,
+    password_reset_otp VARCHAR(10),
+    password_reset_otp_expires_at TIMESTAMPTZ,
+    failed_login_attempts INT DEFAULT 0,
+    locked_until TIMESTAMPTZ,
+    fcm_token TEXT,
+    language VARCHAR(5) DEFAULT 'vi',
+    last_login_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_status ON users(status);
+
+-- 2. EVENT_ORGANIZERS
+CREATE TABLE event_organizers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_name VARCHAR(255) NOT NULL,
+    tax_id VARCHAR(20),
+    address TEXT,
+    verification_status verification_status DEFAULT 'PENDING',
+    verified_at TIMESTAMPTZ,
+    verified_by UUID REFERENCES users(id),
+    rating_avg DECIMAL(3,2) DEFAULT 0,
+    rating_count INT DEFAULT 0,
+    total_events_completed INT DEFAULT 0,
+    subscription_id UUID,
+    subscription_expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_event_organizers_user ON event_organizers(user_id);
+CREATE INDEX idx_event_organizers_status ON event_organizers(verification_status);
+
+-- 3. WORKERS
+CREATE TABLE workers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    full_name VARCHAR(255) NOT NULL,
+    cccd_number VARCHAR(12),
+    cccd_front_url TEXT,
+    cccd_back_url TEXT,
+    selfie_url TEXT,
+    kyc_status kyc_status DEFAULT 'PENDING',
+    kyc_submitted_at TIMESTAMPTZ,
+    kyc_reviewed_by UUID REFERENCES users(id),
+    reliability_score INT DEFAULT 50 CHECK (reliability_score >= 0 AND reliability_score <= 100),
+    rating_avg DECIMAL(3,2) DEFAULT 0,
+    rating_count INT DEFAULT 0,
+    total_shifts_completed INT DEFAULT 0,
+    total_cancellations INT DEFAULT 0,
+    total_noshows INT DEFAULT 0,
+    is_online BOOLEAN DEFAULT FALSE,
+    base_address TEXT,
+    base_lat DECIMAL(10,8),
+    base_lng DECIMAL(11,8),
+    skills UUID[] DEFAULT '{}',
+    years_experience INT DEFAULT 0,
+    bio TEXT,
+    min_wage BIGINT DEFAULT 0,
+    max_distance_km DECIMAL(5,2) DEFAULT 30,
+    skill_tier skill_tier DEFAULT 'STARTER',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_workers_user ON workers(user_id);
+CREATE INDEX idx_workers_reliability ON workers(reliability_score);
+CREATE INDEX idx_workers_online ON workers(is_online);
+CREATE INDEX idx_workers_skill_tier ON workers(skill_tier);
+
+-- 4. SKILLS
+CREATE TABLE skills (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    category VARCHAR(100),
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. WORKER_AVAILABILITY
+CREATE TABLE worker_availability (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    day_of_week INT CHECK (day_of_week >= 0 AND day_of_week <= 6),
+    start_time TIME,
+    end_time TIME,
+    is_available BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(worker_id, day_of_week)
+);
+CREATE INDEX idx_worker_availability_worker ON worker_availability(worker_id);
+
+-- 6. EVENTS
+CREATE TABLE events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organizer_id UUID NOT NULL REFERENCES event_organizers(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    venue_address TEXT NOT NULL,
+    venue_lat DECIMAL(10,8),
+    venue_lng DECIMAL(11,8),
+    event_date DATE NOT NULL,
+    mode event_mode NOT NULL,
+    status event_status DEFAULT 'DRAFT',
+    readiness_score INT DEFAULT 0,
+    total_shifts INT DEFAULT 0,
+    total_required_workers INT DEFAULT 0,
+    total_confirmed_workers INT DEFAULT 0,
+    total_estimated_cost BIGINT,
+    total_paid BIGINT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ
+);
+CREATE INDEX idx_events_organizer ON events(organizer_id);
+CREATE INDEX idx_events_status ON events(status);
+CREATE INDEX idx_events_date ON events(event_date);
+CREATE INDEX idx_events_mode ON events(mode);
+
+-- 7. SHIFTS
+CREATE TABLE shifts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    job_type VARCHAR(100) NOT NULL,
+    description TEXT,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    required_workers INT NOT NULL DEFAULT 1,
+    confirmed_workers INT DEFAULT 0,
+    remaining_workers INT DEFAULT 0,
+    hourly_wage BIGINT NOT NULL,
+    allowance BIGINT DEFAULT 0,
+    total_cost BIGINT,
+    status shift_status DEFAULT 'DRAFT',
+    risk_score DECIMAL(5,2) DEFAULT 0,
+    location_address TEXT,
+    location_lat DECIMAL(10,8),
+    location_lng DECIMAL(11,8),
+    required_skills UUID[] DEFAULT '{}',
+    min_reliability_score INT DEFAULT 0,
+    max_distance_km DECIMAL(5,2) DEFAULT 30,
+    min_experience_level experience_level,
+    arrival_time TIME,
+    dress_code TEXT,
+    checklist JSONB DEFAULT '[]',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_shifts_event ON shifts(event_id);
+CREATE INDEX idx_shifts_status ON shifts(status);
+CREATE INDEX idx_shifts_start_time ON shifts(start_time);
+CREATE INDEX idx_shifts_job_type ON shifts(job_type);
+
+-- 8. INVITES
+CREATE TABLE invites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
+    target_type VARCHAR(20) DEFAULT 'SHIFT' CHECK (target_type IN ('SHIFT', 'GROUP')),
+    group_id UUID,
+    code VARCHAR(10) NOT NULL,
+    max_uses INT DEFAULT 1,
+    used_count INT DEFAULT 0,
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_invites_event ON invites(event_id);
+CREATE INDEX idx_invites_shift ON invites(shift_id);
+CREATE INDEX idx_invites_code ON invites(code);
+CREATE INDEX idx_invites_group ON invites(group_id);
+CREATE UNIQUE INDEX idx_invites_code_active ON invites(code) WHERE is_active = TRUE;
+
+-- 9. DISPATCH_PROPOSALS
+CREATE TABLE dispatch_proposals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    match_score DECIMAL(5,2),
+    score_breakdown JSONB,
+    status proposal_status DEFAULT 'PENDING',
+    expires_at TIMESTAMPTZ NOT NULL,
+    responded_at TIMESTAMPTZ,
+    source VARCHAR(20) DEFAULT 'MATCHING' CHECK (source IN ('MATCHING', 'DIRECT', 'BULK')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_dispatch_proposals_shift ON dispatch_proposals(shift_id);
+CREATE INDEX idx_dispatch_proposals_worker ON dispatch_proposals(worker_id);
+CREATE INDEX idx_dispatch_proposals_status ON dispatch_proposals(status);
+CREATE INDEX idx_dispatch_proposals_expires ON dispatch_proposals(expires_at) WHERE status = 'PENDING';
+CREATE UNIQUE INDEX idx_dispatch_proposals_unique ON dispatch_proposals(shift_id, worker_id);
+
+-- 10. SHIFT_ASSIGNMENTS
+CREATE TABLE shift_assignments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    proposal_id UUID REFERENCES dispatch_proposals(id) ON DELETE SET NULL,
+    invite_id UUID REFERENCES invites(id) ON DELETE SET NULL,
+    source VARCHAR(20) CHECK (source IN ('MATCHING', 'DIRECT', 'BULK', 'GROUP')),
+    group_id UUID,
+    is_group_leader BOOLEAN DEFAULT FALSE,
+    status assignment_status DEFAULT 'CONFIRMED',
+    cancellation_reason TEXT,
+    cancelled_by UUID REFERENCES users(id),
+    cancelled_at TIMESTAMPTZ,
+    cancellation_type VARCHAR(20),
+    replaced_by UUID REFERENCES shift_assignments(id),
+    is_replacement BOOLEAN DEFAULT FALSE,
+    eo_confirmed BOOLEAN DEFAULT FALSE,
+    eo_confirmed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_shift_assignments_shift ON shift_assignments(shift_id);
+CREATE INDEX idx_shift_assignments_worker ON shift_assignments(worker_id);
+CREATE INDEX idx_shift_assignments_status ON shift_assignments(status);
+CREATE INDEX idx_shift_assignments_group ON shift_assignments(group_id);
+CREATE UNIQUE INDEX idx_shift_assignments_unique ON shift_assignments(shift_id, worker_id);
+
+-- 11. ATTENDANCE_LOGS
+CREATE TABLE attendance_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id UUID UNIQUE NOT NULL REFERENCES shift_assignments(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    checkin_time TIMESTAMPTZ,
+    checkin_qr_hash VARCHAR(64),
+    checkin_lat DECIMAL(10,8),
+    checkin_lng DECIMAL(11,8),
+    checkout_time TIMESTAMPTZ,
+    checkout_qr_hash VARCHAR(64),
+    hours_worked DECIMAL(5,2),
+    is_on_time BOOLEAN,
+    attendance_status attendance_status DEFAULT 'NOT_CHECKED_IN',
+    qr_generated_at TIMESTAMPTZ,
+    qr_expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_attendance_logs_worker ON attendance_logs(worker_id);
+CREATE INDEX idx_attendance_logs_status ON attendance_logs(attendance_status);
+
+-- 12. DISPUTES
+CREATE TABLE disputes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id UUID REFERENCES shift_assignments(id) ON DELETE SET NULL,
+    complainant_id UUID NOT NULL REFERENCES users(id),
+    respondent_id UUID NOT NULL REFERENCES users(id),
+    type dispute_type NOT NULL,
+    title VARCHAR(255),
+    description TEXT NOT NULL,
+    evidence JSONB DEFAULT '[]',
+    messages JSONB DEFAULT '[]',
+    status dispute_status DEFAULT 'SUBMITTED',
+    resolution TEXT,
+    resolved_by UUID REFERENCES users(id),
+    resolved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_disputes_complainant ON disputes(complainant_id);
+CREATE INDEX idx_disputes_respondent ON disputes(respondent_id);
+CREATE INDEX idx_disputes_status ON disputes(status);
+CREATE INDEX idx_disputes_type ON disputes(type);
+CREATE INDEX idx_disputes_assignment ON disputes(assignment_id);
+
+-- 13. REVIEWS
+CREATE TABLE reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    assignment_id UUID NOT NULL REFERENCES shift_assignments(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL REFERENCES users(id),
+    reviewee_id UUID NOT NULL REFERENCES users(id),
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    criteria_work_completion DECIMAL(3,2),
+    criteria_punctuality DECIMAL(3,2),
+    criteria_professionalism DECIMAL(3,2),
+    criteria_venue_rules DECIMAL(3,2),
+    criteria_teamwork DECIMAL(3,2),
+    criteria_shift_clarity DECIMAL(3,2),
+    criteria_timing DECIMAL(3,2),
+    criteria_work_environment DECIMAL(3,2),
+    criteria_support DECIMAL(3,2),
+    criteria_payment_timing DECIMAL(3,2),
+    comment TEXT,
+    tags TEXT[] DEFAULT '{}',
+    is_auto_closed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(assignment_id, reviewer_id)
+);
+CREATE INDEX idx_reviews_reviewee ON reviews(reviewee_id);
+CREATE INDEX idx_reviews_assignment ON reviews(assignment_id);
+CREATE INDEX idx_reviews_rating ON reviews(rating);
+
+-- 14. RELIABILITY_LOGS
+CREATE TABLE reliability_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    change_amount INT NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    reference_type VARCHAR(50),
+    reference_id UUID,
+    score_before INT,
+    score_after INT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_reliability_logs_worker ON reliability_logs(worker_id);
+CREATE INDEX idx_reliability_logs_created ON reliability_logs(created_at);
+
+-- 15. PAYMENTS
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+    shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
+    assignment_id UUID REFERENCES shift_assignments(id) ON DELETE SET NULL,
+    eo_id UUID REFERENCES event_organizers(id),
+    worker_id UUID REFERENCES workers(id),
+    agreed_amount BIGINT NOT NULL,
+    declared_amount BIGINT,
+    status payment_status DEFAULT 'NOT_DECLARED',
+    payment_method VARCHAR(50),
+    declared_at TIMESTAMPTZ,
+    external_ref VARCHAR(100),
+    payment_proof_url TEXT,
+    worker_confirmed_at TIMESTAMPTZ,
+    worker_confirm_status VARCHAR(20) CHECK (worker_confirm_status IN ('CONFIRMED_FULL', 'CONFIRMED_PARTIAL', 'REJECTED')),
+    worker_comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_payments_event ON payments(event_id);
+CREATE INDEX idx_payments_assignment ON payments(assignment_id);
+CREATE INDEX idx_payments_worker ON payments(worker_id);
+CREATE INDEX idx_payments_eo ON payments(eo_id);
+CREATE INDEX idx_payments_status ON payments(status);
+
+-- 16. PAYMENT_LOGS
+CREATE TABLE payment_logs (
+    id BIGSERIAL PRIMARY KEY,
+    payment_id UUID REFERENCES payments(id) ON DELETE CASCADE,
+    event TEXT,
+    payload JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_payment_logs_payment ON payment_logs(payment_id);
+CREATE INDEX idx_payment_logs_event ON payment_logs(event);
+
+-- 17. SUBSCRIPTIONS
+CREATE TABLE subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organizer_id UUID NOT NULL REFERENCES event_organizers(id),
+    plan_name VARCHAR(100),
+    plan_type subscription_plan DEFAULT 'INVITE_ONLY',
+    duration_days INT,
+    price BIGINT NOT NULL,
+    features JSONB DEFAULT '[]',
+    max_events INT,
+    max_shifts INT,
+    max_workers INT,
+    events_used INT DEFAULT 0,
+    shifts_used INT DEFAULT 0,
+    status subscription_status DEFAULT 'ACTIVE',
+    starts_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_subscriptions_organizer ON subscriptions(organizer_id);
+CREATE INDEX idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX idx_subscriptions_expires ON subscriptions(expires_at);
+
+-- 18. WORKER_GROUPS
+CREATE TABLE worker_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    skill_focus VARCHAR(100),
+    leader_worker_id UUID NOT NULL REFERENCES workers(id),
+    min_size INT DEFAULT 5,
+    max_size INT DEFAULT 20,
+    availability JSONB DEFAULT '{}',
+    member_count INT DEFAULT 0,
+    avg_rating DECIMAL(3,2) DEFAULT 0,
+    reliability_score INT DEFAULT 50,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(name, leader_worker_id)
+);
+CREATE INDEX idx_worker_groups_leader ON worker_groups(leader_worker_id);
+CREATE INDEX idx_worker_groups_active ON worker_groups(is_active);
+
+-- 19. WORKER_GROUP_MEMBERSHIPS
+CREATE TABLE worker_group_memberships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES worker_groups(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    role_in_group group_member_role DEFAULT 'MEMBER',
+    role_title VARCHAR(50),
+    status group_membership_status DEFAULT 'PENDING',
+    invited_by UUID REFERENCES workers(id),
+    joined_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(group_id, worker_id)
+);
+CREATE INDEX idx_worker_group_memberships_group ON worker_group_memberships(group_id);
+CREATE INDEX idx_worker_group_memberships_worker ON worker_group_memberships(worker_id);
+CREATE INDEX idx_worker_group_memberships_status ON worker_group_memberships(status) WHERE status = 'ACTIVE';
+
+-- 20. WAGE_MATRIX
+CREATE TABLE wage_matrix (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    city city NOT NULL,
+    job_type VARCHAR(100) NOT NULL,
+    time_slot time_slot NOT NULL,
+    lead_time lead_time NOT NULL,
+    wage_per_hour BIGINT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(city, job_type, time_slot, lead_time)
+);
+CREATE INDEX idx_wage_matrix_city ON wage_matrix(city);
+CREATE INDEX idx_wage_matrix_job_type ON wage_matrix(job_type);
+CREATE INDEX idx_wage_matrix_active ON wage_matrix(is_active);
+
+-- 21. WAGE_RECOMMENDATIONS
+CREATE TABLE wage_recommendations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    city city,
+    job_type VARCHAR(100),
+    time_slot time_slot,
+    lead_time lead_time,
+    suggested_wage BIGINT,
+    matched_row_id UUID REFERENCES wage_matrix(id),
+    fallback_level INT DEFAULT 0 CHECK (fallback_level >= 0 AND fallback_level <= 3),
+    shift_id UUID REFERENCES shifts(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_wage_recommendations_shift ON wage_recommendations(shift_id);
+CREATE INDEX idx_wage_recommendations_fallback ON wage_recommendations(fallback_level) WHERE fallback_level > 0;
+
+-- 22. WORKER_SKILL_POINTS
+CREATE TABLE worker_skill_points (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    job_type VARCHAR(100),
+    sp_verify INT DEFAULT 0,
+    sp_experience INT DEFAULT 0,
+    sp_rating INT DEFAULT 0,
+    total_sp INT DEFAULT 0,
+    tier skill_tier DEFAULT 'STARTER',
+    total_shifts_completed INT DEFAULT 0,
+    total_shifts_cancelled INT DEFAULT 0,
+    avg_rating DECIMAL(3,2) DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(worker_id, job_type)
+);
+CREATE INDEX idx_worker_skill_points_worker ON worker_skill_points(worker_id);
+CREATE INDEX idx_worker_skill_points_tier ON worker_skill_points(tier);
+CREATE INDEX idx_worker_skill_points_total ON worker_skill_points(total_sp);
+
+-- 23. EO_WORKERS
+CREATE TABLE eo_workers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    eo_id UUID NOT NULL REFERENCES event_organizers(id) ON DELETE CASCADE,
+    worker_id UUID NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    total_shifts_together INT DEFAULT 0,
+    completion_rate DECIMAL(5,2) DEFAULT 0,
+    avg_rating_given DECIMAL(3,2) DEFAULT 0,
+    last_worked_at TIMESTAMPTZ,
+    internal_note TEXT,
+    is_favorited BOOLEAN DEFAULT FALSE,
+    is_blacklisted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(eo_id, worker_id)
+);
+CREATE INDEX idx_eo_workers_eo ON eo_workers(eo_id);
+CREATE INDEX idx_eo_workers_worker ON eo_workers(worker_id);
+CREATE INDEX idx_eo_workers_favorited ON eo_workers(eo_id, is_favorited) WHERE is_favorited = TRUE;
+
+-- 24. NOTIFICATIONS
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    body TEXT,
+    type notif_type NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    reference_type VARCHAR(50),
+    reference_id UUID,
+    data JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
+CREATE INDEX idx_notifications_type ON notifications(type);
+CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
+
+-- 25. BLOCK_LIST
+CREATE TABLE block_list (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    blocker_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(blocker_id, blocked_id)
+);
+CREATE INDEX idx_block_list_blocker ON block_list(blocker_id);
+CREATE INDEX idx_block_list_blocked ON block_list(blocked_id);
+
+-- 26. SYSTEM_CONFIG
+CREATE TABLE system_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    key VARCHAR(100) UNIQUE NOT NULL,
+    value TEXT,
+    description TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_by UUID REFERENCES users(id)
+);
+INSERT INTO system_config (key, value, description) VALUES
+('platform_fee_invite', '50000', 'Phí Invite Mode (VND)'),
+('platform_fee_matching', '80000', 'Phí Matching + Invite Mode (VND)'),
+('min_reliability_for_proposal', '60', 'Ngưỡng reliability tối thiểu'),
+('proposal_timeout_minutes', '15', 'Thời gian hết hạn proposal'),
+('penalty_noshow', '25', 'Điểm trừ RS khi no-show'),
+('rating_auto_close_days', '7', 'Số ngày tự động đóng rating'),
+('default_wage_per_hour', '50000', 'Mức wage mặc định');
+
+-- 27. AUDIT_LOGS
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id UUID,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX idx_audit_logs_created ON audit_logs(created_at DESC);
+
+-- ADD CONSTRAINTS
+ALTER TABLE invites ADD CONSTRAINT fk_invites_group FOREIGN KEY (group_id) REFERENCES worker_groups(id) ON DELETE SET NULL;
+ALTER TABLE shift_assignments ADD CONSTRAINT fk_assignments_group FOREIGN KEY (group_id) REFERENCES worker_groups(id) ON DELETE SET NULL;
+
+-- TRIGGERS
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_updated BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_event_organizers_updated BEFORE UPDATE ON event_organizers FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_workers_updated BEFORE UPDATE ON workers FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_events_updated BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_shifts_updated BEFORE UPDATE ON shifts FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_disputes_updated BEFORE UPDATE ON disputes FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_subscriptions_updated BEFORE UPDATE ON subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_worker_groups_updated BEFORE UPDATE ON worker_groups FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_payments_updated BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER trg_worker_group_memberships_updated BEFORE UPDATE ON worker_group_memberships FOR EACH ROW EXECUTE FUNCTION update_updated_at();

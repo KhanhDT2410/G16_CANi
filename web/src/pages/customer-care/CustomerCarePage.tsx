@@ -1,15 +1,15 @@
 import React from 'react';
 
-const CskhPage = () => {
+export const CustomerCarePage: React.FC = () => {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', fontFamily: 'inherit' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>
-            🎧 Customer Care & Dispute Center (CSKH)
+            🎧 Customer Care & Dispute Center
           </h2>
           <p style={{ color: '#6b7280', margin: '0.25rem 0 0 0', fontSize: '0.9rem' }}>
-            Tiếp nhận khiếu nại ca làm việc, hỗ trợ Worker & Event Organizer, và phê duyệt kháng cáo kỷ luật.
+            Tiếp nhận khiếu nại ca làm việc, hỗ trợ Worker & Event Organizer, và giải quyết tranh chấp hợp đồng.
           </p>
         </div>
         <span style={{
@@ -20,7 +20,7 @@ const CskhPage = () => {
           fontSize: '0.8rem',
           fontWeight: '600'
         }}>
-          Role: CUSTOMER_CARE (CSKH)
+          Role: CUSTOMER_CARE
         </span>
       </div>
 
@@ -79,4 +79,4 @@ const CskhPage = () => {
   );
 };
 
-export default CskhPage;
+export default CustomerCarePage;

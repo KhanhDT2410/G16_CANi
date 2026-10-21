@@ -50,6 +50,13 @@ export const useLogin = () => {
         password: formData.password,
       });
 
+      // Nếu là tài khoản WORKER, chặn và yêu cầu dùng app mobile
+      if (data.user.role === 'WORKER') {
+        await authApi.logout();
+        setErrorMessage('Tài khoản Nhân sự (Worker) vui lòng đăng nhập trên ứng dụng CANi Mobile!');
+        return;
+      }
+
       if (data.token) {
         localStorage.setItem('cani_token', data.token);
       }
@@ -60,16 +67,13 @@ export const useLogin = () => {
         localStorage.setItem('cani_user', JSON.stringify(data.user));
       }
 
-      // Điều hướng theo vai trò (chỉ gồm 4 vai trò chuẩn)
+      // Điều hướng theo các vai trò hợp lệ trên Web
       switch (data.user.role) {
         case 'ADMIN':
           navigate('/admin');
           break;
         case 'CUSTOMER_CARE':
-          navigate('/cskh');
-          break;
-        case 'WORKER':
-          navigate('/worker');
+          navigate('/customer-care');
           break;
         case 'EVENT_ORGANIZER':
         default:

@@ -1,6 +1,8 @@
 spring:
   application:
     name: cani-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/postgres}
@@ -49,6 +51,6 @@ logging:
 cani:
   auth:
     supabase:
-      url: ${SUPABASE_URL:https://db.hgnilsojrauajmyslhug.supabase.co}
+      url: ${SUPABASE_URL:https://hgnilsojrauajmyslhug.supabase.co}
       anon-key: ${SUPABASE_ANON_KEY:}
       service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}

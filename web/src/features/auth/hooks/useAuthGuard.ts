@@ -17,11 +17,10 @@ export const useAuthGuard = (allowedRoles?: UserRole[]) => {
     }
 
     if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-      // Điều hướng về trang mặc định theo role của user nếu truy cập trái phép
       if (user.role === 'ADMIN') navigate('/admin', { replace: true });
-      else if (user.role === 'CUSTOMER_CARE') navigate('/cskh', { replace: true });
+      else if (user.role === 'CUSTOMER_CARE') navigate('/customer-care', { replace: true });
       else if (user.role === 'EVENT_ORGANIZER') navigate('/eo', { replace: true });
-      else navigate('/worker', { replace: true });
+      else navigate('/login', { replace: true });
     }
   }, [isAuthenticated, isLoading, user, allowedRoles, navigate, location.pathname]);
 

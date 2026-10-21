@@ -49,6 +49,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- 4) Thu hồi quyền từ client roles và chỉ cấp USAGE cho postgres
-REVOKE ALL ON SCHEMA public FROM anon, authenticated, service_role;
-GRANT USAGE ON SCHEMA public TO postgres;
+-- 4) Cấp quyền schema: RLS bảo vệ dữ liệu ở mức bảng, nhưng schema cần USAGE để Supabase GoTrue đọc metadata
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON SCHEMA public TO postgres, service_role;

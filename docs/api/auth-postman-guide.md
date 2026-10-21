@@ -61,7 +61,7 @@ END $$;
 | Email | Mật khẩu | Vai trò (`role`) | Nền tảng sử dụng |
 |:---|:---|:---|:---|
 | `admin@cani.vn` | `Password123!` | `ADMIN` | Web Admin Portal (`/admin`) |
-| `cskh@cani.vn` | `Password123!` | `CUSTOMER_CARE` | Web Support Desk (`/cskh`) |
+| `cskh@cani.vn` | `Password123!` | `CUSTOMER_CARE` | Web Support Desk (`/customer-care`) |
 | `eo@cani.vn` | `Password123!` | `EVENT_ORGANIZER` | Web Organizer Portal (`/eo`) |
 | `worker@cani.vn` | `Password123!` | `WORKER` | Mobile Flutter App |
 

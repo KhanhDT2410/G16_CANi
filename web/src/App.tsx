@@ -4,9 +4,7 @@ import EOPage from './pages/eo/EOPage';
 import AdminPage from './pages/admin/AdminPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import WorkerDashboard from './pages/worker/WorkerDashboard';
-import FinancePage from './pages/finance/FinancePage';
-import CskhPage from './pages/cskh/CskhPage';
+import CustomerCarePage from './pages/customer-care/CustomerCarePage';
 
 function App() {
   return (
@@ -15,12 +13,12 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<Navigate to="/worker" replace />} />
-          <Route path="worker" element={<WorkerDashboard />} />
+          <Route index element={<Navigate to="/eo" replace />} />
           <Route path="eo" element={<EOPage />} />
           <Route path="admin" element={<AdminPage />} />
-          <Route path="finance" element={<FinancePage />} />
-          <Route path="cskh" element={<CskhPage />} />
+          <Route path="customer-care" element={<CustomerCarePage />} />
+          {/* Fallback route cho đường dẫn cũ /cskh */}
+          <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

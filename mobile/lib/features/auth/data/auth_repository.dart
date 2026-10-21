@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:cani/core/network/auth_interceptor.dart';
+
 import 'package:cani/features/auth/data/auth_api.dart';
 import 'package:cani/features/auth/models/auth_request.dart';
 import 'package:cani/features/auth/models/user_dto.dart';
@@ -33,7 +35,8 @@ class AuthRepository {
         LoginRequestModel(email: email, password: password),
       );
 
-      // 2. Persist tokens in secure storage
+      // 2. Persist tokens in secure storage & in-memory cache
+      AuthInterceptor.inMemoryToken = response.token;
       await _storage.write(key: _tokenKey, value: response.token);
       if (response.refreshToken != null) {
         await _storage.write(key: _refreshTokenKey, value: response.refreshToken);
@@ -95,6 +98,7 @@ class AuthRepository {
   }
 
   Future<void> clearSession() async {
+    AuthInterceptor.inMemoryToken = null;
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _refreshTokenKey);
   }

@@ -47,8 +47,13 @@ public class SecurityConfig {
                     "/api/auth/google",
                     "/api/auth/verify-otp",
                     "/api/auth/reset-password",
-                    "/api/auth/refresh"
+                    "/api/auth/refresh",
+                    "/api/v1/workers/skills/taxonomy",
+                    "/api/v1/workers/skills/tiers/config",
+                    "/api/v1/workers/ekyc/**"
                 ).permitAll()
+                .requestMatchers("/api/v1/workers/skills/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/workers/skills/**").authenticated()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2

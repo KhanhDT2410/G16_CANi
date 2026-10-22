@@ -1,0 +1,48 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 30000
+      max-lifetime: 60000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: public
+        type:
+          preferred_enum_jdbc_type: NAMED_ENUM
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    clean-disabled: true
+    schemas: public
+    default-schema: public
+
+server:
+  port: ${SERVER_PORT:8080}
+
+cani:
+  auth:
+    supabase:
+      url: ${SUPABASE_URL:https://hgnilsojrauajmyslhug.supabase.co}
+      anon-key: ${SUPABASE_ANON_KEY}
+      service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY}
+      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+      url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
+      timeout-ms: 20000

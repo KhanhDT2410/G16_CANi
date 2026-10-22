@@ -60,6 +60,7 @@ public class EventOrganizer {
     @Builder.Default
     private Integer totalEventsCompleted = 0;
 
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subscription_id")
     private Subscription subscription;

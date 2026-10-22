@@ -21,7 +21,7 @@ public class SystemConfig {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID configId;
 
-    @Column(name = "key", nullable = false, unique = true, length = 100)
+    @Column(name = "\"key\"", nullable = false, unique = true, length = 100)
     private String key;
 
     @Column(name = "value", nullable = false, columnDefinition = "TEXT")

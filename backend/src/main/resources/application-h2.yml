@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:cani;INIT=RUNSCRIPT FROM 'classpath:h2-init.sql';DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=USER,VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: com.cani.config.CustomH2Dialect
+        default_schema: ""
+        format_sql: false
+
+  flyway:
+    enabled: false
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    com.cani: INFO
+    org.springframework.security: WARN
+
+cani:
+  auth:
+    supabase:
+      url: ${SUPABASE_URL:https://hgnilsojrauajmyslhug.supabase.co}
+      anon-key: ${SUPABASE_ANON_KEY:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhnbmlsc29qcmF1YWpteXNsaHVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MDU3MDcsImV4cCI6MjEwNzM4MTcwN30.25kiZ2qaQXl6oM3eJOHDCMYKR544OCsHNOwaVvhaGyw}
+      service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:dummy}
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.5-flash}

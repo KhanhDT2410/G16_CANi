@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth';
+import { ToastContainer } from '../components/common/Toast';
 import './MainLayout.css';
 
 const MainLayout = () => {
@@ -8,9 +9,10 @@ const MainLayout = () => {
   const { user, isAuthenticated, logout } = useAuth();
 
   const navItems = [
-    { path: '/eo', label: 'Event Organizer' },
+    { path: '/eo', label: 'Ban Tổ Chức (EO)' },
+    { path: '/worker', label: 'Nhân Sự (Worker)' },
     { path: '/customer-care', label: 'Customer Care' },
-    { path: '/admin', label: 'Admin' },
+    { path: '/admin', label: 'Admin Portal' },
   ];
 
   const handleLogout = async () => {
@@ -20,9 +22,13 @@ const MainLayout = () => {
 
   return (
     <div className="main-layout">
+      <ToastContainer />
       <header className="main-header">
         <div className="main-header-left">
-          <h1 className="main-logo">CANi</h1>
+          <Link to="/eo" className="main-logo-group">
+            <span className="main-logo">CANi</span>
+            <span className="main-logo-sub">Platform</span>
+          </Link>
           <nav className="main-nav">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;

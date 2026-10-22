@@ -85,7 +85,7 @@ public class Shift {
     @Column(name = "location_lng")
     private Double locationLng;
 
-    @Column(name = "required_skills", columnDefinition = "uuid[]")
+    @Column(name = "required_skills")
     private UUID[] requiredSkills;
 
     @Column(name = "min_reliability_score")

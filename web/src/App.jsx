@@ -6,6 +6,8 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import CustomerCarePage from './pages/customer-care/CustomerCarePage';
 
+import WorkerPage from './pages/worker/WorkerPage';
+
 function App() {
   return (
     <BrowserRouter>
@@ -15,8 +17,9 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Navigate to="/eo" replace />} />
           <Route path="eo" element={<EOPage />} />
-          <Route path="admin" element={<AdminPage />} />
+          <Route path="worker" element={<WorkerPage />} />
           <Route path="customer-care" element={<CustomerCarePage />} />
+          <Route path="admin" element={<AdminPage />} />
           {/* Fallback route cho duong dan cu /cskh */}
           <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
         </Route>

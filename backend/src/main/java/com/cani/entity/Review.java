@@ -66,7 +66,7 @@ public class Review {
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
 
-    @Column(name = "tags", columnDefinition = "text[]")
+    @Column(name = "tags")
     private String[] tags;
 
     @Column(name = "is_auto_closed")

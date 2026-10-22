@@ -1,9 +1,17 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/cani_dev}
+    # Kết nối trực tiếp hoặc qua Session Mode Pooler (Port 5432) để hỗ trợ Flyway migrations
+    url: ${DB_URL:jdbc:postgresql://db.hgnilsojrauajmyslhug.supabase.co:5432/postgres?sslmode=require}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # Giới hạn pool kết nối cho từng máy dev để tránh lỗi cạn kiệt connection trên Supabase Free Tier
+      maximum-pool-size: 3
+      minimum-idle: 1
+      idle-timeout: 30000
+      max-lifetime: 60000
+      connection-timeout: 20000
 
   jpa:
     hibernate:

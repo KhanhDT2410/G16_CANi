@@ -48,6 +48,7 @@ mobile/linux/flutter/ephemeral/
 .vscode/
 .agents/
 .claude/
+.omo/
 *.iml
 *.iws
 .project

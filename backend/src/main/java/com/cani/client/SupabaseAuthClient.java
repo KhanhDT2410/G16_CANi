@@ -33,6 +33,13 @@ public class SupabaseAuthClient {
      * Tạo user qua GoTrue Admin API (sử dụng service_role key).
      */
     public SupabaseUser createUser(String email, String password, String fullName, String phone) {
+        return createUser(email, password, fullName, phone, null, null);
+    }
+
+    /**
+     * Tạo user qua GoTrue Admin API kèm metadata role và companyName (hỗ trợ DB Trigger ACID).
+     */
+    public SupabaseUser createUser(String email, String password, String fullName, String phone, String role, String companyName) {
         try {
             Map<String, Object> body = new HashMap<>();
             body.put("email", email);
@@ -41,8 +48,14 @@ public class SupabaseAuthClient {
 
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("full_name", fullName);
-            if (phone != null) {
+            if (phone != null && !phone.isBlank()) {
                 metadata.put("phone", phone);
+            }
+            if (role != null && !role.isBlank()) {
+                metadata.put("role", role);
+            }
+            if (companyName != null && !companyName.isBlank()) {
+                metadata.put("company_name", companyName);
             }
             body.put("user_metadata", metadata);
 

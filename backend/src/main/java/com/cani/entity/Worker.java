@@ -95,7 +95,7 @@ public class Worker {
     @Column(name = "base_lng")
     private Double baseLng;
 
-    @Column(name = "skills", columnDefinition = "uuid[]")
+    @Column(name = "skills")
     private UUID[] skills;
 
     @Column(name = "years_experience")
@@ -117,6 +117,7 @@ public class Worker {
     @Column(name = "skill_tier")
     @Builder.Default
     private SkillTier skillTier = SkillTier.STARTER;
+
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

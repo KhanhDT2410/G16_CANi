@@ -9,11 +9,8 @@ class ApiConstants {
   ApiConstants._();
 
   static String get defaultBaseUrl {
-    if (kIsWeb || (!kIsWeb && Platform.isWindows)) {
-      return 'http://localhost:8080';
-    }
-    // Android emulator fallback
-    return 'http://10.0.2.2:8080';
+    // Sử dụng http://localhost:8080 (kết hợp lệnh 'adb reverse tcp:8080 tcp:8080' giúp máy thật Android cắm cáp USB gọi thẳng vào Backend trên PC mà không lo khác mạng Wi-Fi hay tường lửa)
+    return 'http://localhost:8080';
   }
 
   static final String baseUrl = const String.fromEnvironment(

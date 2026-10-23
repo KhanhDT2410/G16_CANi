@@ -70,6 +70,9 @@ class SkillVerificationFlowTest {
     private AuthService authService;
 
     @MockitoBean
+    private com.cani.service.EmailOtpService emailOtpService;
+
+    @MockitoBean
     private SkillVerificationService verificationService;
 
     @MockitoBean

@@ -4,12 +4,15 @@ import lombok.*;
 
 import java.util.Map;
 
+/**
+ * DTO chuẩn hóa kết quả định danh điện tử từ eKYC Provider (VNPT eKYC, Mock...)
+ */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class GeminiEkycResultDto {
+public class EkycIdentityResultDto {
 
     private String idNumber;
     private String fullName;

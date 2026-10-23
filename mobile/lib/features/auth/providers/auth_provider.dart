@@ -66,10 +66,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> sendOtp(String email) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _repository.sendOtp(email);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> loginWithGoogle() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final response = await _repository.signInWithGoogle();
+      state = state.copyWith(isLoading: false, user: response.user);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
   Future<bool> register({
     required String email,
     required String password,
     required String fullName,
+    required String otpCode,
     String? phone,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
@@ -78,6 +109,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: email,
         password: password,
         fullName: fullName,
+        otpCode: otpCode,
         phone: phone,
       );
       state = state.copyWith(isLoading: false);

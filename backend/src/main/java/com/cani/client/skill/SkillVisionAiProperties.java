@@ -1,33 +1,36 @@
-package com.cani.client.gemini;
+package com.cani.client.skill;
 
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Cấu hình kết nối Vision AI phục vụ thẩm định chứng chỉ, bằng cấp nghề nghiệp (Skill Verification).
+ */
 @Configuration
 @ConfigurationProperties(prefix = "cani.ai.gemini")
 @Getter
 @Setter
-public class GeminiProperties {
+public class SkillVisionAiProperties {
 
     /**
-     * Google AI Studio API Key. Supplied via GEMINI_API_KEY env var only - never hardcode.
+     * API Key gọi dịch vụ Vision AI. Lấy từ biến môi trường GEMINI_API_KEY.
      */
     private String apiKey;
 
     /**
-     * Model name (e.g., gemini-3.5-flash-lite)
+     * Tên mô hình Vision AI
      */
     private String model = "gemini-3.5-flash-lite";
 
     /**
-     * API base URL
+     * Endpoint API
      */
     private String url = "https://generativelanguage.googleapis.com/v1beta/models";
 
     /**
-     * Request timeout in milliseconds
+     * Thời gian timeout tính bằng mili-giây
      */
     private int timeoutMs = 20000;
 }

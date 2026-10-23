@@ -36,9 +36,13 @@ public class AuthService {
     private final WorkerRepository workerRepository;
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
+    private final EmailOtpService emailOtpService;
 
     @Transactional
     public UserDto register(RegisterRequest request) {
+        // 0. Xác thực mã OTP 6 số đã gửi tới email người dùng
+        emailOtpService.verifyOtp(request.getEmail(), request.getOtpCode(), "REGISTER");
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email này đã được sử dụng");
         }

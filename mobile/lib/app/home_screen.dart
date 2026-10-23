@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/auth.dart';
+import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/job_proposals/screens/job_proposals_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
@@ -48,8 +49,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final user = authState.user!;
     final theme = Theme.of(context);
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      TermsOfServiceDialog.checkAndShow(context, user.id);
+    });
+
     final titles = [
-      'Bản Đồ Việc Làm (Radar)',
+      'Bản Đồ Việc Làm',
       'Bảng Điểm Kỹ Năng',
       'AI Thẩm Định Chứng Chỉ',
       'Lịch Sử Xác Thực',
@@ -130,9 +135,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.radar_outlined),
-            selectedIcon: Icon(Icons.radar),
-            label: 'Radar Việc',
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'Bản Đồ Việc',
           ),
           NavigationDestination(
             icon: Icon(Icons.workspace_premium_outlined),

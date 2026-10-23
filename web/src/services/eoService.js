@@ -94,4 +94,25 @@ export const eoService = {
     const response = await apiClient.post('/v1/payments/eo/declare', paymentData);
     return response.data?.data;
   },
+
+  // EO Lấy trạng thái hồ sơ định danh doanh nghiệp eKYC
+  getEkycStatus: async () => {
+    try {
+      const response = await apiClient.get('/v1/eo/ekyc/status');
+      return response.data?.data;
+    } catch (error) {
+      console.warn('Lỗi getEkycStatus:', error);
+      return null;
+    }
+  },
+
+  // EO Nộp hồ sơ định danh eKYC doanh nghiệp (CCCD trước, sau, selfie, GPKD)
+  submitEkyc: async (formData) => {
+    const response = await apiClient.post('/v1/eo/ekyc/submit', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data?.data;
+  },
 };

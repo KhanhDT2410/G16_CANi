@@ -36,3 +36,5 @@ cani:
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_MODEL:gemini-3.5-flash}
+  ekyc:
+    provider: mock

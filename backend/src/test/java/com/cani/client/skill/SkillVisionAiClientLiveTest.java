@@ -1,6 +1,6 @@
-package com.cani.client.gemini;
+package com.cani.client.skill;
 
-import com.cani.dto.skill.GeminiVerificationResultDto;
+import com.cani.dto.skill.SkillVerificationAiResultDto;
 import com.cani.entity.enums.RoutingDecision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -12,11 +12,11 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class GeminiVisionClientLiveTest {
+class SkillVisionAiClientLiveTest {
 
     @Test
-    @DisplayName("Live Integration Test: Call Gemini AI Studio API with user API key and verify structured JSON output")
-    void testLiveGeminiVisionVerification() {
+    @DisplayName("Live Integration Test: Call Vision AI Studio API with user API key and verify structured JSON output")
+    void testLiveVisionAiVerification() {
         String apiKey = System.getenv("GEMINI_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
             Map<String, Object> envProps = com.cani.config.DotenvLoader.load();
@@ -29,14 +29,14 @@ class GeminiVisionClientLiveTest {
             return;
         }
 
-        GeminiProperties properties = new GeminiProperties();
+        SkillVisionAiProperties properties = new SkillVisionAiProperties();
         properties.setApiKey(apiKey);
         properties.setModel("gemini-3.5-flash-lite");
         properties.setUrl("https://generativelanguage.googleapis.com/v1beta/models");
         properties.setTimeoutMs(25000);
 
         ObjectMapper objectMapper = new ObjectMapper();
-        GeminiVisionClient client = new GeminiVisionClient(properties, objectMapper);
+        SkillVisionAiClient client = new SkillVisionAiClient(properties, objectMapper);
 
         // Sample certificate document text
         String sampleCertText = """
@@ -64,9 +64,9 @@ class GeminiVisionClientLiveTest {
                 "Điều phối sự kiện"
         );
 
-        GeminiVerificationResultDto result = client.verifyDocument(certBytes, "text/plain", taxonomy);
+        SkillVerificationAiResultDto result = client.verifyDocument(certBytes, "text/plain", taxonomy);
 
-        System.out.println("=== LIVE GEMINI AI VERIFICATION RESULT ===");
+        System.out.println("=== LIVE VISION AI VERIFICATION RESULT ===");
         System.out.println("Recipient Name: " + result.getRecipientName());
         System.out.println("Institution: " + result.getInstitution());
         System.out.println("Has Seal/Signature: " + result.getHasSealOrSignature());
@@ -83,7 +83,6 @@ class GeminiVisionClientLiveTest {
         assertNotNull(result);
         assertNotNull(result.getRoutingDecision());
         assertTrue(result.getOverallConfidence() > 0.0);
-        // Live response should AUTO_APPROVE or ADMIN_REVIEW
         assertNotEquals(RoutingDecision.REJECT, result.getRoutingDecision());
     }
 }

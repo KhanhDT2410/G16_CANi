@@ -69,42 +69,86 @@ class JobRadarScreen extends ConsumerWidget {
             ),
           ),
 
-          // 2. Bộ lọc bán kính & Nút chuyển đổi View Mode (Radar Map / List)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          // 1.1 Trạng thái GPS Thực tế / Cấp quyền
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: state.isRealLocation ? Colors.blue.shade50 : Colors.amber.shade50,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Chọn bán kính
-                Row(
-                  children: [
-                    const Text('Bán kính:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Wrap(
-                      spacing: 4,
-                      children: [5.0, 10.0, 15.0].map((r) {
-                        final isSel = state.searchRadiusKm == r;
-                        return ChoiceChip(
-                          label: Text('${r.toInt()}km', style: TextStyle(fontSize: 11, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
-                          selected: isSel,
-                          onSelected: (_) => notifier.setRadius(r),
-                          visualDensity: VisualDensity.compact,
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                Icon(
+                  state.isRealLocation ? Icons.gps_fixed : Icons.gps_not_fixed,
+                  size: 16,
+                  color: state.isRealLocation ? Colors.blue.shade700 : Colors.amber.shade800,
                 ),
-
-                // Toggle Radar / List
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, icon: Icon(Icons.radar, size: 16), label: Text('Radar', style: TextStyle(fontSize: 11))),
-                    ButtonSegment(value: false, icon: Icon(Icons.view_list, size: 16), label: Text('Danh sách', style: TextStyle(fontSize: 11))),
-                  ],
-                  selected: {state.isRadarView},
-                  onSelectionChanged: (set) => notifier.toggleViewMode(set.first),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    state.isRealLocation
+                        ? 'Vị trí GPS thực: ${state.userLat.toStringAsFixed(4)}, ${state.userLng.toStringAsFixed(4)}'
+                        : (state.errorMessage ?? 'Chưa kích hoạt GPS chính xác. Nhấn định vị để cấp quyền.'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: state.isRealLocation ? Colors.blue.shade900 : Colors.amber.shade900,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => notifier.refreshCurrentLocation(),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(
+                    state.isRealLocation ? 'Cập nhật' : 'Cấp quyền GPS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: state.isRealLocation ? Colors.blue.shade700 : Colors.amber.shade900,
+                    ),
+                  ),
                 ),
               ],
+            ),
+          ),
+
+          // 2. Bộ lọc bán kính & Nút chuyển đổi View Mode (Bản đồ / Danh sách)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // Chọn bán kính
+                  const Text('Bán kính:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 6),
+                  Wrap(
+                    spacing: 4,
+                    children: [5.0, 10.0, 15.0].map((r) {
+                      final isSel = state.searchRadiusKm == r;
+                      return ChoiceChip(
+                        label: Text('${r.toInt()}km', style: TextStyle(fontSize: 11, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                        selected: isSel,
+                        onSelected: (_) => notifier.setRadius(r),
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Toggle Bản đồ / Danh sách
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: true, icon: Icon(Icons.map_outlined, size: 16), label: Text('Bản đồ', style: TextStyle(fontSize: 11))),
+                      ButtonSegment(value: false, icon: Icon(Icons.view_list, size: 16), label: Text('Danh sách', style: TextStyle(fontSize: 11))),
+                    ],
+                    selected: {state.isRadarView},
+                    onSelectionChanged: (set) => notifier.toggleViewMode(set.first),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -118,10 +162,25 @@ class JobRadarScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => notifier.scanNearbyShifts(),
-        icon: const Icon(Icons.my_location),
-        label: const Text('Quét lại', style: TextStyle(fontWeight: FontWeight.bold)),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'recenter_gps',
+            onPressed: () => notifier.refreshCurrentLocation(),
+            tooltip: 'Định vị GPS thực tế',
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.blue.shade700,
+            child: const Icon(Icons.my_location),
+          ),
+          const SizedBox(width: 10),
+          FloatingActionButton.extended(
+            heroTag: 'refresh_jobs',
+            onPressed: () => notifier.scanNearbyShifts(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Quét lại', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -129,7 +188,7 @@ class JobRadarScreen extends ConsumerWidget {
   Widget _buildRadarView(BuildContext context, JobRadarState state, JobRadarNotifier notifier) {
     return Column(
       children: [
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -143,13 +202,15 @@ class JobRadarScreen extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Expanded(
           child: JobRadarMapWidget(
             shifts: state.nearbyShifts,
             selectedShift: state.selectedShift,
             maxRadiusKm: state.searchRadiusKm,
             isOnline: state.isOnline,
+            userLat: state.userLat,
+            userLng: state.userLng,
             onSelectShift: (shift) {
               notifier.selectShift(shift);
               _showShiftDetails(context, shift);

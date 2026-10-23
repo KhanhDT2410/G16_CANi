@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
+import '../widgets/shift_navigation_sheet.dart';
+import 'attendance_qr_scanner_screen.dart';
 
 class JobProposalsScreen extends ConsumerStatefulWidget {
   const JobProposalsScreen({super.key});
@@ -299,6 +301,10 @@ class _JobProposalsScreenState extends ConsumerState<JobProposalsScreen> with Si
         final isDeclared = a.paymentStatus == 'DECLARED_PENDING_WORKER';
         final isConfirmed = a.paymentStatus == 'CONFIRMED_FULL';
 
+        final isCheckedIn = a.status == 'CHECKED_IN' || (a.checkinTime != null && a.checkoutTime == null);
+        final isCompleted = a.status == 'COMPLETED' || a.checkoutTime != null;
+        final isNotStarted = !isCheckedIn && !isCompleted;
+
         return Card(
           margin: const EdgeInsets.only(bottom: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -307,6 +313,7 @@ class _JobProposalsScreenState extends ConsumerState<JobProposalsScreen> with Si
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header: Tên ca & Trạng thái
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -314,20 +321,137 @@ class _JobProposalsScreenState extends ConsumerState<JobProposalsScreen> with Si
                       child: Text('${a.jobType} — ${a.eventName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.15),
+                        color: isCompleted
+                            ? Colors.purple.shade50
+                            : (isCheckedIn ? Colors.green.shade50 : Colors.blue.shade50),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isCompleted
+                              ? Colors.purple.shade200
+                              : (isCheckedIn ? Colors.green.shade300 : Colors.blue.shade200),
+                        ),
                       ),
-                      child: Text(a.status, style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+                      child: Text(
+                        isCompleted
+                            ? 'ĐÃ HOÀN THÀNH'
+                            : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN'),
+                        style: TextStyle(
+                          color: isCompleted
+                              ? Colors.purple.shade800
+                              : (isCheckedIn ? Colors.green.shade800 : Colors.blue.shade800),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('Địa điểm: ${a.venueAddress}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text('Địa điểm: ${a.venueAddress}', style: const TextStyle(fontSize: 12, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 4),
-                Text('Thù lao: ${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 13)),
-                const Divider(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Thù lao: ${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade800, fontSize: 13),
+                    ),
+                    if (a.hoursWorked != null)
+                      Text(
+                        'Đã làm: ${a.hoursWorked!.toStringAsFixed(1)}h',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.teal.shade800),
+                      ),
+                  ],
+                ),
+
+                // Lịch sử Check-in / Check-out nếu có
+                if (a.checkinTime != null || a.checkoutTime != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.schedule, size: 14, color: Colors.grey.shade700),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${a.checkinTime != null ? "Vào: ${a.checkinTime!.hour.toString().padLeft(2, '0')}:${a.checkinTime!.minute.toString().padLeft(2, '0')}" : ""}${a.checkoutTime != null ? " | Ra: ${a.checkoutTime!.hour.toString().padLeft(2, '0')}:${a.checkoutTime!.minute.toString().padLeft(2, '0')}" : ""}',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 12),
+
+                // Nút Hành Động: Chỉ đường & Quét QR Điểm Danh
+                Row(
+                  children: [
+                    // Nút Chỉ đường
+                    Expanded(
+                      flex: 4,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openNavigationSheet(a),
+                        icon: const Icon(Icons.directions, size: 18),
+                        label: const Text('Chỉ đường', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Nút Quét QR Check-in hoặc Check-out
+                    if (isNotStarted) ...[
+                      Expanded(
+                        flex: 5,
+                        child: FilledButton.icon(
+                          onPressed: () => _openQrScanner(a, true),
+                          icon: const Icon(Icons.qr_code_scanner, size: 18),
+                          label: const Text('QR Check-in', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.teal.shade700,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ] else if (isCheckedIn) ...[
+                      Expanded(
+                        flex: 5,
+                        child: FilledButton.icon(
+                          onPressed: () => _openQrScanner(a, false),
+                          icon: const Icon(Icons.exit_to_app, size: 18),
+                          label: const Text('QR Check-out', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.deepOrange.shade700,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                const Divider(height: 20),
 
                 // Khung xác nhận nhận lương trực tiếp (Mục 12 SRS)
                 Container(
@@ -398,5 +522,30 @@ class _JobProposalsScreenState extends ConsumerState<JobProposalsScreen> with Si
         );
       },
     );
+  }
+
+  void _openNavigationSheet(ShiftAssignmentItem a) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ShiftNavigationSheet(assignment: a),
+    );
+  }
+
+  Future<void> _openQrScanner(ShiftAssignmentItem a, bool isCheckin) async {
+    final success = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => AttendanceQrScannerScreen(
+          assignment: a,
+          isCheckin: isCheckin,
+        ),
+      ),
+    );
+
+    if (success == true) {
+      _loadData();
+    }
   }
 }

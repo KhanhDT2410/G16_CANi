@@ -1,9 +1,9 @@
 package com.cani.service;
 
-import com.cani.client.gemini.GeminiVisionClient;
+import com.cani.client.ekyc.EkycProvider;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
-import com.cani.dto.ekyc.GeminiEkycResultDto;
+import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerEkycVerification;
@@ -33,7 +33,7 @@ public class WorkerEkycService {
 
     private final WorkerRepository workerRepository;
     private final WorkerEkycVerificationRepository ekycVerificationRepository;
-    private final GeminiVisionClient geminiVisionClient;
+    private final EkycProvider ekycProvider;
     private final UserRepository userRepository;
 
     /**
@@ -45,6 +45,23 @@ public class WorkerEkycService {
             MultipartFile frontFile,
             MultipartFile backFile,
             MultipartFile selfieFile) {
+        return submitEkyc(userId, frontFile, backFile, selfieFile, null, null, null, null, null, null, null, null);
+    }
+
+    @Transactional
+    public EkycVerificationResultDto submitEkyc(
+            UUID userId,
+            MultipartFile frontFile,
+            MultipartFile backFile,
+            MultipartFile selfieFile,
+            String confirmedCccd,
+            String confirmedFullName,
+            String confirmedDob,
+            String confirmedGender,
+            String confirmedOriginAddress,
+            String confirmedResidenceAddress,
+            String confirmedIssueDate,
+            String confirmedExpiryDate) {
 
         Worker worker = workerRepository.findByUser_UserId(userId)
                 .orElseGet(() -> {
@@ -62,30 +79,71 @@ public class WorkerEkycService {
             byte[] backBytes = backFile.getBytes();
             byte[] selfieBytes = selfieFile.getBytes();
 
-            // 1. Gửi sang Gemini Vision AI phân tích OCR, Fraud Detection và Face Matching
-            GeminiEkycResultDto aiResult = geminiVisionClient.verifyEkycIdentity(
+            // 1. Gửi sang eKYC Provider (VNPT eKYC / Mock) phân tích OCR, Fraud Detection và Face Matching
+            EkycIdentityResultDto ekycResult = ekycProvider.verifyIdentity(
                     frontBytes, frontFile.getContentType(),
                     backBytes, backFile.getContentType(),
                     selfieBytes, selfieFile.getContentType());
 
+            // Đồng bộ tên worker nếu là chế độ Mock để phản ánh đúng người dùng đăng nhập
+            if ("MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())) {
+                if (worker.getFullName() != null && !worker.getFullName().isBlank()) {
+                    ekycResult.setFullName(worker.getFullName().toUpperCase());
+                }
+                String uniqueSuffix = String.format("%06d", Math.abs(worker.getWorkerId().hashCode()) % 1_000_000);
+                ekycResult.setIdNumber("001202" + uniqueSuffix);
+                ekycResult.setRoutingDecision("AUTO_APPROVED");
+                ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
+            }
+
+            // Ghi đè bằng thông tin người dùng đã xác nhận hoặc quét từ mã QR trên thẻ CCCD gắn chip (nếu có)
+            if (confirmedCccd != null && !confirmedCccd.isBlank()) {
+                ekycResult.setIdNumber(confirmedCccd.trim());
+            }
+            if (confirmedFullName != null && !confirmedFullName.isBlank()) {
+                String cleanName = confirmedFullName.trim().toUpperCase();
+                ekycResult.setFullName(cleanName);
+                if (worker.getUser() != null) {
+                    worker.getUser().setFullName(cleanName);
+                }
+            }
+            if (confirmedDob != null && !confirmedDob.isBlank()) {
+                ekycResult.setDob(confirmedDob.trim());
+            }
+            if (confirmedGender != null && !confirmedGender.isBlank()) {
+                ekycResult.setGender(confirmedGender.trim());
+            }
+            if (confirmedOriginAddress != null && !confirmedOriginAddress.isBlank()) {
+                ekycResult.setOriginAddress(confirmedOriginAddress.trim());
+            }
+            if (confirmedResidenceAddress != null && !confirmedResidenceAddress.isBlank()) {
+                ekycResult.setResidenceAddress(confirmedResidenceAddress.trim());
+            }
+            if (confirmedIssueDate != null && !confirmedIssueDate.isBlank()) {
+                ekycResult.setIssueDate(confirmedIssueDate.trim());
+            }
+            if (confirmedExpiryDate != null && !confirmedExpiryDate.isBlank()) {
+                ekycResult.setExpiryDate(confirmedExpiryDate.trim());
+            }
+
             // 2. Băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
-            String rawIdNumber = aiResult.getIdNumber();
+            String rawIdNumber = ekycResult.getIdNumber();
             String idHash = hashCccd(rawIdNumber);
             String maskedNumber = maskCccd(rawIdNumber);
 
-            // 3. Kiểm tra chống gian lận dùng trùng CCCD cho nhiều tài khoản
-            if (idHash != null && ekycVerificationRepository.existsByCccdNumberHashAndStatus(idHash, "APPROVED")) {
-                aiResult.setRoutingDecision("REJECTED");
-                aiResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
+            // 3. Kiểm tra chống gian lận dùng trùng CCCD cho nhiều tài khoản (trừ khi là chính worker này nộp lại)
+            if (idHash != null && ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(idHash, "APPROVED", worker.getWorkerId())) {
+                ekycResult.setRoutingDecision("REJECTED");
+                ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
             }
 
             Map<String, Object> fraudFlags = new HashMap<>();
-            fraudFlags.put("isCutCorner", aiResult.isCutCorner());
-            fraudFlags.put("isScreenCaptured", aiResult.isScreenCaptured());
-            fraudFlags.put("isPhotoshoped", aiResult.isPhotoshoped());
-            fraudFlags.put("isExpired", aiResult.isExpired());
+            fraudFlags.put("isCutCorner", ekycResult.isCutCorner());
+            fraudFlags.put("isScreenCaptured", ekycResult.isScreenCaptured());
+            fraudFlags.put("isPhotoshoped", ekycResult.isPhotoshoped());
+            fraudFlags.put("isExpired", ekycResult.isExpired());
 
-            String decision = aiResult.getRoutingDecision();
+            String decision = ekycResult.getRoutingDecision();
             String status;
             if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
                 status = "APPROVED";
@@ -105,23 +163,23 @@ public class WorkerEkycService {
                     .worker(worker)
                     .cccdNumberMasked(maskedNumber)
                     .cccdNumberHash(idHash)
-                    .fullName(aiResult.getFullName() != null ? aiResult.getFullName() : worker.getFullName())
-                    .dob(aiResult.getDob())
-                    .gender(aiResult.getGender())
-                    .nationality(aiResult.getNationality())
-                    .originAddress(aiResult.getOriginAddress())
-                    .residenceAddress(aiResult.getResidenceAddress())
-                    .expiryDate(aiResult.getExpiryDate())
-                    .issueDate(aiResult.getIssueDate())
-                    .identificationFeatures(aiResult.getIdentificationFeatures())
+                    .fullName(ekycResult.getFullName() != null ? ekycResult.getFullName() : worker.getFullName())
+                    .dob(ekycResult.getDob())
+                    .gender(ekycResult.getGender())
+                    .nationality(ekycResult.getNationality())
+                    .originAddress(ekycResult.getOriginAddress())
+                    .residenceAddress(ekycResult.getResidenceAddress())
+                    .expiryDate(ekycResult.getExpiryDate())
+                    .issueDate(ekycResult.getIssueDate())
+                    .identificationFeatures(ekycResult.getIdentificationFeatures())
                     .frontImageUrl(frontUrl)
                     .backImageUrl(backUrl)
                     .selfieImageUrl(selfieUrl)
-                    .faceMatchScore(BigDecimal.valueOf(aiResult.getFaceMatchScore()))
-                    .ocrConfidence(BigDecimal.valueOf(aiResult.getOcrConfidence()))
+                    .faceMatchScore(BigDecimal.valueOf(ekycResult.getFaceMatchScore()))
+                    .ocrConfidence(BigDecimal.valueOf(ekycResult.getOcrConfidence()))
                     .fraudFlags(fraudFlags)
                     .routingDecision(decision)
-                    .routingReason(aiResult.getRoutingReason())
+                    .routingReason(ekycResult.getRoutingReason())
                     .status(status)
                     .build();
 
@@ -131,19 +189,14 @@ public class WorkerEkycService {
             if ("APPROVED".equals(status)) {
                 worker.setKycStatus(KycStatus.APPROVED);
                 worker.setCccdNumber(maskedNumber);
-                worker.setCccdFrontUrl(frontUrl);
-                worker.setCccdBackUrl(backUrl);
-                worker.setSelfieUrl(selfieUrl);
-                worker.setKycSubmittedAt(Instant.now());
             } else if ("PENDING_REVIEW".equals(status)) {
                 worker.setKycStatus(KycStatus.PENDING);
-                worker.setKycSubmittedAt(Instant.now());
             } else {
                 worker.setKycStatus(KycStatus.REJECTED);
             }
             workerRepository.save(worker);
 
-            log.info("Worker {} đã nộp eKYC: Quyết định AI={}, Trạng thái={}", worker.getWorkerId(), decision, status);
+            log.info("Worker {} đã nộp eKYC: Quyết định eKYC={}, Trạng thái={}", worker.getWorkerId(), decision, status);
 
             return mapToDto(verification);
 
@@ -189,15 +242,11 @@ public class WorkerEkycService {
         if ("APPROVED".equals(decision)) {
             worker.setKycStatus(KycStatus.APPROVED);
             worker.setCccdNumber(verification.getCccdNumberMasked());
-            worker.setCccdFrontUrl(verification.getFrontImageUrl());
-            worker.setCccdBackUrl(verification.getBackImageUrl());
-            worker.setSelfieUrl(verification.getSelfieImageUrl());
-            worker.setKycReviewedBy(adminUserId);
         } else {
             worker.setKycStatus(KycStatus.REJECTED);
-            worker.setKycReviewedBy(adminUserId);
         }
         workerRepository.save(worker);
+
 
         log.info("Admin {} đã duyệt hồ sơ eKYC {}: {}", adminUserId, verificationId, decision);
         return mapToDto(verification);

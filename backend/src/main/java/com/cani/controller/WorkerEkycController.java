@@ -34,10 +34,21 @@ public class WorkerEkycController {
             @RequestParam("backImage") MultipartFile backImage,
             @RequestParam("selfieImage") MultipartFile selfieImage,
             @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            @RequestParam(value = "cccdNumber", required = false) String cccdNumber,
+            @RequestParam(value = "fullName", required = false) String fullName,
+            @RequestParam(value = "dob", required = false) String dob,
+            @RequestParam(value = "gender", required = false) String gender,
+            @RequestParam(value = "originAddress", required = false) String originAddress,
+            @RequestParam(value = "residenceAddress", required = false) String residenceAddress,
+            @RequestParam(value = "issueDate", required = false) String issueDate,
+            @RequestParam(value = "expiryDate", required = false) String expiryDate,
             Authentication authentication) {
 
         UUID userId = resolveUserId(authentication, explicitUserId);
-        EkycVerificationResultDto result = ekycService.submitEkyc(userId, frontImage, backImage, selfieImage);
+        EkycVerificationResultDto result = ekycService.submitEkyc(
+                userId, frontImage, backImage, selfieImage,
+                cccdNumber, fullName, dob, gender,
+                originAddress, residenceAddress, issueDate, expiryDate);
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {

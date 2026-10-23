@@ -18,6 +18,13 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.cani.service.EmailOtpService emailOtpService;
+
+    @PostMapping({"/send-otp", "/register/send-otp"})
+    public ResponseEntity<ApiResponse<Void>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
+        emailOtpService.sendOtp(request.getEmail(), request.getOtpType());
+        return ResponseEntity.ok(ApiResponse.ok(null, "Mã xác thực OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư."));
+    }
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<UserDto>> register(@Valid @RequestBody RegisterRequest request) {

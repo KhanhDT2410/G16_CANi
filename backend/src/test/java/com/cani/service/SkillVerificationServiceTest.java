@@ -1,6 +1,6 @@
 package com.cani.service;
 
-import com.cani.client.gemini.GeminiVisionClient;
+import com.cani.client.skill.SkillVisionAiClient;
 import com.cani.dto.skill.*;
 import com.cani.entity.Skill;
 import com.cani.entity.SkillVerificationRequest;
@@ -48,7 +48,7 @@ class SkillVerificationServiceTest {
     private SkillVerificationRequestRepository verificationRequestRepository;
 
     @Mock
-    private GeminiVisionClient geminiVisionClient;
+    private SkillVisionAiClient skillVisionAiClient;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -67,8 +67,8 @@ class SkillVerificationServiceTest {
                 .workerId(workerId)
                 .fullName("Nguyen Van An")
                 .skillTier(SkillTier.STARTER)
-                .skills(new UUID[]{})
                 .build();
+
 
         mockSkill = Skill.builder()
                 .skillId(UUID.randomUUID())
@@ -95,7 +95,7 @@ class SkillVerificationServiceTest {
                 .evidenceSnippet("Completed 40h bartender course")
                 .build();
 
-        GeminiVerificationResultDto aiResult = GeminiVerificationResultDto.builder()
+        SkillVerificationAiResultDto aiResult = SkillVerificationAiResultDto.builder()
                 .recipientName("Nguyen Van An")
                 .institution("BarSaver Academy")
                 .issueDate("15/08/2024")
@@ -106,7 +106,7 @@ class SkillVerificationServiceTest {
                 .extractedSkills(List.of(extracted))
                 .build();
 
-        when(geminiVisionClient.verifyDocument(any(), any(), any())).thenReturn(aiResult);
+        when(skillVisionAiClient.verifyDocument(any(), any(), any())).thenReturn(aiResult);
         when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(eq(workerId), anyString()))
                 .thenReturn(Optional.empty());
 
@@ -145,7 +145,7 @@ class SkillVerificationServiceTest {
         when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
         when(skillRepository.findByIsActiveTrue()).thenReturn(List.of(mockSkill));
 
-        GeminiVerificationResultDto aiResult = GeminiVerificationResultDto.builder()
+        SkillVerificationAiResultDto aiResult = SkillVerificationAiResultDto.builder()
                 .recipientName("Nguyen Van An")
                 .institution("Training Center")
                 .overallConfidence(0.72)
@@ -153,7 +153,7 @@ class SkillVerificationServiceTest {
                 .routingReason("Evidence valid but seal is blurred")
                 .build();
 
-        when(geminiVisionClient.verifyDocument(any(), any(), any())).thenReturn(aiResult);
+        when(skillVisionAiClient.verifyDocument(any(), any(), any())).thenReturn(aiResult);
         when(verificationRequestRepository.save(any(SkillVerificationRequest.class)))
                 .thenAnswer(invocation -> {
                     SkillVerificationRequest req = invocation.getArgument(0);
@@ -204,8 +204,8 @@ class SkillVerificationServiceTest {
         assertEquals(0, result.get(0).getSpVerifyAwarded());
 
         verify(workerSkillRepository, times(1)).save(any(WorkerSkill.class));
-        verify(workerRepository, times(1)).save(mockWorker);
     }
+
 
     @Test
     @DisplayName("BR-64 Single Source of Truth: Tier thresholds must match BR-64 specification")

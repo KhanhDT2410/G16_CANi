@@ -4,6 +4,7 @@ import { showToast } from '../../components/common/Toast';
 import PromptModal from '../../components/common/PromptModal';
 import SkeletonCard from '../../components/common/SkeletonLoader';
 import MapModal from '../../components/common/MapModal';
+import EoEkycTab from './EoEkycTab';
 import './EOPage.css';
 
 const ROLES = [
@@ -297,6 +298,12 @@ const EOPage = () => {
         >
           Thanh Toán & Khai Báo Lương ({payments.length})
         </button>
+        <button
+          className={`eo-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ekyc')}
+        >
+          Định Danh Doanh Nghiệp (eKYC)
+        </button>
       </div>
 
       {/* Tab Content: Events */}
@@ -462,6 +469,9 @@ const EOPage = () => {
           </table>
         </div>
       )}
+
+      {/* Tab Content: eKYC */}
+      {activeTab === 'ekyc' && <EoEkycTab />}
 
       {/* Modal: Tạo Sự Kiện Mới */}
       {showEventModal && (

@@ -9,11 +9,14 @@ import lombok.NoArgsConstructor;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * DTO chứa kết quả trích xuất và thẩm định chứng chỉ nghề nghiệp của Worker bằng Vision AI.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class GeminiVerificationResultDto {
+public class SkillVerificationAiResultDto {
     private String recipientName;
     private String identityNumber;
     private String institution;

@@ -1,6 +1,6 @@
 package com.cani.service;
 
-import com.cani.client.gemini.GeminiVisionClient;
+import com.cani.client.skill.SkillVisionAiClient;
 import com.cani.dto.skill.*;
 import com.cani.entity.Skill;
 import com.cani.entity.SkillVerificationRequest;
@@ -53,13 +53,13 @@ public class SkillVerificationService {
     private final WorkerSkillRepository workerSkillRepository;
     private final WorkerSkillPointRepository workerSkillPointRepository;
     private final SkillVerificationRequestRepository verificationRequestRepository;
-    private final GeminiVisionClient geminiVisionClient;
+    private final SkillVisionAiClient skillVisionAiClient;
     private final ObjectMapper objectMapper;
 
     /**
      * Submit certificate/credential for AI Verification (UC-43 & UC-46).
      * NOTE: This outer method is intentionally NOT @Transactional to prevent holding
-     * a database connection pool slot while waiting 5-20s for the external Gemini API call.
+     * a database connection pool slot while waiting 5-20s for the external Vision AI API call.
      */
     public SkillVerificationResponseDto submitVerification(UUID workerId, MultipartFile file, UUID requestedSkillId, String notes) {
         Worker worker = workerRepository.findById(workerId)
@@ -93,8 +93,8 @@ public class SkillVerificationService {
             throw new BadRequestException("Không thể đọc nội dung tệp tải lên: " + e.getMessage());
         }
 
-        // 1. Call Gemini AI OUTSIDE of database transaction
-        GeminiVerificationResultDto aiResult = geminiVisionClient.verifyDocument(
+        // 1. Call Vision AI OUTSIDE of database transaction
+        SkillVerificationAiResultDto aiResult = skillVisionAiClient.verifyDocument(
                 fileBytes, contentType, taxonomyNames
         );
 
@@ -110,7 +110,7 @@ public class SkillVerificationService {
             UUID workerId,
             Skill requestedSkill,
             MultipartFile file,
-            GeminiVerificationResultDto aiResult,
+            SkillVerificationAiResultDto aiResult,
             String notes,
             List<Skill> activeSkills
     ) {
@@ -204,10 +204,6 @@ public class SkillVerificationService {
         }
 
         List<WorkerSkill> resultList = new ArrayList<>();
-        Set<UUID> allSkillIds = new HashSet<>();
-        if (worker.getSkills() != null) {
-            allSkillIds.addAll(Arrays.asList(worker.getSkills()));
-        }
 
         for (DeclareSkillRequestDto.SkillItem item : request.getSkills()) {
             Skill skill = skillRepository.findById(item.getSkillId())
@@ -234,18 +230,14 @@ public class SkillVerificationService {
 
             WorkerSkill saved = workerSkillRepository.save(ws);
             resultList.add(saved);
-            allSkillIds.add(skill.getSkillId());
 
             // Ensure baseline WorkerSkillPoint exists for this job_type
             ensureWorkerSkillPoint(worker, skill.getName());
         }
 
-        // Sync legacy skills UUID[] array
-        worker.setSkills(allSkillIds.toArray(new UUID[0]));
-        workerRepository.save(worker);
-
         return resultList.stream().map(this::mapToWorkerSkillDto).collect(Collectors.toList());
     }
+
 
     /**
      * Get all declared and verified skills of a worker (BR-16, BR-17)
@@ -340,13 +332,7 @@ public class SkillVerificationService {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(730, ChronoUnit.DAYS); // BR-17: 24 months validity
 
-        Set<UUID> skillIds = new HashSet<>();
-        if (worker.getSkills() != null) {
-            skillIds.addAll(Arrays.asList(worker.getSkills()));
-        }
-
         for (Skill s : skills) {
-            skillIds.add(s.getSkillId());
             WorkerSkill ws = workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(worker.getWorkerId(), s.getSkillId())
                     .orElseGet(() -> WorkerSkill.builder()
                             .worker(worker)
@@ -361,9 +347,6 @@ public class SkillVerificationService {
             ws.setEvidenceRequestId(requestId);
             workerSkillRepository.save(ws);
         }
-
-        // Update legacy skills UUID[] array
-        worker.setSkills(skillIds.toArray(new UUID[0]));
 
         // Update WorkerSkillPoint for effective job type
         String effectiveJobType = (jobType != null && !jobType.isBlank())
@@ -426,7 +409,7 @@ public class SkillVerificationService {
                 ));
     }
 
-    private String resolveJobType(GeminiVerificationResultDto aiResult, Skill requestedSkill) {
+    private String resolveJobType(SkillVerificationAiResultDto aiResult, Skill requestedSkill) {
         if (requestedSkill != null && requestedSkill.getName() != null) {
             return requestedSkill.getName();
         }

@@ -13,8 +13,16 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Entity đại diện cho Worker (Nhân sự sự kiện).
+ * Bảng workers đã được chuẩn hóa 3NF:
+ * - Dữ liệu eKYC chi tiết & hình ảnh chuyển sang bảng worker_ekyc_verifications.
+ * - Cài đặt vị trí và mức lương tối thiểu được tách sang bảng con worker_preferences (@SecondaryTable).
+ * - Kỹ năng chuyên biệt được quản lý qua bảng worker_skills.
+ */
 @Entity
 @Table(name = "workers")
+@SecondaryTable(name = "worker_preferences", pkJoinColumns = @PrimaryKeyJoinColumn(name = "worker_id", referencedColumnName = "id"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -37,26 +45,11 @@ public class Worker {
     @Column(name = "cccd_number", length = 20)
     private String cccdNumber;
 
-    @Column(name = "cccd_front_url", columnDefinition = "TEXT")
-    private String cccdFrontUrl;
-
-    @Column(name = "cccd_back_url", columnDefinition = "TEXT")
-    private String cccdBackUrl;
-
-    @Column(name = "selfie_url", columnDefinition = "TEXT")
-    private String selfieUrl;
-
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "kyc_status")
     @Builder.Default
     private KycStatus kycStatus = KycStatus.PENDING;
-
-    @Column(name = "kyc_submitted_at")
-    private Instant kycSubmittedAt;
-
-    @Column(name = "kyc_reviewed_by")
-    private UUID kycReviewedBy;
 
     @Column(name = "reliability_score")
     @Builder.Default
@@ -86,18 +79,6 @@ public class Worker {
     @Builder.Default
     private Boolean isOnline = false;
 
-    @Column(name = "base_address", columnDefinition = "TEXT")
-    private String baseAddress;
-
-    @Column(name = "base_lat")
-    private Double baseLat;
-
-    @Column(name = "base_lng")
-    private Double baseLng;
-
-    @Column(name = "skills")
-    private UUID[] skills;
-
     @Column(name = "years_experience")
     @Builder.Default
     private Integer yearsExperience = 0;
@@ -105,19 +86,30 @@ public class Worker {
     @Column(name = "bio", columnDefinition = "TEXT")
     private String bio;
 
-    @Column(name = "min_wage", precision = 12, scale = 2)
-    @Builder.Default
-    private BigDecimal minWage = BigDecimal.ZERO;
-
-    @Column(name = "max_distance_km")
-    private Double maxDistanceKm;
-
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "skill_tier")
     @Builder.Default
     private SkillTier skillTier = SkillTier.STARTER;
 
+    // -------------------------------------------------------------------------
+    // CÁC THUỘC TÍNH THUỘC BẢNG worker_preferences (@SecondaryTable)
+    // -------------------------------------------------------------------------
+    @Column(table = "worker_preferences", name = "base_address", columnDefinition = "TEXT")
+    private String baseAddress;
+
+    @Column(table = "worker_preferences", name = "base_lat")
+    private Double baseLat;
+
+    @Column(table = "worker_preferences", name = "base_lng")
+    private Double baseLng;
+
+    @Column(table = "worker_preferences", name = "min_wage", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal minWage = BigDecimal.ZERO;
+
+    @Column(table = "worker_preferences", name = "max_distance_km")
+    private Double maxDistanceKm;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

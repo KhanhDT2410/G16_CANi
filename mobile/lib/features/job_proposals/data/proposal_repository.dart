@@ -142,4 +142,62 @@ class ProposalRepository {
       return true; // Fallback demo
     }
   }
+
+  // Quét QR Check-in điểm danh vào ca làm việc
+  Future<AttendanceCheckResult> checkin({
+    required String assignmentId,
+    required String qrContent,
+    double? lat,
+    double? lng,
+    String? token,
+  }) async {
+    final options = Options(
+      headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+    );
+    final response = await _dio.post(
+      '/workers/assignments/$assignmentId/checkin',
+      data: {
+        'qrContent': qrContent,
+        'lat': lat,
+        'lng': lng,
+      },
+      options: options,
+    );
+    if (response.data != null && response.data['data'] != null) {
+      return AttendanceCheckResult.fromJson(response.data['data']);
+    }
+    return AttendanceCheckResult(
+      assignmentId: assignmentId,
+      message: 'Điểm danh Check-in thành công!',
+    );
+  }
+
+  // Quét QR Check-out hoàn thành ca làm việc
+  Future<AttendanceCheckResult> checkout({
+    required String assignmentId,
+    required String qrContent,
+    double? lat,
+    double? lng,
+    String? token,
+  }) async {
+    final options = Options(
+      headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+    );
+    final response = await _dio.post(
+      '/workers/assignments/$assignmentId/checkout',
+      data: {
+        'qrContent': qrContent,
+        'lat': lat,
+        'lng': lng,
+      },
+      options: options,
+    );
+    if (response.data != null && response.data['data'] != null) {
+      return AttendanceCheckResult.fromJson(response.data['data']);
+    }
+    return AttendanceCheckResult(
+      assignmentId: assignmentId,
+      message: 'Điểm danh Check-out thành công!',
+    );
+  }
 }

@@ -66,6 +66,12 @@ class ShiftAssignmentItem {
   final String paymentStatus; // NOT_DECLARED, DECLARED_PENDING_WORKER, CONFIRMED_FULL, CONFIRMED_PARTIAL, DISPUTED
   final double declaredAmount;
   final String? paymentMethod;
+  final double? venueLat;
+  final double? venueLng;
+  final String? attendanceStatus;
+  final DateTime? checkinTime;
+  final DateTime? checkoutTime;
+  final double? hoursWorked;
 
   ShiftAssignmentItem({
     required this.assignmentId,
@@ -82,6 +88,12 @@ class ShiftAssignmentItem {
     required this.paymentStatus,
     required this.declaredAmount,
     this.paymentMethod,
+    this.venueLat,
+    this.venueLng,
+    this.attendanceStatus,
+    this.checkinTime,
+    this.checkoutTime,
+    this.hoursWorked,
   });
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
@@ -100,6 +112,50 @@ class ShiftAssignmentItem {
       paymentStatus: json['paymentStatus'] ?? 'NOT_DECLARED',
       declaredAmount: (json['declaredAmount'] is num) ? (json['declaredAmount'] as num).toDouble() : 0.0,
       paymentMethod: json['paymentMethod'],
+      venueLat: (json['venueLat'] is num) ? (json['venueLat'] as num).toDouble() : null,
+      venueLng: (json['venueLng'] is num) ? (json['venueLng'] as num).toDouble() : null,
+      attendanceStatus: json['attendanceStatus'],
+      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime']) : null,
+      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime']) : null,
+      hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
+    );
+  }
+}
+
+class AttendanceCheckResult {
+  final String assignmentId;
+  final String? attendanceId;
+  final String? attendanceStatus;
+  final String? assignmentStatus;
+  final DateTime? checkinTime;
+  final DateTime? checkoutTime;
+  final double? hoursWorked;
+  final bool? isOnTime;
+  final String message;
+
+  AttendanceCheckResult({
+    required this.assignmentId,
+    this.attendanceId,
+    this.attendanceStatus,
+    this.assignmentStatus,
+    this.checkinTime,
+    this.checkoutTime,
+    this.hoursWorked,
+    this.isOnTime,
+    required this.message,
+  });
+
+  factory AttendanceCheckResult.fromJson(Map<String, dynamic> json) {
+    return AttendanceCheckResult(
+      assignmentId: json['assignmentId'] ?? '',
+      attendanceId: json['attendanceId'],
+      attendanceStatus: json['attendanceStatus'],
+      assignmentStatus: json['assignmentStatus'],
+      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime']) : null,
+      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime']) : null,
+      hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
+      isOnTime: json['isOnTime'] ?? true,
+      message: json['message'] ?? 'Thành công',
     );
   }
 }

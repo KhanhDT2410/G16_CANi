@@ -105,6 +105,38 @@ public class WorkerJobController {
     }
 
     /**
+     * Worker quét QR Check-in điểm danh vào ca làm việc
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/assignments/{assignmentId}/checkin")
+    public ResponseEntity<ApiResponse<com.cani.dto.worker.AttendanceCheckResponseDto>> checkin(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @RequestBody com.cani.dto.worker.AttendanceCheckRequestDto request,
+            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            Authentication authentication
+    ) {
+        UUID userId = resolveUserId(authentication, explicitUserId);
+        com.cani.dto.worker.AttendanceCheckResponseDto response = workerJobService.checkinAssignment(userId, assignmentId, request);
+        return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
+    }
+
+    /**
+     * Worker quét QR Check-out hoàn thành ca làm việc
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/assignments/{assignmentId}/checkout")
+    public ResponseEntity<ApiResponse<com.cani.dto.worker.AttendanceCheckResponseDto>> checkout(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @RequestBody com.cani.dto.worker.AttendanceCheckRequestDto request,
+            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            Authentication authentication
+    ) {
+        UUID userId = resolveUserId(authentication, explicitUserId);
+        com.cani.dto.worker.AttendanceCheckResponseDto response = workerJobService.checkoutAssignment(userId, assignmentId, request);
+        return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
+    }
+
+    /**
      * Quét và tìm kiếm các ca làm việc xung quanh vị trí Worker trên bản đồ (Job Radar Map)
      */
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")

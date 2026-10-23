@@ -1,5 +1,7 @@
 package com.cani.service;
 
+import com.cani.dto.worker.AttendanceCheckRequestDto;
+import com.cani.dto.worker.AttendanceCheckResponseDto;
 import com.cani.dto.worker.JobProposalResponseDto;
 import com.cani.dto.worker.NearbyShiftResponseDto;
 import com.cani.dto.worker.ShiftAssignmentResponseDto;
@@ -7,6 +9,7 @@ import com.cani.dto.worker.WorkerOnlineStatusRequestDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentSource;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.AttendanceStatus;
 import com.cani.entity.enums.ProposalStatus;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.exception.BadRequestException;
@@ -18,9 +21,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -36,6 +42,7 @@ public class WorkerJobService {
     private final EventRepository eventRepository;
     private final MatchingDispatchService matchingDispatchService;
     private final DirectPaymentService directPaymentService;
+    private final AttendanceLogRepository attendanceLogRepository;
 
     /**
      * Bật / tắt trạng thái "Bắt đầu kiếm việc" (Online status)
@@ -240,6 +247,16 @@ public class WorkerJobService {
             totalPay = s.getHourlyWage().multiply(BigDecimal.valueOf(hours)).add(s.getAllowance() != null ? s.getAllowance() : BigDecimal.ZERO);
         }
 
+        Double venueLat = s != null && s.getLocationLat() != null ? s.getLocationLat() : (e != null && e.getVenueLat() != null ? e.getVenueLat() : 10.7769);
+        Double venueLng = s != null && s.getLocationLng() != null ? s.getLocationLng() : (e != null && e.getVenueLng() != null ? e.getVenueLng() : 106.7009);
+
+        // Tra cứu lịch sử điểm danh nếu có
+        Optional<AttendanceLog> attendanceOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(a.getAssignmentId());
+        String attendanceStatus = attendanceOpt.map(att -> att.getAttendanceStatus().name()).orElse("NOT_CHECKED_IN");
+        Instant checkinTime = attendanceOpt.map(AttendanceLog::getCheckinTime).orElse(null);
+        Instant checkoutTime = attendanceOpt.map(AttendanceLog::getCheckoutTime).orElse(null);
+        BigDecimal hoursWorked = attendanceOpt.map(AttendanceLog::getHoursWorked).orElse(BigDecimal.ZERO);
+
         return ShiftAssignmentResponseDto.builder()
                 .assignmentId(a.getAssignmentId())
                 .shiftId(s != null ? s.getShiftId() : null)
@@ -254,8 +271,143 @@ public class WorkerJobService {
                 .status(a.getStatus())
                 .source(a.getSource())
                 .eoConfirmed(a.getEoConfirmed())
+                .venueLat(venueLat)
+                .venueLng(venueLng)
+                .attendanceStatus(attendanceStatus)
+                .checkinTime(checkinTime)
+                .checkoutTime(checkoutTime)
+                .hoursWorked(hoursWorked)
                 .createdAt(a.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Quét QR Check-in vào ca làm việc
+     */
+    @Transactional
+    public AttendanceCheckResponseDto checkinAssignment(UUID userId, UUID assignmentId, AttendanceCheckRequestDto request) {
+        Worker worker = workerRepository.findByUser_UserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Worker cho User: " + userId));
+
+        ShiftAssignment assignment = shiftAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ca làm việc đã nhận: " + assignmentId));
+
+        if (!assignment.getWorker().getWorkerId().equals(worker.getWorkerId())) {
+            throw new BadRequestException("Bạn không có quyền điểm danh cho ca làm việc này.");
+        }
+
+        Shift shift = assignment.getShift();
+        Instant now = Instant.now();
+
+        AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
+                .orElseGet(() -> AttendanceLog.builder()
+                        .shiftAssignment(assignment)
+                        .worker(worker)
+                        .build());
+
+        if (attendanceLog.getCheckinTime() != null) {
+            throw new BadRequestException("Bạn đã thực hiện check-in vào ca làm việc này rồi.");
+        }
+
+        boolean isOnTime = shift == null || shift.getStartTime() == null ||
+                now.isBefore(shift.getStartTime().plus(Duration.ofMinutes(15)));
+
+        AttendanceStatus status = isOnTime ? AttendanceStatus.ON_TIME : AttendanceStatus.LATE;
+
+        attendanceLog.setCheckinTime(now);
+        attendanceLog.setCheckinLat(request.getLat());
+        attendanceLog.setCheckinLng(request.getLng());
+        attendanceLog.setCheckinQrHash(request.getQrContent() != null ? hashString(request.getQrContent()) : "MANUAL_CHECKIN");
+        attendanceLog.setIsOnTime(isOnTime);
+        attendanceLog.setAttendanceStatus(status);
+
+        attendanceLog = attendanceLogRepository.save(attendanceLog);
+
+        assignment.setStatus(AssignmentStatus.CHECKED_IN);
+        shiftAssignmentRepository.save(assignment);
+
+        String msg = isOnTime
+                ? "Điểm danh Check-in thành công! Bạn đã có mặt đúng giờ."
+                : "Điểm danh Check-in thành công (Ghi nhận có mặt muộn).";
+
+        return AttendanceCheckResponseDto.builder()
+                .assignmentId(assignmentId)
+                .attendanceId(attendanceLog.getAttendanceId())
+                .attendanceStatus(status)
+                .assignmentStatus(assignment.getStatus().name())
+                .checkinTime(now)
+                .isOnTime(isOnTime)
+                .message(msg)
+                .build();
+    }
+
+    /**
+     * Quét QR Check-out hoàn thành ca làm việc
+     */
+    @Transactional
+    public AttendanceCheckResponseDto checkoutAssignment(UUID userId, UUID assignmentId, AttendanceCheckRequestDto request) {
+        Worker worker = workerRepository.findByUser_UserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Worker cho User: " + userId));
+
+        ShiftAssignment assignment = shiftAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ca làm việc đã nhận: " + assignmentId));
+
+        if (!assignment.getWorker().getWorkerId().equals(worker.getWorkerId())) {
+            throw new BadRequestException("Bạn không có quyền điểm danh cho ca làm việc này.");
+        }
+
+        AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
+                .orElseThrow(() -> new BadRequestException("Bạn chưa check-in vào ca làm việc này nên không thể check-out."));
+
+        if (attendanceLog.getCheckoutTime() != null) {
+            throw new BadRequestException("Bạn đã check-out hoàn thành ca làm việc này rồi.");
+        }
+
+        Instant now = Instant.now();
+        Instant checkin = attendanceLog.getCheckinTime() != null ? attendanceLog.getCheckinTime() : now.minus(Duration.ofHours(4));
+        long minutes = Math.max(30, Duration.between(checkin, now).toMinutes());
+        BigDecimal hoursWorked = BigDecimal.valueOf(minutes / 60.0);
+
+        attendanceLog.setCheckoutTime(now);
+        attendanceLog.setCheckoutQrHash(request.getQrContent() != null ? hashString(request.getQrContent()) : "MANUAL_CHECKOUT");
+        attendanceLog.setHoursWorked(hoursWorked);
+        attendanceLog.setAttendanceStatus(AttendanceStatus.CHECKED_OUT);
+
+        attendanceLogRepository.save(attendanceLog);
+
+        assignment.setStatus(AssignmentStatus.COMPLETED);
+        shiftAssignmentRepository.save(assignment);
+
+        worker.setTotalShiftsCompleted((worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
+        workerRepository.save(worker);
+
+        return AttendanceCheckResponseDto.builder()
+                .assignmentId(assignmentId)
+                .attendanceId(attendanceLog.getAttendanceId())
+                .attendanceStatus(AttendanceStatus.CHECKED_OUT)
+                .assignmentStatus(assignment.getStatus().name())
+                .checkinTime(attendanceLog.getCheckinTime())
+                .checkoutTime(now)
+                .hoursWorked(hoursWorked)
+                .isOnTime(attendanceLog.getIsOnTime())
+                .message("Điểm danh Check-out thành công! Cảm ơn bạn đã hoàn thành ca làm việc.")
+                .build();
+    }
+
+    private String hashString(String raw) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(raw.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            return String.valueOf(raw.hashCode());
+        }
     }
 
     /**

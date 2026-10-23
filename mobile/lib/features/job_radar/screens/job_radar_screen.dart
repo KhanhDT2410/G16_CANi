@@ -69,6 +69,51 @@ class JobRadarScreen extends ConsumerWidget {
             ),
           ),
 
+          // 1.1 Trạng thái GPS Thực tế / Cấp quyền
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: state.isRealLocation ? Colors.blue.shade50 : Colors.amber.shade50,
+            child: Row(
+              children: [
+                Icon(
+                  state.isRealLocation ? Icons.gps_fixed : Icons.gps_not_fixed,
+                  size: 16,
+                  color: state.isRealLocation ? Colors.blue.shade700 : Colors.amber.shade800,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    state.isRealLocation
+                        ? 'Vị trí GPS thực: ${state.userLat.toStringAsFixed(4)}, ${state.userLng.toStringAsFixed(4)}'
+                        : (state.errorMessage ?? 'Chưa kích hoạt GPS chính xác. Nhấn định vị để cấp quyền.'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: state.isRealLocation ? Colors.blue.shade900 : Colors.amber.shade900,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => notifier.refreshCurrentLocation(),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(
+                    state.isRealLocation ? 'Cập nhật' : 'Cấp quyền GPS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: state.isRealLocation ? Colors.blue.shade700 : Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // 2. Bộ lọc bán kính & Nút chuyển đổi View Mode (Bản đồ / Danh sách)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
@@ -117,10 +162,25 @@ class JobRadarScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => notifier.scanNearbyShifts(),
-        icon: const Icon(Icons.my_location),
-        label: const Text('Quét lại', style: TextStyle(fontWeight: FontWeight.bold)),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'recenter_gps',
+            onPressed: () => notifier.refreshCurrentLocation(),
+            tooltip: 'Định vị GPS thực tế',
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.blue.shade700,
+            child: const Icon(Icons.my_location),
+          ),
+          const SizedBox(width: 10),
+          FloatingActionButton.extended(
+            heroTag: 'refresh_jobs',
+            onPressed: () => notifier.scanNearbyShifts(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Quét lại', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

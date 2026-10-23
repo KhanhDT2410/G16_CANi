@@ -29,5 +29,11 @@ public class ShiftAssignmentResponseDto {
     private AssignmentStatus status;
     private AssignmentSource source;
     private Boolean eoConfirmed;
+    private Double venueLat;
+    private Double venueLng;
+    private String attendanceStatus;
+    private Instant checkinTime;
+    private Instant checkoutTime;
+    private BigDecimal hoursWorked;
     private Instant createdAt;
 }

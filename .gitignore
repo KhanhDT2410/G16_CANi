@@ -34,14 +34,10 @@ mobile/.flutter-plugins-cache/
 mobile/.symlinks/
 mobile/android/.gradle/
 mobile/android/app/build/
-mobile/ios/Pods/
-mobile/ios/.symlinks/
-mobile/ios/Flutter/ephemeral/
-mobile/macos/Pods/
-mobile/macos/.symlinks/
-mobile/macos/Flutter/ephemeral/
+mobile/ios/
+mobile/macos/
+mobile/linux/
 mobile/windows/flutter/ephemeral/
-mobile/linux/flutter/ephemeral/
 
 # IDE & AI Tooling
 .idea/

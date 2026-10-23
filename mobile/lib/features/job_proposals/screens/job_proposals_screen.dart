@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 
-class JobProposalsScreen extends StatefulWidget {
+class JobProposalsScreen extends ConsumerStatefulWidget {
   const JobProposalsScreen({super.key});
 
   @override
-  State<JobProposalsScreen> createState() => _JobProposalsScreenState();
+  ConsumerState<JobProposalsScreen> createState() => _JobProposalsScreenState();
 }
 
-class _JobProposalsScreenState extends State<JobProposalsScreen> with SingleTickerProviderStateMixin {
+class _JobProposalsScreenState extends ConsumerState<JobProposalsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final ProposalRepository _repository = ProposalRepository();
 
   List<JobProposalItem> _proposals = [];
   List<ShiftAssignmentItem> _assignments = [];
@@ -32,8 +33,9 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> with SingleTick
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final props = await _repository.fetchProposals();
-    final assigns = await _repository.fetchAssignments();
+    final repo = ref.read(proposalRepositoryProvider);
+    final props = await repo.fetchProposals();
+    final assigns = await repo.fetchAssignments();
     if (mounted) {
       setState(() {
         _proposals = props;
@@ -57,7 +59,7 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> with SingleTick
     );
 
     if (confirmed == true) {
-      await _repository.acceptProposal(item.proposalId);
+      await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
       setState(() {
         _proposals.removeWhere((p) => p.proposalId == item.proposalId);
         _assignments.insert(
@@ -89,7 +91,7 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> with SingleTick
   }
 
   Future<void> _rejectProposal(JobProposalItem item) async {
-    await _repository.rejectProposal(item.proposalId, 'Bận lịch cá nhân');
+    await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
     setState(() {
       _proposals.removeWhere((p) => p.proposalId == item.proposalId);
     });
@@ -108,7 +110,7 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> with SingleTick
       comment = 'Nhận thiếu thù lao ca làm';
     }
 
-    await _repository.confirmPayment(item.assignmentId, status, comment);
+    await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, status, comment);
     setState(() {
       final index = _assignments.indexWhere((a) => a.assignmentId == item.assignmentId);
       if (index != -1) {

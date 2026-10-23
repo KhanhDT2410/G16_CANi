@@ -1,19 +1,11 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import 'package:cani/core/network/auth_interceptor.dart';
 import '../models/ekyc_models.dart';
 
 class EkycRepository {
   final Dio _dio;
-  static const String _baseUrl = 'http://localhost:8080/api/v1';
 
-  EkycRepository({Dio? dio})
-      : _dio = dio ??
-            (Dio(BaseOptions(
-              baseUrl: _baseUrl,
-              connectTimeout: const Duration(seconds: 25),
-              receiveTimeout: const Duration(seconds: 90), // AI Multimodal cần thời gian phân tích
-            ))..interceptors.add(AuthInterceptor()));
+  EkycRepository(this._dio);
 
   Future<EkycVerificationItem> submitEkyc({
     required Uint8List frontBytes,
@@ -43,10 +35,11 @@ class EkycRepository {
 
       final options = Options(
         headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+        receiveTimeout: const Duration(seconds: 90), // AI Multimodal cần thời gian phân tích ảnh
       );
 
       final response = await _dio.post(
-        '/workers/ekyc/submit',
+        '/v1/workers/ekyc/submit',
         data: formData,
         queryParameters: queryParams,
         options: options,
@@ -68,11 +61,9 @@ class EkycRepository {
 
   Future<EkycVerificationItem?> getMyEkycStatus({String? token}) async {
     try {
-      final options = Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-      );
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
 
-      final response = await _dio.get('/workers/ekyc/status', options: options);
+      final response = await _dio.get('/v1/workers/ekyc/status', options: options);
       if (response.data != null && response.data['data'] != null) {
         return EkycVerificationItem.fromJson(response.data['data']);
       }

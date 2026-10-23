@@ -48,7 +48,7 @@ class AiVerificationResultCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Kết Quả Thẩm Định AI Gemini',
+                  'Kết Quả Thẩm Định Vision AI',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: statusColor,

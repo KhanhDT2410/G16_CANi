@@ -18,4 +18,6 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
     List<WorkerEkycVerification> findByStatusOrderByCreatedAtDesc(String status);
 
     boolean existsByCccdNumberHashAndStatus(String cccdNumberHash, String status);
+
+    boolean existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(String cccdNumberHash, String status, UUID workerId);
 }

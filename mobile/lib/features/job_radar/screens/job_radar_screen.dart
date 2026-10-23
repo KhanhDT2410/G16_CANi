@@ -69,42 +69,41 @@ class JobRadarScreen extends ConsumerWidget {
             ),
           ),
 
-          // 2. Bộ lọc bán kính & Nút chuyển đổi View Mode (Radar Map / List)
+          // 2. Bộ lọc bán kính & Nút chuyển đổi View Mode (Bản đồ / Danh sách)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Chọn bán kính
-                Row(
-                  children: [
-                    const Text('Bán kính:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Wrap(
-                      spacing: 4,
-                      children: [5.0, 10.0, 15.0].map((r) {
-                        final isSel = state.searchRadiusKm == r;
-                        return ChoiceChip(
-                          label: Text('${r.toInt()}km', style: TextStyle(fontSize: 11, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
-                          selected: isSel,
-                          onSelected: (_) => notifier.setRadius(r),
-                          visualDensity: VisualDensity.compact,
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // Chọn bán kính
+                  const Text('Bán kính:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 6),
+                  Wrap(
+                    spacing: 4,
+                    children: [5.0, 10.0, 15.0].map((r) {
+                      final isSel = state.searchRadiusKm == r;
+                      return ChoiceChip(
+                        label: Text('${r.toInt()}km', style: TextStyle(fontSize: 11, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                        selected: isSel,
+                        onSelected: (_) => notifier.setRadius(r),
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(width: 12),
 
-                // Toggle Radar / List
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment(value: true, icon: Icon(Icons.radar, size: 16), label: Text('Radar', style: TextStyle(fontSize: 11))),
-                    ButtonSegment(value: false, icon: Icon(Icons.view_list, size: 16), label: Text('Danh sách', style: TextStyle(fontSize: 11))),
-                  ],
-                  selected: {state.isRadarView},
-                  onSelectionChanged: (set) => notifier.toggleViewMode(set.first),
-                ),
-              ],
+                  // Toggle Bản đồ / Danh sách
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: true, icon: Icon(Icons.map_outlined, size: 16), label: Text('Bản đồ', style: TextStyle(fontSize: 11))),
+                      ButtonSegment(value: false, icon: Icon(Icons.view_list, size: 16), label: Text('Danh sách', style: TextStyle(fontSize: 11))),
+                    ],
+                    selected: {state.isRadarView},
+                    onSelectionChanged: (set) => notifier.toggleViewMode(set.first),
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -129,7 +128,7 @@ class JobRadarScreen extends ConsumerWidget {
   Widget _buildRadarView(BuildContext context, JobRadarState state, JobRadarNotifier notifier) {
     return Column(
       children: [
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -143,13 +142,15 @@ class JobRadarScreen extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Expanded(
           child: JobRadarMapWidget(
             shifts: state.nearbyShifts,
             selectedShift: state.selectedShift,
             maxRadiusKm: state.searchRadiusKm,
             isOnline: state.isOnline,
+            userLat: state.userLat,
+            userLng: state.userLng,
             onSelectShift: (shift) {
               notifier.selectShift(shift);
               _showShiftDetails(context, shift);

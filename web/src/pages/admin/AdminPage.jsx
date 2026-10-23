@@ -111,7 +111,7 @@ const AdminPage = () => {
           <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10b981' }}>
             84.2%
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#10b981' }}>Gemini Multimodal Vision</div>
+          <div style={{ fontSize: '0.8rem', color: '#10b981' }}>Multimodal Vision AI</div>
         </div>
         <div className="admin-metric-card">
           <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>

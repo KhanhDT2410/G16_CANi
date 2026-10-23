@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ekyc_models.dart';
 import '../providers/ekyc_provider.dart';
 import 'card_scanner_screen.dart';
+import 'cccd_qr_scanner_screen.dart';
+import 'cccd_confirm_dialog.dart';
 
 class EkycVerificationScreen extends ConsumerStatefulWidget {
   const EkycVerificationScreen({super.key});
@@ -36,6 +38,39 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
     }
   }
 
+  Future<void> _openQrScanner() async {
+    final notifier = ref.read(ekycProvider.notifier);
+    final result = await Navigator.of(context).push<CccdCardInfo>(
+      MaterialPageRoute(
+        builder: (_) => const CccdQrScannerScreen(),
+      ),
+    );
+
+    if (result != null && mounted) {
+      notifier.setConfirmedCccdInfo(
+        cccdNumber: result.cccdNumber,
+        fullName: result.fullName,
+        dob: result.dob,
+        gender: result.gender,
+        residenceAddress: result.residenceAddress,
+        issueDate: result.issueDate,
+      );
+
+      _openConfirmDialog();
+    }
+  }
+
+  void _openConfirmDialog() {
+    final state = ref.read(ekycProvider);
+    final notifier = ref.read(ekycProvider.notifier);
+
+    CccdConfirmDialog.show(
+      context,
+      state: state,
+      onConfirm: notifier.setConfirmedCccdInfo,
+    );
+  }
+
   Future<void> _selectImageSource({
     required BuildContext context,
     required String title,
@@ -61,6 +96,28 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
+
+                if (scanType == ScanType.cccdFront) ...[
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.qr_code_scanner, color: Colors.purple),
+                    ),
+                    title: const Text('Quét mã QR góc thẻ CCCD', style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Đọc đúng 100% dữ liệu Bộ Công An (không dùng AI)'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _openQrScanner();
+                    },
+                  ),
+                  const Divider(),
+                ],
+
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(10),
@@ -121,6 +178,13 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
       appBar: AppBar(
         title: const Text('Định Danh Điện Tử (eKYC)'),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_note),
+            tooltip: 'Xem & sửa thông tin CCCD',
+            onPressed: _openConfirmDialog,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -130,6 +194,16 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
             // Status Header Banner
             _buildStatusHeader(context, state.result),
             const SizedBox(height: 16),
+
+            // Banner Hướng dẫn quét QR & Chỉnh sửa thông tin
+            _buildQrScanBanner(context, state),
+            const SizedBox(height: 16),
+
+            // Card hiển thị thông tin CCCD đã xác nhận (nếu có)
+            if (state.hasConfirmedInfo) ...[
+              _buildConfirmedCard(context, state),
+              const SizedBox(height: 16),
+            ],
 
             if (state.errorMessage != null)
               Container(
@@ -223,7 +297,7 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
                     )
                   : const Icon(Icons.verified_user),
               label: Text(
-                state.isLoading ? 'AI Đang Phân Tích & So Khớp...' : 'Gửi Thẩm Định AI eKYC',
+                state.isLoading ? 'Đang gửi hồ sơ xác thực...' : 'Gửi Hồ Sơ Xác Thực eKYC',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               style: FilledButton.styleFrom(
@@ -436,7 +510,7 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
                 const Icon(Icons.analytics_outlined, color: Colors.blueAccent),
                 const SizedBox(width: 8),
                 const Text(
-                  'Chi Tiết Thẩm Định AI',
+                  'Chi Tiết Xác Thực eKYC',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const Spacer(),
@@ -545,4 +619,136 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
       ),
     );
   }
+
+  Widget _buildQrScanBanner(BuildContext context, EkycState state) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bóc Tách Thông Tin Thẻ Chuẩn 100%',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Quét QR góc thẻ hoặc tự chỉnh sửa thông tin (Không dùng AI)',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: _openQrScanner,
+                  icon: const Icon(Icons.qr_code, size: 18),
+                  label: const Text('Quét Mã QR CCCD', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _openConfirmDialog,
+                icon: const Icon(Icons.edit, size: 16),
+                label: const Text('Sửa Thông Tin', style: TextStyle(fontSize: 13)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfirmedCard(BuildContext context, EkycState state) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified, color: Colors.green, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Thông Tin CCCD Đã Xác Nhận',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 14),
+                ),
+              ),
+              InkWell(
+                onTap: _openConfirmDialog,
+                borderRadius: BorderRadius.circular(6),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.edit_outlined, size: 14, color: Colors.green),
+                      SizedBox(width: 4),
+                      Text('Sửa', style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 16),
+          if (state.confirmedCccd != null)
+            _buildInfoRow('Số CCCD:', state.confirmedCccd!),
+          if (state.confirmedFullName != null)
+            _buildInfoRow('Họ và tên:', state.confirmedFullName!),
+          if (state.confirmedDob != null)
+            _buildInfoRow('Ngày sinh:', state.confirmedDob!),
+          if (state.confirmedGender != null)
+            _buildInfoRow('Giới tính:', state.confirmedGender!),
+          if (state.confirmedResidenceAddress != null)
+            _buildInfoRow('Thường trú:', state.confirmedResidenceAddress!),
+          if (state.confirmedIssueDate != null && state.confirmedIssueDate!.isNotEmpty)
+            _buildInfoRow('Ngày cấp:', state.confirmedIssueDate!),
+        ],
+      ),
+    );
+  }
 }
+

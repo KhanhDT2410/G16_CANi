@@ -15,6 +15,19 @@ export const authApi = {
     }
   },
 
+  sendOtp: async (email, otpType = 'REGISTER') => {
+    try {
+      const response = await apiClient.post('/auth/send-otp', { email, otpType });
+      return response.data;
+    } catch (error) {
+      if (!error.response) {
+        throw new Error('Không thể kết nối đến máy chủ Backend.');
+      }
+      const message = error.response.data?.message || 'Không thể gửi mã xác thực OTP. Vui lòng thử lại.';
+      throw new Error(message);
+    }
+  },
+
   register: async (userData) => {
     try {
       const response = await apiClient.post('/auth/register', userData);

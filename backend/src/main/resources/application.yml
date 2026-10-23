@@ -33,6 +33,18 @@ spring:
         type:
           preferred_enum_jdbc_type: NAMED_ENUM
 
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -71,3 +83,13 @@ cani:
       model: ${GEMINI_MODEL:gemini-3.5-flash}
       url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
       timeout-ms: 20000
+  ekyc:
+    provider: ${EKYC_PROVIDER:vnpt}
+    vnpt:
+      enabled: ${VNPT_EKYC_ENABLED:false}
+      base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}
+      token-id: ${VNPT_EKYC_TOKEN_ID:5e7a3b1b-db74-1656-e063-63199f0a717f}
+      token-key: ${VNPT_EKYC_TOKEN_KEY:MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAlvv9EToVRDb3ZS58HaSGBNDHN9GLm9lROWE4CxyRMHib2K1XCmSS6suua/4coDMvthnv8zKmUy25BiplQtd6MMCAwEAAQ==}
+      access-token: ${VNPT_EKYC_ACCESS_TOKEN:}
+      mac-address: ${VNPT_EKYC_MAC_ADDRESS:TEST1}
+      timeout-ms: 25000

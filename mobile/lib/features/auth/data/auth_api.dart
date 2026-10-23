@@ -25,6 +25,22 @@ class AuthApi {
     return LoginResponseModel.fromJson(data);
   }
 
+  Future<void> sendOtp(String email, [String otpType = 'REGISTER']) async {
+    await _dio.post<void>(
+      '/auth/send-otp',
+      data: {'email': email, 'otpType': otpType},
+    );
+  }
+
+  Future<LoginResponseModel> syncGoogleAuth(String supabaseAccessToken) async {
+    final response = await _dio.post<Map<String, Object?>>(
+      '/auth/google',
+      data: {'supabaseAccessToken': supabaseAccessToken},
+    );
+    final data = (response.data?['data'] as Map<String, Object?>?) ?? <String, Object?>{};
+    return LoginResponseModel.fromJson(data);
+  }
+
   Future<UserDto> register(RegisterRequestModel request) async {
     final response = await _dio.post<Map<String, Object?>>(
       '/auth/register',

@@ -24,6 +24,7 @@ class RegisterRequestModel {
     required this.email,
     required this.password,
     required this.fullName,
+    required this.otpCode,
     this.phone,
     this.accountType = 'WORKER',
   });
@@ -31,6 +32,7 @@ class RegisterRequestModel {
   final String email;
   final String password;
   final String fullName;
+  final String otpCode;
   final String? phone;
   final String accountType;
 
@@ -39,6 +41,7 @@ class RegisterRequestModel {
       'email': email,
       'password': password,
       'fullName': fullName,
+      'otpCode': otpCode,
       'phone': phone,
       'accountType': accountType,
     };

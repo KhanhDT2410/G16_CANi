@@ -71,7 +71,7 @@ class _AiVerificationTabState extends ConsumerState<AiVerificationTab> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('AI Gemini đã phân tích thành công chứng chỉ của bạn!'),
+            content: Text('Hệ thống AI đã phân tích thành công chứng chỉ của bạn!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -122,7 +122,7 @@ class _AiVerificationTabState extends ConsumerState<AiVerificationTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'AI Skill Verification (Gemini Vision)',
+                        'AI Skill Verification',
                         style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
@@ -249,7 +249,7 @@ class _AiVerificationTabState extends ConsumerState<AiVerificationTab> {
                             )
                           : const Icon(Icons.bolt),
                       label: Text(
-                        state.isSubmitting ? 'AI Gemini đang phân tích hồ sơ...' : 'GỬI THẨM ĐỊNH AI (GEMINI VISION)',
+                        state.isSubmitting ? 'AI đang phân tích hồ sơ...' : 'GỬI THẨM ĐỊNH CHỨNG CHỈ (AI)',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                       ),
                       style: ElevatedButton.styleFrom(

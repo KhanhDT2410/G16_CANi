@@ -53,10 +53,24 @@ class AuthRepository {
     }
   }
 
+  Future<void> sendOtp(String email) async {
+    try {
+      await _api.sendOtp(email, 'REGISTER');
+    } on DioException catch (e) {
+      final message = (e.response?.data is Map)
+          ? (e.response?.data as Map)['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Không thể gửi mã OTP. Vui lòng kiểm tra lại email.');
+    } catch (e) {
+      throw Exception('Lỗi gửi OTP: ${e.toString()}');
+    }
+  }
+
   Future<UserDto> registerWorker({
     required String email,
     required String password,
     required String fullName,
+    required String otpCode,
     String? phone,
   }) async {
     try {
@@ -65,6 +79,7 @@ class AuthRepository {
           email: email,
           password: password,
           fullName: fullName,
+          otpCode: otpCode,
           phone: phone,
           accountType: 'WORKER',
         ),
@@ -76,6 +91,40 @@ class AuthRepository {
       throw Exception(message ?? 'Đăng ký tài khoản thất bại.');
     } catch (e) {
       throw Exception('Lỗi đăng ký: ${e.toString()}');
+    }
+  }
+
+  Future<LoginResponseModel> signInWithGoogle() async {
+    try {
+      // 1. Mở Supabase OAuth Google Sign-in
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'cani://login-callback',
+      );
+
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session == null || session.accessToken.isEmpty) {
+        throw Exception('Không nhận được phiên xác thực từ Google.');
+      }
+
+      // 2. Đồng bộ user sang CANi Backend API
+      final response = await _api.syncGoogleAuth(session.accessToken);
+
+      // 3. Lưu trữ token
+      AuthInterceptor.inMemoryToken = response.token;
+      await _storage.write(key: _tokenKey, value: response.token);
+      if (response.refreshToken != null) {
+        await _storage.write(key: _refreshTokenKey, value: response.refreshToken);
+      }
+
+      return response;
+    } on DioException catch (e) {
+      final message = (e.response?.data is Map)
+          ? (e.response?.data as Map)['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Xác thực Google không thành công.');
+    } catch (e) {
+      throw Exception('Lỗi Google Sign-In: ${e.toString()}');
     }
   }
 

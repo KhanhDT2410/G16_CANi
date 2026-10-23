@@ -1,5 +1,6 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 
@@ -9,6 +10,8 @@ class JobRadarMapWidget extends StatefulWidget {
   final ValueChanged<NearbyShiftItem> onSelectShift;
   final double maxRadiusKm;
   final bool isOnline;
+  final double userLat;
+  final double userLng;
 
   const JobRadarMapWidget({
     super.key,
@@ -17,6 +20,8 @@ class JobRadarMapWidget extends StatefulWidget {
     required this.onSelectShift,
     this.maxRadiusKm = 15.0,
     this.isOnline = true,
+    this.userLat = 10.7769,
+    this.userLng = 106.7009,
   });
 
   @override
@@ -24,243 +29,250 @@ class JobRadarMapWidget extends StatefulWidget {
 }
 
 class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
+  late final MapController _mapController;
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
+    _mapController = MapController();
+    _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
-    _animController.dispose();
+    _pulseController.dispose();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  void _recenter() {
+    _mapController.move(LatLng(widget.userLat, widget.userLng), 13.0);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final userPos = LatLng(widget.userLat, widget.userLng);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = math.min(constraints.maxWidth, constraints.maxHeight);
-        final center = Offset(size / 2, size / 2);
-        final radarRadius = (size / 2) - 30;
+    return Stack(
+      children: [
+        // 1. Bản đồ tương tác vệ tinh / đường phố OpenStreetMap
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: userPos,
+            initialZoom: 13.0,
+            minZoom: 9.0,
+            maxZoom: 18.0,
+          ),
+          children: [
+            // Lớp gạch nền bản đồ OpenStreetMap
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.cani.cani',
+            ),
 
-        return Center(
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // 1. Radar background canvas với tia quét xoay
-                AnimatedBuilder(
-                  animation: _animController,
-                  builder: (context, child) {
-                    return CustomPaint(
-                      size: Size(size, size),
-                      painter: _RadarBackgroundPainter(
-                        angle: _animController.value * 2 * math.pi,
-                        theme: theme,
-                        isOnline: widget.isOnline,
-                        maxRadiusKm: widget.maxRadiusKm,
-                      ),
-                    );
-                  },
+            // Lớp vòng tròn quét bán kính tìm việc
+            CircleLayer(
+              circles: [
+                CircleMarker(
+                  point: userPos,
+                  radius: widget.maxRadiusKm * 1000, // Đổi sang mét
+                  useRadiusInMeter: true,
+                  color: (widget.isOnline ? Colors.teal : Colors.grey).withOpacity(0.12),
+                  borderColor: (widget.isOnline ? Colors.teal : Colors.grey).withOpacity(0.6),
+                  borderStrokeWidth: 2,
                 ),
+              ],
+            ),
 
-                // 2. Chấm tâm vị trí người dùng (Worker)
-                Positioned(
-                  left: center.dx - 22,
-                  top: center.dy - 22,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: widget.isOnline ? Colors.blue.shade600 : Colors.grey,
-                      border: Border.all(color: Colors.white, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (widget.isOnline ? Colors.blue : Colors.grey).withOpacity(0.4),
-                          blurRadius: 12,
-                          spreadRadius: 4,
+            // Lớp Marker: Vị trí của Worker & Các ca làm việc xung quanh
+            MarkerLayer(
+              markers: [
+                // Ghim vị trí của Worker (Tâm phát sóng)
+                Marker(
+                  point: userPos,
+                  width: 60,
+                  height: 60,
+                  child: AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: child,
+                      );
+                    },
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: (widget.isOnline ? Colors.teal : Colors.grey).withOpacity(0.3),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: const Icon(Icons.person_pin_circle, color: Colors.white, size: 24),
-                  ),
-                ),
-
-                // 3. Render các Pin công việc
-                if (widget.isOnline)
-                  ...widget.shifts.map((shift) {
-                    final normalizedDist = (shift.distanceKm / widget.maxRadiusKm).clamp(0.15, 0.95);
-                    // Dùng hash của id để tính góc phân bổ hiển thị trên radar
-                    final hash = shift.shiftId.hashCode.abs();
-                    final angle = (hash % 360) * (math.pi / 180);
-
-                    final pinX = center.dx + (radarRadius * normalizedDist) * math.cos(angle);
-                    final pinY = center.dy + (radarRadius * normalizedDist) * math.sin(angle);
-
-                    final isSelected = widget.selectedShift?.shiftId == shift.shiftId;
-
-                    return Positioned(
-                      left: pinX - 24,
-                      top: pinY - 24,
-                      child: GestureDetector(
-                        onTap: () => widget.onSelectShift(shift),
-                        child: AnimatedScale(
-                          scale: isSelected ? 1.25 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? Colors.amber.shade700 : Colors.indigo.shade700,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white, width: 2),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.bolt, color: Colors.amberAccent, size: 14),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '${(shift.hourlyWage / 1000).toStringAsFixed(0)}k/h',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Container(
-                                width: 14,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isSelected ? Colors.amberAccent : Colors.white,
-                                  border: Border.all(color: Colors.indigo.shade900, width: 2.5),
-                                ),
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: widget.isOnline ? Colors.teal.shade700 : Colors.grey.shade700,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
+                          child: const Icon(Icons.navigation, color: Colors.white, size: 12),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Ghim từng Ca làm việc (Job Pins)
+                ...widget.shifts.map((shift) {
+                  final isSelected = widget.selectedShift?.shiftId == shift.shiftId;
+                  final shiftPos = LatLng(shift.locationLat, shift.locationLng);
+
+                  return Marker(
+                    point: shiftPos,
+                    width: 70,
+                    height: 60,
+                    child: GestureDetector(
+                      onTap: () => widget.onSelectShift(shift),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Badge giá lương / ca
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.indigo.shade800 : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected ? Colors.amber : Colors.indigo.shade400,
+                                width: isSelected ? 2 : 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '${(shift.hourlyWage / 1000).toInt()}k/h',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? Colors.amber : Colors.indigo.shade900,
+                              ),
+                            ),
+                          ),
+                          // Icon Pin chỉ vị trí
+                          Icon(
+                            Icons.location_on_rounded,
+                            size: isSelected ? 36 : 28,
+                            color: isSelected ? Colors.amber.shade700 : Colors.indigo.shade600,
+                            shadows: [
+                              Shadow(color: Colors.black.withOpacity(0.3), blurRadius: 4),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  }),
+                    ),
+                  );
+                }),
               ],
             ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RadarBackgroundPainter extends CustomPainter {
-  final double angle;
-  final ThemeData theme;
-  final bool isOnline;
-  final double maxRadiusKm;
-
-  _RadarBackgroundPainter({
-    required this.angle,
-    required this.theme,
-    required this.isOnline,
-    required this.maxRadiusKm,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = (size.width / 2) - 30;
-
-    // Nền tối công nghệ radar
-    final bgPaint = Paint()
-      ..color = const Color(0xFF0F172A)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, maxRadius, bgPaint);
-
-    final linePaint = Paint()
-      ..color = (isOnline ? Colors.tealAccent : Colors.grey).withOpacity(0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    // Vẽ các vòng tròn đồng tâm (1/3, 2/3, 100%)
-    final step = maxRadius / 3;
-    final textPainter = TextPainter(textDirection: TextDirection.ltr);
-
-    for (int i = 1; i <= 3; i++) {
-      final r = step * i;
-      canvas.drawCircle(center, r, linePaint);
-
-      final kmText = '${(maxRadiusKm * (i / 3)).toStringAsFixed(0)} km';
-      textPainter.text = TextSpan(
-        text: kmText,
-        style: TextStyle(
-          color: (isOnline ? Colors.tealAccent : Colors.grey).withOpacity(0.7),
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-      textPainter.layout();
-      textPainter.paint(canvas, Offset(center.dx + 4, center.dy - r + 2));
-    }
-
-    // Vẽ trục chữ thập thập tự
-    canvas.drawLine(Offset(center.dx - maxRadius, center.dy), Offset(center.dx + maxRadius, center.dy), linePaint);
-    canvas.drawLine(Offset(center.dx, center.dy - maxRadius), Offset(center.dx, center.dy + maxRadius), linePaint);
-
-    // Vẽ tia radar quét (chỉ khi online)
-    if (isOnline) {
-      final sweepPaint = Paint()
-        ..shader = SweepGradient(
-          center: Alignment.center,
-          startAngle: 0.0,
-          endAngle: math.pi / 2,
-          colors: [
-            Colors.tealAccent.withOpacity(0.4),
-            Colors.tealAccent.withOpacity(0.0),
           ],
-          transform: GradientRotation(angle),
-        ).createShader(Rect.fromCircle(center: center, radius: maxRadius))
-        ..style = PaintingStyle.fill;
+        ),
 
-      canvas.drawCircle(center, maxRadius, sweepPaint);
+        // 2. Nút định vị & Zoom tiện lợi
+        Positioned(
+          right: 16,
+          bottom: 24,
+          child: Column(
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'map_recenter',
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.teal.shade800,
+                elevation: 3,
+                onPressed: _recenter,
+                tooltip: 'Về vị trí của tôi',
+                child: const Icon(Icons.my_location),
+              ),
+              const SizedBox(height: 8),
+              FloatingActionButton.small(
+                heroTag: 'map_zoom_in',
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black87,
+                elevation: 3,
+                onPressed: () {
+                  final zoom = _mapController.camera.zoom + 1;
+                  _mapController.move(_mapController.camera.center, zoom);
+                },
+                child: const Icon(Icons.add),
+              ),
+              const SizedBox(height: 8),
+              FloatingActionButton.small(
+                heroTag: 'map_zoom_out',
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black87,
+                elevation: 3,
+                onPressed: () {
+                  final zoom = _mapController.camera.zoom - 1;
+                  _mapController.move(_mapController.camera.center, zoom);
+                },
+                child: const Icon(Icons.remove),
+              ),
+            ],
+          ),
+        ),
 
-      // Tia quét sáng
-      final beamPaint = Paint()
-        ..color = Colors.tealAccent.withOpacity(0.8)
-        ..strokeWidth = 2.0;
-      final beamX = center.dx + maxRadius * math.cos(angle);
-      final beamY = center.dy + maxRadius * math.sin(angle);
-      canvas.drawLine(center, Offset(beamX, beamY), beamPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RadarBackgroundPainter oldDelegate) {
-    return oldDelegate.angle != angle ||
-        oldDelegate.isOnline != isOnline ||
-        oldDelegate.maxRadiusKm != maxRadiusKm;
+        // 3. Chú thích trạng thái nếu Offline
+        if (!widget.isOnline)
+          Positioned(
+            top: 12,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.75),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.visibility_off, color: Colors.amber, size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    'Đang tắt chế độ tìm việc. Gạt công tắc trên để bắt đầu.',
+                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

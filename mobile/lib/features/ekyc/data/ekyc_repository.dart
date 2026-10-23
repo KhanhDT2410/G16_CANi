@@ -12,7 +12,7 @@ class EkycRepository {
             (Dio(BaseOptions(
               baseUrl: _baseUrl,
               connectTimeout: const Duration(seconds: 25),
-              receiveTimeout: const Duration(seconds: 90), // AI Multimodal cần thời gian phân tích
+              receiveTimeout: const Duration(seconds: 30),
             ))..interceptors.add(AuthInterceptor()));
 
   Future<EkycVerificationItem> submitEkyc({
@@ -24,6 +24,14 @@ class EkycRepository {
     required String selfieFileName,
     String? token,
     String? userId,
+    String? cccdNumber,
+    String? fullName,
+    String? dob,
+    String? gender,
+    String? originAddress,
+    String? residenceAddress,
+    String? issueDate,
+    String? expiryDate,
   }) async {
     try {
       final formDataMap = <String, dynamic>{
@@ -31,9 +39,16 @@ class EkycRepository {
         'backImage': MultipartFile.fromBytes(backBytes, filename: backFileName),
         'selfieImage': MultipartFile.fromBytes(selfieBytes, filename: selfieFileName),
       };
-      if (userId != null && userId.isNotEmpty) {
-        formDataMap['userId'] = userId;
-      }
+      if (userId != null && userId.isNotEmpty) formDataMap['userId'] = userId;
+      if (cccdNumber != null && cccdNumber.isNotEmpty) formDataMap['cccdNumber'] = cccdNumber;
+      if (fullName != null && fullName.isNotEmpty) formDataMap['fullName'] = fullName;
+      if (dob != null && dob.isNotEmpty) formDataMap['dob'] = dob;
+      if (gender != null && gender.isNotEmpty) formDataMap['gender'] = gender;
+      if (originAddress != null && originAddress.isNotEmpty) formDataMap['originAddress'] = originAddress;
+      if (residenceAddress != null && residenceAddress.isNotEmpty) formDataMap['residenceAddress'] = residenceAddress;
+      if (issueDate != null && issueDate.isNotEmpty) formDataMap['issueDate'] = issueDate;
+      if (expiryDate != null && expiryDate.isNotEmpty) formDataMap['expiryDate'] = expiryDate;
+
       final formData = FormData.fromMap(formDataMap);
 
       final queryParams = <String, dynamic>{};
@@ -55,12 +70,15 @@ class EkycRepository {
       if (response.data != null && response.data['data'] != null) {
         return EkycVerificationItem.fromJson(response.data['data']);
       }
-      throw Exception('Không nhận được dữ liệu phản hồi từ máy chủ AI eKYC');
+      throw Exception('Không nhận được dữ liệu phản hồi từ máy chủ eKYC');
     } on DioException catch (de) {
+      if (de.response?.statusCode == 401) {
+        throw Exception('Phiên đăng nhập đã hết hạn (401). Vui lòng đăng nhập lại để tiếp tục.');
+      }
       final serverMsg = (de.response?.data is Map)
           ? de.response?.data['message']?.toString()
           : null;
-      throw Exception(serverMsg ?? 'Lỗi kết nối máy chủ AI (${de.message})');
+      throw Exception(serverMsg ?? 'Lỗi kết nối máy chủ eKYC (${de.message})');
     } catch (e) {
       throw Exception('Lỗi xử lý eKYC: $e');
     }

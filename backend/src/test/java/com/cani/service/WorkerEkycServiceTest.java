@@ -1,9 +1,9 @@
 package com.cani.service;
 
-import com.cani.client.gemini.GeminiVisionClient;
+import com.cani.client.ekyc.EkycProvider;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
-import com.cani.dto.ekyc.GeminiEkycResultDto;
+import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerEkycVerification;
@@ -37,7 +37,7 @@ class WorkerEkycServiceTest {
     private WorkerEkycVerificationRepository ekycVerificationRepository;
 
     @Mock
-    private GeminiVisionClient geminiVisionClient;
+    private EkycProvider ekycProvider;
 
     @InjectMocks
     private WorkerEkycService workerEkycService;
@@ -70,7 +70,7 @@ class WorkerEkycServiceTest {
     @Test
     @DisplayName("Tự động duyệt eKYC thành công khi AI trả về độ khớp khuôn mặt và OCR cao")
     void shouldAutoApproveEkycWhenAiReturnsHighScore() {
-        GeminiEkycResultDto aiResult = GeminiEkycResultDto.builder()
+        EkycIdentityResultDto aiResult = EkycIdentityResultDto.builder()
                 .idNumber("079201012345")
                 .fullName("TRẦN THỊ HOA")
                 .dob("15/05/2001")
@@ -86,7 +86,7 @@ class WorkerEkycServiceTest {
                 .build();
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
-        when(geminiVisionClient.verifyEkycIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
+        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
         when(ekycVerificationRepository.existsByCccdNumberHashAndStatus(any(), eq("APPROVED"))).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
@@ -107,7 +107,7 @@ class WorkerEkycServiceTest {
     @Test
     @DisplayName("Chuyển hàng đợi Admin duyệt khi ảnh hơi mờ hoặc điểm khớp khuôn mặt trung bình")
     void shouldSetPendingReviewWhenAiConfidenceIsMedium() {
-        GeminiEkycResultDto aiResult = GeminiEkycResultDto.builder()
+        EkycIdentityResultDto aiResult = EkycIdentityResultDto.builder()
                 .idNumber("079201012345")
                 .fullName("TRẦN THỊ HOA")
                 .ocrConfidence(0.75)
@@ -117,7 +117,7 @@ class WorkerEkycServiceTest {
                 .build();
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
-        when(geminiVisionClient.verifyEkycIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
+        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
         when(ekycVerificationRepository.existsByCccdNumberHashAndStatus(any(), eq("APPROVED"))).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
@@ -136,7 +136,7 @@ class WorkerEkycServiceTest {
     @Test
     @DisplayName("Từ chối eKYC khi phát hiện số CCCD đã được tài khoản khác xác thực trước đó")
     void shouldRejectWhenDuplicateCccdDetected() {
-        GeminiEkycResultDto aiResult = GeminiEkycResultDto.builder()
+        EkycIdentityResultDto aiResult = EkycIdentityResultDto.builder()
                 .idNumber("079201012345")
                 .ocrConfidence(0.95)
                 .faceMatchScore(90.0)
@@ -144,7 +144,7 @@ class WorkerEkycServiceTest {
                 .build();
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
-        when(geminiVisionClient.verifyEkycIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
+        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
         when(ekycVerificationRepository.existsByCccdNumberHashAndStatus(any(), eq("APPROVED"))).thenReturn(true);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);

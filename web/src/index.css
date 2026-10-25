@@ -1,36 +1,91 @@
-/* Global Design System & Smooth Micro-Animations - CANi Web Portal */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Global Design System - Modern Event-Tech (CANi Platform) */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 
 :root {
-  --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-glow: rgba(37, 99, 235, 0.25);
+  /* Typography - Be Vietnam Pro chuẩn 100% dấu tiếng Việt không bị lệch/vỡ chữ */
+  --font-display: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family: var(--font-body);
+
+  /* Primary Brand Palette: Ocean Blue to Vibrant Cyan (#5B86E5 -> #36D1DC) */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary: #5B86E5;
+  --color-primary-hover: #4a75d4;
+  --color-primary-active: #3b64c3;
+  --color-primary-glow: rgba(91, 134, 229, 0.28);
+  --color-primary-subtle: rgba(91, 134, 229, 0.08);
+
+  /* Secondary Brand Accents */
+  --color-accent-cyan: #36D1DC;
+  --color-accent-amber: #f59e0b;
+  --gradient-brand: linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%);
+  --gradient-brand-hover: linear-gradient(135deg, #4a75d4 0%, #2bc0cb 100%);
+  --gradient-brand-subtle: linear-gradient(135deg, rgba(91, 134, 229, 0.06) 0%, rgba(54, 209, 220, 0.08) 100%);
+  --gradient-glow: radial-gradient(circle at top right, rgba(54, 209, 220, 0.12), transparent 60%);
+
+  /* Semantic Feedback */
   --color-success: #10b981;
+  --color-success-hover: #059669;
   --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-success-text: #065f46;
+
   --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
   --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-warning-text: #92400e;
+
   --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
   --color-danger-bg: #fef2f2;
-  --color-bg-subtle: #f8fafc;
+  --color-danger-border: #fecaca;
+  --color-danger-text: #991b1b;
+
+  --color-info: #0284c7;
+  --color-info-bg: #f0f9ff;
+  --color-info-border: #bae6fd;
+  --color-info-text: #075985;
+
+  /* Surfaces & Backgrounds */
+  --color-bg-page: #f8fafc;
+  --color-bg-subtle: #f1f5f9;
+  --color-surface-card: #ffffff;
   --color-border: #e2e8f0;
+  --color-border-subtle: #f1f5f9;
+  --color-border-strong: #cbd5e1;
+
+  /* Typography Colors */
   --color-text-main: #0f172a;
+  --color-text-body: #334155;
   --color-text-muted: #64748b;
-  
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --color-text-subtle: #94a3b8;
+
+  /* Geometry & Radius */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --radius-full: 9999px;
 
-  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-card: 0 4px 14px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.02);
-  --shadow-card-hover: 0 12px 28px rgba(15, 23, 42, 0.09), 0 2px 6px rgba(15, 23, 42, 0.03);
-  --shadow-modal: 0 20px 40px -15px rgba(15, 23, 42, 0.25);
+  /* Elevation Shadows */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-subtle: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-card: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  --shadow-card-hover: 0 16px 32px -4px rgba(91, 134, 229, 0.14), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  --shadow-modal: 0 24px 48px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.06);
 
-  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-fast: 0.18s var(--ease-smooth);
-  --transition-normal: 0.28s var(--ease-smooth);
-  --transition-slow: 0.45s var(--ease-smooth);
+  /* Transitions */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 0.18s var(--ease-spring);
+  --transition-normal: 0.28s var(--ease-spring);
+  --transition-slow: 0.45s var(--ease-spring);
 }
 
 * {
@@ -41,7 +96,7 @@
 
 html {
   font-family: var(--font-family);
-  background-color: #f8fafc;
+  background-color: var(--color-bg-page);
   color: var(--color-text-main);
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
@@ -51,7 +106,15 @@ html {
 body {
   min-height: 100vh;
   line-height: 1.5;
-  background-color: #f8fafc;
+  background-color: var(--color-bg-page);
+  color: var(--color-text-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--color-text-main);
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
 /* Custom Sleek Scrollbar */
@@ -61,13 +124,13 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--color-bg-subtle);
 }
 
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: var(--radius-full);
-  border: 2px solid #f1f5f9;
+  border: 2px solid var(--color-bg-subtle);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -110,7 +173,7 @@ button:active {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
@@ -130,7 +193,7 @@ button:active {
 @keyframes scaleIn {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(8px);
+    transform: scale(0.96) translateY(10px);
   }
   to {
     opacity: 1;
@@ -140,10 +203,10 @@ button:active {
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+    box-shadow: 0 0 0 0 rgba(91, 134, 229, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0);
+    box-shadow: 0 0 0 10px rgba(91, 134, 229, 0);
   }
 }
 
@@ -159,10 +222,42 @@ button:active {
   animation: scaleIn var(--transition-normal) forwards;
 }
 
-/* Glassmorphism helpers */
+/* Glassmorphism utility */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-card);
 }
+
+/* Page loading fallback for React.lazy & Suspense */
+.page-loading-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 55vh;
+  gap: 16px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.cani-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3.5px solid rgba(91, 134, 229, 0.15);
+  border-top-color: var(--color-primary);
+  border-right-color: var(--color-accent-cyan);
+  border-radius: 50%;
+  animation: caniSpin 0.75s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+@keyframes caniSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

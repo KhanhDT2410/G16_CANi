@@ -106,23 +106,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.badge_outlined),
-            tooltip: 'Định danh eKYC Căn cước',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const EkycVerificationScreen()),
-              );
-            },
+            icon: const Icon(Icons.assignment_outlined),
+            tooltip: 'Hồ sơ kỹ năng & Thẩm định',
+            onPressed: () => setState(() => _currentIndex = 1),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Làm mới dữ liệu',
             onPressed: () => ref.read(skillVerificationProvider.notifier).loadAll(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Đăng xuất',
-            onPressed: () => ref.read(authStateProvider.notifier).logout(),
           ),
         ],
       ),
@@ -133,31 +124,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        indicatorColor: const Color(0xFF0077FF).withOpacity(0.15),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
-            label: 'Bản Đồ Việc',
+            selectedIcon: Icon(Icons.map, color: Color(0xFF0077FF)),
+            label: 'Bản đồ',
           ),
           NavigationDestination(
-            icon: Icon(Icons.workspace_premium_outlined),
-            selectedIcon: Icon(Icons.workspace_premium),
-            label: 'Điểm SP',
+            icon: Icon(Icons.work_outline),
+            selectedIcon: Icon(Icons.work, color: Color(0xFF0077FF)),
+            label: 'Việc làm',
           ),
           NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome),
-            label: 'Thẩm Định AI',
+            icon: Icon(Icons.notifications_none),
+            selectedIcon: Icon(Icons.notifications, color: Color(0xFF0077FF)),
+            label: 'Thông báo',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_edu_outlined),
-            selectedIcon: Icon(Icons.history_edu),
-            label: 'Lịch Sử',
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet, color: Color(0xFF0077FF)),
+            label: 'Thu nhập',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Hồ Sơ & CV',
+            selectedIcon: Icon(Icons.person, color: Color(0xFF0077FF)),
+            label: 'Cá nhân',
           ),
         ],
       ),

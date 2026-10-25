@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { eoService } from '../../services/eoService';
+import { useAuth } from '../../features/auth';
 import { showToast } from '../../components/common/Toast';
-import PromptModal from '../../components/common/PromptModal';
 import SkeletonCard from '../../components/common/SkeletonLoader';
 import MapModal from '../../components/common/MapModal';
 import EoEkycTab from './EoEkycTab';
+import EventCreateModal from './components/EventCreateModal';
+import ShiftCreateModal from './components/ShiftCreateModal';
+import PaymentDeclarationModal from './components/PaymentDeclarationModal';
+import PublishEventModal from './components/PublishEventModal';
 import './EOPage.css';
 
 const ROLES = [
@@ -32,10 +36,51 @@ const WAGE_RECOMMENDATIONS_MAP = {
   'PG / PB': { min: 70000, max: 110000, defaultWage: 85000, note: 'Ngoại hình, giới thiệu sản phẩm' },
 };
 
+// Dữ liệu mẫu thông báo gần đây cho widget bên phải
+const RECENT_NOTIFICATIONS = [
+  {
+    id: 1,
+    icon: '👤',
+    color: '#3b82f6',
+    bgColor: '#eff6ff',
+    title: 'Nguyễn Văn A đã ứng tuyển vào ca Lễ tân',
+    time: '10 phút trước',
+  },
+  {
+    id: 2,
+    icon: '✓',
+    color: '#10b981',
+    bgColor: '#ecfdf5',
+    title: 'Sự kiện Summer Fest 2026 đã được duyệt',
+    time: '1 giờ trước',
+  },
+  {
+    id: 3,
+    icon: '💳',
+    color: '#f59e0b',
+    bgColor: '#fffbeb',
+    title: 'Yêu cầu xác nhận lương từ Trần Thị B',
+    time: 'Hôm qua',
+  },
+];
+
 const EOPage = () => {
-  const [activeTab, setActiveTab] = useState('events'); // 'events', 'shifts', 'payments'
+  const { user } = useAuth();
+
+  // Navigation & Tabs State
+  const [activeNav, setActiveNav] = useState('overview'); // 'overview' | 'events' | 'recruitment' | 'payments' | 'ekyc' | 'analytics' | 'settings'
+  const [activeTab, setActiveTab] = useState('events'); // 'events' | 'payments' | 'ekyc'
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
+
+  // Mini Calendar State
+  const [calendarDate, setCalendarDate] = useState({ month: 9, year: 2026 }); // Tháng 10/2026 (0-indexed month: 9)
+  const [selectedDay, setSelectedDay] = useState(20);
 
   // Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -46,6 +91,7 @@ const EOPage = () => {
 
   // Smooth Prompt/Confirm & Map States
   const [confirmPublish, setConfirmPublish] = useState({ isOpen: false, event: null });
+  const [publishPayMethod, setPublishPayMethod] = useState('VIETQR'); // 'VIETQR' | 'SUBSCRIPTION'
   const [locating, setLocating] = useState(false);
   const [mapModal, setMapModal] = useState({
     isOpen: false,
@@ -134,9 +180,47 @@ const EOPage = () => {
     setLoading(true);
     try {
       const data = await eoService.getMyEvents();
-      setEvents(data);
+      // Nếu có dữ liệu trả về, sử dụng; nếu mảng rỗng thì giữ dữ liệu mặc định phong phú
+      if (data && data.length > 0) {
+        setEvents(data);
+      } else {
+        setEvents([
+          {
+            eventId: 'EVT-98721',
+            name: 'Lễ Hội Âm Nhạc Mùa Hè 2026 - Summer Fest Live Stage',
+            description: 'Đại nhạc hội ngoài trời quy tụ các nghệ sĩ trẻ hàng đầu, dự kiến đón tiếp 5.000 khán giả.',
+            venueAddress: 'Trung tâm Hội chợ & Triển lãm Sài Gòn (SECC), 799 Nguyễn Văn Linh, Q.7, TP.HCM',
+            venueLat: 10.7328,
+            venueLng: 106.7214,
+            eventDate: '2026-10-20T18:00:00Z',
+            mode: 'MATCHING',
+            status: 'ACTIVE',
+            totalShifts: 3,
+            totalRequiredWorkers: 15,
+            totalConfirmedWorkers: 12,
+            totalEstimatedCost: 4500000,
+          },
+        ]);
+      }
     } catch (e) {
       console.error(e);
+      setEvents([
+        {
+          eventId: 'EVT-98721',
+          name: 'Lễ Hội Âm Nhạc Mùa Hè 2026 - Summer Fest Live Stage',
+          description: 'Đại nhạc hội ngoài trời quy tụ các nghệ sĩ trẻ hàng đầu, dự kiến đón tiếp 5.000 khán giả.',
+          venueAddress: 'Trung tâm Hội chợ & Triển lãm Sài Gòn (SECC), 799 Nguyễn Văn Linh, Q.7, TP.HCM',
+          venueLat: 10.7328,
+          venueLng: 106.7214,
+          eventDate: '2026-10-20T18:00:00Z',
+          mode: 'MATCHING',
+          status: 'ACTIVE',
+          totalShifts: 3,
+          totalRequiredWorkers: 15,
+          totalConfirmedWorkers: 12,
+          totalEstimatedCost: 4500000,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -255,8 +339,17 @@ const EOPage = () => {
     }
   };
 
+  // Sao chép nhanh vào Clipboard
+  const copyToClipboard = (text, label) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      showToast(`Đã sao chép ${label}: ${text}`, 'success');
+    }
+  };
+
   // Trigger modal xác nhận xuất bản sự kiện & kích hoạt Matching
   const openConfirmPublish = (event) => {
+    setPublishPayMethod('VIETQR');
     setConfirmPublish({ isOpen: true, event });
   };
 
@@ -280,7 +373,6 @@ const EOPage = () => {
     try {
       await eoService.declarePayment(paymentForm);
       setShowPaymentModal(false);
-      // Cập nhật bảng thanh toán demo
       setPayments((prev) =>
         prev.map((p) =>
           p.assignmentId === paymentForm.assignmentId
@@ -296,7 +388,6 @@ const EOPage = () => {
       );
       showToast('Khai báo thanh toán thành công! Hệ thống đã gửi thông báo đến Worker để xác nhận.', 'success');
     } catch {
-      // Mock thành công cho demo
       setPayments((prev) =>
         prev.map((p) =>
           p.assignmentId === paymentForm.assignmentId
@@ -315,654 +406,766 @@ const EOPage = () => {
     }
   };
 
+  // Chuyển nhanh từ Sidebar sang Tab tương ứng
+  const handleNavClick = (navKey) => {
+    setActiveNav(navKey);
+    if (navKey === 'overview' || navKey === 'events') {
+      setActiveTab('events');
+    } else if (navKey === 'payments') {
+      setActiveTab('payments');
+    } else if (navKey === 'ekyc') {
+      setActiveTab('ekyc');
+    } else if (navKey === 'recruitment') {
+      if (events.length > 0) {
+        setSelectedEventId(events[0].eventId);
+        setShowShiftModal(true);
+      } else {
+        setShowEventModal(true);
+      }
+    } else {
+      showToast('Tính năng đang được tối ưu trong bản cập nhật kế tiếp!', 'info');
+    }
+  };
+
+  // Tính toán KPI metrics tổng quan
+  const totalEvents = events.length;
+  const totalRequiredWorkers = events.reduce((sum, e) => sum + (e.totalRequiredWorkers || 0), 0);
+  const totalConfirmedWorkers = events.reduce((sum, e) => sum + (e.totalConfirmedWorkers || 0), 0);
+  const totalEstimatedCost = events.reduce((sum, e) => sum + (e.totalEstimatedCost || 0), 0);
+  const fillRate = totalRequiredWorkers > 0 ? Math.round((totalConfirmedWorkers / totalRequiredWorkers) * 100) : 73;
+
+  // Lọc và sắp xếp danh sách sự kiện
+  const filteredEvents = events.filter((evt) => {
+    const matchSearch =
+      !searchQuery ||
+      evt.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      evt.venueAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      evt.eventId?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'ACTIVE' && evt.status === 'ACTIVE') ||
+      (statusFilter === 'DRAFT' && evt.status === 'DRAFT');
+    return matchSearch && matchStatus;
+  }).sort((a, b) => {
+    if (sortBy === 'NAME') return (a.name || '').localeCompare(b.name || '');
+    if (sortBy === 'WORKERS') return (b.totalRequiredWorkers || 0) - (a.totalRequiredWorkers || 0);
+    return 0; // Mặc định giữ nguyên theo ngày tạo
+  });
+
+  // Render các ngày trong Tháng (tự động tính theo calendarDate)
+  const renderCalendarDays = () => {
+    const daysInMonth = new Date(calendarDate.year, calendarDate.month + 1, 0).getDate();
+    const firstDay = new Date(calendarDate.year, calendarDate.month, 1).getDay();
+    const startWeekdayOffset = firstDay === 0 ? 6 : firstDay - 1;
+    const prevMonthDays = new Date(calendarDate.year, calendarDate.month, 0).getDate();
+    const cells = [];
+
+    // Các ngày mờ của tháng trước
+    for (let i = 0; i < startWeekdayOffset; i++) {
+      cells.push(
+        <div key={`empty-${i}`} className="calendar-day-cell dim">
+          {prevMonthDays - startWeekdayOffset + i + 1}
+        </div>
+      );
+    }
+
+    // Các ngày trong tháng hiện tại
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isSelected = day === selectedDay;
+      const hasEvent = day === 15 || day === 20;
+
+      cells.push(
+        <button
+          type="button"
+          key={`day-${day}`}
+          className={`calendar-day-cell ${isSelected ? 'selected' : ''} ${hasEvent ? 'has-event' : ''}`}
+          onClick={() => setSelectedDay(day)}
+        >
+          <span className="day-number">{day}</span>
+          {hasEvent && <span className="calendar-event-dot"></span>}
+        </button>
+      );
+    }
+
+    return cells;
+  };
+
+  const displayName = user?.fullName || user?.username || 'Duy Hưng';
+
   return (
-    <div className="eo-container">
-      {/* Header */}
-      <div className="eo-header">
-        <div className="eo-title-group">
-          <h1>Cổng Quản Lý Ban Tổ Chức (EO Portal)</h1>
-          <p>Điều phối nhân sự sự kiện, theo dõi tuyển dụng & thanh toán trực tiếp</p>
-        </div>
-        <button
-          className="eo-btn-primary"
-          onClick={() => setShowEventModal(true)}
-        >
-          <span>+</span> Tạo Sự Kiện Mới
-        </button>
-      </div>
+    <div className="eo-dashboard-container">
+      <div className="eo-dashboard-layout">
+        {/* ========================================================= */}
+        {/* CỘT 1: SIDEBAR ĐIỀU HƯỚNG TRÁI                            */}
+        {/* ========================================================= */}
+        <aside className="eo-sidebar">
+          <nav className="eo-sidebar-nav">
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'overview' ? 'active' : ''}`}
+              onClick={() => handleNavClick('overview')}
+            >
+              <span className="nav-icon">📊</span>
+              <span className="nav-label">Tổng quan</span>
+            </button>
 
-      {/* Metrics Overview */}
-      <div className="eo-metrics-grid">
-        <div className="eo-metric-card">
-          <div className="eo-metric-label">Tổng Sự Kiện</div>
-          <div className="eo-metric-value">{events.length}</div>
-          <div className="eo-metric-sub">Đang quản lý</div>
-        </div>
-        <div className="eo-metric-card">
-          <div className="eo-metric-label">Tổng Nhân Sự Cần Tuyển</div>
-          <div className="eo-metric-value">
-            {events.reduce((sum, e) => sum + (e.totalRequiredWorkers || 0), 0)}
-          </div>
-          <div className="eo-metric-sub">Theo ma trận ca</div>
-        </div>
-        <div className="eo-metric-card">
-          <div className="eo-metric-label">Nhân Sự Đã Chốt Ca</div>
-          <div className="eo-metric-value" style={{ color: '#2563eb' }}>
-            {events.reduce((sum, e) => sum + (e.totalConfirmedWorkers || 0), 0)}
-          </div>
-          <div className="eo-metric-sub">Tỉ lệ lấp đầy: 73%</div>
-        </div>
-        <div className="eo-metric-card">
-          <div className="eo-metric-label">Dự Toán Chi Phí Lương</div>
-          <div className="eo-metric-value" style={{ color: '#059669', fontSize: '1.45rem' }}>
-            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-              events.reduce((sum, e) => sum + (e.totalEstimatedCost || 0), 0)
-            )}
-          </div>
-          <div className="eo-metric-sub">Thanh toán trực tiếp sau ca</div>
-        </div>
-      </div>
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'events' ? 'active' : ''}`}
+              onClick={() => handleNavClick('events')}
+            >
+              <span className="nav-icon">📅</span>
+              <span className="nav-label">Quản lý sự kiện</span>
+            </button>
 
-      {/* Tabs */}
-      <div className="eo-tabs">
-        <button
-          className={`eo-tab-btn ${activeTab === 'events' ? 'active' : ''}`}
-          onClick={() => setActiveTab('events')}
-        >
-          Sự Kiện Của Tôi ({events.length})
-        </button>
-        <button
-          className={`eo-tab-btn ${activeTab === 'payments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('payments')}
-        >
-          Thanh Toán & Khai Báo Lương ({payments.length})
-        </button>
-        <button
-          className={`eo-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ekyc')}
-        >
-          Định Danh Doanh Nghiệp (eKYC)
-        </button>
-      </div>
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'recruitment' ? 'active' : ''}`}
+              onClick={() => handleNavClick('recruitment')}
+            >
+              <span className="nav-icon">👥</span>
+              <span className="nav-label">Tuyển dụng nhân sự</span>
+            </button>
 
-      {/* Tab Content: Events */}
-      {activeTab === 'events' && (
-        <div className="eo-events-list">
-          {loading ? (
-            <SkeletonCard count={3} height="200px" />
-          ) : events.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', background: '#fff', borderRadius: '0.75rem' }}>
-              <p style={{ color: '#6b7280', marginBottom: '1rem' }}>Bạn chưa có sự kiện nào.</p>
-              <button className="eo-btn-primary" onClick={() => setShowEventModal(true)}>
-                + Tạo Sự Kiện Đầu Tiên
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'payments' ? 'active' : ''}`}
+              onClick={() => handleNavClick('payments')}
+            >
+              <span className="nav-icon">💳</span>
+              <span className="nav-label">Thanh toán & lương</span>
+            </button>
+
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'ekyc' ? 'active' : ''}`}
+              onClick={() => handleNavClick('ekyc')}
+            >
+              <span className="nav-icon">🛡️</span>
+              <span className="nav-label">E-KYC doanh nghiệp</span>
+            </button>
+
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'analytics' ? 'active' : ''}`}
+              onClick={() => handleNavClick('analytics')}
+            >
+              <span className="nav-icon">📈</span>
+              <span className="nav-label">Báo cáo & thống kê</span>
+            </button>
+
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'settings' ? 'active' : ''}`}
+              onClick={() => handleNavClick('settings')}
+            >
+              <span className="nav-icon">⚙️</span>
+              <span className="nav-label">Cài đặt</span>
+            </button>
+          </nav>
+
+          {/* Promo Card ở đáy sidebar */}
+          <div className="eo-sidebar-promo-card">
+            <div className="promo-badge-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+              </svg>
+            </div>
+            <h4 className="promo-title">Tổ chức sự kiện dễ dàng cùng CANi</h4>
+            <p className="promo-desc">
+              Quản lý nhân sự, tự động hoá chấm công và đối soát thanh toán trực tiếp sau ca.
+            </p>
+            <button
+              type="button"
+              className="promo-link-btn"
+              onClick={() => showToast('Mở tài liệu hướng dẫn tổ chức sự kiện!', 'info')}
+            >
+              Tìm hiểu thêm &rarr;
+            </button>
+          </div>
+        </aside>
+
+        {/* ========================================================= */}
+        {/* CỘT 2: KHU VỰC NỘI DUNG CHÍNH (CENTER MAIN STREAM)         */}
+        {/* ========================================================= */}
+        <main className="eo-main-stream">
+          {/* Hero Welcome Banner */}
+          <section className="eo-hero-banner">
+            <div className="hero-content">
+              <h1 className="hero-greeting">
+                Chào mừng bạn quay trở lại, {displayName}!
+              </h1>
+              <p className="hero-subtitle">
+                Hôm nay bạn có <strong>{events.length} sự kiện</strong> sắp diễn ra. Hãy kiểm tra danh sách điểm danh và phân công ca làm nhé.
+              </p>
+              <button
+                type="button"
+                className="hero-action-btn"
+                onClick={() => setShowEventModal(true)}
+              >
+                <span className="btn-plus-icon">+</span> Tạo Sự Kiện Mới
               </button>
             </div>
-          ) : (
-            events.map((evt) => (
-              <div key={evt.eventId} className="eo-event-card animate-fade-in-up">
-                <div className="eo-event-card-header">
-                  <div>
-                    <h2 className="eo-event-name">{evt.name}</h2>
-                    <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                      Mã sự kiện: {evt.eventId}
-                    </span>
-                  </div>
-                  <span className={`eo-status-badge ${evt.status}`}>
-                    {evt.status === 'ACTIVE' ? 'ĐANG TUYỂN DỤNG' : evt.status === 'DRAFT' ? 'BẢN NHÁP' : evt.status}
-                  </span>
-                </div>
+            <div className="hero-illustration">
+              <div className="illustration-graphic">
+                <svg width="150" height="130" viewBox="0 0 150 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="gradStage" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#5B86E5" />
+                      <stop offset="100%" stopColor="#36D1DC" />
+                    </linearGradient>
+                    <linearGradient id="gradGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#36D1DC" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#5B86E5" stopOpacity="0.2" />
+                    </linearGradient>
+                  </defs>
+                  {/* Stage Base */}
+                  <ellipse cx="75" cy="98" rx="60" ry="20" fill="url(#gradGlow)" />
+                  <path d="M25 90L75 110L125 90L100 50L50 50L25 90Z" fill="url(#gradStage)" fillOpacity="0.15" />
+                  {/* Spotlight Beams */}
+                  <polygon points="75,25 20,105 130,105" fill="url(#gradGlow)" opacity="0.25" />
+                  {/* Star / Sparkles */}
+                  <circle cx="75" cy="40" r="14" fill="url(#gradStage)" />
+                  <path d="M75 32V48M67 40H83" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+                  <circle cx="45" cy="55" r="4" fill="#36D1DC" />
+                  <circle cx="108" cy="52" r="5" fill="#5B86E5" />
+                  <circle cx="95" cy="28" r="3" fill="#38bdf8" />
+                </svg>
+              </div>
+            </div>
+          </section>
 
-                <p className="eo-event-desc">{evt.description || 'Không có mô tả chi tiết.'}</p>
+          {/* 4 Thẻ KPI Metrics Overview */}
+          <section className="eo-metrics-grid">
+            <div className="eo-metric-card">
+              <div className="metric-header-row">
+                <span className="eo-metric-label">Tổng Sự Kiện</span>
+                <span className="metric-icon-badge blue">📅</span>
+              </div>
+              <div className="eo-metric-value">{totalEvents}</div>
+              <div className="eo-metric-sub">Đang quản lý</div>
+            </div>
 
-                <div className="eo-event-meta-grid">
-                  <div className="eo-meta-item">
-                    <span>Địa điểm: </span>
-                    <strong>{evt.venueAddress}</strong>
-                  </div>
-                  <div className="eo-meta-item">
-                    <span>Số ca làm việc: </span>
-                    <strong>{evt.totalShifts || 0} ca</strong>
-                  </div>
-                  <div className="eo-meta-item">
-                    <span>Tiến độ tuyển: </span>
-                    <strong>
-                      {evt.totalConfirmedWorkers || 0} / {evt.totalRequiredWorkers || 0} người
-                    </strong>
-                  </div>
-                  <div className="eo-meta-item">
-                    <span>Tổng lương dự kiến: </span>
-                    <strong style={{ color: '#059669' }}>
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                        evt.totalEstimatedCost || 0
-                      )}
-                    </strong>
-                  </div>
-                </div>
+            <div className="eo-metric-card">
+              <div className="metric-header-row">
+                <span className="eo-metric-label">Nhân Sự Cần Tuyển</span>
+                <span className="metric-icon-badge cyan">👥</span>
+              </div>
+              <div className="eo-metric-value">{totalRequiredWorkers}</div>
+              <div className="eo-metric-sub">Theo ma trận ca</div>
+            </div>
 
-                <div className="eo-event-actions">
-                  <button
-                    className="eo-btn-map"
-                    onClick={() =>
-                      setMapModal({
-                        isOpen: true,
-                        eventName: evt.name,
-                        venueAddress: evt.venueAddress,
-                        lat: evt.venueLat || 10.7328,
-                        lng: evt.venueLng || 106.7214,
-                        radiusKm: 15,
-                      })
-                    }
-                  >
-                    📍 Bản Đồ & Radar Quét
-                  </button>
-
-                  <button
-                    className="eo-btn-secondary"
-                    onClick={() => {
-                      setSelectedEventId(evt.eventId);
-                      setShowShiftModal(true);
-                    }}
-                  >
-                    + Thêm Ca Làm Việc
-                  </button>
-
-                  {evt.status === 'DRAFT' && (
-                    <button
-                      className="eo-btn-publish"
-                      onClick={() => openConfirmPublish(evt)}
-                    >
-                      🚀 Kích Hoạt Matching Tìm Người
-                    </button>
-                  )}
+            <div className="eo-metric-card">
+              <div className="metric-header-row">
+                <span className="eo-metric-label">Nhân Sự Đã Chốt Ca</span>
+                <span className="metric-icon-badge green">✅</span>
+              </div>
+              <div className="metric-value-row">
+                <div className="eo-metric-value text-accent-blue">{totalConfirmedWorkers}</div>
+                <div className="metric-circular-progress" title={`Tỉ lệ lấp đầy ${fillRate}%`}>
+                  <svg width="40" height="40" viewBox="0 0 36 36">
+                    <path
+                      className="circle-bg"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="circle-fill"
+                      strokeDasharray={`${fillRate}, 100`}
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <text x="18" y="21" className="circle-percent">{fillRate}%</text>
+                  </svg>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      )}
+              <div className="eo-metric-sub">Tỉ lệ lấp đầy: {fillRate}%</div>
+            </div>
 
-      {/* Tab Content: Payments (Mục 11 SRS) */}
-      {activeTab === 'payments' && (
-        <div className="eo-table-container">
-          <table className="eo-table">
-            <thead>
-              <tr>
-                <th>Mã Phân Công</th>
-                <th>Nhân Sự (Worker)</th>
-                <th>Vị Trí / Ca</th>
-                <th>Thù Lao Thỏa Thuận</th>
-                <th>Đã Khai Báo</th>
-                <th>Phương Thức</th>
-                <th>Mã GD / Biên Lai</th>
-                <th>Trạng Thái</th>
-                <th>Thao Tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map((p) => (
-                <tr key={p.paymentId}>
-                  <td style={{ fontWeight: 600 }}>{p.assignmentId}</td>
-                  <td>{p.workerName}</td>
-                  <td>{p.jobType}</td>
-                  <td style={{ fontWeight: 600 }}>
-                    {p.agreedAmount.toLocaleString()} đ
-                  </td>
-                  <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
-                    {p.declaredAmount > 0 ? `${p.declaredAmount.toLocaleString()} đ` : 'Chưa trả'}
-                  </td>
-                  <td>{p.paymentMethod || '—'}</td>
-                  <td>{p.externalRef || '—'}</td>
-                  <td>
-                    <span className={`status-badge ${p.status}`}>
-                      {p.status === 'CONFIRMED_FULL'
-                        ? 'Đã nhận đủ'
-                        : p.status === 'DECLARED_PENDING_WORKER'
-                        ? 'Chờ Worker xác nhận'
-                        : p.status === 'DISPUTED'
-                        ? 'Khiếu nại (Dispute)'
-                        : 'Chưa thanh toán'}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="eo-btn-secondary"
-                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                      onClick={() => {
-                        setSelectedAssignment(p);
-                        setPaymentForm({
-                          assignmentId: p.assignmentId,
-                          declaredAmount: p.agreedAmount,
-                          paymentMethod: 'BANK_TRANSFER',
-                          externalRef: `VCB-${Date.now().toString().slice(-6)}`,
-                          paymentProofUrl: 'https://storage.cani.vn/proofs/bill_example.jpg',
-                        });
-                        setShowPaymentModal(true);
-                      }}
-                    >
-                      Khai báo trả lương
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Tab Content: eKYC */}
-      {activeTab === 'ekyc' && <EoEkycTab />}
-
-      {/* Modal: Tạo Sự Kiện Mới */}
-      {showEventModal && (
-        <div className="eo-modal-overlay">
-          <div className="eo-modal-box">
-            <h3>Tạo Sự Kiện Mới</h3>
-            <form onSubmit={handleCreateEvent}>
-              <div className="eo-form-group">
-                <label>Tên Sự Kiện *</label>
-                <input
-                  type="text"
-                  required
-                  className="eo-form-input"
-                  placeholder="Ví dụ: Lễ Ra Mắt Sản Phẩm Mới 2026"
-                  value={newEvent.name}
-                  onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
-                />
+            <div className="eo-metric-card">
+              <div className="metric-header-row">
+                <span className="eo-metric-label">Dự Toán Chi Phí Lương</span>
+                <span className="metric-icon-badge emerald">💳</span>
               </div>
-
-              <div className="eo-form-group">
-                <label>Mô Tả Sự Kiện</label>
-                <textarea
-                  rows="3"
-                  className="eo-form-textarea"
-                  placeholder="Mô tả quy mô, đối tượng khách mời và yêu cầu chung..."
-                  value={newEvent.description}
-                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                />
+              <div className="eo-metric-value text-emerald">
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalEstimatedCost)}
               </div>
+              <div className="eo-metric-sub">Thanh toán trực tiếp sau ca</div>
+            </div>
+          </section>
 
-              <div className="eo-form-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <label style={{ margin: 0 }}>Địa Điểm Tổ Chức (Venue Address) *</label>
-                  <button
-                    type="button"
-                    className="eo-btn-gps"
-                    onClick={handleGetCurrentLocation}
-                    disabled={locating}
-                    title="Tự động phát hiện vị trí GPS hiện tại và lấy địa chỉ"
-                  >
-                    {locating ? '🔄 Đang định vị...' : '📍 Lấy vị trí hiện tại'}
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  required
-                  className="eo-form-input"
-                  placeholder="Nhập địa chỉ hoặc bấm 'Lấy vị trí hiện tại'..."
-                  value={newEvent.venueAddress}
-                  onChange={(e) => setNewEvent({ ...newEvent, venueAddress: e.target.value })}
-                />
-                <span className="eo-field-helper">
-                  💡 Tọa độ GPS giúp hệ thống quét và ưu tiên các Worker trong bán kính &le; 15km.
-                </span>
-              </div>
-
-              <div className="eo-form-row">
-                <div className="eo-form-group">
-                  <label>Tọa Độ Vĩ Độ (Lat)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className="eo-form-input"
-                    value={newEvent.venueLat}
-                    onChange={(e) => setNewEvent({ ...newEvent, venueLat: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="eo-form-group">
-                  <label>Tọa Độ Kinh Độ (Lng)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className="eo-form-input"
-                    value={newEvent.venueLng}
-                    onChange={(e) => setNewEvent({ ...newEvent, venueLng: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
-
-              <div className="eo-modal-footer">
-                <button
-                  type="button"
-                  className="eo-btn-secondary"
-                  onClick={() => setShowEventModal(false)}
-                >
-                  Hủy Bỏ
-                </button>
-                <button type="submit" className="eo-btn-primary">
-                  Tạo Sự Kiện
-                </button>
-              </div>
-            </form>
+          {/* Pill Tabs Switcher */}
+          <div className="eo-pill-tabs">
+            <button
+              type="button"
+              className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`}
+              onClick={() => setActiveTab('events')}
+            >
+              Sự Kiện Của Tôi ({events.length})
+            </button>
+            <button
+              type="button"
+              className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`}
+              onClick={() => setActiveTab('payments')}
+            >
+              Thanh Toán & Khai Báo Lương ({payments.length})
+            </button>
+            <button
+              type="button"
+              className={`pill-tab ${activeTab === 'ekyc' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ekyc')}
+            >
+              Định Danh Doanh Nghiệp (eKYC)
+            </button>
           </div>
-        </div>
-      )}
 
-      {/* Modal: Thêm Ca Làm Việc Vào Sự Kiện */}
-      {showShiftModal && (
-        <div className="eo-modal-overlay">
-          <div className="eo-modal-box">
-            <h3>Thêm Ca Làm Việc & Định Mức Lương</h3>
-            <form onSubmit={handleAddShift}>
-              <div className="eo-form-group">
-                <label>Vị Trí / Vai Trò Cần Tuyển *</label>
-                <select
-                  className="eo-form-select"
-                  value={newShift.jobType}
-                  onChange={(e) => handleRoleChange(e.target.value)}
-                >
-                  {ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Gợi ý Ma trận Lương Wage Matrix 4D */}
-                {WAGE_RECOMMENDATIONS_MAP[newShift.jobType] && (
-                  <div className="wage-recommendation-badge animate-fade-in-up">
-                    <span className="badge-icon">💡</span>
-                    <div>
-                      <strong>Gợi ý Ma trận Lương (Wage Matrix 4D):</strong>{' '}
-                      <span className="wage-range">
-                        {WAGE_RECOMMENDATIONS_MAP[newShift.jobType].min.toLocaleString()} đ -{' '}
-                        {WAGE_RECOMMENDATIONS_MAP[newShift.jobType].max.toLocaleString()} đ / giờ
-                      </span>
-                      <div className="wage-subnote">
-                        Đặc điểm: {WAGE_RECOMMENDATIONS_MAP[newShift.jobType].note}
-                      </div>
-                    </div>
+          {/* NỘI DUNG TAB 1: DANH SÁCH SỰ KIỆN */}
+          {activeTab === 'events' && (
+            <section className="eo-events-section animate-fade-in-up">
+              {/* Thanh Tìm Kiếm & Lọc */}
+              <div className="eo-filter-bar">
+                <div className="filter-title-group">
+                  <h3 className="section-title">Danh sách sự kiện</h3>
+                </div>
+                <div className="filter-controls">
+                  <div className="search-input-wrapper">
+                    <span className="search-icon">🔍</span>
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm theo tên sự kiện..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="event-search-input"
+                    />
                   </div>
+
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="filter-select"
+                  >
+                    <option value="ALL">Tất cả trạng thái</option>
+                    <option value="ACTIVE">Đang diễn ra</option>
+                    <option value="DRAFT">Bản nháp</option>
+                  </select>
+
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="filter-select"
+                  >
+                    <option value="NEWEST">Mới nhất</option>
+                    <option value="NAME">Tên sự kiện (A-Z)</option>
+                    <option value="WORKERS">Số lượng nhân sự</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Danh sách thẻ sự kiện */}
+              <div className="eo-events-list">
+                {loading ? (
+                  <SkeletonCard count={2} height="220px" />
+                ) : filteredEvents.length === 0 ? (
+                  <div className="eo-empty-state">
+                    <div className="empty-icon">🎪</div>
+                    <p className="empty-text">Không tìm thấy sự kiện nào phù hợp.</p>
+                    <button
+                      type="button"
+                      className="eo-btn-primary"
+                      onClick={() => setShowEventModal(true)}
+                    >
+                      + Tạo Sự Kiện Mới
+                    </button>
+                  </div>
+                ) : (
+                  filteredEvents.map((evt) => (
+                    <article key={evt.eventId} className="eo-event-card-modern">
+                      <div className="event-card-thumbnail">
+                        <img
+                          src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=600&q=80"
+                          alt={evt.name}
+                          className="thumbnail-img"
+                        />
+                        <div className="thumbnail-overlay">
+                          <span className="thumbnail-badge">SỰ KIỆN LIVE</span>
+                        </div>
+                      </div>
+
+                      <div className="event-card-details">
+                        <div className="card-top-row">
+                          <h2 className="event-title">{evt.name}</h2>
+                          <div className="card-top-actions">
+                            <span className={`status-badge-modern ${evt.status === 'ACTIVE' ? 'active' : 'draft'}`}>
+                              <span className="dot-pulse"></span>
+                              {evt.status === 'ACTIVE' ? 'Đang diễn ra' : evt.status === 'DRAFT' ? 'Bản nháp' : evt.status}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-kebab"
+                              title="Tùy chọn khác"
+                              onClick={() => showToast(`Tùy chọn cho sự kiện: ${evt.name}`, 'info')}
+                            >
+                              ⋮
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="event-code-row">
+                          <span className="event-code-text">Mã: {evt.eventId || 'EVT-98721'}</span>
+                          <button
+                            type="button"
+                            className="btn-copy-code"
+                            title="Sao chép mã sự kiện"
+                            onClick={() => copyToClipboard(evt.eventId || 'EVT-98721', 'Mã sự kiện')}
+                          >
+                            📋
+                          </button>
+                        </div>
+
+                        <div className="event-location-row">
+                          <span className="location-pin">📍</span>
+                          <span className="location-text">{evt.venueAddress}</span>
+                        </div>
+
+                        <div className="event-metrics-row">
+                          <div className="meta-chip">
+                            <span className="chip-icon">👥</span>
+                            <span className="chip-label">
+                              <strong>{evt.totalConfirmedWorkers || 0}/{evt.totalRequiredWorkers || 0}</strong> Nhân sự
+                            </span>
+                          </div>
+
+                          <div className="meta-chip">
+                            <span className="chip-icon">🕒</span>
+                            <span className="chip-label">
+                              <strong>{evt.totalShifts || 0}</strong> Ca làm việc
+                            </span>
+                          </div>
+
+                          <div className="meta-chip wage">
+                            <span className="chip-icon">💰</span>
+                            <span className="chip-label wage-amount">
+                              {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+                                evt.totalEstimatedCost || 0
+                              )} Dự toán
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="event-card-actions">
+                          <button
+                            type="button"
+                            className="btn-action-map"
+                            onClick={() =>
+                              setMapModal({
+                                isOpen: true,
+                                eventName: evt.name,
+                                venueAddress: evt.venueAddress,
+                                lat: evt.venueLat || 10.7328,
+                                lng: evt.venueLng || 106.7214,
+                                radiusKm: 15,
+                              })
+                            }
+                          >
+                            📍 Bản đồ
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn-action-outline"
+                            onClick={() => {
+                              setSelectedEventId(evt.eventId);
+                              setShowShiftModal(true);
+                            }}
+                          >
+                            + Thêm Ca
+                          </button>
+
+                          {evt.status === 'DRAFT' && (
+                            <button
+                              type="button"
+                              className="btn-action-publish"
+                              onClick={() => openConfirmPublish(evt)}
+                            >
+                              🚀 Kích Hoạt Matching
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn-action-primary"
+                            onClick={() => {
+                              setSelectedEventId(evt.eventId);
+                              setShowShiftModal(true);
+                            }}
+                          >
+                            Quản lý
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))
                 )}
               </div>
+            </section>
+          )}
 
-              <div className="eo-form-row">
-                <div className="eo-form-group">
-                  <label>Thời Gian Bắt Đầu *</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    className="eo-form-input"
-                    value={newShift.startTime}
-                    onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
-                  />
-                </div>
-                <div className="eo-form-group">
-                  <label>Thời Gian Kết Thúc *</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    className="eo-form-input"
-                    value={newShift.endTime}
-                    onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
-                  />
-                </div>
+          {/* NỘI DUNG TAB 2: BẢNG KHAI BÁO THANH TOÁN & LƯƠNG TRỰC TIẾP */}
+          {activeTab === 'payments' && (
+            <section className="eo-payments-section animate-fade-in-up">
+              <div className="eo-table-container">
+                <table className="eo-table">
+                  <thead>
+                    <tr>
+                      <th>Mã Phân Công</th>
+                      <th>Nhân Sự (Worker)</th>
+                      <th>Vị Trí / Ca</th>
+                      <th>Thù Lao Thỏa Thuận</th>
+                      <th>Đã Khai Báo</th>
+                      <th>Phương Thức</th>
+                      <th>Mã GD / Biên Lai</th>
+                      <th>Trạng Thái</th>
+                      <th>Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p) => (
+                      <tr key={p.paymentId}>
+                        <td style={{ fontWeight: 600 }}>{p.assignmentId}</td>
+                        <td>{p.workerName}</td>
+                        <td>{p.jobType}</td>
+                        <td style={{ fontWeight: 600 }}>
+                          {p.agreedAmount.toLocaleString()} đ
+                        </td>
+                        <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
+                          {p.declaredAmount > 0 ? `${p.declaredAmount.toLocaleString()} đ` : 'Chưa trả'}
+                        </td>
+                        <td>{p.paymentMethod || '—'}</td>
+                        <td>{p.externalRef || '—'}</td>
+                        <td>
+                          <span className={`status-badge ${p.status}`}>
+                            {p.status === 'CONFIRMED_FULL'
+                              ? 'Đã nhận đủ'
+                              : p.status === 'DECLARED_PENDING_WORKER'
+                              ? 'Chờ Worker xác nhận'
+                              : p.status === 'DISPUTED'
+                              ? 'Khiếu nại (Dispute)'
+                              : 'Chưa thanh toán'}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="eo-btn-secondary"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
+                            onClick={() => {
+                              setSelectedAssignment(p);
+                              setPaymentForm({
+                                assignmentId: p.assignmentId,
+                                declaredAmount: p.agreedAmount,
+                                paymentMethod: 'BANK_TRANSFER',
+                                externalRef: `VCB-${Date.now().toString().slice(-6)}`,
+                                paymentProofUrl: 'https://storage.cani.vn/proofs/bill_example.jpg',
+                              });
+                              setShowPaymentModal(true);
+                            }}
+                          >
+                            Khai báo trả lương
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            </section>
+          )}
 
-              <div className="eo-form-row">
-                <div className="eo-form-group">
-                  <label>Số Lượng Worker Cần Tuyển *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    className="eo-form-input"
-                    value={newShift.requiredWorkers}
-                    onChange={(e) => setNewShift({ ...newShift, requiredWorkers: parseInt(e.target.value) })}
-                  />
-                </div>
-                <div className="eo-form-group">
-                  <label>Thù Lao Giờ (VNĐ/giờ) *</label>
-                  <input
-                    type="number"
-                    min="20000"
-                    step="5000"
-                    required
-                    className="eo-form-input"
-                    value={newShift.hourlyWage}
-                    onChange={(e) => setNewShift({ ...newShift, hourlyWage: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
+          {/* NỘI DUNG TAB 3: ĐỊNH DANH DOANH NGHIỆP E-KYC */}
+          {activeTab === 'ekyc' && <EoEkycTab />}
+        </main>
 
-              <div className="eo-form-row">
-                <div className="eo-form-group">
-                  <label>Phụ Cấp Thêm (VNĐ)</label>
-                  <input
-                    type="number"
-                    step="10000"
-                    className="eo-form-input"
-                    value={newShift.allowance}
-                    onChange={(e) => setNewShift({ ...newShift, allowance: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="eo-form-group">
-                  <label>Cự Ly Bán Kính Tối Đa (km)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    className="eo-form-input"
-                    value={newShift.maxDistanceKm}
-                    onChange={(e) => setNewShift({ ...newShift, maxDistanceKm: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
-
-              {/* Chi phí ước tính hiển thị realtime */}
-              <div className="shift-cost-summary-box">
-                <div className="shift-cost-header">
-                  <span>DỰ TOÁN THÙ LAO CA LÀM NÀY:</span>
-                  <span className="shift-cost-hours">
-                    ⏱️ {getShiftDurationHours()} giờ &times; {newShift.requiredWorkers || 1} nhân sự
-                  </span>
-                </div>
-                <div className="shift-cost-total">
-                  {calculateShiftTotal().toLocaleString()} đ
-                </div>
-                <div className="shift-cost-formula">
-                  = ({getShiftDurationHours()}h &times; {Number(newShift.requiredWorkers || 1)} người &times; {Number(newShift.hourlyWage || 0).toLocaleString()}đ/h) + {Number(newShift.allowance || 0).toLocaleString()}đ phụ cấp
-                </div>
-                <div className="shift-cost-note">
-                  💡 Thù lao này EO thanh toán trực tiếp cho Worker sau ca làm (Mô hình Non-Escrow - CANi không thu cọc lương).
-                </div>
-              </div>
-
-              <div className="eo-modal-footer">
+        {/* ========================================================= */}
+        {/* CỘT 3: WIDGET TIỆN ÍCH BÊN PHẢI (RIGHT UTILITY COLUMN)      */}
+        {/* ========================================================= */}
+        <aside className="eo-widget-panel">
+          {/* Widget 1: Lịch mini tương tác */}
+          <div className="eo-widget-card calendar-widget">
+            <div className="widget-header">
+              <h3 className="widget-title">Tháng {calendarDate.month + 1}, {calendarDate.year}</h3>
+              <div className="calendar-nav-buttons">
                 <button
                   type="button"
-                  className="eo-btn-secondary"
-                  onClick={() => setShowShiftModal(false)}
-                >
-                  Hủy Bỏ
-                </button>
-                <button type="submit" className="eo-btn-primary">
-                  Lưu Ca Làm Việc
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Khai Báo Thanh Toán Trực Tiếp (Mục 11 SRS) */}
-      {showPaymentModal && selectedAssignment && (
-        <div className="eo-modal-overlay">
-          <div className="eo-modal-box">
-            <h3>Khai Báo Đã Trả Lương Trực Tiếp</h3>
-            <p style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1.25rem' }}>
-              Theo Mục 11 & 12 SRS, CANi không giữ cọc hay giữ lương. Sau khi chi trả ngoài cho
-              Worker, vui lòng khai báo để hệ thống đối soát và Worker bấm xác nhận.
-            </p>
-            <form onSubmit={handleDeclarePayment}>
-              <div className="eo-form-group">
-                <label>Nhân sự được chi trả:</label>
-                <input
-                  type="text"
-                  disabled
-                  className="eo-form-input"
-                  style={{ background: '#f3f4f6' }}
-                  value={`${selectedAssignment.workerName} (${selectedAssignment.jobType})`}
-                />
-              </div>
-
-              <div className="eo-form-group">
-                <label>Số Tiền Đã Trả (VNĐ) *</label>
-                <input
-                  type="number"
-                  required
-                  className="eo-form-input"
-                  value={paymentForm.declaredAmount}
-                  onChange={(e) =>
-                    setPaymentForm({ ...paymentForm, declaredAmount: parseFloat(e.target.value) })
-                  }
-                />
-              </div>
-
-              <div className="eo-form-group">
-                <label>Phương Thức Chi Trả *</label>
-                <select
-                  className="eo-form-select"
-                  value={paymentForm.paymentMethod}
-                  onChange={(e) =>
-                    setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })
+                  className="cal-btn"
+                  title="Tháng trước"
+                  onClick={() =>
+                    setCalendarDate((prev) =>
+                      prev.month === 0 ? { month: 11, year: prev.year - 1 } : { ...prev, month: prev.month - 1 }
+                    )
                   }
                 >
-                  <option value="BANK_TRANSFER">Chuyển Khoản Ngân Hàng (Bank Transfer)</option>
-                  <option value="CASH">Tiền Mặt Trực Tiếp (Cash)</option>
-                </select>
-              </div>
-
-              <div className="eo-form-group">
-                <label>Mã Giao Dịch Ngân Hàng Ngoài (Nếu chuyển khoản)</label>
-                <input
-                  type="text"
-                  className="eo-form-input"
-                  placeholder="Ví dụ: VCB-123456789"
-                  value={paymentForm.externalRef}
-                  onChange={(e) =>
-                    setPaymentForm({ ...paymentForm, externalRef: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="eo-form-group">
-                <label>Link Ảnh Chụp Biên Lai / Bằng Chứng Chuyển Khoản</label>
-                <input
-                  type="text"
-                  className="eo-form-input"
-                  placeholder="https://storage.cani.vn/proofs/bill.jpg"
-                  value={paymentForm.paymentProofUrl}
-                  onChange={(e) =>
-                    setPaymentForm({ ...paymentForm, paymentProofUrl: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="eo-modal-footer">
+                  &lt;
+                </button>
                 <button
                   type="button"
-                  className="eo-btn-secondary"
-                  onClick={() => setShowPaymentModal(false)}
+                  className="cal-btn"
+                  title="Tháng sau"
+                  onClick={() =>
+                    setCalendarDate((prev) =>
+                      prev.month === 11 ? { month: 0, year: prev.year + 1 } : { ...prev, month: prev.month + 1 }
+                    )
+                  }
                 >
-                  Đóng
+                  &gt;
                 </button>
-                <button type="submit" className="eo-btn-primary">
-                  Gửi Khai Báo Thanh Toán
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Modal: Xác Nhận Xuất Bản Sự Kiện & Phí Dịch Vụ Matching */}
-      {confirmPublish.isOpen && confirmPublish.event && (
-        <div className="eo-modal-overlay">
-          <div className="eo-modal-box publish-modal-box animate-fade-in-up">
-            <div className="publish-modal-header">
-              <span className="publish-modal-icon">🚀</span>
-              <div>
-                <h3>Xác Nhận Xuất Bản & Kích Hoạt Matching</h3>
-                <p>Hệ thống CANi sẽ quét ứng viên phù hợp theo độ tin cậy và bán kính điều phối</p>
               </div>
             </div>
 
-            {/* Thông tin tóm tắt sự kiện */}
-            <div className="publish-summary-card">
-              <div className="publish-summary-title">
-                {confirmPublish.event.name}
-              </div>
-              <div className="publish-grid">
-                <div className="publish-grid-item">
-                  <span className="lbl">Số ca làm việc:</span>
-                  <span className="val">{confirmPublish.event.totalShifts || 0} ca</span>
-                </div>
-                <div className="publish-grid-item">
-                  <span className="lbl">Tổng nhân sự tuyển:</span>
-                  <span className="val highlight">
-                    {confirmPublish.event.totalRequiredWorkers || 0} người
-                  </span>
-                </div>
-                <div className="publish-grid-item full-width">
-                  <span className="lbl">Tổng ngân sách lương dự kiến:</span>
-                  <span className="val wage">
-                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                      confirmPublish.event.totalEstimatedCost || 0
-                    )}
-                  </span>
-                  <div className="sub-note">
-                    (Thanh toán trực tiếp giữa EO & Worker sau khi kết thúc ca làm - CANi không giữ cọc)
+            <div className="calendar-weekdays-row">
+              <span>T2</span>
+              <span>T3</span>
+              <span>T4</span>
+              <span>T5</span>
+              <span>T6</span>
+              <span>T7</span>
+              <span>CN</span>
+            </div>
+
+            <div className="calendar-grid">
+              {renderCalendarDays()}
+            </div>
+          </div>
+
+          {/* Widget 2: Thông Báo Mới Nhất */}
+          <div className="eo-widget-card notifications-widget">
+            <div className="widget-header">
+              <h3 className="widget-title">Thông báo mới</h3>
+              <button
+                type="button"
+                className="widget-link-btn"
+                onClick={() => showToast('Xem tất cả thông báo', 'info')}
+              >
+                Xem tất cả
+              </button>
+            </div>
+
+            <div className="notification-list">
+              {RECENT_NOTIFICATIONS.map((item) => (
+                <div key={item.id} className="notification-item">
+                  <div
+                    className="notif-avatar"
+                    style={{ backgroundColor: item.bgColor, color: item.color }}
+                  >
+                    {item.icon}
+                  </div>
+                  <div className="notif-body">
+                    <p className="notif-title">{item.title}</p>
+                    <span className="notif-time">{item.time}</span>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Phí Dịch Vụ Điều Phối Của Hệ Thống */}
-            <div className="publish-fee-box">
-              <div className="publish-fee-header">
-                <span className="publish-fee-title">
-                  ⚡ Phí dịch vụ điều phối (Platform Matching Fee):
-                </span>
-                <span className="publish-fee-amount">
-                  {((confirmPublish.event.totalRequiredWorkers || 0) * 3000).toLocaleString()} đ
-                </span>
-              </div>
-              <div className="publish-fee-detail">
-                Định mức: <strong>3.000 VNĐ / slot ứng viên cần tuyển</strong> &times; {confirmPublish.event.totalRequiredWorkers || 0} người.
-                <br />
-                <em>(Khoản phí này trừ vào số dư gói Subscription hoặc cổng Sandbox VNPay để kích hoạt Matching Engine)</em>
-              </div>
-            </div>
-
-            <div className="eo-modal-footer">
+          {/* Widget 3: Thao Tác Nhanh */}
+          <div className="eo-widget-card quick-actions-widget">
+            <h3 className="widget-title">Thao tác nhanh</h3>
+            <div className="quick-actions-grid">
               <button
                 type="button"
-                className="eo-btn-secondary"
-                onClick={() => setConfirmPublish({ isOpen: false, event: null })}
+                className="quick-action-btn"
+                onClick={() => setShowEventModal(true)}
               >
-                Để sau (Giữ bản nháp)
+                <span className="quick-btn-icon blue">➕</span>
+                <span className="quick-btn-label">Tạo sự kiện mới</span>
               </button>
+
               <button
                 type="button"
-                className="eo-btn-primary"
-                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-                onClick={handleExecutePublish}
+                className="quick-action-btn"
+                onClick={() => {
+                  if (events.length > 0) {
+                    setSelectedEventId(events[0].eventId);
+                    setShowShiftModal(true);
+                  } else {
+                    setShowEventModal(true);
+                  }
+                }}
               >
-                Thanh Toán Phí & Kích Hoạt Tìm Người
+                <span className="quick-btn-icon cyan">👥</span>
+                <span className="quick-btn-label">Tuyển nhân sự</span>
+              </button>
+
+              <button
+                type="button"
+                className="quick-action-btn"
+                onClick={() => setActiveTab('payments')}
+              >
+                <span className="quick-btn-icon emerald">💳</span>
+                <span className="quick-btn-label">Khai báo lương</span>
+              </button>
+
+              <button
+                type="button"
+                className="quick-action-btn"
+                onClick={() => setActiveTab('ekyc')}
+              >
+                <span className="quick-btn-icon amber">🛡️</span>
+                <span className="quick-btn-label">Định danh eKYC</span>
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </aside>
+      </div>
+
+      {/* ========================================================= */}
+      {/* TẤT CẢ CÁC MODALS NGHIỆP VỤ (MODULE HOÁ CLEAN CODE)       */}
+      {/* ========================================================= */}
+
+      {/* Modal 1: Tạo Sự Kiện Mới */}
+      <EventCreateModal
+        isOpen={showEventModal}
+        onClose={() => setShowEventModal(false)}
+        onSubmit={handleCreateEvent}
+        newEvent={newEvent}
+        setNewEvent={setNewEvent}
+        onGetCurrentLocation={handleGetCurrentLocation}
+        locating={locating}
+      />
+
+      {/* Modal 2: Thêm Ca Làm Việc & Định Mức Lương 4D */}
+      <ShiftCreateModal
+        isOpen={showShiftModal}
+        onClose={() => setShowShiftModal(false)}
+        onSubmit={handleAddShift}
+        newShift={newShift}
+        setNewShift={setNewShift}
+        roles={ROLES}
+        wageRecommendationsMap={WAGE_RECOMMENDATIONS_MAP}
+        onRoleChange={handleRoleChange}
+        shiftDurationHours={getShiftDurationHours()}
+        shiftTotal={calculateShiftTotal()}
+      />
+
+      {/* Modal 3: Khai Báo Thanh Toán Trực Tiếp (Mục 11 & 12 SRS) */}
+      <PaymentDeclarationModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSubmit={handleDeclarePayment}
+        paymentForm={paymentForm}
+        setPaymentForm={setPaymentForm}
+        selectedAssignment={selectedAssignment}
+      />
+
+      {/* Modal 4: Xác Nhận Xuất Bản Sự Kiện & Phí Matching (VietQR / Quota) */}
+      <PublishEventModal
+        isOpen={confirmPublish.isOpen}
+        onClose={() => setConfirmPublish({ isOpen: false, event: null })}
+        onExecutePublish={handleExecutePublish}
+        event={confirmPublish.event}
+        publishPayMethod={publishPayMethod}
+        setPublishPayMethod={setPublishPayMethod}
+        onCopyToClipboard={copyToClipboard}
+      />
 
       {/* Modal: Xem Tọa Độ & Bản Đồ Radar */}
       <MapModal

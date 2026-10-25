@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLogin } from '../hooks/useLogin';
+import CaniLogo from '../../../components/common/CaniLogo';
 import '../auth.css';
 
 export const LoginForm = () => {
@@ -17,9 +18,9 @@ export const LoginForm = () => {
   return (
     <div className="auth-card">
       <div className="auth-header">
-        <div className="auth-logo-badge">C</div>
-        <h2 className="auth-title">Đăng Nhập</h2>
-        <p className="auth-subtitle">Cổng Quản Trị & Tổ Chức Sự Kiện CANi</p>
+        <CaniLogo variant="full" height={52} className="auth-logo-center" />
+        <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng Nhập</h2>
+        <p className="auth-subtitle">Cổng Quản Trị & Tổ Chức Sự Kiện</p>
       </div>
 
       {errorMessage && (

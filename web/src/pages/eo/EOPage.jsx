@@ -19,6 +19,19 @@ const ROLES = [
   'PG / PB',
 ];
 
+// Ma trận thù lao thị trường tham chiếu (Wage Matrix 4D Recommendation)
+const WAGE_RECOMMENDATIONS_MAP = {
+  'Lễ tân / Check-in': { min: 45000, max: 60000, defaultWage: 50000, note: 'Giao tiếp tốt, ngoại hình sáng' },
+  'Phục vụ bàn': { min: 35000, max: 50000, defaultWage: 40000, note: 'Nhanh nhẹn, cẩn thận' },
+  'Pha chế (Bartender/Barista)': { min: 60000, max: 85000, defaultWage: 70000, note: 'Có tay nghề pha chế' },
+  'Thu ngân': { min: 40000, max: 55000, defaultWage: 45000, note: 'Trung thực, tính toán chuẩn xác' },
+  'Điều phối sự kiện': { min: 70000, max: 100000, defaultWage: 80000, note: 'Kinh nghiệm quản lý nhóm' },
+  'Kỹ thuật âm thanh - ánh sáng': { min: 80000, max: 120000, defaultWage: 95000, note: 'Chuyên môn thiết bị sự kiện' },
+  'Bảo vệ / An ninh': { min: 40000, max: 55000, defaultWage: 45000, note: 'Thể lực tốt, giữ trật tự' },
+  'Hậu cần / Setup sự kiện': { min: 50000, max: 70000, defaultWage: 55000, note: 'Sức khỏe tốt, khuân vác, setup' },
+  'PG / PB': { min: 70000, max: 110000, defaultWage: 85000, note: 'Ngoại hình, giới thiệu sản phẩm' },
+};
+
 const EOPage = () => {
   const [activeTab, setActiveTab] = useState('events'); // 'events', 'shifts', 'payments'
   const [events, setEvents] = useState([]);
@@ -32,7 +45,8 @@ const EOPage = () => {
   const [selectedAssignment, setSelectedAssignment] = useState(null);
 
   // Smooth Prompt/Confirm & Map States
-  const [confirmPublish, setConfirmPublish] = useState({ isOpen: false, eventId: null });
+  const [confirmPublish, setConfirmPublish] = useState({ isOpen: false, event: null });
+  const [locating, setLocating] = useState(false);
   const [mapModal, setMapModal] = useState({
     isOpen: false,
     eventName: '',
@@ -128,12 +142,67 @@ const EOPage = () => {
     }
   };
 
-  // Tính thù lao ước tính realtime
-  const calculateShiftTotal = () => {
+  // Lấy vị trí GPS hiện tại và Reverse Geocoding địa chỉ qua OpenStreetMap
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      showToast('Trình duyệt của bạn không hỗ trợ định vị GPS.', 'error');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = parseFloat(pos.coords.latitude.toFixed(6));
+        const lng = parseFloat(pos.coords.longitude.toFixed(6));
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            { headers: { 'Accept-Language': 'vi' } }
+          );
+          const data = await res.json();
+          const addr = data.display_name || `Vị trí GPS (${lat}, ${lng})`;
+          setNewEvent((prev) => ({
+            ...prev,
+            venueAddress: addr,
+            venueLat: lat,
+            venueLng: lng,
+          }));
+          showToast('Đã định vị tọa độ GPS & địa chỉ hiện tại thành công!', 'success');
+        } catch {
+          setNewEvent((prev) => ({
+            ...prev,
+            venueAddress: `Tọa độ GPS (${lat}, ${lng})`,
+            venueLat: lat,
+            venueLng: lng,
+          }));
+          showToast('Đã lấy tọa độ GPS thành công!', 'info');
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        showToast('Không thể lấy vị trí: ' + (err.message || 'Quyền GPS bị từ chối'), 'error');
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // Tính số giờ của ca làm việc
+  const getShiftDurationHours = () => {
     try {
       const start = new Date(newShift.startTime);
       const end = new Date(newShift.endTime);
-      const hours = Math.max(0.5, (end - start) / (1000 * 60 * 60));
+      const diff = (end - start) / (1000 * 60 * 60);
+      return diff > 0 ? parseFloat(diff.toFixed(1)) : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  // Tính thù lao ước tính realtime
+  const calculateShiftTotal = () => {
+    try {
+      const hours = getShiftDurationHours() || 0.5;
       return (
         hours *
           Number(newShift.requiredWorkers || 1) *
@@ -143,6 +212,16 @@ const EOPage = () => {
     } catch {
       return 0;
     }
+  };
+
+  // Xử lý đổi vai trò công việc -> Tự động gợi ý mức lương tham chiếu
+  const handleRoleChange = (role) => {
+    const rec = WAGE_RECOMMENDATIONS_MAP[role];
+    setNewShift((prev) => ({
+      ...prev,
+      jobType: role,
+      hourlyWage: rec ? rec.defaultWage : prev.hourlyWage,
+    }));
   };
 
   // Submit Tạo Sự Kiện
@@ -177,19 +256,19 @@ const EOPage = () => {
   };
 
   // Trigger modal xác nhận xuất bản sự kiện & kích hoạt Matching
-  const openConfirmPublish = (eventId) => {
-    setConfirmPublish({ isOpen: true, eventId });
+  const openConfirmPublish = (event) => {
+    setConfirmPublish({ isOpen: true, event });
   };
 
   const handleExecutePublish = async () => {
-    const eventId = confirmPublish.eventId;
-    setConfirmPublish({ isOpen: false, eventId: null });
+    const eventId = confirmPublish.event?.eventId;
+    setConfirmPublish({ isOpen: false, event: null });
     if (!eventId) return;
 
     try {
       await eoService.publishEvent(eventId);
       loadEvents();
-      showToast('Xuất bản thành công! Hệ thống đang tự động lọc ứng viên phù hợp theo vị trí và độ uy tín.', 'success');
+      showToast('Xuất bản thành công! Đã tính phí dịch vụ điều phối và kích hoạt Matching Engine tìm ứng viên.', 'success');
     } catch (err) {
       showToast('Lỗi: ' + (err.response?.data?.message || err.message), 'error');
     }
@@ -390,9 +469,9 @@ const EOPage = () => {
                   {evt.status === 'DRAFT' && (
                     <button
                       className="eo-btn-publish"
-                      onClick={() => openConfirmPublish(evt.eventId)}
+                      onClick={() => openConfirmPublish(evt)}
                     >
-                      Kích Hoạt Matching Tìm Người
+                      🚀 Kích Hoạt Matching Tìm Người
                     </button>
                   )}
                 </div>
@@ -503,14 +582,29 @@ const EOPage = () => {
               </div>
 
               <div className="eo-form-group">
-                <label>Địa Điểm Tổ Chức (Venue Address) *</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label style={{ margin: 0 }}>Địa Điểm Tổ Chức (Venue Address) *</label>
+                  <button
+                    type="button"
+                    className="eo-btn-gps"
+                    onClick={handleGetCurrentLocation}
+                    disabled={locating}
+                    title="Tự động phát hiện vị trí GPS hiện tại và lấy địa chỉ"
+                  >
+                    {locating ? '🔄 Đang định vị...' : '📍 Lấy vị trí hiện tại'}
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
                   className="eo-form-input"
+                  placeholder="Nhập địa chỉ hoặc bấm 'Lấy vị trí hiện tại'..."
                   value={newEvent.venueAddress}
                   onChange={(e) => setNewEvent({ ...newEvent, venueAddress: e.target.value })}
                 />
+                <span className="eo-field-helper">
+                  💡 Tọa độ GPS giúp hệ thống quét và ưu tiên các Worker trong bán kính &le; 15km.
+                </span>
               </div>
 
               <div className="eo-form-row">
@@ -564,7 +658,7 @@ const EOPage = () => {
                 <select
                   className="eo-form-select"
                   value={newShift.jobType}
-                  onChange={(e) => setNewShift({ ...newShift, jobType: e.target.value })}
+                  onChange={(e) => handleRoleChange(e.target.value)}
                 >
                   {ROLES.map((role) => (
                     <option key={role} value={role}>
@@ -572,6 +666,23 @@ const EOPage = () => {
                     </option>
                   ))}
                 </select>
+
+                {/* Gợi ý Ma trận Lương Wage Matrix 4D */}
+                {WAGE_RECOMMENDATIONS_MAP[newShift.jobType] && (
+                  <div className="wage-recommendation-badge animate-fade-in-up">
+                    <span className="badge-icon">💡</span>
+                    <div>
+                      <strong>Gợi ý Ma trận Lương (Wage Matrix 4D):</strong>{' '}
+                      <span className="wage-range">
+                        {WAGE_RECOMMENDATIONS_MAP[newShift.jobType].min.toLocaleString()} đ -{' '}
+                        {WAGE_RECOMMENDATIONS_MAP[newShift.jobType].max.toLocaleString()} đ / giờ
+                      </span>
+                      <div className="wage-subnote">
+                        Đặc điểm: {WAGE_RECOMMENDATIONS_MAP[newShift.jobType].note}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="eo-form-row">
@@ -648,23 +759,21 @@ const EOPage = () => {
               </div>
 
               {/* Chi phí ước tính hiển thị realtime */}
-              <div
-                style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  padding: '1rem',
-                  borderRadius: '0.5rem',
-                  margin: '1rem 0',
-                }}
-              >
-                <div style={{ fontSize: '0.85rem', color: '#166534', fontWeight: 600 }}>
-                  DỰ TOÁN CHI PHÍ CA LÀM VIỆC NÀY:
+              <div className="shift-cost-summary-box">
+                <div className="shift-cost-header">
+                  <span>DỰ TOÁN THÙ LAO CA LÀM NÀY:</span>
+                  <span className="shift-cost-hours">
+                    ⏱️ {getShiftDurationHours()} giờ &times; {newShift.requiredWorkers || 1} nhân sự
+                  </span>
                 </div>
-                <div style={{ fontSize: '1.4rem', color: '#15803d', fontWeight: 800 }}>
+                <div className="shift-cost-total">
                   {calculateShiftTotal().toLocaleString()} đ
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#4b5563', marginTop: '0.25rem' }}>
-                  (Thanh toán trực tiếp cho Worker sau khi hoàn thành ca làm)
+                <div className="shift-cost-formula">
+                  = ({getShiftDurationHours()}h &times; {Number(newShift.requiredWorkers || 1)} người &times; {Number(newShift.hourlyWage || 0).toLocaleString()}đ/h) + {Number(newShift.allowance || 0).toLocaleString()}đ phụ cấp
+                </div>
+                <div className="shift-cost-note">
+                  💡 Thù lao này EO thanh toán trực tiếp cho Worker sau ca làm (Mô hình Non-Escrow - CANi không thu cọc lương).
                 </div>
               </div>
 
@@ -775,17 +884,85 @@ const EOPage = () => {
           </div>
         </div>
       )}
-      {/* Modal: Xác Nhận Xuất Bản Sự Kiện */}
-      <PromptModal
-        isOpen={confirmPublish.isOpen}
-        title="Kích Hoạt Matching Tìm Nhân Sự"
-        description="Hệ thống sẽ quét ứng viên đạt độ tin cậy và kỹ năng trong bán kính ưu tiên. Mô hình Non-Escrow của CANi không giữ cọc hay giữ ví, EO sẽ tự trả lương sau ca."
-        type="info"
-        confirmText="Kích Hoạt Ngay"
-        cancelText="Để Sau"
-        onConfirm={handleExecutePublish}
-        onCancel={() => setConfirmPublish({ isOpen: false, eventId: null })}
-      />
+      {/* Modal: Xác Nhận Xuất Bản Sự Kiện & Phí Dịch Vụ Matching */}
+      {confirmPublish.isOpen && confirmPublish.event && (
+        <div className="eo-modal-overlay">
+          <div className="eo-modal-box publish-modal-box animate-fade-in-up">
+            <div className="publish-modal-header">
+              <span className="publish-modal-icon">🚀</span>
+              <div>
+                <h3>Xác Nhận Xuất Bản & Kích Hoạt Matching</h3>
+                <p>Hệ thống CANi sẽ quét ứng viên phù hợp theo độ tin cậy và bán kính điều phối</p>
+              </div>
+            </div>
+
+            {/* Thông tin tóm tắt sự kiện */}
+            <div className="publish-summary-card">
+              <div className="publish-summary-title">
+                {confirmPublish.event.name}
+              </div>
+              <div className="publish-grid">
+                <div className="publish-grid-item">
+                  <span className="lbl">Số ca làm việc:</span>
+                  <span className="val">{confirmPublish.event.totalShifts || 0} ca</span>
+                </div>
+                <div className="publish-grid-item">
+                  <span className="lbl">Tổng nhân sự tuyển:</span>
+                  <span className="val highlight">
+                    {confirmPublish.event.totalRequiredWorkers || 0} người
+                  </span>
+                </div>
+                <div className="publish-grid-item full-width">
+                  <span className="lbl">Tổng ngân sách lương dự kiến:</span>
+                  <span className="val wage">
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+                      confirmPublish.event.totalEstimatedCost || 0
+                    )}
+                  </span>
+                  <div className="sub-note">
+                    (Thanh toán trực tiếp giữa EO & Worker sau khi kết thúc ca làm - CANi không giữ cọc)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Phí Dịch Vụ Điều Phối Của Hệ Thống */}
+            <div className="publish-fee-box">
+              <div className="publish-fee-header">
+                <span className="publish-fee-title">
+                  ⚡ Phí dịch vụ điều phối (Platform Matching Fee):
+                </span>
+                <span className="publish-fee-amount">
+                  {((confirmPublish.event.totalRequiredWorkers || 0) * 3000).toLocaleString()} đ
+                </span>
+              </div>
+              <div className="publish-fee-detail">
+                Định mức: <strong>3.000 VNĐ / slot ứng viên cần tuyển</strong> &times; {confirmPublish.event.totalRequiredWorkers || 0} người.
+                <br />
+                <em>(Khoản phí này trừ vào số dư gói Subscription hoặc cổng Sandbox VNPay để kích hoạt Matching Engine)</em>
+              </div>
+            </div>
+
+            <div className="eo-modal-footer">
+              <button
+                type="button"
+                className="eo-btn-secondary"
+                onClick={() => setConfirmPublish({ isOpen: false, event: null })}
+              >
+                Để sau (Giữ bản nháp)
+              </button>
+              <button
+                type="button"
+                className="eo-btn-primary"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                onClick={handleExecutePublish}
+              >
+                Thanh Toán Phí & Kích Hoạt Tìm Người
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Xem Tọa Độ & Bản Đồ Radar */}
       <MapModal

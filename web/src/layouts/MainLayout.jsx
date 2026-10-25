@@ -8,12 +8,34 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
 
-  const navItems = [
-    { path: '/eo', label: 'Ban Tổ Chức (EO)' },
-    { path: '/worker', label: 'Nhân Sự (Worker)' },
-    { path: '/customer-care', label: 'Customer Care' },
-    { path: '/admin', label: 'Admin Portal' },
-  ];
+  // Phân quyền thanh điều hướng chuẩn đặc tả SEP490:
+  // - Web Portal: Dành riêng cho Event Organizer (EO), Admin, Customer Care.
+  // - Worker: Hoạt động độc lập 100% trên Mobile App (CANi Partner App).
+  const getNavItems = () => {
+    if (!user) {
+      return [{ path: '/eo', label: 'Ban Tổ Chức (EO)' }];
+    }
+    switch (user.role) {
+      case 'ADMIN':
+        return [
+          { path: '/admin', label: 'Admin Portal' },
+          { path: '/customer-care', label: 'Customer Care' },
+          { path: '/eo', label: 'Xem Cổng EO' },
+        ];
+      case 'CUSTOMER_CARE':
+        return [
+          { path: '/customer-care', label: 'Customer Care' },
+          { path: '/eo', label: 'Xem Cổng EO' },
+        ];
+      case 'EVENT_ORGANIZER':
+      default:
+        return [
+          { path: '/eo', label: 'Ban Tổ Chức (EO)' },
+        ];
+    }
+  };
+
+  const navItems = getNavItems();
 
   const handleLogout = async () => {
     await logout();

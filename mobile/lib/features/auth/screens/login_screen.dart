@@ -166,16 +166,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ? null
                         : () async {
                             final success = await ref.read(authStateProvider.notifier).loginWithGoogle();
-                            if (success && mounted) {
+                            if (!context.mounted) return;
+                            if (success) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Đăng nhập Google thành công!'), backgroundColor: Colors.green),
+                                const SnackBar(
+                                  content: Text('Đăng nhập Google thành công!'),
+                                  backgroundColor: Colors.green,
+                                ),
                               );
                             }
                           },
-                    icon: const Icon(Icons.g_mobiledata, size: 28, color: Colors.blue),
-                    label: const Text(
-                      'Đăng nhập với Google',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                    icon: authState.isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.g_mobiledata, size: 28, color: Colors.blue),
+                    label: Text(
+                      authState.isLoading ? 'Đang kết nối Google...' : 'Đăng nhập với Google',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                     ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),

@@ -73,6 +73,9 @@ Desktop.ini
 !.env.example
 *.pem
 *.key
+*.bak
+*.bak*
+client_secret*.json
 secrets/
 credentials/
 

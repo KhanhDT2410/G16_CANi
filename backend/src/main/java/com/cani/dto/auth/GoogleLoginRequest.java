@@ -14,4 +14,6 @@ public class GoogleLoginRequest {
 
     @NotBlank(message = "Supabase access token không được để trống")
     private String supabaseAccessToken;
+
+    private String targetRole;
 }

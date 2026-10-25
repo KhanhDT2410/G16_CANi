@@ -179,31 +179,47 @@ public class AuthService {
             UUID userId = UUID.fromString(jwt.getSubject());
             String email = jwt.getClaimAsString("email");
 
-            User user = userRepository.findById(userId).orElseGet(() -> {
+            User user = userRepository.findById(userId)
+                    .or(() -> userRepository.findByEmail(email))
+                    .orElseGet(() -> {
                 String fullName = email;
                 Map<String, Object> userMetadata = jwt.getClaim("user_metadata");
                 if (userMetadata != null && userMetadata.get("full_name") != null) {
                     fullName = userMetadata.get("full_name").toString();
                 }
 
+                // Xác định vai trò ban đầu: Nếu từ Web gửi EVENT_ORGANIZER thì cấp quyền EO, ngược lại mặc định WORKER
+                UserRole initialRole = UserRole.WORKER;
+                if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())) {
+                    initialRole = UserRole.EVENT_ORGANIZER;
+                }
+
                 User newUser = User.builder()
                         .userId(userId)
                         .email(email)
                         .fullName(fullName)
-                        .role(UserRole.WORKER) // Mặc định tài khoản Google đăng nhập lần đầu là WORKER
+                        .role(initialRole)
                         .status(UserStatus.ACTIVE)
                         .emailVerified(true)
                         .build();
 
                 User saved = userRepository.save(newUser);
 
-                Worker worker = workerRepository.findByUser_UserId(saved.getUserId())
-                        .orElseGet(() -> Worker.builder()
-                                .user(saved)
-                                .fullName(saved.getFullName())
-                                .build());
-                worker.setFullName(saved.getFullName());
-                workerRepository.save(worker);
+                if (initialRole == UserRole.EVENT_ORGANIZER) {
+                    EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(saved.getUserId())
+                            .orElseGet(() -> EventOrganizer.builder()
+                                    .user(saved)
+                                    .build());
+                    eventOrganizerRepository.save(eo);
+                } else {
+                    Worker worker = workerRepository.findByUser_UserId(saved.getUserId())
+                            .orElseGet(() -> Worker.builder()
+                                    .user(saved)
+                                    .fullName(saved.getFullName())
+                                    .build());
+                    worker.setFullName(saved.getFullName());
+                    workerRepository.save(worker);
+                }
 
                 return saved;
             });

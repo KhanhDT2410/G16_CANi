@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
-import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/job_proposals/screens/job_proposals_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
 import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
@@ -106,8 +105,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.assignment_outlined),
-            tooltip: 'Hồ sơ kỹ năng & Thẩm định',
+            icon: const Icon(Icons.workspace_premium_outlined),
+            tooltip: 'Bảng điểm kỹ năng & Cấp bậc',
             onPressed: () => setState(() => _currentIndex = 1),
           ),
           IconButton(
@@ -124,7 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        indicatorColor: const Color(0xFF0077FF).withOpacity(0.15),
+        indicatorColor: const Color(0x260077FF),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.map_outlined),
@@ -132,19 +131,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             label: 'Bản đồ',
           ),
           NavigationDestination(
-            icon: Icon(Icons.work_outline),
-            selectedIcon: Icon(Icons.work, color: Color(0xFF0077FF)),
-            label: 'Việc làm',
+            icon: Icon(Icons.workspace_premium_outlined),
+            selectedIcon: Icon(Icons.workspace_premium, color: Color(0xFF0077FF)),
+            label: 'Điểm SP',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_none),
-            selectedIcon: Icon(Icons.notifications, color: Color(0xFF0077FF)),
-            label: 'Thông báo',
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome, color: Color(0xFF0077FF)),
+            label: 'Thẩm định AI',
           ),
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet, color: Color(0xFF0077FF)),
-            label: 'Thu nhập',
+            icon: Icon(Icons.history_edu_outlined),
+            selectedIcon: Icon(Icons.history_edu, color: Color(0xFF0077FF)),
+            label: 'Lịch sử',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:cani/core/constants/api_constants.dart';
 import 'package:cani/core/network/auth_interceptor.dart';
 
 import 'package:cani/features/auth/data/auth_api.dart';
@@ -96,21 +99,59 @@ class AuthRepository {
 
   Future<LoginResponseModel> signInWithGoogle() async {
     try {
-      // 1. Mở Supabase OAuth Google Sign-in
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'cani://login-callback',
-      );
-
-      final session = Supabase.instance.client.auth.currentSession;
-      if (session == null || session.accessToken.isEmpty) {
-        throw Exception('Không nhận được phiên xác thực từ Google.');
+      // 1. Dọn dẹp phiên xác thực Supabase cũ nếu còn sót lại
+      if (Supabase.instance.client.auth.currentSession != null) {
+        try {
+          await Supabase.instance.client.auth.signOut();
+        } catch (_) {}
       }
 
-      // 2. Đồng bộ user sang CANi Backend API
-      final response = await _api.syncGoogleAuth(session.accessToken);
+      // 2. Khởi tạo Native Google Sign-In qua Google Play Services
+      final googleSignIn = GoogleSignIn(
+        serverClientId: ApiConstants.googleWebClientId,
+        scopes: ['email', 'profile'],
+      );
 
-      // 3. Lưu trữ token
+      // Đăng xuất Google phiên trước để người dùng có thể chọn tài khoản khác
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Bạn đã hủy đăng nhập Google.');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Không nhận được ID Token từ Google. Vui lòng kiểm tra lại Google Play Services.');
+      }
+
+      // 3. Đăng nhập Supabase trực tiếp bằng ID Token (Native, không mở Web Browser)
+      final authResponse = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      final session = authResponse.session;
+      if (session == null || session.accessToken.isEmpty) {
+        throw Exception('Không nhận được phiên xác thực từ Google ID Token.');
+      }
+
+      // 4. Đồng bộ user sang CANi Backend API với targetRole: WORKER
+      final response = await _api.syncGoogleAuth(session.accessToken, 'WORKER');
+
+      // 5. Kiểm tra vai trò: App di động dành riêng cho Worker
+      if (response.user.role.toUpperCase() != 'WORKER') {
+        await clearSession();
+        throw Exception('Tài khoản của bạn là ${response.user.role}. Ứng dụng này chỉ dành cho Nhân sự (Worker). Vui lòng đăng nhập trên Web Portal.');
+      }
+
+      // 6. Lưu trữ token
       AuthInterceptor.inMemoryToken = response.token;
       await _storage.write(key: _tokenKey, value: response.token);
       if (response.refreshToken != null) {
@@ -122,8 +163,9 @@ class AuthRepository {
       final message = (e.response?.data is Map)
           ? (e.response?.data as Map)['message']?.toString()
           : null;
-      throw Exception(message ?? 'Xác thực Google không thành công.');
+      throw Exception(message ?? 'Đồng bộ tài khoản Google với hệ thống CANi thất bại.');
     } catch (e) {
+      if (e is Exception) rethrow;
       throw Exception('Lỗi Google Sign-In: ${e.toString()}');
     }
   }

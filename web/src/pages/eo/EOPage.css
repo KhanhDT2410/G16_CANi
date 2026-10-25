@@ -401,3 +401,248 @@
   background: #f3f4f6;
   color: #6b7280;
 }
+
+/* Nút GPS Lấy vị trí hiện tại */
+.eo-btn-gps {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.2s ease;
+}
+
+.eo-btn-gps:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
+  transform: translateY(-1px);
+}
+
+.eo-btn-gps:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.eo-field-helper {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.35rem;
+}
+
+/* Badge Gợi Ý Ma Trận Lương (Wage Matrix) */
+.wage-recommendation-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  margin-top: 0.5rem;
+  font-size: 0.825rem;
+  color: #92400e;
+}
+
+.wage-recommendation-badge .badge-icon {
+  font-size: 1.1rem;
+}
+
+.wage-recommendation-badge .wage-range {
+  color: #b45309;
+  font-weight: 800;
+}
+
+.wage-recommendation-badge .wage-subnote {
+  font-size: 0.75rem;
+  color: #78350f;
+  margin-top: 0.15rem;
+  font-style: italic;
+}
+
+/* Chi phí ca làm việc (Shift Cost Box) */
+.shift-cost-summary-box {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border: 1px solid #a7f3d0;
+  padding: 1.1rem;
+  border-radius: 0.625rem;
+  margin: 1.25rem 0;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.08);
+}
+
+.shift-cost-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.shift-cost-hours {
+  background: #d1fae5;
+  color: #047857;
+  padding: 0.15rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+}
+
+.shift-cost-total {
+  font-size: 1.6rem;
+  color: #059669;
+  font-weight: 900;
+  margin: 0.35rem 0;
+  letter-spacing: -0.02em;
+}
+
+.shift-cost-formula {
+  font-size: 0.775rem;
+  color: #047857;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.4rem;
+}
+
+.shift-cost-note {
+  font-size: 0.75rem;
+  color: #4b5563;
+  line-height: 1.35;
+}
+
+/* Publish Modal Styling */
+.publish-modal-box {
+  max-width: 540px !important;
+}
+
+.publish-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.publish-modal-icon {
+  font-size: 2rem;
+  background: #eff6ff;
+  border-radius: 0.75rem;
+  width: 3.25rem;
+  height: 3.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.publish-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.publish-modal-header p {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.825rem;
+  color: #6b7280;
+}
+
+.publish-summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.625rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.publish-summary-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+.publish-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.publish-grid-item.full-width {
+  grid-column: 1 / -1;
+  background: #ffffff;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.publish-grid-item .lbl {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+.publish-grid-item .val {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.publish-grid-item .val.highlight {
+  color: #2563eb;
+}
+
+.publish-grid-item .val.wage {
+  color: #059669;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.publish-grid-item .sub-note {
+  font-size: 0.725rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+/* Platform Matching Fee Box */
+.publish-fee-box {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: 0.625rem;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.publish-fee-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  color: #854d0e;
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
+}
+
+.publish-fee-amount {
+  color: #ca8a04;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.publish-fee-detail {
+  font-size: 0.775rem;
+  color: #713f12;
+  line-height: 1.45;
+}

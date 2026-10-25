@@ -32,10 +32,16 @@ class AuthApi {
     );
   }
 
-  Future<LoginResponseModel> syncGoogleAuth(String supabaseAccessToken) async {
+  Future<LoginResponseModel> syncGoogleAuth(
+    String supabaseAccessToken, [
+    String targetRole = 'WORKER',
+  ]) async {
     final response = await _dio.post<Map<String, Object?>>(
       '/auth/google',
-      data: {'supabaseAccessToken': supabaseAccessToken},
+      data: {
+        'supabaseAccessToken': supabaseAccessToken,
+        'targetRole': targetRole,
+      },
     );
     final data = (response.data?['data'] as Map<String, Object?>?) ?? <String, Object?>{};
     return LoginResponseModel.fromJson(data);

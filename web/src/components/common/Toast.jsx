@@ -3,6 +3,7 @@ import './Toast.css';
 
 let toastHandler = null;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const showToast = (message, type = 'success', duration = 3500) => {
   if (toastHandler) {
     toastHandler(message, type, duration);

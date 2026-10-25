@@ -79,6 +79,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.cani.cani',
+              errorTileCallback: (tile, error, stackTrace) {
+                // Bắt lỗi an toàn khi DNS mạng hoặc offline, tránh văng ứng dụng
+              },
             ),
 
             // Lớp vòng tròn quét bán kính tìm việc

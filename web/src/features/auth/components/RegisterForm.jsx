@@ -1,5 +1,6 @@
 import React from 'react';
 import { useRegister } from '../hooks/useRegister';
+import CaniLogo from '../../../components/common/CaniLogo';
 import '../auth.css';
 
 export const RegisterForm = () => {
@@ -22,8 +23,8 @@ export const RegisterForm = () => {
   return (
     <div className="auth-card auth-card-wide">
       <div className="auth-header">
-        <div className="auth-logo-badge">C</div>
-        <h2 className="auth-title">Đăng Ký Nhà Tổ Chức</h2>
+        <CaniLogo variant="full" height={52} className="auth-logo-center" />
+        <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng Ký Nhà Tổ Chức</h2>
         <p className="auth-subtitle">
           Tạo tài khoản dành riêng cho Ban Tổ Chức & Doanh Nghiệp Sự Kiện
         </p>

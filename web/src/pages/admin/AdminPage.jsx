@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../../services/api';
 import { showToast } from '../../components/common/Toast';
+import { AdminDashboard } from '../../features/admin-dashboard';
 import './AdminPage.css';
 
 const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState('ekyc'); // 'ekyc', 'skills'
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [ekycQueue, setEkycQueue] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Mock eKYC Queue
   useEffect(() => {
-    loadEkycQueue();
-  }, []);
+    if (activeTab === 'ekyc') {
+      loadEkycQueue();
+    }
+  }, [activeTab]);
 
   const loadEkycQueue = async () => {
     setLoading(true);
@@ -83,60 +85,28 @@ const AdminPage = () => {
 
   return (
     <div className="admin-container">
-      <div className="admin-header">
-        <h1>
-          Cổng Quản Trị Hệ Thống
-          <span className="admin-badge">ADMIN PORTAL</span>
-        </h1>
-        <p style={{ color: '#6b7280', margin: 0 }}>
-          Giám sát vận hành, phê duyệt hồ sơ định danh eKYC và thẩm định kỹ năng AI
-        </p>
-      </div>
-
-      {/* Metrics */}
-      <div className="admin-metrics">
-        <div className="admin-metric-card">
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>
-            Hồ Sơ eKYC Chờ Duyệt
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#dc2626' }}>
-            {ekycQueue.length}
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#dc2626' }}>Cần xử lý trong ngày</div>
-        </div>
-        <div className="admin-metric-card">
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>
-            Tỷ Lệ Auto-Approved AI
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10b981' }}>
-            84.2%
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#10b981' }}>Multimodal Vision AI</div>
-        </div>
-        <div className="admin-metric-card">
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>
-            Tổng Sự Kiện Đang Chạy
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#2563eb' }}>
-            28
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#2563eb' }}>TP.HCM & Hà Nội</div>
-        </div>
-      </div>
-
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="admin-tabs">
+        <button
+          className={`admin-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          📊 Dashboard Tổng Quan
+        </button>
         <button
           className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
           onClick={() => setActiveTab('ekyc')}
         >
-          Hàng Đợi eKYC Căn Cước ({ekycQueue.length})
+          🪪 Hàng Đợi eKYC ({ekycQueue.length})
         </button>
       </div>
 
-      {/* Content */}
+      {/* Tab: Dashboard (W-38) */}
+      {activeTab === 'dashboard' && <AdminDashboard />}
+
+      {/* Tab: eKYC Queue (giữ nguyên) */}
       {activeTab === 'ekyc' && (
-        <div className="admin-card-list">
+        <div className="admin-card-list" style={{ marginTop: '1.5rem' }}>
           {loading ? (
             <div style={{ padding: '1rem 0' }}>
               <div className="skeleton" style={{ height: '320px', borderRadius: '14px', marginBottom: '1rem' }} />

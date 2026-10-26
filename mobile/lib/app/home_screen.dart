@@ -3,13 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
-import 'package:cani/features/job_proposals/screens/job_proposals_screen.dart';
+import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
-import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
-import 'package:cani/features/skill_verification/widgets/ai_verification_tab.dart';
-import 'package:cani/features/skill_verification/widgets/skill_points_tab.dart';
-import 'package:cani/features/skill_verification/widgets/verification_history_tab.dart';
-import 'package:cani/features/skill_verification/widgets/worker_profile_tab.dart';
+import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
+import 'package:cani/features/skill_verification/screens/worker_profile_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -23,10 +20,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   final List<Widget> _pages = const [
     JobRadarScreen(),
-    SkillPointsTab(),
-    AiVerificationTab(),
-    VerificationHistoryTab(),
-    WorkerProfileTab(),
+    MyAssignmentsScreen(),
+    SkillHubScreen(),
+    WorkerProfileScreen(),
   ];
 
   @override
@@ -46,76 +42,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     final user = authState.user!;
-    final theme = Theme.of(context);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       TermsOfServiceDialog.checkAndShow(context, user.id);
     });
 
-    final titles = [
-      'Bản Đồ Việc Làm',
-      'Bảng Điểm Kỹ Năng',
-      'AI Thẩm Định Chứng Chỉ',
-      'Lịch Sử Xác Thực',
-      'Hồ Sơ Worker & CV',
-    ];
-
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Text(
-                user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : 'W',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    titles[_currentIndex],
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-                  ),
-                  Text(
-                    user.fullName,
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.work_history_outlined),
-            tooltip: 'Lời mời việc & Ca làm',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const JobProposalsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.workspace_premium_outlined),
-            tooltip: 'Bảng điểm kỹ năng & Cấp bậc',
-            onPressed: () => setState(() => _currentIndex = 1),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Làm mới dữ liệu',
-            onPressed: () => ref.read(skillVerificationProvider.notifier).loadAll(),
-          ),
-        ],
-      ),
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
@@ -123,32 +55,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        indicatorColor: const Color(0x260077FF),
+        indicatorColor: const Color(0x260066FF),
+        backgroundColor: Colors.white,
+        elevation: 8,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map, color: Color(0xFF0077FF)),
+            selectedIcon: Icon(Icons.map, color: Color(0xFF0066FF)),
             label: 'Bản đồ',
           ),
           NavigationDestination(
+            icon: Icon(Icons.assignment_outlined),
+            selectedIcon: Icon(Icons.assignment, color: Color(0xFF0066FF)),
+            label: 'Lịch ca',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.workspace_premium_outlined),
-            selectedIcon: Icon(Icons.workspace_premium, color: Color(0xFF0077FF)),
-            label: 'Điểm SP',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_awesome_outlined),
-            selectedIcon: Icon(Icons.auto_awesome, color: Color(0xFF0077FF)),
-            label: 'Thẩm định AI',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_edu_outlined),
-            selectedIcon: Icon(Icons.history_edu, color: Color(0xFF0077FF)),
-            label: 'Lịch sử',
+            selectedIcon: Icon(Icons.workspace_premium, color: Color(0xFF0066FF)),
+            label: 'Kỹ năng',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: Color(0xFF0077FF)),
-            label: 'Cá nhân',
+            selectedIcon: Icon(Icons.person, color: Color(0xFF0066FF)),
+            label: 'Tài khoản',
           ),
         ],
       ),

@@ -1,201 +1,285 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/job_proposals/data/proposal_repository.dart';
+import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
+import 'package:cani/features/job_radar/widgets/job_proposal_dispatch_card.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_map_painter.dart';
 
-class JobRadarScreen extends ConsumerWidget {
+class JobRadarScreen extends ConsumerStatefulWidget {
   const JobRadarScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<JobRadarScreen> createState() => _JobRadarScreenState();
+}
+
+class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
+  List<JobProposalItem> _proposals = [];
+  bool _isLoadingProposals = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProposals();
+  }
+
+  Future<void> _loadProposals() async {
+    setState(() => _isLoadingProposals = true);
+    final repo = ref.read(proposalRepositoryProvider);
+    final list = await repo.fetchProposals();
+    if (mounted) {
+      setState(() {
+        _proposals = list;
+        _isLoadingProposals = false;
+      });
+    }
+  }
+
+  Future<void> _acceptProposal(JobProposalItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận nhận việc', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Bạn có chắc chắn muốn nhận ca làm: ${item.jobType} tại sự kiện "${item.eventName}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0066FF)),
+            child: const Text('Nhận Ca'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
+      setState(() {
+        _proposals.removeWhere((p) => p.proposalId == item.proposalId);
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nhận việc thành công! Ca làm đã được thêm vào Lịch ca của bạn.'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectProposal(JobProposalItem item) async {
+    await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
+    setState(() {
+      _proposals.removeWhere((p) => p.proposalId == item.proposalId);
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã từ chối lời mời. Hệ thống sẽ điều phối việc khác cho bạn.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(jobRadarProvider);
     final notifier = ref.read(jobRadarProvider.notifier);
-    final theme = Theme.of(context);
+    final authState = ref.watch(authStateProvider);
+    final userName = authState.user?.fullName ?? 'Bạn';
 
     return Scaffold(
-      body: Column(
-        children: [
-          // 1. Header: Switch Bắt đầu kiếm việc (Online / Offline) chuẩn Image 2
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: state.isOnline ? const Color(0xFFE8FDF3) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: state.isOnline ? const Color(0xFFB7F4D8) : Colors.grey.shade200,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: state.isOnline ? const Color(0xFF10B981) : Colors.grey,
-                    boxShadow: state.isOnline
-                        ? [const BoxShadow(color: Color(0xFF10B981), blurRadius: 6, spreadRadius: 1)]
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        state.isOnline ? 'CHẾ ĐỘ TÌM VIỆC ĐANG BẬT' : 'CHẾ ĐỘ NGHỈ (OFFLINE)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5,
-                          color: state.isOnline ? const Color(0xFF065F46) : Colors.grey.shade700,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      Text(
-                        state.isOnline
-                            ? 'Bạn sẽ nhận được đề xuất việc trong ${state.searchRadiusKm.toInt()}km'
-                            : 'Gạt công tắc để bắt đầu quét việc quanh bạn',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: state.isOnline ? const Color(0xFF047857) : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: state.isOnline,
-                  activeColor: Colors.white,
-                  activeTrackColor: const Color(0xFF10B981),
-                  onChanged: (val) => notifier.toggleOnlineStatus(),
-                ),
-              ],
-            ),
-          ),
-
-          // 1.1 Trạng thái GPS Thực tế
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                const Icon(Icons.location_on_outlined, size: 16, color: Color(0xFF0077FF)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    state.isRealLocation
-                        ? 'Vị trí GPS thực: ${state.userLat.toStringAsFixed(4)}, ${state.userLng.toStringAsFixed(4)}'
-                        : 'Vị trí GPS thực: 20.9967, 105.5217',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF334155),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                InkWell(
-                  onTap: () => notifier.refreshCurrentLocation(),
-                  borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. Header cá nhân hóa & Chuông thông báo
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.refresh, size: 14, color: Color(0xFF0077FF)),
-                        SizedBox(width: 4),
                         Text(
-                          'Cập nhật',
+                          'Xin chào, $userName 👋',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Sẵn sàng nhận các ca làm việc sự kiện gần bạn',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_proposals.isNotEmpty)
+                    Badge(
+                      label: Text('${_proposals.length}'),
+                      backgroundColor: const Color(0xFFEF4444),
+                      child: IconButton(
+                        icon: const Icon(Icons.notifications_active, color: Color(0xFF0066FF)),
+                        onPressed: _loadProposals,
+                        tooltip: 'Lời mời việc mới',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // 2. Header Switch Bắt đầu kiếm việc (Online / Offline)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: state.isOnline ? const Color(0xFFE8FDF3) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: state.isOnline ? const Color(0xFFB7F4D8) : Colors.grey.shade300,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: state.isOnline ? const Color(0xFF10B981) : Colors.grey,
+                      boxShadow: state.isOnline
+                          ? [const BoxShadow(color: Color(0xFF10B981), blurRadius: 6, spreadRadius: 1)]
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          state.isOnline ? 'CHẾ ĐỘ NHẬN VIỆC ĐANG BẬT' : 'CHẾ ĐỘ TẠM NGHỈ (OFFLINE)',
                           style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0077FF),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: state.isOnline ? const Color(0xFF065F46) : Colors.grey.shade700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        Text(
+                          state.isOnline
+                              ? 'Hệ thống tự động đề xuất việc trong bán kính ${state.searchRadiusKm.toInt()}km'
+                              : 'Bật công tắc để quét và nhận lời mời việc',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: state.isOnline ? const Color(0xFF047857) : Colors.grey.shade600,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  Switch(
+                    value: state.isOnline,
+                    activeColor: Colors.white,
+                    activeTrackColor: const Color(0xFF10B981),
+                    onChanged: (val) => notifier.toggleOnlineStatus(),
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // 2. Bộ lọc bán kính (Pills) & Toggle Bản đồ
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-            child: Row(
-              children: [
-                const Text('Bán kính:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                const SizedBox(width: 8),
-                Wrap(
-                  spacing: 6,
-                  children: [5.0, 10.0, 15.0].map((r) {
-                    final isSel = state.searchRadiusKm == r;
-                    return InkWell(
-                      onTap: () => notifier.setRadius(r),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: isSel ? const Color(0xFF0077FF) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSel ? const Color(0xFF0077FF) : const Color(0xFFE2E8F0),
+            // 3. Thẻ Lời Mời Việc Độc Quyền (Push / Dispatch Model)
+            if (_proposals.isNotEmpty)
+              JobProposalDispatchCard(
+                proposal: _proposals.first,
+                onAccept: () => _acceptProposal(_proposals.first),
+                onReject: () => _rejectProposal(_proposals.first),
+              ),
+
+            // 4. Thanh Bán Kính & Toggle Chế Độ Xem
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+              child: Row(
+                children: [
+                  const Text('Bán kính:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const SizedBox(width: 8),
+                  Wrap(
+                    spacing: 6,
+                    children: [5.0, 10.0, 15.0].map((r) {
+                      final isSel = state.searchRadiusKm == r;
+                      return InkWell(
+                        onTap: () => notifier.setRadius(r),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isSel ? const Color(0xFF0066FF) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSel ? const Color(0xFF0066FF) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Text(
+                            '${r.toInt()}km',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                              color: isSel ? Colors.white : const Color(0xFF475569),
+                            ),
                           ),
                         ),
-                        child: Text(
-                          '${r.toInt()}km',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                            color: isSel ? Colors.white : const Color(0xFF475569),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                      );
+                    }).toList(),
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () => notifier.toggleRadarView(),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            state.isRadarView ? Icons.list_alt : Icons.map_outlined,
+                            size: 14,
+                            color: const Color(0xFF0066FF),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            state.isRadarView ? 'Danh sách' : 'Bản đồ',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF0066FF)),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.map_outlined, size: 14, color: Color(0xFF0077FF)),
-                      SizedBox(width: 4),
-                      Text('Bản đồ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF0077FF))),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // 3. Body: Radar Map View hoặc Danh sách công việc
-          Expanded(
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : state.isRadarView
-                    ? _buildRadarView(context, state, notifier)
-                    : _buildListView(context, state, notifier),
-          ),
-        ],
+            // 5. Body: Radar Map View hoặc List View
+            Expanded(
+              child: state.isLoading || _isLoadingProposals
+                  ? const Center(child: CircularProgressIndicator())
+                  : state.isRadarView
+                      ? _buildRadarView(context, state, notifier)
+                      : _buildListView(context, state, notifier),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
@@ -205,13 +289,16 @@ class JobRadarScreen extends ConsumerWidget {
             onPressed: () => notifier.refreshCurrentLocation(),
             tooltip: 'Định vị GPS thực tế',
             backgroundColor: Colors.white,
-            foregroundColor: Colors.blue.shade700,
+            foregroundColor: const Color(0xFF0066FF),
             child: const Icon(Icons.my_location),
           ),
           const SizedBox(width: 10),
           FloatingActionButton.extended(
             heroTag: 'refresh_jobs',
-            onPressed: () => notifier.scanNearbyShifts(),
+            onPressed: () {
+              notifier.scanNearbyShifts();
+              _loadProposals();
+            },
             icon: const Icon(Icons.refresh),
             label: const Text('Quét lại', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -223,21 +310,19 @@ class JobRadarScreen extends ConsumerWidget {
   Widget _buildRadarView(BuildContext context, JobRadarState state, JobRadarNotifier notifier) {
     return Column(
       children: [
-        const SizedBox(height: 6),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             children: [
-              Icon(Icons.info_outline, size: 16, color: Colors.indigo.shade400),
+              const Icon(Icons.info_outline, size: 15, color: Color(0xFF64748B)),
               const SizedBox(width: 6),
               Text(
                 'Tìm thấy ${state.nearbyShifts.length} ca làm việc phù hợp xung quanh',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 6),
         Expanded(
           child: JobRadarMapWidget(
             shifts: state.nearbyShifts,
@@ -262,9 +347,9 @@ class JobRadarScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.location_off, size: 48, color: Colors.grey.shade400),
+            Icon(Icons.location_off_outlined, size: 48, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            const Text('Không có ca làm việc nào trong khu vực này'),
+            const Text('Không có ca làm việc nào trong khu vực này', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => notifier.setRadius(15.0),
@@ -283,7 +368,7 @@ class JobRadarScreen extends ConsumerWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          elevation: 2,
+          elevation: 1,
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: () {
@@ -306,13 +391,13 @@ class JobRadarScreen extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
+                          color: const Color(0xFFF0FDF4),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.teal.shade200),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
                         ),
                         child: Text(
                           '${shift.distanceKm.toStringAsFixed(1)} km',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal.shade800),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
                         ),
                       ),
                     ],
@@ -320,7 +405,7 @@ class JobRadarScreen extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Text(
                     shift.jobType,
-                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.indigo.shade700, fontSize: 13),
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF0066FF), fontSize: 13),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -335,11 +420,11 @@ class JobRadarScreen extends ConsumerWidget {
                     children: [
                       Text(
                         '${shift.hourlyWage.toStringAsFixed(0)} đ/h',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green.shade800),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF16A34A)),
                       ),
                       Text(
                         'Cần: ${shift.remainingWorkers}/${shift.requiredWorkers} người',
-                        style: TextStyle(fontSize: 12, color: Colors.red.shade700, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -364,7 +449,7 @@ class JobRadarScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Đã gửi yêu cầu ứng tuyển ca: ${shift.jobType}'),
-              backgroundColor: Colors.green,
+              backgroundColor: const Color(0xFF16A34A),
             ),
           );
         },

@@ -38,7 +38,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đăng nhập thành công! Chào mừng bạn đến với CANi Worker.'),
+          content: Text('Đăng nhập thành công! Chào mừng bạn đến với CANi.'),
           backgroundColor: Color(0xFF10B981),
         ),
       );
@@ -48,7 +48,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -148,7 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0077FF).withOpacity(0.35),
+                          color: const Color(0xFF0077FF).withValues(alpha: 0.35),
                           blurRadius: 14,
                           offset: const Offset(0, 5),
                         ),
@@ -233,7 +232,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             'https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png',
                             height: 20,
                             width: 20,
-                            errorBuilder: (_, __, ___) => const Icon(
+                            errorBuilder: (_, _, _) => const Icon(
                               Icons.g_mobiledata,
                               size: 26,
                               color: Colors.blue,
@@ -260,9 +259,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Chưa có tài khoản Worker? ',
-                        style: TextStyle(fontSize: 13.5, color: Colors.grey.shade700),
+                      const Text(
+                        'Bạn chưa có tài khoản? ',
+                        style: TextStyle(fontSize: 13.5, color: Color(0xFF1E293B)),
                       ),
                       GestureDetector(
                         onTap: () {

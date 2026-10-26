@@ -1,6 +1,6 @@
 import { USER_ROLE_LABELS, USER_STATUS_LABELS } from '../types/userManagement.constants';
 
-const UserDetailModal = ({ user, loading, onClose }) => {
+const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
   if (!user && !loading) return null;
 
   const roleInfo = user?.role ? (USER_ROLE_LABELS[user.role] || { label: user.role }) : null;
@@ -135,6 +135,42 @@ const UserDetailModal = ({ user, loading, onClose }) => {
                 </div>
               </div>
             )}
+
+            {/* Modal Footer Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn-filter-reset"
+                onClick={onClose}
+              >
+                Đóng
+              </button>
+              {user.status === 'LOCKED' ? (
+                <button
+                  type="button"
+                  className="btn-action-unlock"
+                  style={{ padding: '0.55rem 1.25rem', fontSize: '0.85rem' }}
+                  onClick={() => {
+                    onClose();
+                    if (onOpenStatusModal) onOpenStatusModal(user);
+                  }}
+                >
+                  Mở Khóa Tài Khoản
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-action-lock"
+                  style={{ padding: '0.55rem 1.25rem', fontSize: '0.85rem' }}
+                  onClick={() => {
+                    onClose();
+                    if (onOpenStatusModal) onOpenStatusModal(user);
+                  }}
+                >
+                  Khóa Tài Khoản
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

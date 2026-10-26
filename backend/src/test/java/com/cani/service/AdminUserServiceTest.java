@@ -57,7 +57,7 @@ class AdminUserServiceTest {
     private EventOrganizerRepository eventOrganizerRepository;
 
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private AuditLogService auditLogService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -209,7 +209,7 @@ class AdminUserServiceTest {
         assertThat(result).isNotNull();
         assertThat(sampleWorkerUser.getStatus()).isEqualTo(UserStatus.LOCKED);
         verify(userRepository, times(1)).save(sampleWorkerUser);
-        verify(auditLogRepository, times(1)).save(any(AuditLog.class));
+        verify(auditLogService, times(1)).logAction(any(AuditLog.class));
     }
 
     @Test
@@ -227,6 +227,6 @@ class AdminUserServiceTest {
                 .hasMessageContaining("Quản trị viên không thể tự thay đổi trạng thái tài khoản của chính mình");
 
         verify(userRepository, never()).save(any());
-        verify(auditLogRepository, never()).save(any());
+        verify(auditLogService, never()).logAction(any());
     }
 }

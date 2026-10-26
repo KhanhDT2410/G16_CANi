@@ -38,7 +38,7 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final WorkerRepository workerRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -115,9 +115,9 @@ public class AdminUserService {
                     .newValues(newValJson)
                     .build();
 
-            auditLogRepository.save(logEntry);
+            auditLogService.logAction(logEntry);
         } catch (Exception e) {
-            log.error("Không thể ghi nhận AuditLog khi cập nhật trạng thái user: {}", targetUserId, e);
+            log.error("Không thể chuẩn bị AuditLog khi cập nhật trạng thái user: {}", targetUserId, e);
         }
     }
 

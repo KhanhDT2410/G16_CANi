@@ -53,6 +53,7 @@ const UserManagementView = () => {
         user={selectedUser}
         loading={detailLoading}
         onClose={closeDetailModal}
+        onOpenStatusModal={openStatusModal}
       />
 
       {/* Modal xác nhận khóa / mở khóa tài khoản */}

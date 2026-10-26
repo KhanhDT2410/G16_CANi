@@ -5,13 +5,7 @@ import '../models/ekyc_models.dart';
 class EkycRepository {
   final Dio _dio;
 
-  EkycRepository({Dio? dio})
-      : _dio = dio ??
-            (Dio(BaseOptions(
-              baseUrl: _baseUrl,
-              connectTimeout: const Duration(seconds: 25),
-              receiveTimeout: const Duration(seconds: 30),
-            ))..interceptors.add(AuthInterceptor()));
+  EkycRepository(this._dio);
 
   Future<EkycVerificationItem> submitEkyc({
     required Uint8List frontBytes,

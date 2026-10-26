@@ -63,13 +63,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // 1. Logo CANi Worker Chính Thức (Chuẩn Mockup Image 2)
-                  const SizedBox(height: 8),
-                  const CaniBrandLogo(
-                    height: 52,
-                    isWorker: true,
-                    showSlogan: false,
-                  ),
                   const SizedBox(height: 6),
+                  const CaniBrandLogo(),
                   Text(
                     'Đăng nhập để nhận ca làm sự kiện linh hoạt',
                     textAlign: TextAlign.center,

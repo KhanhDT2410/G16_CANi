@@ -328,6 +328,19 @@ public class SkillVerificationService {
         return mapToResponseDto(saved, null, worker);
     }
 
+    /**
+     * Admin / Customer Care queue for Medium-confidence submissions awaiting manual review (UC-47)
+     */
+    @Transactional(readOnly = true)
+    public List<SkillVerificationResponseDto> getPendingVerificationQueue() {
+        List<SkillVerificationRequest> pending = verificationRequestRepository
+                .findByStatusOrderByCreatedAtAsc(SkillVerificationStatus.PENDING_REVIEW);
+
+        return pending.stream()
+                .map(req -> mapToResponseDto(req, null, req.getWorker()))
+                .collect(Collectors.toList());
+    }
+
     private void applyApprovedSkills(Worker worker, List<Skill> skills, String jobType, UUID requestId) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(730, ChronoUnit.DAYS); // BR-17: 24 months validity
@@ -456,9 +469,14 @@ public class SkillVerificationService {
                     .orElse(0);
         }
 
+        Worker w = worker != null ? worker : req.getWorker();
+        String workerName = (w != null && w.getUser() != null) ? w.getUser().getFullName() : null;
+
         return SkillVerificationResponseDto.builder()
                 .id(req.getId())
                 .workerId(req.getWorker().getWorkerId())
+                .workerName(workerName)
+                .documentUrl(req.getDocumentUrl())
                 .skillId(req.getSkill() != null ? req.getSkill().getSkillId() : null)
                 .skillName(req.getSkill() != null ? req.getSkill().getName() : req.getJobType())
                 .jobType(req.getJobType())

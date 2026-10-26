@@ -19,6 +19,8 @@ import java.util.UUID;
 public class SkillVerificationResponseDto {
     private UUID id;
     private UUID workerId;
+    private String workerName;
+    private String documentUrl;
     private UUID skillId;
     private String skillName;
     private String jobType;

@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../services/api';
 import { showToast } from '../../components/common/Toast';
 import { AdminDashboard } from '../../features/admin-dashboard';
+import { UserManagement } from '../../features/user-management';
 import './AdminPage.css';
 
 const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [ekycQueue, setEkycQueue] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   useEffect(() => {
     if (activeTab === 'ekyc') {
@@ -89,13 +105,19 @@ const AdminPage = () => {
       <div className="admin-tabs">
         <button
           className={`admin-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
+          onClick={() => handleTabChange('dashboard')}
         >
-          📊 Dashboard Tổng Quan
+          📊 Dashboard Tổng Quan (W-38)
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+          onClick={() => handleTabChange('users')}
+        >
+          👥 Quản Lý Người Dùng (W-39)
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ekyc')}
+          onClick={() => handleTabChange('ekyc')}
         >
           🪪 Hàng Đợi eKYC ({ekycQueue.length})
         </button>
@@ -103,6 +125,9 @@ const AdminPage = () => {
 
       {/* Tab: Dashboard (W-38) */}
       {activeTab === 'dashboard' && <AdminDashboard />}
+
+      {/* Tab: User Management (W-39) */}
+      {activeTab === 'users' && <UserManagement />}
 
       {/* Tab: eKYC Queue (giữ nguyên) */}
       {activeTab === 'ekyc' && (

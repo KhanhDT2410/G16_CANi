@@ -4,6 +4,8 @@ import { apiClient } from '../../services/api';
 import { showToast } from '../../components/common/Toast';
 import { AdminDashboard } from '../../features/admin-dashboard';
 import { UserManagement } from '../../features/user-management';
+import { RbacManagement } from '../../features/rbac-management';
+import { RevenueDashboard } from '../../features/revenue-dashboard';
 import './AdminPage.css';
 
 const AdminPage = () => {
@@ -18,7 +20,7 @@ const AdminPage = () => {
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [searchParams]);
+  }, [searchParams, activeTab]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -116,6 +118,18 @@ const AdminPage = () => {
           👥 Quản Lý Người Dùng (W-39)
         </button>
         <button
+          className={`admin-tab-btn ${activeTab === 'rbac' ? 'active' : ''}`}
+          onClick={() => handleTabChange('rbac')}
+        >
+          🛡️ Phân Quyền & Vai Trò (W-40)
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'revenue' ? 'active' : ''}`}
+          onClick={() => handleTabChange('revenue')}
+        >
+          💰 Doanh Thu Gói VNPay (W-34)
+        </button>
+        <button
           className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
           onClick={() => handleTabChange('ekyc')}
         >
@@ -128,6 +142,12 @@ const AdminPage = () => {
 
       {/* Tab: User Management (W-39) */}
       {activeTab === 'users' && <UserManagement />}
+
+      {/* Tab: RBAC Roles & Permissions (W-40) */}
+      {activeTab === 'rbac' && <RbacManagement />}
+
+      {/* Tab: Revenue Dashboard (W-34) */}
+      {activeTab === 'revenue' && <RevenueDashboard />}
 
       {/* Tab: eKYC Queue (giữ nguyên) */}
       {activeTab === 'ekyc' && (

@@ -16,4 +16,8 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
     boolean existsByEmail(String email);
 
     boolean existsByPhone(String phone);
+
+    long countByRole(com.cani.entity.enums.UserRole role);
+
+    long countByStatus(com.cani.entity.enums.UserStatus status);
 }

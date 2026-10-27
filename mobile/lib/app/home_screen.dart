@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
+import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
 import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    final proposalsCount = ref.watch(proposalsCountProvider).asData?.value ?? 0;
 
     if (authState.isLoading) {
       return const Scaffold(
@@ -58,23 +60,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         indicatorColor: const Color(0x260066FF),
         backgroundColor: Colors.white,
         elevation: 8,
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.map_outlined),
             selectedIcon: Icon(Icons.map, color: Color(0xFF0066FF)),
             label: 'Bản đồ',
           ),
           NavigationDestination(
-            icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment, color: Color(0xFF0066FF)),
-            label: 'Lịch ca',
+            icon: Badge(
+              isLabelVisible: proposalsCount > 0,
+              label: Text('$proposalsCount'),
+              backgroundColor: const Color(0xFFEF4444),
+              child: const Icon(Icons.assignment_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: proposalsCount > 0,
+              label: Text('$proposalsCount'),
+              backgroundColor: const Color(0xFFEF4444),
+              child: const Icon(Icons.assignment, color: Color(0xFF0066FF)),
+            ),
+            label: 'Việc của tôi',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.workspace_premium_outlined),
             selectedIcon: Icon(Icons.workspace_premium, color: Color(0xFF0066FF)),
             label: 'Kỹ năng',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person, color: Color(0xFF0066FF)),
             label: 'Tài khoản',

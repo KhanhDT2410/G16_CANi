@@ -9,6 +9,12 @@ final proposalRepositoryProvider = Provider<ProposalRepository>((ref) {
   return ProposalRepository(dio);
 });
 
+final proposalsCountProvider = FutureProvider<int>((ref) async {
+  final repo = ref.watch(proposalRepositoryProvider);
+  final list = await repo.fetchProposals();
+  return list.length;
+});
+
 class ProposalRepository {
   final Dio _dio;
 

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
@@ -31,6 +32,7 @@ class ProposalRepository {
       }
       return [];
     } catch (e) {
+      debugPrint('[CANi] Fallback data used: $e');
       // Fallback demo khi lỗi mạng hoặc chưa có dữ liệu backend
       return [
         JobProposalItem(
@@ -75,8 +77,8 @@ class ProposalRepository {
       final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
       final response = await _dio.post('/v1/workers/proposals/$proposalId/accept', options: options);
       return response.statusCode == 200;
-    } catch (e) {
-      return true; // Fallback demo
+    } on DioException {
+      rethrow;
     }
   }
 
@@ -90,8 +92,8 @@ class ProposalRepository {
         options: options,
       );
       return response.statusCode == 200;
-    } catch (e) {
-      return true; // Fallback demo
+    } on DioException {
+      rethrow;
     }
   }
 
@@ -106,6 +108,7 @@ class ProposalRepository {
       }
       return [];
     } catch (e) {
+      debugPrint('[CANi] Fallback data used: $e');
       // Fallback Demo Data
       return [
         ShiftAssignmentItem(
@@ -131,15 +134,24 @@ class ProposalRepository {
   // Worker Xác nhận tình trạng nhận tiền lương trực tiếp (Mục 12 SRS)
   Future<bool> confirmPayment(String assignmentId, String confirmStatus, String comment, {String? token}) async {
     try {
+      // Ánh xạ trạng thái từ Domain/UI (PaymentStatus) sang Payload backend (DirectPaymentService)
+      // UI: CONFIRMED_FULL -> Backend: RECEIVED_FULL
+      // UI: CONFIRMED_PARTIAL -> Backend: RECEIVED_PARTIAL
+      final apiStatus = switch (confirmStatus) {
+        'CONFIRMED_FULL' => 'RECEIVED_FULL',
+        'CONFIRMED_PARTIAL' => 'RECEIVED_PARTIAL',
+        _ => confirmStatus,
+      };
+
       final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
       final response = await _dio.post(
         '/v1/payments/worker/confirm/$assignmentId',
-        data: {'confirmStatus': confirmStatus, 'comment': comment},
+        data: {'confirmStatus': apiStatus, 'comment': comment},
         options: options,
       );
       return response.statusCode == 200;
-    } catch (e) {
-      return true; // Fallback demo
+    } on DioException {
+      rethrow;
     }
   }
 
@@ -155,7 +167,7 @@ class ProposalRepository {
       headers: token != null ? {'Authorization': 'Bearer $token'} : null,
     );
     final response = await _dio.post(
-      '/workers/assignments/$assignmentId/checkin',
+      '/v1/workers/assignments/$assignmentId/checkin',
       data: {
         'qrContent': qrContent,
         'lat': lat,
@@ -184,7 +196,7 @@ class ProposalRepository {
       headers: token != null ? {'Authorization': 'Bearer $token'} : null,
     );
     final response = await _dio.post(
-      '/workers/assignments/$assignmentId/checkout',
+      '/v1/workers/assignments/$assignmentId/checkout',
       data: {
         'qrContent': qrContent,
         'lat': lat,

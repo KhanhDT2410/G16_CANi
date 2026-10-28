@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '../../services/api';
 import { showToast } from '../../components/common/Toast';
 import { UserManagementView } from '../../features/admin-users';
+import { AdminDashboardView } from '../../features/admin-dashboard';
 import './AdminPage.css';
 
 const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState('ekyc'); // 'ekyc', 'skills'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'ekyc', 'skills', 'users'
   const [ekycQueue, setEkycQueue] = useState([]);
   const [skillQueue, setSkillQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -165,39 +166,14 @@ const AdminPage = () => {
         </p>
       </div>
 
-      {/* Metrics */}
-      <div className="admin-metrics">
-        <div className="admin-metric-card">
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>
-            Hồ Sơ eKYC Chờ Duyệt
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#dc2626' }}>
-            {ekycQueue.length}
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#dc2626' }}>Cần xử lý trong ngày</div>
-        </div>
-        <div className="admin-metric-card">
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>
-            Tỷ Lệ Auto-Approved AI
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10b981' }}>
-            84.2%
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#10b981' }}>Multimodal Vision AI</div>
-        </div>
-        <div className="admin-metric-card">
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>
-            Tổng Sự Kiện Đang Chạy
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#2563eb' }}>
-            28
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#2563eb' }}>TP.HCM & Hà Nội</div>
-        </div>
-      </div>
-
       {/* Tabs */}
       <div className="admin-tabs">
+        <button
+          className={`admin-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          📊 Bảng Điều Khiển
+        </button>
         <button
           className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
           onClick={() => setActiveTab('ekyc')}
@@ -219,6 +195,7 @@ const AdminPage = () => {
       </div>
 
       {/* Content */}
+      {activeTab === 'dashboard' && <AdminDashboardView onNavigateTab={setActiveTab} />}
       {activeTab === 'ekyc' && (
         <div className="admin-card-list">
           {loading ? (

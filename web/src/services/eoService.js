@@ -115,4 +115,52 @@ export const eoService = {
     });
     return response.data?.data;
   },
+
+  // UC-11: Cập nhật thông tin sự kiện
+  updateEvent: async (eventId, eventData) => {
+    const response = await apiClient.put(`/v1/eo/events/${eventId}`, eventData);
+    return response.data?.data;
+  },
+
+  // UC-12: Hủy sự kiện
+  cancelEvent: async (eventId, reason) => {
+    const response = await apiClient.post(`/v1/eo/events/${eventId}/cancel`, { reason });
+    return response.data?.data;
+  },
+
+  // UC-18: Cập nhật ca làm việc
+  updateShift: async (shiftId, shiftData) => {
+    const response = await apiClient.put(`/v1/eo/events/shifts/${shiftId}`, shiftData);
+    return response.data?.data;
+  },
+
+  // UC-19: Hủy ca làm việc
+  cancelShift: async (shiftId, reason) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/cancel`, { reason });
+    return response.data?.data;
+  },
+
+  // UC-52: Lấy mã QR điểm danh của ca (Check-in & Check-out)
+  getShiftQr: async (shiftId) => {
+    const response = await apiClient.get(`/v1/eo/events/shifts/${shiftId}/qr`);
+    return response.data?.data;
+  },
+
+  // UC-48: Lấy danh sách điểm danh và tiến độ ca (Live Attendance)
+  getShiftAttendance: async (shiftId) => {
+    const response = await apiClient.get(`/v1/eo/events/shifts/${shiftId}/attendance`);
+    return response.data?.data || [];
+  },
+
+  // UC-49: EO xác nhận hoàn thành ca & duyệt công cho Worker
+  verifyAttendance: async (assignmentId) => {
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/verify`);
+    return response.data?.data;
+  },
+
+  // UC-69: EO đánh giá Worker sau ca làm việc
+  rateWorker: async (assignmentId, reviewData) => {
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/reviews`, reviewData);
+    return response.data?.data;
+  },
 };

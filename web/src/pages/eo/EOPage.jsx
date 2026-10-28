@@ -9,6 +9,11 @@ import EventCreateModal from './components/EventCreateModal';
 import ShiftCreateModal from './components/ShiftCreateModal';
 import PaymentDeclarationModal from './components/PaymentDeclarationModal';
 import PublishEventModal from './components/PublishEventModal';
+import ShiftQrModal from './components/ShiftQrModal';
+import LiveAttendanceModal from './components/LiveAttendanceModal';
+import EditEventModal from './components/EditEventModal';
+import EditShiftModal from './components/EditShiftModal';
+import EventShiftsDrawer from './components/EventShiftsDrawer';
 import './EOPage.css';
 
 const ROLES = [
@@ -88,6 +93,17 @@ const EOPage = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
+
+  // UC-11, UC-18, UC-48, UC-49, UC-52, UC-69 States
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [editingShift, setEditingShift] = useState(null);
+  const [selectedShiftForQr, setSelectedShiftForQr] = useState(null);
+  const [selectedShiftForAttendance, setSelectedShiftForAttendance] = useState(null);
+  const [expandedEventId, setExpandedEventId] = useState(null);
+  const [submittingEditEvent, setSubmittingEditEvent] = useState(false);
+  const [submittingEditShift, setSubmittingEditShift] = useState(false);
+  const [qrModalData, setQrModalData] = useState(null);
+  const [loadingQr, setLoadingQr] = useState(false);
 
   // Smooth Prompt/Confirm & Map States
   const [confirmPublish, setConfirmPublish] = useState({ isOpen: false, event: null });
@@ -404,6 +420,113 @@ const EOPage = () => {
       setShowPaymentModal(false);
       showToast('Khai báo thanh toán thành công (Chế độ Demo)! Đang chờ Worker xác nhận.', 'info');
     }
+  };
+
+  // UC-11: Chỉnh sửa sự kiện
+  const handleUpdateEvent = async (eventId, formData) => {
+    setSubmittingEditEvent(true);
+    try {
+      await eoService.updateEvent(eventId, formData);
+      showToast('Cập nhật sự kiện thành công!', 'success');
+      setEditingEvent(null);
+      loadEvents();
+    } catch (err) {
+      showToast('Lỗi cập nhật sự kiện: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setSubmittingEditEvent(false);
+    }
+  };
+
+  // UC-12: Hủy sự kiện
+  const handleCancelEvent = async (event) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn HỦY sự kiện "${event.name}"? Tất cả ca làm việc và phân công liên quan sẽ bị hủy.`)) {
+      return;
+    }
+    try {
+      await eoService.cancelEvent(event.eventId, 'Ban tổ chức hủy sự kiện');
+      showToast('Đã hủy sự kiện thành công!', 'success');
+      loadEvents();
+    } catch (err) {
+      showToast('Lỗi hủy sự kiện: ' + (err.response?.data?.message || err.message), 'error');
+    }
+  };
+
+  // UC-18: Chỉnh sửa ca làm việc
+  const handleUpdateShift = async (shiftId, shiftData) => {
+    setSubmittingEditShift(true);
+    try {
+      await eoService.updateShift(shiftId, shiftData);
+      showToast('Cập nhật ca làm việc thành công!', 'success');
+      setEditingShift(null);
+      loadEvents();
+    } catch (err) {
+      showToast('Lỗi cập nhật ca: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setSubmittingEditShift(false);
+    }
+  };
+
+  // UC-19: Hủy ca làm việc
+  const handleCancelShift = async (shift) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn HỦY ca "${shift.jobType}"?`)) {
+      return;
+    }
+    try {
+      await eoService.cancelShift(shift.shiftId, 'Ban tổ chức hủy ca');
+      showToast('Đã hủy ca làm việc thành công!', 'success');
+      loadEvents();
+    } catch (err) {
+      showToast('Lỗi hủy ca: ' + (err.response?.data?.message || err.message), 'error');
+    }
+  };
+
+  // UC-52: Mở modal mã QR Điểm danh
+  const handleOpenShiftQr = async (shift, event) => {
+    setSelectedShiftForQr(shift);
+    setLoadingQr(true);
+    try {
+      const data = await eoService.getShiftQr(shift.shiftId);
+      setQrModalData(data || {
+        shiftId: shift.shiftId,
+        eventName: event?.name || shift.eventName || 'Sự kiện',
+        jobType: shift.jobType,
+        venueAddress: shift.locationAddress || event?.venueAddress || '',
+        checkinQrContent: `CANI_CHECKIN:${shift.shiftId}`,
+        checkoutQrContent: `CANI_CHECKOUT:${shift.shiftId}`,
+      });
+    } catch {
+      setQrModalData({
+        shiftId: shift.shiftId,
+        eventName: event?.name || shift.eventName || 'Sự kiện',
+        jobType: shift.jobType,
+        venueAddress: shift.locationAddress || event?.venueAddress || '',
+        checkinQrContent: `CANI_CHECKIN:${shift.shiftId}`,
+        checkoutQrContent: `CANI_CHECKOUT:${shift.shiftId}`,
+      });
+    } finally {
+      setLoadingQr(false);
+    }
+  };
+
+  // UC-48: Mở modal theo dõi điểm danh trực tiếp
+  const handleOpenAttendance = (shift, event) => {
+    setSelectedShiftForAttendance({
+      ...shift,
+      eventName: event?.name || shift.eventName,
+    });
+  };
+
+  // Mở thanh toán từ modal Điểm danh
+  const handleOpenPaymentDeclarationFromAttendance = (attendanceItem) => {
+    setSelectedAssignment(attendanceItem);
+    setPaymentForm({
+      assignmentId: attendanceItem.assignmentId,
+      declaredAmount: attendanceItem.agreedWage || 200000,
+      paymentMethod: 'BANK_TRANSFER',
+      externalRef: `VCB-${Date.now().toString().slice(-6)}`,
+      paymentProofUrl: 'https://storage.cani.vn/proofs/bill_example.jpg',
+    });
+    setShowPaymentModal(true);
   };
 
   // Chuyển nhanh từ Sidebar sang Tab tương ứng
@@ -880,6 +1003,27 @@ const EOPage = () => {
                             + Thêm Ca
                           </button>
 
+                          <button
+                            type="button"
+                            className="btn-action-outline"
+                            onClick={() => setEditingEvent(evt)}
+                            title="Chỉnh sửa thông tin sự kiện"
+                          >
+                            ✏️ Sửa
+                          </button>
+
+                          {evt.status !== 'CANCELLED' && evt.status !== 'COMPLETED' && (
+                            <button
+                              type="button"
+                              className="btn-action-map"
+                              style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                              onClick={() => handleCancelEvent(evt)}
+                              title="Hủy sự kiện này"
+                            >
+                              ❌ Hủy
+                            </button>
+                          )}
+
                           {evt.status === 'DRAFT' && (
                             <button
                               type="button"
@@ -893,16 +1037,30 @@ const EOPage = () => {
                           <button
                             type="button"
                             className="btn-action-primary"
-                            onClick={() => {
-                              setSelectedEventId(evt.eventId);
-                              setShowShiftModal(true);
-                            }}
+                            onClick={() => setExpandedEventId(expandedEventId === evt.eventId ? null : evt.eventId)}
                           >
-                            Quản lý
+                            {expandedEventId === evt.eventId
+                              ? '▲ Thu Gọn'
+                              : `📋 Quản Lý Ca (${evt.shifts?.length || evt.totalShifts || 0})`}
                           </button>
                         </div>
                       </div>
-                    </article>
+
+                    {/* DRAWER DANH SÁCH CA LÀM VIỆC & ĐIỂM DANH QR */}
+                    {expandedEventId === evt.eventId && (
+                      <EventShiftsDrawer
+                        event={evt}
+                        onAddShift={(eventId) => {
+                          setSelectedEventId(eventId);
+                          setShowShiftModal(true);
+                        }}
+                        onOpenQr={handleOpenShiftQr}
+                        onOpenAttendance={handleOpenAttendance}
+                        onEditShift={setEditingShift}
+                        onCancelShift={handleCancelShift}
+                      />
+                    )}
+                  </article>
                   ))
                 )}
               </div>
@@ -1177,6 +1335,45 @@ const EOPage = () => {
         lng={mapModal.lng}
         radiusKm={mapModal.radiusKm}
         onClose={() => setMapModal({ ...mapModal, isOpen: false })}
+      />
+
+      {/* Modal 5: Chỉnh Sửa Sự Kiện (UC-11) */}
+      <EditEventModal
+        isOpen={Boolean(editingEvent)}
+        onClose={() => setEditingEvent(null)}
+        event={editingEvent}
+        onSubmit={handleUpdateEvent}
+        submitting={submittingEditEvent}
+      />
+
+      {/* Modal 6: Chỉnh Sửa Ca Làm Việc (UC-18) */}
+      <EditShiftModal
+        isOpen={Boolean(editingShift)}
+        onClose={() => setEditingShift(null)}
+        shift={editingShift}
+        roles={ROLES}
+        onSubmit={handleUpdateShift}
+        submitting={submittingEditShift}
+      />
+
+      {/* Modal 7: Hiển Thị Mã QR Điểm Danh Ca Làm Việc (UC-52) */}
+      <ShiftQrModal
+        isOpen={Boolean(selectedShiftForQr)}
+        onClose={() => {
+          setSelectedShiftForQr(null);
+          setQrModalData(null);
+        }}
+        qrData={qrModalData}
+        loading={loadingQr}
+      />
+
+      {/* Modal 8: Theo Dõi Điểm Danh Trực Tiếp, Duyệt Công & Đánh Giá (UC-48, UC-49, UC-69) */}
+      <LiveAttendanceModal
+        isOpen={Boolean(selectedShiftForAttendance)}
+        onClose={() => setSelectedShiftForAttendance(null)}
+        shift={selectedShiftForAttendance}
+        onOpenQr={(shift) => handleOpenShiftQr(shift, { name: shift.eventName })}
+        onOpenPaymentDeclaration={handleOpenPaymentDeclarationFromAttendance}
       />
     </div>
   );

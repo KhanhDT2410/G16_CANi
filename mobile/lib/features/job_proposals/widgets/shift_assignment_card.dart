@@ -7,6 +7,9 @@ class ShiftAssignmentCard extends StatelessWidget {
   final VoidCallback onNavigate;
   final VoidCallback onQrScan;
   final void Function(String status) onConfirmPayment;
+  final VoidCallback? onOpenChecklist;
+  final VoidCallback? onCancelAssignment;
+  final VoidCallback? onRateOrganizer;
 
   const ShiftAssignmentCard({
     super.key,
@@ -14,6 +17,9 @@ class ShiftAssignmentCard extends StatelessWidget {
     required this.onNavigate,
     required this.onQrScan,
     required this.onConfirmPayment,
+    this.onOpenChecklist,
+    this.onCancelAssignment,
+    this.onRateOrganizer,
   });
 
   @override
@@ -230,6 +236,65 @@ class ShiftAssignmentCard extends StatelessWidget {
                 ),
             ],
           ),
+
+          // Hàng nút phụ: Checklist việc / Hủy ca / Đánh giá BTC
+          if (onOpenChecklist != null || onCancelAssignment != null || onRateOrganizer != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (onOpenChecklist != null)
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: onOpenChecklist,
+                      icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF0D9488)),
+                      label: const Text(
+                        'Checklist việc',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
+                      ),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFF0FDFA),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                if (onOpenChecklist != null && (isNotStarted && onCancelAssignment != null || isCompleted && onRateOrganizer != null))
+                  const SizedBox(width: 8),
+                if (isNotStarted && onCancelAssignment != null)
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: onCancelAssignment,
+                      icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
+                      label: const Text(
+                        'Hủy nhận ca',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                      ),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFFEF2F2),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                if (isCompleted && onRateOrganizer != null)
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: onRateOrganizer,
+                      icon: const Icon(Icons.star_rounded, size: 17, color: Color(0xFFD97706)),
+                      label: const Text(
+                        'Đánh giá BTC',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                      ),
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFFEF3C7),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
 
           const Divider(height: 22, color: Color(0xFFE2E8F0)),
 

@@ -77,7 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person, color: Color(0xFF0066FF)),
-            label: 'Tài khoản',
+            label: 'Hồ sơ',
           ),
         ],
       ),

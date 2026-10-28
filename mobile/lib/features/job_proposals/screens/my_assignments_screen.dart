@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
+import '../widgets/cancel_assignment_dialog.dart';
+import '../widgets/rate_eo_dialog.dart';
 import '../widgets/shift_assignment_card.dart';
+import '../widgets/shift_checklist_sheet.dart';
 import '../widgets/shift_navigation_sheet.dart';
 import 'attendance_qr_scanner_screen.dart';
 
@@ -104,6 +107,50 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> with 
     }
   }
 
+  void _openChecklistSheet(ShiftAssignmentItem a) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ShiftChecklistSheet(assignment: a),
+    );
+  }
+
+  Future<void> _openCancelDialog(ShiftAssignmentItem a) async {
+    final cancelled = await showDialog<bool>(
+      context: context,
+      builder: (_) => CancelAssignmentDialog(assignment: a),
+    );
+    if (cancelled == true) {
+      setState(() {
+        _assignments.removeWhere((item) => item.assignmentId == a.assignmentId);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã hủy nhận ca làm việc. Hệ thống đang tìm người thay thế.'),
+            backgroundColor: Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openRateDialog(ShiftAssignmentItem a) async {
+    final rated = await showDialog<bool>(
+      context: context,
+      builder: (_) => RateEoDialog(assignment: a),
+    );
+    if (rated == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cảm ơn bạn đã gửi đánh giá cho Ban tổ chức!'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final upcomingList = _assignments.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).toList();
@@ -195,6 +242,9 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> with 
             onNavigate: () => _openNavigationSheet(item),
             onQrScan: () => _openQrScanner(item, !isCheckedIn),
             onConfirmPayment: (status) => _confirmPayment(item, status),
+            onOpenChecklist: () => _openChecklistSheet(item),
+            onCancelAssignment: () => _openCancelDialog(item),
+            onRateOrganizer: () => _openRateDialog(item),
           );
         },
       ),

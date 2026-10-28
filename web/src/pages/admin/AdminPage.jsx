@@ -6,6 +6,7 @@ import { AdminDashboard } from '../../features/admin-dashboard';
 import { UserManagement } from '../../features/user-management';
 import { RbacManagement } from '../../features/rbac-management';
 import { RevenueDashboard } from '../../features/revenue-dashboard';
+import { SystemConfig } from '../../features/system-configuration';
 import './AdminPage.css';
 
 const AdminPage = () => {
@@ -135,6 +136,12 @@ const AdminPage = () => {
         >
           🪪 Hàng Đợi eKYC ({ekycQueue.length})
         </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
+          onClick={() => handleTabChange('config')}
+        >
+          ⚙️ Cấu Hình Hệ Thống (W-41)
+        </button>
       </div>
 
       {/* Tab: Dashboard (W-38) */}
@@ -148,6 +155,9 @@ const AdminPage = () => {
 
       {/* Tab: Revenue Dashboard (W-34) */}
       {activeTab === 'revenue' && <RevenueDashboard />}
+
+      {/* Tab: System Configuration (W-41) */}
+      {activeTab === 'config' && <SystemConfig />}
 
       {/* Tab: eKYC Queue (giữ nguyên) */}
       {activeTab === 'ekyc' && (

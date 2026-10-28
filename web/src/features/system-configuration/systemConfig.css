@@ -1,0 +1,627 @@
+/* ===================================================================
+   W-41: System Configuration – Screen - systemConfig.css
+   Tuân thủ DESIGN.md: Pill Segmented Control, glassmorphism, brand gradient
+   =================================================================== */
+
+.scf-dashboard {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+/* ---- Header ---- */
+.scf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.scf-title {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #0f172a 35%, var(--color-primary) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.scf-badge {
+  background: var(--gradient-brand);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.22rem 0.6rem;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.05em;
+  -webkit-text-fill-color: #fff;
+}
+
+.scf-subtitle {
+  color: var(--color-text-muted);
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+.scf-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.scf-last-saved {
+  font-size: 0.8rem;
+  color: var(--color-text-subtle);
+}
+
+.scf-save-btn {
+  background: var(--gradient-brand);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px var(--color-primary-glow);
+  transition: all var(--transition-fast);
+}
+
+.scf-save-btn:hover:not(:disabled) {
+  background: var(--gradient-brand-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px var(--color-primary-glow);
+}
+
+.scf-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- Pill Segmented Tab Switcher (DESIGN.md §5.3) ---- */
+.scf-tabs {
+  display: flex;
+  gap: 0.3rem;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  padding: 0.35rem;
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+  scrollbar-width: none;
+}
+
+.scf-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.scf-tab-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.scf-tab-btn:hover {
+  color: var(--color-text-main);
+  background: rgba(91, 134, 229, 0.08);
+}
+
+.scf-tab-btn.active {
+  background: var(--gradient-brand);
+  color: #fff;
+  box-shadow: 0 4px 12px var(--color-primary-glow);
+}
+
+.scf-tab-icon {
+  font-size: 0.95rem;
+}
+
+.scf-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
+  display: inline-block;
+}
+
+.scf-tab-btn.active .scf-dot {
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
+}
+
+/* ---- 2-Column Grid (form + audit) ---- */
+.scf-grid {
+  display: grid;
+  grid-template-columns: 1fr 310px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .scf-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Config Form Panel ---- */
+.scf-panel {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-subtle);
+  overflow: hidden;
+}
+
+.scf-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: linear-gradient(135deg, rgba(91, 134, 229, 0.05) 0%, rgba(54, 209, 220, 0.05) 100%);
+}
+
+.scf-panel-icon {
+  font-size: 1.4rem;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-subtle);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.scf-panel-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  margin: 0;
+}
+
+.scf-panel-sub {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0.15rem 0 0;
+  line-height: 1.4;
+}
+
+.scf-panel-count {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+/* ---- Sections & Field Grid ---- */
+.scf-sections {
+  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.scf-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-subtle);
+  margin: 0 0 0.25rem;
+}
+
+.scf-section-desc {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.9rem;
+}
+
+.scf-section-title + .scf-section-desc {
+  margin-top: 0;
+}
+
+.scf-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem 1.5rem;
+}
+
+@media (max-width: 700px) {
+  .scf-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Fields ---- */
+.scf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.scf-field-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-body);
+  letter-spacing: 0.02em;
+}
+
+.scf-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.scf-input {
+  width: 100%;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: all var(--transition-fast);
+  font-family: var(--font-body);
+}
+
+.scf-input:focus {
+  border-color: var(--color-primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.scf-input-text {
+  padding-right: 0.9rem;
+}
+
+/* Unit suffix */
+.scf-input-wrap .scf-input {
+  padding-right: 1.2rem;
+}
+
+.scf-unit {
+  position: absolute;
+  right: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-subtle);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Fields with suffix keep input width correct */
+.scf-input-wrap {
+  width: 100%;
+}
+
+.scf-input-wrap .scf-input {
+  flex: 1;
+}
+
+.scf-help {
+  font-size: 0.72rem;
+  color: var(--color-text-subtle);
+  line-height: 1.4;
+}
+
+.scf-field.has-error .scf-input {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.scf-error {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-danger-text);
+}
+
+/* ---- Toggle row ---- */
+.scf-field-toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.9rem;
+}
+
+.scf-field-toggle .scf-help {
+  margin-top: 0.15rem;
+}
+
+.scf-toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--color-border-strong);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.scf-toggle.on {
+  background: var(--gradient-brand);
+}
+
+.scf-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
+  transition: transform var(--transition-fast);
+}
+
+.scf-toggle.on .scf-toggle-thumb {
+  transform: translateX(20px);
+}
+
+/* ---- Action button ---- */
+.scf-action-btn {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border: 1px solid var(--color-danger-border);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.scf-action-btn:hover {
+  background: var(--color-danger);
+  color: #fff;
+  border-color: var(--color-danger);
+}
+
+/* ---- Audit Log Panel ---- */
+.scf-audit-panel {
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-subtle);
+  overflow: hidden;
+  position: sticky;
+  top: 1rem;
+}
+
+.scf-audit-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
+}
+
+.scf-audit-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  margin: 0;
+  flex: 1;
+}
+
+.scf-audit-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg-subtle);
+  padding: 0.18rem 0.6rem;
+  border-radius: var(--radius-full);
+}
+
+.scf-audit-list {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+.scf-audit-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-subtle);
+}
+
+.scf-audit-item {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.15rem;
+  padding: 0.65rem 1.1rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.8rem;
+}
+
+.scf-audit-item:last-child {
+  border-bottom: none;
+}
+
+.scf-audit-ts {
+  font-size: 0.72rem;
+  color: var(--color-text-subtle);
+  font-weight: 500;
+}
+
+.scf-audit-admin {
+  font-weight: 600;
+  color: var(--color-info);
+}
+
+.scf-audit-target {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  color: var(--color-text-main);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scf-audit-diff {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+}
+
+.scf-audit-old {
+  color: var(--color-danger-text);
+  text-decoration: line-through;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.scf-audit-arrow {
+  color: var(--color-text-subtle);
+}
+
+.scf-audit-new {
+  color: var(--color-success-text);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scf-audit-msg {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  width: fit-content;
+}
+
+/* ---- Modal (DESIGN.md §5.4) ---- */
+.scf-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.scf-modal-card {
+  background: var(--color-surface-card);
+  border-radius: 20px;
+  padding: 1.75rem;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: var(--shadow-modal);
+  text-align: center;
+}
+
+.scf-modal-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.scf-modal-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--color-text-main);
+  margin: 0 0 0.5rem;
+}
+
+.scf-modal-text {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+  margin: 0 0 1.25rem;
+}
+
+.scf-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.scf-modal-btn {
+  padding: 0.55rem 1.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+}
+
+.scf-modal-btn.secondary {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-body);
+  border: 1px solid var(--color-border);
+}
+
+.scf-modal-btn.secondary:hover {
+  background: var(--color-border);
+}
+
+.scf-modal-btn.danger {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.scf-modal-btn.danger:hover {
+  background: var(--color-danger-hover);
+}
+
+/* ---- Loading skeleton wrap ---- */
+.scf-loading {
+  padding: 0;
+}

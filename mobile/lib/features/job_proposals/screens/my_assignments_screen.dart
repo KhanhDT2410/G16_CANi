@@ -37,49 +37,72 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> with 
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final assigns = await ref.read(proposalRepositoryProvider).fetchAssignments();
-    if (mounted) {
-      setState(() {
-        _assignments = assigns;
-        _isLoading = false;
-      });
+    try {
+      final assigns = await ref.read(proposalRepositoryProvider).fetchAssignments();
+      if (mounted) {
+        setState(() {
+          _assignments = assigns;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể tải danh sách ca làm: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _confirmPayment(ShiftAssignmentItem item, String status) async {
     final comment = status == 'NOT_RECEIVED' ? 'Chưa nhận được tiền lương từ Ban tổ chức' : '';
-    await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, status, comment);
-    setState(() {
-      final index = _assignments.indexWhere((a) => a.assignmentId == item.assignmentId);
-      if (index != -1) {
-        _assignments[index] = ShiftAssignmentItem(
-          assignmentId: item.assignmentId,
-          shiftId: item.shiftId,
-          eventId: item.eventId,
-          eventName: item.eventName,
-          venueAddress: item.venueAddress,
-          jobType: item.jobType,
-          startTime: item.startTime,
-          endTime: item.endTime,
-          hourlyWage: item.hourlyWage,
-          totalPay: item.totalPay,
-          status: item.status,
-          paymentStatus: status,
-          declaredAmount: item.declaredAmount,
-          paymentMethod: item.paymentMethod,
+    try {
+      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, status, comment);
+      setState(() {
+        final index = _assignments.indexWhere((a) => a.assignmentId == item.assignmentId);
+        if (index != -1) {
+          _assignments[index] = ShiftAssignmentItem(
+            assignmentId: item.assignmentId,
+            shiftId: item.shiftId,
+            eventId: item.eventId,
+            eventName: item.eventName,
+            venueAddress: item.venueAddress,
+            jobType: item.jobType,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            hourlyWage: item.hourlyWage,
+            totalPay: item.totalPay,
+            status: item.status,
+            paymentStatus: status,
+            declaredAmount: item.declaredAmount,
+            paymentMethod: item.paymentMethod,
+          );
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(status == 'CONFIRMED_FULL'
+                ? 'Đã xác nhận nhận đủ tiền lương!'
+                : 'Đã gửi khiếu nại (Dispute). Đội ngũ CANi sẽ hỗ trợ bạn!'),
+            backgroundColor: status == 'CONFIRMED_FULL' ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+          ),
         );
       }
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(status == 'CONFIRMED_FULL'
-              ? 'Đã xác nhận nhận đủ tiền lương!'
-              : 'Đã gửi khiếu nại (Dispute). Đội ngũ CANi sẽ hỗ trợ bạn!'),
-          backgroundColor: status == 'CONFIRMED_FULL' ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
-        ),
-      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi gửi xác nhận thanh toán: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
     }
   }
 

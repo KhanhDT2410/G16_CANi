@@ -143,15 +143,24 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
   }
 
   Future<void> toggleOnlineStatus() async {
-    final nextStatus = !state.isOnline;
-    state = state.copyWith(isOnline: nextStatus);
-    await _repo.setOnlineStatus(
-      isOnline: nextStatus,
-      lat: state.userLat,
-      lng: state.userLng,
-    );
-    if (nextStatus) {
-      scanNearbyShifts();
+    final prevStatus = state.isOnline;
+    final nextStatus = !prevStatus;
+    state = state.copyWith(isOnline: nextStatus, errorMessage: null);
+    try {
+      await _repo.setOnlineStatus(
+        isOnline: nextStatus,
+        lat: state.userLat,
+        lng: state.userLng,
+      );
+      if (nextStatus) {
+        scanNearbyShifts();
+      }
+    } catch (e) {
+      // Rollback trạng thái khi API lỗi hoặc mất kết nối, triệt tiêu trạng thái "Online giả"
+      state = state.copyWith(
+        isOnline: prevStatus,
+        errorMessage: 'Không thể cập nhật trạng thái hoạt động: $e',
+      );
     }
   }
 

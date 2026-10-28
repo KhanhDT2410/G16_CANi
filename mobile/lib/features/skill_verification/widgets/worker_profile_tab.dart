@@ -32,17 +32,21 @@ class _WorkerProfileTabState extends ConsumerState<WorkerProfileTab> {
 
   Future<void> _loadProfileData() async {
     final repo = ref.read(proposalRepositoryProvider);
-    final results = await Future.wait([
-      repo.fetchIncomeSummary(),
-      repo.fetchAvailability(),
-      repo.fetchPreferences(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _income = results[0] as WorkerIncomeSummary;
-      _availability = results[1] as List<WorkerAvailabilitySlot>;
-      _prefs = results[2] as WorkerPreferencesModel;
-    });
+    try {
+      final results = await Future.wait([
+        repo.fetchIncomeSummary().catchError((_) => const WorkerIncomeSummary()),
+        repo.fetchAvailability().catchError((_) => <WorkerAvailabilitySlot>[]),
+        repo.fetchPreferences().catchError((_) => const WorkerPreferencesModel()),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _income = results[0] as WorkerIncomeSummary;
+        _availability = results[1] as List<WorkerAvailabilitySlot>;
+        _prefs = results[2] as WorkerPreferencesModel;
+      });
+    } catch (_) {
+      // Giữ default state an toàn khi mất kết nối, tránh unhandled exception làm sập màn hình
+    }
   }
 
   String _formatMoney(double val) {

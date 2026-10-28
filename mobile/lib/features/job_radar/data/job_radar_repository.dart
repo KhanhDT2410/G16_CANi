@@ -14,6 +14,10 @@ class JobRadarRepository {
 
   JobRadarRepository(this._dio);
 
+  /// Cờ bật/tắt dữ liệu giả lập (mock demo data).
+  /// Mặc định là false (OFF) trong production. Có thể bật qua `--dart-define=DEMO_MODE=true`.
+  static const bool demoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);
+
   /// Cập nhật trạng thái kiếm việc (Online / Offline)
   Future<bool> setOnlineStatus({
     required bool isOnline,
@@ -35,8 +39,10 @@ class JobRadarRepository {
       }
       return isOnline;
     } catch (e) {
-      // Fallback cho local demo
-      return isOnline;
+      if (demoMode) {
+        return isOnline;
+      }
+      rethrow;
     }
   }
 
@@ -64,8 +70,10 @@ class JobRadarRepository {
       }
       return [];
     } catch (e) {
-      // Nếu server chưa có dữ liệu hoặc offline: Trả về danh sách mẫu sinh động phục vụ demo đồ án
-      return _generateDemoShifts(lat, lng);
+      if (demoMode) {
+        return _generateDemoShifts(lat, lng);
+      }
+      rethrow;
     }
   }
 

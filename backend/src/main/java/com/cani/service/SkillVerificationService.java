@@ -13,8 +13,10 @@ import com.cani.entity.enums.SkillTier;
 import com.cani.entity.enums.SkillVerificationStatus;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.VerificationTier;
+import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
 import com.cani.repository.SkillRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
 import com.cani.repository.WorkerRepository;
@@ -489,20 +491,21 @@ public class SkillVerificationService {
 
     /**
      * Resolve Worker ID from authenticated user or explicit ID for Admin.
+     * Chống IDOR: Chỉ Admin được phép thao tác thay Worker khác; Worker thường chỉ được thao tác trên chính hồ sơ của mình.
      */
     @Transactional(readOnly = true)
     public UUID resolveWorkerId(User user, UUID explicitWorkerId) {
-        if (user != null) {
-            if (explicitWorkerId != null && user.getRole() == UserRole.ADMIN) {
-                return explicitWorkerId;
-            }
-            Worker worker = workerRepository.findByUser_UserId(user.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Người dùng chưa có hồ sơ Worker trên hệ thống"));
-            return worker.getWorkerId();
+        if (user == null) {
+            throw new BadRequestException("Vui lòng đăng nhập để thực hiện thao tác này.");
         }
-        if (explicitWorkerId != null) {
+        if (explicitWorkerId != null && user.getRole() == UserRole.ADMIN) {
             return explicitWorkerId;
         }
-        throw new BadRequestException("Vui lòng đăng nhập để thực hiện thao tác này.");
+        Worker worker = workerRepository.findByUser_UserId(user.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng chưa có hồ sơ Worker trên hệ thống"));
+        if (explicitWorkerId != null && !worker.getWorkerId().equals(explicitWorkerId)) {
+            throw new AppException("Không có quyền thao tác thay cho Worker khác", HttpStatus.FORBIDDEN);
+        }
+        return worker.getWorkerId();
     }
 }

@@ -4,6 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cani/core/network/dio_client.dart';
 import '../models/proposal_models.dart';
 
+class RepositoryException implements Exception {
+  final String message;
+  final dynamic originalError;
+
+  const RepositoryException(this.message, [this.originalError]);
+
+  @override
+  String toString() => message;
+}
+
 final proposalRepositoryProvider = Provider<ProposalRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return ProposalRepository(dio);
@@ -13,6 +23,26 @@ class ProposalRepository {
   final Dio _dio;
 
   ProposalRepository(this._dio);
+
+  /// Cờ bật/tắt dữ liệu giả lập (mock demo data).
+  /// Mặc định là false (OFF) trong production. Có thể bật qua `--dart-define=DEMO_MODE=true`.
+  static const bool demoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);
+
+  String _extractErrorMessage(dynamic error, String fallback) {
+    if (error is DioException) {
+      final resData = error.response?.data;
+      if (resData is Map && resData['message'] != null) {
+        return resData['message'].toString();
+      }
+      if (error.type == DioExceptionType.connectionTimeout || error.type == DioExceptionType.receiveTimeout) {
+        return 'Hết thời gian chờ kết nối máy chủ.';
+      }
+      if (error.type == DioExceptionType.connectionError) {
+        return 'Không thể kết nối đến máy chủ CANi.';
+      }
+    }
+    return fallback;
+  }
 
   // Lấy các đề xuất việc làm đang chờ Worker phản hồi
   Future<List<JobProposalItem>> fetchProposals({String? token}) async {
@@ -25,41 +55,43 @@ class ProposalRepository {
       }
       return [];
     } catch (e) {
-      // Fallback demo khi lỗi mạng hoặc chưa có dữ liệu backend
-      return [
-        JobProposalItem(
-          proposalId: 'prop-m01',
-          shiftId: 'shift-m101',
-          eventId: 'evt-m01',
-          eventName: 'Lễ Khai Mạc Triển Lãm Công Nghệ Quốc Tế',
-          venueAddress: 'SECC, 799 Nguyễn Văn Linh, Quận 7, TP.HCM',
-          jobType: 'Lễ tân / Check-in',
-          description: 'Đón tiếp khách mời VIP, quét mã QR đại biểu vào hội trường.',
-          startTime: DateTime.now().add(const Duration(days: 1, hours: 2)),
-          endTime: DateTime.now().add(const Duration(days: 1, hours: 6)),
-          hourlyWage: 60000,
-          allowance: 30000,
-          totalEstimatedPay: 270000,
-          matchScore: 95.0,
-          status: 'PENDING',
-        ),
-        JobProposalItem(
-          proposalId: 'prop-m02',
-          shiftId: 'shift-m102',
-          eventId: 'evt-m02',
-          eventName: 'Gala Dinner Ra Mắt Sản Phẩm Mới',
-          venueAddress: 'Gem Center, Quận 1, TP.HCM',
-          jobType: 'Pha chế (Bartender/Barista)',
-          description: 'Phục vụ đồ uống tại sảnh tiệc chính cho 200 khách mời.',
-          startTime: DateTime.now().add(const Duration(days: 2, hours: 10)),
-          endTime: DateTime.now().add(const Duration(days: 2, hours: 15)),
-          hourlyWage: 75000,
-          allowance: 50000,
-          totalEstimatedPay: 425000,
-          matchScore: 89.0,
-          status: 'PENDING',
-        ),
-      ];
+      if (demoMode) {
+        return [
+          JobProposalItem(
+            proposalId: 'prop-m01',
+            shiftId: 'shift-m101',
+            eventId: 'evt-m01',
+            eventName: 'Lễ Khai Mạc Triển Lãm Công Nghệ Quốc Tế',
+            venueAddress: 'SECC, 799 Nguyễn Văn Linh, Quận 7, TP.HCM',
+            jobType: 'Lễ tân / Check-in',
+            description: 'Đón tiếp khách mời VIP, quét mã QR đại biểu vào hội trường.',
+            startTime: DateTime.now().add(const Duration(days: 1, hours: 2)),
+            endTime: DateTime.now().add(const Duration(days: 1, hours: 6)),
+            hourlyWage: 60000,
+            allowance: 30000,
+            totalEstimatedPay: 270000,
+            matchScore: 95.0,
+            status: 'PENDING',
+          ),
+          JobProposalItem(
+            proposalId: 'prop-m02',
+            shiftId: 'shift-m102',
+            eventId: 'evt-m02',
+            eventName: 'Gala Dinner Ra Mắt Sản Phẩm Mới',
+            venueAddress: 'Gem Center, Quận 1, TP.HCM',
+            jobType: 'Pha chế (Bartender/Barista)',
+            description: 'Phục vụ đồ uống tại sảnh tiệc chính cho 200 khách mời.',
+            startTime: DateTime.now().add(const Duration(days: 2, hours: 10)),
+            endTime: DateTime.now().add(const Duration(days: 2, hours: 15)),
+            hourlyWage: 75000,
+            allowance: 50000,
+            totalEstimatedPay: 425000,
+            matchScore: 89.0,
+            status: 'PENDING',
+          ),
+        ];
+      }
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải danh sách lời mời việc làm.'), e);
     }
   }
 
@@ -70,7 +102,7 @@ class ProposalRepository {
       final response = await _dio.post('/v1/workers/proposals/$proposalId/accept', options: options);
       return response.statusCode == 200;
     } catch (e) {
-      return true; // Fallback demo
+      throw RepositoryException(_extractErrorMessage(e, 'Chấp nhận ca làm việc thất bại.'), e);
     }
   }
 
@@ -85,7 +117,7 @@ class ProposalRepository {
       );
       return response.statusCode == 200;
     } catch (e) {
-      return true; // Fallback demo
+      throw RepositoryException(_extractErrorMessage(e, 'Từ chối ca làm việc thất bại.'), e);
     }
   }
 
@@ -100,25 +132,27 @@ class ProposalRepository {
       }
       return [];
     } catch (e) {
-      // Fallback Demo Data
-      return [
-        ShiftAssignmentItem(
-          assignmentId: 'assign-m01',
-          shiftId: 'shift-m100',
-          eventId: 'evt-m00',
-          eventName: 'Hội Thảo Chuyển Đổi Số Doanh Nghiệp',
-          venueAddress: 'Khách sạn Rex, 141 Nguyễn Huệ, Quận 1',
-          jobType: 'Điều phối sự kiện',
-          startTime: DateTime.now().subtract(const Duration(days: 1)),
-          endTime: DateTime.now().subtract(const Duration(days: 1, hours: -4)),
-          hourlyWage: 60000,
-          totalPay: 240000,
-          status: 'COMPLETED',
-          paymentStatus: 'DECLARED_PENDING_WORKER',
-          declaredAmount: 240000,
-          paymentMethod: 'BANK_TRANSFER',
-        ),
-      ];
+      if (demoMode) {
+        return [
+          ShiftAssignmentItem(
+            assignmentId: 'assign-m01',
+            shiftId: 'shift-m100',
+            eventId: 'evt-m00',
+            eventName: 'Hội Thảo Chuyển Đổi Số Doanh Nghiệp',
+            venueAddress: 'Khách sạn Rex, 141 Nguyễn Huệ, Quận 1',
+            jobType: 'Điều phối sự kiện',
+            startTime: DateTime.now().subtract(const Duration(days: 1)),
+            endTime: DateTime.now().subtract(const Duration(days: 1, hours: -4)),
+            hourlyWage: 60000,
+            totalPay: 240000,
+            status: 'COMPLETED',
+            paymentStatus: 'DECLARED_PENDING_WORKER',
+            declaredAmount: 240000,
+            paymentMethod: 'BANK_TRANSFER',
+          ),
+        ];
+      }
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải danh sách ca làm việc của bạn.'), e);
     }
   }
 
@@ -133,7 +167,7 @@ class ProposalRepository {
       );
       return response.statusCode == 200;
     } catch (e) {
-      return true; // Fallback demo
+      throw RepositoryException(_extractErrorMessage(e, 'Xác nhận tình trạng thanh toán thất bại.'), e);
     }
   }
 
@@ -145,25 +179,29 @@ class ProposalRepository {
     double? lng,
     String? token,
   }) async {
-    final options = Options(
-      headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-    );
-    final response = await _dio.post(
-      '/v1/workers/assignments/$assignmentId/checkin',
-      data: {
-        'qrContent': qrContent,
-        'lat': lat,
-        'lng': lng,
-      },
-      options: options,
-    );
-    if (response.data != null && response.data['data'] != null) {
-      return AttendanceCheckResult.fromJson(response.data['data']);
+    try {
+      final options = Options(
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+      );
+      final response = await _dio.post(
+        '/v1/workers/assignments/$assignmentId/checkin',
+        data: {
+          'qrContent': qrContent,
+          'lat': lat,
+          'lng': lng,
+        },
+        options: options,
+      );
+      if (response.data != null && response.data['data'] != null) {
+        return AttendanceCheckResult.fromJson(response.data['data']);
+      }
+      return AttendanceCheckResult(
+        assignmentId: assignmentId,
+        message: 'Điểm danh Check-in thành công!',
+      );
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Điểm danh Check-in thất bại. Vui lòng quét lại mã QR.'), e);
     }
-    return AttendanceCheckResult(
-      assignmentId: assignmentId,
-      message: 'Điểm danh Check-in thành công!',
-    );
   }
 
   // Quét QR Check-out hoàn thành ca làm việc
@@ -174,25 +212,29 @@ class ProposalRepository {
     double? lng,
     String? token,
   }) async {
-    final options = Options(
-      headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-    );
-    final response = await _dio.post(
-      '/v1/workers/assignments/$assignmentId/checkout',
-      data: {
-        'qrContent': qrContent,
-        'lat': lat,
-        'lng': lng,
-      },
-      options: options,
-    );
-    if (response.data != null && response.data['data'] != null) {
-      return AttendanceCheckResult.fromJson(response.data['data']);
+    try {
+      final options = Options(
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+      );
+      final response = await _dio.post(
+        '/v1/workers/assignments/$assignmentId/checkout',
+        data: {
+          'qrContent': qrContent,
+          'lat': lat,
+          'lng': lng,
+        },
+        options: options,
+      );
+      if (response.data != null && response.data['data'] != null) {
+        return AttendanceCheckResult.fromJson(response.data['data']);
+      }
+      return AttendanceCheckResult(
+        assignmentId: assignmentId,
+        message: 'Điểm danh Check-out thành công!',
+      );
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Điểm danh Check-out thất bại. Vui lòng quét lại mã QR.'), e);
     }
-    return AttendanceCheckResult(
-      assignmentId: assignmentId,
-      message: 'Điểm danh Check-out thành công!',
-    );
   }
 
   // UC-25: Lấy lịch rảnh tuần cố định của Worker
@@ -205,14 +247,17 @@ class ProposalRepository {
         return list.map((item) => WorkerAvailabilitySlot.fromJson(item)).toList();
       }
       return [];
-    } catch (_) {
-      return [
-        const WorkerAvailabilitySlot(dayOfWeek: 1, startTime: '18:00', endTime: '23:00'),
-        const WorkerAvailabilitySlot(dayOfWeek: 3, startTime: '18:00', endTime: '23:00'),
-        const WorkerAvailabilitySlot(dayOfWeek: 5, startTime: '18:00', endTime: '23:00'),
-        const WorkerAvailabilitySlot(dayOfWeek: 6, startTime: '08:00', endTime: '22:00'),
-        const WorkerAvailabilitySlot(dayOfWeek: 0, startTime: '08:00', endTime: '22:00'),
-      ];
+    } catch (e) {
+      if (demoMode) {
+        return const [
+          WorkerAvailabilitySlot(dayOfWeek: 1, startTime: '18:00', endTime: '23:00'),
+          WorkerAvailabilitySlot(dayOfWeek: 3, startTime: '18:00', endTime: '23:00'),
+          WorkerAvailabilitySlot(dayOfWeek: 5, startTime: '18:00', endTime: '23:00'),
+          WorkerAvailabilitySlot(dayOfWeek: 6, startTime: '08:00', endTime: '22:00'),
+          WorkerAvailabilitySlot(dayOfWeek: 0, startTime: '08:00', endTime: '22:00'),
+        ];
+      }
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải lịch rảnh của bạn.'), e);
     }
   }
 
@@ -228,8 +273,8 @@ class ProposalRepository {
         options: options,
       );
       return response.statusCode == 200;
-    } catch (_) {
-      return true;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Cập nhật lịch rảnh thất bại.'), e);
     }
   }
 
@@ -242,8 +287,11 @@ class ProposalRepository {
         return WorkerPreferencesModel.fromJson(response.data['data']);
       }
       return const WorkerPreferencesModel();
-    } catch (_) {
-      return const WorkerPreferencesModel();
+    } catch (e) {
+      if (demoMode) {
+        return const WorkerPreferencesModel();
+      }
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải cài đặt tiêu chí tìm việc.'), e);
     }
   }
 
@@ -257,8 +305,8 @@ class ProposalRepository {
         options: options,
       );
       return response.statusCode == 200;
-    } catch (_) {
-      return true;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Cập nhật tiêu chí tìm việc thất bại.'), e);
     }
   }
 
@@ -272,8 +320,8 @@ class ProposalRepository {
         options: options,
       );
       return response.statusCode == 200;
-    } catch (_) {
-      return true;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Hủy ca làm việc thất bại.'), e);
     }
   }
 
@@ -289,8 +337,11 @@ class ProposalRepository {
         }
       }
       return _defaultChecklist();
-    } catch (_) {
-      return _defaultChecklist();
+    } catch (e) {
+      if (demoMode) {
+        return _defaultChecklist();
+      }
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải checklist ca làm việc.'), e);
     }
   }
 
@@ -313,8 +364,8 @@ class ProposalRepository {
         options: options,
       );
       return response.statusCode == 200;
-    } catch (_) {
-      return true;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Cập nhật Checklist thất bại.'), e);
     }
   }
 
@@ -344,8 +395,8 @@ class ProposalRepository {
         options: options,
       );
       return response.statusCode == 200;
-    } catch (_) {
-      return true;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Gửi đánh giá Ban tổ chức thất bại.'), e);
     }
   }
 
@@ -358,15 +409,18 @@ class ProposalRepository {
         return WorkerIncomeSummary.fromJson(response.data['data']);
       }
       return const WorkerIncomeSummary();
-    } catch (_) {
-      return const WorkerIncomeSummary(
-        totalEarnings: 1450000,
-        pendingEarnings: 240000,
-        completedShiftsCount: 6,
-        totalHoursWorked: 24.5,
-        avgRating: 4.9,
-        reliabilityScore: 100,
-      );
+    } catch (e) {
+      if (demoMode) {
+        return const WorkerIncomeSummary(
+          totalEarnings: 1450000,
+          pendingEarnings: 240000,
+          completedShiftsCount: 6,
+          totalHoursWorked: 24.5,
+          avgRating: 4.9,
+          reliabilityScore: 100,
+        );
+      }
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải thống kê thu nhập.'), e);
     }
   }
 }

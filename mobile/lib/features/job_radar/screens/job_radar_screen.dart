@@ -29,13 +29,22 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
 
   Future<void> _loadProposals() async {
     setState(() => _isLoadingProposals = true);
-    final repo = ref.read(proposalRepositoryProvider);
-    final list = await repo.fetchProposals();
-    if (mounted) {
-      setState(() {
-        _proposals = list;
-        _isLoadingProposals = false;
-      });
+    try {
+      final repo = ref.read(proposalRepositoryProvider);
+      final list = await repo.fetchProposals();
+      if (mounted) {
+        setState(() {
+          _proposals = list;
+          _isLoadingProposals = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _proposals = [];
+          _isLoadingProposals = false;
+        });
+      }
     }
   }
 
@@ -57,31 +66,53 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     );
 
     if (confirmed == true) {
-      await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
-      setState(() {
-        _proposals.removeWhere((p) => p.proposalId == item.proposalId);
-      });
+      try {
+        await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
+        setState(() {
+          _proposals.removeWhere((p) => p.proposalId == item.proposalId);
+        });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Nhận việc thành công! Ca làm đã được thêm vào Lịch ca của bạn.'),
-            backgroundColor: Color(0xFF16A34A),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nhận việc thành công! Ca làm đã được thêm vào Lịch ca của bạn.'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi khi nhận việc: ${e.toString().replaceAll("Exception: ", "")}'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
       }
     }
   }
 
   Future<void> _rejectProposal(JobProposalItem item) async {
-    await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
-    setState(() {
-      _proposals.removeWhere((p) => p.proposalId == item.proposalId);
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã từ chối lời mời. Hệ thống sẽ điều phối việc khác cho bạn.')),
-      );
+    try {
+      await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
+      setState(() {
+        _proposals.removeWhere((p) => p.proposalId == item.proposalId);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã từ chối lời mời. Hệ thống sẽ điều phối việc khác cho bạn.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi từ chối lời mời: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
     }
   }
 

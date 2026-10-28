@@ -398,7 +398,7 @@ class _WorkerSettingsScreenState extends ConsumerState<WorkerSettingsScreen> {
                           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                         ),
                         trailing: Text(
-                          'CANi Partner v1.2.0',
+                          'CANi Partner v1.0.0 (Build 1)',
                           style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
                         ),
                       ),

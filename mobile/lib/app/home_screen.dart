@@ -26,7 +26,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = ref.read(authStateProvider).user;
+      if (user != null) {
+        TermsOfServiceDialog.checkAndShow(context, user.id);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Lắng nghe thay đổi trạng thái đăng nhập để hiển thị điều khoản một cách an toàn
+    ref.listen<AuthState>(authStateProvider, (previous, next) {
+      if (next.isAuthenticated && next.user != null && previous?.user?.id != next.user!.id) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            TermsOfServiceDialog.checkAndShow(context, next.user!.id);
+          }
+        });
+      }
+    });
+
     final authState = ref.watch(authStateProvider);
 
     if (authState.isLoading) {
@@ -40,12 +63,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!authState.isAuthenticated) {
       return const LoginScreen();
     }
-
-    final user = authState.user!;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      TermsOfServiceDialog.checkAndShow(context, user.id);
-    });
 
     return Scaffold(
       body: IndexedStack(

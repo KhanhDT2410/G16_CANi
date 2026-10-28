@@ -72,6 +72,8 @@ Desktop.ini
 *.bak
 *.bak*
 client_secret*.json
+*firebase-adminsdk*.json
+firebase-service-account*.json
 secrets/
 credentials/
 

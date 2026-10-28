@@ -508,12 +508,15 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   }
 
   void _showShiftDetails(BuildContext context, NearbyShiftItem shift) {
+    final state = ref.read(jobRadarProvider);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => JobDetailBottomSheet(
         shift: shift,
+        userLat: state.userLat,
+        userLng: state.userLng,
         onApply: () {
           Navigator.pop(ctx);
           _applyQuick(context, shift);

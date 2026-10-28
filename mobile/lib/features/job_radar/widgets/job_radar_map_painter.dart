@@ -56,9 +56,39 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant JobRadarMapWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Khi chọn ca làm việc mới -> tự động căn chỉnh camera bao quát cả vị trí Worker và Ca làm việc
+    if (widget.selectedShift != null && widget.selectedShift?.shiftId != oldWidget.selectedShift?.shiftId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitSelectedRoute());
+    } else if (oldWidget.userLat != widget.userLat || oldWidget.userLng != widget.userLng) {
+      // Khi GPS cập nhật vị trí mới từ thiết bị và chưa chọn ca nào -> lia camera về vị trí thật
+      if (widget.selectedShift == null) {
+        _recenter();
+      }
+    }
+  }
+
   void _recenter() {
     _mapController.move(LatLng(widget.userLat, widget.userLng), 13.0);
     widget.onRecenterGps?.call();
+  }
+
+  void _fitSelectedRoute() {
+    if (widget.selectedShift == null) return;
+    final userPos = LatLng(widget.userLat, widget.userLng);
+    final shiftPos = LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng);
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints([userPos, shiftPos]),
+          padding: const EdgeInsets.only(top: 80, bottom: 120, left: 60, right: 60),
+        ),
+      );
+    } catch (_) {
+      _mapController.move(shiftPos, 14.0);
+    }
   }
 
   @override
@@ -101,6 +131,35 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                 ),
               ],
             ),
+
+            // Lớp vẽ đường lộ trình dẫn đường khi chọn ca làm việc (Route Polyline)
+            if (widget.selectedShift != null)
+              PolylineLayer(
+                polylines: [
+                  // Đường viền đổ bóng nổi bật
+                  Polyline(
+                    points: [
+                      userPos,
+                      LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng),
+                    ],
+                    strokeWidth: 6.0,
+                    color: const Color(0xFF0066FF).withOpacity(0.3),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                  // Đường lộ trình chính
+                  Polyline(
+                    points: [
+                      userPos,
+                      LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng),
+                    ],
+                    strokeWidth: 3.5,
+                    color: const Color(0xFF0066FF),
+                    strokeCap: StrokeCap.round,
+                    strokeJoin: StrokeJoin.round,
+                  ),
+                ],
+              ),
 
             // Lớp Marker: Vị trí của Worker & Các ca làm việc xung quanh
             MarkerLayer(
@@ -291,6 +350,69 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+        // 4. Banner thông tin lộ trình dẫn đường khi chọn ca làm việc
+        if (widget.selectedShift != null)
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                  border: Border.all(color: const Color(0xFF0066FF).withOpacity(0.3), width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.route, color: Color(0xFF0066FF), size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.selectedShift!.eventName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Lộ trình: ${widget.selectedShift!.distanceKm.toStringAsFixed(1)} km (~${((widget.selectedShift!.distanceKm / 25.0) * 60).round().clamp(5, 120)} phút đi xe máy)',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF0066FF), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.center_focus_strong, size: 20, color: Color(0xFF64748B)),
+                      tooltip: 'Căn chỉnh toàn bộ lộ trình',
+                      onPressed: _fitSelectedRoute,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

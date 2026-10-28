@@ -1,5 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/notifications/fcm_service.dart';
 import 'package:cani/features/auth/data/auth_repository.dart';
 import 'package:cani/features/auth/models/user_dto.dart';
 
@@ -31,21 +34,26 @@ class AuthState {
 
 final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(repository);
+  final dio = ref.watch(dioProvider);
+  return AuthNotifier(repository, dio);
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._repository) : super(const AuthState()) {
+  AuthNotifier(this._repository, this._dio) : super(const AuthState()) {
     checkAuthStatus();
   }
 
   final AuthRepository _repository;
+  final Dio _dio;
 
   Future<void> checkAuthStatus() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final user = await _repository.getSavedUser();
       state = state.copyWith(isLoading: false, user: user);
+      if (user != null) {
+        FcmService.syncTokenWithBackend(_dio, explicitUserId: user.id);
+      }
     } catch (_) {
       state = state.copyWith(isLoading: false, user: null);
     }
@@ -56,6 +64,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final response = await _repository.login(email, password);
       state = state.copyWith(isLoading: false, user: response.user);
+      FcmService.syncTokenWithBackend(_dio, explicitUserId: response.user.id);
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -86,6 +95,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final response = await _repository.signInWithGoogle();
       state = state.copyWith(isLoading: false, user: response.user);
+      FcmService.syncTokenWithBackend(_dio, explicitUserId: response.user.id);
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -125,6 +135,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
+    final currentUserId = state.user?.id;
+    try {
+      await FcmService.unregisterToken(_dio, explicitUserId: currentUserId);
+    } catch (_) {}
     await _repository.logout();
     state = const AuthState();
   }

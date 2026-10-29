@@ -21,7 +21,7 @@ class WorkerIllustrationCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0077FF).withOpacity(0.06),
+            color: const Color(0xFF0077FF).withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -42,7 +42,7 @@ class WorkerIllustrationCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF38BDF8).withOpacity(0.35),
+                      const Color(0xFF38BDF8).withValues(alpha: 0.35),
                       Colors.transparent,
                     ],
                   ),
@@ -58,7 +58,7 @@ class WorkerIllustrationCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF0077FF).withOpacity(0.25),
+                      const Color(0xFF0077FF).withValues(alpha: 0.25),
                       Colors.transparent,
                     ],
                   ),
@@ -77,7 +77,7 @@ class WorkerIllustrationCard extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: [
                       Colors.transparent,
-                      const Color(0xFF38BDF8).withOpacity(0.12),
+                      const Color(0xFF38BDF8).withValues(alpha: 0.12),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,

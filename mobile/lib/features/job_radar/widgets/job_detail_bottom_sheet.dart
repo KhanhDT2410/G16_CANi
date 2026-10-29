@@ -52,7 +52,7 @@ class JobDetailBottomSheet extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -117,7 +117,7 @@ class JobDetailBottomSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withOpacity(0.6),
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -165,7 +165,7 @@ class JobDetailBottomSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

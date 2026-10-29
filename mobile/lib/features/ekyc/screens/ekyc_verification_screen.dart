@@ -172,7 +172,6 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(ekycProvider);
     final notifier = ref.read(ekycProvider.notifier);
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -694,8 +693,6 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
   }
 
   Widget _buildConfirmedCard(BuildContext context, EkycState state) {
-    final theme = Theme.of(context);
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(

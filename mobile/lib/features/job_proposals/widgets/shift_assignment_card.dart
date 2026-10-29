@@ -32,344 +32,308 @@ class ShiftAssignmentCard extends StatelessWidget {
     final isDeclared = a.paymentStatus == 'DECLARED_PENDING_WORKER';
     final isConfirmed = a.paymentStatus == 'CONFIRMED_FULL';
 
+    final barColor = isCompleted
+        ? const Color(0xFF7E22CE)
+        : (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF0077FF));
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCheckedIn ? const Color(0xFF10B981).withValues(alpha: 0.6) : const Color(0xFFE2E8F0),
-          width: isCheckedIn ? 1.5 : 1.0,
-        ),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0077FF).withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          // Header: Tên ca & Badge trạng thái
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      a.jobType,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      a.eventName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.5,
-                        color: Color(0xFF0066FF),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isCompleted
-                      ? const Color(0xFFF3E8FF)
-                      : (isCheckedIn ? const Color(0xFFD1FAE5) : const Color(0xFFE0F2FE)),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isCompleted
-                        ? const Color(0xFFD8B4FE)
-                        : (isCheckedIn ? const Color(0xFF6EE7B7) : const Color(0xFFBAE6FD)),
-                  ),
-                ),
-                child: Text(
-                  isCompleted
-                      ? 'ĐÃ HOÀN THÀNH'
-                      : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN'),
-                  style: TextStyle(
-                    color: isCompleted
-                        ? const Color(0xFF7E22CE)
-                        : (isCheckedIn ? const Color(0xFF065F46) : const Color(0xFF0369A1)),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 10.5,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Địa chỉ & Thời gian
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined, size: 15, color: Color(0xFF64748B)),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  a.venueAddress,
-                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF64748B)),
-              const SizedBox(width: 5),
-              Text(
-                '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} • ${a.startTime.day}/${a.startTime.month}/${a.startTime.year}',
-                style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569), fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Thù lao & giờ làm
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Thù lao: ${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF16A34A),
-                  fontSize: 14.5,
-                ),
-              ),
-              if (a.hoursWorked != null)
-                Text(
-                  'Đã làm: ${a.hoursWorked!.toStringAsFixed(1)}h',
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
-                ),
-            ],
+          // Vạch màu trang trí mép trái theo OpenDesign
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 4.5,
+            child: Container(color: barColor),
           ),
 
-          // Lịch sử Check-in / Out nếu có
-          if (a.checkinTime != null || a.checkoutTime != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.schedule, size: 14, color: Color(0xFF64748B)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '${a.checkinTime != null ? "Vào ca: ${a.checkinTime!.hour.toString().padLeft(2, '0')}:${a.checkinTime!.minute.toString().padLeft(2, '0')}" : ""}${a.checkoutTime != null ? " | Ra ca: ${a.checkoutTime!.hour.toString().padLeft(2, '0')}:${a.checkoutTime!.minute.toString().padLeft(2, '0')}" : ""}',
-                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF334155), fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 14),
-
-          // Hàng nút hành động: Chỉ đường & Quét QR
-          Row(
-            children: [
-              Expanded(
-                flex: 4,
-                child: OutlinedButton.icon(
-                  onPressed: onNavigate,
-                  icon: const Icon(Icons.directions, size: 17, color: Color(0xFF0066FF)),
-                  label: const Text('Chỉ đường', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF0066FF))),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    side: const BorderSide(color: Color(0xFF0066FF)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              if (isNotStarted)
-                Expanded(
-                  flex: 5,
-                  child: FilledButton.icon(
-                    onPressed: onQrScan,
-                    icon: const Icon(Icons.qr_code_scanner, size: 17),
-                    label: const Text('QR Check-in', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                )
-              else if (isCheckedIn)
-                Expanded(
-                  flex: 5,
-                  child: FilledButton.icon(
-                    onPressed: onQrScan,
-                    icon: const Icon(Icons.exit_to_app, size: 17),
-                    label: const Text('QR Check-out', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFEA580C),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
-          // Hàng nút phụ: Checklist việc / Hủy ca / Đánh giá BTC
-          if (onOpenChecklist != null || onCancelAssignment != null || onRateOrganizer != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (onOpenChecklist != null)
-                  Expanded(
-                    child: TextButton.icon(
-                      onPressed: onOpenChecklist,
-                      icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF0D9488)),
-                      label: const Text(
-                        'Checklist việc',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
-                      ),
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFF0FDFA),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ),
-                if (onOpenChecklist != null && (isNotStarted && onCancelAssignment != null || isCompleted && onRateOrganizer != null))
-                  const SizedBox(width: 8),
-                if (isNotStarted && onCancelAssignment != null)
-                  Expanded(
-                    child: TextButton.icon(
-                      onPressed: onCancelAssignment,
-                      icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
-                      label: const Text(
-                        'Hủy nhận ca',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
-                      ),
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFFEF2F2),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ),
-                if (isCompleted && onRateOrganizer != null)
-                  Expanded(
-                    child: TextButton.icon(
-                      onPressed: onRateOrganizer,
-                      icon: const Icon(Icons.star_rounded, size: 17, color: Color(0xFFD97706)),
-                      label: const Text(
-                        'Đánh giá BTC',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
-                      ),
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFFEF3C7),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-
-          const Divider(height: 22, color: Color(0xFFE2E8F0)),
-
-          // Khung xác nhận thù lao (BR-12 / A-20)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isConfirmed
-                  ? const Color(0xFFF0FDF4)
-                  : (isDeclared ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC)),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isConfirmed
-                    ? const Color(0xFF86EFAC)
-                    : (isDeclared ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0)),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 15, 15, 15),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Tag trạng thái
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Thanh toán thù lao:',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF1E293B)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? const Color(0xFFF3E8FF)
+                            : (isCheckedIn
+                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                : const Color(0xFF0077FF).withValues(alpha: 0.10)),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isCompleted
+                                  ? const Color(0xFF7E22CE)
+                                  : (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF0077FF)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isCompleted
+                                ? 'ĐÃ HOÀN THÀNH'
+                                : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: isCompleted
+                                  ? const Color(0xFF7E22CE)
+                                  : (isCheckedIn ? const Color(0xFF059669) : const Color(0xFF0077FF)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    Text(
-                      isConfirmed
-                          ? '✓ Đã nhận đủ tiền'
-                          : (isDeclared ? 'Ban tổ chức đã thanh toán' : 'Chờ hoàn thành ca'),
-                      style: TextStyle(
-                        color: isConfirmed
-                            ? const Color(0xFF16A34A)
-                            : (isDeclared ? const Color(0xFFD97706) : const Color(0xFF64748B)),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11.5,
+                    InkWell(
+                      onTap: onNavigate,
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        child: Row(
+                          children: [
+                            Icon(Icons.directions, size: 14, color: Color(0xFF0066FF)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Chỉ đường',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0066FF),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                if (isDeclared) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Đã chuyển: ${a.declaredAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ (${a.paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Tiền mặt'}). Vui lòng kiểm tra và xác nhận:',
-                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569)),
+                const SizedBox(height: 9),
+
+                // Tên ca & Sự kiện
+                Text(
+                  '${a.jobType} · ${a.eventName}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: Color(0xFF0B1B3D),
+                    letterSpacing: -0.1,
                   ),
+                ),
+                const SizedBox(height: 4),
+
+                // Thời gian & Địa điểm
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF0077FF)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.venueAddress}',
+                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Nút Quét QR Lớn cao 52px màu Teal nếu ca đang chạy hoặc chờ
+                if (!isCompleted) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x550D9488),
+                            blurRadius: 16,
+                            offset: Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: onQrScan,
+                        icon: const Icon(Icons.qr_code_scanner, size: 19, color: Colors.white),
+                        label: Text(
+                          isCheckedIn ? 'Quét QR Check-out Thực Địa' : 'Quét QR Check-in Thực Địa',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Hàng nút phụ: Checklist việc / Hủy ca / Đánh giá BTC
+                if (onOpenChecklist != null || onCancelAssignment != null || onRateOrganizer != null) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(
-                        child: FilledButton.tonal(
-                          onPressed: () => onConfirmPayment('RECEIVED_FULL'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFDCFCE7),
-                            foregroundColor: const Color(0xFF166534),
-                            visualDensity: VisualDensity.compact,
+                      if (onOpenChecklist != null)
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: onOpenChecklist,
+                            icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF0D9488)),
+                            label: const Text(
+                              'Checklist việc',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFFF0FDFA),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
                           ),
-                          child: const Text('✓ Đã nhận đủ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => onConfirmPayment('NOT_RECEIVED'),
-                          style: OutlinedButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            side: const BorderSide(color: Color(0xFFEF4444)),
+                      if (onOpenChecklist != null && (isNotStarted && onCancelAssignment != null || isCompleted && onRateOrganizer != null))
+                        const SizedBox(width: 8),
+                      if (isNotStarted && onCancelAssignment != null)
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: onCancelAssignment,
+                            icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
+                            label: const Text(
+                              'Hủy nhận ca',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFFFEF2F2),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
                           ),
-                          child: const Text('✕ Chưa nhận', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFFEF4444))),
                         ),
-                      ),
+                      if (isCompleted && onRateOrganizer != null)
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: onRateOrganizer,
+                            icon: const Icon(Icons.star_rounded, size: 17, color: Color(0xFFD97706)),
+                            label: const Text(
+                              'Đánh giá BTC',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFFFEF3C7),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],
+
+                const SizedBox(height: 12),
+
+                // Khung Thù Lao & Nút Xác Nhận
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.30)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.monetization_on_outlined, size: 16, color: Color(0xFF059669)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            text: isDeclared ? 'Ban tổ chức đã thanh toán: ' : 'Thù lao: ',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
+                            children: [
+                              TextSpan(
+                                text: '${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+                              ),
+                              if (isDeclared)
+                                TextSpan(
+                                  text: ' (${a.paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Tiền mặt'})',
+                                  style: const TextStyle(fontSize: 10.5, color: Color(0xFF065F46)),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (isConfirmed)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF059669),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Đã nhận đủ ✓',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      else if (isDeclared)
+                        InkWell(
+                          onTap: () => onConfirmPayment('CONFIRMED_FULL'),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF10B981)),
+                            ),
+                            child: const Text(
+                              'Xác nhận nhận tiền',
+                              style: TextStyle(color: Color(0xFF059669), fontSize: 10.5, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          'Sẽ trả sau ca',
+                          style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600, fontWeight: FontWeight.w700),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

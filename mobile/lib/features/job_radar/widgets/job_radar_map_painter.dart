@@ -12,6 +12,7 @@ class JobRadarMapWidget extends StatefulWidget {
   final bool isOnline;
   final double userLat;
   final double userLng;
+  final VoidCallback? onRecenterGps;
 
   const JobRadarMapWidget({
     super.key,
@@ -22,6 +23,7 @@ class JobRadarMapWidget extends StatefulWidget {
     this.isOnline = true,
     this.userLat = 10.7769,
     this.userLng = 106.7009,
+    this.onRecenterGps,
   });
 
   @override
@@ -70,6 +72,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
 
   void _recenter() {
     _mapController.move(LatLng(widget.userLat, widget.userLng), 13.0);
+    widget.onRecenterGps?.call();
   }
 
   void _fitSelectedRoute() {
@@ -94,22 +97,24 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
 
     return Stack(
       children: [
-        // 1. Bản đồ tương tác vệ tinh / đường phố OpenStreetMap
+        // 1. Bản đồ vệ tinh/đường phố CartoDB Voyager CDN phân giải toàn cầu (thay thế OSM bị lỗi DNS)
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
             initialCenter: userPos,
             initialZoom: 13.0,
-            minZoom: 9.0,
-            maxZoom: 18.0,
+            minZoom: 8.0,
+            maxZoom: 19.0,
           ),
           children: [
-            // Lớp gạch nền bản đồ OpenStreetMap
+            // Lớp gạch bản đồ CartoDB Voyager mượt mà, không bị chặn bởi nhà mạng Việt Nam
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+              subdomains: const ['a', 'b', 'c', 'd'],
               userAgentPackageName: 'com.cani.cani',
+              maxZoom: 19,
               errorTileCallback: (tile, error, stackTrace) {
-                // Bắt lỗi an toàn khi DNS mạng hoặc offline, tránh văng ứng dụng
+                // Fallback im lặng khi mất mạng
               },
             ),
 
@@ -120,9 +125,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                   point: userPos,
                   radius: widget.maxRadiusKm * 1000, // Đổi sang mét
                   useRadiusInMeter: true,
-                  color: (widget.isOnline ? Colors.teal : Colors.grey).withOpacity(0.12),
-                  borderColor: (widget.isOnline ? Colors.teal : Colors.grey).withOpacity(0.6),
-                  borderStrokeWidth: 2,
+                  color: (widget.isOnline ? const Color(0xFF0077FF) : Colors.grey).withValues(alpha: 0.10),
+                  borderColor: (widget.isOnline ? const Color(0xFF0077FF) : Colors.grey).withValues(alpha: 0.5),
+                  borderStrokeWidth: 1.8,
                 ),
               ],
             ),
@@ -138,7 +143,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                       LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng),
                     ],
                     strokeWidth: 6.0,
-                    color: const Color(0xFF0066FF).withOpacity(0.3),
+                    color: const Color(0xFF0066FF).withValues(alpha: 0.3),
                     strokeCap: StrokeCap.round,
                     strokeJoin: StrokeJoin.round,
                   ),
@@ -180,7 +185,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                           height: 44,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: (widget.isOnline ? Colors.teal : Colors.grey).withOpacity(0.3),
+                            color: (widget.isOnline ? const Color(0xFF0077FF) : Colors.grey).withValues(alpha: 0.25),
                           ),
                         ),
                         Container(
@@ -188,11 +193,11 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                           height: 24,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: widget.isOnline ? Colors.teal.shade700 : Colors.grey.shade700,
+                            color: widget.isOnline ? const Color(0xFF0066FF) : Colors.grey.shade700,
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withValues(alpha: 0.2),
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
@@ -205,15 +210,15 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                   ),
                 ),
 
-                // Ghim từng Ca làm việc (Job Pins)
+                // Ghim từng Ca làm việc (Job Wage Pins)
                 ...widget.shifts.map((shift) {
                   final isSelected = widget.selectedShift?.shiftId == shift.shiftId;
                   final shiftPos = LatLng(shift.locationLat, shift.locationLng);
 
                   return Marker(
                     point: shiftPos,
-                    width: 70,
-                    height: 60,
+                    width: 72,
+                    height: 62,
                     child: GestureDetector(
                       onTap: () => widget.onSelectShift(shift),
                       child: Column(
@@ -221,18 +226,18 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                         children: [
                           // Badge giá lương / ca
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.indigo.shade800 : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
+                              color: isSelected ? const Color(0xFF0B1B3D) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isSelected ? Colors.amber : Colors.indigo.shade400,
+                                color: isSelected ? const Color(0xFF00D2FF) : const Color(0xFFCBD5E1),
                                 width: isSelected ? 2 : 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 4,
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 5,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
@@ -240,9 +245,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                             child: Text(
                               '${(shift.hourlyWage / 1000).toInt()}k/h',
                               style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.amber : Colors.indigo.shade900,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected ? Colors.white : const Color(0xFF0B1B3D),
                               ),
                             ),
                           ),
@@ -250,9 +255,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                           Icon(
                             Icons.location_on_rounded,
                             size: isSelected ? 36 : 28,
-                            color: isSelected ? Colors.amber.shade700 : Colors.indigo.shade600,
+                            color: isSelected ? const Color(0xFF0066FF) : const Color(0xFF2563EB),
                             shadows: [
-                              Shadow(color: Colors.black.withOpacity(0.3), blurRadius: 4),
+                              Shadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4),
                             ],
                           ),
                         ],
@@ -265,26 +270,27 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
           ],
         ),
 
-        // 2. Nút định vị & Zoom tiện lợi
+        // 2. Cột nút Zoom & Recenter tiện lợi ở góc phải
         Positioned(
-          right: 16,
-          bottom: 24,
+          right: 14,
+          bottom: 90, // Cách đáy hợp lý để không che sliding card
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               FloatingActionButton.small(
                 heroTag: 'map_recenter',
                 backgroundColor: Colors.white,
-                foregroundColor: Colors.teal.shade800,
+                foregroundColor: const Color(0xFF0066FF),
                 elevation: 3,
                 onPressed: _recenter,
-                tooltip: 'Về vị trí của tôi',
+                tooltip: 'Về vị trí GPS của tôi',
                 child: const Icon(Icons.my_location),
               ),
               const SizedBox(height: 8),
               FloatingActionButton.small(
                 heroTag: 'map_zoom_in',
                 backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
+                foregroundColor: const Color(0xFF1E293B),
                 elevation: 3,
                 onPressed: () {
                   final zoom = _mapController.camera.zoom + 1;
@@ -296,7 +302,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
               FloatingActionButton.small(
                 heroTag: 'map_zoom_out',
                 backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
+                foregroundColor: const Color(0xFF1E293B),
                 elevation: 3,
                 onPressed: () {
                   final zoom = _mapController.camera.zoom - 1;
@@ -308,26 +314,40 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
           ),
         ),
 
-        // 3. Chú thích trạng thái nếu Offline
+        // 3. Thông báo trạng thái khi Tắt chế độ tìm việc (Offline) - Đã bọc chống tràn
         if (!widget.isOnline)
           Positioned(
-            top: 12,
-            left: 20,
-            right: 20,
+            top: 10,
+            left: 14,
+            right: 14,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
+                color: const Color(0xFF0B1B3D).withValues(alpha: 0.90),
                 borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.visibility_off, color: Colors.amber, size: 16),
+                  Icon(Icons.visibility_off_outlined, color: Color(0xFFF59E0B), size: 16),
                   SizedBox(width: 8),
-                  Text(
-                    'Đang tắt chế độ tìm việc. Gạt công tắc trên để bắt đầu.',
-                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                  Expanded(
+                    child: Text(
+                      'Đang tắt chế độ tìm việc. Gạt công tắc trên để bắt đầu.',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -349,12 +369,12 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
                   ],
-                  border: Border.all(color: const Color(0xFF0066FF).withOpacity(0.3), width: 1.5),
+                  border: Border.all(color: const Color(0xFF0066FF).withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Row(
                   children: [

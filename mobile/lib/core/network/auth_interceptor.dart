@@ -31,8 +31,8 @@ class AuthInterceptor extends Interceptor {
             inMemoryToken = refreshRes.session!.accessToken;
             await _storage.write(key: 'cani_token', value: inMemoryToken);
           }
-        } else if (inMemoryToken == null) {
-          inMemoryToken = session.accessToken;
+        } else {
+          inMemoryToken ??= session.accessToken;
         }
       }
     } catch (_) {}

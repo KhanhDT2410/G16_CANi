@@ -19,6 +19,16 @@ final proposalRepositoryProvider = Provider<ProposalRepository>((ref) {
   return ProposalRepository(dio);
 });
 
+final proposalsCountProvider = FutureProvider<int>((ref) async {
+  try {
+    final repo = ref.watch(proposalRepositoryProvider);
+    final list = await repo.fetchProposals();
+    return list.length;
+  } catch (_) {
+    return 0;
+  }
+});
+
 class ProposalRepository {
   final Dio _dio;
 
@@ -159,10 +169,19 @@ class ProposalRepository {
   // Worker Xác nhận tình trạng nhận tiền lương trực tiếp (Mục 12 SRS)
   Future<bool> confirmPayment(String assignmentId, String confirmStatus, String comment, {String? token}) async {
     try {
+      // Ánh xạ trạng thái từ Domain/UI (PaymentStatus) sang Payload backend (DirectPaymentService)
+      // UI: CONFIRMED_FULL -> Backend: RECEIVED_FULL
+      // UI: CONFIRMED_PARTIAL -> Backend: RECEIVED_PARTIAL
+      final apiStatus = switch (confirmStatus) {
+        'CONFIRMED_FULL' => 'RECEIVED_FULL',
+        'CONFIRMED_PARTIAL' => 'RECEIVED_PARTIAL',
+        _ => confirmStatus,
+      };
+
       final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
       final response = await _dio.post(
         '/v1/payments/worker/confirm/$assignmentId',
-        data: {'confirmStatus': confirmStatus, 'comment': comment},
+        data: {'confirmStatus': apiStatus, 'comment': comment},
         options: options,
       );
       return response.statusCode == 200;

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../services/api';
 import { showToast } from '../../components/common/Toast';
+<<<<<<< HEAD
 import { UserManagementView } from '../../features/admin-users';
 import { AdminDashboardView } from '../../features/admin-dashboard';
 import './AdminPage.css';
@@ -16,6 +18,39 @@ const AdminPage = () => {
     loadEkycQueue();
     loadSkillQueue();
   }, []);
+=======
+import { AdminDashboard } from '../../features/admin-dashboard';
+import { UserManagement } from '../../features/user-management';
+import { RbacManagement } from '../../features/rbac-management';
+import { RevenueDashboard } from '../../features/revenue-dashboard';
+import { SystemConfig } from '../../features/system-configuration';
+import './AdminPage.css';
+
+const AdminPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [ekycQueue, setEkycQueue] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams, activeTab]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
+  useEffect(() => {
+    if (activeTab === 'ekyc') {
+      loadEkycQueue();
+    }
+  }, [activeTab]);
+>>>>>>> origin/duong
 
   const loadSkillQueue = async () => {
     try {
@@ -156,6 +191,7 @@ const AdminPage = () => {
 
   return (
     <div className="admin-container">
+<<<<<<< HEAD
       <div className="admin-header">
         <h1>
           Cổng Quản Trị Hệ Thống
@@ -177,8 +213,45 @@ const AdminPage = () => {
         <button
           className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
           onClick={() => setActiveTab('ekyc')}
+=======
+      {/* Navigation Tabs */}
+      <div className="admin-tabs">
+        <button
+          className={`admin-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => handleTabChange('dashboard')}
+>>>>>>> origin/duong
         >
-          Hàng Đợi eKYC Căn Cước ({ekycQueue.length})
+          Dashboard Tổng Quan
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+          onClick={() => handleTabChange('users')}
+        >
+          Quản Lý Người Dùng
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'rbac' ? 'active' : ''}`}
+          onClick={() => handleTabChange('rbac')}
+        >
+          Phân Quyền & Vai Trò
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'revenue' ? 'active' : ''}`}
+          onClick={() => handleTabChange('revenue')}
+        >
+          Doanh Thu Gói VNPay
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
+          onClick={() => handleTabChange('ekyc')}
+        >
+          Hàng Đợi eKYC ({ekycQueue.length})
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
+          onClick={() => handleTabChange('config')}
+        >
+          Cấu Hình Hệ Thống
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'skills' ? 'active' : ''}`}
@@ -194,10 +267,29 @@ const AdminPage = () => {
         </button>
       </div>
 
+<<<<<<< HEAD
       {/* Content */}
       {activeTab === 'dashboard' && <AdminDashboardView onNavigateTab={setActiveTab} />}
+=======
+      {/* Tab: Dashboard (W-38) */}
+      {activeTab === 'dashboard' && <AdminDashboard />}
+
+      {/* Tab: User Management (W-39) */}
+      {activeTab === 'users' && <UserManagement />}
+
+      {/* Tab: RBAC Roles & Permissions (W-40) */}
+      {activeTab === 'rbac' && <RbacManagement />}
+
+      {/* Tab: Revenue Dashboard (W-34) */}
+      {activeTab === 'revenue' && <RevenueDashboard />}
+
+      {/* Tab: System Configuration (W-41) */}
+      {activeTab === 'config' && <SystemConfig />}
+
+      {/* Tab: eKYC Queue (giữ nguyên) */}
+>>>>>>> origin/duong
       {activeTab === 'ekyc' && (
-        <div className="admin-card-list">
+        <div className="admin-card-list" style={{ marginTop: '1.5rem' }}>
           {loading ? (
             <div style={{ padding: '1rem 0' }}>
               <div className="skeleton" style={{ height: '320px', borderRadius: '14px', marginBottom: '1rem' }} />

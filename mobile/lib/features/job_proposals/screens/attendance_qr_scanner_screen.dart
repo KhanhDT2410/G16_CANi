@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 
-class AttendanceQrScannerScreen extends StatefulWidget {
+class AttendanceQrScannerScreen extends ConsumerStatefulWidget {
   final ShiftAssignmentItem assignment;
   final bool isCheckin; // true: Check-in, false: Check-out
 
@@ -16,10 +17,10 @@ class AttendanceQrScannerScreen extends StatefulWidget {
   });
 
   @override
-  State<AttendanceQrScannerScreen> createState() => _AttendanceQrScannerScreenState();
+  ConsumerState<AttendanceQrScannerScreen> createState() => _AttendanceQrScannerScreenState();
 }
 
-class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
+class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerScreen> {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: const [BarcodeFormat.qrCode],
@@ -27,7 +28,6 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
 
   bool _isProcessing = false;
   bool _isFlashOn = false;
-  final ProposalRepository _repo = ProposalRepository();
 
   @override
   void dispose() {
@@ -69,16 +69,17 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
       }
 
       // 3. Gửi API đối soát điểm danh
+      final repo = ref.read(proposalRepositoryProvider);
       AttendanceCheckResult result;
       if (widget.isCheckin) {
-        result = await _repo.checkin(
+        result = await repo.checkin(
           assignmentId: widget.assignment.assignmentId,
           qrContent: rawValue.trim(),
           lat: lat,
           lng: lng,
         );
       } else {
-        result = await _repo.checkout(
+        result = await repo.checkout(
           assignmentId: widget.assignment.assignmentId,
           qrContent: rawValue.trim(),
           lat: lat,

@@ -62,7 +62,7 @@ class _TermsOfServiceDialogState extends State<TermsOfServiceDialog> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.12),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.gavel_rounded, color: theme.colorScheme.primary, size: 28),

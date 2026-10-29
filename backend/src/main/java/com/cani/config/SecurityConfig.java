@@ -46,7 +46,9 @@ public class SecurityConfig {
                     "/api/v1/workers/skills/taxonomy",
                     "/api/v1/workers/skills/tiers/config",
                     "/api/v1/workers/ekyc/**",
-                    "/api/v1/eo/ekyc/**"
+                    "/api/v1/eo/ekyc/**",
+                    "/api/v1/devices/**",
+                    "/api/v1/notifications/**"
                 ).permitAll()
                 .requestMatchers("/api/v1/workers/skills/admin/**").hasRole("ADMIN")
                 // Module tranh chấp (UC-99/100/102/109): Customer Care cùng quyền với Admin

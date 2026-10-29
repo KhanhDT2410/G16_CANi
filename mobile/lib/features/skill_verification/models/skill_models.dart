@@ -224,4 +224,18 @@ class WorkerSkillItem {
         return 'Cơ bản';
     }
   }
+
+  String get proficiencyLabelEn {
+    switch (proficiency.toUpperCase()) {
+      case 'EXPERT':
+        return 'Expert';
+      case 'ADVANCED':
+        return 'Advanced';
+      case 'INTERMEDIATE':
+        return 'Intermediate';
+      case 'BEGINNER':
+      default:
+        return 'Beginner';
+    }
+  }
 }

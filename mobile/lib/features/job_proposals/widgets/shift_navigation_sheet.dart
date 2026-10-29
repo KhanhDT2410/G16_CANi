@@ -127,7 +127,6 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final a = widget.assignment;
     final destLat = a.venueLat ?? 10.7769;
     final destLng = a.venueLng ?? 106.7009;

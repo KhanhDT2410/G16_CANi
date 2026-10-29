@@ -33,9 +33,15 @@ migrate_working_dir/
 /build/
 /coverage/
 /windows/flutter/ephemeral/
-/linux/flutter/ephemeral/
-/macos/Flutter/ephemeral/
-/ios/Flutter/ephemeral/
+/linux/
+/macos/
+/ios/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/linux/flutter/generated_plugin_registrant.*
+**/linux/flutter/generated_plugins.cmake
+**/macos/Flutter/GeneratedPluginRegistrant.swift
 
 # Symbolication related
 app.*.symbols

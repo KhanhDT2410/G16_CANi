@@ -9,7 +9,7 @@ APP_BASE_NAME="$(basename "$0")"
 APP_HOME="$(cd "$(dirname "$0")" && pwd)"
 
 # Add default JVM options
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS='"-Xmx2048m" "-Xms512m"'
 
 # Build the classpath
 CLASSPATH="$APP_HOME/.mvn/wrapper/maven-wrapper.jar"
@@ -41,6 +41,6 @@ elif [ -x "C:/Program Files (x86)/Java/jdk-21.0.2/bin/java.exe" ]; then
 fi
 
 # Execute Maven
-exec "$JAVACMD" $DEFAULT_JVM_OPTS \
+exec "$JAVACMD" $DEFAULT_JVM_OPTS $MAVEN_OPTS \
     -classpath "$CLASSPATH" \
     org.apache.maven.wrapper.MavenWrapperMain "$@"

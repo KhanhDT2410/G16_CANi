@@ -98,6 +98,14 @@ class EkycNotifier extends StateNotifier<EkycState> {
 
   EkycNotifier(this._repository, this._ref) : super(const EkycState()) {
     checkStatus();
+    _ref.listen<AuthState>(authStateProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id) {
+        resetForm();
+        if (next.isAuthenticated) {
+          checkStatus();
+        }
+      }
+    });
   }
 
   Future<void> checkStatus() async {

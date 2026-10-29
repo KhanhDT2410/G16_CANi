@@ -59,9 +59,7 @@ class EkycStatusHeader extends StatelessWidget {
                 Text(
                   isApproved
                       ? 'ĐÃ ĐỊNH DANH eKYC (TÍCH XANH)'
-                      : (isPending
-                          ? 'ĐANG CHỜ THẨM ĐỊNH'
-                          : 'CHƯA ĐỊNH DANH eKYC'),
+                      : 'CHƯA ĐỊNH DANH eKYC',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -71,10 +69,8 @@ class EkycStatusHeader extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   isApproved
-                      ? 'Tài khoản của bạn đã được đối soát CCCD hợp lệ. Bạn được ưu tiên nhận việc.'
-                      : (isPending
-                          ? 'Hồ sơ đang được hệ thống thẩm định.'
-                          : 'Vui lòng hoàn thành 3 bước bên dưới để xác thực danh tính.'),
+                      ? 'Tài khoản của bạn đã được đối soát CCCD hợp lệ và tự động phê duyệt ngay. Bạn được ưu tiên nhận việc.'
+                      : 'Vui lòng hoàn thành 3 bước bên dưới để hệ thống tự động xác thực và cấp tích xanh ngay.',
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant,

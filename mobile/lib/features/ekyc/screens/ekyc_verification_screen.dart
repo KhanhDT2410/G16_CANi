@@ -30,6 +30,16 @@ class EkycVerificationScreen extends ConsumerStatefulWidget {
 
 class _EkycVerificationScreenState
     extends ConsumerState<EkycVerificationScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isOnboarding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(ekycProvider.notifier).resetForm();
+      });
+    }
+  }
+
   Future<void> _pickImage(Function(Uint8List, String) onPicked) async {
     try {
       final result = await FilePickerPlatform.instance.pickFiles(
@@ -303,7 +313,7 @@ class _EkycVerificationScreenState
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                                'Đã gửi hồ sơ eKYC thẩm định thành công!'),
+                                'Định danh eKYC thành công! Tài khoản đã được cấp tích xanh tự động.'),
                             backgroundColor: Colors.green,
                           ),
                         );

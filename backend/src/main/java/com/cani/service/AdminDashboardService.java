@@ -155,6 +155,12 @@ public class AdminDashboardService {
             case "REJECT_SKILL_VERIFICATION" -> "Từ chối chứng chỉ kỹ năng";
             case "REJECT_WORKER_EKYC" -> "Từ chối hồ sơ eKYC Worker";
             case "REJECT_EO_EKYC" -> "Từ chối hồ sơ eKYC Doanh nghiệp";
+            case "SUBMIT_DISPUTE" -> "Nộp mới tranh chấp";
+            case "ADD_DISPUTE_EVIDENCE" -> "Bổ sung bằng chứng tranh chấp";
+            case "ASSIGN_DISPUTE" -> "Phân công tranh chấp cho Customer Care";
+            case "ISSUE_DISPUTE_DECISION" -> "CC ra quyết định xử lý tranh chấp";
+            case "ESCALATE_DISPUTE" -> "Kháng nghị quyết định tranh chấp lên Admin";
+            case "DISPUTE_FINAL_DECISION" -> "Admin quyết định cuối tranh chấp";
             default -> {
                 if (action.contains("USER")) yield "Quản trị người dùng";
                 if (action.contains("EKYC")) yield "Xử lý hồ sơ eKYC";

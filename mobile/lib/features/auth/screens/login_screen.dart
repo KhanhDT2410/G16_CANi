@@ -5,7 +5,6 @@ import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/auth/screens/forgot_password_screen.dart';
 import 'package:cani/features/auth/screens/register_screen.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
-import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
 import 'package:cani/shared/widgets/worker_illustration_card.dart';
 
@@ -247,13 +246,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             if (success) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Đăng nhập Google thành công! Bắt đầu định danh CCCD.'),
+                                  content: Text('Đăng nhập Google thành công!'),
                                   backgroundColor: Color(0xFF10B981),
-                                ),
-                              );
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const EkycVerificationScreen(isOnboarding: true),
                                 ),
                               );
                             }

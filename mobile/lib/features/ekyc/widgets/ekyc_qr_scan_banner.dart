@@ -115,3 +115,4 @@ class EkycQrScanBanner extends StatelessWidget {
     );
   }
 }
+

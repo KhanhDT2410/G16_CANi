@@ -32,6 +32,21 @@ class AuthApi {
     );
   }
 
+  Future<void> confirmResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _dio.post<void>(
+      '/auth/confirm-reset-password',
+      data: {
+        'email': email,
+        'otp': otp,
+        'newPassword': newPassword,
+      },
+    );
+  }
+
   Future<LoginResponseModel> syncGoogleAuth(
     String supabaseAccessToken, [
     String targetRole = 'WORKER',

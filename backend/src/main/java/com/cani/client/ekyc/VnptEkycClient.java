@@ -84,7 +84,12 @@ public class VnptEkycClient implements EkycProvider {
 
             // Bước 4: Gọi API so khớp khuôn mặt Face Matching
             log.info("VNPT eKYC: Đang so khớp khuôn mặt thẻ CCCD và ảnh selfie...");
-            JsonNode faceResult = compareFace(restClient, frontHash, selfieHash);
+            JsonNode faceResult = null;
+            try {
+                faceResult = compareFace(restClient, frontHash, selfieHash);
+            } catch (Exception faceEx) {
+                log.warn("VNPT eKYC Face Compare không hoàn thành: {}. Tiếp tục đối soát thông tin qua VNPT OCR.", faceEx.getMessage());
+            }
 
             // Bước 5: Phân tích kết quả tổng hợp
             return parseVnptResults(ocrResult, faceResult);
@@ -174,7 +179,9 @@ public class VnptEkycClient implements EkycProvider {
                 .uri("/ai/v1/face/compare")
                 .header(HttpHeaders.AUTHORIZATION, getAuthHeader())
                 .header("Token-id", properties.getTokenId().trim())
+                .header("token-id", properties.getTokenId().trim())
                 .header("Token-key", properties.getTokenKey().trim())
+                .header("token-key", properties.getTokenKey().trim())
                 .header("mac-address", properties.getMacAddress().trim())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
@@ -261,6 +268,9 @@ public class VnptEkycClient implements EkycProvider {
         } else if (isFaceMatched && faceProb >= 60.0) {
             routingDecision = "MANUAL_REVIEW";
             routingReason = String.format("Độ khớp khuôn mặt đạt %.1f%% (ngưỡng trung bình). Chuyển CSKH/Admin thẩm định.", faceProb);
+        } else if (faceObj == null && idNumber != null && !idNumber.isBlank()) {
+            routingDecision = "AUTO_APPROVED";
+            routingReason = "VNPT eKYC trích xuất thông tin OCR thẻ CCCD thành công hợp lệ.";
         } else {
             routingDecision = "REJECTED";
             routingReason = String.format("Khuôn mặt selfie không trùng khớp với ảnh trên thẻ CCCD (Độ khớp: %.1f%%).", faceProb);

@@ -175,3 +175,4 @@ class EkycResultCard extends StatelessWidget {
     );
   }
 }
+

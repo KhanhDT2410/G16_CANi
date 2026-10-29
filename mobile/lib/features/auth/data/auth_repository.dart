@@ -69,6 +69,40 @@ class AuthRepository {
     }
   }
 
+  Future<void> sendResetPasswordOtp(String email) async {
+    try {
+      await _api.sendOtp(email, 'RESET_PASSWORD');
+    } on DioException catch (e) {
+      final message = (e.response?.data is Map)
+          ? (e.response?.data as Map)['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Không thể gửi mã OTP đặt lại mật khẩu. Vui lòng kiểm tra lại email.');
+    } catch (e) {
+      throw Exception('Lỗi gửi OTP: ${e.toString()}');
+    }
+  }
+
+  Future<void> confirmResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      await _api.confirmResetPassword(
+        email: email,
+        otp: otp,
+        newPassword: newPassword,
+      );
+    } on DioException catch (e) {
+      final message = (e.response?.data is Map)
+          ? (e.response?.data as Map)['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.');
+    } catch (e) {
+      throw Exception('Lỗi đặt lại mật khẩu: ${e.toString()}');
+    }
+  }
+
   Future<UserDto> registerWorker({
     required String email,
     required String password,

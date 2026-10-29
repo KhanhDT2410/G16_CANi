@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 @Slf4j
@@ -155,6 +156,29 @@ public class SupabaseAuthClient {
         } catch (HttpClientErrorException e) {
             log.error("Làm mới token thất bại: {}", e.getResponseBodyAsString());
             throw new BadRequestException("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+        }
+    }
+
+    /**
+     * Cập nhật mật khẩu user qua GoTrue Admin API (sử dụng service_role key).
+     */
+    public void updateUserPassword(UUID userId, String newPassword) {
+        try {
+            Map<String, Object> body = Map.of(
+                    "password", newPassword
+            );
+
+            restClient.put()
+                    .uri("/auth/v1/admin/users/{userId}", userId)
+                    .header("apikey", properties.getServiceRoleKey())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getServiceRoleKey())
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Đã cập nhật mật khẩu mới thành công qua GoTrue Admin cho user: {}", userId);
+        } catch (HttpClientErrorException e) {
+            log.error("Lỗi khi cập nhật mật khẩu qua GoTrue Admin API: {}", e.getResponseBodyAsString());
+            throw new BadRequestException("Không thể cập nhật mật khẩu mới: " + e.getResponseBodyAsString());
         }
     }
 }

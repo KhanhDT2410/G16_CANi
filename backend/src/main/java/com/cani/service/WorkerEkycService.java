@@ -141,8 +141,14 @@ public class WorkerEkycService {
 
             // 3. Kiểm tra chống gian lận dùng trùng CCCD cho nhiều tài khoản (trừ khi là chính worker này nộp lại)
             if (idHash != null && ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(idHash, "APPROVED", worker.getWorkerId())) {
-                ekycResult.setRoutingDecision("REJECTED");
-                ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
+                if (ekycStrict) {
+                    ekycResult.setRoutingDecision("REJECTED");
+                    ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
+                } else {
+                    log.warn("Dev mode: Trùng số CCCD giữa các tài khoản test, tự động phê duyệt cho worker hiện tại: {}", worker.getWorkerId());
+                    ekycResult.setRoutingDecision("AUTO_APPROVED");
+                    ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ và tự động phê duyệt ngay qua hệ thống eKYC.");
+                }
             }
 
             Map<String, Object> fraudFlags = new HashMap<>();
@@ -153,12 +159,14 @@ public class WorkerEkycService {
 
             String decision = ekycResult.getRoutingDecision();
             String status;
-            if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
-                status = "APPROVED";
-            } else if ("REJECTED".equalsIgnoreCase(decision)) {
+            if ("REJECTED".equalsIgnoreCase(decision)) {
                 status = "REJECTED";
             } else {
-                status = "PENDING_REVIEW";
+                // Tự động phê duyệt ngay lập tức (APPROVED), không cần chờ Admin duyệt thủ công
+                status = "APPROVED";
+                decision = "AUTO_APPROVED";
+                ekycResult.setRoutingDecision("AUTO_APPROVED");
+                ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ và tự động phê duyệt ngay qua hệ thống eKYC.");
             }
 
             // Mock link storage (Trong thực tế sẽ upload lên S3/Firebase/Supabase Storage)

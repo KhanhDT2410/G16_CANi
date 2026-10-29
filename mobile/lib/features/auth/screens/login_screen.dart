@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/screens/forgot_password_screen.dart';
 import 'package:cani/features/auth/screens/register_screen.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
+import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
 import 'package:cani/shared/widgets/worker_illustration_card.dart';
 
@@ -133,7 +135,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 4),
+
+                  // Quên mật khẩu link
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ForgotPasswordScreen(
+                              initialEmail: _emailController.text.trim(),
+                            ),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text(
+                        'Quên mật khẩu?',
+                        style: TextStyle(
+                          color: Color(0xFF0077FF),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
                   // 5. Nút Đăng Nhập Gradient (Ocean Cyan-Blue) kèm icon Mũi tên ->
                   Container(
@@ -216,8 +247,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             if (success) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Đăng nhập Google thành công!'),
+                                  content: Text('Đăng nhập Google thành công! Bắt đầu định danh CCCD.'),
                                   backgroundColor: Color(0xFF10B981),
+                                ),
+                              );
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const EkycVerificationScreen(isOnboarding: true),
                                 ),
                               );
                             }

@@ -14,6 +14,7 @@ class AuthTextField extends StatelessWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.validator,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -24,6 +25,7 @@ class AuthTextField extends StatelessWidget {
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +48,7 @@ class AuthTextField extends StatelessWidget {
           keyboardType: keyboardType,
           obscureText: obscureText,
           validator: validator,
+          onChanged: onChanged,
           // Chữ người dùng nhập vào - Luôn là màu Đen sắc nét (#0F172A)
           style: const TextStyle(
             fontSize: 15,

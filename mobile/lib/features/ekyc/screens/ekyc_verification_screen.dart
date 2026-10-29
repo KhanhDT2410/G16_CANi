@@ -187,7 +187,7 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
     final state = ref.watch(ekycProvider);
     final notifier = ref.read(ekycProvider.notifier);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
         title: const Text('Định Danh Điện Tử (eKYC)'),
         elevation: 0,
@@ -349,6 +349,20 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
         ),
       ),
     );
+
+    if (widget.isOnboarding) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) {
+            _navigateToHome();
+          }
+        },
+        child: scaffold,
+      );
+    }
+
+    return scaffold;
   }
 
   Widget _buildStatusHeader(BuildContext context, EkycVerificationItem? item) {

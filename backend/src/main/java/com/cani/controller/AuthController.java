@@ -67,6 +67,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã gửi hướng dẫn khôi phục mật khẩu qua email"));
     }
 
+    @PostMapping("/confirm-reset-password")
+    public ResponseEntity<ApiResponse<Void>> confirmResetPassword(@Valid @RequestBody ConfirmResetPasswordRequest request) {
+        authService.confirmResetPassword(request);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đặt lại mật khẩu thành công! Vui lòng đăng nhập với mật khẩu mới."));
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
         LoginResponse response = authService.refreshToken(request);

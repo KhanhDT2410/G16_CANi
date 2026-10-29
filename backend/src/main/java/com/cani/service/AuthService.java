@@ -271,6 +271,22 @@ public class AuthService {
     }
 
     @Transactional
+    public void confirmResetPassword(ConfirmResetPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+
+        // 1. Xác thực OTP loại RESET_PASSWORD
+        emailOtpService.verifyOtp(email, request.getOtp(), "RESET_PASSWORD");
+
+        // 2. Tìm User trong cơ sở dữ liệu
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy tài khoản với email: " + email));
+
+        // 3. Cập nhật mật khẩu trong Supabase qua GoTrue Admin API
+        supabaseAuthClient.updateUserPassword(user.getUserId(), request.getNewPassword());
+        log.info("Khôi phục mật khẩu thành công cho email: {}", email);
+    }
+
+    @Transactional
     public LoginResponse refreshToken(RefreshTokenRequest request) {
         SupabaseSession session = supabaseAuthClient.refreshToken(request.getRefreshToken());
         UUID userId = session.getUser().getId();

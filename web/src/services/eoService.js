@@ -7,39 +7,42 @@ export const eoService = {
       const response = await apiClient.get('/v1/eo/events');
       return response.data?.data || [];
     } catch (error) {
-      console.warn('Lỗi getMyEvents, sử dụng dữ liệu mẫu:', error);
-      return [
-        {
-          eventId: 'evt-01',
-          name: 'Triển lãm Công nghệ Quốc tế TechExpo 2026',
-          description: 'Sự kiện công nghệ quy mô 5.000 khách tại SECC',
-          venueAddress: '799 Nguyễn Văn Linh, Quận 7, TP.HCM',
-          venueLat: 10.7328,
-          venueLng: 106.7214,
-          eventDate: '2026-11-15T08:00:00Z',
-          mode: 'MATCHING',
-          status: 'ACTIVE',
-          totalShifts: 3,
-          totalRequiredWorkers: 15,
-          totalConfirmedWorkers: 11,
-          totalEstimatedCost: 18500000,
-        },
-        {
-          eventId: 'evt-02',
-          name: 'Đêm Nhạc Hội Tri Ân Khách Hàng',
-          description: 'Gala Dinner tại Gem Center',
-          venueAddress: '8 Nguyễn Bỉnh Khiêm, Đa Kao, Quận 1, TP.HCM',
-          venueLat: 10.7877,
-          venueLng: 106.7003,
-          eventDate: '2026-11-20T17:00:00Z',
-          mode: 'MATCHING',
-          status: 'DRAFT',
-          totalShifts: 2,
-          totalRequiredWorkers: 8,
-          totalConfirmedWorkers: 0,
-          totalEstimatedCost: 9600000,
-        },
-      ];
+      if (import.meta.env.VITE_DEMO === 'true') {
+        console.warn('Lỗi getMyEvents, sử dụng dữ liệu mẫu demo:', error);
+        return [
+          {
+            eventId: 'evt-01',
+            name: 'Triển lãm Công nghệ Quốc tế TechExpo 2026',
+            description: 'Sự kiện công nghệ quy mô 5.000 khách tại SECC',
+            venueAddress: '799 Nguyễn Văn Linh, Quận 7, TP.HCM',
+            venueLat: 10.7328,
+            venueLng: 106.7214,
+            eventDate: '2026-11-15T08:00:00Z',
+            mode: 'MATCHING',
+            status: 'ACTIVE',
+            totalShifts: 3,
+            totalRequiredWorkers: 15,
+            totalConfirmedWorkers: 11,
+            totalEstimatedCost: 18500000,
+          },
+          {
+            eventId: 'evt-02',
+            name: 'Đêm Nhạc Hội Tri Ân Khách Hàng',
+            description: 'Gala Dinner tại Gem Center',
+            venueAddress: '8 Nguyễn Bỉnh Khiêm, Đa Kao, Quận 1, TP.HCM',
+            venueLat: 10.7877,
+            venueLng: 106.7003,
+            eventDate: '2026-11-20T17:00:00Z',
+            mode: 'MATCHING',
+            status: 'DRAFT',
+            totalShifts: 2,
+            totalRequiredWorkers: 8,
+            totalConfirmedWorkers: 0,
+            totalEstimatedCost: 9600000,
+          },
+        ];
+      }
+      throw error;
     }
   },
 
@@ -113,6 +116,54 @@ export const eoService = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data?.data;
+  },
+
+  // UC-11: Cập nhật thông tin sự kiện
+  updateEvent: async (eventId, eventData) => {
+    const response = await apiClient.put(`/v1/eo/events/${eventId}`, eventData);
+    return response.data?.data;
+  },
+
+  // UC-12: Hủy sự kiện
+  cancelEvent: async (eventId, reason) => {
+    const response = await apiClient.post(`/v1/eo/events/${eventId}/cancel`, { reason });
+    return response.data?.data;
+  },
+
+  // UC-18: Cập nhật ca làm việc
+  updateShift: async (shiftId, shiftData) => {
+    const response = await apiClient.put(`/v1/eo/events/shifts/${shiftId}`, shiftData);
+    return response.data?.data;
+  },
+
+  // UC-19: Hủy ca làm việc
+  cancelShift: async (shiftId, reason) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/cancel`, { reason });
+    return response.data?.data;
+  },
+
+  // UC-52: Lấy mã QR điểm danh của ca (Check-in & Check-out)
+  getShiftQr: async (shiftId) => {
+    const response = await apiClient.get(`/v1/eo/events/shifts/${shiftId}/qr`);
+    return response.data?.data;
+  },
+
+  // UC-48: Lấy danh sách điểm danh và tiến độ ca (Live Attendance)
+  getShiftAttendance: async (shiftId) => {
+    const response = await apiClient.get(`/v1/eo/events/shifts/${shiftId}/attendance`);
+    return response.data?.data || [];
+  },
+
+  // UC-49: EO xác nhận hoàn thành ca & duyệt công cho Worker
+  verifyAttendance: async (assignmentId) => {
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/verify`);
+    return response.data?.data;
+  },
+
+  // UC-69: EO đánh giá Worker sau ca làm việc
+  rateWorker: async (assignmentId, reviewData) => {
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/reviews`, reviewData);
     return response.data?.data;
   },
 };

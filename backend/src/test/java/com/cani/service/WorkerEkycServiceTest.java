@@ -18,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -87,7 +88,7 @@ class WorkerEkycServiceTest {
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
-        when(ekycVerificationRepository.existsByCccdNumberHashAndStatus(any(), eq("APPROVED"))).thenReturn(false);
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
             v.setId(UUID.randomUUID());
@@ -118,7 +119,7 @@ class WorkerEkycServiceTest {
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
-        when(ekycVerificationRepository.existsByCccdNumberHashAndStatus(any(), eq("APPROVED"))).thenReturn(false);
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
             v.setId(UUID.randomUUID());
@@ -145,7 +146,7 @@ class WorkerEkycServiceTest {
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
-        when(ekycVerificationRepository.existsByCccdNumberHashAndStatus(any(), eq("APPROVED"))).thenReturn(true);
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(true);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
             v.setId(UUID.randomUUID());
@@ -157,6 +158,36 @@ class WorkerEkycServiceTest {
         assertThat(result.getStatus()).isEqualTo("REJECTED");
         assertThat(result.getRoutingReason()).contains("liên kết với một tài khoản Worker khác");
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("Chuyển sang MANUAL_REVIEW khi chạy MOCK_EKYC nhưng bật cờ EKYC_STRICT=true")
+    void shouldRouteToManualReviewWhenMockProviderAndStrictModeEnabled() {
+        ReflectionTestUtils.setField(workerEkycService, "ekycStrict", true);
+
+        EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
+                .idNumber("079201012345")
+                .ocrConfidence(0.95)
+                .faceMatchScore(93.5)
+                .routingDecision("AUTO_APPROVED")
+                .build();
+
+        when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
+        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
+        when(ekycProvider.getProviderName()).thenReturn("MOCK_EKYC");
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(false);
+        when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
+            WorkerEkycVerification v = i.getArgument(0);
+            v.setId(UUID.randomUUID());
+            return v;
+        });
+
+        EkycVerificationResultDto result = workerEkycService.submitEkyc(workerUser.getUserId(), frontFile, backFile, selfieFile);
+
+        assertThat(result.getStatus()).isEqualTo("PENDING_REVIEW");
+        assertThat(result.getRoutingDecision()).isEqualTo("MANUAL_REVIEW");
+        assertThat(result.getRoutingReason()).contains("EKYC_STRICT=true");
+        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.PENDING);
     }
 
     @Test

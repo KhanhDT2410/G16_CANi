@@ -85,11 +85,12 @@ cani:
       timeout-ms: 20000
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
+    strict: ${EKYC_STRICT:false}
     vnpt:
       enabled: ${VNPT_EKYC_ENABLED:false}
       base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}
-      token-id: ${VNPT_EKYC_TOKEN_ID:5e7a3b1b-db74-1656-e063-63199f0a717f}
-      token-key: ${VNPT_EKYC_TOKEN_KEY:MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAlvv9EToVRDb3ZS58HaSGBNDHN9GLm9lROWE4CxyRMHib2K1XCmSS6suua/4coDMvthnv8zKmUy25BiplQtd6MMCAwEAAQ==}
+      token-id: ${VNPT_EKYC_TOKEN_ID:}
+      token-key: ${VNPT_EKYC_TOKEN_KEY:}
       access-token: ${VNPT_EKYC_ACCESS_TOKEN:}
       mac-address: ${VNPT_EKYC_MAC_ADDRESS:TEST1}
       timeout-ms: 25000

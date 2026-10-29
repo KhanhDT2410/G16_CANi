@@ -166,4 +166,42 @@ class VnptEkycClientTest {
         assertThat(result.getRoutingDecision()).isEqualTo("REJECTED");
         assertThat(result.getRoutingReason()).contains("Khuôn mặt selfie không trùng khớp");
     }
+
+    @Test
+    @DisplayName("Từ chối REJECTED khi thẻ CCCD đã hết hạn sử dụng (valid_date trước ngày hiện tại)")
+    void shouldRejectWhenCccdIsExpired() throws Exception {
+        String ocrJson = """
+                {
+                    "message": "IDG-00000000",
+                    "object": {
+                        "id": "079201012345",
+                        "name": "NGUYỄN VĂN CŨ",
+                        "valid_date": "01/01/2020",
+                        "tampering": {
+                            "is_legal": "yes"
+                        },
+                        "id_fake_warning": "no"
+                    }
+                }
+                """;
+
+        String faceJson = """
+                {
+                    "message": "IDG-00000000",
+                    "object": {
+                        "msg": "MATCH",
+                        "prob": 95.0
+                    }
+                }
+                """;
+
+        JsonNode ocrNode = objectMapper.readTree(ocrJson);
+        JsonNode faceNode = objectMapper.readTree(faceJson);
+
+        EkycIdentityResultDto result = vnptEkycClient.parseVnptResults(ocrNode, faceNode);
+
+        assertThat(result.isExpired()).isTrue();
+        assertThat(result.getRoutingDecision()).isEqualTo("REJECTED");
+        assertThat(result.getRoutingReason()).contains("hết hạn sử dụng");
+    }
 }

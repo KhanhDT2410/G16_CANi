@@ -44,14 +44,16 @@ public class SecurityConfig {
                     "/actuator/health",
                     "/api/auth/**",
                     "/api/v1/workers/skills/taxonomy",
-                    "/api/v1/workers/skills/tiers/config",
+                    "/api/v1/workers/skills/tiers/config"
+                ).permitAll()
+                .requestMatchers("/api/v1/workers/skills/admin/**").hasRole("ADMIN")
+                .requestMatchers(
+                    "/api/v1/workers/skills/**",
                     "/api/v1/workers/ekyc/**",
                     "/api/v1/eo/ekyc/**",
                     "/api/v1/devices/**",
                     "/api/v1/notifications/**"
-                ).permitAll()
-                .requestMatchers("/api/v1/workers/skills/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/v1/workers/skills/**").authenticated()
+                ).authenticated()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2

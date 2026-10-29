@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
+import RequireRole from './features/auth/components/RequireRole';
 
 const EOPage = lazy(() => import('./pages/eo/EOPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
@@ -38,12 +39,33 @@ function App() {
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/eo" replace />} />
-            <Route path="eo" element={<EOPage />} />
+            <Route
+              path="eo"
+              element={
+                <RequireRole allowedRoles={['EVENT_ORGANIZER', 'ADMIN']}>
+                  <EOPage />
+                </RequireRole>
+              }
+            />
             {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về EO nếu truy cập trên Web */}
             <Route path="worker" element={<Navigate to="/eo" replace />} />
             <Route path="mobile-preview" element={<MobileShowcasePage />} />
-            <Route path="customer-care" element={<CustomerCarePage />} />
-            <Route path="admin" element={<AdminPage />} />
+            <Route
+              path="customer-care"
+              element={
+                <RequireRole allowedRoles={['CUSTOMER_CARE', 'ADMIN']}>
+                  <CustomerCarePage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="admin"
+              element={
+                <RequireRole allowedRoles={['ADMIN']}>
+                  <AdminPage />
+                </RequireRole>
+              }
+            />
             {/* Fallback route cho duong dan cu /cskh */}
             <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
           </Route>

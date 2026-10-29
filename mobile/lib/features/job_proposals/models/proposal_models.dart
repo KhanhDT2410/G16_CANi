@@ -159,3 +159,180 @@ class AttendanceCheckResult {
     );
   }
 }
+
+class WorkerAvailabilitySlot {
+  final int dayOfWeek; // 0: CN, 1: T2, ..., 6: T7
+  final String startTime; // "08:00"
+  final String endTime; // "17:00"
+  final bool isAvailable;
+
+  const WorkerAvailabilitySlot({
+    required this.dayOfWeek,
+    required this.startTime,
+    required this.endTime,
+    this.isAvailable = true,
+  });
+
+  factory WorkerAvailabilitySlot.fromJson(Map<String, dynamic> json) {
+    String normalizeTime(String? raw, String fallback) {
+      if (raw == null || raw.isEmpty) return fallback;
+      final parts = raw.split(':');
+      if (parts.length >= 2) {
+        return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+      }
+      return raw;
+    }
+
+    return WorkerAvailabilitySlot(
+      dayOfWeek: (json['dayOfWeek'] is num) ? (json['dayOfWeek'] as num).toInt() : 1,
+      startTime: normalizeTime(json['startTime']?.toString(), '08:00'),
+      endTime: normalizeTime(json['endTime']?.toString(), '17:00'),
+      isAvailable: json['isAvailable'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'dayOfWeek': dayOfWeek,
+        'startTime': startTime.length == 5 ? '$startTime:00' : startTime,
+        'endTime': endTime.length == 5 ? '$endTime:00' : endTime,
+        'isAvailable': isAvailable,
+      };
+
+  WorkerAvailabilitySlot copyWith({
+    int? dayOfWeek,
+    String? startTime,
+    String? endTime,
+    bool? isAvailable,
+  }) {
+    return WorkerAvailabilitySlot(
+      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      isAvailable: isAvailable ?? this.isAvailable,
+    );
+  }
+}
+
+class WorkerPreferencesModel {
+  final String baseAddress;
+  final double? baseLat;
+  final double? baseLng;
+  final double minWage;
+  final double maxDistanceKm;
+
+  const WorkerPreferencesModel({
+    this.baseAddress = 'TP. Hồ Chí Minh',
+    this.baseLat,
+    this.baseLng,
+    this.minWage = 35000,
+    this.maxDistanceKm = 15.0,
+  });
+
+  factory WorkerPreferencesModel.fromJson(Map<String, dynamic> json) {
+    return WorkerPreferencesModel(
+      baseAddress: json['baseAddress'] ?? 'TP. Hồ Chí Minh',
+      baseLat: (json['baseLat'] is num) ? (json['baseLat'] as num).toDouble() : null,
+      baseLng: (json['baseLng'] is num) ? (json['baseLng'] as num).toDouble() : null,
+      minWage: (json['minWage'] is num) ? (json['minWage'] as num).toDouble() : 35000,
+      maxDistanceKm: (json['maxDistanceKm'] is num) ? (json['maxDistanceKm'] as num).toDouble() : 15.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'baseAddress': baseAddress,
+        if (baseLat != null) 'baseLat': baseLat,
+        if (baseLng != null) 'baseLng': baseLng,
+        'minWage': minWage,
+        'maxDistanceKm': maxDistanceKm,
+      };
+
+  WorkerPreferencesModel copyWith({
+    String? baseAddress,
+    double? baseLat,
+    double? baseLng,
+    double? minWage,
+    double? maxDistanceKm,
+  }) {
+    return WorkerPreferencesModel(
+      baseAddress: baseAddress ?? this.baseAddress,
+      baseLat: baseLat ?? this.baseLat,
+      baseLng: baseLng ?? this.baseLng,
+      minWage: minWage ?? this.minWage,
+      maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
+    );
+  }
+}
+
+class ShiftChecklistItem {
+  final String id;
+  final String title;
+  final bool isCompleted;
+  final DateTime? completedAt;
+
+  const ShiftChecklistItem({
+    required this.id,
+    required this.title,
+    this.isCompleted = false,
+    this.completedAt,
+  });
+
+  factory ShiftChecklistItem.fromJson(Map<String, dynamic> json) {
+    return ShiftChecklistItem(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? '',
+      isCompleted: json['isCompleted'] ?? false,
+      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'].toString()) : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'isCompleted': isCompleted,
+        if (completedAt != null) 'completedAt': completedAt!.toUtc().toIso8601String(),
+      };
+
+  ShiftChecklistItem copyWith({
+    String? id,
+    String? title,
+    bool? isCompleted,
+    DateTime? completedAt,
+  }) {
+    return ShiftChecklistItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      isCompleted: isCompleted ?? this.isCompleted,
+      completedAt: completedAt ?? this.completedAt,
+    );
+  }
+}
+
+class WorkerIncomeSummary {
+  final double totalEarnings;
+  final double pendingEarnings;
+  final int completedShiftsCount;
+  final double totalHoursWorked;
+  final double avgRating;
+  final int reliabilityScore;
+
+  const WorkerIncomeSummary({
+    this.totalEarnings = 0,
+    this.pendingEarnings = 0,
+    this.completedShiftsCount = 0,
+    this.totalHoursWorked = 0,
+    this.avgRating = 5.0,
+    this.reliabilityScore = 100,
+  });
+
+  factory WorkerIncomeSummary.fromJson(Map<String, dynamic> json) {
+    return WorkerIncomeSummary(
+      totalEarnings: (json['totalEarnings'] is num) ? (json['totalEarnings'] as num).toDouble() : 0,
+      pendingEarnings: (json['pendingEarnings'] is num) ? (json['pendingEarnings'] as num).toDouble() : 0,
+      completedShiftsCount: (json['completedShiftsCount'] is num) ? (json['completedShiftsCount'] as num).toInt() : 0,
+      totalHoursWorked: (json['totalHoursWorked'] is num) ? (json['totalHoursWorked'] as num).toDouble() : 0,
+      avgRating: (json['avgRating'] is num) ? (json['avgRating'] as num).toDouble() : 5.0,
+      reliabilityScore: (json['reliabilityScore'] is num) ? (json['reliabilityScore'] as num).toInt() : 100,
+    );
+  }
+}
+

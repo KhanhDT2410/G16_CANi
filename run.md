@@ -21,7 +21,11 @@ cd Code/backend
   .\mvnw.cmd spring-boot:run
   ```
 
-*Tài khoản Worker có sẵn: `worker@cani.vn` | Mật khẩu: `123456`*
+*Tài khoản demo có sẵn (Dùng chung mật khẩu: `Password123!`):*
+- **Worker (Mobile):** `worker@cani.vn` | Mật khẩu: `Password123!`
+- **Event Organizer (Web):** `eo@cani.vn` | Mật khẩu: `Password123!`
+- **Customer Care (Web):** `cskh@cani.vn` | Mật khẩu: `Password123!`
+- **Administrator (Web):** `admin@cani.vn` | Mật khẩu: `Password123!`
 
 ---
 
@@ -33,6 +37,10 @@ npm install   # Chỉ cần chạy lần đầu
 npm run dev
 ```
 Truy cập: [http://localhost:5173](http://localhost:5173)
+
+> **Lưu ý cấu hình biến môi trường (`web/.env`):**
+> - `VITE_DEMO=true`: Bật chế độ Demo Mock Data (chạy offline độc lập không cần backend).
+> - `VITE_DEMO=false` (mặc định): Gọi trực tiếp Backend REST API thực tế.
 
 ---
 

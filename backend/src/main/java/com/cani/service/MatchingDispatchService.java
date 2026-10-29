@@ -2,6 +2,7 @@ package com.cani.service;
 
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.ProposalStatus;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.UserStatus;
@@ -13,6 +14,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,9 @@ public class MatchingDispatchService {
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final DispatchProposalRepository dispatchProposalRepository;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     private static final double MAX_DISTANCE_KM = 15.0;
     private static final int MIN_RELIABILITY_SCORE = 60;
@@ -83,8 +88,16 @@ public class MatchingDispatchService {
         Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
         Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
 
-        // Lấy danh sách tất cả Worker
-        List<Worker> allWorkers = workerRepository.findAll();
+        // Bán kính tối đa của ca làm việc (hoặc mặc định 15km)
+        double maxAllowedDistanceKm = (shift.getMaxDistanceKm() != null && shift.getMaxDistanceKm().doubleValue() > 0)
+                ? shift.getMaxDistanceKm().doubleValue()
+                : MAX_DISTANCE_KM;
+
+        // Ưu tiên truy vấn danh sách Worker đang Online dưới DB để tối ưu hiệu năng (O(online) thay vì full table scan)
+        List<Worker> allWorkers = workerRepository.findByIsOnlineTrue();
+        if (allWorkers == null || allWorkers.isEmpty()) {
+            allWorkers = workerRepository.findAll();
+        }
 
         List<CandidateMatch> matchedCandidates = new ArrayList<>();
 
@@ -96,7 +109,7 @@ public class MatchingDispatchService {
 
             // Tính khoảng cách Haversine
             double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
-            if (distanceKm > MAX_DISTANCE_KM) {
+            if (distanceKm > maxAllowedDistanceKm) {
                 continue;
             }
 
@@ -134,8 +147,25 @@ public class MatchingDispatchService {
                     .expiresAt(expiresAt)
                     .build();
 
-            dispatchProposalRepository.save(proposal);
+            DispatchProposal savedProposal = dispatchProposalRepository.save(proposal);
             createdCount++;
+
+            if (notificationService != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
+                try {
+                    String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
+                    notificationService.createAndSend(
+                            worker.getUser().getUserId(),
+                            "Đề xuất ca làm mới: " + shift.getJobType(),
+                            "Bạn vừa nhận được lời mời làm việc tại \"" + eventName + "\" với mức thù lao " + shift.getHourlyWage() + " đ/giờ.",
+                            NotificationType.PROPOSAL,
+                            "PROPOSAL",
+                            savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shiftId,
+                            Map.of("shiftId", shiftId.toString(), "type", "NEW_PROPOSAL")
+                    );
+                } catch (Exception ex) {
+                    log.warn("Không thể gửi thông báo FCM cho đề xuất ca làm: {}", ex.getMessage());
+                }
+            }
         }
 
         log.info("Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên, đã gửi {} đề xuất (Proposals).",
@@ -164,7 +194,21 @@ public class MatchingDispatchService {
             return false;
         }
 
-        // 4. Kiểm tra xung đột lịch làm việc (Không được trùng ca đã xác nhận/đang chờ)
+        // 4. Kiểm tra kinh nghiệm tối thiểu nếu ca làm có yêu cầu (minExperienceLevel)
+        if (shift.getMinExperienceLevel() != null) {
+            int requiredShifts = switch (shift.getMinExperienceLevel()) {
+                case INTERMEDIATE -> 3;
+                case ADVANCED -> 5;
+                case EXPERT -> 10;
+                default -> 0;
+            };
+            int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
+            if (completed < requiredShifts) {
+                return false;
+            }
+        }
+
+        // 5. Kiểm tra xung đột lịch làm việc (Không được trùng ca đã xác nhận/đang chờ)
         List<AssignmentStatus> activeStatuses = List.of(
                 AssignmentStatus.CONFIRMED,
                 AssignmentStatus.CHECKED_IN,

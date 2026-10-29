@@ -27,7 +27,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = ref.read(authStateProvider).user;
+      if (user != null) {
+        TermsOfServiceDialog.checkAndShow(context, user.id);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Lắng nghe thay đổi trạng thái đăng nhập để hiển thị điều khoản một cách an toàn
+    ref.listen<AuthState>(authStateProvider, (previous, next) {
+      if (next.isAuthenticated && next.user != null && previous?.user?.id != next.user!.id) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            TermsOfServiceDialog.checkAndShow(context, next.user!.id);
+          }
+        });
+      }
+    });
+
     final authState = ref.watch(authStateProvider);
     final proposalsCount = ref.watch(proposalsCountProvider).asData?.value ?? 0;
 
@@ -42,12 +65,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!authState.isAuthenticated) {
       return const LoginScreen();
     }
-
-    final user = authState.user!;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      TermsOfServiceDialog.checkAndShow(context, user.id);
-    });
 
     return Scaffold(
       body: IndexedStack(
@@ -89,7 +106,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person, color: Color(0xFF0066FF)),
-            label: 'Tài khoản',
+            label: 'Hồ sơ',
           ),
         ],
       ),

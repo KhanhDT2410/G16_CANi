@@ -26,20 +26,9 @@ public class JwtConfig {
                 .jwsAlgorithm(SignatureAlgorithm.ES256)
                 .build();
 
-        return token -> {
-            if (token != null && token.startsWith("dev-token-")) {
-                Instant now = Instant.now();
-                String subject = token.substring("dev-token-".length());
-                return Jwt.withTokenValue(token)
-                        .header("alg", "none")
-                        .subject(subject)
-                        .claim("email", "worker@cani.vn")
-                        .issuedAt(now)
-                        .expiresAt(now.plusSeconds(86400 * 30))
-                        .build();
-            }
-            return nimbusDecoder.decode(token);
-        };
+        // ponytail: nhánh dev-token- cũ (auth bypass mọi profile != h2) đã bị xóa.
+        // Token dev-token-* chỉ còn được JwtDecoder của profile "h2" chấp nhận.
+        return nimbusDecoder;
     }
 
     @Bean

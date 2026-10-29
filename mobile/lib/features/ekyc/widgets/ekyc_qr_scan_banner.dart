@@ -13,15 +13,12 @@ class EkycQrScanBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+        color: const Color(0xFFF0F7FF),
         borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: const Color(0xFFDBEAFE), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -31,7 +28,7 @@ class EkycQrScanBanner extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
+                  color: const Color(0xFF0077FF),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -47,13 +44,17 @@ class EkycQrScanBanner extends StatelessWidget {
                   children: [
                     Text(
                       'Bóc Tách Thông Tin Thẻ Chuẩn 100%',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFF0B1B3D),
+                        letterSpacing: -0.2,
+                      ),
                     ),
                     SizedBox(height: 2),
                     Text(
                       'Quét QR góc thẻ hoặc tự chỉnh sửa thông tin (Không dùng AI)',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -64,15 +65,22 @@ class EkycQrScanBanner extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: FilledButton.tonalIcon(
+                child: ElevatedButton.icon(
                   onPressed: onScanQr,
-                  icon: const Icon(Icons.qr_code, size: 18),
+                  icon: const Icon(Icons.qr_code, size: 18, color: Colors.white),
                   label: const Text(
                     'Quét Mã QR CCCD',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0077FF),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 11),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -82,11 +90,19 @@ class EkycQrScanBanner extends StatelessWidget {
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: onEditInfo,
-                icon: const Icon(Icons.edit, size: 16),
-                label: const Text('Sửa Thông Tin', style: TextStyle(fontSize: 13)),
+                icon: const Icon(Icons.edit_note, size: 18, color: Color(0xFF0077FF)),
+                label: const Text(
+                  'Sửa Thông Tin',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),

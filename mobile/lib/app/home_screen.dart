@@ -7,6 +7,7 @@ import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
 import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
+import 'package:cani/features/skill_verification/widgets/skill_point_policy_dialog.dart';
 import 'package:cani/features/profile/profile.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -73,7 +74,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
+        onDestinationSelected: (index) {
+          setState(() => _currentIndex = index);
+          if (index == 2) {
+            final user = ref.read(authStateProvider).user;
+            if (user != null) {
+              SkillPointPolicyDialog.checkAndShow(context, user.id);
+            }
+          }
+        },
         indicatorColor: const Color(0x260066FF),
         backgroundColor: Colors.white,
         elevation: 8,

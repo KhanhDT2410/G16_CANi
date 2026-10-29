@@ -6,8 +6,11 @@ import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/auth/widgets/auth_error_banner.dart';
 import 'package:cani/features/auth/widgets/otp_pin_input_row.dart';
 import 'package:cani/features/auth/widgets/otp_resend_countdown.dart';
+import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
+import 'package:cani/shared/widgets/app_back_button.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
+import 'package:cani/shared/widgets/registration_stepper.dart';
 
 /// VerifyEmailScreen - Màn hình Xác thực mã OTP qua Email riêng biệt (UC-01)
 class VerifyEmailScreen extends ConsumerStatefulWidget {
@@ -112,6 +115,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     if (!mounted) return;
 
     if (loggedIn) {
+      final user = ref.read(authStateProvider).user;
+      if (user != null) {
+        await TermsOfServiceDialog.markAccepted(user.id);
+      }
+      if (!mounted) return;
       _showToast('Xác thực email thành công! Bắt đầu định danh CCCD.', isError: false);
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
@@ -148,10 +156,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildTopNavigation(context),
-              const SizedBox(height: 12),
+              _buildTopHeader(context),
+              const SizedBox(height: 10),
+              const RegistrationStepper(currentStep: 2),
+              const SizedBox(height: 16),
               _buildBrandHeader(screenWidth),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               _buildEmailBadge(),
               const SizedBox(height: 24),
               if (authState.errorMessage != null) ...[
@@ -178,61 +188,39 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     );
   }
 
-  Widget _buildTopNavigation(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: InkWell(
-        onTap: () {
-          ref.read(authStateProvider.notifier).clearError();
-          Navigator.of(context).pop();
-        },
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0F7FF),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0077FF).withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.arrow_back_ios_new,
-            size: 16,
-            color: Color(0xFF1E293B),
+  Widget _buildTopHeader(BuildContext context) {
+    return Row(
+      children: [
+        AppBackButton(
+          onTap: () {
+            ref.read(authStateProvider.notifier).clearError();
+            Navigator.of(context).pop();
+          },
+        ),
+        const SizedBox(width: 14),
+        const Text(
+          'Xác thực email',
+          style: TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0B1B3D),
+            letterSpacing: -0.3,
           ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildBrandHeader(double screenWidth) {
     return Column(
       children: [
-        CaniBrandLogo(width: (screenWidth * 0.55).clamp(160.0, 220.0)),
-        const SizedBox(height: 12),
-        const Text(
-          'Xác Thực Email',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0B1B3D),
-            letterSpacing: -0.3,
-          ),
-        ),
-        const SizedBox(height: 6),
+        CaniBrandLogo(width: (screenWidth * 0.45).clamp(140.0, 180.0)),
+        const SizedBox(height: 10),
         const Text(
           'Vui lòng nhập mã OTP 6 chữ số vừa được gửi đến hòm thư:',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 13.5,
             fontWeight: FontWeight.w500,
             color: Color(0xFF64748B),
           ),

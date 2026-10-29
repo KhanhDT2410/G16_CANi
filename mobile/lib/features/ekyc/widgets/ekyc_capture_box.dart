@@ -24,26 +24,32 @@ class EkycCaptureBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final hasImage = bytes != null;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: hasImage ? Colors.green : theme.colorScheme.outlineVariant,
-            width: hasImage ? 2 : 1,
+            color: hasImage ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+            width: 1.5,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF000000).withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               child: hasImage
                   ? Image.memory(
                       bytes!,
@@ -54,11 +60,10 @@ class EkycCaptureBox extends StatelessWidget {
                   : Container(
                       width: 60,
                       height: 60,
-                      color: theme.colorScheme.primaryContainer
-                          .withValues(alpha: 0.5),
+                      color: const Color(0xFFEFF6FF),
                       child: Icon(
                         icon,
-                        color: theme.colorScheme.primary,
+                        color: const Color(0xFF0077FF),
                         size: 28,
                       ),
                     ),
@@ -72,17 +77,21 @@ class EkycCaptureBox extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                            horizontal: 7, vertical: 2.5),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(4),
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFFDBEAFE),
+                            width: 1,
+                          ),
                         ),
                         child: Text(
                           'Bước $step',
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0077FF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -91,8 +100,10 @@ class EkycCaptureBox extends StatelessWidget {
                         child: Text(
                           title,
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.5,
+                            color: Color(0xFF0B1B3D),
+                            letterSpacing: -0.2,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -100,16 +111,16 @@ class EkycCaptureBox extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   Text(
                     hasImage ? 'Đã chọn: $fileName' : subtitle,
                     style: TextStyle(
                       fontSize: 12,
                       color: hasImage
-                          ? Colors.green
-                          : theme.colorScheme.onSurfaceVariant,
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFF64748B),
                       fontWeight:
-                          hasImage ? FontWeight.bold : FontWeight.normal,
+                          hasImage ? FontWeight.w700 : FontWeight.w400,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -119,7 +130,7 @@ class EkycCaptureBox extends StatelessWidget {
             ),
             Icon(
               hasImage ? Icons.check_circle : Icons.camera_alt,
-              color: hasImage ? Colors.green : theme.colorScheme.primary,
+              color: hasImage ? const Color(0xFF10B981) : const Color(0xFF0077FF),
             ),
           ],
         ),

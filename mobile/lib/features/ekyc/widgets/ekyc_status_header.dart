@@ -88,3 +88,4 @@ class EkycStatusHeader extends StatelessWidget {
     );
   }
 }
+

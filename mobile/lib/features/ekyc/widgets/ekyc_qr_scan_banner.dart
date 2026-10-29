@@ -99,3 +99,4 @@ class EkycQrScanBanner extends StatelessWidget {
     );
   }
 }
+

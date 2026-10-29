@@ -111,3 +111,4 @@ class EkycConfirmedInfoCard extends StatelessWidget {
     );
   }
 }
+

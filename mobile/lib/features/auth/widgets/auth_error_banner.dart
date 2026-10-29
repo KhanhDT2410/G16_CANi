@@ -33,3 +33,4 @@ class AuthErrorBanner extends StatelessWidget {
     );
   }
 }
+

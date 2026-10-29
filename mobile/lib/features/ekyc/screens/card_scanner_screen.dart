@@ -36,7 +36,6 @@ class _CardScannerScreenState extends State<CardScannerScreen>
   bool _isCameraInitialized = false;
   bool _isFlashOn = false;
   bool _isCapturing = false;
-  XFile? _capturedImage;
   Uint8List? _capturedBytes;
 
   late AnimationController _animController;
@@ -149,7 +148,6 @@ class _CardScannerScreenState extends State<CardScannerScreen>
       final bytes = await File(file.path).readAsBytes();
 
       setState(() {
-        _capturedImage = file;
         _capturedBytes = bytes;
         _isCapturing = false;
       });
@@ -167,7 +165,6 @@ class _CardScannerScreenState extends State<CardScannerScreen>
 
   void _retake() {
     setState(() {
-      _capturedImage = null;
       _capturedBytes = null;
     });
   }

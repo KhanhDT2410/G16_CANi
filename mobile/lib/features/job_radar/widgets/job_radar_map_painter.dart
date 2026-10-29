@@ -143,7 +143,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                       LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng),
                     ],
                     strokeWidth: 6.0,
-                    color: const Color(0xFF0066FF).withOpacity(0.3),
+                    color: const Color(0xFF0066FF).withValues(alpha: 0.3),
                     strokeCap: StrokeCap.round,
                     strokeJoin: StrokeJoin.round,
                   ),
@@ -369,12 +369,12 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
                   ],
-                  border: Border.all(color: const Color(0xFF0066FF).withOpacity(0.3), width: 1.5),
+                  border: Border.all(color: const Color(0xFF0066FF).withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Row(
                   children: [

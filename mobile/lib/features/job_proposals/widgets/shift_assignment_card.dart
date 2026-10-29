@@ -21,7 +21,6 @@ class ShiftAssignmentCard extends StatelessWidget {
     final a = assignment;
     final isCheckedIn = a.status == 'CHECKED_IN' || (a.checkinTime != null && a.checkoutTime == null);
     final isCompleted = a.status == 'COMPLETED' || a.checkoutTime != null;
-    final isNotStarted = !isCheckedIn && !isCompleted;
 
     final isDeclared = a.paymentStatus == 'DECLARED_PENDING_WORKER';
     final isConfirmed = a.paymentStatus == 'CONFIRMED_FULL';

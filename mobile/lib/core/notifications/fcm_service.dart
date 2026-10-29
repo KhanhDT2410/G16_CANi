@@ -139,7 +139,7 @@ class FcmService {
           '/v1/devices/tokens',
           queryParameters: {
             'fcmToken': _cachedToken,
-            if (explicitUserId != null) 'userId': explicitUserId,
+            'userId': ?explicitUserId,
           },
         );
         debugPrint('[FcmService] Successfully unregistered FCM token on backend.');

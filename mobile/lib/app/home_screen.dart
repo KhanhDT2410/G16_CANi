@@ -7,7 +7,7 @@ import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
 import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
-import 'package:cani/features/skill_verification/screens/worker_profile_screen.dart';
+import 'package:cani/features/profile/profile.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});

@@ -65,11 +65,11 @@ export const CreateRoleModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="rbac-modal-header">
-          <div className="rbac-modal-header-icon">🛡️</div>
+
           <div>
             <h3 className="rbac-modal-title">Tạo Vai Trò Tùy Chỉnh Mới</h3>
             <p className="rbac-modal-sub">
-              Khởi tạo nhóm thẩm quyền mới theo yêu cầu vận hành (UC-113)
+              Khởi tạo nhóm thẩm quyền mới theo yêu cầu vận hành
             </p>
           </div>
           <button type="button" className="rbac-modal-close" onClick={onClose}>

@@ -52,29 +52,25 @@ export const PERMISSION_MODULES = [
     id: 'FE_01_EVENTS',
     code: 'FE-01',
     name: 'Sự Kiện & Ca Làm (Events & Shifts)',
-    description: 'Khai báo thông số, tạo ca làm việc đơn/hàng loạt, huỷ ca đền bù (W-09 -> W-14)',
-    icon: '🎪',
+    description: 'Khai báo thông số, tạo ca làm việc đơn/hàng loạt, huỷ ca đền bù',
   },
   {
     id: 'FE_02_MATCHING',
     code: 'FE-02',
     name: 'AI Matching & Tuyển Dụng',
-    description: 'Ghép nối AI (40% Skill, 20% RS, 15% Exp/Loc), Job Feed, My Team (W-18, W-25)',
-    icon: '⚡',
+    description: 'Ghép nối AI (40% Skill, 20% RS, 15% Exp/Loc), Job Feed, My Team',
   },
   {
     id: 'FE_03_ATTENDANCE',
     code: 'FE-03',
     name: 'Chấm Công & Giám Sát GPS',
-    description: 'Quét QR động (15s token), kiểm tra Geofencing bán kính 100m, chỉnh công (Mục 10 TQ)',
-    icon: '📍',
+    description: 'Quét QR động (15s token), kiểm tra Geofencing bán kính 100m, chỉnh công',
   },
   {
     id: 'FE_04_FINANCE',
     code: 'FE-04',
     name: 'Ký Quỹ Escrow & Quyết Toán Lương',
     description: 'Khóa ví ký quỹ Escrow trước khi chạy ca, giải ngân thù lao VNPay, rút Napas 247',
-    icon: '💳',
   },
   {
     id: 'FE_05_DISPUTES',
@@ -508,7 +504,7 @@ export const MOCK_RBAC_METRICS = {
   lastAudit: {
     adminName: 'Mai Hải Dương (Lead Admin)',
     timestamp: '27/10/2026 18:30',
-    summary: 'Cập nhật phân quyền module Quản Trị Hệ Thống (FE-13) cho CSKH_ADMIN',
+    summary: 'Cập nhật phân quyền module Quản Trị Hệ Thống',
   },
 };
 

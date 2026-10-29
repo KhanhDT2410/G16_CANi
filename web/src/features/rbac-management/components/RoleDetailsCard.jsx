@@ -24,13 +24,13 @@ export const RoleDetailsCard = ({
             </span>
             {role.isSystem ? (
               <span className="rbac-badge-system">
-                {role.isSuperAdmin ? 'Super Admin (Toàn quyền bảo mật BR-69)' : 'Vai trò Hệ thống (Bảo vệ cốt lõi)'}
+                {role.isSuperAdmin ? 'Admin' : 'Vai trò Hệ thống (Bảo vệ cốt lõi)'}
               </span>
             ) : (
-              <span className="rbac-badge-custom">Vai trò Tùy chỉnh (AF-01)</span>
+              <span className="rbac-badge-custom">Vai trò Tùy chỉnh</span>
             )}
             <span className="rbac-badge-users">
-              👥 <strong>{role.userCount}</strong> tài khoản đảm nhiệm
+              <strong>{role.userCount}</strong> tài khoản đảm nhiệm
             </span>
           </div>
 
@@ -64,7 +64,7 @@ export const RoleDetailsCard = ({
                 onClick={() => onDeleteRole(role.id)}
                 title="Xóa vai trò tùy chỉnh"
               >
-                🗑 Xóa Vai Trò
+                Xóa Vai Trò
               </button>
             </div>
           )}
@@ -82,7 +82,7 @@ export const RoleDetailsCard = ({
           {role.lastModifiedBy && <em> (bởi {role.lastModifiedBy})</em>}
         </div>
         <div className="rbac-immediate-notice">
-          ⚡ <em>Hiệu lực tức thời: Mọi thay đổi áp dụng ngay cho tất cả tài khoản thuộc vai trò này.</em>
+          <em>Hiệu lực tức thời: Mọi thay đổi áp dụng ngay cho tất cả tài khoản thuộc vai trò này.</em>
         </div>
       </div>
     </div>

@@ -1061,6 +1061,62 @@
   gap: 0.75rem;
 }
 
+/* Modal Action Buttons (Primary / Secondary) */
+.eo-btn-secondary,
+.um-btn-secondary {
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: #ffffff;
+  color: var(--color-text-main, #334155);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.2s ease);
+}
+
+.eo-btn-secondary:hover:not(:disabled),
+.um-btn-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.eo-btn-secondary:disabled,
+.um-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eo-btn-primary,
+.um-btn-primary {
+  padding: 0.65rem 1.35rem;
+  border-radius: var(--radius-sm, 8px);
+  border: none;
+  background: var(--gradient-brand);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(91, 134, 229, 0.28);
+  transition: all var(--transition-fast, 0.2s ease);
+}
+
+.eo-btn-primary:hover:not(:disabled),
+.um-btn-primary:hover:not(:disabled) {
+  background: var(--gradient-brand-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(91, 134, 229, 0.35);
+}
+
+.eo-btn-primary:disabled,
+.um-btn-primary:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
 /* Form Styles */
 .um-form-group {
   margin-bottom: 1rem;

@@ -112,7 +112,7 @@ export const RolePermissionAccordion = ({
                           className={`rbac-switch ${isProtectedAdmin ? 'disabled' : ''}`}
                           title={
                             isProtectedAdmin
-                              ? 'Quyền quản trị tối cao được bảo vệ cốt lõi (BR-69)'
+                              ? 'Quyền quản trị tối cao được bảo vệ cốt lõi'
                               : `${isGranted ? 'Thu hồi' : 'Cấp'} quyền`
                           }
                         >

@@ -64,7 +64,7 @@ export const UserManagement = () => {
         <div>
           <h1 className="um-header-title">
             Quản Lý Tài Khoản Người Dùng
-            <span className="um-header-badge">W-39 • UC-112</span>
+
           </h1>
           <p className="um-header-sub">
             Tra cứu, kiểm soát vai trò, đặt lại mật khẩu và áp dụng chế tài kỷ luật

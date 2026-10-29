@@ -13,7 +13,6 @@ export const ResetRoleModal = ({ isOpen, onClose, onConfirm }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="rbac-modal-header">
-          <div className="rbac-modal-header-icon warning">⚠️</div>
           <div>
             <h3 className="rbac-modal-title">Xác Nhận Khôi Phục</h3>
             <p className="rbac-modal-sub">Khôi phục danh sách quyền về mặc định</p>

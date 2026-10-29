@@ -19,7 +19,7 @@ export const PermissionMatrixTable = ({
           <thead>
             <tr>
               <th className="rbac-th-perm-info">
-                <span>Phân Hệ & Quyền Hạn Chi Tiết (FE-01 → FE-13)</span>
+                <span>Phân Hệ & Quyền Hạn Chi Tiết</span>
               </th>
               <th className="rbac-th-action-type">Thao Tác</th>
               <th className="rbac-th-risk">Mức Rủi Ro</th>
@@ -127,7 +127,7 @@ export const PermissionMatrixTable = ({
                                 className={`rbac-switch ${isProtectedAdmin ? 'disabled' : ''}`}
                                 title={
                                   isProtectedAdmin
-                                    ? 'Quyền quản trị tối cao được bảo vệ cốt lõi (BR-69)'
+                                    ? 'Quyền quản trị tối cao được bảo vệ cốt lõi'
                                     : `${isGranted ? 'Thu hồi' : 'Cấp'} quyền cho ${role.name}`
                                 }
                               >

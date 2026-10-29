@@ -110,37 +110,37 @@ const AdminPage = () => {
           className={`admin-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => handleTabChange('dashboard')}
         >
-          📊 Dashboard Tổng Quan (W-38)
+          Dashboard Tổng Quan
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => handleTabChange('users')}
         >
-          👥 Quản Lý Người Dùng (W-39)
+          Quản Lý Người Dùng
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'rbac' ? 'active' : ''}`}
           onClick={() => handleTabChange('rbac')}
         >
-          🛡️ Phân Quyền & Vai Trò (W-40)
+          Phân Quyền & Vai Trò
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'revenue' ? 'active' : ''}`}
           onClick={() => handleTabChange('revenue')}
         >
-          💰 Doanh Thu Gói VNPay (W-34)
+          Doanh Thu Gói VNPay
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
           onClick={() => handleTabChange('ekyc')}
         >
-          🪪 Hàng Đợi eKYC ({ekycQueue.length})
+          Hàng Đợi eKYC ({ekycQueue.length})
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'config' ? 'active' : ''}`}
           onClick={() => handleTabChange('config')}
         >
-          ⚙️ Cấu Hình Hệ Thống (W-41)
+          Cấu Hình Hệ Thống
         </button>
       </div>
 

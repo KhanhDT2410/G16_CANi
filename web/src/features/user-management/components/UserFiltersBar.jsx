@@ -20,10 +20,10 @@ export const UserFiltersBar = ({
 }) => {
   const roleTabs = [
     { key: USER_ROLES.ALL, label: 'Tất cả' },
-    { key: USER_ROLES.WORKER, label: 'Nhân Sự (Worker)' },
-    { key: USER_ROLES.EVENT_ORGANIZER, label: 'Nhà Tổ Chức (EO)' },
-    { key: USER_ROLES.CSKH, label: 'CSKH' },
-    { key: USER_ROLES.ADMIN, label: 'Admin' },
+    { key: USER_ROLES.WORKER, label: 'Nhân Sự' },
+    { key: USER_ROLES.EVENT_ORGANIZER, label: 'Nhà Tổ Chức' },
+    { key: USER_ROLES.CSKH, label: 'Chăm sóc khách hàng' },
+    { key: USER_ROLES.ADMIN, label: 'Quản trị viên' },
   ];
 
   return (

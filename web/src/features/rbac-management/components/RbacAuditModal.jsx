@@ -15,7 +15,7 @@ export const RbacAuditModal = ({ isOpen, onClose, auditLogs }) => {
       case 'PERMISSION_REVOKED':
         return <span className="rbac-audit-badge revoke">Thu Hồi Quyền</span>;
       case 'ROLE_CREATED':
-        return <span className="rbac-audit-badge create">Tạo Vai Trò (AF-01)</span>;
+        return <span className="rbac-audit-badge create">Tạo Vai Trò</span>;
       default:
         return <span className="rbac-audit-badge mod">Thay Đổi</span>;
     }
@@ -28,11 +28,10 @@ export const RbacAuditModal = ({ isOpen, onClose, auditLogs }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="rbac-modal-header">
-          <div className="rbac-modal-header-icon">📜</div>
           <div>
-            <h3 className="rbac-modal-title">Nhật Ký Kiểm Toán Phân Quyền (RBAC Audit)</h3>
+            <h3 className="rbac-modal-title">Nhật Ký Kiểm Toán Phân Quyền</h3>
             <p className="rbac-modal-sub">
-              Kho lưu trữ bất biến theo quy định <strong>BR-70</strong> (Bảo lưu 60 tháng • Không thể xóa/sửa)
+              Kho lưu trữ bất biến theo quy định(Bảo lưu 60 tháng,không thể xóa/sửa)
             </p>
           </div>
           <button type="button" className="rbac-modal-close" onClick={onClose}>
@@ -90,7 +89,7 @@ export const RbacAuditModal = ({ isOpen, onClose, auditLogs }) => {
 
         <div className="rbac-modal-footer">
           <div className="rbac-audit-footer-hint">
-            🔒 <em>Tuân thủ UC-121 & BR-70: Mọi phiên truy cập và can thiệp đều được niêm phong chống sửa đổi.</em>
+            <em>Mọi phiên truy cập và can thiệp đều được niêm phong chống sửa đổi.</em>
           </div>
           <button type="button" className="rbac-btn-secondary" onClick={onClose}>
             Đóng

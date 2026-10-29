@@ -63,12 +63,11 @@ export const RbacManagement = () => {
       <div className="rbac-header">
         <div>
           <h1 className="rbac-header-title">
-            Phân Quyền & Vai Trò Hệ Thống (RBAC)
-            <span className="rbac-header-badge">W-40 • UC-113 • BR-69</span>
+            Phân Quyền & Vai Trò Hệ Thống
+
           </h1>
           <p className="rbac-header-sub">
-            Thiết lập ma trận phân quyền chi tiết (FE-01 → FE-13), cấu hình vai trò tùy chỉnh.
-            Mọi thay đổi có hiệu lực ngay lập tức và lưu nhật ký kiểm toán bất biến 60 tháng (BR-70).
+            cấu hình vai trò tùy chỉnh.Mọi thay đổi có hiệu lực ngay lập tức và lưu nhật ký kiểm toán bất biến 60 tháng.
           </p>
         </div>
       </div>

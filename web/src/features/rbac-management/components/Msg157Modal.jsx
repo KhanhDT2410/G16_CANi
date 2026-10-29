@@ -18,7 +18,7 @@ export const Msg157Modal = ({ isOpen, dialogData, onClose, onConfirm }) => {
           <div>
             <h3 className="rbac-modal-title">{MSG157_WARNING.title}</h3>
             <p className="rbac-modal-sub">
-              Mã cảnh báo: {MSG157_WARNING.code} (UC-113 Bước 5a)
+              Mã cảnh báo: {MSG157_WARNING.code}
             </p>
           </div>
         </div>

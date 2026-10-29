@@ -20,9 +20,7 @@ const MetricCard = ({ icon, label, value, change, unit, color }) => {
   const isPositive = change >= 0;
   return (
     <div className="adm-metric-card animate-fade-in-up">
-      <div className="adm-metric-icon" style={{ color }}>
-        {icon}
-      </div>
+
       <div className="adm-metric-body">
         <div className="adm-metric-label">{label}</div>
         <div className="adm-metric-value" style={{ color }}>
@@ -33,9 +31,8 @@ const MetricCard = ({ icon, label, value, change, unit, color }) => {
         </div>
         {change !== undefined && change !== null && (
           <div
-            className={`adm-metric-change ${
-              isPositive ? 'positive' : 'negative'
-            }`}
+            className={`adm-metric-change ${isPositive ? 'positive' : 'negative'
+              }`}
           >
             {isPositive ? '▲' : '▼'} {Math.abs(change)}% so với tuần trước
           </div>
@@ -127,28 +124,24 @@ const AdminDashboard = () => {
       {/* KPI Metric Cards */}
       <div className="adm-metrics-grid">
         <MetricCard
-          icon="👥"
           label="Người Dùng Hoạt Động"
           value={metrics.totalActiveUsers}
           change={metrics.activeUsersChange}
           color="var(--color-primary)"
         />
         <MetricCard
-          icon="📅"
           label="Sự Kiện Đang Chạy"
           value={metrics.totalActiveEvents}
           change={metrics.activeEventsChange}
           color="#0284c7"
         />
         <MetricCard
-          icon="⚠️"
           label="Tranh Chấp Mở"
           value={metrics.openDisputes}
           change={metrics.openDisputesChange}
           color="var(--color-danger)"
         />
         <MetricCard
-          icon="💰"
           label="Doanh Thu Tháng"
           value={metrics.totalRevenue}
           change={metrics.revenueChange}

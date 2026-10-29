@@ -21,7 +21,6 @@ export const RbacMetricsGrid = ({ metrics, loading }) => {
       <div className="rbac-metric-card">
         <div className="rbac-metric-top">
           <span className="rbac-metric-title">Tổng Vai Trò Hệ Thống</span>
-          <span className="rbac-metric-icon">🛡️</span>
         </div>
         <div className="rbac-metric-val">{metrics.totalRoles}</div>
         <div className="rbac-metric-sub">
@@ -35,7 +34,6 @@ export const RbacMetricsGrid = ({ metrics, loading }) => {
       <div className="rbac-metric-card">
         <div className="rbac-metric-top">
           <span className="rbac-metric-title">Quyền Hạn Chi Tiết</span>
-          <span className="rbac-metric-icon">⚡</span>
         </div>
         <div className="rbac-metric-val">{metrics.totalPermissions}</div>
         <div className="rbac-metric-sub">
@@ -47,7 +45,6 @@ export const RbacMetricsGrid = ({ metrics, loading }) => {
       <div className="rbac-metric-card">
         <div className="rbac-metric-top">
           <span className="rbac-metric-title">Tài Khoản Phân Quyền</span>
-          <span className="rbac-metric-icon">👥</span>
         </div>
         <div className="rbac-metric-val">
           {metrics.affectedUsers.toLocaleString('vi-VN')}
@@ -61,8 +58,7 @@ export const RbacMetricsGrid = ({ metrics, loading }) => {
       {/* Metric 4: Kiểm Toán Gần Nhất */}
       <div className="rbac-metric-card">
         <div className="rbac-metric-top">
-          <span className="rbac-metric-title">Nhật Ký Kiểm Toán RBAC</span>
-          <span className="rbac-metric-icon">📑</span>
+          <span className="rbac-metric-title">Nhật Ký Kiểm Toán</span>
         </div>
         <div className="rbac-metric-audit-info">
           <div className="rbac-audit-time">{metrics.lastAudit.timestamp}</div>

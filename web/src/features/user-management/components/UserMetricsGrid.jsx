@@ -19,9 +19,7 @@ export const UserMetricsGrid = ({ metrics, loading }) => {
       {/* 1. Tổng Người Dùng */}
       <div className="um-metric-card animate-fade-in-up">
         <div className="um-metric-top">
-          <span className="um-metric-icon" style={{ background: '#eff6ff', color: '#5B86E5' }}>
-            👥
-          </span>
+
           <span className="um-metric-tag positive">
             +{metrics.usersGrowth}%
           </span>
@@ -30,15 +28,13 @@ export const UserMetricsGrid = ({ metrics, loading }) => {
           {metrics.totalUsers?.toLocaleString('vi-VN')}
         </div>
         <div className="um-metric-title">Tổng Tài Khoản Đã Đăng Ký</div>
-        <div className="um-metric-sub">Bao gồm Worker, EO, CSKH & Admin</div>
+        <div className="um-metric-sub">Bao gồm nhân sự, nhà tổ chức, chăm sóc khách hàng & quản trị viên</div>
       </div>
 
       {/* 2. Worker & Tích Xanh */}
       <div className="um-metric-card animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
         <div className="um-metric-top">
-          <span className="um-metric-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
-            💼
-          </span>
+
           <span className="um-metric-tag verified">
             ✓ {metrics.workerVerifiedPercent}% eKYC
           </span>
@@ -53,9 +49,7 @@ export const UserMetricsGrid = ({ metrics, loading }) => {
       {/* 3. Nhà Tổ Chức (EO) */}
       <div className="um-metric-card animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
         <div className="um-metric-top">
-          <span className="um-metric-icon" style={{ background: '#f0f9ff', color: '#0284c7' }}>
-            🏢
-          </span>
+
           <span className="um-metric-tag positive">
             +{metrics.eoGrowth}%
           </span>
@@ -70,9 +64,7 @@ export const UserMetricsGrid = ({ metrics, loading }) => {
       {/* 4. Giám Sát & Hạn Chế */}
       <div className="um-metric-card animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
         <div className="um-metric-top">
-          <span className="um-metric-icon" style={{ background: '#fef2f2', color: '#ef4444' }}>
-            🛡️
-          </span>
+
           <span className="um-metric-tag attention">
             Cần lưu ý
           </span>

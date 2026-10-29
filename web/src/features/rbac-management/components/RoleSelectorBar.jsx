@@ -32,15 +32,13 @@ export const RoleSelectorBar = ({
             className={`rbac-pill-btn ${viewMode === 'matrix' ? 'active' : ''}`}
             onClick={() => onViewModeChange('matrix')}
           >
-            <span className="rbac-pill-icon">▦</span>
-            Ma Trận Phân Quyền (Matrix)
+            Ma Trận Phân Quyền
           </button>
           <button
             type="button"
             className={`rbac-pill-btn ${viewMode === 'detailed' ? 'active' : ''}`}
             onClick={() => onViewModeChange('detailed')}
           >
-            <span className="rbac-pill-icon">📑</span>
             Chi Tiết Từng Vai Trò
           </button>
         </div>
@@ -51,16 +49,15 @@ export const RoleSelectorBar = ({
             type="button"
             className="rbac-btn-secondary"
             onClick={onOpenAuditLogs}
-            title="Xem nhật ký kiểm toán thay đổi phân quyền (BR-70 - 60 tháng)"
+            title="Xem nhật ký kiểm toán thay đổi phân quyền (60 tháng)"
           >
-            <span>📜</span>
-            Nhật Ký Kiểm Toán (W-42)
+            Nhật Ký Kiểm Toán
           </button>
           <button
             type="button"
             className="rbac-btn-primary"
             onClick={onOpenCreateRole}
-            title="Khởi tạo vai trò tùy chỉnh mới (AF-01)"
+            title="Khởi tạo vai trò tùy chỉnh mới"
           >
             <span>+</span>
             Tạo Vai Trò Mới
@@ -72,7 +69,6 @@ export const RoleSelectorBar = ({
       <div className="rbac-filter-row">
         {/* Ô tìm kiếm quyền hạn */}
         <div className="rbac-search-box">
-          <span className="rbac-search-icon">🔍</span>
           <input
             type="text"
             className="rbac-search-input"
@@ -144,11 +140,11 @@ export const RoleSelectorBar = ({
                   {role.permissions.length} quyền
                 </span>
                 {role.isSystem ? (
-                  <span className="rbac-chip-sys" title="Vai trò mặc định hệ thống (BR-69)">
+                  <span className="rbac-chip-sys" title="Vai trò mặc định hệ thống">
                     {role.isSuperAdmin ? 'Super Admin' : 'Hệ thống'}
                   </span>
                 ) : (
-                  <span className="rbac-chip-custom" title="Vai trò do Admin khởi tạo (AF-01)">
+                  <span className="rbac-chip-custom" title="Vai trò do Admin khởi tạo">
                     Tùy chỉnh
                   </span>
                 )}

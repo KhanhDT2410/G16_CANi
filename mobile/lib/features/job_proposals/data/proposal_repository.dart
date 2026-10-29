@@ -1,32 +1,39 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:cani/core/network/dio_client.dart';
 import '../models/proposal_models.dart';
+
+final proposalRepositoryProvider = Provider<ProposalRepository>((ref) {
+  final dio = ref.watch(dioProvider);
+  return ProposalRepository(dio);
+});
+
+final proposalsCountProvider = FutureProvider<int>((ref) async {
+  final repo = ref.watch(proposalRepositoryProvider);
+  final list = await repo.fetchProposals();
+  return list.length;
+});
 
 class ProposalRepository {
   final Dio _dio;
-  static const String _baseUrl = 'http://localhost:8080/api/v1';
 
-  ProposalRepository({Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
-              baseUrl: _baseUrl,
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 10),
-            ));
+  ProposalRepository(this._dio);
 
   // Lấy các đề xuất việc làm đang chờ Worker phản hồi
   Future<List<JobProposalItem>> fetchProposals({String? token}) async {
     try {
-      final options = Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-      );
-      final response = await _dio.get('/workers/proposals', options: options);
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.get('/v1/workers/proposals', options: options);
       if (response.data != null && response.data['data'] != null) {
         final List list = response.data['data'];
         return list.map((item) => JobProposalItem.fromJson(item)).toList();
       }
       return [];
     } catch (e) {
-      // Mock Demo Data
+      debugPrint('[CANi] Fallback data used: $e');
+      // Fallback demo khi lỗi mạng hoặc chưa có dữ liệu backend
       return [
         JobProposalItem(
           proposalId: 'prop-m01',
@@ -67,44 +74,42 @@ class ProposalRepository {
   // Chấp nhận ca làm việc
   Future<bool> acceptProposal(String proposalId, {String? token}) async {
     try {
-      final options = Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-      );
-      final response = await _dio.post('/workers/proposals/$proposalId/accept', options: options);
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.post('/v1/workers/proposals/$proposalId/accept', options: options);
       return response.statusCode == 200;
-    } catch (e) {
-      return true; // Fallback demo
+    } on DioException {
+      rethrow;
     }
   }
 
   // Từ chối lời mời
   Future<bool> rejectProposal(String proposalId, String reason, {String? token}) async {
     try {
-      final options = Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.post(
+        '/v1/workers/proposals/$proposalId/reject',
+        queryParameters: {'reason': reason},
+        options: options,
       );
-      final response = await _dio.post('/workers/proposals/$proposalId/reject',
-          queryParameters: {'reason': reason}, options: options);
       return response.statusCode == 200;
-    } catch (e) {
-      return true; // Fallback demo
+    } on DioException {
+      rethrow;
     }
   }
 
   // Lấy các ca làm việc của Worker
   Future<List<ShiftAssignmentItem>> fetchAssignments({String? token}) async {
     try {
-      final options = Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-      );
-      final response = await _dio.get('/workers/assignments', options: options);
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.get('/v1/workers/assignments', options: options);
       if (response.data != null && response.data['data'] != null) {
         final List list = response.data['data'];
         return list.map((item) => ShiftAssignmentItem.fromJson(item)).toList();
       }
       return [];
     } catch (e) {
-      // Mock Demo Data
+      debugPrint('[CANi] Fallback data used: $e');
+      // Fallback Demo Data
       return [
         ShiftAssignmentItem(
           assignmentId: 'assign-m01',
@@ -129,17 +134,24 @@ class ProposalRepository {
   // Worker Xác nhận tình trạng nhận tiền lương trực tiếp (Mục 12 SRS)
   Future<bool> confirmPayment(String assignmentId, String confirmStatus, String comment, {String? token}) async {
     try {
-      final options = Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-      );
+      // Ánh xạ trạng thái từ Domain/UI (PaymentStatus) sang Payload backend (DirectPaymentService)
+      // UI: CONFIRMED_FULL -> Backend: RECEIVED_FULL
+      // UI: CONFIRMED_PARTIAL -> Backend: RECEIVED_PARTIAL
+      final apiStatus = switch (confirmStatus) {
+        'CONFIRMED_FULL' => 'RECEIVED_FULL',
+        'CONFIRMED_PARTIAL' => 'RECEIVED_PARTIAL',
+        _ => confirmStatus,
+      };
+
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
       final response = await _dio.post(
-        '/payments/worker/confirm/$assignmentId',
-        data: {'confirmStatus': confirmStatus, 'comment': comment},
+        '/v1/payments/worker/confirm/$assignmentId',
+        data: {'confirmStatus': apiStatus, 'comment': comment},
         options: options,
       );
       return response.statusCode == 200;
-    } catch (e) {
-      return true; // Fallback demo
+    } on DioException {
+      rethrow;
     }
   }
 
@@ -155,7 +167,7 @@ class ProposalRepository {
       headers: token != null ? {'Authorization': 'Bearer $token'} : null,
     );
     final response = await _dio.post(
-      '/workers/assignments/$assignmentId/checkin',
+      '/v1/workers/assignments/$assignmentId/checkin',
       data: {
         'qrContent': qrContent,
         'lat': lat,
@@ -184,7 +196,7 @@ class ProposalRepository {
       headers: token != null ? {'Authorization': 'Bearer $token'} : null,
     );
     final response = await _dio.post(
-      '/workers/assignments/$assignmentId/checkout',
+      '/v1/workers/assignments/$assignmentId/checkout',
       data: {
         'qrContent': qrContent,
         'lat': lat,

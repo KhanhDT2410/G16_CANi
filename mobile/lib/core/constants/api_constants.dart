@@ -1,6 +1,3 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 /// API configuration constants.
 ///
 /// For Windows Desktop / Web: Uses http://localhost:8080

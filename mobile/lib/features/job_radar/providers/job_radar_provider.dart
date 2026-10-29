@@ -164,6 +164,10 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     state = state.copyWith(isRadarView: isRadar);
   }
 
+  void toggleRadarView() {
+    state = state.copyWith(isRadarView: !state.isRadarView);
+  }
+
   void selectShift(NearbyShiftItem? shift) {
     state = state.copyWith(selectedShift: shift);
   }

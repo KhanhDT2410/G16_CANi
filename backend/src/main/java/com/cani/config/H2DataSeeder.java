@@ -94,7 +94,7 @@ public class H2DataSeeder implements CommandLineRunner {
                 .companyName("CANi Event Management")
                 .taxId("0109876543")
                 .address("799 Nguyễn Văn Linh, Quận 7, TP.HCM")
-                .verificationStatus(VerificationStatus.VERIFIED)
+                .verificationStatus(VerificationStatus.APPROVED)
                 .verifiedAt(Instant.now())
                 .build();
             eventOrganizerRepository.save(eo);

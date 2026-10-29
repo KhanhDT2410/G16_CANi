@@ -5,6 +5,7 @@ import com.cani.dto.payment.DeclarePaymentRequestDto;
 import com.cani.dto.payment.PaymentResponseDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.PaymentStatus;
+import com.cani.exception.AppException;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -182,5 +184,43 @@ class DirectPaymentServiceTest {
         assertThatThrownBy(() -> directPaymentService.confirmPayment(strangerWorkerId, assignment.getAssignmentId(), request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Bạn không có quyền xác nhận thanh toán này");
+    }
+
+    @Test
+    @DisplayName("W2: Worker hoặc EO chủ sở hữu xem được thanh toán của Assignment")
+    void shouldReturnPaymentWhenOwnerWorkerOrEoRequests() {
+        User workerUser = User.builder().userId(UUID.randomUUID()).fullName("Nguyễn Văn An").build();
+        User eoUser = User.builder().userId(UUID.randomUUID()).fullName("CEO Sao Mai").build();
+        worker.setUser(workerUser);
+        eo.setUser(eoUser);
+
+        when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(initialPayment));
+
+        PaymentResponseDto byWorker = directPaymentService.getPaymentByAssignment(
+                assignment.getAssignmentId(), workerUser.getUserId(), false);
+        PaymentResponseDto byEo = directPaymentService.getPaymentByAssignment(
+                assignment.getAssignmentId(), eoUser.getUserId(), false);
+
+        assertThat(byWorker).isNotNull();
+        assertThat(byWorker.getAssignmentId()).isEqualTo(assignment.getAssignmentId());
+        assertThat(byEo).isNotNull();
+        assertThat(byEo.getEoId()).isEqualTo(eo.getEoId());
+    }
+
+    @Test
+    @DisplayName("W2: Worker/EO lạ dò UUID của Assignment khác sẽ nhận 404 NOT_FOUND (chống IDOR)")
+    void shouldThrow404WhenStrangerRequestsAssignmentPayment() {
+        User workerUser = User.builder().userId(UUID.randomUUID()).fullName("Nguyễn Văn An").build();
+        User eoUser = User.builder().userId(UUID.randomUUID()).fullName("CEO Sao Mai").build();
+        worker.setUser(workerUser);
+        eo.setUser(eoUser);
+        UUID strangerUserId = UUID.randomUUID();
+
+        when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(initialPayment));
+
+        assertThatThrownBy(() -> directPaymentService.getPaymentByAssignment(
+                assignment.getAssignmentId(), strangerUserId, false))
+                .isInstanceOf(AppException.class)
+                .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 }

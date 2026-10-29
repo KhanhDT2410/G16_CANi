@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
+import 'package:cani/features/job_radar/data/job_radar_repository.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
@@ -478,14 +479,29 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         shift: shift,
         userLat: state.userLat,
         userLng: state.userLng,
-        onApply: () {
+        onApply: () async {
           Navigator.pop(ctx);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đã gửi yêu cầu ứng tuyển ca: ${shift.jobType}'),
-              backgroundColor: const Color(0xFF16A34A),
-            ),
-          );
+          try {
+            await ref.read(jobRadarRepositoryProvider).applyForShift(shift.shiftId);
+            ref.read(jobRadarProvider.notifier).scanNearbyShifts();
+            if (mounted) {
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text('Ứng tuyển thành công ca: ${shift.jobType}! Đã thêm vào Lịch ca của bạn.'),
+                  backgroundColor: const Color(0xFF16A34A),
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text('Không thể ứng tuyển: ${e.toString().replaceAll("Exception: ", "")}'),
+                  backgroundColor: const Color(0xFFDC2626),
+                ),
+              );
+            }
+          }
         },
       ),
     );

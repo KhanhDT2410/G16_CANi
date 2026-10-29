@@ -59,9 +59,12 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> with 
   }
 
   Future<void> _confirmPayment(ShiftAssignmentItem item, String status) async {
-    final comment = status == 'NOT_RECEIVED' ? 'Chưa nhận được tiền lương từ Ban tổ chức' : '';
+    final isFull = status == 'RECEIVED_FULL' || status == 'CONFIRMED_FULL';
+    final apiStatus = isFull ? 'RECEIVED_FULL' : 'NOT_RECEIVED';
+    final localPaymentStatus = isFull ? 'CONFIRMED_FULL' : 'DISPUTED';
+    final comment = apiStatus == 'NOT_RECEIVED' ? 'Chưa nhận được tiền lương từ Ban tổ chức' : '';
     try {
-      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, status, comment);
+      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, apiStatus, comment);
       setState(() {
         final index = _assignments.indexWhere((a) => a.assignmentId == item.assignmentId);
         if (index != -1) {
@@ -77,7 +80,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> with 
             hourlyWage: item.hourlyWage,
             totalPay: item.totalPay,
             status: item.status,
-            paymentStatus: status,
+            paymentStatus: localPaymentStatus,
             declaredAmount: item.declaredAmount,
             paymentMethod: item.paymentMethod,
           );
@@ -87,10 +90,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> with 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(status == 'CONFIRMED_FULL'
+            content: Text(isFull
                 ? 'Đã xác nhận nhận đủ tiền lương!'
                 : 'Đã gửi khiếu nại (Dispute). Đội ngũ CANi sẽ hỗ trợ bạn!'),
-            backgroundColor: status == 'CONFIRMED_FULL' ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+            backgroundColor: isFull ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
           ),
         );
       }

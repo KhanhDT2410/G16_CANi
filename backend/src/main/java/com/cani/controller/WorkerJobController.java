@@ -151,6 +151,21 @@ public class WorkerJobController {
     }
 
     /**
+     * Worker ứng tuyển trực tiếp vào ca làm việc từ Job Radar Map
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/shifts/{shiftId}/apply")
+    public ResponseEntity<ApiResponse<ShiftAssignmentResponseDto>> applyForShift(
+            @PathVariable("shiftId") UUID shiftId,
+            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            Authentication authentication
+    ) {
+        UUID userId = resolveUserId(authentication, explicitUserId);
+        ShiftAssignmentResponseDto assignment = workerJobService.applyForShift(userId, shiftId);
+        return ResponseEntity.ok(ApiResponse.ok(assignment, "Ứng tuyển thành công! Ca làm đã được thêm vào Lịch làm việc của bạn."));
+    }
+
+    /**
      * UC-25: Lấy danh sách lịch rảnh tuần của Worker
      */
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")

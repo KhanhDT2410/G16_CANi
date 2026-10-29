@@ -347,7 +347,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: FilledButton.tonal(
-                          onPressed: () => onConfirmPayment('CONFIRMED_FULL'),
+                          onPressed: () => onConfirmPayment('RECEIVED_FULL'),
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFDCFCE7),
                             foregroundColor: const Color(0xFF166534),

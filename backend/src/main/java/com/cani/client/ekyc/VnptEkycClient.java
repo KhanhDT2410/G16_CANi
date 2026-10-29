@@ -16,7 +16,10 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -240,6 +243,7 @@ public class VnptEkycClient implements EkycProvider {
             faceMsg = faceObj.path("msg").asText("NOMATCH");
         }
         boolean isFaceMatched = "MATCH".equalsIgnoreCase(faceMsg) || faceProb >= 75.0;
+        boolean isExpired = isCardExpired(validDate);
 
         // Routing Decision
         String routingDecision;
@@ -248,6 +252,9 @@ public class VnptEkycClient implements EkycProvider {
         if (!isLegal || isFake) {
             routingDecision = "REJECTED";
             routingReason = "Phát hiện giấy tờ có dấu hiệu bị can thiệp, chỉnh sửa hoặc cắt góc (VNPT Anti-fraud).";
+        } else if (isExpired) {
+            routingDecision = "REJECTED";
+            routingReason = String.format("Thẻ CCCD đã hết hạn sử dụng (%s). Vui lòng sử dụng giấy tờ còn hiệu lực.", validDate);
         } else if (isFaceMatched && faceProb >= 80.0 && !isCutCorner) {
             routingDecision = "AUTO_APPROVED";
             routingReason = String.format("VNPT eKYC xác thực thành công. Độ khớp khuôn mặt đạt %.1f%%.", faceProb);
@@ -266,6 +273,7 @@ public class VnptEkycClient implements EkycProvider {
         rawAnalysis.put("isLegal", isLegal);
         rawAnalysis.put("isFakeWarning", isFake);
         rawAnalysis.put("isBlurred", isBlurred);
+        rawAnalysis.put("isExpired", isExpired);
 
         return EkycIdentityResultDto.builder()
                 .idNumber(idNumber)
@@ -282,11 +290,39 @@ public class VnptEkycClient implements EkycProvider {
                 .isCutCorner(isCutCorner)
                 .isScreenCaptured(isFake)
                 .isPhotoshoped(!isLegal)
-                .isExpired(false)
+                .isExpired(isExpired)
                 .routingDecision(routingDecision)
                 .routingReason(routingReason)
                 .rawAnalysis(rawAnalysis)
                 .build();
+    }
+
+    /**
+     * Kiểm tra thẻ CCCD đã hết hạn hay chưa dựa trên chuỗi valid_date của VNPT OCR.
+     * Hỗ trợ định dạng dd/MM/yyyy, dd-MM-yyyy, yyyy-MM-dd và trường hợp "KHÔNG THỜI HẠN".
+     */
+    private boolean isCardExpired(String validDate) {
+        if (validDate == null || validDate.isBlank() || "-".equals(validDate.trim())) {
+            return false;
+        }
+        String normalized = validDate.trim().toUpperCase();
+        if (normalized.contains("KHÔNG THỜI HẠN") || normalized.contains("KHONG THOI HAN") || normalized.contains("UNLIMITED")) {
+            return false;
+        }
+        List<DateTimeFormatter> formatters = List.of(
+                DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                DateTimeFormatter.ofPattern("d/M/yyyy"),
+                DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+                DateTimeFormatter.ofPattern("yyyy-MM-dd")
+        );
+        for (DateTimeFormatter fmt : formatters) {
+            try {
+                LocalDate expiry = LocalDate.parse(validDate.trim(), fmt);
+                return expiry.isBefore(LocalDate.now());
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
     }
 
     private String getAuthHeader() {

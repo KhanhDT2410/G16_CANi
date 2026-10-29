@@ -258,15 +258,16 @@ public class AuthService {
 
     @Transactional
     public void verifyOtp(VerifyOtpRequest request) {
-        supabaseAuthClient.verifyOtp(request.getEmail(), request.getToken());
+        emailOtpService.verifyOtp(request.getEmail(), request.getToken(), "REGISTER");
         userRepository.findByEmail(request.getEmail()).ifPresent(u -> {
             u.setEmailVerified(true);
             userRepository.save(u);
         });
     }
 
+    @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        supabaseAuthClient.resetPassword(request.getEmail());
+        emailOtpService.sendOtp(request.getEmail(), "RESET_PASSWORD");
     }
 
     @Transactional

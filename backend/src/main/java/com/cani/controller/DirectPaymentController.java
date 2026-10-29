@@ -72,8 +72,19 @@ public class DirectPaymentController {
      */
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/shifts/{shiftId}")
-    public ResponseEntity<ApiResponse<List<PaymentResponseDto>>> getShiftPayments(@PathVariable UUID shiftId) {
-        List<PaymentResponseDto> payments = directPaymentService.getPaymentsByShift(shiftId);
+    public ResponseEntity<ApiResponse<List<PaymentResponseDto>>> getShiftPayments(
+            @PathVariable UUID shiftId,
+            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            Authentication authentication) {
+        boolean isAdmin = isAdmin(authentication);
+        UUID callerEoId = null;
+        if (!isAdmin) {
+            UUID userId = resolveUserId(authentication, explicitUserId);
+            EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
+                    .orElseThrow(() -> new IllegalStateException("Tài khoản chưa đăng ký hồ sơ Nhà tổ chức sự kiện (EO)"));
+            callerEoId = eo.getEoId();
+        }
+        List<PaymentResponseDto> payments = directPaymentService.getPaymentsByShift(shiftId, callerEoId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok(payments, "Lấy danh sách thanh toán của ca thành công"));
     }
 
@@ -98,9 +109,20 @@ public class DirectPaymentController {
      */
     @PreAuthorize("hasAnyRole('WORKER', 'EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/assignments/{assignmentId}")
-    public ResponseEntity<ApiResponse<PaymentResponseDto>> getAssignmentPayment(@PathVariable UUID assignmentId) {
-        PaymentResponseDto payment = directPaymentService.getPaymentByAssignment(assignmentId);
+    public ResponseEntity<ApiResponse<PaymentResponseDto>> getAssignmentPayment(
+            @PathVariable UUID assignmentId,
+            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            Authentication authentication) {
+        boolean isAdmin = isAdmin(authentication);
+        UUID callerId = isAdmin ? null : resolveUserId(authentication, explicitUserId);
+        PaymentResponseDto payment = directPaymentService.getPaymentByAssignment(assignmentId, callerId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok(payment, "Lấy thông tin thanh toán thành công"));
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities() != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ADMIN".equals(a.getAuthority()));
     }
 
     private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {

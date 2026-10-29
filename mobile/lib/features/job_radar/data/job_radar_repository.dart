@@ -77,6 +77,22 @@ class JobRadarRepository {
     }
   }
 
+  /// Ứng tuyển trực tiếp vào ca làm việc từ Job Radar Map
+  Future<void> applyForShift(String shiftId) async {
+    try {
+      await _dio.post('/v1/workers/shifts/$shiftId/apply');
+    } on DioException catch (e) {
+      if (demoMode) return;
+      final serverMessage = e.response?.data is Map
+          ? (e.response?.data['message'] as String?)
+          : null;
+      throw Exception(serverMessage ?? 'Không thể ứng tuyển ca làm việc: ${e.message}');
+    } catch (e) {
+      if (demoMode) return;
+      rethrow;
+    }
+  }
+
   List<NearbyShiftItem> _generateDemoShifts(double centerLat, double centerLng) {
     return [
       NearbyShiftItem(

@@ -65,7 +65,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   void _startCountdown() {
     setState(() {
-      _countdown = 30;
+      _countdown = 60;
       _otpSent = true;
     });
     _timer?.cancel();

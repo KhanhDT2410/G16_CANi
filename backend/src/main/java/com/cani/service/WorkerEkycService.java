@@ -36,6 +36,9 @@ public class WorkerEkycService {
     private final EkycProvider ekycProvider;
     private final UserRepository userRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
+    private boolean ekycStrict;
+
     /**
      * Worker nộp hồ sơ eKYC: Mặt trước CCCD, Mặt sau CCCD và Ảnh Selfie chân dung
      */
@@ -92,8 +95,13 @@ public class WorkerEkycService {
                 }
                 String uniqueSuffix = String.format("%06d", Math.abs(worker.getWorkerId().hashCode()) % 1_000_000);
                 ekycResult.setIdNumber("001202" + uniqueSuffix);
-                ekycResult.setRoutingDecision("AUTO_APPROVED");
-                ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
+                if (ekycStrict) {
+                    ekycResult.setRoutingDecision("MANUAL_REVIEW");
+                    ekycResult.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
+                } else {
+                    ekycResult.setRoutingDecision("AUTO_APPROVED");
+                    ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
+                }
             }
 
             // Ghi đè bằng thông tin người dùng đã xác nhận hoặc quét từ mã QR trên thẻ CCCD gắn chip (nếu có)

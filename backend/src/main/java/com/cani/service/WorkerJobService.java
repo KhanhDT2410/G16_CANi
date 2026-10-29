@@ -194,7 +194,7 @@ public class WorkerJobService {
     }
 
     /**
-     * Quét QR Check-in vào ca làm việc
+     * Quét QR Check-in vào ca làm việc (Có xác thực nội dung QR ca làm & kiểm tra Geofence)
      */
     @Transactional
     public AttendanceCheckResponseDto checkinAssignment(UUID userId, UUID assignmentId, AttendanceCheckRequestDto request) {
@@ -203,6 +203,35 @@ public class WorkerJobService {
 
         Shift shift = assignment.getShift();
         Instant now = Instant.now();
+
+        // 1. Xác thực mã QR Check-in
+        String qrContent = request != null && request.getQrContent() != null ? request.getQrContent().trim() : "";
+        if (qrContent.startsWith("CANI_CHECKOUT:")) {
+            throw new BadRequestException("Đây là mã QR Check-out (Kết ca). Vui lòng quét mã QR Check-in để vào ca làm việc!");
+        }
+        if (qrContent.startsWith("CANI_CHECKIN:") && shift != null && shift.getShiftId() != null) {
+            String scannedShiftPart = qrContent.substring("CANI_CHECKIN:".length()).trim();
+            if (!scannedShiftPart.isEmpty() && !scannedShiftPart.startsWith(shift.getShiftId().toString())) {
+                throw new BadRequestException("Mã QR Check-in này không thuộc ca làm việc hiện tại của bạn!");
+            }
+        }
+
+        // 2. Kiểm tra khoảng cách Geofence nếu có tọa độ
+        if (request != null && request.getLat() != null && request.getLng() != null && shift != null) {
+            Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat()
+                    : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+            Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng()
+                    : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+            if (targetLat != null && targetLng != null) {
+                double distanceKm = MatchingDispatchService.calculateDistance(
+                        request.getLat(), request.getLng(), targetLat, targetLng);
+                if (!qrContent.startsWith("CANI_CHECKIN:") && distanceKm > 0.2) {
+                    throw new BadRequestException(String.format(
+                            "Vị trí hiện tại của bạn cách điểm sự kiện %.2f km (vượt quá bán kính điểm danh 200m). Vui lòng đến đúng điểm sự kiện hoặc quét mã QR chính thức tại quầy Ban tổ chức.",
+                            distanceKm));
+                }
+            }
+        }
 
         AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
                 .orElseGet(() -> AttendanceLog.builder()
@@ -219,10 +248,14 @@ public class WorkerJobService {
 
         AttendanceStatus status = isOnTime ? AttendanceStatus.ON_TIME : AttendanceStatus.LATE;
 
+        attendanceLog.setQrGeneratedAt(now);
+        attendanceLog.setQrExpiresAt(shift != null && shift.getEndTime() != null
+                ? shift.getEndTime().plus(Duration.ofHours(2))
+                : now.plus(Duration.ofHours(8)));
         attendanceLog.setCheckinTime(now);
-        attendanceLog.setCheckinLat(request.getLat());
-        attendanceLog.setCheckinLng(request.getLng());
-        attendanceLog.setCheckinQrHash(request.getQrContent() != null ? hashString(request.getQrContent()) : "MANUAL_CHECKIN");
+        attendanceLog.setCheckinLat(request != null ? request.getLat() : null);
+        attendanceLog.setCheckinLng(request != null ? request.getLng() : null);
+        attendanceLog.setCheckinQrHash(!qrContent.isEmpty() ? hashString(qrContent) : "MANUAL_CHECKIN");
         attendanceLog.setIsOnTime(isOnTime);
         attendanceLog.setAttendanceStatus(status);
 
@@ -253,6 +286,18 @@ public class WorkerJobService {
     public AttendanceCheckResponseDto checkoutAssignment(UUID userId, UUID assignmentId, AttendanceCheckRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
+        Shift shift = assignment.getShift();
+
+        String qrContent = request != null && request.getQrContent() != null ? request.getQrContent().trim() : "";
+        if (qrContent.startsWith("CANI_CHECKIN:")) {
+            throw new BadRequestException("Đây là mã QR Check-in (Vào ca). Vui lòng quét mã QR Check-out để kết thúc ca làm việc!");
+        }
+        if (qrContent.startsWith("CANI_CHECKOUT:") && shift != null && shift.getShiftId() != null) {
+            String scannedShiftPart = qrContent.substring("CANI_CHECKOUT:".length()).trim();
+            if (!scannedShiftPart.isEmpty() && !scannedShiftPart.startsWith(shift.getShiftId().toString())) {
+                throw new BadRequestException("Mã QR Check-out này không thuộc ca làm việc hiện tại của bạn!");
+            }
+        }
 
         AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
                 .orElseThrow(() -> new BadRequestException("Bạn chưa check-in vào ca làm việc này nên không thể check-out."));
@@ -267,7 +312,7 @@ public class WorkerJobService {
         BigDecimal hoursWorked = BigDecimal.valueOf(minutes / 60.0);
 
         attendanceLog.setCheckoutTime(now);
-        attendanceLog.setCheckoutQrHash(request.getQrContent() != null ? hashString(request.getQrContent()) : "MANUAL_CHECKOUT");
+        attendanceLog.setCheckoutQrHash(!qrContent.isEmpty() ? hashString(qrContent) : "MANUAL_CHECKOUT");
         attendanceLog.setHoursWorked(hoursWorked);
         attendanceLog.setAttendanceStatus(AttendanceStatus.CHECKED_OUT);
 
@@ -337,6 +382,62 @@ public class WorkerJobService {
 
         nearbyList.sort(Comparator.comparingDouble(NearbyShiftResponseDto::getDistanceKm));
         return nearbyList;
+    }
+
+    /**
+     * Worker chủ động ứng tuyển trực tiếp vào ca làm việc trên Job Radar (M5)
+     */
+    @Transactional
+    public ShiftAssignmentResponseDto applyForShift(UUID userId, UUID shiftId) {
+        Worker worker = getWorkerOrThrow(userId);
+        Shift shift = shiftRepository.findById(shiftId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy ca làm việc ID: " + shiftId));
+
+        if (shift.getStatus() != ShiftStatus.ACTIVE) {
+            throw new BadRequestException("Ca làm việc này hiện không còn mở tuyển nhân sự.");
+        }
+
+        if (shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
+            throw new BadRequestException("Bạn đã nhận hoặc ứng tuyển vào ca làm việc này rồi!");
+        }
+
+        List<AssignmentStatus> activeStatuses = List.of(
+                AssignmentStatus.CONFIRMED,
+                AssignmentStatus.CHECKED_IN,
+                AssignmentStatus.PENDING
+        );
+        List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
+                worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
+        if (!conflicts.isEmpty()) {
+            throw new BadRequestException("Bạn đã có một ca làm việc khác trùng khung giờ với ca này!");
+        }
+
+        int updatedRows = shiftRepository.incrementConfirmedWorkersAtomic(shiftId);
+        if (updatedRows == 0) {
+            throw new BadRequestException("Rất tiếc! Ca làm việc này vừa đủ số lượng nhân sự.");
+        }
+
+        ShiftAssignment assignment = ShiftAssignment.builder()
+                .shift(shift)
+                .worker(worker)
+                .source(AssignmentSource.MATCHING)
+                .status(AssignmentStatus.CONFIRMED)
+                .eoConfirmed(false)
+                .build();
+        assignment = shiftAssignmentRepository.save(assignment);
+
+        directPaymentService.createInitialPayment(assignment);
+
+        Event event = shift.getEvent();
+        if (event != null) {
+            event.setTotalConfirmedWorkers((event.getTotalConfirmedWorkers() != null ? event.getTotalConfirmedWorkers() : 0) + 1);
+            eventRepository.save(event);
+        }
+
+        log.info("Worker {} đã ứng tuyển trực tiếp thành công vào ca {} (Assignment ID: {})",
+                userId, shiftId, assignment.getAssignmentId());
+
+        return mapToAssignmentDto(assignment);
     }
 
     // =========================================================================
@@ -714,7 +815,9 @@ public class WorkerJobService {
         Double venueLng = s != null && s.getLocationLng() != null ? s.getLocationLng()
                 : (e != null && e.getVenueLng() != null ? e.getVenueLng() : DEFAULT_CENTER_LNG);
 
-        Optional<AttendanceLog> attendanceOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(a.getAssignmentId());
+        Optional<AttendanceLog> attendanceOpt = attendanceLogRepository != null
+                ? attendanceLogRepository.findByShiftAssignment_AssignmentId(a.getAssignmentId())
+                : Optional.empty();
 
         return ShiftAssignmentResponseDto.builder()
                 .assignmentId(a.getAssignmentId())

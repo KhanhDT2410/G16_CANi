@@ -65,7 +65,7 @@ class EkycConfirmedInfoCard extends StatelessWidget {
               ),
             ],
           ),
-          const Divider(height: 16),
+          const Divider(height: 16, color: Color(0xFFDCFCE7)),
           if (state.confirmedCccd != null)
             _buildInfoRow('Số CCCD:', state.confirmedCccd!),
           if (state.confirmedFullName != null)
@@ -94,7 +94,7 @@ class EkycConfirmedInfoCard extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
             ),
           ),
           Expanded(
@@ -102,7 +102,8 @@ class EkycConfirmedInfoCard extends StatelessWidget {
               value,
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
-                fontSize: 13,
+                fontSize: 13.5,
+                color: Color(0xFF0F172A),
               ),
             ),
           ),

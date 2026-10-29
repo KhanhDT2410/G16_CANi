@@ -11,6 +11,12 @@ class TermsOfServiceDialog extends StatefulWidget {
     required this.onAccepted,
   });
 
+  /// Ghi nhận người dùng đã chấp thuận điều khoản (ví dụ: đã tick chọn khi đăng ký)
+  static Future<void> markAccepted(String userId) async {
+    const storage = FlutterSecureStorage();
+    await storage.write(key: 'cani_terms_accepted_$userId', value: 'true');
+  }
+
   static Future<void> checkAndShow(BuildContext context, String userId) async {
     const storage = FlutterSecureStorage();
     final accepted = await storage.read(key: 'cani_terms_accepted_$userId');

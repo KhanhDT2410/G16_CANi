@@ -5,8 +5,11 @@ import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/auth/screens/verify_email_screen.dart';
 import 'package:cani/features/auth/widgets/auth_error_banner.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
+import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
+import 'package:cani/shared/widgets/app_back_button.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
+import 'package:cani/shared/widgets/registration_stepper.dart';
 
 /// RegisterScreen - Màn hình Đăng ký tài khoản Worker CANi
 /// Thiết kế đồng bộ 100% Visual DNA với LoginScreen theo bản prototype OpenDesign:
@@ -48,6 +51,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final success = await ref.read(authStateProvider.notifier).loginWithGoogle();
     if (!mounted) return;
     if (success) {
+      final user = ref.read(authStateProvider).user;
+      if (user != null) {
+        await TermsOfServiceDialog.markAccepted(user.id);
+      }
+      if (!mounted) return;
       _showToast('Đăng ký qua Google thành công! Bắt đầu định danh CCCD.', isError: false);
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
@@ -110,7 +118,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildTopNavigation(context),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                const RegistrationStepper(currentStep: 1),
+                const SizedBox(height: 14),
                 _buildBrandHeader(screenWidth),
                 const SizedBox(height: 18),
                 _buildGoogleFastTrack(authState),
@@ -140,33 +150,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget _buildTopNavigation(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: InkWell(
+      child: AppBackButton(
         onTap: () {
           ref.read(authStateProvider.notifier).clearError();
           Navigator.of(context).pop();
         },
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0F7FF),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0077FF).withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.arrow_back_ios_new,
-            size: 16,
-            color: Color(0xFF1E293B),
-          ),
-        ),
       ),
     );
   }

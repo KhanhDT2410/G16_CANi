@@ -12,11 +12,13 @@ class EkycResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -24,32 +26,37 @@ class EkycResultCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.analytics_outlined, color: Colors.blueAccent),
+                const Icon(Icons.analytics_outlined, color: Color(0xFF0077FF)),
                 const SizedBox(width: 8),
                 const Text(
                   'Chi Tiết Xác Thực eKYC',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: Color(0xFF0B1B3D),
+                    letterSpacing: -0.2,
+                  ),
                 ),
                 const Spacer(),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: item.isApproved ? Colors.green : Colors.orange,
+                    color: item.isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     item.status,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
                   ),
                 ),
               ],
             ),
-            const Divider(height: 24),
+            const Divider(height: 24, color: Color(0xFFF1F5F9)),
 
             // Scores
             Row(
@@ -58,14 +65,14 @@ class EkycResultCard extends StatelessWidget {
                   child: _buildMetricTile(
                     'Độ khớp khuôn mặt',
                     '${item.faceMatchScore.toStringAsFixed(1)}%',
-                    item.faceMatchScore >= 80 ? Colors.green : Colors.orange,
+                    item.faceMatchScore >= 80 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                   ),
                 ),
                 Expanded(
                   child: _buildMetricTile(
                     'Độ tin cậy OCR',
                     '${(item.ocrConfidence * 100).toStringAsFixed(1)}%',
-                    item.ocrConfidence >= 0.85 ? Colors.green : Colors.blue,
+                    item.ocrConfidence >= 0.85 ? const Color(0xFF10B981) : const Color(0xFF0077FF),
                   ),
                 ),
               ],
@@ -84,20 +91,21 @@ class EkycResultCard extends StatelessWidget {
 
             // Reason
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.info_outline,
-                      size: 18, color: Colors.blueGrey),
+                      size: 18, color: Color(0xFF0077FF)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       item.routingReason,
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
                     ),
                   ),
                 ],
@@ -111,18 +119,19 @@ class EkycResultCard extends StatelessWidget {
 
   Widget _buildMetricTile(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(10),
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
           Text(
             value,
             style: TextStyle(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
               fontSize: 18,
               color: color,
             ),
@@ -130,7 +139,7 @@ class EkycResultCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, color: Colors.grey),
+            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -140,7 +149,7 @@ class EkycResultCard extends StatelessWidget {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -148,7 +157,7 @@ class EkycResultCard extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
             ),
           ),
           Expanded(
@@ -156,7 +165,8 @@ class EkycResultCard extends StatelessWidget {
               value,
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
-                fontSize: 13,
+                fontSize: 13.5,
+                color: Color(0xFF0F172A),
               ),
             ),
           ),

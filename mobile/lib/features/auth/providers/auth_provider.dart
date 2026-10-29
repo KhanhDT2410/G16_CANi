@@ -5,6 +5,7 @@ import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/core/notifications/fcm_service.dart';
 import 'package:cani/features/auth/data/auth_repository.dart';
 import 'package:cani/features/auth/models/user_dto.dart';
+import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 
 class AuthState {
   const AuthState({
@@ -115,13 +116,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await _repository.registerWorker(
+      final user = await _repository.registerWorker(
         email: email,
         password: password,
         fullName: fullName,
         otpCode: otpCode,
         phone: phone,
       );
+      // Người dùng đã đồng ý điều khoản ở bước 1, lưu trạng thái để tránh popup đè lên các bước tiếp theo
+      await TermsOfServiceDialog.markAccepted(user.id);
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {

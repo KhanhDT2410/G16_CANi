@@ -21,13 +21,6 @@ class SkillHubScreen extends ConsumerWidget {
     final state = ref.watch(skillVerificationProvider);
     final user = ref.watch(authStateProvider).user;
 
-    // Automatically check and show the SP policy popup for first-time workers entering this screen
-    if (user != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        SkillPointPolicyDialog.checkAndShow(context, user.id);
-      });
-    }
-
     final pointsList = state.skillPoints;
     final totalAllSp = pointsList.fold<int>(0, (sum, p) => sum + p.totalSp);
     final currentTier = pointsList.isNotEmpty ? pointsList.first.tier : 'STARTER';

@@ -101,14 +101,48 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
     }
   }
 
+  InputDecoration _inputDecoration({
+    required String label,
+    required String hint,
+    required IconData prefixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+      prefixIcon: Icon(prefixIcon, color: const Color(0xFF0077FF), size: 20),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      counterText: '',
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF0077FF), width: 1.5),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    const inputTextStyle = TextStyle(
+      fontSize: 14.5,
+      fontWeight: FontWeight.w600,
+      color: Color(0xFF0F172A),
+    );
 
     return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: SingleChildScrollView(
@@ -123,11 +157,11 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEFF6FF),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.badge_outlined, color: theme.colorScheme.primary),
+                    child: const Icon(Icons.badge_outlined, color: Color(0xFF0077FF)),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
@@ -136,35 +170,39 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
                       children: [
                         Text(
                           'Xác Nhận Thông Tin Thẻ CCCD',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16.5,
+                            color: Color(0xFF0B1B3D),
+                            letterSpacing: -0.3,
+                          ),
                         ),
                         SizedBox(height: 2),
                         Text(
                           'Kiểm tra và điều chỉnh thông tin chính xác theo thẻ thật',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
-              const Divider(height: 24),
+              const Divider(height: 24, color: Color(0xFFF1F5F9)),
 
               // Số CCCD
               TextFormField(
                 controller: _cccdController,
                 keyboardType: TextInputType.number,
                 maxLength: 12,
-                decoration: const InputDecoration(
-                  labelText: 'Số Căn cước công dân (12 chữ số) *',
-                  hintText: 'Ví dụ: 001202012345',
-                  prefixIcon: Icon(Icons.fingerprint),
-                  border: OutlineInputBorder(),
-                  counterText: '',
+                style: inputTextStyle,
+                decoration: _inputDecoration(
+                  label: 'Số Căn cước công dân (12 chữ số) *',
+                  hint: 'Ví dụ: 001202012345',
+                  prefixIcon: Icons.fingerprint,
                 ),
                 validator: (val) {
                   if (val == null || val.trim().length != 12) {
@@ -182,11 +220,11 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
               TextFormField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Họ và tên (In hoa có dấu hoặc không dấu) *',
-                  hintText: 'Ví dụ: PHẠM DUY HƯNG',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
+                style: inputTextStyle,
+                decoration: _inputDecoration(
+                  label: 'Họ và tên (In hoa có dấu hoặc không dấu) *',
+                  hint: 'Ví dụ: NGUYỄN VĂN A',
+                  prefixIcon: Icons.person,
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
@@ -205,11 +243,11 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
                     child: TextFormField(
                       controller: _dobController,
                       keyboardType: TextInputType.datetime,
-                      decoration: const InputDecoration(
-                        labelText: 'Ngày sinh (dd/MM/yyyy) *',
-                        hintText: '26/07/2000',
-                        prefixIcon: Icon(Icons.calendar_today),
-                        border: OutlineInputBorder(),
+                      style: inputTextStyle,
+                      decoration: _inputDecoration(
+                        label: 'Ngày sinh (dd/MM/yyyy) *',
+                        hint: '26/07/2000',
+                        prefixIcon: Icons.calendar_today,
                       ),
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) {
@@ -224,9 +262,26 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
                     flex: 2,
                     child: DropdownButtonFormField<String>(
                       initialValue: _gender,
-                      decoration: const InputDecoration(
+                      style: inputTextStyle,
+                      dropdownColor: Colors.white,
+                      decoration: InputDecoration(
                         labelText: 'Giới tính',
-                        border: OutlineInputBorder(),
+                        labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF0077FF), width: 1.5),
+                        ),
                       ),
                       items: const [
                         DropdownMenuItem(value: 'Nam', child: Text('Nam')),
@@ -245,11 +300,11 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
               TextFormField(
                 controller: _addressController,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Nơi thường trú *',
-                  hintText: 'Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố',
-                  prefixIcon: Icon(Icons.home_outlined),
-                  border: OutlineInputBorder(),
+                style: inputTextStyle,
+                decoration: _inputDecoration(
+                  label: 'Nơi thường trú *',
+                  hint: 'Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố',
+                  prefixIcon: Icons.home_outlined,
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
@@ -264,23 +319,51 @@ class _CccdConfirmDialogState extends State<CccdConfirmDialog> {
               TextFormField(
                 controller: _issueDateController,
                 keyboardType: TextInputType.datetime,
-                decoration: const InputDecoration(
-                  labelText: 'Ngày cấp (dd/MM/yyyy)',
-                  hintText: '10/05/2021',
-                  prefixIcon: Icon(Icons.event_available),
-                  border: OutlineInputBorder(),
+                style: inputTextStyle,
+                decoration: _inputDecoration(
+                  label: 'Ngày cấp (dd/MM/yyyy)',
+                  hint: '10/05/2021',
+                  prefixIcon: Icons.event_available,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
 
-              // Action Buttons
-              FilledButton.icon(
-                onPressed: _submit,
-                icon: const Icon(Icons.check),
-                label: const Text('Lưu Thông Tin CCCD Xác Nhận', style: TextStyle(fontWeight: FontWeight.bold)),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              // Action Button (Gradient button)
+              Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00D2FF), Color(0xFF0066FF)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0077FF).withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: _submit,
+                  icon: const Icon(Icons.check, color: Colors.white, size: 20),
+                  label: const Text(
+                    'Lưu Thông Tin CCCD Xác Nhận',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15.5,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ],

@@ -5,4 +5,5 @@ export 'models/user_dto.dart';
 export 'providers/auth_provider.dart';
 export 'screens/login_screen.dart';
 export 'screens/register_screen.dart';
+export 'screens/verify_email_screen.dart';
 export 'widgets/auth_text_field.dart';

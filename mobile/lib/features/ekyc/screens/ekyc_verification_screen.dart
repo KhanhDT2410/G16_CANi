@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:cani/app/home_screen.dart';
 import '../models/ekyc_models.dart';
 import '../providers/ekyc_provider.dart';
 import 'card_scanner_screen.dart';
@@ -9,7 +11,12 @@ import 'cccd_qr_scanner_screen.dart';
 import 'cccd_confirm_dialog.dart';
 
 class EkycVerificationScreen extends ConsumerStatefulWidget {
-  const EkycVerificationScreen({super.key});
+  final bool isOnboarding;
+
+  const EkycVerificationScreen({
+    super.key,
+    this.isOnboarding = false,
+  });
 
   @override
   ConsumerState<EkycVerificationScreen> createState() => _EkycVerificationScreenState();
@@ -168,6 +175,13 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
     );
   }
 
+  void _navigateToHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(ekycProvider);
@@ -177,7 +191,25 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
       appBar: AppBar(
         title: const Text('Định Danh Điện Tử (eKYC)'),
         elevation: 0,
+        leading: widget.isOnboarding
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Hoàn thiện sau',
+                onPressed: _navigateToHome,
+              )
+            : null,
         actions: [
+          if (widget.isOnboarding)
+            TextButton(
+              onPressed: _navigateToHome,
+              child: const Text(
+                'Hoàn thiện sau',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0077FF),
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.edit_note),
             tooltip: 'Xem & sửa thông tin CCCD',
@@ -285,6 +317,9 @@ class _EkycVerificationScreenState extends ConsumerState<EkycVerificationScreen>
                             backgroundColor: Colors.green,
                           ),
                         );
+                        if (widget.isOnboarding) {
+                          _navigateToHome();
+                        }
                       }
                     }
                   : null,

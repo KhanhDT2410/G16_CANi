@@ -1,8 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/screens/verify_email_screen.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
 
@@ -28,79 +28,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // 6 ô nhập mã OTP tách rời (Auto-advance)
-  final List<TextEditingController> _otpControllers =
-      List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
-
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeTerms = true;
 
-  bool _isSendingOtp = false;
-  bool _otpSent = false;
-  int _countdown = 0;
-  Timer? _timer;
-
   @override
   void dispose() {
-    _timer?.cancel();
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    for (final c in _otpControllers) {
-      c.dispose();
-    }
-    for (final f in _otpFocusNodes) {
-      f.dispose();
-    }
     super.dispose();
-  }
-
-  String get _combinedOtpCode {
-    return _otpControllers.map((c) => c.text.trim()).join();
-  }
-
-  void _startCountdown() {
-    setState(() {
-      _countdown = 60;
-      _otpSent = true;
-    });
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      if (_countdown > 0) {
-        setState(() => _countdown--);
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  Future<void> _handleSendOtp() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      _showToast('Vui lòng nhập địa chỉ email trước khi nhận mã OTP', isError: true);
-      return;
-    }
-    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-    if (!emailRegex.hasMatch(email)) {
-      _showToast('Định dạng email không hợp lệ', isError: true);
-      return;
-    }
-
-    setState(() => _isSendingOtp = true);
-    final success = await ref.read(authStateProvider.notifier).sendOtp(email);
-    if (!mounted) return;
-    setState(() => _isSendingOtp = false);
-
-    if (success) {
-      _startCountdown();
-      _showToast('Mã OTP 6 số đã được gửi tới email của bạn!', isError: false);
-      _otpFocusNodes[0].requestFocus();
-    }
   }
 
   Future<void> _handleGoogleRegister() async {
@@ -112,7 +51,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
-  Future<void> _submitRegister() async {
+  Future<void> _proceedToVerifyEmail() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     if (!_agreeTerms) {
@@ -120,24 +59,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    final otp = _combinedOtpCode;
-    if (otp.length != 6) {
-      _showToast('Vui lòng nhập đầy đủ 6 chữ số mã xác thực OTP', isError: true);
-      return;
-    }
-
-    final success = await ref.read(authStateProvider.notifier).register(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          fullName: _fullNameController.text.trim(),
-          otpCode: otp,
-          phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        );
-
+    final email = _emailController.text.trim();
+    final success = await ref.read(authStateProvider.notifier).sendOtp(email);
     if (!mounted) return;
+
     if (success) {
-      _showToast('Tạo tài khoản thành công! Chào mừng bạn đến với CANi.', isError: false);
-      Navigator.of(context).pop();
+      _showToast('Mã OTP 6 số đã được gửi tới email của bạn.', isError: false);
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VerifyEmailScreen(
+            email: email,
+            password: _passwordController.text,
+            fullName: _fullNameController.text.trim(),
+            phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          ),
+        ),
+      );
     }
   }
 
@@ -342,21 +279,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         const SizedBox(height: 14),
 
-        // Email + Nút gửi OTP inline (Suffix Button)
+        // Email
         AuthTextField(
           controller: _emailController,
-          label: 'Địa chỉ email · xác minh OTP',
+          label: 'Địa chỉ email',
           hintText: 'worker@cani.vn',
           keyboardType: TextInputType.emailAddress,
           prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF0077FF), size: 20),
-          suffixIcon: _buildOtpPillButton(),
-          validator: (val) =>
-              val == null || val.trim().isEmpty ? 'Vui lòng nhập địa chỉ email' : null,
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return 'Vui lòng nhập địa chỉ email';
+            }
+            final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+            if (!emailRegex.hasMatch(val.trim())) {
+              return 'Định dạng email không hợp lệ';
+            }
+            return null;
+          },
         ),
-        const SizedBox(height: 14),
-
-        // 6 ô nhập mã OTP tách rời
-        _buildOtpBoxesSection(screenWidth),
         const SizedBox(height: 14),
 
         // Số điện thoại
@@ -418,128 +358,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             if (val != _passwordController.text) return 'Mật khẩu xác nhận không khớp';
             return null;
           },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOtpPillButton() {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6, top: 5, bottom: 5),
-      child: InkWell(
-        onTap: (_isSendingOtp || _countdown > 0) ? null : _handleSendOtp,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: _countdown > 0
-                ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                : const Color(0xFF0077FF).withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _countdown > 0
-                  ? const Color(0xFF10B981).withValues(alpha: 0.3)
-                  : const Color(0xFF0077FF).withValues(alpha: 0.2),
-            ),
-          ),
-          child: _isSendingOtp
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Color(0xFF0077FF),
-                  ),
-                )
-              : Text(
-                  _countdown > 0
-                      ? 'Gửi lại (${_countdown}s)'
-                      : (_otpSent ? 'Gửi lại mã' : 'Gửi mã OTP'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: _countdown > 0
-                        ? const Color(0xFF059669)
-                        : const Color(0xFF0077FF),
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOtpBoxesSection(double screenWidth) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Mã xác thực OTP (6 chữ số)',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E293B),
-              ),
-            ),
-            if (_otpSent)
-              const Text(
-                'Đã gửi tới email ✓',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF10B981),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(6, (index) {
-            return SizedBox(
-              width: (screenWidth > 380) ? 46 : 42,
-              height: 52,
-              child: TextFormField(
-                controller: _otpControllers[index],
-                focusNode: _otpFocusNodes[index],
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                maxLength: 1,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0B1B3D),
-                ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  contentPadding: EdgeInsets.zero,
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF0077FF), width: 2),
-                  ),
-                ),
-                onChanged: (val) {
-                  if (val.isNotEmpty && index < 5) {
-                    _otpFocusNodes[index + 1].requestFocus();
-                  } else if (val.isEmpty && index > 0) {
-                    _otpFocusNodes[index - 1].requestFocus();
-                  }
-                },
-              ),
-            );
-          }),
         ),
       ],
     );
@@ -612,7 +430,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: authState.isLoading ? null : _submitRegister,
+        onPressed: authState.isLoading ? null : _proceedToVerifyEmail,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
@@ -633,7 +451,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Tạo Tài Khoản',
+                    'Tiếp tục (Nhận mã OTP)',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,

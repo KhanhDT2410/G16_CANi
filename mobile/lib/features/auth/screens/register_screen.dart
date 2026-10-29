@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/auth/screens/verify_email_screen.dart';
+import 'package:cani/features/auth/widgets/auth_error_banner.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
+import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
 
 /// RegisterScreen - Màn hình Đăng ký tài khoản Worker CANi
@@ -46,8 +48,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final success = await ref.read(authStateProvider.notifier).loginWithGoogle();
     if (!mounted) return;
     if (success) {
-      _showToast('Đăng ký qua Google thành công!', isError: false);
-      Navigator.of(context).pop();
+      _showToast('Đăng ký qua Google thành công! Bắt đầu định danh CCCD.', isError: false);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const EkycVerificationScreen(isOnboarding: true),
+        ),
+        (route) => false,
+      );
     }
   }
 
@@ -111,7 +118,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 _buildDivider(),
                 const SizedBox(height: 16),
                 if (authState.errorMessage != null) ...[
-                  _buildErrorAlert(authState.errorMessage!),
+                  AuthErrorBanner(errorMessage: authState.errorMessage!),
                   const SizedBox(height: 16),
                 ],
                 _buildFormInputs(screenWidth),
@@ -238,29 +245,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         Expanded(child: Divider(color: Colors.grey.shade300)),
       ],
-    );
-  }
-
-  Widget _buildErrorAlert(String errorMessage) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFECACA)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              errorMessage,
-              style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

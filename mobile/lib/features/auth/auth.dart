@@ -7,3 +7,6 @@ export 'screens/login_screen.dart';
 export 'screens/register_screen.dart';
 export 'screens/verify_email_screen.dart';
 export 'widgets/auth_text_field.dart';
+export 'widgets/auth_error_banner.dart';
+export 'widgets/otp_pin_input_row.dart';
+export 'widgets/otp_resend_countdown.dart';

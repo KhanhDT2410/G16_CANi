@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/widgets/auth_error_banner.dart';
+import 'package:cani/features/auth/widgets/otp_pin_input_row.dart';
+import 'package:cani/features/auth/widgets/otp_resend_countdown.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
 
 /// VerifyEmailScreen - Màn hình Xác thực mã OTP qua Email riêng biệt (UC-01)
-/// Nhận thông tin đăng ký từ RegisterScreen, cho phép nhập mã OTP 6 số,
-/// gửi lại OTP kèm vòng đếm ngược 60s. Sau khi đăng ký thành công, tự động
-/// đăng nhập và chuyển hướng sang luồng eKYC Onboarding.
 class VerifyEmailScreen extends ConsumerStatefulWidget {
   final String email;
   final String password;
@@ -101,12 +101,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           phone: widget.phone,
         );
 
-    if (!mounted) return;
-
-    if (!registered) {
-      // Giữ nguyên form tại VerifyEmailScreen để người dùng kiểm tra hoặc gửi lại OTP
-      return;
-    }
+    if (!mounted || !registered) return;
 
     // 2. Tự động đăng nhập để lưu JWT session token phục vụ luồng eKYC
     final loggedIn = await ref.read(authStateProvider.notifier).login(
@@ -118,7 +113,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
     if (loggedIn) {
       _showToast('Xác thực email thành công! Bắt đầu định danh CCCD.', isError: false);
-      // Chuyển hướng sang màn hình eKYC Onboarding (xóa stack auth)
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => const EkycVerificationScreen(isOnboarding: true),
@@ -126,7 +120,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         (route) => false,
       );
     } else {
-      // Trường hợp hiếm: tạo user thành công nhưng login có sự cố -> pop về LoginScreen
       _showToast('Tài khoản đã tạo thành công. Vui lòng đăng nhập.', isError: false);
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
@@ -162,14 +155,22 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
               _buildEmailBadge(),
               const SizedBox(height: 24),
               if (authState.errorMessage != null) ...[
-                _buildErrorAlert(authState.errorMessage!),
+                AuthErrorBanner(errorMessage: authState.errorMessage!),
                 const SizedBox(height: 16),
               ],
-              _buildOtpBoxesSection(screenWidth),
+              OtpPinInputRow(
+                controllers: _otpControllers,
+                focusNodes: _otpFocusNodes,
+                screenWidth: screenWidth,
+              ),
               const SizedBox(height: 24),
-              _buildResendSection(),
+              OtpResendCountdown(
+                countdown: _countdown,
+                isSendingOtp: _isSendingOtp,
+                onResend: _handleResendOtp,
+              ),
               const SizedBox(height: 32),
-              _buildGradientSubmitButton(authState),
+              _buildSubmitButton(authState),
             ],
           ),
         ),
@@ -214,9 +215,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   Widget _buildBrandHeader(double screenWidth) {
     return Column(
       children: [
-        CaniBrandLogo(
-          width: (screenWidth * 0.55).clamp(160.0, 220.0),
-        ),
+        CaniBrandLogo(width: (screenWidth * 0.55).clamp(160.0, 220.0)),
         const SizedBox(height: 12),
         const Text(
           'Xác Thực Email',
@@ -270,133 +269,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     );
   }
 
-  Widget _buildErrorAlert(String errorMessage) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFECACA)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              errorMessage,
-              style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOtpBoxesSection(double screenWidth) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(6, (index) {
-            return SizedBox(
-              width: (screenWidth > 380) ? 46 : 42,
-              height: 54,
-              child: TextFormField(
-                controller: _otpControllers[index],
-                focusNode: _otpFocusNodes[index],
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                maxLength: 1,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0B1B3D),
-                ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  contentPadding: EdgeInsets.zero,
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: Color(0xFF0077FF), width: 2),
-                  ),
-                ),
-                onChanged: (val) {
-                  if (val.isNotEmpty && index < 5) {
-                    _otpFocusNodes[index + 1].requestFocus();
-                  } else if (val.isEmpty && index > 0) {
-                    _otpFocusNodes[index - 1].requestFocus();
-                  }
-                },
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildResendSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text(
-          'Không nhận được mã? ',
-          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-        ),
-        if (_countdown > 0)
-          Text(
-            'Gửi lại sau ${_countdown}s',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF059669),
-            ),
-          )
-        else
-          InkWell(
-            onTap: _isSendingOtp ? null : _handleResendOtp,
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: _isSendingOtp
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF0077FF),
-                      ),
-                    )
-                  : const Text(
-                      'Gửi lại ngay',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0077FF),
-                      ),
-                    ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildGradientSubmitButton(AuthState authState) {
+  Widget _buildSubmitButton(AuthState authState) {
     return Container(
       height: 52,
       decoration: BoxDecoration(
@@ -451,4 +324,3 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     );
   }
 }
-

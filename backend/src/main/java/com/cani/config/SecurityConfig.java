@@ -47,6 +47,11 @@ public class SecurityConfig {
                     "/api/v1/workers/skills/tiers/config"
                 ).permitAll()
                 .requestMatchers("/api/v1/workers/skills/admin/**").hasRole("ADMIN")
+                // Module tranh chấp (UC-99/100/102/109): Customer Care cùng quyền với Admin
+                // (BR-59: CC có thẩm quyền quyết định Level-1; Admin quyết định cuối).
+                .requestMatchers("/api/v1/admin/disputes/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                .requestMatchers("/api/v1/disputes/**").authenticated()
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers(
                     "/api/v1/workers/skills/**",
                     "/api/v1/workers/ekyc/**",

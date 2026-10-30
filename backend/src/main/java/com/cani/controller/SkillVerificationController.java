@@ -4,10 +4,6 @@ import com.cani.dto.response.ApiResponse;
 import com.cani.dto.skill.*;
 import com.cani.entity.Skill;
 import com.cani.entity.User;
-import com.cani.entity.Worker;
-import com.cani.entity.enums.UserRole;
-import com.cani.exception.BadRequestException;
-import com.cani.exception.ResourceNotFoundException;
 import com.cani.service.SkillVerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -129,9 +125,19 @@ public class SkillVerificationController {
     }
 
     /**
-     * Admin manual review for Medium-confidence submissions (UC-47)
+     * Admin / Customer Care queue for Medium-confidence submissions (UC-47)
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
+    @GetMapping("/admin/queue")
+    public ResponseEntity<ApiResponse<List<SkillVerificationResponseDto>>> getPendingQueue() {
+        List<SkillVerificationResponseDto> queue = verificationService.getPendingVerificationQueue();
+        return ResponseEntity.ok(ApiResponse.ok(queue, "Lấy danh sách hồ sơ thẩm định kỹ năng chờ duyệt thành công"));
+    }
+
+    /**
+     * Admin / Customer Care manual review for Medium-confidence submissions (UC-47)
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
     @PostMapping("/admin/{id}/review")
     public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> adminReview(
             @PathVariable("id") UUID verificationId,
@@ -144,7 +150,7 @@ public class SkillVerificationController {
                 : null;
 
         SkillVerificationResponseDto response = verificationService.adminReview(verificationId, adminUserId, approved, reviewNotes);
-        String msg = approved ? "Admin đã phê duyệt kỹ năng và cộng +25 SP_verify" : "Admin đã từ chối yêu cầu xác thực";
+        String msg = approved ? "Đã phê duyệt kỹ năng và cộng +25 SP_verify" : "Đã từ chối yêu cầu xác thực";
         return ResponseEntity.ok(ApiResponse.ok(response, msg));
     }
 

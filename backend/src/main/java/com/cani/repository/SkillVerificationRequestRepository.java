@@ -14,4 +14,6 @@ public interface SkillVerificationRequestRepository extends JpaRepository<SkillV
     List<SkillVerificationRequest> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
     List<SkillVerificationRequest> findByStatusOrderByCreatedAtAsc(SkillVerificationStatus status);
+
+    long countByStatus(SkillVerificationStatus status);
 }

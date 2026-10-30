@@ -8,6 +8,7 @@ import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerEkycVerification;
 import com.cani.entity.enums.KycStatus;
+import com.cani.entity.enums.UserRole;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.UserRepository;
@@ -70,6 +71,9 @@ public class WorkerEkycService {
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy User cho User ID: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.WORKER && user.getRole() != UserRole.ADMIN) {
+                        throw new BadRequestException("Tài khoản không phải là Worker");
+                    }
                     return workerRepository.save(Worker.builder().user(user).isOnline(false).build());
                 });
 
@@ -141,14 +145,8 @@ public class WorkerEkycService {
 
             // 3. Kiểm tra chống gian lận dùng trùng CCCD cho nhiều tài khoản (trừ khi là chính worker này nộp lại)
             if (idHash != null && ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(idHash, "APPROVED", worker.getWorkerId())) {
-                if (ekycStrict) {
-                    ekycResult.setRoutingDecision("REJECTED");
-                    ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
-                } else {
-                    log.warn("Dev mode: Trùng số CCCD giữa các tài khoản test, tự động phê duyệt cho worker hiện tại: {}", worker.getWorkerId());
-                    ekycResult.setRoutingDecision("AUTO_APPROVED");
-                    ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ và tự động phê duyệt ngay qua hệ thống eKYC.");
-                }
+                ekycResult.setRoutingDecision("REJECTED");
+                ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
             }
 
             Map<String, Object> fraudFlags = new HashMap<>();
@@ -159,14 +157,12 @@ public class WorkerEkycService {
 
             String decision = ekycResult.getRoutingDecision();
             String status;
-            if ("REJECTED".equalsIgnoreCase(decision)) {
+            if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
+                status = "APPROVED";
+            } else if ("REJECTED".equalsIgnoreCase(decision)) {
                 status = "REJECTED";
             } else {
-                // Tự động phê duyệt ngay lập tức (APPROVED), không cần chờ Admin duyệt thủ công
-                status = "APPROVED";
-                decision = "AUTO_APPROVED";
-                ekycResult.setRoutingDecision("AUTO_APPROVED");
-                ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ và tự động phê duyệt ngay qua hệ thống eKYC.");
+                status = "PENDING_REVIEW";
             }
 
             // Mock link storage (Trong thực tế sẽ upload lên S3/Firebase/Supabase Storage)

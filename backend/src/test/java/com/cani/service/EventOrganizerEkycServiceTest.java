@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -136,6 +137,81 @@ class EventOrganizerEkycServiceTest {
         assertEquals("APPROVED", result.getStatus());
         assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
         verify(eoEkycVerificationRepository, times(1)).save(pending);
+        verify(eventOrganizerRepository, times(1)).save(eo);
+    }
+
+    @Test
+    @DisplayName("Nộp eKYC doanh nghiệp qua Mock Provider và bật EKYC_STRICT=true thì chuyển PENDING_REVIEW")
+    void submitEkyc_MockProvider_StrictEnabled_ManualReview() {
+        ReflectionTestUtils.setField(eventOrganizerEkycService, "ekycStrict", true);
+
+        when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+
+        EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
+                .idNumber("001201012345")
+                .fullName("MOCK NAME")
+                .faceMatchScore(95.0)
+                .ocrConfidence(0.98)
+                .routingDecision("AUTO_APPROVED")
+                .build();
+
+        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
+        when(ekycProvider.getProviderName()).thenReturn("MOCK_EKYC");
+        when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatus(anyString(), eq("APPROVED"))).thenReturn(false);
+        when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
+                .thenAnswer(invocation -> {
+                    EoEkycVerification v = invocation.getArgument(0);
+                    v.setId(UUID.randomUUID());
+                    return v;
+                });
+
+        EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
+                user.getUserId(), frontFile, backFile, selfieFile, null
+        );
+
+        assertNotNull(result);
+        assertEquals("PENDING_REVIEW", result.getStatus());
+        assertEquals("MANUAL_REVIEW", result.getRoutingDecision());
+        assertEquals("ĐẠI DIỆN DOANH NGHIỆP", result.getRepresentativeName());
+        assertTrue(result.getCccdNumberMasked().startsWith("001******"));
+        assertEquals(VerificationStatus.PENDING, eo.getVerificationStatus());
+    }
+
+    @Test
+    @DisplayName("Nộp eKYC doanh nghiệp qua Mock Provider và EKYC_STRICT=false thì tự động duyệt và đồng bộ tên user")
+    void submitEkyc_MockProvider_NotStrict_AutoApproved() {
+        ReflectionTestUtils.setField(eventOrganizerEkycService, "ekycStrict", false);
+
+        when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+
+        EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
+                .idNumber("001201012345")
+                .fullName("MOCK NAME")
+                .faceMatchScore(95.0)
+                .ocrConfidence(0.98)
+                .routingDecision("AUTO_APPROVED")
+                .build();
+
+        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
+        when(ekycProvider.getProviderName()).thenReturn("MOCK_EKYC");
+        when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatus(anyString(), eq("APPROVED"))).thenReturn(false);
+        when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
+                .thenAnswer(invocation -> {
+                    EoEkycVerification v = invocation.getArgument(0);
+                    v.setId(UUID.randomUUID());
+                    return v;
+                });
+
+        EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
+                user.getUserId(), frontFile, backFile, selfieFile, null
+        );
+
+        assertNotNull(result);
+        assertEquals("APPROVED", result.getStatus());
+        assertEquals("AUTO_APPROVED", result.getRoutingDecision());
+        assertEquals("ĐẠI DIỆN DOANH NGHIỆP", result.getRepresentativeName());
+        assertTrue(result.getCccdNumberMasked().startsWith("001******"));
+        assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
         verify(eventOrganizerRepository, times(1)).save(eo);
     }
 }

@@ -30,6 +30,7 @@ public class EventOrganizerEkycController {
     /**
      * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC doanh nghiệp
      */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @PostMapping(value = "/eo/ekyc/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> submitEkyc(
             @RequestParam("frontImage") MultipartFile frontImage,
@@ -59,6 +60,7 @@ public class EventOrganizerEkycController {
     /**
      * Nhà tổ chức kiểm tra trạng thái định danh eKYC của đơn vị mình
      */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/eo/ekyc/status")
     public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> getMyEkycStatus(
             @RequestParam(value = "userId", required = false) UUID explicitUserId,

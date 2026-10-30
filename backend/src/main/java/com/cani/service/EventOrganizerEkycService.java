@@ -7,6 +7,7 @@ import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.entity.EventOrganizer;
 import com.cani.entity.EoEkycVerification;
 import com.cani.entity.User;
+import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.VerificationStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
@@ -36,6 +37,9 @@ public class EventOrganizerEkycService {
     private final UserRepository userRepository;
     private final EkycProvider ekycProvider;
 
+    @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
+    private boolean ekycStrict;
+
     /**
      * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC doanh nghiệp
      */
@@ -51,6 +55,9 @@ public class EventOrganizerEkycService {
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
+                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
+                    }
                     return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
                 });
 
@@ -68,6 +75,23 @@ public class EventOrganizerEkycService {
                     frontBytes, frontFile.getContentType(),
                     backBytes, backFile.getContentType(),
                     selfieBytes, selfieFile.getContentType());
+
+            // Đồng bộ thông tin người đại diện nếu là chế độ Mock để phản ánh đúng người dùng đăng nhập
+            if ("MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())) {
+                if (eo.getUser() != null && eo.getUser().getFullName() != null && !eo.getUser().getFullName().isBlank()) {
+                    result.setFullName(eo.getUser().getFullName().toUpperCase());
+                }
+                int seed = eo.getEoId() != null ? eo.getEoId().hashCode() : userId.hashCode();
+                String uniqueSuffix = String.format("%06d", Math.abs(seed) % 1_000_000);
+                result.setIdNumber("001202" + uniqueSuffix);
+                if (ekycStrict) {
+                    result.setRoutingDecision("MANUAL_REVIEW");
+                    result.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
+                } else {
+                    result.setRoutingDecision("AUTO_APPROVED");
+                    result.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
+                }
+            }
 
             // 2. Băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
             String rawIdNumber = result.getIdNumber();

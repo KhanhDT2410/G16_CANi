@@ -6,6 +6,7 @@ import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/cancel_assignment_dialog.dart';
 import '../widgets/job_proposal_invite_card.dart';
+import '../widgets/payment_confirm_dialog.dart';
 import '../widgets/rate_eo_dialog.dart';
 import '../widgets/shift_assignment_card.dart';
 import '../widgets/shift_checklist_sheet.dart';
@@ -146,13 +147,27 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
-  Future<void> _confirmPayment(ShiftAssignmentItem item, String status) async {
+  Future<void> _openPaymentDialog(ShiftAssignmentItem a) async {
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (_) => PaymentConfirmDialog(assignment: a),
+    );
+    if (result != null && mounted) {
+      final status = result['status']!;
+      final comment = result['comment'] ?? '';
+      await _confirmPayment(a, status, comment: comment);
+    }
+  }
+
+  Future<void> _confirmPayment(ShiftAssignmentItem item, String status, {String comment = ''}) async {
     final isFull = status == 'RECEIVED_FULL' || status == 'CONFIRMED_FULL';
-    final apiStatus = isFull ? 'RECEIVED_FULL' : 'NOT_RECEIVED';
-    final localPaymentStatus = isFull ? 'CONFIRMED_FULL' : 'DISPUTED';
-    final comment = apiStatus == 'NOT_RECEIVED' ? 'Chưa nhận được tiền lương từ Ban tổ chức' : '';
+    final isPartial = status == 'RECEIVED_PARTIAL' || status == 'CONFIRMED_PARTIAL';
+    final localPaymentStatus = isFull
+        ? 'CONFIRMED_FULL'
+        : (isPartial ? 'CONFIRMED_PARTIAL' : 'DISPUTED');
+
     try {
-      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, apiStatus, comment);
+      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, status, comment);
       setState(() {
         final index = _assignments.indexWhere((a) => a.assignmentId == item.assignmentId);
         if (index != -1) {
@@ -171,17 +186,31 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
             paymentStatus: localPaymentStatus,
             declaredAmount: item.declaredAmount,
             paymentMethod: item.paymentMethod,
+            venueLat: item.venueLat,
+            venueLng: item.venueLng,
+            attendanceStatus: item.attendanceStatus,
+            checkinTime: item.checkinTime,
+            checkoutTime: item.checkoutTime,
+            hoursWorked: item.hoursWorked,
           );
         }
       });
 
       if (mounted) {
+        String msg = 'Đã xác nhận nhận đủ tiền thù lao!';
+        Color color = const Color(0xFF16A34A);
+        if (isPartial) {
+          msg = 'Đã ghi nhận tình trạng nhận một phần thù lao.';
+          color = const Color(0xFFD97706);
+        } else if (!isFull && !isPartial) {
+          msg = 'Đã gửi khiếu nại (Dispute). Đội ngũ CSKH CANi sẽ liên hệ hỗ trợ bạn!';
+          color = const Color(0xFFDC2626);
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isFull
-                ? 'Đã xác nhận nhận đủ tiền lương!'
-                : 'Đã gửi khiếu nại (Dispute). Đội ngũ CANi sẽ hỗ trợ bạn!'),
-            backgroundColor: isFull ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+            content: Text(msg),
+            backgroundColor: color,
           ),
         );
       }
@@ -509,7 +538,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
           assignment: item,
           onNavigate: () => _openNavigationSheet(item),
           onQrScan: () => _openQrScanner(item, !isCheckedIn),
-          onConfirmPayment: (status) => _confirmPayment(item, status),
+          onConfirmPayment: () => _openPaymentDialog(item),
           onOpenChecklist: () => _openChecklistSheet(item),
           onCancelAssignment: () => _openCancelDialog(item),
           onRateOrganizer: () => _openRateDialog(item),

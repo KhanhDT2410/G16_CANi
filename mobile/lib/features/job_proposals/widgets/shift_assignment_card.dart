@@ -6,7 +6,7 @@ class ShiftAssignmentCard extends StatelessWidget {
   final ShiftAssignmentItem assignment;
   final VoidCallback onNavigate;
   final VoidCallback onQrScan;
-  final void Function(String status) onConfirmPayment;
+  final VoidCallback onConfirmPayment;
   final VoidCallback? onOpenChecklist;
   final VoidCallback? onCancelAssignment;
   final VoidCallback? onRateOrganizer;
@@ -30,7 +30,9 @@ class ShiftAssignmentCard extends StatelessWidget {
     final isNotStarted = !isCheckedIn && !isCompleted;
 
     final isDeclared = a.paymentStatus == 'DECLARED_PENDING_WORKER';
-    final isConfirmed = a.paymentStatus == 'CONFIRMED_FULL';
+    final isConfirmedFull = a.paymentStatus == 'CONFIRMED_FULL';
+    final isConfirmedPartial = a.paymentStatus == 'CONFIRMED_PARTIAL';
+    final isDisputed = a.paymentStatus == 'DISPUTED';
 
     final barColor = isCompleted
         ? const Color(0xFF7E22CE)
@@ -280,14 +282,20 @@ class ShiftAssignmentCard extends StatelessWidget {
                       Expanded(
                         child: Text.rich(
                           TextSpan(
-                            text: isDeclared ? 'Ban tổ chức đã thanh toán: ' : 'Thù lao: ',
+                            text: isDeclared
+                                ? (a.declaredAmount > 0 && a.declaredAmount < a.totalPay
+                                    ? 'BTC khai báo: '
+                                    : 'BTC đã thanh toán: ')
+                                : 'Thù lao: ',
                             style: const TextStyle(fontSize: 11, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
                             children: [
                               TextSpan(
-                                text: '${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                                text: isDeclared && a.declaredAmount > 0 && a.declaredAmount < a.totalPay
+                                    ? '${a.declaredAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ / ${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ'
+                                    : '${(isDeclared && a.declaredAmount > 0 ? a.declaredAmount : a.totalPay).toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
                                 style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669)),
                               ),
-                              if (isDeclared)
+                              if (isDeclared && a.paymentMethod != null)
                                 TextSpan(
                                   text: ' (${a.paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Tiền mặt'})',
                                   style: const TextStyle(fontSize: 10.5, color: Color(0xFF065F46)),
@@ -297,7 +305,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      if (isConfirmed)
+                      if (isConfirmedFull)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
@@ -309,20 +317,51 @@ class ShiftAssignmentCard extends StatelessWidget {
                             style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
                           ),
                         )
+                      else if (isConfirmedPartial)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Nhận một phần ⚠️',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      else if (isDisputed)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Đang khiếu nại ⚖️',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          ),
+                        )
                       else if (isDeclared)
                         InkWell(
-                          onTap: () => onConfirmPayment('CONFIRMED_FULL'),
+                          onTap: onConfirmPayment,
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF10B981)),
+                              border: Border.all(color: const Color(0xFF10B981), width: 1.2),
                             ),
-                            child: const Text(
-                              'Xác nhận nhận tiền',
-                              style: TextStyle(color: Color(0xFF059669), fontSize: 10.5, fontWeight: FontWeight.w800),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.edit_note, size: 14, color: Color(0xFF059669)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Xác nhận thù lao',
+                                  style: TextStyle(color: Color(0xFF059669), fontSize: 10.5, fontWeight: FontWeight.w800),
+                                ),
+                              ],
                             ),
                           ),
                         )

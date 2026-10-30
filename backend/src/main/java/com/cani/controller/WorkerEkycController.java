@@ -30,6 +30,7 @@ public class WorkerEkycController {
     /**
      * Worker nộp hồ sơ eKYC (Mặt trước CCCD, Mặt sau CCCD, Ảnh chân dung Selfie)
      */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @PostMapping(value = "/workers/ekyc/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> submitEkyc(
             @RequestParam("frontImage") MultipartFile frontImage,
@@ -67,6 +68,7 @@ public class WorkerEkycController {
     /**
      * Worker kiểm tra trạng thái hồ sơ eKYC
      */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/workers/ekyc/status")
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> getMyEkycStatus(
             @RequestParam(value = "userId", required = false) UUID explicitUserId,

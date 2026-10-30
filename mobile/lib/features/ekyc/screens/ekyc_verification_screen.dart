@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cani/app/home_screen.dart';
 import 'package:cani/shared/widgets/app_back_button.dart';
 import 'package:cani/shared/widgets/registration_stepper.dart';
+import '../models/ekyc_models.dart';
 import '../providers/ekyc_provider.dart';
 import '../widgets/ekyc_capture_box.dart';
 import '../widgets/ekyc_confirmed_info_card.dart';
@@ -250,6 +251,16 @@ class _EkycVerificationScreenState
   }
 
   Future<void> _handlePostponeOrExit() async {
+    final state = ref.read(ekycProvider);
+    if (state.result != null) {
+      if (widget.isOnboarding) {
+        _navigateToHome();
+      } else {
+        Navigator.of(context).maybePop();
+      }
+      return;
+    }
+
     if (!widget.isOnboarding) {
       Navigator.of(context).maybePop();
       return;
@@ -352,99 +363,16 @@ class _EkycVerificationScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(ekycProvider);
     final notifier = ref.read(ekycProvider.notifier);
+    final isResultView = state.result != null;
 
     final scaffold = Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildTopHeader(context),
-              if (widget.isOnboarding) ...[
-                const SizedBox(height: 10),
-                const RegistrationStepper(currentStep: 3),
-                const SizedBox(height: 12),
-                const Text(
-                  'Bước cuối: Xác thực căn cước công dân để bắt đầu nhận ca làm việc',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              EkycStatusHeader(item: state.result),
-              const SizedBox(height: 16),
-              EkycQrScanBanner(
-                onScanQr: _openQrScanner,
-                onEditInfo: _openConfirmDialog,
-              ),
-              const SizedBox(height: 16),
-              if (state.hasConfirmedInfo) ...[
-                EkycConfirmedInfoCard(
-                  state: state,
-                  onEditInfo: _openConfirmDialog,
-                ),
-                const SizedBox(height: 16),
-              ],
-              EkycCaptureBox(
-                step: '1',
-                title: 'Mặt trước CCCD',
-                subtitle: 'Chụp rõ nét, đủ 4 góc, không lóa sáng',
-                icon: Icons.credit_card,
-                bytes: state.frontBytes,
-                fileName: state.frontFileName,
-                onTap: () => _selectImageSource(
-                  context: context,
-                  title: 'Mặt Trước Thẻ CCCD',
-                  scanType: ScanType.cccdFront,
-                  onPicked: notifier.setFrontImage,
-                ),
-              ),
-              const SizedBox(height: 12),
-              EkycCaptureBox(
-                step: '2',
-                title: 'Mặt sau CCCD',
-                subtitle: 'Chụp rõ đặc điểm nhận dạng và ngày cấp',
-                icon: Icons.flip_to_back,
-                bytes: state.backBytes,
-                fileName: state.backFileName,
-                onTap: () => _selectImageSource(
-                  context: context,
-                  title: 'Mặt Sau Thẻ CCCD',
-                  scanType: ScanType.cccdBack,
-                  onPicked: notifier.setBackImage,
-                ),
-              ),
-              const SizedBox(height: 12),
-              EkycCaptureBox(
-                step: '3',
-                title: 'Ảnh Chân Dung Selfie',
-                subtitle: 'Chụp chính diện, rõ mặt, không đeo kính râm/khẩu trang',
-                icon: Icons.face_retouching_natural,
-                bytes: state.selfieBytes,
-                fileName: state.selfieFileName,
-                onTap: () => _selectImageSource(
-                  context: context,
-                  title: 'Ảnh Chân Dung Selfie',
-                  scanType: ScanType.selfie,
-                  onPicked: notifier.setSelfieImage,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-              _buildSubmitButton(state, notifier),
-              if (state.result != null) ...[
-                const SizedBox(height: 24),
-                EkycResultCard(item: state.result!),
-              ],
-              const SizedBox(height: 16),
-            ],
-          ),
+          child: isResultView
+              ? _buildResultView(context, state, notifier)
+              : _buildFormView(context, state, notifier),
         ),
       ),
     );
@@ -464,17 +392,17 @@ class _EkycVerificationScreenState
     return scaffold;
   }
 
-  Widget _buildTopHeader(BuildContext context) {
+  Widget _buildTopHeader(BuildContext context, {bool isResultView = false}) {
     return Row(
       children: [
         AppBackButton(
           onTap: _handlePostponeOrExit,
         ),
         const SizedBox(width: 14),
-        const Expanded(
+        Expanded(
           child: Text(
-            'Định danh eKYC',
-            style: TextStyle(
+            isResultView ? 'Kết quả định danh eKYC' : 'Định danh eKYC',
+            style: const TextStyle(
               fontSize: 21,
               fontWeight: FontWeight.w800,
               color: Color(0xFF0B1B3D),
@@ -482,7 +410,7 @@ class _EkycVerificationScreenState
             ),
           ),
         ),
-        if (widget.isOnboarding)
+        if (widget.isOnboarding && !isResultView)
           TextButton(
             onPressed: _handlePostponeOrExit,
             child: const Text(
@@ -494,6 +422,348 @@ class _EkycVerificationScreenState
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _buildFormView(
+    BuildContext context,
+    EkycState state,
+    EkycNotifier notifier,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildTopHeader(context, isResultView: false),
+        if (widget.isOnboarding) ...[
+          const SizedBox(height: 10),
+          const RegistrationStepper(currentStep: 3),
+          const SizedBox(height: 12),
+          const Text(
+            'Bước cuối: Xác thực căn cước công dân để bắt đầu nhận ca làm việc',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        const EkycStatusHeader(item: null),
+        const SizedBox(height: 16),
+        EkycQrScanBanner(
+          onScanQr: _openQrScanner,
+          onEditInfo: _openConfirmDialog,
+        ),
+        const SizedBox(height: 16),
+        if (state.hasConfirmedInfo) ...[
+          EkycConfirmedInfoCard(
+            state: state,
+            onEditInfo: _openConfirmDialog,
+          ),
+          const SizedBox(height: 16),
+        ],
+        EkycCaptureBox(
+          step: '1',
+          title: 'Mặt trước CCCD',
+          subtitle: 'Chụp rõ nét, đủ 4 góc, không lóa sáng',
+          icon: Icons.credit_card,
+          bytes: state.frontBytes,
+          fileName: state.frontFileName,
+          onTap: () => _selectImageSource(
+            context: context,
+            title: 'Mặt Trước Thẻ CCCD',
+            scanType: ScanType.cccdFront,
+            onPicked: notifier.setFrontImage,
+          ),
+        ),
+        const SizedBox(height: 12),
+        EkycCaptureBox(
+          step: '2',
+          title: 'Mặt sau CCCD',
+          subtitle: 'Chụp rõ đặc điểm nhận dạng và ngày cấp',
+          icon: Icons.flip_to_back,
+          bytes: state.backBytes,
+          fileName: state.backFileName,
+          onTap: () => _selectImageSource(
+            context: context,
+            title: 'Mặt Sau Thẻ CCCD',
+            scanType: ScanType.cccdBack,
+            onPicked: notifier.setBackImage,
+          ),
+        ),
+        const SizedBox(height: 12),
+        EkycCaptureBox(
+          step: '3',
+          title: 'Ảnh Chân Dung Selfie',
+          subtitle: 'Chụp chính diện, rõ mặt, không đeo kính râm/khẩu trang',
+          icon: Icons.face_retouching_natural,
+          bytes: state.selfieBytes,
+          fileName: state.selfieFileName,
+          onTap: () => _selectImageSource(
+            context: context,
+            title: 'Ảnh Chân Dung Selfie',
+            scanType: ScanType.selfie,
+            onPicked: notifier.setSelfieImage,
+          ),
+        ),
+        const SizedBox(height: 24),
+        _buildSubmitButton(state, notifier),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildResultView(
+    BuildContext context,
+    EkycState state,
+    EkycNotifier notifier,
+  ) {
+    final item = state.result!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildTopHeader(context, isResultView: true),
+        if (widget.isOnboarding) ...[
+          const SizedBox(height: 10),
+          const RegistrationStepper(currentStep: 3),
+          const SizedBox(height: 12),
+          Text(
+            item.isApproved
+                ? 'Chúc mừng! Hồ sơ của bạn đã được phê duyệt thành công.'
+                : (item.isPending
+                    ? 'Hồ sơ đã gửi thành công, đang chờ CSKH kiểm duyệt.'
+                    : 'Định danh chưa hoàn tất, vui lòng thử lại.'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        EkycStatusHeader(item: item),
+        const SizedBox(height: 16),
+        EkycResultCard(item: item),
+        const SizedBox(height: 24),
+        _buildResultActions(item, notifier),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildResultActions(EkycVerificationItem item, EkycNotifier notifier) {
+    final isApproved = item.isApproved;
+    final isPending = item.isPending;
+
+    if (isApproved) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF00D2FF), Color(0xFF0066FF)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0077FF).withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (widget.isOnboarding) {
+                  _navigateToHome();
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              },
+              icon: const Icon(Icons.rocket_launch, color: Colors.white, size: 20),
+              label: Text(
+                widget.isOnboarding ? 'Bắt đầu nhận việc ngay' : 'Hoàn tất & Về trang chủ',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => notifier.resetForm(),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Cập nhật lại ảnh thẻ CCCD',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (isPending) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF00D2FF), Color(0xFF0066FF)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0077FF).withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ElevatedButton.icon(
+              onPressed: () {
+                if (widget.isOnboarding) {
+                  _navigateToHome();
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              },
+              icon: const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+              label: const Text(
+                'Tôi đã hiểu & Về trang chủ',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => notifier.resetForm(),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Chụp lại hồ sơ mới',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Rejected / Failure
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: 52,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            onPressed: () => notifier.resetForm(),
+            icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+            label: const Text(
+              'Thực hiện lại định danh',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: () {
+            if (widget.isOnboarding) {
+              _navigateToHome();
+            } else {
+              Navigator.of(context).maybePop();
+            }
+          },
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text(
+            'Để sau (Về trang chủ)',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: Color(0xFF64748B),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -527,16 +797,24 @@ class _EkycVerificationScreenState
         onPressed: isReady
             ? () async {
                 final success = await notifier.submitVerification();
-                if (success && mounted) {
+                if (!mounted) return;
+                if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Đã gửi hồ sơ eKYC thẩm định thành công!'),
                       backgroundColor: Color(0xFF10B981),
                     ),
                   );
-                  if (widget.isOnboarding) {
-                    _navigateToHome();
-                  }
+                  // Không gọi _navigateToHome() tại đây để người dùng nhìn thấy kết quả chi tiết
+                } else {
+                  final err = ref.read(ekycProvider).errorMessage ??
+                      'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(err),
+                      backgroundColor: const Color(0xFFDC2626),
+                    ),
+                  );
                 }
               }
             : null,

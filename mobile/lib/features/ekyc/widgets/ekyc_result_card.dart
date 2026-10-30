@@ -42,7 +42,11 @@ class EkycResultCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: item.isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    color: item.isApproved
+                        ? const Color(0xFF10B981)
+                        : (item.isPending
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFFEF4444)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

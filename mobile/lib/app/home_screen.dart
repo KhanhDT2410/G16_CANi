@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
-import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
-import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
@@ -32,40 +30,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final user = ref.read(authStateProvider).user;
       if (user != null) {
         TermsOfServiceDialog.checkAndShow(context, user.id);
-        final ekycStatus = await ref.read(ekycRepositoryProvider).getMyEkycStatus();
-        if (!mounted) return;
-        if (ekycStatus == null || !ekycStatus.isApproved) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const EkycVerificationScreen(isOnboarding: true),
-            ),
-          );
-        }
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Lắng nghe thay đổi trạng thái đăng nhập để hiển thị điều khoản và luồng eKYC Onboarding
+    // Lắng nghe thay đổi trạng thái đăng nhập để hiển thị điều khoản một cách an toàn
     ref.listen<AuthState>(authStateProvider, (previous, next) {
       if (next.isAuthenticated && next.user != null && previous?.user?.id != next.user!.id) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!mounted) return;
-          TermsOfServiceDialog.checkAndShow(context, next.user!.id);
-          final ekycStatus = await ref.read(ekycRepositoryProvider).getMyEkycStatus();
-          if (!mounted) return;
-          if (ekycStatus == null || !ekycStatus.isApproved) {
-            Navigator.of(this.context).push(
-              MaterialPageRoute(
-                builder: (_) => const EkycVerificationScreen(isOnboarding: true),
-              ),
-            );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            TermsOfServiceDialog.checkAndShow(context, next.user!.id);
           }
         });
       }

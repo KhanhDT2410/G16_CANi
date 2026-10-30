@@ -4,14 +4,21 @@ import 'package:flutter/material.dart';
 /// Card hình minh hoạ nhân sự sự kiện năng động, cầm điện thoại thông minh,
 /// với hậu cảnh sân khấu festival ánh sáng xanh dịu mát chuẩn mockup Image 2.
 class WorkerIllustrationCard extends StatelessWidget {
-  const WorkerIllustrationCard({super.key});
+  final double height;
+  final EdgeInsetsGeometry margin;
+
+  const WorkerIllustrationCard({
+    super.key,
+    this.height = 175,
+    this.margin = const EdgeInsets.only(bottom: 20),
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 175,
+      height: height,
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: margin,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(

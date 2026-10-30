@@ -5,6 +5,7 @@ import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/auth/screens/forgot_password_screen.dart';
 import 'package:cani/features/auth/screens/register_screen.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
+import 'package:cani/shared/widgets/app_back_button.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
 import 'package:cani/shared/widgets/worker_illustration_card.dart';
 
@@ -43,6 +44,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           backgroundColor: Color(0xFF10B981),
         ),
       );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -62,6 +66,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (Navigator.of(context).canPop()) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: AppBackButton(
+                        onTap: () {
+                          ref.read(authStateProvider.notifier).clearError();
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   // 1. Logo CANi Worker Chính Thức (Chuẩn Mockup Image 2)
                   const SizedBox(height: 6),
                   const CaniBrandLogo(),
@@ -250,6 +267,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   backgroundColor: Color(0xFF10B981),
                                 ),
                               );
+                              if (Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop();
+                              }
                             }
                           },
                     icon: authState.isLoading
@@ -296,7 +316,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       GestureDetector(
                         onTap: () {
                           ref.read(authStateProvider.notifier).clearError();
-                          Navigator.of(context).push(
+                          Navigator.of(context).pushReplacement(
                             MaterialPageRoute<void>(
                               builder: (_) => const RegisterScreen(),
                             ),

@@ -3,6 +3,7 @@ export 'data/auth_repository.dart';
 export 'models/auth_request.dart';
 export 'models/user_dto.dart';
 export 'providers/auth_provider.dart';
+export 'screens/intro_screen.dart';
 export 'screens/login_screen.dart';
 export 'screens/register_screen.dart';
 export 'screens/verify_email_screen.dart';

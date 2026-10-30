@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/screens/login_screen.dart';
 import 'package:cani/features/auth/screens/verify_email_screen.dart';
 import 'package:cani/features/auth/widgets/auth_error_banner.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
@@ -449,7 +450,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         GestureDetector(
           onTap: () {
             ref.read(authStateProvider.notifier).clearError();
-            Navigator.of(context).pop();
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+            );
           },
           child: const Text(
             'Đăng nhập ngay',

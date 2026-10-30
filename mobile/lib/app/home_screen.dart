@@ -64,7 +64,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     if (!authState.isAuthenticated) {
-      return const LoginScreen();
+      return const IntroScreen();
     }
 
     return Scaffold(

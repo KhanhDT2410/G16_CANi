@@ -12,9 +12,10 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
   const isDescValid = descLength >= 50 && descLength <= 3000;
 
   const handleQuickFill = () => {
+    setAssignmentId('9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d');
     setTitle('Chưa nhận tiền công và phụ cấp ca trực lễ tân');
     setDescription(
-      'Tôi đã hoàn thành đầy đủ ca làm việc theo phân công nhưng đã quá 24h nhà tổ chức sự kiện vẫn chưa thanh toán thù lao và không phản hồi tin nhắn đối soát.'
+      'Tôi đã hoàn thành đầy đủ ca làm việc theo phân công nhưng đã quá 24h nhà tổ chức sự kiện vẫn chưa thanh toán thù lao và không phản hồi tin nhắn đối soát (đủ 50 ký tự theo BR-52).'
     );
   };
 

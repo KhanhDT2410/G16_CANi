@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/screens/forgot_password_screen.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/profile/providers/profile_providers.dart';
 import 'package:cani/features/profile/widgets/profile_block_cv.dart';
 import 'package:cani/features/profile/widgets/profile_block_ekyc.dart';
 import 'package:cani/features/profile/widgets/profile_block_identity.dart';
 import 'package:cani/features/profile/widgets/profile_block_logout.dart';
-import 'package:cani/features/profile/widgets/profile_block_public.dart';
 import 'package:cani/features/profile/widgets/profile_block_security.dart';
 import 'package:cani/features/profile/widgets/profile_block_settings.dart';
 import 'package:cani/features/profile/widgets/profile_block_trust.dart';
@@ -62,8 +62,18 @@ class WorkerProfileScreen extends ConsumerWidget {
             ),
             const ProfileCvBlock(),
             const ProfileSettingsBlock(),
-            const ProfileSecurityBlock(),
-            const ProfilePublicProfileBlock(),
+            ProfileSecurityBlock(
+              onChangePassword: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ForgotPasswordScreen(
+                      initialEmail: data.user?.email,
+                      isChangePassword: true,
+                    ),
+                  ),
+                );
+              },
+            ),
             ProfileLogoutFooter(
               onLogout: () => ref.read(authStateProvider.notifier).logout(),
             ),

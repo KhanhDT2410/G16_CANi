@@ -13,11 +13,28 @@ import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 import 'package:cani/features/skill_verification/widgets/skill_point_policy_dialog.dart';
 import 'package:cani/features/skill_verification/widgets/skill_stats_row.dart';
 
-class SkillHubScreen extends ConsumerWidget {
+class SkillHubScreen extends ConsumerStatefulWidget {
   const SkillHubScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SkillHubScreen> createState() => _SkillHubScreenState();
+}
+
+class _SkillHubScreenState extends ConsumerState<SkillHubScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = ref.read(authStateProvider).user;
+      if (user != null) {
+        SkillPointPolicyDialog.checkAndShow(context, user.id);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(skillVerificationProvider);
     final user = ref.watch(authStateProvider).user;
 
@@ -31,6 +48,7 @@ class SkillHubScreen extends ConsumerWidget {
         backgroundColor: SkillHubColors.canvas,
         elevation: 0,
         scrolledUnderElevation: 0,
+        iconTheme: const IconThemeData(color: SkillHubColors.textPrimary),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

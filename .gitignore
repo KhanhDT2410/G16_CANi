@@ -45,6 +45,7 @@ mobile/windows/flutter/ephemeral/
 .agents/
 .claude/
 .omo/
+graphify-out/
 *.iml
 *.iws
 .project

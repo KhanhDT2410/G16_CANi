@@ -16,6 +16,7 @@ import 'package:cani/features/profile/widgets/profile_block_security.dart';
 import 'package:cani/features/profile/widgets/profile_block_settings.dart';
 import 'package:cani/features/profile/widgets/profile_block_trust.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
+import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
 import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 
 class WorkerProfileScreen extends ConsumerWidget {
@@ -49,6 +50,9 @@ class WorkerProfileScreen extends ConsumerWidget {
               avgRating: data.avgRating,
               nextThreshold: SkillHubColors.getNextTierThreshold(data.totalSp),
               nextTierLabel: SkillHubColors.getNextTierName(data.totalSp),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SkillHubScreen()),
+              ),
             ),
             ProfileEkycCard(
               status: data.ekycResult,

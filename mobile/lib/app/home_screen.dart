@@ -6,8 +6,6 @@ import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
-import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
-import 'package:cani/features/skill_verification/widgets/skill_point_policy_dialog.dart';
 import 'package:cani/features/profile/profile.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -23,7 +21,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final List<Widget> _pages = const [
     JobRadarScreen(),
     MyAssignmentsScreen(),
-    SkillHubScreen(),
     WorkerProfileScreen(),
   ];
 
@@ -76,21 +73,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
           setState(() => _currentIndex = index);
-          if (index == 2) {
-            final user = ref.read(authStateProvider).user;
-            if (user != null) {
-              SkillPointPolicyDialog.checkAndShow(context, user.id);
-            }
-          }
         },
         indicatorColor: const Color(0x260066FF),
         backgroundColor: Colors.white,
         elevation: 8,
         destinations: [
           const NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map, color: Color(0xFF0066FF)),
-            label: 'Bản đồ',
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home, color: Color(0xFF0066FF)),
+            label: 'Trang chủ',
           ),
           NavigationDestination(
             icon: Badge(
@@ -105,17 +96,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               backgroundColor: const Color(0xFFEF4444),
               child: const Icon(Icons.assignment, color: Color(0xFF0066FF)),
             ),
-            label: 'Việc của tôi',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.workspace_premium_outlined),
-            selectedIcon: Icon(Icons.workspace_premium, color: Color(0xFF0066FF)),
-            label: 'Kỹ năng',
+            label: 'Ca làm',
           ),
           const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person, color: Color(0xFF0066FF)),
-            label: 'Hồ sơ',
+            label: 'Cá nhân',
           ),
         ],
       ),

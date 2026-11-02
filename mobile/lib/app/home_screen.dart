@@ -74,13 +74,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onDestinationSelected: (index) {
           setState(() => _currentIndex = index);
         },
-        indicatorColor: const Color(0x260066FF),
-        backgroundColor: Colors.white,
-        elevation: 8,
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: Color(0xFF0066FF)),
+            selectedIcon: Icon(Icons.home),
             label: 'Trang chủ',
           ),
           NavigationDestination(
@@ -94,13 +91,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               isLabelVisible: proposalsCount > 0,
               label: Text('$proposalsCount'),
               backgroundColor: const Color(0xFFEF4444),
-              child: const Icon(Icons.assignment, color: Color(0xFF0066FF)),
+              child: const Icon(Icons.assignment),
             ),
             label: 'Ca làm',
           ),
           const NavigationDestination(
             icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: Color(0xFF0066FF)),
+            selectedIcon: Icon(Icons.person),
             label: 'Cá nhân',
           ),
         ],

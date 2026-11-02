@@ -59,6 +59,7 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final penalty = _calculatePenalty();
 
     return AlertDialog(
@@ -70,16 +71,20 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
+              color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'Xác Nhận Hủy Nhận Ca',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Color(0xFF0F172A)),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+              ),
             ),
           ),
         ],
@@ -92,39 +97,53 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
+                color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.35) : const Color(0xFFFFFBEB),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFDE68A)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFFB45309).withValues(alpha: 0.6) : const Color(0xFFFDE68A),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.shield_outlined, size: 16, color: Color(0xFFD97706)),
+                      Icon(
+                        Icons.shield_outlined,
+                        size: 16,
+                        color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Cảnh báo trừ -$penalty điểm Uy Tín',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 12.5,
-                          color: Color(0xFFB45309),
+                          color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     '• Hủy trước > 24h: -5 điểm Uy tín\n• Hủy từ 12h - 24h: -10 điểm Uy tín\n• Hủy cận giờ (< 12h): -20 điểm Uy tín',
-                    style: TextStyle(fontSize: 11.5, color: Color(0xFF78350F), height: 1.4),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF78350F),
+                      height: 1.4,
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Chọn lý do hủy ca:',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF334155)),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              ),
             ),
             const SizedBox(height: 6),
             ..._quickReasons.map(
@@ -134,7 +153,13 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 activeColor: const Color(0xFFDC2626),
-                title: Text(r, style: const TextStyle(fontSize: 13)),
+                title: Text(
+                  r,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                  ),
+                ),
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedQuickReason = val);
                 },
@@ -160,7 +185,13 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
       actions: [
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.pop(context, false),
-          child: const Text('Giữ lại ca', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+          child: Text(
+            'Giữ lại ca',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+          ),
         ),
         FilledButton(
           onPressed: _isSubmitting ? null : _submitCancel,

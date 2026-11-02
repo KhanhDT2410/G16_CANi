@@ -57,7 +57,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
     }
   }
 
-  Widget _buildStarRow(String label, int currentVal, ValueChanged<int> onChanged) {
+  Widget _buildStarRow(String label, int currentVal, ValueChanged<int> onChanged, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -66,7 +66,11 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+              ),
             ),
           ),
           Row(
@@ -93,6 +97,8 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
@@ -107,7 +113,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
+                    color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 24),
@@ -117,13 +123,20 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Đánh Giá Ban Tổ Chức',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Color(0xFF0F172A)),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                        ),
                       ),
                       Text(
                         widget.assignment.eventName,
-                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -136,9 +149,13 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
             Center(
               child: Column(
                 children: [
-                  const Text(
+                  Text(
                     'Trải nghiệm chung của bạn tại sự kiện',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -165,22 +182,28 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Column(
                 children: [
-                  _buildStarRow('Môi trường làm việc', _envScore, (v) => setState(() => _envScore = v)),
-                  _buildStarRow('Sự hỗ trợ của Quản lý', _supportScore, (v) => setState(() => _supportScore = v)),
-                  _buildStarRow('Thanh toán minh bạch', _paymentScore, (v) => setState(() => _paymentScore = v)),
+                  _buildStarRow('Môi trường làm việc', _envScore, (v) => setState(() => _envScore = v), isDark),
+                  _buildStarRow('Sự hỗ trợ của Quản lý', _supportScore, (v) => setState(() => _supportScore = v), isDark),
+                  _buildStarRow('Thanh toán minh bạch', _paymentScore, (v) => setState(() => _paymentScore = v), isDark),
                 ],
               ),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Điểm cộng nổi bật:',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -189,12 +212,25 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
               children: _allTags.map((tag) {
                 final selected = _selectedTags.contains(tag);
                 return FilterChip(
-                  label: Text(tag, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: selected ? const Color(0xFF0066FF) : const Color(0xFF475569))),
+                  label: Text(
+                    tag,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF0066FF))
+                          : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                    ),
+                  ),
                   selected: selected,
-                  selectedColor: const Color(0xFFDBEAFE),
-                  checkmarkColor: const Color(0xFF0066FF),
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  side: BorderSide(color: selected ? const Color(0xFF93C5FD) : Colors.transparent),
+                  selectedColor: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.5) : const Color(0xFFDBEAFE),
+                  checkmarkColor: isDark ? const Color(0xFF60A5FA) : const Color(0xFF0066FF),
+                  backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  side: BorderSide(
+                    color: selected
+                        ? (isDark ? const Color(0xFF2563EB) : const Color(0xFF93C5FD))
+                        : (isDark ? const Color(0xFF334155) : Colors.transparent),
+                  ),
                   onSelected: (val) {
                     setState(() {
                       if (val) {
@@ -226,9 +262,16 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                     onPressed: _isSubmitting ? null : () => Navigator.pop(context, false),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Để sau', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: Text(
+                      'Để sau',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),

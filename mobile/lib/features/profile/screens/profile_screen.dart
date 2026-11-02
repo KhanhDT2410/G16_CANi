@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/app/theme_provider.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/auth/screens/forgot_password_screen.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
@@ -33,14 +34,14 @@ class WorkerProfileScreen extends ConsumerWidget {
     if (data.user == null) {
       return Scaffold(
         backgroundColor: t.canvas,
-        appBar: _appBar(context),
+        appBar: _appBar(context, ref),
         body: const Center(child: Text('Chưa có thông tin người dùng')),
       );
     }
 
     return Scaffold(
       backgroundColor: t.canvas,
-      appBar: _appBar(context),
+      appBar: _appBar(context, ref),
       body: RefreshIndicator(
         onRefresh: () async {},
         child: ListView(
@@ -107,8 +108,10 @@ class WorkerProfileScreen extends ConsumerWidget {
     );
   }
 
-  PreferredSizeWidget _appBar(BuildContext context) {
+  PreferredSizeWidget _appBar(BuildContext context, WidgetRef ref) {
     final t = Theme.of(context).profileX;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AppBar(
       title: Text(
         'Tài khoản',
@@ -123,21 +126,118 @@ class WorkerProfileScreen extends ConsumerWidget {
       centerTitle: false,
       actions: [
         IconButton(
-          icon: const Icon(Icons.dark_mode_outlined),
-          tooltip: 'Chế độ Sáng / Tối',
-          color: t.accentDeep,
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Tính năng chuyển đổi giao diện Sáng / Tối đang được phát triển.'),
-                behavior: SnackBarBehavior.floating,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
+          icon: Icon(
+            isDark ? Icons.light_mode_rounded : Icons.dark_mode_outlined,
+            color: isDark ? const Color(0xFFFBBF24) : t.accentDeep,
+          ),
+          tooltip: isDark ? 'Đang bật Chế độ Tối' : 'Đang bật Chế độ Sáng',
+          onPressed: () => _showThemeBottomSheet(context, ref),
         ),
         const SizedBox(width: 8),
       ],
+    );
+  }
+
+  void _showThemeBottomSheet(BuildContext context, WidgetRef ref) {
+    final t = Theme.of(context).profileX;
+    final currentMode = ref.read(themeModeProvider);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: t.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Giao diện ứng dụng',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: t.text,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildThemeOption(
+                context: context,
+                ref: ref,
+                ctx: ctx,
+                icon: Icons.light_mode_outlined,
+                title: 'Chế độ Sáng',
+                subtitle: 'Giao diện sáng sủa, thanh lịch',
+                mode: ThemeMode.light,
+                isSelected: currentMode == ThemeMode.light,
+              ),
+              _buildThemeOption(
+                context: context,
+                ref: ref,
+                ctx: ctx,
+                icon: Icons.dark_mode_outlined,
+                title: 'Chế độ Tối',
+                subtitle: 'Dễ chịu cho mắt khi làm việc ban đêm',
+                mode: ThemeMode.dark,
+                isSelected: currentMode == ThemeMode.dark,
+              ),
+              _buildThemeOption(
+                context: context,
+                ref: ref,
+                ctx: ctx,
+                icon: Icons.settings_brightness_outlined,
+                title: 'Tự động theo hệ thống',
+                subtitle: 'Đồng bộ với cài đặt của thiết bị',
+                mode: ThemeMode.system,
+                isSelected: currentMode == ThemeMode.system,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOption({
+    required BuildContext context,
+    required WidgetRef ref,
+    required BuildContext ctx,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required ThemeMode mode,
+    required bool isSelected,
+  }) {
+    final t = Theme.of(context).profileX;
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? t.accent.withValues(alpha: 0.15) : t.chipSoft,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: isSelected ? t.accent : t.muted, size: 22),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? t.accent : t.text,
+        ),
+      ),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: t.muted)),
+      trailing: isSelected
+          ? Icon(Icons.check_circle_rounded, color: t.accent)
+          : null,
+      onTap: () async {
+        Navigator.of(ctx).pop();
+        await ref.read(themeModeProvider.notifier).setThemeMode(mode);
+      },
     );
   }
 

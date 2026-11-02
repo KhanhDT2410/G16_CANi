@@ -89,15 +89,17 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
 
     final selectedOrFirstShift = state.selectedShift ?? (state.nearbyShifts.isNotEmpty ? state.nearbyShifts.first : null);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             // 1. Header chuẩn OpenDesign
             Container(
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               child: Row(
                 children: [
                   // Avatar Gradient với chấm xanh online
@@ -139,7 +141,10 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: state.isOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
-                            border: Border.all(color: Colors.white, width: 2.2),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              width: 2.2,
+                            ),
                           ),
                         ),
                       ),
@@ -154,10 +159,10 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                       children: [
                         Text(
                           'Chào buổi sáng, $userName!',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
-                            color: Color(0xFF0B1B3D),
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
                             letterSpacing: -0.2,
                           ),
                           maxLines: 1,
@@ -170,10 +175,10 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                             const SizedBox(width: 4),
                             Text(
                               'Hạng $currentTier · $totalSp SP',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                               ),
                             ),
                           ],
@@ -189,10 +194,14 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: state.isOnline ? const Color(0xFFE8FDF3) : const Color(0xFFF1F5F9),
+                        color: state.isOnline
+                            ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFE8FDF3))
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: state.isOnline ? const Color(0xFFB7F4D8) : const Color(0xFFE2E8F0),
+                          color: state.isOnline
+                              ? (isDark ? const Color(0xFF059669) : const Color(0xFFB7F4D8))
+                              : (isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0)),
                         ),
                       ),
                       child: Row(
@@ -205,12 +214,18 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
-                                  color: state.isOnline ? const Color(0xFF059669) : const Color(0xFF64748B),
+                                  color: state.isOnline
+                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                 ),
                               ),
                               Text(
                                 state.isOnline ? 'GPS bật' : 'GPS tắt',
-                                style: const TextStyle(fontSize: 8.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
@@ -220,7 +235,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                             height: 18,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(99),
-                              color: state.isOnline ? const Color(0xFF10B981) : const Color(0xFFCBD5E1),
+                              color: state.isOnline
+                                  ? const Color(0xFF10B981)
+                                  : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                             ),
                             child: AnimatedAlign(
                               duration: const Duration(milliseconds: 200),
@@ -258,9 +275,13 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(
                 children: [
-                  const Text(
+                  Text(
                     'Bán kính:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Wrap(
@@ -273,10 +294,14 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                           decoration: BoxDecoration(
-                            color: isSel ? const Color(0xFF0077FF) : Colors.white,
+                            color: isSel
+                                ? const Color(0xFF0077FF)
+                                : (isDark ? const Color(0xFF1E293B) : Colors.white),
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: isSel ? const Color(0xFF0077FF) : const Color(0xFFE2E8F0),
+                              color: isSel
+                                  ? const Color(0xFF0077FF)
+                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                             ),
                             boxShadow: isSel
                                 ? const [BoxShadow(color: Color(0x400077FF), blurRadius: 6, offset: Offset(0, 2))]
@@ -287,7 +312,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: isSel ? Colors.white : const Color(0xFF64748B),
+                              color: isSel
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             ),
                           ),
                         ),
@@ -301,21 +328,27 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             state.isRadarView ? Icons.list_alt : Icons.map_outlined,
                             size: 14,
-                            color: const Color(0xFF0077FF),
+                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             state.isRadarView ? 'Danh sách' : 'Bản đồ',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0077FF)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
+                            ),
                           ),
                         ],
                       ),
@@ -370,21 +403,23 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.94),
+                                    color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.94),
                                     borderRadius: BorderRadius.circular(999),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF0B1B3D).withValues(alpha: 0.12),
+                                        color: isDark
+                                            ? Colors.black.withValues(alpha: 0.35)
+                                            : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
                                         blurRadius: 8,
                                       ),
                                     ],
                                   ),
                                   child: Text(
                                     '${state.nearbyShifts.length} ca trong bán kính ${state.searchRadiusKm.toInt()} km',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 10.5,
                                       fontWeight: FontWeight.w800,
-                                      color: Color(0xFF1E293B),
+                                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                                     ),
                                   ),
                                 ),
@@ -413,6 +448,8 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   }
 
   Widget _buildListView(BuildContext context, JobRadarState state, JobRadarNotifier notifier) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     if (state.nearbyShifts.isEmpty) {
       return Center(
         child: Column(
@@ -420,7 +457,13 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
           children: [
             Icon(Icons.location_off_outlined, size: 48, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            const Text('Không có ca làm việc nào trong khu vực này', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(
+              'Không có ca làm việc nào trong khu vực này',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+              ),
+            ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => notifier.setRadius(15.0),
@@ -438,7 +481,10 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         final shift = state.nearbyShifts[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: isDark ? const BorderSide(color: Color(0xFF334155)) : BorderSide.none,
+          ),
           elevation: 1,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
@@ -456,19 +502,29 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                       Expanded(
                         child: Text(
                           shift.eventName,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: Color(0xFF0F172A)),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                          ),
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF4),
+                          color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFF0FDF4),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF059669) : const Color(0xFFBBF7D0),
+                          ),
                         ),
                         child: Text(
                           '${shift.distanceKm.toStringAsFixed(1)} km',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF16A34A),
+                          ),
                         ),
                       ),
                     ],
@@ -481,11 +537,14 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                   const SizedBox(height: 4),
                   Text(
                     shift.locationAddress,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Divider(height: 18, color: Color(0xFFE2E8F0)),
+                  Divider(height: 18, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

@@ -42,38 +42,43 @@ class _SkillHubScreenState extends ConsumerState<SkillHubScreen> {
     final totalAllSp = pointsList.fold<int>(0, (sum, p) => sum + p.totalSp);
     final currentTier = pointsList.isNotEmpty ? pointsList.first.tier : 'STARTER';
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canvasBg = isDark ? Theme.of(context).scaffoldBackgroundColor : SkillHubColors.canvas;
+    final primaryTextColor = isDark ? const Color(0xFFF8FAFC) : SkillHubColors.textPrimary;
+    final secondaryTextColor = isDark ? const Color(0xFF94A3B8) : SkillHubColors.textSecondary;
+
     return Scaffold(
-      backgroundColor: SkillHubColors.canvas,
+      backgroundColor: canvasBg,
       appBar: AppBar(
-        backgroundColor: SkillHubColors.canvas,
+        backgroundColor: canvasBg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: const IconThemeData(color: SkillHubColors.textPrimary),
+        iconTheme: IconThemeData(color: primaryTextColor),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Trung Tâm Kỹ Năng',
               style: TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
-                color: SkillHubColors.textPrimary,
+                color: primaryTextColor,
               ),
             ),
             Text(
               user != null ? 'Xin chào, ${user.fullName}' : 'Kỹ năng & Thăng hạng nghề nghiệp',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w500,
-                color: SkillHubColors.textSecondary,
+                color: secondaryTextColor,
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline, color: SkillHubColors.textPrimary),
+            icon: Icon(Icons.info_outline, color: primaryTextColor),
             tooltip: 'Quy chế Điểm kỹ năng',
             onPressed: () => SkillPointPolicyDialog.show(context, userId: user?.id),
           ),

@@ -10,9 +10,9 @@ import DisputeDecisionModal from './DisputeDecisionModal';
 import EscalateModal from './EscalateModal';
 import './Disputes.css';
 
-export const DisputeCenterView = ({ showTestSubmission = false }) => {
+export const DisputeCenterView = () => {
   const { user } = useAuth();
-  const isAdminOrCC = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
+  const isArbitrator = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
 
   const {
     activeTab,
@@ -29,12 +29,11 @@ export const DisputeCenterView = ({ showTestSubmission = false }) => {
     assignDispute,
     issueDecision,
     escalateDispute,
-  } = useDisputes('queue');
+  } = useDisputes(isArbitrator ? 'queue' : 'my');
 
   const [modalType, setModalType] = useState(null); // 'detail' | 'create' | 'evidence' | 'decision' | 'escalate'
   const [modalDispute, setModalDispute] = useState(null);
   const [searchId, setSearchId] = useState('');
-  const [devTestMode, setDevTestMode] = useState(showTestSubmission);
 
   const riskCount = queue.filter((item) => item.slaAtRisk).length;
 
@@ -74,14 +73,14 @@ export const DisputeCenterView = ({ showTestSubmission = false }) => {
       <div className="disputes-header">
         <div>
           <h1 className="disputes-title">
-            ⚖️ Trung Tâm Giải Quyết Tranh Chấp & Khiếu Nại (Dispute Center)
+            ⚖️ Trung Tâm Giải Quyết Tranh Chấp & Khiếu Nại
           </h1>
           <p className="disputes-subtitle">
             Tiếp nhận hồ sơ, đối soát bằng chứng, tự động khấu trừ điểm uy tín RS (BR-55) và kiểm soát thời hạn SLA (BR-53/54).
           </p>
         </div>
         <div className="disputes-actions-group">
-          {(!isAdminOrCC || devTestMode) && (
+          {!isArbitrator && (
             <button
               type="button"
               className="btn-quick-fill"
@@ -94,24 +93,7 @@ export const DisputeCenterView = ({ showTestSubmission = false }) => {
               }}
               onClick={() => setModalType('create')}
             >
-              + {isAdminOrCC ? '🧪 Giả lập nộp đơn (Test)' : 'Nộp đơn khiếu nại (UC-96)'}
-            </button>
-          )}
-          {isAdminOrCC && (
-            <button
-              type="button"
-              className="btn-quick-fill"
-              style={{
-                padding: '0.6rem 0.85rem',
-                fontSize: '0.8rem',
-                background: devTestMode ? '#fef3c7' : 'transparent',
-                color: devTestMode ? '#b45309' : 'var(--color-text-muted)',
-                borderColor: devTestMode ? '#f59e0b' : 'var(--color-border)',
-              }}
-              onClick={() => setDevTestMode((prev) => !prev)}
-              title="Chế độ giả lập nộp đơn dành cho kiểm thử chức năng"
-            >
-              {devTestMode ? '🧪 Tắt Test Sandbox' : '🧪 Bật Test Sandbox'}
+              + Nộp đơn khiếu nại (UC-96)
             </button>
           )}
           <button
@@ -120,51 +102,51 @@ export const DisputeCenterView = ({ showTestSubmission = false }) => {
             style={{ padding: '0.6rem 1rem', background: 'var(--color-bg-subtle)', fontSize: '0.85rem' }}
             onClick={() => (activeTab === 'queue' ? loadQueue() : loadMyDisputes())}
           >
-            🔄 Tải lại
+            🔄 Làm mới
           </button>
         </div>
       </div>
 
       {/* Tra cứu nhanh theo ID */}
-      <form onSubmit={handleSearchById} style={{ display: 'flex', gap: '0.5rem', maxWidth: '480px' }}>
+      <form onSubmit={handleSearchById} style={{ display: 'flex', gap: '0.5rem', maxWidth: '520px' }}>
         <input
           type="text"
           className="dispute-input"
-          placeholder="Nhập ID tranh chấp (UUID) để tra cứu trực tiếp..."
+          placeholder="Nhập mã tranh chấp (UUID) để tra cứu hồ sơ trực tiếp..."
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
         />
-        <button type="submit" className="btn-quick-fill" style={{ margin: 0 }}>
-          Tìm
+        <button type="submit" className="btn-quick-fill" style={{ margin: 0, padding: '0.65rem 1.1rem' }}>
+          Tra cứu
         </button>
       </form>
 
       {/* Tabs */}
       <div className="disputes-tabs">
-        <button
-          type="button"
-          className={`disputes-tab-btn ${activeTab === 'queue' ? 'active' : ''}`}
-          onClick={() => setActiveTab('queue')}
-        >
-          <span>Hàng đợi xử lý (UC-109)</span>
-          <span className={`tab-badge-count ${riskCount > 0 ? 'risk' : ''}`}>
-            {queue.length} {riskCount > 0 && `(⚠️ ${riskCount} gấp)`}
-          </span>
-        </button>
-        {(!isAdminOrCC || devTestMode) && (
+        {isArbitrator && (
           <button
             type="button"
-            className={`disputes-tab-btn ${activeTab === 'my' ? 'active' : ''}`}
-            onClick={() => setActiveTab('my')}
+            className={`disputes-tab-btn ${activeTab === 'queue' ? 'active' : ''}`}
+            onClick={() => setActiveTab('queue')}
           >
-            <span>{isAdminOrCC ? '🧪 Đơn cá nhân (Test Sandbox)' : 'Tranh chấp của tôi (UC-104)'}</span>
-            <span className="tab-badge-count">{myDisputes.length}</span>
+            <span>Hàng đợi xử lý (UC-109)</span>
+            <span className={`tab-badge-count ${riskCount > 0 ? 'risk' : ''}`}>
+              {queue.length} {riskCount > 0 && `(⚠️ ${riskCount} gấp)`}
+            </span>
           </button>
         )}
+        <button
+          type="button"
+          className={`disputes-tab-btn ${activeTab === 'my' ? 'active' : ''}`}
+          onClick={() => setActiveTab('my')}
+        >
+          <span>Lịch sử tranh chấp của tôi (UC-104)</span>
+          <span className="tab-badge-count">{myDisputes.length}</span>
+        </button>
       </div>
 
       {/* Tab content */}
-      {activeTab === 'queue' ? (
+      {activeTab === 'queue' && isArbitrator ? (
         <DisputeQueueTable
           queue={queue}
           loading={loading}
@@ -228,4 +210,3 @@ export const DisputeCenterView = ({ showTestSubmission = false }) => {
 };
 
 export default DisputeCenterView;
-

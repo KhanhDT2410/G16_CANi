@@ -10,15 +10,10 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
   const [label, setLabel] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleQuickFill = () => {
-    setFileUrl('https://storage.cani.vn/disputes/test-receipt-' + Date.now() + '.jpg');
-    setLabel('Biên lai chuyển khoản và sao kê tài khoản ngân hàng');
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!fileUrl.trim()) {
-      alert('Vui lòng nhập đường dẫn file bằng chứng (URL)');
+      alert('Vui lòng nhập đường dẫn tệp bằng chứng (URL)');
       return;
     }
 
@@ -31,7 +26,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
       });
       onClose();
     } catch {
-      // Đã bắt toast
+      // Đã hiển thị toast lỗi
     } finally {
       setSubmitting(false);
     }
@@ -52,12 +47,6 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
 
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" className="btn-quick-fill" onClick={handleQuickFill}>
-                ⚡ Điền URL mẫu
-              </button>
-            </div>
-
             <div className="dispute-field-group">
               <label>Loại bằng chứng *</label>
               <select
@@ -74,7 +63,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
             </div>
 
             <div className="dispute-field-group">
-              <label>Đường dẫn tệp / Hình ảnh chứng từ (URL) *</label>
+              <label>Đường dẫn tệp chứng từ / Hình ảnh (URL) *</label>
               <input
                 type="url"
                 className="dispute-input"
@@ -86,12 +75,12 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
             </div>
 
             <div className="dispute-field-group">
-              <label>Mô tả / Nhãn bằng chứng</label>
+              <label>Nhãn / Chú thích tệp</label>
               <input
                 type="text"
                 className="dispute-input"
                 maxLength={255}
-                placeholder="Ví dụ: Ảnh chụp màn hình tin nhắn thỏa thuận..."
+                placeholder="Ví dụ: Ảnh chụp màn hình tin nhắn thỏa thuận phụ cấp..."
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
               />
@@ -129,4 +118,3 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
 };
 
 export default AddEvidenceModal;
-

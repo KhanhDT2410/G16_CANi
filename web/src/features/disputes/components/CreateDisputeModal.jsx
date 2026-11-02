@@ -11,14 +11,6 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
   const descLength = description.trim().length;
   const isDescValid = descLength >= 50 && descLength <= 3000;
 
-  const handleQuickFill = () => {
-    setAssignmentId('9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d');
-    setTitle('Chưa nhận tiền công và phụ cấp ca trực lễ tân');
-    setDescription(
-      'Tôi đã hoàn thành đầy đủ ca làm việc theo phân công nhưng đã quá 24h nhà tổ chức sự kiện vẫn chưa thanh toán thù lao và không phản hồi tin nhắn đối soát (đủ 50 ký tự theo BR-52).'
-    );
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!assignmentId.trim()) {
@@ -30,7 +22,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
       return;
     }
     if (!isDescValid) {
-      alert('Mô tả tranh chấp phải từ 50 đến 3000 ký tự (theo quy định BR-52)');
+      alert('Mô tả tranh chấp phải từ 50 đến 3000 ký tự theo quy định BR-52');
       return;
     }
 
@@ -44,7 +36,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
       });
       onClose();
     } catch {
-      // Đã xử lý toast ở hook
+      // Đã hiển thị toast lỗi
     } finally {
       setSubmitting(false);
     }
@@ -54,23 +46,18 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
     <div className="dispute-modal-overlay" onClick={onClose}>
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
-          <h3>Nộp Đơn Tranh Chấp Mới (UC-96)</h3>
+          <h3>Nộp Đơn Tranh Chấp & Khiếu Nại (UC-96)</h3>
           <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                Quy định BR-52: Cửa sổ nộp trong 14 ngày, mô tả ≥ 50 ký tự.
-              </span>
-              <button type="button" className="btn-quick-fill" onClick={handleQuickFill}>
-                ⚡ Điền nhanh mẫu test
-              </button>
+            <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+              Quy tắc BR-52: Đơn chỉ được nộp trong vòng 14 ngày kể từ khi ca kết thúc, mô tả tối thiểu 50 ký tự.
             </div>
 
             <div className="dispute-field-group">
-              <label>ID Ca làm việc (Assignment UUID) *</label>
+              <label>Mã Ca Làm Việc (Assignment ID) *</label>
               <input
                 type="text"
                 className="dispute-input"
@@ -102,7 +89,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
                 type="text"
                 className="dispute-input"
                 maxLength={200}
-                placeholder="Tóm tắt vấn đề (tối đa 200 ký tự)"
+                placeholder="Tóm tắt nội dung khiếu nại (tối đa 200 ký tự)"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -156,4 +143,3 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
 };
 
 export default CreateDisputeModal;
-

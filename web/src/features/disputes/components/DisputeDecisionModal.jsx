@@ -16,12 +16,6 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
   const rationaleLen = rationale.trim().length;
   const isRationaleValid = rationaleLen >= 100 && rationaleLen <= 5000;
 
-  const handleQuickFill = () => {
-    setRationale(
-      'Qua quá trình đối chiếu toàn diện giữa nhật ký điểm danh QR, sao kê ngân hàng và tường trình của hai bên, xác nhận sự việc có vi phạm thỏa thuận ca làm việc. Quyết định được ban hành theo quy chuẩn giải quyết tranh chấp CANi (lý do trên 100 ký tự).'
-    );
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isRationaleValid) {
@@ -38,7 +32,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
       });
       onClose();
     } catch {
-      // Đã toast lỗi
+      // Đã hiển thị toast lỗi
     } finally {
       setSubmitting(false);
     }
@@ -55,7 +49,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
                 : 'Ban Hành Quyết Định Giải Quyết (UC-100)'}
             </h3>
             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              Đơn: <code>{dispute.id}</code> (Trạng thái: <strong>{dispute.status}</strong>)
+              Mã đơn: <code>{dispute.id}</code> (Trạng thái hiện tại: <strong>{dispute.status}</strong>)
             </span>
           </div>
           <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
@@ -63,17 +57,8 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
 
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                Ràng buộc: Lý do quyết định bắt buộc từ 100 đến 5000 ký tự.
-              </span>
-              <button type="button" className="btn-quick-fill" onClick={handleQuickFill}>
-                ⚡ Điền lý do mẫu (≥100 ký tự)
-              </button>
-            </div>
-
             <div className="dispute-field-group">
-              <label>Kết quả xử lý (Outcome) *</label>
+              <label>Kết quả phán quyết (Outcome) *</label>
               <select
                 className="dispute-select"
                 value={outcome}
@@ -98,7 +83,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
               <textarea
                 className="dispute-textarea"
                 rows={5}
-                placeholder="Nêu rõ căn cứ bằng chứng, điều khoản thỏa thuận ca, kết quả đối chiếu giữa hai bên..."
+                placeholder="Nêu rõ căn cứ bằng chứng, đối chiếu nhật ký QR, điều khoản thỏa thuận ca và giải trình của hai bên..."
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
                 required
@@ -109,12 +94,12 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
             </div>
 
             <div className="dispute-field-group">
-              <label>Lý do miễn phạt điểm RS (Tùy chọn - nếu áp dụng miễn trừ)</label>
+              <label>Lý do miễn trừ phạt điểm RS (Nếu có xem xét miễn trừ)</label>
               <input
                 type="text"
                 className="dispute-input"
                 maxLength={500}
-                placeholder="Ví dụ: Worker gặp sự cố bất khả kháng về y tế có xác nhận của trạm y tế..."
+                placeholder="Ví dụ: Worker gặp sự cố bất khả kháng về sức khỏe có chứng từ..."
                 value={penaltyWaiverReason}
                 onChange={(e) => setPenaltyWaiverReason(e.target.value)}
               />
@@ -152,4 +137,3 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
 };
 
 export default DisputeDecisionModal;
-

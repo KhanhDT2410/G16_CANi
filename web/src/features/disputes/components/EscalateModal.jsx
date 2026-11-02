@@ -4,12 +4,6 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleQuickFill = () => {
-    setReason(
-      'Tôi không đồng ý với kết luận giải quyết của Chăm sóc khách hàng vì chưa xem xét biên bản thỏa thuận phụ cấp ca làm việc. Đề nghị Ban Quản trị viên can thiệp và thẩm định lại toàn bộ bằng chứng.'
-    );
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!reason.trim()) {
@@ -22,7 +16,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
       await onSubmit(dispute.id, { reason: reason.trim() });
       onClose();
     } catch {
-      // Đã toast lỗi
+      // Đã hiển thị toast lỗi
     } finally {
       setSubmitting(false);
     }
@@ -35,7 +29,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
           <div>
             <h3>Kháng Nghị Lên Ban Quản Trị Viên (UC-101)</h3>
             <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              Đơn: <code>{dispute.id}</code> (BR-54: Trong vòng 7 ngày kể từ quyết định CC)
+              Mã đơn: <code>{dispute.id}</code> (BR-54: Trong vòng 7 ngày kể từ quyết định của CSKH)
             </span>
           </div>
           <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
@@ -43,18 +37,12 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
 
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" className="btn-quick-fill" onClick={handleQuickFill}>
-                ⚡ Điền lý do mẫu
-              </button>
-            </div>
-
             <div className="dispute-field-group">
-              <label>Lý do khiếu nại / Kháng nghị kết quả *</label>
+              <label>Lý do khiếu nại / Kháng nghị phán quyết *</label>
               <textarea
                 className="dispute-textarea"
                 rows={4}
-                placeholder="Nêu rõ lý do bạn không đồng tình với phán quyết của bộ phận Chăm sóc khách hàng..."
+                placeholder="Nêu rõ căn cứ hoặc bằng chứng chứng minh kết luận của Chăm sóc khách hàng chưa thỏa đáng..."
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 required
@@ -97,4 +85,3 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
 };
 
 export default EscalateModal;
-

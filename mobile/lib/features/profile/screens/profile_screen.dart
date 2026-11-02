@@ -63,6 +63,8 @@ class WorkerProfileScreen extends ConsumerWidget {
             const ProfileCvBlock(),
             const ProfileSettingsBlock(),
             ProfileSecurityBlock(
+              isGoogleLinked: data.user?.isGoogleLinked ?? false,
+              googleEmail: data.user?.email,
               onChangePassword: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -70,6 +72,19 @@ class WorkerProfileScreen extends ConsumerWidget {
                       initialEmail: data.user?.email,
                       isChangePassword: true,
                     ),
+                  ),
+                );
+              },
+              onTapGoogleAccount: () {
+                final isLinked = data.user?.isGoogleLinked ?? false;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      isLinked
+                          ? 'Tài khoản đã liên kết bảo mật với Google (${data.user?.email ?? ''})'
+                          : 'Tài khoản chưa liên kết với Google.',
+                    ),
+                    behavior: SnackBarBehavior.floating,
                   ),
                 );
               },

@@ -7,10 +7,16 @@ import 'package:cani/features/profile/widgets/profile_tokens.dart';
 class ProfileSecurityBlock extends StatelessWidget {
   const ProfileSecurityBlock({
     this.onChangePassword,
+    this.isGoogleLinked = false,
+    this.googleEmail,
+    this.onTapGoogleAccount,
     super.key,
   });
 
   final VoidCallback? onChangePassword;
+  final bool isGoogleLinked;
+  final String? googleEmail;
+  final VoidCallback? onTapGoogleAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +49,10 @@ class ProfileSecurityBlock extends StatelessWidget {
             label: 'Đổi mật khẩu',
             onTap: onChangePassword,
           ),
-          const _Row(
-            icon: Icons.link,
-            label: 'Tài khoản liên kết (SSO)',
-            isComingSoon: true,
+          _GoogleAccountRow(
+            isLinked: isGoogleLinked,
+            email: googleEmail,
+            onTap: onTapGoogleAccount,
           ),
           const _Row(
             icon: Icons.device_hub,
@@ -54,6 +60,104 @@ class ProfileSecurityBlock extends StatelessWidget {
             isComingSoon: true,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GoogleAccountRow extends StatelessWidget {
+  const _GoogleAccountRow({
+    required this.isLinked,
+    this.email,
+    this.onTap,
+  });
+
+  final bool isLinked;
+  final String? email;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).profileX;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                alignment: Alignment.center,
+                child: Image.network(
+                  'https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png',
+                  width: 20,
+                  height: 20,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.account_circle_outlined,
+                    size: 20,
+                    color: Color(0xFFEA4335),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tài khoản Google',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: t.text,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                    if (isLinked && email != null && email!.isNotEmpty)
+                      Text(
+                        email!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: t.muted,
+                              fontSize: 11,
+                            ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isLinked ? const Color(0xFFDCFCE7) : t.chipSoft,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: isLinked ? const Color(0xFF86EFAC) : t.border,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isLinked ? Icons.check_circle_rounded : Icons.link_off_rounded,
+                      size: 13,
+                      color: isLinked ? const Color(0xFF16A34A) : t.muted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isLinked ? 'Đã liên kết' : 'Chưa liên kết',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isLinked ? const Color(0xFF15803D) : t.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

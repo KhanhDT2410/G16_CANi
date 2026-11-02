@@ -30,6 +30,7 @@ class AuthRepository {
 
   static const _tokenKey = 'cani_token';
   static const _refreshTokenKey = 'cani_refresh_token';
+  static const _authProviderKey = 'cani_auth_provider';
 
   Future<LoginResponseModel> login(String email, String password) async {
     try {
@@ -41,11 +42,14 @@ class AuthRepository {
       // 2. Persist tokens in secure storage & in-memory cache
       AuthInterceptor.inMemoryToken = response.token;
       await _storage.write(key: _tokenKey, value: response.token);
+      await _storage.write(key: _authProviderKey, value: 'password');
       if (response.refreshToken != null) {
         await _storage.write(key: _refreshTokenKey, value: response.refreshToken);
       }
 
-      return response;
+      return response.copyWith(
+        user: response.user.copyWith(authProvider: 'password'),
+      );
     } on DioException catch (e) {
       final message = (e.response?.data is Map)
           ? (e.response?.data as Map)['message']?.toString()
@@ -188,11 +192,14 @@ class AuthRepository {
       // 6. Lưu trữ token
       AuthInterceptor.inMemoryToken = response.token;
       await _storage.write(key: _tokenKey, value: response.token);
+      await _storage.write(key: _authProviderKey, value: 'google');
       if (response.refreshToken != null) {
         await _storage.write(key: _refreshTokenKey, value: response.refreshToken);
       }
 
-      return response;
+      return response.copyWith(
+        user: response.user.copyWith(authProvider: 'google'),
+      );
     } on DioException catch (e) {
       final message = (e.response?.data is Map)
           ? (e.response?.data as Map)['message']?.toString()
@@ -208,7 +215,9 @@ class AuthRepository {
     try {
       final token = await _storage.read(key: _tokenKey);
       if (token == null || token.isEmpty) return null;
-      return await _api.getMe();
+      final authProvider = await _storage.read(key: _authProviderKey);
+      final user = await _api.getMe();
+      return user.copyWith(authProvider: authProvider);
     } catch (_) {
       await clearSession();
       return null;
@@ -226,5 +235,6 @@ class AuthRepository {
     AuthInterceptor.inMemoryToken = null;
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _refreshTokenKey);
+    await _storage.delete(key: _authProviderKey);
   }
 }

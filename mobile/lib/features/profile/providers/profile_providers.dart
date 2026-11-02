@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:cani/features/auth/models/user_dto.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
@@ -47,3 +48,31 @@ final profileDataProvider = Provider<ProfileData>((ref) {
     ekycResult: ekycResult,
   );
 });
+
+/// Quản lý trạng thái bật/tắt thông báo của ứng dụng lưu trữ bền vững
+final notificationSettingsProvider =
+    StateNotifierProvider<NotificationSettingsNotifier, bool>((ref) {
+  return NotificationSettingsNotifier();
+});
+
+class NotificationSettingsNotifier extends StateNotifier<bool> {
+  NotificationSettingsNotifier() : super(true) {
+    _load();
+  }
+
+  static const _storage = FlutterSecureStorage();
+  static const _key = 'cani_push_notifications_enabled';
+
+  Future<void> _load() async {
+    final val = await _storage.read(key: _key);
+    if (val != null) {
+      state = val == 'true';
+    }
+  }
+
+  Future<void> toggle(bool enabled) async {
+    state = enabled;
+    await _storage.write(key: _key, value: enabled.toString());
+  }
+}
+

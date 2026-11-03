@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { showToast } from '../../../components/common/Toast';
 import {
   DISPUTE_OUTCOMES,
   DISPUTE_OUTCOME_LABELS,
@@ -19,7 +20,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isRationaleValid) {
-      alert('Lý do quyết định phải từ 100 đến 5000 ký tự theo quy định BR-55/BR-68.');
+      showToast('Lý do quyết định phải từ 100 đến 5000 ký tự theo quy định.', 'warning');
       return;
     }
 
@@ -32,7 +33,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
       });
       onClose();
     } catch {
-      // Đã hiển thị toast lỗi
+      // Toast lỗi đã được hook xử lý
     } finally {
       setSubmitting(false);
     }
@@ -45,14 +46,14 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
           <div>
             <h3>
               {isEscalated
-                ? 'Phán Quyết Cuối Cùng Của Admin (UC-102)'
-                : 'Ban Hành Quyết Định Giải Quyết (UC-100)'}
+                ? 'Phán Quyết Cuối Cùng Của Admin'
+                : 'Ban Hành Quyết Định Giải Quyết'}
             </h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+            <span className="dispute-modal-subtitle">
               Mã đơn: <code>{dispute.id}</code> (Trạng thái hiện tại: <strong>{dispute.status}</strong>)
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -73,8 +74,8 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
             </div>
 
             {outcome === DISPUTE_OUTCOMES.WORKER_FAULT && (
-              <div style={{ padding: '0.65rem 0.85rem', background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning-border)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--color-warning-text)' }}>
-                ⚡ <strong>Quy tắc BR-55:</strong> Kết quả <code>WORKER_FAULT</code> sẽ tự động khấu trừ <strong>−10 điểm RS</strong> của Worker (trừ khi có lý do miễn trừ hợp lệ bên dưới).
+              <div className="dispute-rule-notice">
+                <strong>Quy tắc</strong> Kết quả <code>WORKER_FAULT</code> sẽ tự động khấu trừ <strong>-10 điểm RS</strong> của Worker (trừ khi có lý do miễn trừ hợp lệ bên dưới).
               </div>
             )}
 
@@ -89,7 +90,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
                 required
               />
               <div className={`char-counter ${isRationaleValid ? 'valid' : 'invalid'}`}>
-                {rationaleLen} / 100 ký tự tối thiểu {isRationaleValid ? '✓' : '(chưa đủ)'}
+                {rationaleLen} / 100 ký tự tối thiểu {isRationaleValid ? '(Đủ điều kiện)' : '(Chưa đủ)'}
               </div>
             </div>
 
@@ -109,8 +110,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
           <div className="dispute-modal-footer">
             <button
               type="button"
-              className="btn-quick-fill"
-              style={{ background: 'var(--color-bg-subtle)' }}
+              className="btn-cancel"
               onClick={onClose}
               disabled={submitting}
             >
@@ -118,13 +118,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
             </button>
             <button
               type="submit"
-              className="btn-quick-fill"
-              style={{
-                color: '#fff',
-                background: isRationaleValid ? 'var(--color-success)' : '#94a3b8',
-                borderColor: 'transparent',
-                padding: '0.5rem 1.25rem',
-              }}
+              className="btn-submit"
               disabled={submitting || !isRationaleValid}
             >
               {submitting ? 'Đang lưu...' : isEscalated ? 'Ban hành phán quyết cuối' : 'Ghi nhận quyết định'}

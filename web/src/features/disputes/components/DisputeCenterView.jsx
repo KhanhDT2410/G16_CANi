@@ -63,11 +63,11 @@ export const DisputeCenterView = () => {
       <div className="disputes-header">
         <div>
           <h1 className="disputes-title">
-            ⚖️ {isArbitrator ? 'Hàng Đợi Xử Lý Tranh Chấp & Khiếu Nại' : 'Tranh Chấp Của Tôi'}
+            {isArbitrator ? 'Hàng Đợi Xử Lý Tranh Chấp & Khiếu Nại' : 'Tranh Chấp Của Tôi'}
           </h1>
           <p className="disputes-subtitle">
             {isArbitrator
-              ? 'Tiếp nhận hồ sơ, đối soát bằng chứng, tự động khấu trừ điểm uy tín RS (BR-55) và kiểm soát thời hạn SLA (BR-53/54).'
+              ? 'Tiếp nhận hồ sơ, đối soát bằng chứng, tự động khấu trừ điểm uy tín RS và kiểm soát thời hạn SLA.'
               : 'Theo dõi tiến trình giải quyết khiếu nại ca làm việc và bổ sung bằng chứng theo quy định.'}
           </p>
         </div>
@@ -75,26 +75,24 @@ export const DisputeCenterView = () => {
           {!isArbitrator && (
             <button
               type="button"
-              className="btn-quick-fill"
-              style={{ padding: '0.6rem 1.1rem', color: '#fff', background: 'var(--color-primary)', borderColor: 'transparent' }}
+              className="dispute-btn-primary"
               onClick={() => setModalType('create')}
             >
-              + Nộp đơn khiếu nại (UC-96)
+              Nộp đơn khiếu nại
             </button>
           )}
           <button
             type="button"
-            className="btn-quick-fill"
-            style={{ padding: '0.6rem 1rem', background: 'var(--color-bg-subtle)' }}
+            className="dispute-btn-secondary"
             onClick={() => (isArbitrator ? loadQueue() : loadMyDisputes())}
           >
-            🔄 Làm mới
+            Làm mới
           </button>
         </div>
       </div>
 
       {/* Tra cứu nhanh theo ID */}
-      <form onSubmit={(e) => { e.preventDefault(); if (searchId.trim()) handleOpenDetail(searchId.trim()); }} style={{ display: 'flex', gap: '0.5rem', maxWidth: '520px' }}>
+      <form onSubmit={(e) => { e.preventDefault(); if (searchId.trim()) handleOpenDetail(searchId.trim()); }} className="dispute-search-form">
         <input
           type="text"
           className="dispute-input"
@@ -102,7 +100,7 @@ export const DisputeCenterView = () => {
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
         />
-        <button type="submit" className="btn-quick-fill" style={{ margin: 0, padding: '0.65rem 1.1rem' }}>
+        <button type="submit" className="dispute-btn-secondary">
           Tra cứu
         </button>
       </form>
@@ -124,7 +122,7 @@ export const DisputeCenterView = () => {
           </button>
           {riskCount > 0 && (
             <button type="button" className={`disputes-tab-btn ${queueFilter === 'SLA_RISK' ? 'active' : ''}`} onClick={() => setQueueFilter('SLA_RISK')}>
-              <span style={{ color: 'var(--color-danger)' }}>⚠️ SLA Khẩn cấp ({riskCount})</span>
+              <span className="tab-danger-text">SLA Khẩn cấp ({riskCount})</span>
             </button>
           )}
         </div>

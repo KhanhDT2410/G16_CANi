@@ -51,7 +51,7 @@ const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide }) => 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                     <span>{slaDate}</span>
                     {item.slaAtRisk && (
-                      <span className="sla-risk-badge">⚠️ Gấp (&lt;24h)</span>
+                      <span className="sla-risk-badge">Gấp (&lt;24h)</span>
                     )}
                   </div>
                 </td>

@@ -35,7 +35,7 @@ const DisputeDetailModal = ({
               ID: <code>{dispute.id}</code>
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <div className="dispute-modal-body">
@@ -81,7 +81,7 @@ const DisputeDetailModal = ({
                   style={{ margin: 0 }}
                   onClick={() => onAddEvidence(dispute)}
                 >
-                  + Nạp thêm bằng chứng
+                  Nạp thêm bằng chứng
                 </button>
               )}
             </div>
@@ -119,7 +119,7 @@ const DisputeDetailModal = ({
               </div>
               {dispute.rsPenaltyApplied && (
                 <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: 'var(--color-danger-text)', fontWeight: 600 }}>
-                  ⚠️ Đã tự động áp dụng khấu trừ −10 điểm RS của Worker (BR-55)
+                  Đã tự động áp dụng khấu trừ -10 điểm RS của Worker
                 </div>
               )}
               {dispute.resolution && (

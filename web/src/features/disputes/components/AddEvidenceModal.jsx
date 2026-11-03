@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { showToast } from '../../../components/common/Toast';
 import {
   DISPUTE_EVIDENCE_TYPES,
   DISPUTE_EVIDENCE_LABELS,
@@ -13,7 +14,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!fileUrl.trim()) {
-      alert('Vui lòng nhập đường dẫn tệp bằng chứng (URL)');
+      showToast('Vui lòng nhập đường dẫn tệp bằng chứng (URL)', 'warning');
       return;
     }
 
@@ -26,7 +27,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
       });
       onClose();
     } catch {
-      // Đã hiển thị toast lỗi
+      // Toast lỗi đã được hook xử lý
     } finally {
       setSubmitting(false);
     }
@@ -38,11 +39,11 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
         <div className="dispute-modal-header">
           <div>
             <h3>Nạp Bằng Chứng Tranh Chấp (UC-98)</h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+            <span className="dispute-modal-subtitle">
               Đơn: <code>{dispute.id}</code>
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -90,8 +91,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
           <div className="dispute-modal-footer">
             <button
               type="button"
-              className="btn-quick-fill"
-              style={{ background: 'var(--color-bg-subtle)' }}
+              className="btn-cancel"
               onClick={onClose}
               disabled={submitting}
             >
@@ -99,13 +99,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
             </button>
             <button
               type="submit"
-              className="btn-quick-fill"
-              style={{
-                color: '#fff',
-                background: 'var(--color-primary)',
-                borderColor: 'transparent',
-                padding: '0.5rem 1.25rem',
-              }}
+              className="btn-submit"
               disabled={submitting || !fileUrl.trim()}
             >
               {submitting ? 'Đang lưu...' : 'Lưu bằng chứng'}

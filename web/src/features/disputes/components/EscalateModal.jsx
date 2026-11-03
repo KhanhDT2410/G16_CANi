@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { showToast } from '../../../components/common/Toast';
 
 const EscalateModal = ({ dispute, onClose, onSubmit }) => {
   const [reason, setReason] = useState('');
@@ -7,7 +8,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!reason.trim()) {
-      alert('Vui lòng nhập lý do kháng nghị lên Quản trị viên');
+      showToast('Vui lòng nhập lý do kháng nghị lên Quản trị viên', 'warning');
       return;
     }
 
@@ -16,7 +17,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
       await onSubmit(dispute.id, { reason: reason.trim() });
       onClose();
     } catch {
-      // Đã hiển thị toast lỗi
+      // Toast lỗi đã được hook xử lý
     } finally {
       setSubmitting(false);
     }
@@ -27,12 +28,12 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
           <div>
-            <h3>Kháng Nghị Lên Ban Quản Trị Viên (UC-101)</h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              Mã đơn: <code>{dispute.id}</code> (BR-54: Trong vòng 7 ngày kể từ quyết định của CSKH)
+            <h3>Kháng Nghị Lên Ban Quản Trị Viên</h3>
+            <span className="dispute-modal-subtitle">
+              Mã đơn: <code>{dispute.id}</code> (Trong vòng 7 ngày kể từ quyết định của CSKH)
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -49,16 +50,15 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
               />
             </div>
 
-            <div style={{ padding: '0.65rem 0.85rem', background: '#fae8ff', border: '1px solid #f0abfc', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: '#86198f' }}>
-              ℹ️ Đơn sẽ được chuyển trực tiếp vào hàng đợi thẩm định của Quản trị viên (Admin). Quyết định của Quản trị viên sau bước này sẽ là <strong>phán quyết cuối cùng (BR-68)</strong>.
+            <div className="dispute-escalate-notice">
+              Đơn sẽ được chuyển trực tiếp vào hàng đợi thẩm định của Quản trị viên (Admin). Quyết định của Quản trị viên sau bước này sẽ là <strong>phán quyết cuối cùng</strong>.
             </div>
           </div>
 
           <div className="dispute-modal-footer">
             <button
               type="button"
-              className="btn-quick-fill"
-              style={{ background: 'var(--color-bg-subtle)' }}
+              className="btn-cancel"
               onClick={onClose}
               disabled={submitting}
             >
@@ -66,13 +66,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
             </button>
             <button
               type="submit"
-              className="btn-quick-fill"
-              style={{
-                color: '#fff',
-                background: '#86198f',
-                borderColor: 'transparent',
-                padding: '0.5rem 1.25rem',
-              }}
+              className="btn-escalate-submit"
               disabled={submitting || !reason.trim()}
             >
               {submitting ? 'Đang gửi...' : 'Gửi kháng nghị lên Admin'}

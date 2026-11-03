@@ -66,8 +66,8 @@ const ShiftQrModal = ({
     <div className="eo-modal-overlay">
       <div className="eo-modal-box" style={{ maxWidth: 480, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, textAlign: 'left' }}>📱 Mã QR Điểm Danh Ca Làm</h3>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+          <h3 style={{ margin: 0, textAlign: 'left' }}>Mã QR Điểm Danh Ca Làm</h3>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}>Đóng</button>
         </div>
 
         {/* Tab Switcher: Check-in vs Check-out */}
@@ -88,7 +88,7 @@ const ShiftQrModal = ({
               transition: 'all 0.2s',
             }}
           >
-            🟢 Check-in (Vào ca)
+            Check-in (Vào ca)
           </button>
           <button
             type="button"
@@ -106,13 +106,13 @@ const ShiftQrModal = ({
               transition: 'all 0.2s',
             }}
           >
-            🔵 Check-out (Tan ca)
+            Check-out (Tan ca)
           </button>
         </div>
 
         {loading ? (
           <div style={{ padding: '3rem 0', color: '#64748b' }}>
-            🔄 Đang tải mã QR ca làm...
+            Đang tải mã QR ca làm...
           </div>
         ) : (
           <div>
@@ -150,7 +150,7 @@ const ShiftQrModal = ({
             </div>
 
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '1rem 0 1.2rem', lineHeight: 1.4 }}>
-              💡 <em>Hướng dẫn:</em> Hiển thị màn hình này tại bàn tiếp tân sự kiện hoặc in ra giấy để Worker quét mã trực tiếp trên ứng dụng CANi.
+              <em>Hướng dẫn:</em> Hiển thị màn hình này tại bàn tiếp tân sự kiện hoặc in ra giấy để Worker quét mã trực tiếp trên ứng dụng CANi.
             </p>
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
@@ -164,7 +164,7 @@ const ShiftQrModal = ({
                   fontSize: '0.85rem',
                 }}
               >
-                🖨️ In Mã QR Ra Giấy
+                In Mã QR Ra Giấy
               </button>
               <button
                 type="button"

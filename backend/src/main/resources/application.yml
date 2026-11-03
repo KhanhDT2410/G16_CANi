@@ -109,8 +109,8 @@ cani:
     client-id: ${PAYOS_CLIENT_ID:856cf773-33b5-4da1-8cf0-adf01233ba1a}
     api-key: ${PAYOS_API_KEY:0e56b01d-3514-4ad9-901b-4afd203f1a44}
     checksum-key: ${PAYOS_CHECKSUM_KEY:04ec2256d44a67dfcaa6fb04c9a741365bff5cd9911afd8f96cadd3efaf1ddfc}
-    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?tab=subscription&payos=success}
-    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?tab=subscription&payos=cancel}
+    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?payos=success}
+    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?payos=cancel}
 
 
 

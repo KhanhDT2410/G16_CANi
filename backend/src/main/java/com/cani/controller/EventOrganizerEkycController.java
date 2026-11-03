@@ -2,6 +2,7 @@ package com.cani.controller;
 
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
+import com.cani.dto.ekyc.EoProfileDto;
 import com.cani.dto.response.ApiResponse;
 import com.cani.entity.User;
 import com.cani.exception.AppException;
@@ -69,6 +70,35 @@ public class EventOrganizerEkycController {
         UUID userId = resolveUserId(authentication, explicitUserId);
         EoEkycVerificationResultDto result = eoEkycService.getMyEkycStatus(userId);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy thông tin trạng thái eKYC doanh nghiệp thành công"));
+    }
+
+    /**
+     * Nhà tổ chức lấy thông tin hồ sơ doanh nghiệp (Profile)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/eo/profile")
+    public ResponseEntity<ApiResponse<EoProfileDto>> getMyProfile(
+            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            Authentication authentication) {
+
+        UUID userId = resolveUserId(authentication, explicitUserId);
+        EoProfileDto profile = eoEkycService.getEoProfile(userId);
+        return ResponseEntity.ok(ApiResponse.ok(profile, "Lấy thông tin hồ sơ doanh nghiệp thành công"));
+    }
+
+    /**
+     * Nhà tổ chức cập nhật thông tin hồ sơ doanh nghiệp (Profile)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PutMapping("/eo/profile")
+    public ResponseEntity<ApiResponse<EoProfileDto>> updateMyProfile(
+            @RequestBody EoProfileDto request,
+            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            Authentication authentication) {
+
+        UUID userId = resolveUserId(authentication, explicitUserId);
+        EoProfileDto profile = eoEkycService.updateEoProfile(userId, request);
+        return ResponseEntity.ok(ApiResponse.ok(profile, "Cập nhật thông tin hồ sơ doanh nghiệp thành công"));
     }
 
     /**

@@ -329,7 +329,7 @@ public class SubscriptionService {
         EventOrganizer eo = getEoOrThrow(userId);
         SubscriptionPlanDto plan = getPlanDefinition(dto.getPlanType());
 
-        long orderCode = System.currentTimeMillis() % 1000000000L;
+        long orderCode = Math.abs(System.currentTimeMillis() % 900000000L) + 100000000L;
         pendingOrders.put("PAYOS_" + orderCode, new PendingOrder(eo.getEoId(), plan.getPlanType(), plan.getPrice(), Instant.now()));
 
         String desc = "CANI " + (plan.getPlanType() == PlanType.INVITE_ONLY ? "INVITE 50K" : "MATCH 80K");

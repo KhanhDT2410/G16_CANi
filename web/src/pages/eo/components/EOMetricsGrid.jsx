@@ -6,7 +6,6 @@ export default function EOMetricsGrid({ metrics }) {
       <div className="eo-metric-card">
         <div className="metric-header-row">
           <span className="eo-metric-label">Tổng Sự Kiện</span>
-          <span className="metric-icon-badge blue">📅</span>
         </div>
         <div className="eo-metric-value">{totalEvents}</div>
         <div className="eo-metric-sub">Đang quản lý</div>
@@ -15,7 +14,6 @@ export default function EOMetricsGrid({ metrics }) {
       <div className="eo-metric-card">
         <div className="metric-header-row">
           <span className="eo-metric-label">Nhân Sự Cần Tuyển</span>
-          <span className="metric-icon-badge cyan">👥</span>
         </div>
         <div className="eo-metric-value">{totalRequiredWorkers}</div>
         <div className="eo-metric-sub">Theo ma trận ca</div>
@@ -24,7 +22,6 @@ export default function EOMetricsGrid({ metrics }) {
       <div className="eo-metric-card">
         <div className="metric-header-row">
           <span className="eo-metric-label">Nhân Sự Đã Chốt Ca</span>
-          <span className="metric-icon-badge green">✅</span>
         </div>
         <div className="metric-value-row">
           <div className="eo-metric-value text-accent-blue">{totalConfirmedWorkers}</div>
@@ -49,7 +46,6 @@ export default function EOMetricsGrid({ metrics }) {
       <div className="eo-metric-card">
         <div className="metric-header-row">
           <span className="eo-metric-label">Dự Toán Chi Phí Lương</span>
-          <span className="metric-icon-badge emerald">💳</span>
         </div>
         <div className="eo-metric-value text-emerald">
           {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalEstimatedCost)}

@@ -53,6 +53,14 @@ public class PayOSService {
         body.put("returnUrl", returnUrl);
         body.put("signature", signature);
 
+        List<Map<String, Object>> items = new ArrayList<>();
+        Map<String, Object> item = new HashMap<>();
+        item.put("name", cleanDesc);
+        item.put("quantity", 1);
+        item.put("price", amount);
+        items.add(item);
+        body.put("items", items);
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("x-client-id", payOSConfig.getClientId());
@@ -62,14 +70,21 @@ public class PayOSService {
         String url = payOSConfig.getEndpoint() + "/v2/payment-requests";
 
         try {
-            log.info("Gửi yêu cầu tạo liên kết thanh toán PayOS orderCode: {}, amount: {}", orderCode, amount);
+            log.info("Gửi yêu cầu tạo liên kết thanh toán PayOS orderCode: {}, amount: {}, desc: {}", orderCode, amount, cleanDesc);
             ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
+            log.info("PayOS response: Status={}, Body={}", response.getStatusCode(), response.getBody());
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 String code = root.path("code").asText("");
                 if ("00".equals(code)) {
                     JsonNode data = root.path("data");
+                    String rawQr = data.path("qrCode").asText("");
+                    String checkoutUrl = data.path("checkoutUrl").asText("");
+                    String vietQrImg = "https://img.vietqr.io/image/MB-2622014789096-compact2.png?amount="
+                            + amount + "&addInfo=" + URLEncoder.encode(cleanDesc, StandardCharsets.UTF_8)
+                            + "&accountName=" + URLEncoder.encode("PHAM DUY HUNG", StandardCharsets.UTF_8);
+
                     return PayOSPaymentResponseDto.builder()
                             .orderCode(data.path("orderCode").asLong())
                             .amount(data.path("amount").asInt())
@@ -77,8 +92,8 @@ public class PayOSService {
                             .accountNumber(data.path("accountNumber").asText("2622014789096"))
                             .accountName(data.path("accountName").asText("PHAM DUY HUNG"))
                             .bin(data.path("bin").asText("970422"))
-                            .checkoutUrl(data.path("checkoutUrl").asText())
-                            .qrCode(data.path("qrCode").asText())
+                            .checkoutUrl(checkoutUrl.isBlank() ? vietQrImg : checkoutUrl)
+                            .qrCode(rawQr.isBlank() ? vietQrImg : rawQr)
                             .status(data.path("status").asText("PENDING"))
                             .build();
                 } else {
@@ -86,7 +101,7 @@ public class PayOSService {
                 }
             }
         } catch (Exception e) {
-            log.error("Lỗi gọi PayOS API: {}", e.getMessage());
+            log.error("Lỗi gọi PayOS API: {}", e.getMessage(), e);
         }
 
         // Fallback: Tạo VietQR trực tiếp theo chuẩn NAPAS với tài khoản MB của bạn

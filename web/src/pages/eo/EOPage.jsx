@@ -127,7 +127,15 @@ export default function EOPage() {
               onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
               onOpenEditEvent={events.setEditingEvent}
               onCancelEvent={events.handleCancelEvent}
-              onOpenConfirmPublish={events.openConfirmPublish}
+              onOpenConfirmPublish={(evt) => {
+                if (!evt.totalShifts || evt.totalShifts === 0) {
+                  showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi kích hoạt Matching!', 'warning');
+                  shifts.setSelectedEventId(evt.eventId);
+                  shifts.setShowShiftModal(true);
+                  return;
+                }
+                events.openConfirmPublish(evt);
+              }}
               onOpenMap={setMapModal}
               onOpenQr={shifts.handleOpenShiftQr}
               onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}

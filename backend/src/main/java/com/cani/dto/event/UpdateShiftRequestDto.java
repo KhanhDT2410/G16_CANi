@@ -53,4 +53,6 @@ public class UpdateShiftRequestDto {
     private Double locationLat;
 
     private Double locationLng;
+
+    private String checklist;
 }

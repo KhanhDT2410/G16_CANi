@@ -1,5 +1,5 @@
 import MapModal from '../../../components/common/MapModal';
-import EventCreateModal from './EventCreateModal';
+import EventCreationWizardModal from './EventCreationWizardModal';
 import ShiftCreateModal from './ShiftCreateModal';
 import PaymentDeclarationModal from './PaymentDeclarationModal';
 import PublishEventModal from './PublishEventModal';
@@ -24,14 +24,14 @@ export default function EOModals({
 }) {
   return (
     <>
-      <EventCreateModal
+      <EventCreationWizardModal
         isOpen={events.showEventModal}
         onClose={() => events.setShowEventModal(false)}
+        onSuccess={events.loadEvents}
         newEvent={events.newEvent}
         setNewEvent={events.setNewEvent}
         locating={events.locating}
         onGetCurrentLocation={events.handleGetCurrentLocation}
-        onSubmit={events.handleCreateEvent}
       />
 
       <ShiftCreateModal

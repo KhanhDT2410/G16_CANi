@@ -3,11 +3,11 @@ import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 
 const DISPUTE_TYPES = [
-  { value: 'PAYMENT', label: '💰 Tranh chấp tiền lương / đối soát thanh toán' },
-  { value: 'WORK_QUALITY', label: '⚠️ Chất lượng công việc không đạt yêu cầu' },
-  { value: 'NO_SHOW', label: '❌ Nhân sự vắng mặt không lý do (No-show)' },
-  { value: 'HARASSMENT', label: '🛑 Thái độ / Vi phạm quy tắc ứng xử' },
-  { value: 'OTHER', label: '❓ Lý do khác' },
+  { value: 'PAYMENT', label: 'Tranh chấp tiền lương / đối soát thanh toán' },
+  { value: 'WORK_QUALITY', label: 'Chất lượng công việc không đạt yêu cầu' },
+  { value: 'NO_SHOW', label: 'Nhân sự vắng mặt không lý do (No-show)' },
+  { value: 'HARASSMENT', label: 'Thái độ / Vi phạm quy tắc ứng xử' },
+  { value: 'OTHER', label: 'Lý do khác' },
 ];
 
 export default function DisputeModal({ isOpen, onClose, assignment, onSuccess }) {
@@ -92,15 +92,15 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
     <div className="eo-modal-overlay">
       <div className="eo-modal-box" style={{ maxWidth: 640 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
-            <span>⚖️</span> Khiếu Nại & Tranh Chấp 3 Bên (FE-11)
+          <h3 style={{ margin: 0, color: '#0f172a' }}>
+            Khiếu Nại & Tranh Chấp 3 Bên (FE-11)
           </h3>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}
+            style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}
           >
-            ✕
+            Đóng
           </button>
         </div>
 
@@ -120,7 +120,7 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
               cursor: 'pointer',
             }}
           >
-            📝 Gửi Đơn Khiếu Nại
+            Gửi Đơn Khiếu Nại
           </button>
           <button
             type="button"
@@ -136,7 +136,7 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
               cursor: 'pointer',
             }}
           >
-            📜 Lịch Sử Khiếu Nại ({disputes.length})
+            Lịch Sử Khiếu Nại ({disputes.length})
           </button>
         </div>
 
@@ -199,7 +199,7 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
                 placeholder="Dán link ảnh bằng chứng, mã giao dịch, ảnh chụp tin nhắn..."
               />
               <span className="eo-field-helper">
-                💡 Bằng chứng xác thực giúp Customer Care đưa ra phán quyết công bằng và nhanh chóng hơn.
+                Bằng chứng xác thực giúp Customer Care đưa ra phán quyết công bằng và nhanh chóng hơn.
               </span>
             </div>
 

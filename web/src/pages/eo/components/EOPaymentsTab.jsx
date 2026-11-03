@@ -43,10 +43,10 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
                     }`}
                   >
                     {p.status === 'CONFIRMED_FULL'
-                      ? '✓ Đã hoàn tất'
+                      ? 'Đã hoàn tất'
                       : p.status === 'DECLARED_PENDING_WORKER'
-                      ? '⏳ Chờ Worker xác nhận'
-                      : '⚠️ Chưa khai báo'}
+                      ? 'Chờ Worker xác nhận'
+                      : 'Chưa khai báo'}
                   </span>
                 </td>
                 <td>
@@ -75,7 +75,7 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
                       onClick={() => onOpenDisputeModal && onOpenDisputeModal(p)}
                       title="Gửi khiếu nại tranh chấp lên Customer Care (UC-96)"
                     >
-                      ⚖️ Khiếu Nại
+                      Khiếu Nại
                     </button>
                   </div>
                 </td>

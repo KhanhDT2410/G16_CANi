@@ -50,9 +50,7 @@ export default function EOSubscriptionTab() {
       <div className="sub-current-card">
         <div className="sub-current-header">
           <div className="sub-current-title-group">
-            <h2>
-              <span>💎</span> Gói Dịch Vụ & Hạn Mức Điều Phối
-            </h2>
+            <h2>Gói Dịch Vụ & Hạn Mức Điều Phối</h2>
             <p className="sub-current-subtitle">
               Mô hình thanh toán theo Sự kiện (Pay-per-Event Quota). Tuân thủ mô hình Non-Escrow & Nghị định 52/2024/NĐ-CP.
             </p>
@@ -60,15 +58,15 @@ export default function EOSubscriptionTab() {
           <div>
             {isCurrentActive ? (
               <span className="sub-status-pill status-active">
-                ● Đang Hoạt Động: {currentSubscription.planName}
+                Đang Hoạt Động: {currentSubscription.planName}
               </span>
             ) : currentSubscription && currentSubscription.status === 'CONSUMED' ? (
               <span className="sub-status-pill status-consumed">
-                ● Đã Sử Dụng Hết Hạn Mức
+                Đã Sử Dụng Hết Hạn Mức
               </span>
             ) : (
               <span className="sub-status-pill status-none">
-                ● Chưa Có Gói Kích Hoạt
+                Chưa Có Gói Kích Hoạt
               </span>
             )}
           </div>
@@ -89,9 +87,9 @@ export default function EOSubscriptionTab() {
             <span className="sub-metric-label">Chế độ tuyển dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem' }}>
               {currentSubscription?.planType === 'MATCHING_PLUS'
-                ? '⚡ Matching Radar AI + Mời'
+                ? 'Matching Radar AI + Mời'
                 : currentSubscription?.planType === 'INVITE_ONLY'
-                ? '🔗 Mời Trực Tiếp (Invite Mode)'
+                ? 'Mời Trực Tiếp (Invite Mode)'
                 : 'Chưa kích hoạt'}
             </span>
             <span className="sub-metric-hint">
@@ -120,14 +118,14 @@ export default function EOSubscriptionTab() {
           className={`sub-tab-btn ${activeSubTab === 'plans' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('plans')}
         >
-          <span>🏷️</span> Danh Mục Gói Cước (UC-10, UC-11)
+          Danh Mục Gói Cước (UC-10, UC-11)
         </button>
         <button
           type="button"
           className={`sub-tab-btn ${activeSubTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('history')}
         >
-          <span>📜</span> Lịch Sử Giao Dịch VNPay (UC-12) ({history.length})
+          Lịch Sử Giao Dịch ({history.length})
         </button>
       </div>
 
@@ -135,13 +133,10 @@ export default function EOSubscriptionTab() {
       {activeSubTab === 'plans' && (
         <>
           <div className="demo-sandbox-notice">
-            <div className="demo-notice-icon">🛡️</div>
             <div className="demo-notice-content">
               <h4>Môi Trường Thử Nghiệm VNPay Sandbox Gateway & Non-Escrow Compliance</h4>
               <p>
-                Hệ thống CANi tích hợp trực tiếp Cổng thanh toán <strong>VNPay Sandbox</strong>. Khi bấm <strong>"Thanh toán VNPay"</strong>, 
-                bạn sẽ được chuyển hướng sang cổng thanh toán VNPay chính thức. Để hỗ trợ chấm điểm và Demo hội đồng mượt mà, bạn cũng có thể bấm 
-                <strong>"[Demo] Giả lập thanh toán"</strong> để kích hoạt gói ngay lập tức mà không cần qua bước nhập thẻ test.
+                Hệ thống CANi tích hợp Cổng thanh toán <strong>PayOS VietQR</strong> và <strong>VNPay Sandbox</strong>. Khi chọn hình thức thanh toán, bạn có thể quét mã VietQR tự động khớp tiền hoặc bấm <strong>"[Demo] Giả lập thanh toán"</strong> để kích hoạt gói ngay lập tức phục vụ demo hội đồng.
               </p>
             </div>
           </div>
@@ -154,15 +149,13 @@ export default function EOSubscriptionTab() {
             <div className="sub-pricing-grid">
               {plans.map((plan) => {
                 const isMatching = plan.planType === 'MATCHING_PLUS';
-                const isCurrentThisPlan =
-                  currentSubscription?.planType === plan.planType && isCurrentActive;
 
                 return (
                   <div
                     key={plan.planType}
                     className={`pricing-card ${isMatching ? 'featured' : ''}`}
                   >
-                    {isMatching && <div className="pricing-badge">Khuyên Dùng ★</div>}
+                    {isMatching && <div className="pricing-badge">Khuyên Dùng</div>}
 
                     <div className="pricing-header">
                       <h3 className="pricing-title">{plan.name}</h3>
@@ -178,7 +171,7 @@ export default function EOSubscriptionTab() {
                     <ul className="pricing-features">
                       {(plan.features || []).map((feat, idx) => (
                         <li key={idx}>
-                          <span className="feat-icon">✓</span>
+                          <span className="feat-icon">-</span>
                           <span>{feat}</span>
                         </li>
                       ))}
@@ -188,17 +181,14 @@ export default function EOSubscriptionTab() {
                       <button
                         type="button"
                         className="btn-purchase-vnpay"
-                        style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' }}
+                        style={{ background: '#059669' }}
                         disabled={purchasingPlan !== null}
                         onClick={() => handlePurchasePayOS(plan.planType)}
                       >
                         {purchasingPlan === plan.planType ? (
                           'Đang khởi tạo PayOS...'
                         ) : (
-                          <>
-                            <span>⚡ Quét Mã VietQR (PayOS MBBank)</span>
-                            <span>&rarr;</span>
-                          </>
+                          'Quét Mã VietQR (PayOS MBBank)'
                         )}
                       </button>
 
@@ -212,10 +202,7 @@ export default function EOSubscriptionTab() {
                         {purchasingPlan === plan.planType ? (
                           'Đang kết nối VNPay...'
                         ) : (
-                          <>
-                            <span>Thanh toán VNPay Sandbox ({formatCurrency(plan.price)} đ)</span>
-                            <span>&rarr;</span>
-                          </>
+                          `Thanh toán VNPay Sandbox (${formatCurrency(plan.price)} đ)`
                         )}
                       </button>
 
@@ -226,7 +213,7 @@ export default function EOSubscriptionTab() {
                         onClick={() => handleSimulateDemo(plan.planType)}
                         title="Dành riêng cho Hội đồng chấm đồ án: Giả lập thanh toán thành công tức thì"
                       >
-                        ⚡ [Demo Sandbox] Giả Lập Thành Công
+                        [Demo Sandbox] Giả Lập Thành Công
                       </button>
                     </div>
                   </div>
@@ -281,9 +268,7 @@ export default function EOSubscriptionTab() {
                       {formatCurrency(item.amountPaid)} đ
                     </td>
                     <td>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                        🏦 VNPay Sandbox
-                      </span>
+                      <span>VNPay / PayOS</span>
                     </td>
                     <td>
                       <span style={{ fontWeight: 600, color: item.remainingEvents > 0 ? '#059669' : '#64748b' }}>
@@ -330,4 +315,3 @@ export default function EOSubscriptionTab() {
     </div>
   );
 }
-

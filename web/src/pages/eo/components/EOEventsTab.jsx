@@ -41,13 +41,13 @@ export default function EOEventsTab({
         </div>
         <div className="filter-controls">
           <div className="search-input-wrapper">
-            <span className="search-icon">🔍</span>
             <input
               type="text"
               placeholder="Tìm kiếm theo tên sự kiện..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="event-search-input"
+              style={{ paddingLeft: '0.85rem' }}
             />
           </div>
 
@@ -79,7 +79,6 @@ export default function EOEventsTab({
           <SkeletonCard count={2} height="220px" />
         ) : filteredEvents.length === 0 ? (
           <div className="eo-empty-state">
-            <div className="empty-icon">🎪</div>
             <p className="empty-text">Không tìm thấy sự kiện nào phù hợp.</p>
             <button
               type="button"
@@ -130,32 +129,28 @@ export default function EOEventsTab({
                     title="Sao chép mã sự kiện"
                     onClick={() => copyToClipboard(evt.eventId || 'EVT-98721', 'Mã sự kiện')}
                   >
-                    📋
+                    Sao chép
                   </button>
                 </div>
 
                 <div className="event-location-row">
-                  <span className="location-pin">📍</span>
                   <span className="location-text">{evt.venueAddress}</span>
                 </div>
 
                 <div className="event-metrics-row">
                   <div className="meta-chip">
-                    <span className="chip-icon">👥</span>
                     <span className="chip-label">
                       <strong>{evt.totalConfirmedWorkers || 0}/{evt.totalRequiredWorkers || 0}</strong> Nhân sự
                     </span>
                   </div>
 
                   <div className="meta-chip">
-                    <span className="chip-icon">🕒</span>
                     <span className="chip-label">
                       <strong>{evt.totalShifts || 0}</strong> Ca làm việc
                     </span>
                   </div>
 
                   <div className="meta-chip wage">
-                    <span className="chip-icon">💰</span>
                     <span className="chip-label wage-amount">
                       {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
                         evt.totalEstimatedCost || 0
@@ -179,7 +174,7 @@ export default function EOEventsTab({
                       })
                     }
                   >
-                    📍 Bản đồ
+                    Bản đồ
                   </button>
 
                   <button
@@ -196,7 +191,7 @@ export default function EOEventsTab({
                     onClick={() => onOpenEditEvent(evt)}
                     title="Chỉnh sửa thông tin sự kiện"
                   >
-                    ✏️ Sửa
+                    Sửa
                   </button>
 
                   {evt.status !== 'CANCELLED' && evt.status !== 'COMPLETED' && (
@@ -207,7 +202,7 @@ export default function EOEventsTab({
                       onClick={() => onCancelEvent(evt)}
                       title="Hủy sự kiện này"
                     >
-                      ❌ Hủy
+                      Hủy
                     </button>
                   )}
 
@@ -217,7 +212,7 @@ export default function EOEventsTab({
                       className="btn-action-publish"
                       onClick={() => onOpenConfirmPublish(evt)}
                     >
-                      🚀 Kích Hoạt Matching
+                      Kích Hoạt Matching
                     </button>
                   )}
 
@@ -227,8 +222,8 @@ export default function EOEventsTab({
                     onClick={() => setExpandedEventId(expandedEventId === evt.eventId ? null : evt.eventId)}
                   >
                     {expandedEventId === evt.eventId
-                      ? '▲ Thu Gọn'
-                      : `📋 Quản Lý Ca (${evt.shifts?.length || evt.totalShifts || 0})`}
+                      ? 'Thu Gọn'
+                      : `Quản Lý Ca (${evt.shifts?.length || evt.totalShifts || 0})`}
                   </button>
                 </div>
               </div>

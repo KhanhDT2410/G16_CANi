@@ -22,14 +22,14 @@ export default function PayOSQrModal({ isOpen, onClose, data, onConfirm }) {
       <div className="eo-modal-box" style={{ maxWidth: 540, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
-            <span>⚡</span> Thanh Toán VietQR Tự Động (PayOS)
+            Thanh Toán VietQR Tự Động (PayOS)
           </h3>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}
+            style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}
           >
-            ✕
+            Đóng
           </button>
         </div>
 
@@ -132,7 +132,7 @@ export default function PayOSQrModal({ isOpen, onClose, data, onConfirm }) {
                 fontSize: '0.9rem',
               }}
             >
-              🔗 Mở Trang Thanh Toán PayOS Checkout &rarr;
+              Mở Trang Thanh Toán PayOS Checkout &rarr;
             </a>
           )}
 
@@ -150,7 +150,7 @@ export default function PayOSQrModal({ isOpen, onClose, data, onConfirm }) {
               fontSize: '0.9rem',
             }}
           >
-            ✅ Tôi Đã Chuyển Khoản Xong (Kích Hoạt Gói)
+            Tôi Đã Chuyển Khoản Xong (Kích Hoạt Gói)
           </button>
 
           <button

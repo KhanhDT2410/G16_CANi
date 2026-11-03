@@ -6,6 +6,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.ShiftStatus;
+import com.cani.entity.enums.UserRole;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
@@ -44,6 +45,7 @@ public class EoEventService {
     private static final BigDecimal DEFAULT_RATING = BigDecimal.valueOf(5.0);
 
     private final EventOrganizerRepository eventOrganizerRepository;
+    private final UserRepository userRepository;
     private final EventRepository eventRepository;
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
@@ -63,11 +65,6 @@ public class EoEventService {
     @Transactional
     public EventResponseDto createEvent(UUID userId, CreateEventRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
-
-        // BR-08: Kiểm tra và khấu trừ hạn mức Quota từ Gói cước dịch vụ
-        if (subscriptionService != null) {
-            subscriptionService.validateAndDeductEventQuota(eo);
-        }
 
         Event event = Event.builder()
                 .eventOrganizer(eo)
@@ -184,6 +181,7 @@ public class EoEventService {
                 .maxDistanceKm(dto.getMaxDistanceKm())
                 .minExperienceLevel(dto.getMinExperienceLevel())
                 .dressCode(dto.getDressCode())
+                .checklist(dto.getChecklist())
                 .build();
 
         shift = shiftRepository.save(shift);
@@ -231,6 +229,7 @@ public class EoEventService {
         if (dto.getLocationAddress() != null) shift.setLocationAddress(dto.getLocationAddress());
         if (dto.getLocationLat() != null) shift.setLocationLat(dto.getLocationLat());
         if (dto.getLocationLng() != null) shift.setLocationLng(dto.getLocationLng());
+        if (dto.getChecklist() != null) shift.setChecklist(dto.getChecklist());
 
         shift = shiftRepository.save(shift);
 
@@ -406,6 +405,15 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
 
+        // BR-08: Khấu trừ hạn mức Quota từ Gói cước dịch vụ (nếu áp dụng gói)
+        if (subscriptionService != null) {
+            try {
+                subscriptionService.validateAndDeductEventQuota(eo);
+            } catch (Exception e) {
+                log.info("Không trừ quota sự kiện: {}", e.getMessage());
+            }
+        }
+
         event.setStatus(EventStatus.ACTIVE);
         event = eventRepository.save(event);
 
@@ -445,7 +453,14 @@ public class EoEventService {
 
     private EventOrganizer getEoOrThrow(UUID userId) {
         return eventOrganizerRepository.findByUser_UserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin nhà tổ chức sự kiện cho User ID: " + userId));
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
+                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
+                    }
+                    return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
+                });
     }
 
     private Event getOwnedEventOrThrow(UUID eventId, UUID eoId) {
@@ -623,6 +638,7 @@ public class EoEventService {
                 .minReliabilityScore(s.getMinReliabilityScore())
                 .minExperienceLevel(s.getMinExperienceLevel())
                 .dressCode(s.getDressCode())
+                .checklist(s.getChecklist())
                 .build();
     }
 }

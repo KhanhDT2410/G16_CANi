@@ -109,11 +109,23 @@ export const eoService = {
     }
   },
 
+  // EO Lấy thông tin hồ sơ doanh nghiệp (Profile)
+  getEoProfile: async () => {
+    const response = await apiClient.get('/v1/eo/profile');
+    return response.data?.data;
+  },
+
+  // EO Cập nhật thông tin hồ sơ doanh nghiệp (Profile)
+  updateEoProfile: async (profileData) => {
+    const response = await apiClient.put('/v1/eo/profile', profileData);
+    return response.data?.data;
+  },
+
   // EO Nộp hồ sơ định danh eKYC doanh nghiệp (CCCD trước, sau, selfie, GPKD)
   submitEkyc: async (formData) => {
     const response = await apiClient.post('/v1/eo/ekyc/submit', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': undefined,
       },
     });
     return response.data?.data;

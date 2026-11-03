@@ -9,7 +9,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'overview' ? 'active' : ''}`}
           onClick={() => onNavClick('overview')}
         >
-          <span className="nav-icon">📊</span>
           <span className="nav-label">Tổng quan</span>
         </button>
 
@@ -18,7 +17,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'events' ? 'active' : ''}`}
           onClick={() => onNavClick('events')}
         >
-          <span className="nav-icon">📅</span>
           <span className="nav-label">Quản lý sự kiện</span>
         </button>
 
@@ -27,7 +25,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'recruitment' ? 'active' : ''}`}
           onClick={() => onNavClick('recruitment')}
         >
-          <span className="nav-icon">👥</span>
           <span className="nav-label">Tuyển dụng nhân sự</span>
         </button>
 
@@ -36,7 +33,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'payments' ? 'active' : ''}`}
           onClick={() => onNavClick('payments')}
         >
-          <span className="nav-icon">💳</span>
           <span className="nav-label">Thanh toán & lương</span>
         </button>
 
@@ -45,7 +41,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'subscription' ? 'active' : ''}`}
           onClick={() => onNavClick('subscription')}
         >
-          <span className="nav-icon">💎</span>
           <span className="nav-label">Gói dịch vụ (W-06)</span>
         </button>
 
@@ -54,7 +49,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'ekyc' ? 'active' : ''}`}
           onClick={() => onNavClick('ekyc')}
         >
-          <span className="nav-icon">🛡️</span>
           <span className="nav-label">E-KYC doanh nghiệp</span>
         </button>
 
@@ -63,7 +57,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'analytics' ? 'active' : ''}`}
           onClick={() => onNavClick('analytics')}
         >
-          <span className="nav-icon">📈</span>
           <span className="nav-label">Báo cáo & thống kê</span>
         </button>
 
@@ -72,7 +65,6 @@ export default function EOSidebar({ activeNav, onNavClick }) {
           className={`eo-nav-item ${activeNav === 'settings' ? 'active' : ''}`}
           onClick={() => onNavClick('settings')}
         >
-          <span className="nav-icon">⚙️</span>
           <span className="nav-label">Cài đặt</span>
         </button>
       </nav>

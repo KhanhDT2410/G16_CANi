@@ -65,15 +65,15 @@ export default function ShiftInviteModal({ isOpen, onClose, shift, event }) {
     <div className="eo-modal-overlay">
       <div className="eo-modal-box" style={{ maxWidth: 520, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h3 style={{ margin: 0, textAlign: 'left', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
-            <span>🔗</span> Mã Mời Trực Tiếp (Invite Mode)
+          <h3 style={{ margin: 0, textAlign: 'left', color: '#0f172a' }}>
+            Mã Mời Trực Tiếp (Invite Mode)
           </h3>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b' }}
+            style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}
           >
-            ✕
+            Đóng
           </button>
         </div>
 
@@ -113,7 +113,7 @@ export default function ShiftInviteModal({ isOpen, onClose, shift, event }) {
                   cursor: 'pointer',
                 }}
               >
-                📋 Sao Chép Mã
+                Sao Chép Mã
               </button>
             </div>
 

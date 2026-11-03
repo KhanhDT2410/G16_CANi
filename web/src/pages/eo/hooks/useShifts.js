@@ -40,7 +40,7 @@ export function useShifts({ onReloadEvents }) {
 
   const [newShift, setNewShift] = useState({
     jobType: ROLES[0],
-    description: '',
+    description: 'Hỗ trợ công việc theo phân công của quản lý sự kiện, thái độ niềm nở, chủ động.',
     startTime: '2026-11-20T08:00',
     endTime: '2026-11-20T12:00',
     requiredWorkers: 4,
@@ -48,6 +48,11 @@ export function useShifts({ onReloadEvents }) {
     allowance: 20000,
     minReliabilityScore: 60,
     maxDistanceKm: 15,
+    checklistItems: [
+      'Có mặt trước 15-30 phút nhận vị trí',
+      'Đồng phục chỉn chu theo hướng dẫn',
+      'Thực hiện điểm danh check-in bằng mã QR',
+    ],
   });
 
   const getShiftDurationHours = () => {
@@ -88,8 +93,13 @@ export function useShifts({ onReloadEvents }) {
     e.preventDefault();
     if (!selectedEventId) return;
     try {
+      const checklistStr = Array.isArray(newShift.checklistItems)
+        ? JSON.stringify(newShift.checklistItems)
+        : (newShift.checklist || '[]');
+
       await eoService.addShiftToEvent(selectedEventId, {
         ...newShift,
+        checklist: checklistStr,
         startTime: new Date(newShift.startTime).toISOString(),
         endTime: new Date(newShift.endTime).toISOString(),
       });

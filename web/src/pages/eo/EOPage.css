@@ -848,6 +848,13 @@
   top: 5rem;
 }
 
+.eo-right-sidebar,
+.eo-widget-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 .eo-widget-card {
   background: #ffffff;
   border-radius: 18px;
@@ -920,7 +927,8 @@
   margin-bottom: 0.5rem;
 }
 
-.calendar-grid {
+.calendar-grid,
+.calendar-days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 3px;

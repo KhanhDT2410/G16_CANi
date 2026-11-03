@@ -4,6 +4,7 @@ import com.cani.client.ekyc.EkycProvider;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
+import com.cani.dto.ekyc.EoProfileDto;
 import com.cani.entity.EventOrganizer;
 import com.cani.entity.EoEkycVerification;
 import com.cani.entity.User;
@@ -172,10 +173,9 @@ public class EventOrganizerEkycService {
     /**
      * Lấy trạng thái hồ sơ eKYC hiện tại của Nhà tổ chức sự kiện
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public EoEkycVerificationResultDto getMyEkycStatus(UUID userId) {
-        EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin Nhà tổ chức sự kiện"));
+        EventOrganizer eo = getOrCreateEo(userId);
 
         return eoEkycVerificationRepository.findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId())
                 .map(this::mapToDto)
@@ -185,6 +185,73 @@ public class EventOrganizerEkycService {
                         .status("NOT_SUBMITTED")
                         .routingReason("Doanh nghiệp chưa nộp hồ sơ xác thực định danh eKYC")
                         .build());
+    }
+
+    /**
+     * Lấy thông tin hồ sơ doanh nghiệp (Profile) của EO
+     */
+    @Transactional
+    public EoProfileDto getEoProfile(UUID userId) {
+        EventOrganizer eo = getOrCreateEo(userId);
+        User u = eo.getUser();
+        return EoProfileDto.builder()
+                .eoId(eo.getEoId())
+                .userId(u != null ? u.getUserId() : userId)
+                .companyName(eo.getCompanyName())
+                .taxId(eo.getTaxId())
+                .address(eo.getAddress())
+                .fullName(u != null ? u.getFullName() : null)
+                .phone(u != null ? u.getPhone() : null)
+                .email(u != null ? u.getEmail() : null)
+                .verificationStatus(eo.getVerificationStatus() != null ? eo.getVerificationStatus().name() : "PENDING")
+                .verifiedAt(eo.getVerifiedAt())
+                .ratingAvg(eo.getRatingAvg())
+                .ratingCount(eo.getRatingCount())
+                .totalEventsCompleted(eo.getTotalEventsCompleted())
+                .build();
+    }
+
+    /**
+     * Cập nhật thông tin hồ sơ doanh nghiệp của EO
+     */
+    @Transactional
+    public EoProfileDto updateEoProfile(UUID userId, EoProfileDto dto) {
+        EventOrganizer eo = getOrCreateEo(userId);
+        if (dto.getCompanyName() != null) eo.setCompanyName(dto.getCompanyName().trim());
+        if (dto.getTaxId() != null) eo.setTaxId(dto.getTaxId().trim());
+        if (dto.getAddress() != null) eo.setAddress(dto.getAddress().trim());
+        eventOrganizerRepository.save(eo);
+
+        User u = eo.getUser();
+        if (u != null) {
+            boolean userChanged = false;
+            if (dto.getFullName() != null && !dto.getFullName().isBlank()) {
+                u.setFullName(dto.getFullName().trim());
+                userChanged = true;
+            }
+            if (dto.getPhone() != null && !dto.getPhone().isBlank()) {
+                u.setPhone(dto.getPhone().trim());
+                userChanged = true;
+            }
+            if (userChanged) {
+                userRepository.save(u);
+            }
+        }
+
+        log.info("EO {} đã cập nhật thông tin doanh nghiệp (Profile)", eo.getEoId());
+        return getEoProfile(userId);
+    }
+
+    private EventOrganizer getOrCreateEo(UUID userId) {
+        return eventOrganizerRepository.findByUser_UserId(userId)
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
+                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
+                    }
+                    return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
+                });
     }
 
     /**

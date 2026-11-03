@@ -49,6 +49,7 @@ public class Notification {
     @Column(name = "reference_id")
     private UUID referenceId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data", columnDefinition = "jsonb")
     private String data;
 

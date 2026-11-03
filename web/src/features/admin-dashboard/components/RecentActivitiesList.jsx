@@ -1,3 +1,5 @@
+import { ActivityLogIcon } from './Icons';
+
 /**
  * Danh sách 10 hoạt động quản trị gần nhất từ bảng audit_logs
  */
@@ -31,10 +33,12 @@ const RecentActivitiesList = ({ activities = [] }) => {
     <div className="recent-activities-card">
       <div className="activities-header">
         <div className="activities-title">
-          <span>🕒</span>
+          <div className="metric-icon-box activities">
+            <ActivityLogIcon size={18} />
+          </div>
           <span>Nhật Ký Quản Trị Gần Nhất (Audit Logs)</span>
         </div>
-        <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+        <span className="activities-header-meta">
           Tối đa 10 hoạt động mới nhất
         </span>
       </div>
@@ -65,7 +69,7 @@ const RecentActivitiesList = ({ activities = [] }) => {
                     <span className="activity-performer">
                       {performerName}
                       {item.adminEmail && (
-                        <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: '0.4rem', fontSize: '0.8rem' }}>
+                        <span className="activity-performer-email">
                           ({item.adminEmail})
                         </span>
                       )}
@@ -77,8 +81,13 @@ const RecentActivitiesList = ({ activities = [] }) => {
                     <span className={`activity-chip ${chipClass}`}>
                       {item.actionDescription || item.action}
                     </span>
-                    <span style={{ color: '#4b5563', fontSize: '0.85rem' }}>
-                      Đối tượng: <strong>{item.entityType}</strong> (ID: {item.entityId ? item.entityId.slice(0, 8) + '...' : 'N/A'})
+                    <span className="activity-entity">
+                      Đối tượng: <strong>{item.entityType}</strong>
+                      {item.entityId && (
+                        <span className="activity-entity-id">
+                          (ID: {item.entityId.slice(0, 8)}...)
+                        </span>
+                      )}
                     </span>
                   </div>
 
@@ -98,4 +107,3 @@ const RecentActivitiesList = ({ activities = [] }) => {
 };
 
 export default RecentActivitiesList;
-

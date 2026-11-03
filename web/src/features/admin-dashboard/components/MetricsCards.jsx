@@ -1,3 +1,5 @@
+import { UsersIcon, ClockAlertIcon, CalendarEventsIcon, ArrowRightIcon } from './Icons';
+
 /**
  * Thẻ hiển thị các khối chỉ số vận hành nền tảng (User, Verifications, Operations)
  */
@@ -12,10 +14,12 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
       <div className="dashboard-metric-section">
         <div className="metric-section-header">
           <div className="metric-section-title">
-            <span>👥</span>
+            <div className="metric-icon-box users">
+              <UsersIcon size={18} />
+            </div>
             <span>Người Dùng Nền Tảng</span>
           </div>
-          <span className="metric-section-badge">Tài khoản</span>
+          <span className="metric-section-badge badge-blue">Tài khoản</span>
         </div>
 
         <div className="metric-kpi-main">
@@ -28,11 +32,11 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
           {onNavigateTab && (
             <button
               type="button"
-              className="btn-link"
-              style={{ fontSize: '0.8rem', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+              className="metric-navigate-btn"
               onClick={() => onNavigateTab('users')}
             >
-              Quản lý →
+              <span>Quản lý</span>
+              <ArrowRightIcon size={12} />
             </button>
           )}
         </div>
@@ -65,10 +69,12 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
       <div className="dashboard-metric-section">
         <div className="metric-section-header">
           <div className="metric-section-title">
-            <span>⏳</span>
+            <div className="metric-icon-box verifications">
+              <ClockAlertIcon size={18} />
+            </div>
             <span>Hàng Đợi Chờ Thẩm Định</span>
           </div>
-          <span className="metric-section-badge" style={{ background: '#fef2f2', color: '#dc2626' }}>
+          <span className="metric-section-badge badge-red">
             Cần xử lý
           </span>
         </div>
@@ -108,10 +114,12 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
       <div className="dashboard-metric-section">
         <div className="metric-section-header">
           <div className="metric-section-title">
-            <span>🎪</span>
+            <div className="metric-icon-box operations">
+              <CalendarEventsIcon size={18} />
+            </div>
             <span>Sự Kiện & Ca Làm Việc</span>
           </div>
-          <span className="metric-section-badge" style={{ background: '#ecfdf5', color: '#059669' }}>
+          <span className="metric-section-badge badge-green">
             Vận hành
           </span>
         </div>
@@ -147,4 +155,3 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
 };
 
 export default MetricsCards;
-

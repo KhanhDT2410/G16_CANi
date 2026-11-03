@@ -161,6 +161,10 @@ public class AdminDashboardService {
             case "ISSUE_DISPUTE_DECISION" -> "CC ra quyết định xử lý tranh chấp";
             case "ESCALATE_DISPUTE" -> "Kháng nghị quyết định tranh chấp lên Admin";
             case "DISPUTE_FINAL_DECISION" -> "Admin quyết định cuối tranh chấp";
+            case "SUBMIT_TICKET" -> "Nộp ticket hỗ trợ";
+            case "REPLY_TICKET" -> "Trả lời ticket hỗ trợ";
+            case "ASSIGN_TICKET" -> "Phân công ticket hỗ trợ";
+            case "CLOSE_TICKET" -> "Đóng ticket hỗ trợ";
             default -> {
                 if (action.contains("USER")) yield "Quản trị người dùng";
                 if (action.contains("EKYC")) yield "Xử lý hồ sơ eKYC";

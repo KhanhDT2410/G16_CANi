@@ -51,6 +51,9 @@ public class SecurityConfig {
                 // (BR-59: CC có thẩm quyền quyết định Level-1; Admin quyết định cuối).
                 .requestMatchers("/api/v1/admin/disputes/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 .requestMatchers("/api/v1/disputes/**").authenticated()
+                // Module phiếu hỗ trợ (UC-105/106, SCR-25/26): Customer Care & Admin quản lý queue & detail
+                .requestMatchers("/api/v1/admin/support/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                .requestMatchers("/api/v1/support/**").authenticated()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers(
                     "/api/v1/workers/skills/**",

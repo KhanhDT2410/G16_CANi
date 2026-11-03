@@ -150,7 +150,7 @@ public class SkillVerificationController {
                 : null;
 
         SkillVerificationResponseDto response = verificationService.adminReview(verificationId, adminUserId, approved, reviewNotes);
-        String msg = approved ? "Đã phê duyệt kỹ năng và cộng +25 SP_verify" : "Đã từ chối yêu cầu xác thực";
+        String msg = approved ? "Admin đã phê duyệt kỹ năng và cộng +25 SP_verify" : "Admin đã từ chối yêu cầu xác thực";
         return ResponseEntity.ok(ApiResponse.ok(response, msg));
     }
 

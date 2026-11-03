@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { showToast } from '../../../components/common/Toast';
 import { DISPUTE_TYPES, DISPUTE_TYPE_LABELS } from '../types/dispute.constants';
 
 const CreateDisputeModal = ({ onClose, onSubmit }) => {
@@ -14,15 +15,15 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!assignmentId.trim()) {
-      alert('Vui lòng nhập ID ca làm việc (Assignment ID)');
+      showToast('Vui lòng nhập ID ca làm việc (Assignment ID)', 'warning');
       return;
     }
     if (!title.trim()) {
-      alert('Vui lòng nhập tiêu đề tranh chấp');
+      showToast('Vui lòng nhập tiêu đề tranh chấp', 'warning');
       return;
     }
     if (!isDescValid) {
-      alert('Mô tả tranh chấp phải từ 50 đến 3000 ký tự theo quy định BR-52');
+      showToast('Mô tả tranh chấp phải từ 50 đến 3000 ký tự theo quy định BR-52', 'warning');
       return;
     }
 
@@ -36,7 +37,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
       });
       onClose();
     } catch {
-      // Đã hiển thị toast lỗi
+      // Toast lỗi đã được hook xử lý
     } finally {
       setSubmitting(false);
     }
@@ -47,12 +48,12 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
           <h3>Nộp Đơn Tranh Chấp & Khiếu Nại (UC-96)</h3>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
-            <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+            <div className="dispute-modal-notice">
               Quy tắc BR-52: Đơn chỉ được nộp trong vòng 14 ngày kể từ khi ca kết thúc, mô tả tối thiểu 50 ký tự.
             </div>
 
@@ -107,7 +108,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
                 required
               />
               <div className={`char-counter ${isDescValid ? 'valid' : 'invalid'}`}>
-                {descLength} / 50 ký tự tối thiểu {isDescValid ? '✓' : '(chưa đủ)'}
+                {descLength} / 50 ký tự tối thiểu {isDescValid ? '(Đủ điều kiện)' : '(Chưa đủ)'}
               </div>
             </div>
           </div>
@@ -115,8 +116,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
           <div className="dispute-modal-footer">
             <button
               type="button"
-              className="btn-quick-fill"
-              style={{ background: 'var(--color-bg-subtle)' }}
+              className="btn-cancel"
               onClick={onClose}
               disabled={submitting}
             >
@@ -124,13 +124,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
             </button>
             <button
               type="submit"
-              className="btn-quick-fill"
-              style={{
-                color: '#fff',
-                background: isDescValid ? 'var(--color-primary)' : '#94a3b8',
-                borderColor: 'transparent',
-                padding: '0.5rem 1.25rem',
-              }}
+              className="btn-submit"
               disabled={submitting || !isDescValid}
             >
               {submitting ? 'Đang gửi...' : 'Nộp đơn khiếu nại'}

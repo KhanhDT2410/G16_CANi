@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { UserManagementView } from '../../features/admin-users';
 import { AdminDashboardView } from '../../features/admin-dashboard';
 import { DisputeCenterView } from '../../features/disputes';
+import { SupportTicketsCenterView } from '../../features/support-tickets';
 import AdminEkycTab from './components/AdminEkycTab';
 import AdminSkillsTab from './components/AdminSkillsTab';
 import './AdminPage.css';
@@ -55,6 +56,12 @@ const AdminPage = () => {
         >
           Tranh Chấp & Khiếu Nại
         </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'tickets' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tickets')}
+        >
+          Hỗ Trợ Khách Hàng (Tickets)
+        </button>
       </div>
 
       {/* Content */}
@@ -63,6 +70,7 @@ const AdminPage = () => {
       {activeTab === 'skills' && <AdminSkillsTab onCountChange={setSkillCount} />}
       {activeTab === 'users' && <UserManagementView />}
       {activeTab === 'disputes' && <DisputeCenterView />}
+      {activeTab === 'tickets' && <SupportTicketsCenterView />}
     </div>
   );
 };

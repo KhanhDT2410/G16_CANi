@@ -7,6 +7,7 @@ import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
 import 'package:cani/features/profile/profile.dart';
+import 'package:cani/shared/widgets/bottom_nav_bar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -69,35 +70,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         index: _currentIndex,
         children: _pages,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
           setState(() => _currentIndex = index);
         },
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+        items: [
+          const BottomNavItem(
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home_rounded,
             label: 'Trang chủ',
           ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: proposalsCount > 0,
-              label: Text('$proposalsCount'),
-              backgroundColor: const Color(0xFFEF4444),
-              child: const Icon(Icons.assignment_outlined),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: proposalsCount > 0,
-              label: Text('$proposalsCount'),
-              backgroundColor: const Color(0xFFEF4444),
-              child: const Icon(Icons.assignment),
-            ),
+          BottomNavItem(
+            icon: Icons.assignment_outlined,
+            selectedIcon: Icons.assignment_rounded,
             label: 'Ca làm',
+            badgeCount: proposalsCount,
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+          const BottomNavItem(
+            icon: Icons.person_outline_rounded,
+            selectedIcon: Icons.person_rounded,
             label: 'Cá nhân',
           ),
         ],

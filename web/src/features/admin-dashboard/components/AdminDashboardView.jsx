@@ -1,6 +1,7 @@
 import { useAdminDashboard } from '../hooks/useAdminDashboard';
 import MetricsCards from './MetricsCards';
 import RecentActivitiesList from './RecentActivitiesList';
+import { LayoutDashboardIcon, RefreshCwIcon, AlertCircleIcon } from './Icons';
 import './AdminDashboard.css';
 
 /**
@@ -26,17 +27,19 @@ const AdminDashboardView = ({ onNavigateTab }) => {
   if (error && !metrics) {
     return (
       <div className="dashboard-container">
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #fee2e2' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>⚠️</div>
-          <h3 style={{ color: '#dc2626', margin: '0 0 0.5rem 0' }}>Không thể tải Bảng điều khiển</h3>
-          <p style={{ color: '#6b7280', margin: '0 0 1.25rem 0' }}>{error}</p>
+        <div className="dashboard-error-state">
+          <div className="dashboard-error-icon">
+            <AlertCircleIcon size={36} />
+          </div>
+          <h3 className="dashboard-error-title">Không thể tải Bảng điều khiển</h3>
+          <p className="dashboard-error-desc">{error}</p>
           <button
             type="button"
             className="dashboard-refresh-btn"
             onClick={refresh}
-            style={{ margin: '0 auto' }}
           >
-            Thử lại
+            <RefreshCwIcon size={14} />
+            <span>Thử lại</span>
           </button>
         </div>
       </div>
@@ -48,22 +51,17 @@ const AdminDashboardView = ({ onNavigateTab }) => {
       {/* Thanh công cụ / Tiêu đề */}
       <div className="dashboard-toolbar">
         <div className="dashboard-toolbar-title">
-          <span>📊</span>
-          <span>Tổng Quan Vận Hành Nền Tảng CANi</span>
+          <div className="metric-icon-box dashboard">
+            <LayoutDashboardIcon size={18} />
+          </div>
+          <span>Tổng Quan Vận Hành Nền Tảng</span>
           {isDemoFallback && (
             <span
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                padding: '0.2rem 0.5rem',
-                background: '#fef3c7',
-                color: '#b45309',
-                borderRadius: '0.375rem',
-                marginLeft: '0.5rem',
-              }}
+              className="dashboard-demo-badge"
               title="Backend đang tắt hoặc chưa đăng nhập Admin - Hiển thị dữ liệu mẫu để bạn test giao diện"
             >
-              ⚡ Dữ liệu Demo (Offline)
+              <span className="dashboard-demo-dot" />
+              <span>Chế độ Demo (Offline)</span>
             </span>
           )}
         </div>
@@ -73,7 +71,8 @@ const AdminDashboardView = ({ onNavigateTab }) => {
           onClick={refresh}
           disabled={refreshing}
         >
-          <span>{refreshing ? '🔄 Đang làm mới...' : '🔄 Làm mới dữ liệu'}</span>
+          <RefreshCwIcon size={14} spinning={refreshing} />
+          <span>{refreshing ? 'Đang cập nhật...' : 'Làm mới'}</span>
         </button>
       </div>
 

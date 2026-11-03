@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,12 +54,20 @@ public class EoEventService {
     private final MatchingDispatchService matchingDispatchService;
     private final ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private SubscriptionService subscriptionService;
+
     /**
      * EO tạo Sự kiện mới (Trạng thái DRAFT)
      */
     @Transactional
     public EventResponseDto createEvent(UUID userId, CreateEventRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
+
+        // BR-08: Kiểm tra và khấu trừ hạn mức Quota từ Gói cước dịch vụ
+        if (subscriptionService != null) {
+            subscriptionService.validateAndDeductEventQuota(eo);
+        }
 
         Event event = Event.builder()
                 .eventOrganizer(eo)

@@ -42,6 +42,15 @@ export default function EOSidebar({ activeNav, onNavClick }) {
 
         <button
           type="button"
+          className={`eo-nav-item ${activeNav === 'subscription' ? 'active' : ''}`}
+          onClick={() => onNavClick('subscription')}
+        >
+          <span className="nav-icon">💎</span>
+          <span className="nav-label">Gói dịch vụ (W-06)</span>
+        </button>
+
+        <button
+          type="button"
           className={`eo-nav-item ${activeNav === 'ekyc' ? 'active' : ''}`}
           onClick={() => onNavClick('ekyc')}
         >

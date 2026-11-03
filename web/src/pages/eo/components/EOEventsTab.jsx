@@ -20,6 +20,7 @@ export default function EOEventsTab({
   onOpenConfirmPublish,
   onOpenMap,
   onOpenQr,
+  onOpenInvite,
   onOpenAttendance,
   onEditShift,
   onCancelShift,
@@ -238,6 +239,7 @@ export default function EOEventsTab({
                   event={evt}
                   onAddShift={onOpenAddShift}
                   onOpenQr={onOpenQr}
+                  onOpenInvite={onOpenInvite}
                   onOpenAttendance={onOpenAttendance}
                   onEditShift={onEditShift}
                   onCancelShift={onCancelShift}

@@ -8,6 +8,7 @@ const EventShiftsDrawer = ({
   event,
   onAddShift,
   onOpenQr,
+  onOpenInvite,
   onOpenAttendance,
   onEditShift,
   onCancelShift,
@@ -140,6 +141,27 @@ const EventShiftsDrawer = ({
                     title="Hiển thị mã QR Check-in / Check-out cho Worker quét"
                   >
                     📱 Mã QR
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenInvite && onOpenInvite(shift, event)}
+                    style={{
+                      background: '#7c3aed',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                    title="Lấy link & mã mời trực tiếp cho Worker (Invite Mode - UC-72)"
+                  >
+                    🔗 Mã Mời
                   </button>
 
                   <button

@@ -294,6 +294,72 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
+  // UC-73: Nhập mã mời ca làm việc (Screen 092)
+  Future<void> _openInviteCodeDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nhập Mã Mời Tham Gia Ca', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'CANI-XXXXXX',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.confirmation_number_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () {
+              final code = controller.text.trim();
+              if (code.isNotEmpty) Navigator.pop(ctx, code);
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0066FF)),
+            child: const Text('Tham Gia'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      try {
+        await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 Tham gia ca làm thành công qua mã mời!'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+          _loadData();
+        }
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: $err'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final radarState = ref.watch(jobRadarProvider);
@@ -323,27 +389,36 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                           letterSpacing: -0.2,
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F7FF),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: const Color(0xFFDBEAFE)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.location_on, size: 14, color: Color(0xFF0077FF)),
-                            const SizedBox(width: 4),
-                            Text(
-                              locationLabel,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0077FF),
-                              ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF0077FF), size: 22),
+                            tooltip: 'Nhập mã mời ca làm (Screen 092)',
+                            onPressed: _openInviteCodeDialog,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F7FF),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: const Color(0xFFDBEAFE)),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 14, color: Color(0xFF0077FF)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  locationLabel,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0077FF),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

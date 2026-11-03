@@ -1,4 +1,4 @@
-export default function EOPaymentsTab({ payments, onOpenPaymentModal }) {
+export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisputeModal }) {
   return (
     <section className="eo-payments-section animate-fade-in-up">
       <div className="eo-table-container">
@@ -50,15 +50,34 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal }) {
                   </span>
                 </td>
                 <td>
-                  {p.status !== 'CONFIRMED_FULL' && (
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {p.status !== 'CONFIRMED_FULL' && (
+                      <button
+                        type="button"
+                        className="btn-declare-payment"
+                        onClick={() => onOpenPaymentModal(p)}
+                      >
+                        Khai Báo Trả Lương
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="btn-declare-payment"
-                      onClick={() => onOpenPaymentModal(p)}
+                      style={{
+                        background: '#fee2e2',
+                        color: '#b91c1c',
+                        border: '1px solid #fca5a5',
+                        borderRadius: 6,
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => onOpenDisputeModal && onOpenDisputeModal(p)}
+                      title="Gửi khiếu nại tranh chấp lên Customer Care (UC-96)"
                     >
-                      Khai Báo Trả Lương
+                      ⚖️ Khiếu Nại
                     </button>
-                  )}
+                  </div>
                 </td>
               </tr>
             ))}

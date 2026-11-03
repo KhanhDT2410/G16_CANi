@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../features/auth';
 import { showToast } from '../../components/common/Toast';
 
@@ -11,6 +12,7 @@ import EORightSidebar from './components/EORightSidebar';
 import EOMetricsGrid from './components/EOMetricsGrid';
 import EOEventsTab from './components/EOEventsTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
+import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoEkycTab from './EoEkycTab';
 import EOModals from './components/EOModals';
 
@@ -18,8 +20,17 @@ import './EOPage.css';
 
 export default function EOPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('events');
+
+  // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_)
+  useEffect(() => {
+    if (searchParams.get('tab') === 'subscription' || searchParams.has('vnp_ResponseCode')) {
+      setActiveTab('subscription');
+      setActiveNav('subscription');
+    }
+  }, [searchParams]);
 
   const events = useEvents();
   const shifts = useShifts({ onReloadEvents: events.loadEvents });
@@ -34,10 +45,22 @@ export default function EOPage() {
     radiusKm: 15,
   });
 
+  const [inviteModal, setInviteModal] = useState({
+    isOpen: false,
+    shift: null,
+    event: null,
+  });
+
+  const [disputeModal, setDisputeModal] = useState({
+    isOpen: false,
+    assignment: null,
+  });
+
   const handleNavClick = (navKey) => {
     setActiveNav(navKey);
     if (navKey === 'overview' || navKey === 'events') setActiveTab('events');
     else if (navKey === 'payments') setActiveTab('payments');
+    else if (navKey === 'subscription') setActiveTab('subscription');
     else if (navKey === 'ekyc') setActiveTab('ekyc');
     else if (navKey === 'recruitment') {
       if (events.events.length > 0) {
@@ -80,6 +103,9 @@ export default function EOPage() {
             <button type="button" className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => setActiveTab('payments')}>
               Thanh Toán & Khai Báo Lương ({payments.payments.length})
             </button>
+            <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => setActiveTab('subscription')}>
+              Gói Dịch Vụ & Quota (W-06)
+            </button>
             <button type="button" className={`pill-tab ${activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => setActiveTab('ekyc')}>
               Định Danh Doanh Nghiệp (eKYC)
             </button>
@@ -104,6 +130,7 @@ export default function EOPage() {
               onOpenConfirmPublish={events.openConfirmPublish}
               onOpenMap={setMapModal}
               onOpenQr={shifts.handleOpenShiftQr}
+              onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
               onOpenAttendance={shifts.handleOpenAttendance}
               onEditShift={shifts.setEditingShift}
               onCancelShift={shifts.handleCancelShift}
@@ -118,8 +145,11 @@ export default function EOPage() {
                 payments.setPaymentForm((prev) => ({ ...prev, assignmentId: p.assignmentId, declaredAmount: p.agreedAmount }));
                 payments.setShowPaymentModal(true);
               }}
+              onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
             />
           )}
+
+          {activeTab === 'subscription' && <EOSubscriptionTab />}
 
           {activeTab === 'ekyc' && <EoEkycTab />}
         </main>
@@ -133,6 +163,10 @@ export default function EOPage() {
         payments={payments}
         mapModal={mapModal}
         setMapModal={setMapModal}
+        inviteModal={inviteModal}
+        setInviteModal={setInviteModal}
+        disputeModal={disputeModal}
+        setDisputeModal={setDisputeModal}
       />
     </div>
   );

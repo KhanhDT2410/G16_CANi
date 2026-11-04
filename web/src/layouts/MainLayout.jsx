@@ -71,6 +71,11 @@ const MainLayout = () => {
     navigate('/login');
   };
 
+  const handleOpenProfile = () => {
+    navigate('/eo?tab=profile');
+    window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail: { tab: 'profile' } }));
+  };
+
   return (
     <div className="main-layout">
       <ToastContainer />
@@ -143,7 +148,7 @@ const MainLayout = () => {
                 <button
                   type="button"
                   className="user-avatar-btn"
-                  onClick={() => navigate('/eo?tab=profile')}
+                  onClick={handleOpenProfile}
                   title={`Xem hồ sơ: ${user.fullName || user.username || 'EO'}`}
                 >
                   {userAvatar ? (

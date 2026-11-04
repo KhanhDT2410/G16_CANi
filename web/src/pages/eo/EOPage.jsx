@@ -23,7 +23,7 @@ import './EOPage.css';
 
 export default function EOPage() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('events');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -45,6 +45,25 @@ export default function EOPage() {
       return next;
     });
   };
+
+  // Lắng nghe sự kiện chuyển tab từ Navbar (Header Avatar click)
+  useEffect(() => {
+    const handleSwitch = (e) => {
+      const targetTab = e.detail?.tab;
+      if (targetTab) {
+        setActiveTab(targetTab);
+        setActiveNav(targetTab);
+        try {
+          setSearchParams({ tab: targetTab }, { replace: true });
+        } catch (err) {
+          console.warn('Lỗi setSearchParams:', err);
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener('cani_switch_tab', handleSwitch);
+    return () => window.removeEventListener('cani_switch_tab', handleSwitch);
+  }, [setSearchParams]);
 
   // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_) hoặc điều hướng tab (?tab=profile)
   useEffect(() => {
@@ -87,18 +106,33 @@ export default function EOPage() {
 
   const handleNavClick = (navKey) => {
     setActiveNav(navKey);
-    if (navKey === 'overview' || navKey === 'events') setActiveTab('events');
-    else if (navKey === 'recruitment') setActiveTab('recruitment');
-    else if (navKey === 'payments') setActiveTab('payments');
-    else if (navKey === 'subscription') setActiveTab('subscription');
-    else if (navKey === 'profile' || navKey === 'ekyc') setActiveTab('profile');
-    else if (navKey === 'analytics') setActiveTab('analytics');
-    else if (navKey === 'settings') setActiveTab('settings');
+    let target = 'events';
+    if (navKey === 'overview' || navKey === 'events') target = 'events';
+    else if (navKey === 'recruitment') target = 'recruitment';
+    else if (navKey === 'payments') target = 'payments';
+    else if (navKey === 'subscription') target = 'subscription';
+    else if (navKey === 'profile' || navKey === 'ekyc') target = 'profile';
+    else if (navKey === 'analytics') target = 'analytics';
+    else if (navKey === 'settings') target = 'settings';
+    
+    setActiveTab(target);
+    try {
+      setSearchParams({ tab: target }, { replace: true });
+    } catch (err) {
+      console.warn('Lỗi setSearchParams:', err);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const switchTab = (tabKey) => {
     setActiveTab(tabKey);
     setActiveNav(tabKey);
+    try {
+      setSearchParams({ tab: tabKey }, { replace: true });
+    } catch (err) {
+      console.warn('Lỗi setSearchParams:', err);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const displayName = user?.fullName || user?.username || 'Duy Hưng';
@@ -114,19 +148,24 @@ export default function EOPage() {
         />
 
         <main className="eo-main-stream">
-          <section className="eo-hero-banner">
-            <div className="hero-content">
-              <h1 className="hero-greeting">Chào mừng bạn quay trở lại, {displayName}!</h1>
-              <p className="hero-subtitle">
-                Hôm nay bạn có <strong>{events.events.length} sự kiện</strong> sắp diễn ra. Hãy kiểm tra danh sách điểm danh và phân công ca làm nhé.
-              </p>
-              <button type="button" className="hero-action-btn" onClick={() => events.setShowEventModal(true)}>
-                <span className="btn-plus-icon">+</span> Tạo Sự Kiện Mới
-              </button>
-            </div>
-          </section>
+          {/* Hero Banner & Metrics Grid chỉ hiển thị ở tab Sự kiện / Tổng quan */}
+          {(activeTab === 'events' || activeNav === 'overview') && (
+            <>
+              <section className="eo-hero-banner">
+                <div className="hero-content">
+                  <h1 className="hero-greeting">Chào mừng bạn quay trở lại, {displayName}!</h1>
+                  <p className="hero-subtitle">
+                    Hôm nay bạn có <strong>{events.events.length} sự kiện</strong> sắp diễn ra. Hãy kiểm tra danh sách điểm danh và phân công ca làm nhé.
+                  </p>
+                  <button type="button" className="hero-action-btn" onClick={() => events.setShowEventModal(true)}>
+                    <span className="btn-plus-icon">+</span> Tạo Sự Kiện Mới
+                  </button>
+                </div>
+              </section>
 
-          <EOMetricsGrid metrics={events.metrics} />
+              <EOMetricsGrid metrics={events.metrics} />
+            </>
+          )}
 
           <div className="eo-pill-tabs">
             <button type="button" className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`} onClick={() => switchTab('events')}>

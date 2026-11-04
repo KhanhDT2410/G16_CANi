@@ -47,6 +47,9 @@ function App() {
                 </RequireRole>
               }
             />
+            {/* Direct routes to EO Profile */}
+            <Route path="profile" element={<Navigate to="/eo?tab=profile" replace />} />
+            <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
             {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về EO nếu truy cập trên Web */}
             <Route path="worker" element={<Navigate to="/eo" replace />} />
             <Route path="mobile-preview" element={<MobileShowcasePage />} />

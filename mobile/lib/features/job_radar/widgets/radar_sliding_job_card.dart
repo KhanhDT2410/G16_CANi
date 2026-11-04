@@ -17,16 +17,20 @@ class RadarSlidingJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = shift;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(22),
+        border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B1B3D).withValues(alpha: 0.12),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.35)
+                : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -40,7 +44,7 @@ class RadarSlidingJobCard extends StatelessWidget {
             width: 38,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFE2E8F0),
+              color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
               borderRadius: BorderRadius.circular(99),
             ),
           ),
@@ -54,10 +58,12 @@ class RadarSlidingJobCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  color: isDark
+                      ? const Color(0xFF064E3B).withValues(alpha: 0.4)
+                      : const Color(0xFF10B981).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Column(
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
@@ -66,7 +72,7 @@ class RadarSlidingJobCard extends StatelessWidget {
                         fontFamily: 'Be Vietnam Pro',
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
-                        color: Color(0xFF059669),
+                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                         height: 1.1,
                       ),
                     ),
@@ -75,7 +81,7 @@ class RadarSlidingJobCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 8,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF059669),
+                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -91,10 +97,10 @@ class RadarSlidingJobCard extends StatelessWidget {
                   children: [
                     Text(
                       '${s.jobType} · ${s.eventName}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 13.5,
-                        color: Color(0xFF0B1B3D),
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
                         letterSpacing: -0.1,
                       ),
                       maxLines: 1,
@@ -103,10 +109,10 @@ class RadarSlidingJobCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Cách bạn ${s.distanceKm.toStringAsFixed(1)} km · Cần ${s.remainingWorkers} người',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF64748B),
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -120,10 +126,10 @@ class RadarSlidingJobCard extends StatelessWidget {
                 children: [
                   Text(
                     '${s.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 13.5,
-                      color: Color(0xFF059669),
+                      color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                     ),
                   ),
                   const Text(
@@ -149,18 +155,25 @@ class RadarSlidingJobCard extends StatelessWidget {
                   height: 42,
                   child: OutlinedButton.icon(
                     onPressed: onViewDetails,
-                    icon: const Icon(Icons.info_outline, size: 16, color: Color(0xFF1E293B)),
-                    label: const Text(
+                    icon: Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                    ),
+                    label: Text(
                       'Chi tiết',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E293B),
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
-                      backgroundColor: const Color(0xFFF8FAFC),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        width: 1.5,
+                      ),
+                      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),

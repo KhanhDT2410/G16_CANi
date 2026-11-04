@@ -4,14 +4,11 @@ import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
 import com.cani.dto.response.ApiResponse;
-import com.cani.entity.User;
-import com.cani.exception.AppException;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.EventOrganizerEkycService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -38,10 +35,9 @@ public class EventOrganizerEkycController {
             @RequestParam("backImage") MultipartFile backImage,
             @RequestParam("selfieImage") MultipartFile selfieImage,
             @RequestParam(value = "businessLicenseImage", required = false) MultipartFile businessLicenseImage,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.submitEkyc(
                 userId, frontImage, backImage, selfieImage, businessLicenseImage
         );
@@ -64,10 +60,9 @@ public class EventOrganizerEkycController {
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/eo/ekyc/status")
     public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> getMyEkycStatus(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.getMyEkycStatus(userId);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy thông tin trạng thái eKYC doanh nghiệp thành công"));
     }
@@ -78,10 +73,9 @@ public class EventOrganizerEkycController {
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/eo/profile")
     public ResponseEntity<ApiResponse<EoProfileDto>> getMyProfile(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoProfileDto profile = eoEkycService.getEoProfile(userId);
         return ResponseEntity.ok(ApiResponse.ok(profile, "Lấy thông tin hồ sơ doanh nghiệp thành công"));
     }
@@ -93,10 +87,9 @@ public class EventOrganizerEkycController {
     @PutMapping("/eo/profile")
     public ResponseEntity<ApiResponse<EoProfileDto>> updateMyProfile(
             @RequestBody EoProfileDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoProfileDto profile = eoEkycService.updateEoProfile(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(profile, "Cập nhật thông tin hồ sơ doanh nghiệp thành công"));
     }
@@ -119,30 +112,10 @@ public class EventOrganizerEkycController {
     public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> adminReviewEkyc(
             @PathVariable UUID verificationId,
             @Valid @RequestBody EkycAdminReviewRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID adminUserId = resolveUserId(authentication, explicitUserId);
+        UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.adminReviewEkyc(adminUserId, verificationId, request);
         return ResponseEntity.ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC doanh nghiệp thành công: " + result.getStatus()));
-    }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        UUID callerId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            callerId = u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
-            try {
-                callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        if (callerId == null) {
-            throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
-        }
-        // An toàn: chặn IDOR — chỉ được thao tác với đúng userId của người đang đăng nhập.
-        if (explicitUserId != null && !explicitUserId.equals(callerId)) {
-            throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
-        }
-        return callerId;
     }
 }

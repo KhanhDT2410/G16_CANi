@@ -72,4 +72,18 @@ class LoginResponseModel {
       ),
     );
   }
+
+  LoginResponseModel copyWith({
+    String? token,
+    UserDto? user,
+    String? refreshToken,
+    int? expiresIn,
+  }) {
+    return LoginResponseModel(
+      token: token ?? this.token,
+      user: user ?? this.user,
+      refreshToken: refreshToken ?? this.refreshToken,
+      expiresIn: expiresIn ?? this.expiresIn,
+    );
+  }
 }

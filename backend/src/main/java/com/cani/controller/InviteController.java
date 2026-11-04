@@ -5,14 +5,11 @@ import com.cani.dto.invite.InviteResponseDto;
 import com.cani.dto.invite.JoinInviteRequestDto;
 import com.cani.dto.invite.JoinInviteResponseDto;
 import com.cani.dto.response.ApiResponse;
-import com.cani.entity.User;
-import com.cani.exception.AppException;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.InviteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -38,10 +35,9 @@ public class InviteController {
     public ResponseEntity<ApiResponse<InviteResponseDto>> createShiftInvite(
             @PathVariable("shiftId") UUID shiftId,
             @RequestBody(required = false) CreateInviteRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         InviteResponseDto response = inviteService.generateShiftInvite(userId, shiftId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Sinh mã mời và liên kết tham gia ca thành công!"));
     }
@@ -53,10 +49,9 @@ public class InviteController {
     @GetMapping("/api/v1/eo/shifts/{shiftId}/invites")
     public ResponseEntity<ApiResponse<InviteResponseDto>> getShiftInvite(
             @PathVariable("shiftId") UUID shiftId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         InviteResponseDto response = inviteService.getShiftInvite(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(response, "Lấy thông tin mã mời thành công"));
     }
@@ -79,30 +74,10 @@ public class InviteController {
     @PostMapping("/api/v1/workers/invites/join")
     public ResponseEntity<ApiResponse<JoinInviteResponseDto>> joinViaInvite(
             @Valid @RequestBody JoinInviteRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         JoinInviteResponseDto response = inviteService.joinViaInviteCode(userId, request.getCode());
         return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
     }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        UUID callerId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            callerId = u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
-            try {
-                callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        if (callerId == null) {
-            throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
-        }
-        if (explicitUserId != null && !explicitUserId.equals(callerId)) {
-            throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
-        }
-        return callerId;
-    }
 }
-

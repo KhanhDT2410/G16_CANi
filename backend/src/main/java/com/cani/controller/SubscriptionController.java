@@ -6,16 +6,13 @@ import com.cani.dto.subscription.PurchaseSubscriptionRequestDto;
 import com.cani.dto.subscription.PurchaseSubscriptionResponseDto;
 import com.cani.dto.subscription.SubscriptionPlanDto;
 import com.cani.dto.subscription.SubscriptionResponseDto;
-import com.cani.entity.User;
 import com.cani.entity.enums.PlanType;
-import com.cani.exception.AppException;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.SubscriptionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -48,10 +45,9 @@ public class SubscriptionController {
      */
     @GetMapping("/current")
     public ResponseEntity<ApiResponse<SubscriptionResponseDto>> getCurrentSubscription(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         return ResponseEntity.ok(ApiResponse.ok(subscriptionService.getCurrentSubscription(userId), "Lấy thông tin gói cước hiện tại thành công"));
     }
 
@@ -60,10 +56,9 @@ public class SubscriptionController {
      */
     @GetMapping("/history")
     public ResponseEntity<ApiResponse<List<SubscriptionResponseDto>>> getHistory(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         return ResponseEntity.ok(ApiResponse.ok(subscriptionService.getSubscriptionHistory(userId), "Lấy lịch sử mua gói cước thành công"));
     }
 
@@ -73,11 +68,10 @@ public class SubscriptionController {
     @PostMapping("/purchase")
     public ResponseEntity<ApiResponse<PurchaseSubscriptionResponseDto>> purchaseSubscription(
             @Valid @RequestBody PurchaseSubscriptionRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication,
             HttpServletRequest servletRequest
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         PurchaseSubscriptionResponseDto response = subscriptionService.createVNPayPaymentSession(userId, request, servletRequest);
         return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo giao dịch VNPay thành công. Chuyển hướng để thanh toán."));
     }
@@ -99,10 +93,9 @@ public class SubscriptionController {
     @PostMapping("/purchase-payos")
     public ResponseEntity<ApiResponse<PayOSPaymentResponseDto>> purchaseSubscriptionPayOS(
             @Valid @RequestBody PurchaseSubscriptionRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         PayOSPaymentResponseDto response = subscriptionService.createPayOSPaymentSession(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo mã VietQR thanh toán PayOS thành công"));
     }
@@ -135,31 +128,10 @@ public class SubscriptionController {
     @PostMapping("/demo-simulate")
     public ResponseEntity<ApiResponse<SubscriptionResponseDto>> simulateDemo(
             @RequestParam(value = "planType", defaultValue = "MATCHING_PLUS") PlanType planType,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         SubscriptionResponseDto result = subscriptionService.simulatePurchaseDemo(userId, planType);
         return ResponseEntity.ok(ApiResponse.ok(result, "Kích hoạt Gói dịch vụ (Mô phỏng Sandbox) thành công!"));
     }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        UUID callerId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            callerId = u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
-            try {
-                callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        if (callerId == null) {
-            if (explicitUserId != null) return explicitUserId;
-            throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
-        }
-        if (explicitUserId != null && !explicitUserId.equals(callerId)) {
-            throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
-        }
-        return callerId;
-    }
 }
-

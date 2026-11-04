@@ -11,6 +11,7 @@ class AuthTextField extends StatelessWidget {
     required this.hintText,
     this.keyboardType,
     this.obscureText = false,
+    this.readOnly = false,
     this.prefixIcon,
     this.suffixIcon,
     this.validator,
@@ -22,6 +23,7 @@ class AuthTextField extends StatelessWidget {
   final String hintText;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final bool readOnly;
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
@@ -47,6 +49,7 @@ class AuthTextField extends StatelessWidget {
           controller: controller,
           keyboardType: keyboardType,
           obscureText: obscureText,
+          readOnly: readOnly,
           validator: validator,
           onChanged: onChanged,
           // Chữ người dùng nhập vào - Luôn là màu Đen sắc nét (#0F172A)

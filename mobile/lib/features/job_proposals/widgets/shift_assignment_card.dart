@@ -38,14 +38,19 @@ class ShiftAssignmentCard extends StatelessWidget {
         ? const Color(0xFF7E22CE)
         : (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF0077FF));
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
+        border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0077FF).withValues(alpha: 0.08),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.20)
+                : const Color(0xFF0077FF).withValues(alpha: 0.08),
             blurRadius: 18,
             offset: const Offset(0, 4),
           ),
@@ -140,10 +145,10 @@ class ShiftAssignmentCard extends StatelessWidget {
                 // Tên ca & Sự kiện
                 Text(
                   '${a.jobType} · ${a.eventName}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14.5,
-                    color: Color(0xFF0B1B3D),
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
                     letterSpacing: -0.1,
                   ),
                 ),
@@ -157,7 +162,11 @@ class ShiftAssignmentCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.venueAddress}',
-                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -221,7 +230,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
                             ),
                             style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xFFF0FDFA),
+                              backgroundColor: isDark
+                                  ? const Color(0xFF134E4A).withValues(alpha: 0.35)
+                                  : const Color(0xFFF0FDFA),
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
@@ -239,7 +250,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
                             ),
                             style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xFFFEF2F2),
+                              backgroundColor: isDark
+                                  ? const Color(0xFF7F1D1D).withValues(alpha: 0.35)
+                                  : const Color(0xFFFEF2F2),
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
@@ -255,7 +268,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
                             ),
                             style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xFFFEF3C7),
+                              backgroundColor: isDark
+                                  ? const Color(0xFF78350F).withValues(alpha: 0.35)
+                                  : const Color(0xFFFEF3C7),
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
@@ -271,7 +286,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.15 : 0.08),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.30)),
                   ),
@@ -298,7 +313,10 @@ class ShiftAssignmentCard extends StatelessWidget {
                               if (isDeclared && a.paymentMethod != null)
                                 TextSpan(
                                   text: ' (${a.paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Tiền mặt'})',
-                                  style: const TextStyle(fontSize: 10.5, color: Color(0xFF065F46)),
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                                  ),
                                 ),
                             ],
                           ),
@@ -348,7 +366,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: const Color(0xFF10B981), width: 1.2),
                             ),
@@ -368,7 +386,11 @@ class ShiftAssignmentCard extends StatelessWidget {
                       else
                         Text(
                           'Sẽ trả sau ca',
-                          style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                     ],
                   ),

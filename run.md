@@ -61,9 +61,27 @@ cd Code/mobile
   D:\Code\flutter\bin\flutter.bat run -d chrome
   ```
 
+- **Chạy trên thiết bị thật Android (Cắm cáp USB):**
+  1. Sử dụng cáp truyền dữ liệu (Data cable), cắm điện thoại vào máy tính và đảm bảo đã bật **Gỡ lỗi qua USB (USB Debugging)** & **Cài đặt qua USB (Install via USB)** trong *Tùy chọn nhà phát triển (Developer Options)*.
+  2. Mở cổng kết nối đường hầm mạng tới Backend Spring Boot trên máy tính:
+     ```powershell
+     & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse tcp:8080 tcp:8080
+     ```
+     *(Lệnh này giúp ứng dụng trên điện thoại gọi `http://localhost:8080` đi thẳng vào Backend trên PC mà không cần chung mạng Wi-Fi hay lo tường lửa)*
+  3. Kiểm tra thiết bị đã sẵn sàng:
+     ```powershell
+     flutter devices
+     ```
+  4. Khởi chạy ứng dụng lên điện thoại:
+     ```powershell
+     flutter run -d android
+     ```
+     *(Nếu có nhiều thiết bị, chỉ định mã cụ thể: `flutter run -d <device_id>`)*
+
 ---
 
 ### Phím tắt hữu ích khi đang chạy Flutter:
-- Nhấn `r`: Hot Reload (cập nhật code giao diện tức thì).
-- Nhấn `R`: Hot Restart (khởi động lại ứng dụng).
+- Nhấn `r`: Hot Reload (cập nhật code giao diện/logic tức thì trong ~1s mà không mất dữ liệu/state).
+- Nhấn `R`: Hot Restart (khởi động lại toàn bộ app và reset state).
+- Nhấn `d`: Detach (ngắt kết nối terminal để giải phóng máy tính nhưng ứng dụng vẫn tiếp tục chạy trên điện thoại).
 - Nhấn `q`: Thoát ứng dụng.

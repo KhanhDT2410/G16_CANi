@@ -4,12 +4,27 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class TermsOfServiceDialog extends StatefulWidget {
   final String userId;
   final VoidCallback onAccepted;
+  final bool isReadOnly;
 
   const TermsOfServiceDialog({
     super.key,
     required this.userId,
     required this.onAccepted,
+    this.isReadOnly = false,
   });
+
+  /// Hiển thị điều khoản xem lại (không bắt buộc tích chọn)
+  static void show(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => TermsOfServiceDialog(
+        userId: '',
+        isReadOnly: true,
+        onAccepted: () => Navigator.of(ctx).pop(),
+      ),
+    );
+  }
 
   /// Ghi nhận người dùng đã chấp thuận điều khoản (ví dụ: đã tick chọn khi đăng ký)
   static Future<void> markAccepted(String userId) async {
@@ -134,44 +149,56 @@ class _TermsOfServiceDialogState extends State<TermsOfServiceDialog> {
               const Divider(height: 1),
               const SizedBox(height: 8),
 
-              // 3. Checkbox Tôi đồng ý
-              InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => setState(() => _isAgreed = !_isAgreed),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Checkbox(
-                        value: _isAgreed,
-                        activeColor: theme.colorScheme.primary,
-                        onChanged: (val) => setState(() => _isAgreed = val ?? false),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'Tôi đã đọc, hiểu rõ và cam kết tuân thủ Điều khoản sử dụng của CANi.',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              // 3. Checkbox hoặc Nút Đóng
+              if (!widget.isReadOnly) ...[
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => setState(() => _isAgreed = !_isAgreed),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: _isAgreed,
+                          activeColor: theme.colorScheme.primary,
+                          onChanged: (val) => setState(() => _isAgreed = val ?? false),
                         ),
-                      ),
-                    ],
+                        const Expanded(
+                          child: Text(
+                            'Tôi đã đọc, hiểu rõ và cam kết tuân thủ Điều khoản sử dụng của CANi.',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // 4. Nút bấm Xác nhận
-              FilledButton(
-                onPressed: _isAgreed ? widget.onAccepted : null,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: _isAgreed ? widget.onAccepted : null,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text(
+                    'Tôi đồng ý & Bắt đầu làm việc',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                 ),
-                child: const Text(
-                  'Tôi đồng ý & Bắt đầu làm việc',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ] else ...[
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text(
+                    'Đã hiểu & Đóng',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

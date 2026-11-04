@@ -66,14 +66,15 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final completedCount = _items.where((i) => i.isCompleted).length;
     final totalCount = _items.length;
     final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
         left: 20,
@@ -90,7 +91,7 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFFCBD5E1),
+                color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -101,7 +102,7 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.25 : 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -114,20 +115,20 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Checklist Công Việc Trong Ca',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 17,
-                        color: Color(0xFF0F172A),
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${widget.assignment.jobType} • ${widget.assignment.eventName}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
-                        color: Color(0xFF64748B),
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -141,21 +142,23 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Tiến độ hoàn thành nhiệm vụ',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12.5,
-                        color: Color(0xFF334155),
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                       ),
                     ),
                     Text(
@@ -174,7 +177,7 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 8,
-                    backgroundColor: const Color(0xFFE2E8F0),
+                    backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                     valueColor: const AlwaysStoppedAnimation<Color>(
                       Color(0xFF0D9488),
                     ),
@@ -210,13 +213,13 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
                       ),
                       decoration: BoxDecoration(
                         color: item.isCompleted
-                            ? const Color(0xFFF0FDFA)
-                            : Colors.white,
+                            ? (isDark ? const Color(0xFF134E4A).withValues(alpha: 0.35) : const Color(0xFFF0FDFA))
+                            : (isDark ? const Color(0xFF0F172A) : Colors.white),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: item.isCompleted
-                              ? const Color(0xFF99F6E4)
-                              : const Color(0xFFE2E8F0),
+                              ? (isDark ? const Color(0xFF0D9488) : const Color(0xFF99F6E4))
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         ),
                       ),
                       child: Row(
@@ -237,8 +240,8 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w600,
                                 color: item.isCompleted
-                                    ? const Color(0xFF0F766E)
-                                    : const Color(0xFF1E293B),
+                                    ? (isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E))
+                                    : (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B)),
                                 decoration: item.isCompleted
                                     ? TextDecoration.lineThrough
                                     : null,

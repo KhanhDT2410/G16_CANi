@@ -6,9 +6,8 @@ import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
-import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
-import 'package:cani/features/skill_verification/widgets/skill_point_policy_dialog.dart';
 import 'package:cani/features/profile/profile.dart';
+import 'package:cani/shared/widgets/bottom_nav_bar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -23,7 +22,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final List<Widget> _pages = const [
     JobRadarScreen(),
     MyAssignmentsScreen(),
-    SkillHubScreen(),
     WorkerProfileScreen(),
   ];
 
@@ -64,7 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     if (!authState.isAuthenticated) {
-      return const LoginScreen();
+      return const IntroScreen();
     }
 
     return Scaffold(
@@ -72,50 +70,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         index: _currentIndex,
         children: _pages,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
           setState(() => _currentIndex = index);
-          if (index == 2) {
-            final user = ref.read(authStateProvider).user;
-            if (user != null) {
-              SkillPointPolicyDialog.checkAndShow(context, user.id);
-            }
-          }
         },
-        indicatorColor: const Color(0x260066FF),
-        backgroundColor: Colors.white,
-        elevation: 8,
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map, color: Color(0xFF0066FF)),
-            label: 'Bản đồ',
+        items: [
+          const BottomNavItem(
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home_rounded,
+            label: 'Trang chủ',
           ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: proposalsCount > 0,
-              label: Text('$proposalsCount'),
-              backgroundColor: const Color(0xFFEF4444),
-              child: const Icon(Icons.assignment_outlined),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: proposalsCount > 0,
-              label: Text('$proposalsCount'),
-              backgroundColor: const Color(0xFFEF4444),
-              child: const Icon(Icons.assignment, color: Color(0xFF0066FF)),
-            ),
-            label: 'Việc của tôi',
+          BottomNavItem(
+            icon: Icons.assignment_outlined,
+            selectedIcon: Icons.assignment_rounded,
+            label: 'Ca làm',
+            badgeCount: proposalsCount,
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.workspace_premium_outlined),
-            selectedIcon: Icon(Icons.workspace_premium, color: Color(0xFF0066FF)),
-            label: 'Kỹ năng',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person, color: Color(0xFF0066FF)),
-            label: 'Hồ sơ',
+          const BottomNavItem(
+            icon: Icons.person_outline_rounded,
+            selectedIcon: Icons.person_rounded,
+            label: 'Cá nhân',
           ),
         ],
       ),

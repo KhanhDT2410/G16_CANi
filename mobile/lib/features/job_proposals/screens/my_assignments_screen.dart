@@ -345,7 +345,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
               backgroundColor: Color(0xFF16A34A),
             ),
           );
-          _loadData();
+          _loadAllData();
         }
       } catch (err) {
         if (mounted) {
@@ -364,28 +364,29 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   Widget build(BuildContext context) {
     final radarState = ref.watch(jobRadarProvider);
     final locationLabel = radarState.isRealLocation ? 'GPS Thực Tế' : 'Q.7, TP.HCM';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             // Header chuẩn OpenDesign Device 02
             Container(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Việc Làm Của Tôi',
                         style: TextStyle(
                           fontFamily: 'Be Vietnam Pro',
                           fontWeight: FontWeight.w800,
                           fontSize: 20,
-                          color: Color(0xFF0B1B3D),
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
                           letterSpacing: -0.2,
                         ),
                       ),
@@ -429,8 +430,9 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                     height: 44,
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8EEF7),
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE8EEF7),
                       borderRadius: BorderRadius.circular(13),
+                      border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
                     ),
                     child: Row(
                       children: [
@@ -438,12 +440,14 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                           index: 0,
                           label: 'Lời Mời Việc',
                           count: _proposals.length,
+                          isDark: isDark,
                         ),
                         const SizedBox(width: 4),
                         _buildSegmentButton(
                           index: 1,
                           label: 'Ca Đã Nhận',
                           count: _assignments.length,
+                          isDark: isDark,
                         ),
                       ],
                     ),
@@ -459,8 +463,8 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                   : RefreshIndicator(
                       onRefresh: _loadAllData,
                       child: _selectedTabIndex == 0
-                          ? _buildProposalsFeed()
-                          : _buildAssignmentsFeed(),
+                          ? _buildProposalsFeed(isDark)
+                          : _buildAssignmentsFeed(isDark),
                     ),
             ),
           ],
@@ -473,6 +477,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     required int index,
     required String label,
     required int count,
+    required bool isDark,
   }) {
     final isSelected = _selectedTabIndex == index;
 
@@ -482,12 +487,17 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
+            color: isSelected
+                ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
+            border: isSelected && isDark ? Border.all(color: const Color(0xFF475569)) : null,
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF0B1B3D).withValues(alpha: 0.10),
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.25)
+                          : const Color(0xFF0B1B3D).withValues(alpha: 0.10),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -503,7 +513,9 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                 height: 20,
                 padding: const EdgeInsets.symmetric(horizontal: 5),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF0077FF) : const Color(0xFF0077FF).withValues(alpha: 0.10),
+                  color: isSelected
+                      ? const Color(0xFF0077FF)
+                      : (isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.5) : const Color(0xFF0077FF).withValues(alpha: 0.10)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 alignment: Alignment.center,
@@ -512,7 +524,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,
-                    color: isSelected ? Colors.white : const Color(0xFF0077FF),
+                    color: isSelected ? Colors.white : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF)),
                   ),
                 ),
               ),
@@ -522,7 +534,9 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: isSelected ? const Color(0xFF0B1B3D) : const Color(0xFF64748B),
+                  color: isSelected
+                      ? (isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D))
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 ),
               ),
             ],
@@ -532,28 +546,35 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     );
   }
 
-  Widget _buildProposalsFeed() {
+  Widget _buildProposalsFeed(bool isDark) {
     if (_proposals.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(24),
-        children: const [
-          SizedBox(height: 40),
-          Center(
+        children: [
+          const SizedBox(height: 40),
+          const Center(
             child: Icon(Icons.inbox_outlined, size: 56, color: Color(0xFF94A3B8)),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Center(
             child: Text(
               'Hiện không có lời mời việc làm nào',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF1E293B)),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+              ),
             ),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Center(
             child: Text(
               'Hãy bật chế độ "Sẵn sàng nhận việc" ở Tab Bản đồ để thuật toán ghép nối ca cho bạn nhé!',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontSize: 12.5,
+              ),
             ),
           ),
         ],
@@ -574,28 +595,35 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     );
   }
 
-  Widget _buildAssignmentsFeed() {
+  Widget _buildAssignmentsFeed(bool isDark) {
     if (_assignments.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(24),
-        children: const [
-          SizedBox(height: 40),
-          Center(
+        children: [
+          const SizedBox(height: 40),
+          const Center(
             child: Icon(Icons.assignment_outlined, size: 56, color: Color(0xFF94A3B8)),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Center(
             child: Text(
               'Bạn chưa có ca làm việc nào đã nhận',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF1E293B)),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+              ),
             ),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Center(
             child: Text(
               'Khi bạn đồng ý một lời mời việc, ca làm sẽ xuất hiện tại đây để bạn quét QR điểm danh.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontSize: 12.5,
+              ),
             ),
           ),
         ],

@@ -10,13 +10,15 @@ import 'package:cani/features/auth/widgets/otp_resend_countdown.dart';
 import 'package:cani/features/auth/widgets/password_strength_checklist.dart';
 import 'package:cani/shared/widgets/app_back_button.dart';
 
-/// ForgotPasswordScreen - Luồng khôi phục mật khẩu 2 bước (Spec P-01 / A-03)
+/// ForgotPasswordScreen - Luồng khôi phục / đổi mật khẩu 2 bước (Spec P-01 / A-03)
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   final String? initialEmail;
+  final bool isChangePassword;
 
   const ForgotPasswordScreen({
     super.key,
     this.initialEmail,
+    this.isChangePassword = false,
   });
 
   @override
@@ -185,9 +187,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đặt lại mật khẩu thành công! Vui lòng đăng nhập.'),
-          backgroundColor: Color(0xFF10B981),
+        SnackBar(
+          content: Text(widget.isChangePassword
+              ? 'Đổi mật khẩu thành công!'
+              : 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập.'),
+          backgroundColor: const Color(0xFF10B981),
         ),
       );
 
@@ -264,20 +268,22 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Quên mật khẩu?',
+            Text(
+              widget.isChangePassword ? 'Đổi Mật Khẩu' : 'Quên mật khẩu?',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
                 color: Color(0xFF0B1B3D),
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Nhập địa chỉ email đã đăng ký. Chúng tôi sẽ gửi mã OTP 6 chữ số để khôi phục mật khẩu.',
+            Text(
+              widget.isChangePassword
+                  ? 'Mã OTP 6 chữ số sẽ được gửi về email tài khoản của bạn để xác thực trước khi thiết lập mật khẩu mới.'
+                  : 'Nhập địa chỉ email đã đăng ký. Chúng tôi sẽ gửi mã OTP 6 chữ số để khôi phục mật khẩu.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF64748B),
                 height: 1.4,
@@ -292,6 +298,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               controller: _emailCtrl,
               label: 'Địa chỉ email',
               hintText: 'worker@cani.vn',
+              readOnly: widget.isChangePassword && (widget.initialEmail?.isNotEmpty ?? false),
               keyboardType: TextInputType.emailAddress,
               prefixIcon: const Icon(
                 Icons.email_outlined,
@@ -431,7 +438,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             ),
             const SizedBox(height: 24),
             _buildGradientButton(
-              text: 'ĐỔI MẬT KHẨU & ĐĂNG NHẬP',
+              text: widget.isChangePassword ? 'XÁC NHẬN ĐỔI MẬT KHẨU' : 'ĐỔI MẬT KHẨU & ĐĂNG NHẬP',
               isLoading: _isLoading,
               onPressed: _isLoading ? null : _handleConfirmReset,
             ),

@@ -2,15 +2,12 @@ package com.cani.controller;
 
 import com.cani.dto.response.ApiResponse;
 import com.cani.dto.worker.*;
-import com.cani.entity.User;
 import com.cani.entity.Worker;
-import com.cani.exception.AppException;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.WorkerJobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -34,10 +31,9 @@ public class WorkerJobController {
     @PostMapping("/status")
     public ResponseEntity<ApiResponse<Boolean>> setOnlineStatus(
             @Valid @RequestBody WorkerOnlineStatusRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         Worker worker = workerJobService.setOnlineStatus(userId, request);
         String msg = Boolean.TRUE.equals(worker.getIsOnline())
                 ? "Đã bật chế độ 'Bắt đầu kiếm việc'. Hệ thống sẽ tự động ghép nối và gửi đề xuất việc làm phù hợp cho bạn."
@@ -51,10 +47,9 @@ public class WorkerJobController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/proposals")
     public ResponseEntity<ApiResponse<List<JobProposalResponseDto>>> getMyProposals(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<JobProposalResponseDto> proposals = workerJobService.getMyProposals(userId);
         return ResponseEntity.ok(ApiResponse.ok(proposals, "Lấy danh sách đề xuất việc làm thành công"));
     }
@@ -66,10 +61,9 @@ public class WorkerJobController {
     @PostMapping("/proposals/{proposalId}/accept")
     public ResponseEntity<ApiResponse<ShiftAssignmentResponseDto>> acceptProposal(
             @PathVariable("proposalId") UUID proposalId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftAssignmentResponseDto assignment = workerJobService.acceptProposal(userId, proposalId);
         return ResponseEntity.ok(ApiResponse.ok(assignment, "Chúc mừng! Bạn đã nhận thành công ca làm việc. Vui lòng có mặt đúng giờ theo yêu cầu của sự kiện."));
     }
@@ -82,10 +76,9 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<Void>> rejectProposal(
             @PathVariable("proposalId") UUID proposalId,
             @RequestParam(value = "reason", required = false) String reason,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         workerJobService.rejectProposal(userId, proposalId, reason);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã từ chối đề xuất việc làm thành công."));
     }
@@ -96,10 +89,9 @@ public class WorkerJobController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/assignments")
     public ResponseEntity<ApiResponse<List<ShiftAssignmentResponseDto>>> getMyAssignments(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<ShiftAssignmentResponseDto> assignments = workerJobService.getMyAssignments(userId);
         return ResponseEntity.ok(ApiResponse.ok(assignments, "Lấy lịch làm việc thành công"));
     }
@@ -112,10 +104,9 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<AttendanceCheckResponseDto>> checkin(
             @PathVariable("assignmentId") UUID assignmentId,
             @RequestBody AttendanceCheckRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         AttendanceCheckResponseDto response = workerJobService.checkinAssignment(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
     }
@@ -128,10 +119,9 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<AttendanceCheckResponseDto>> checkout(
             @PathVariable("assignmentId") UUID assignmentId,
             @RequestBody AttendanceCheckRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         AttendanceCheckResponseDto response = workerJobService.checkoutAssignment(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
     }
@@ -157,10 +147,9 @@ public class WorkerJobController {
     @PostMapping("/shifts/{shiftId}/apply")
     public ResponseEntity<ApiResponse<ShiftAssignmentResponseDto>> applyForShift(
             @PathVariable("shiftId") UUID shiftId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftAssignmentResponseDto assignment = workerJobService.applyForShift(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(assignment, "Ứng tuyển thành công! Ca làm đã được thêm vào Lịch làm việc của bạn."));
     }
@@ -171,10 +160,9 @@ public class WorkerJobController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/availability")
     public ResponseEntity<ApiResponse<List<WorkerAvailabilityDto>>> getAvailability(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<WorkerAvailabilityDto> list = workerJobService.getWorkerAvailability(userId);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách lịch rảnh thành công"));
     }
@@ -186,10 +174,9 @@ public class WorkerJobController {
     @PutMapping("/availability")
     public ResponseEntity<ApiResponse<List<WorkerAvailabilityDto>>> updateAvailability(
             @Valid @RequestBody UpdateAvailabilityRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<WorkerAvailabilityDto> list = workerJobService.updateWorkerAvailability(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(list, "Cập nhật lịch rảnh tuần thành công"));
     }
@@ -200,10 +187,9 @@ public class WorkerJobController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/preferences")
     public ResponseEntity<ApiResponse<WorkerPreferencesDto>> getPreferences(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         WorkerPreferencesDto prefs = workerJobService.getWorkerPreferences(userId);
         return ResponseEntity.ok(ApiResponse.ok(prefs, "Lấy thông tin tiêu chí tìm việc thành công"));
     }
@@ -215,10 +201,9 @@ public class WorkerJobController {
     @PutMapping("/preferences")
     public ResponseEntity<ApiResponse<WorkerPreferencesDto>> updatePreferences(
             @Valid @RequestBody WorkerPreferencesDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         WorkerPreferencesDto prefs = workerJobService.updateWorkerPreferences(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(prefs, "Cập nhật tiêu chí tìm việc thành công"));
     }
@@ -231,10 +216,9 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<Void>> cancelAssignment(
             @PathVariable("assignmentId") UUID assignmentId,
             @RequestParam(value = "reason", required = false) String reason,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         workerJobService.cancelAssignment(userId, assignmentId, reason);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã hủy nhận ca làm việc thành công. Điểm uy tín của bạn đã được cập nhật."));
     }
@@ -246,10 +230,9 @@ public class WorkerJobController {
     @GetMapping("/assignments/{assignmentId}/checklist")
     public ResponseEntity<ApiResponse<List<ShiftChecklistItemDto>>> getShiftChecklist(
             @PathVariable("assignmentId") UUID assignmentId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<ShiftChecklistItemDto> items = workerJobService.getShiftChecklist(userId, assignmentId);
         return ResponseEntity.ok(ApiResponse.ok(items, "Lấy danh sách checklist công việc thành công"));
     }
@@ -262,10 +245,9 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<List<ShiftChecklistItemDto>>> updateShiftChecklist(
             @PathVariable("assignmentId") UUID assignmentId,
             @Valid @RequestBody UpdateChecklistRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<ShiftChecklistItemDto> items = workerJobService.updateShiftChecklist(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(items, "Cập nhật checklist công việc thành công"));
     }
@@ -278,10 +260,9 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<ReviewResponseDto>> createReview(
             @PathVariable("assignmentId") UUID assignmentId,
             @Valid @RequestBody CreateReviewRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ReviewResponseDto review = workerJobService.createReview(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(review, "Gửi đánh giá thành công! Cảm ơn bạn đã phản hồi."));
     }
@@ -293,10 +274,9 @@ public class WorkerJobController {
     @GetMapping("/assignments/{assignmentId}/reviews")
     public ResponseEntity<ApiResponse<ReviewResponseDto>> getAssignmentReview(
             @PathVariable("assignmentId") UUID assignmentId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         return workerJobService.getAssignmentReview(userId, assignmentId)
                 .map(r -> ResponseEntity.ok(ApiResponse.ok(r, "Lấy đánh giá thành công")))
                 .orElseGet(() -> ResponseEntity.ok(ApiResponse.ok(null, "Chưa có đánh giá cho ca này")));
@@ -308,30 +288,10 @@ public class WorkerJobController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/income-summary")
     public ResponseEntity<ApiResponse<WorkerIncomeSummaryDto>> getIncomeSummary(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         WorkerIncomeSummaryDto summary = workerJobService.getIncomeSummary(userId);
         return ResponseEntity.ok(ApiResponse.ok(summary, "Lấy thống kê thu nhập thành công"));
-    }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        UUID callerId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            callerId = u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
-            try {
-                callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        if (callerId == null) {
-            throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
-        }
-        // An toàn: chặn IDOR — chỉ được thao tác với đúng userId của người đang đăng nhập.
-        if (explicitUserId != null && !explicitUserId.equals(callerId)) {
-            throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
-        }
-        return callerId;
     }
 }

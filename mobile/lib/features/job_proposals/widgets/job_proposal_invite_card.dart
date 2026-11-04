@@ -51,16 +51,20 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
   @override
   Widget build(BuildContext context) {
     final p = widget.proposal;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
+        border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0077FF).withValues(alpha: 0.08),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.20)
+                : const Color(0xFF0077FF).withValues(alpha: 0.08),
             blurRadius: 18,
             offset: const Offset(0, 4),
           ),
@@ -77,10 +81,10 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
               Expanded(
                 child: Text(
                   p.jobType,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
-                    color: Color(0xFF0B1B3D),
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
                     letterSpacing: -0.1,
                   ),
                 ),
@@ -108,10 +112,10 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           // Tên sự kiện
           Text(
             p.eventName,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1E293B),
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 10),
@@ -145,7 +149,7 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           const SizedBox(height: 12),
 
           // Divider mỏng
-          const Divider(height: 1, color: Color(0xFFF0F7FF)),
+          Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF0F7FF)),
           const SizedBox(height: 12),
 
           // Footer: Thù lao & Đồng hồ đếm ngược
@@ -205,15 +209,18 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   child: OutlinedButton(
                     onPressed: widget.onReject,
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        width: 1.5,
+                      ),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Từ chối',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E293B),
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF1E293B),
                       ),
                     ),
                   ),

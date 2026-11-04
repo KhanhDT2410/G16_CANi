@@ -351,24 +351,22 @@ class ProposalRepository {
       final response = await _dio.get('/v1/workers/assignments/$assignmentId/checklist', options: options);
       if (response.data != null && response.data['data'] != null) {
         final List list = response.data['data'];
-        if (list.isNotEmpty) {
-          return list.map((item) => ShiftChecklistItem.fromJson(item)).toList();
-        }
+        return list.map((item) => ShiftChecklistItem.fromJson(item)).toList();
       }
-      return _defaultChecklist();
+      return const [];
     } catch (e) {
       if (demoMode) {
-        return _defaultChecklist();
+        return _demoChecklist();
       }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải checklist ca làm việc.'), e);
     }
   }
 
-  List<ShiftChecklistItem> _defaultChecklist() => const [
-        ShiftChecklistItem(id: '1', title: 'Có mặt đúng giờ & kiểm tra trang phục sự kiện', isCompleted: true),
-        ShiftChecklistItem(id: '2', title: 'Nhận bàn giao khu vực phụ trách từ Quản lý ca', isCompleted: false),
-        ShiftChecklistItem(id: '3', title: 'Thực hiện nhiệm vụ theo phân công trong suốt ca', isCompleted: false),
-        ShiftChecklistItem(id: '4', title: 'Bàn giao trang thiết bị & dọn dẹp khu vực cuối ca', isCompleted: false),
+  List<ShiftChecklistItem> _demoChecklist() => const [
+        ShiftChecklistItem(id: 'chk_1', title: 'Có mặt đúng giờ & kiểm tra trang phục sự kiện', isCompleted: false),
+        ShiftChecklistItem(id: 'chk_2', title: 'Nhận bàn giao khu vực phụ trách từ Quản lý ca', isCompleted: false),
+        ShiftChecklistItem(id: 'chk_3', title: 'Thực hiện nhiệm vụ theo phân công trong suốt ca', isCompleted: false),
+        ShiftChecklistItem(id: 'chk_4', title: 'Bàn giao trang thiết bị & dọn dẹp khu vực cuối ca', isCompleted: false),
       ];
 
   // UC-45: Cập nhật tiến độ checklist đầu việc

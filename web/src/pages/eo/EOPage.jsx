@@ -66,6 +66,20 @@ export default function EOPage() {
     return () => window.removeEventListener('cani_switch_tab', handleSwitch);
   }, [setSearchParams]);
 
+  // Lắng nghe tìm kiếm toàn cục từ Header Search Box
+  useEffect(() => {
+    const handleGlobalSearch = (e) => {
+      const q = e.detail?.query ?? '';
+      events.setSearchQuery(q);
+      if (q.trim()) {
+        setActiveTab((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
+        setActiveNav((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
+      }
+    };
+    window.addEventListener('cani_global_search', handleGlobalSearch);
+    return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
+  }, [events]);
+
   // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_) hoặc điều hướng tab (?tab=profile)
   useEffect(() => {
     const tabParam = searchParams.get('tab');

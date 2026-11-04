@@ -78,9 +78,34 @@
 @media (max-width: 900px) {
   .eo-dashboard-layout {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
   .eo-sidebar {
-    display: none;
+    position: static;
+    width: 100%;
+    margin-bottom: 0.5rem;
+    display: block;
+    top: auto;
+  }
+  .eo-sidebar-nav {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.5rem;
+    padding: 0.35rem 0.25rem 0.5rem;
+    width: 100%;
+    scrollbar-width: thin;
+  }
+  .eo-sidebar-toggle-header,
+  .eo-sidebar-promo-card {
+    display: none !important;
+  }
+  .eo-nav-item {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
   }
   .eo-widget-panel {
     display: flex !important;
@@ -537,10 +562,15 @@
   border-radius: 12px;
   border: 1px solid var(--color-border);
   width: fit-content;
-  flex-wrap: wrap;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .pill-tab {
+  white-space: nowrap;
+  flex-shrink: 0;
   padding: 0.6rem 1.25rem;
   border-radius: 9px;
   font-weight: 600;

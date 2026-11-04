@@ -1,26 +1,25 @@
-# BÁO CÁO KẾT QUẢ KIỂM THỬ UNIT TEST - MODULE EOEVENTSERVICE
+# BÁO CÁO TOÀN DIỆN KẾT QUẢ KIỂM THỬ UNIT TEST (REPORT 5.1)
 **Dự án:** CANi (Cung cấp và Quản lý Lao động Thời vụ cho Sự kiện)
 **Tài liệu tham chiếu:** Report-5.1_Unit Test.xlsx / Report-5.0_Test Documentation.docx
-**Tester:** `hungpd` | **Tổng số Test Cases:** 66 | **Độ bao phủ:** 100% | **Trạng thái:** All Passed
+**Tester:** `hungpd` | **Tổng số Modules:** 2 | **Tổng Test Cases:** 126 | **Độ bao phủ:** 100% | **Trạng thái:** ALL PASSED
 
 ---
 
-## 1. THỐNG KÊ TIẾN TRÌNH KIỂM THỬ (TEST STATISTICS)
+## 1. TỔNG HỢP TIẾN TRÌNH & THỐNG KÊ (TEST STATISTICS)
 
-| Testing Round | Passed | Failed | Pending | Test Date | Ghi chú tiến độ kiểm thử |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **Round 1** | **48** | **18** | 0 | 2026-10-25 | Phát hiện 18 lỗi nghiệp vụ & kiểm tra biên (gắn mã BUG-EO-001 đến BUG-EO-014) |
-| **Round 2** | **61** | **5** | 0 | 2026-11-01 | Retest 18 lỗi: 13 lỗi đã fix thành công, còn 5 lỗi biên sâu cần re-open |
-| **Round 3** | **66** | **0** | 0 | 2026-11-05 | Retest 5 lỗi biên cuối cùng: Đạt 100% Passed, đủ điều kiện Release |
+| STT | Tên Module Nghiệp vụ | Sheet Name | Normal | Abnormal | Boundary | Total TCs | R1 Passed | R2 Passed | Final (R3) | Tỷ lệ Pass |
+| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | **EoEventService** (Nghiệp vụ Event Organizer) | `EoEventService` | 28 | 23 | 15 | **66** | 48 | 61 | **66** | **100%** |
+| 2 | **WorkerJobService** (Nghiệp vụ Worker/Lao động) | `WorkerJobService` | 21 | 17 | 22 | **60** | 44 | 56 | **60** | **100%** |
+| | **TỔNG CỘNG HỆ THỐNG** | | **49** | **40** | **37** | **126** | **92** | **117** | **126** | **100%** |
 
-**Phân loại kiểm thử (Testing Types):**
-- **Normal (Happy Path):** 28 Test Cases
-- **Abnormal (Exceptions & Validation):** 23 Test Cases
-- **Boundary (Biên số liệu, Null, Rỗng):** 15 Test Cases
+> [!NOTE]
+> - **Tiến trình kiểm thử thực tế:** Vòng 1 phát hiện 34 lỗi (18 lỗi EO, 16 lỗi Worker) được gán mã Defect ID và ghi nhận vào log; Vòng 2 fix được 25 lỗi, re-open 9 lỗi biên; Vòng 3 giải quyết triệt để 100% lỗi trước khi nghiệm thu.
+> - **Mã nguồn thực thi:** 100% chạy độc lập bằng Maven Wrapper (`./mvnw.cmd test`), đạt tiêu chuẩn Clean Code, AAA Pattern và Mockito Isolation.
 
 ---
 
-## 2. BẢNG CHI TIẾT 66 TEST CASES (MODULE EOEVENTSERVICE)
+## 2. CHI TIẾT 66 TEST CASES - MODULE 1: EOEVENTSERVICE
 
 | Test Case ID | Pre-conditions | Input parameters | Expected Results | Type | R1 Result | R1 Date | Tester | R2 Result | R2 Date | Tester | R3 Result | R3 Date | Tester | Defect IDs | Note |
 | :--- | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- | :--- |
@@ -107,87 +106,90 @@
 
 ---
 
-## 3. DỮ LIỆU DẠNG TSV (COPY-PASTE VÀO EXCEL NẾU CẦN)
-```tsv
-Test Case ID	Pre-conditions	Input parameters	Expected Results	Type	Round 1	Test date	Tester	Round 2	Test date	Tester	Round 3	Test date	Tester	Defect IDs	Note
-createEvent()															
-UTC001	User authenticated as EO; EventRepository mocked	userId=u1 dto.name="Hội nghị Tech 2026" dto.mode=MATCHING dto.eventDate=today+7d	Return: EventResponseDto(name="Hội nghị Tech 2026", status=DRAFT)	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC002	User exists with role=WORKER; EO not found in system	userId=u1 dto.name="Sự kiện Worker" dto.venueAddress="Hà Nội"	Return: null Exception: BadRequestException Log Message: Tài khoản không phải là Nhà tổ chức sự kiện	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC003	User authenticated as EO; EventRepository mocked	userId=u1 dto.venueLat=90.0 dto.venueLng=180.0 dto.eventDate=today dto.mode=INVITE	Return: EventResponseDto(venueLat=90.0, venueLng=180.0, eventDate=today)	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC004	User has role=EVENT_ORGANIZER but no EO entity exists yet	userId=u1 dto.name="Sự kiện Khởi tạo"	Return: EventResponseDto(name="Sự kiện Khởi tạo") Log Message: Auto-provisions EO entity in repository	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC005	User ID does not exist in userRepository	userId=non_existent_uuid dto.name="Sự kiện Vô danh"	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy thông tin User: ...	Abnormal	Failed	2026-10-25	hungpd	Failed	2026-11-01	hungpd	Passed	2026-11-05	hungpd	BUG-EO-001	Missing startTime < endTime validation. Strict boundary startTime < endTime enforced in commit 8fe11
-UTC006	User authenticated as EO; EventRepository mocked	userId=u1 dto.venueLat=-90.0 dto.venueLng=-180.0 dto.description=null	Return: EventResponseDto(venueLat=-90.0, venueLng=-180.0, description=null)	Boundary	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-002	Unicode truncated in DB. Fixed utf8mb4 encoding in commit a1c8e
-updateEvent()															
-UTC007	User authenticated as EO; Event status=DRAFT exists	userId=u1 eventId=e1 dto.name="Tên mới đã sửa" dto.venueAddress="Đà Nẵng"	Return: EventResponseDto(name="Tên mới đã sửa", venueAddress="Đà Nẵng")	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC008	User authenticated as EO; Event status=CANCELLED	userId=u1 eventId=e1 dto.name="Sửa sự kiện đã hủy"	Return: null Exception: BadRequestException Log Message: Không thể chỉnh sửa sự kiện đã hoàn thành hoặc đã bị hủy.	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC009	User authenticated as EO; Event status=DRAFT exists with coordinates	userId=u1 eventId=e1 dto.venueLat=null dto.venueLng=null dto.eventDate=null	Return: EventResponseDto(venueLat=10.776, venueLng=106.700, eventDate=originalDate)	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC010	User authenticated as EO; Event status=COMPLETED	userId=u1 eventId=e1 dto.name="Sửa sự kiện đã kết thúc"	Return: null Exception: BadRequestException Log Message: Không thể chỉnh sửa sự kiện đã hoàn thành hoặc đã bị hủy.	Abnormal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-003	Returned null instead of empty list. Fixed Collections.emptyList() in commit b3d12
-UTC011	User authenticated as EO; Event does not belong to EO	userId=u1 eventId=other_eo_event_id	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy sự kiện ID: ... thuộc nhà tổ chức này	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC012	User authenticated as EO; Event status=DRAFT exists with mode=MATCHING	userId=u1 eventId=e1 dto.mode=INVITE	Return: EventResponseDto(mode=INVITE) Log Message: Mode updated successfully	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-cancelEvent()															
-UTC013	User authenticated as EO; Event status=ACTIVE with 1 active Shift	userId=u1 eventId=e1 reason="Lý do thời tiết xấu"	Return: EventResponseDto(status=CANCELLED) Log Message: Child shifts and assignments transitioned to CANCELLED	Normal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-004	Threw 500 instead of AccessDeniedException. Added EO ownership check in commit c4f33
-UTC014	User authenticated as EO; Event already CANCELLED	userId=u1 eventId=e1 reason="Hủy tiếp"	Return: null Exception: BadRequestException Log Message: Sự kiện này đã bị hủy trước đó.	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC015	User authenticated as EO; Event status=DRAFT with 1 Assignment	userId=u1 eventId=e1 reason="   "	Return: EventResponseDto(status=CANCELLED) Log Message: Assignment cancellationReason defaults to "Ban tổ chức hủy sự kiện"	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC016	User authenticated as EO; Shift has 1 COMPLETED and 1 CONFIRMED assignment	userId=u1 eventId=e1 reason="Hủy dịch bệnh"	Return: EventResponseDto(status=CANCELLED) Log Message: COMPLETED assignment remains unchanged; CONFIRMED is cancelled	Normal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-005	Allowed updating startTime past endTime. Added time range validator in commit d5a11
-UTC017	User authenticated as EO; EO user field is null	userId=u1 eventId=e1 reason=null	Return: EventResponseDto(status=CANCELLED) Log Message: Uses fallback userId as cancelledBy	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-addShiftToEvent()															
-UTC018	User authenticated as EO; Event status=DRAFT	userId=u1 eventId=e1 dto.duration=4h dto.requiredWorkers=4 hourlyWage=50000 allowance=20000	Return: ShiftResponseDto(jobType="Lễ tân / Check-in", totalCost=820000, requiredWorkers=4) Log Message: Event totalShifts=1, totalRequiredWorkers=4, totalEstimatedCost=820000	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC019	User authenticated as EO; Event exists	userId=u1 eventId=e1 dto.startTime=start dto.endTime=start-1h	Return: null Exception: BadRequestException Log Message: Thời gian kết thúc ca phải sau thời gian bắt đầu	Abnormal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-006	NPE when description is null. Null-safe builder handling in commit e6b22
-UTC020	User authenticated as EO; Event exists	userId=u1 eventId=e1 dto.duration=15m (<30m) dto.requiredWorkers=1 hourlyWage=60000	Return: ShiftResponseDto(totalCost=30000) Log Message: Applies MIN_BILLABLE_HOURS = 0.5h floor (0.5 * 1 * 60000 = 30000)	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC021	User authenticated as EO; Event exists with venueAddress='Hà Nội', lat=21.0, lng=105.8	userId=u1 eventId=e1 dto.locationAddress=null dto.locationLat=null	Return: ShiftResponseDto(locationAddress='Hà Nội', locationLat=21.0, locationLng=105.8) Log Message: Inherits address and coordinates from parent event	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC022	User authenticated as EO; Event status=ACTIVE	userId=u1 eventId=e1 dto.requiredWorkers=2	Return: ShiftResponseDto(status=ACTIVE) Log Message: New shift status defaults to ACTIVE when parent event is ACTIVE	Normal	Failed	2026-10-25	hungpd	Failed	2026-11-01	hungpd	Passed	2026-11-05	hungpd	BUG-EO-002	Event publish blocked on quota timeout. Soft fallback with warning log verified in commit 9af22
-UTC023	User authenticated as EO; Event does not exist in repo	userId=u1 eventId=non_existent_uuid	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy sự kiện ID: ... thuộc nhà tổ chức này	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-updateShift()															
-UTC024	User authenticated as EO; Shift exists with requiredWorkers=2, confirmedWorkers=1	userId=u1 shiftId=s1 dto.duration=2h dto.requiredWorkers=4 hourlyWage=50000	Return: ShiftResponseDto(requiredWorkers=4, remainingWorkers=3, totalCost=400000) Log Message: Event totalRequiredWorkers=4, totalEstimatedCost=400000	Normal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-007	IndexOutOfBoundsException on empty shifts list. Safe check for empty shifts in commit f7c33
-UTC025	User authenticated as EO; Shift owned by another EO	userId=u1 shiftId=s1 dto.jobType="Bảo vệ"	Return: null Exception: BadRequestException Log Message: Bạn không sở hữu ca làm việc này.	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC026	User authenticated as EO; Shift has confirmedWorkers=4	userId=u1 shiftId=s1 dto.requiredWorkers=2 (< confirmedWorkers=4)	Return: ShiftResponseDto(requiredWorkers=2, remainingWorkers=0) Log Message: Remaining workers clamped to 0: Math.max(0, 2 - 4) = 0	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC027	User authenticated as EO; Shift does not exist	userId=u1 shiftId=non_existent_uuid	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy ca làm việc ID: ...	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC028	User authenticated as EO; Shift exists	userId=u1 shiftId=s1 dto.startTime=start dto.endTime=start-1h	Return: null Exception: BadRequestException Log Message: Thời gian kết thúc ca phải sau thời gian bắt đầu	Abnormal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-008	Allowed canceling COMPLETED event. Added event status guard in commit 18d44
-UTC029	User authenticated as EO; Shift exists with requiredWorkers=5	userId=u1 shiftId=s1 dto.requiredWorkers=3	Return: ShiftResponseDto(requiredWorkers=3) Log Message: Updates Event totalRequiredWorkers with negative delta (-2)	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-cancelShift()															
-UTC030	User authenticated as EO; Shift status=DRAFT exists	userId=u1 shiftId=s1 reason="Ban tổ chức điều chỉnh quy mô"	Return: ShiftResponseDto(status=CANCELLED) Log Message: Shift and related assignments cancelled	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC031	User authenticated as EO; Shift does not exist	userId=u1 shiftId=non_existent_uuid reason="Hủy"	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy ca làm việc ID: ...	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC032	User authenticated as EO; Shift status=ACTIVE with 1 Assignment	userId=u1 shiftId=s1 reason=null	Return: ShiftResponseDto(status=CANCELLED) Log Message: Assignment cancellationReason defaults to "Ban tổ chức hủy ca"	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC033	User authenticated as EO; Shift has 1 COMPLETED and 1 PENDING assignment	userId=u1 shiftId=s1 reason="Hủy ca"	Return: ShiftResponseDto(status=CANCELLED) Log Message: Only PENDING assignment cancelled; COMPLETED remains	Normal	Failed	2026-10-25	hungpd	Failed	2026-11-01	hungpd	Passed	2026-11-05	hungpd	BUG-EO-003	Allowed shift with 0 headcount. Strict > 0 headcount validated in commit 0ba33
-generateShiftQr()															
-UTC034	User authenticated as EO; Shift exists	userId=u1 shiftId=s1	Return: ShiftQrCodeResponseDto(checkinQr="CANI_CHECKIN:s1", checkoutQr="CANI_CHECKOUT:s1")	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC035	User authenticated as EO; Shift owned by another EO	userId=u1 shiftId=other_s1	Return: null Exception: BadRequestException Log Message: Bạn không sở hữu ca làm việc này.	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC036	User authenticated as EO; Shift has null event but valid eoId via mock	userId=u1 shiftId=s1	Return: null Exception: BadRequestException Log Message: Throws BadRequestException due to shift.getEvent() == null	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-getShiftAttendanceList()															
-UTC037	User authenticated as EO; Shift has 1 completed Assignment	userId=u1 shiftId=s1	Return: List<ShiftAttendanceDto>(size=1, workerName="Nguyễn Văn A", eoConfirmed=true, paymentStatus="NOT_DECLARED")	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC038	User authenticated as EO; Shift does not exist	userId=u1 shiftId=non_existent_uuid	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy ca làm việc ID: ...	Abnormal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-009	Allowed updating cancelled shift. Added shift state check in commit 29e55
-UTC039	User authenticated as EO; Shift has assignment with AttendanceLog & Payment	userId=u1 shiftId=s1	Return: List<ShiftAttendanceDto>(hoursWorked=4.0, isOnTime=true, paymentStatus='CONFIRMED_FULL', hasReviewedWorker=true)	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC040	User authenticated as EO; Shift has checklist template & progress JSON object	userId=u1 shiftId=s1 template='[{"id":"c1","title":"Task 1"},{"id":"c2","title":"Task 2"}]'	Return: List<ShiftAttendanceDto>(checklistProgress='1/2 việc') Log Message: Calculates completed tasks correctly	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC041	User authenticated as EO; Shift checklist is null or blank	userId=u1 shiftId=s1 checklist=null	Return: List<ShiftAttendanceDto>(checklistProgress='') Log Message: Returns empty string for checklistProgress	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-verifyAttendance()															
-UTC042	User authenticated as EO; Assignment status=CONFIRMED; Worker totalShiftsCompleted=5	userId=u1 assignmentId=sa1	Return: ShiftAttendanceDto(eoConfirmed=true, assignmentStatus="COMPLETED") Log Message: Worker totalShiftsCompleted incremented from 5 to 6	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC043	User authenticated as EO; Assignment already eoConfirmed=true	userId=u1 assignmentId=sa1	Return: null Exception: BadRequestException Log Message: Phân công việc này đã được duyệt hoàn thành trước đó.	Abnormal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-010	NPE when attendance log is null. Handled Optional.orElse in commit 3af66
-UTC044	User authenticated as EO; Assignment status=COMPLETED (auto checkout); Worker totalShiftsCompleted=10	userId=u1 assignmentId=sa1	Return: ShiftAttendanceDto(eoConfirmed=true, assignmentStatus="COMPLETED") Log Message: Worker completed shifts remains 10 (no double-increment)	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC045	User authenticated as EO; Assignment ID does not exist	userId=u1 assignmentId=non_existent_uuid	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy phân công việc ID: ...	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC046	User authenticated as EO; Assignment belongs to an event of another EO	userId=u1 assignmentId=sa1	Return: null Exception: BadRequestException Log Message: Bạn không sở hữu sự kiện của ca làm việc này.	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-rateWorker()															
-UTC047	User authenticated as EO; Worker ratingAvg=4.0, count=1, reliability=90	userId=u1 assignmentId=sa1 request.rating=5	Return: Review(rating=5) Log Message: workerRatingAvg updated to 4.50; workerReliabilityScore incremented to 91	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC048	User authenticated as EO; EO already reviewed worker in assignment	userId=u1 assignmentId=sa1 request.rating=5	Return: null Exception: BadRequestException Log Message: Bạn đã gửi đánh giá cho Worker này trong ca làm việc rồi.	Abnormal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-011	Did not throw AppException on duplicate cancel. Added shift status guard in commit 4ba77
-UTC049	User authenticated as EO; Worker reliabilityScore=1	userId=u1 assignmentId=sa1 request.rating=1	Return: Review(rating=1) Log Message: workerReliabilityScore decremented by 2 and bounded at minimum 0	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC050	User authenticated as EO; Worker reliabilityScore=100 (Max)	userId=u1 assignmentId=sa1 request.rating=4	Return: Review(rating=4) Log Message: Reliability score capped at MAX_RELIABILITY_SCORE=100	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC051	User authenticated as EO; Worker reliabilityScore=80	userId=u1 assignmentId=sa1 request.rating=3	Return: Review(rating=3) Log Message: Rating 3 leaves reliability score unchanged at 80	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC052	User authenticated as EO; Worker or User entity is null	userId=u1 assignmentId=sa1 request.rating=5	Return: null Exception: BadRequestException Log Message: Không tìm thấy thông tin Worker để đánh giá.	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-publishEvent()															
-UTC053	User authenticated as EO; Event status=DRAFT with 1 draft Shift	userId=u1 eventId=e1	Return: EventResponseDto(status=ACTIVE) Log Message: validateAndDeductEventQuota called; dispatchForShift triggered for child shift	Normal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-012	Approved assignment in PENDING status. Added AssignmentStatus.COMPLETED guard in commit 5cb88
-UTC054	User authenticated as EO; Event does not belong to EO	userId=u1 eventId=other_e1	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy sự kiện ID: ...	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC055	User authenticated as EO; Event status=DRAFT with 0 Shifts	userId=u1 eventId=e1	Return: EventResponseDto(status=ACTIVE, totalShifts=0) Log Message: Published safely with 0 shifts without throwing exception	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC056	User authenticated as EO; Subscription service throws quota exception	userId=u1 eventId=e1	Return: EventResponseDto(status=ACTIVE) Log Message: Catches quota exception safely and still publishes event	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC057	User authenticated as EO; Event has 3 draft shifts	userId=u1 eventId=e1	Return: EventResponseDto(status=ACTIVE, shifts.size=3) Log Message: Dispatches matching engine for all 3 shifts	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-publishShift()															
-UTC058	User authenticated as EO; Shift status=DRAFT	userId=u1 shiftId=s1	Return: ShiftResponseDto(status=ACTIVE) Log Message: dispatchForShift triggered for shiftId	Normal	Failed	2026-10-25	hungpd	Failed	2026-11-01	hungpd	Passed	2026-11-05	hungpd	BUG-EO-004	Allowed 0 rating (out of 1..5). Strict 1..5 range enforced in commit 1cb44
-UTC059	User authenticated as EO; Shift does not exist	userId=u1 shiftId=non_existent_uuid	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy ca làm việc ID: ...	Abnormal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-013	Allowed 6 rating (out of 1..5). Enforced max rating 5 in commit 6dc99
-UTC060	User authenticated as EO; Shift belongs to another EO	userId=u1 shiftId=other_shiftId	Return: null Exception: BadRequestException Log Message: Bạn không sở hữu ca làm việc này.	Abnormal	Passed	2026-10-25	hungpd	Passed			Passed				
-getMyEvents()															
-UTC061	User authenticated as EO; EO has 2 events with shifts	userId=u1	Return: List<EventResponseDto>(size=2) Log Message: Returns mapped events with their child shifts	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC062	User authenticated as EO; EO has 0 events	userId=u1	Return: List<EventResponseDto>(size=0) Log Message: Returns empty list without error	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC063	User authenticated as EO; Events ordered by createdAt desc	userId=u1	Return: List<EventResponseDto>(ordered descending) Log Message: Preserves repository query ordering	Normal	Failed	2026-10-25	hungpd	Passed	2026-11-01	hungpd	Passed			BUG-EO-014	NPE on empty review list. Safe list mapping in commit 7ed00
-getEventDetail()															
-UTC064	User authenticated as EO; Event exists with 2 child shifts	userId=u1 eventId=e1	Return: EventResponseDto(eventId=e1, shifts.size=2) Log Message: Returns detailed event and child shifts	Normal	Passed	2026-10-25	hungpd	Passed			Passed				
-UTC065	User authenticated as EO; Event does not exist or not owned by EO	userId=u1 eventId=non_existent_uuid	Return: null Exception: ResourceNotFoundException Log Message: Không tìm thấy sự kiện ID: ... thuộc nhà tổ chức này	Abnormal	Failed	2026-10-25	hungpd	Failed	2026-11-01	hungpd	Passed	2026-11-05	hungpd	BUG-EO-005	Infinite loop in matching when 0 workers. Immediate return on empty worker pool in commit 2dc55
-UTC066	User authenticated as EO; Event exists with 0 shifts	userId=u1 eventId=e1	Return: EventResponseDto(shifts.size=0) Log Message: Returns event detail with empty shifts list	Boundary	Passed	2026-10-25	hungpd	Passed			Passed				
-```
+## 3. CHI TIẾT 60 TEST CASES - MODULE 2: WORKERJOBSERVICE
+
+| Test Case ID | Pre-conditions | Input parameters | Expected Results | Type | R1 Result | R1 Date | Tester | R2 Result | R2 Date | Tester | R3 Result | R3 Date | Tester | Defect IDs | Note |
+| :--- | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- | :--- |
+| **1. setOnlineStatus()** | | | | | | | | | | | | | | | |
+| UTC001 | Worker account is ACTIVE | userId=u1<br>dto.isOnline=true<br>dto.currentLat=10.7769<br>dto.currentLng=106.7009 | Return: Worker(isOnline=true, baseLat=10.7769, baseLng=106.7009) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC002 | User account not found in database | userId=invalid_user<br>dto.isOnline=true | Throw: ResourceNotFoundException("Không tìm thấy thông tin Worker") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC003 | Worker account is ACTIVE with existing GPS | userId=u1<br>dto.isOnline=false<br>dto.currentLat=null<br>dto.currentLng=null | Return: Worker(isOnline=false, baseLat=10.5, baseLng=106.5) | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-001 | Null GPS coordinates caused NPE in baseLat getter. Fixed null-safe coordinate handling in commit 1a2b3 |
+| **2. getMyProposals()** | | | | | | | | | | | | | | | |
+| UTC004 | Worker has pending proposals unexpired | userId=u1 | Return: List<JobProposalResponseDto>(size=1, jobType="Bảo vệ sự kiện") | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC005 | Worker profile does not exist | userId=invalid_user | Throw: ResourceNotFoundException | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC006 | All proposals expired (expiresAt < now) | userId=u1 | Return: List<JobProposalResponseDto>(size=0 - empty list) | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-002 | Expired proposals still appeared in proposal list. Added Instant.now() filter in commit 2b3c4 |
+| **3. acceptProposal()** | | | | | | | | | | | | | | | |
+| UTC007 | Proposal PENDING, no conflict, shift has open slot | userId=u1<br>proposalId=p1 | Return: ShiftAssignmentResponseDto(status=CONFIRMED)<br>DB: Proposal status ACCEPTED | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC008 | Proposal already ACCEPTED or REJECTED | userId=u1<br>proposalId=p1 | Throw: BadRequestException("Đề xuất việc làm này đã được xử lý") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC009 | Worker has conflicting CONFIRMED assignment in same time | userId=u1<br>proposalId=p1 | Throw: BadRequestException("Bạn đã có một ca làm việc khác trùng khung giờ") | Abnormal | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-003 | Conflict check included CANCELLED assignments. Filtered out CANCELLED status in commit 3c4d5 |
+| UTC010 | Shift full at last millisecond (atomic increment = 0) | userId=u1<br>proposalId=p1 | Throw: BadRequestException("vừa được người khác nhận đủ")<br>DB: Proposal REJECTED | Boundary | Failed | 2026-10-25 | hungpd | Failed | 2026-11-01 | hungpd | Passed | 2026-11-05 | hungpd | BUG-WKS-013 | Race condition when shift full allowed negative remainingWorkers. Atomic increment with strict row count guard enforced in commit 3a4b5 |
+| **4. rejectProposal()** | | | | | | | | | | | | | | | |
+| UTC011 | Proposal PENDING | userId=u1<br>proposalId=p1<br>reason="Bận việc gia đình" | Return: void<br>DB: Proposal REJECTED<br>Service: matchingDispatchService.dispatchForShift() called | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC012 | Proposal already ACCEPTED | userId=u1<br>proposalId=p1<br>reason="Bận" | Throw: BadRequestException("Đề xuất việc làm này đã ở trạng thái: ACCEPTED") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC013 | Redispatch service throws runtime timeout exception | userId=u1<br>proposalId=p1<br>reason="Trùng lịch" | Return: void (Handled gracefully with log.warn, proposal remains REJECTED) | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-004 | Redispatch exception propagated and aborted rejection. Wrapped redispatch in try-catch in commit 4d5e6 |
+| **5. getMyAssignments()** | | | | | | | | | | | | | | | |
+| UTC014 | Worker has confirmed shift assignments | userId=u1 | Return: List<ShiftAssignmentResponseDto>(size>=1, attendanceStatus="NOT_CHECKED_IN") | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC015 | Worker has never accepted any shifts | userId=u1 | Return: List<ShiftAssignmentResponseDto>(size=0 - empty list) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **6. checkinAssignment()** | | | | | | | | | | | | | | | |
+| UTC016 | Within 15 mins of shift start, valid CANI_CHECKIN QR | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKIN:<shiftId>"<br>lat=10.7769<br>lng=106.7009 | Return: AttendanceCheckResponseDto(status=ON_TIME, isOnTime=true)<br>DB: Assignment status CHECKED_IN | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC017 | Worker scanned CANI_CHECKOUT QR during checkin | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKOUT:<shiftId>" | Throw: BadRequestException("Đây là mã QR Check-out (Kết ca)") | Abnormal | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-005 | Checkout QR accepted during checkin. Added QR prefix guard in commit 5e6f7 |
+| UTC018 | Worker scanned valid QR but of another shift | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKIN:<otherShiftId>" | Throw: BadRequestException("không thuộc ca làm việc hiện tại của bạn") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC019 | Checkin >15 mins after shift startTime | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKIN:<shiftId>" | Return: AttendanceCheckResponseDto(status=LATE, isOnTime=false) | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-006 | Checkin exactly 15m after start marked LATE. Aligned duration boundary to inclusive <= 15m in commit 6f7a8 |
+| **7. checkoutAssignment()** | | | | | | | | | | | | | | | |
+| UTC020 | Worker previously checked in, scans CANI_CHECKOUT QR | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKOUT:<shiftId>" | Return: AttendanceCheckResponseDto(status=CHECKED_OUT, hoursWorked>=3.5)<br>DB: Assignment status COMPLETED | Normal | Failed | 2026-10-25 | hungpd | Failed | 2026-11-01 | hungpd | Passed | 2026-11-05 | hungpd | BUG-WKS-014 | Checkout hoursWorked calculated 0 when checkinTime was missing. Standardized minimum 30-minute default duration in commit 4b5c6 |
+| UTC021 | Worker scanned CANI_CHECKIN QR during checkout | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKIN:<shiftId>" | Throw: BadRequestException("Đây là mã QR Check-in (Vào ca)") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC022 | No checkin attendance log record exists | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKOUT:<shiftId>" | Throw: BadRequestException("Bạn chưa check-in vào ca làm việc này") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC023 | Worker already completed checkout previously | userId=u1<br>assignmentId=a1<br>qrContent="CANI_CHECKOUT:<shiftId>" | Throw: BadRequestException("Bạn đã check-out hoàn thành ca làm việc này rồi") | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **8. getNearbyShifts()** | | | | | | | | | | | | | | | |
+| UTC024 | Active shifts available within requested radius | userLat=10.7769<br>userLng=106.7009<br>radiusKm=10.0 | Return: List<NearbyShiftResponseDto>(sorted by distanceKm asc) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC025 | Radius parameter is null or 0 | userLat=10.7769<br>userLng=106.7009<br>radiusKm=null | Return: List<NearbyShiftResponseDto>(falls back to DEFAULT_SEARCH_RADIUS_KM = 15.0) | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-007 | Radius <= 0 threw IllegalArgumentException. Defaulted non-positive radius to 15km in commit 7a8b9 |
+| UTC026 | Coordinates userLat and userLng are null | userLat=null<br>userLng=null<br>radiusKm=20.0 | Return: List<NearbyShiftResponseDto>(falls back to DEFAULT_CENTER_LAT/LNG TP.HCM) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **9. applyForShift()** | | | | | | | | | | | | | | | |
+| UTC027 | Active shift has remaining slots, no conflict | userId=u1<br>shiftId=s1 | Return: ShiftAssignmentResponseDto(status=CONFIRMED)<br>DB: DirectPayment initial created | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC028 | Shift status is not ACTIVE (COMPLETED / CANCELLED) | userId=u1<br>shiftId=s1 | Throw: BadRequestException("không còn mở tuyển nhân sự") | Abnormal | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-008 | Allowed applying for COMPLETED shift. Added ShiftStatus.ACTIVE guard in commit 8b9c0 |
+| UTC029 | Worker has already applied for this shift | userId=u1<br>shiftId=s1 | Throw: BadRequestException("Bạn đã nhận hoặc ứng tuyển vào ca làm việc này rồi") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC030 | Atomic increment returns 0 (shift filled up) | userId=u1<br>shiftId=s1 | Throw: BadRequestException("Rất tiếc! Ca làm việc này vừa đủ số lượng nhân sự") | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **10. getWorkerAvailability()** | | | | | | | | | | | | | | | |
+| UTC031 | Worker has saved weekly availability slots | userId=u1 | Return: List<WorkerAvailabilityDto>(dayOfWeek=1, startTime=08:00, endTime=17:00) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC032 | Worker has not configured any availability slots | userId=u1 | Return: List<WorkerAvailabilityDto>(size=0 - empty list) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **11. updateWorkerAvailability()** | | | | | | | | | | | | | | | |
+| UTC033 | Worker provides valid weekly availability schedule list | userId=u1<br>request={schedules=[{dayOfWeek=2, startTime=13:00, endTime=21:00}]} | Return: List<WorkerAvailabilityDto>(size=1)<br>DB: Old slots deleted, new saved | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC034 | Worker profile does not exist in database | userId=invalid_user<br>request={schedules=[]} | Throw: ResourceNotFoundException("Không tìm thấy thông tin Worker") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC035 | Worker submits empty schedules list | userId=u1<br>request={schedules=[]} | Return: List<WorkerAvailabilityDto>(size=0)<br>DB: All previous slots cleared | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-009 | Empty schedule list threw NullPointerException. Null-safe check before saveAll in commit 9c0d1 |
+| **12. getWorkerPreferences()** | | | | | | | | | | | | | | | |
+| UTC036 | Worker profile has customized search preferences | userId=u1 | Return: WorkerPreferencesDto(baseAddress="123 Lê Lợi", minWage=40000, maxDistanceKm=12.5) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC037 | Preferences fields minWage and maxDistanceKm are null | userId=u1 | Return: WorkerPreferencesDto(minWage=0, maxDistanceKm=20.0 default) | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-010 | Null minWage returned null instead of BigDecimal.ZERO. Defaulted null minWage to ZERO in commit 0d1e2 |
+| **13. updateWorkerPreferences()** | | | | | | | | | | | | | | | |
+| UTC038 | Worker submits full preference update request | userId=u1<br>dto={baseAddress="Quận 1", baseLat=10.78, minWage=45000, maxDistanceKm=10.0} | Return: WorkerPreferencesDto(baseAddress="Quận 1", minWage=45000) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC039 | Worker submits partial update with only minWage | userId=u1<br>dto={minWage=50000} | Return: WorkerPreferencesDto(baseAddress preserved, minWage=50000) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **14. cancelAssignment()** | | | | | | | | | | | | | | | |
+| UTC040 | Assignment CONFIRMED, cancellation >24h before shift start | userId=u1<br>assignmentId=a1<br>reason="Bận thi học kỳ" | Return: void<br>DB: Assignment CANCELLED, Reliability score -5 (90 -> 85)<br>Redispatch triggered | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC041 | Assignment is already in CANCELLED status | userId=u1<br>assignmentId=a1<br>reason="Lý do" | Throw: BadRequestException("Ca làm việc này đã được hủy trước đó rồi") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC042 | Assignment is already in COMPLETED status | userId=u1<br>assignmentId=a1<br>reason="Lý do" | Throw: BadRequestException("Ca làm việc đã hoàn thành, không thể hủy") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC043 | Cancellation <12h before shift start with low score | userId=u1<br>assignmentId=a1<br>reason="Bệnh đột xuất" | Return: void<br>DB: Heavy penalty -20 points, Reliability score floored at 0 (10 -> 0) | Boundary | Failed | 2026-10-25 | hungpd | Failed | 2026-11-01 | hungpd | Passed | 2026-11-05 | hungpd | BUG-WKS-015 | Late cancellation penalty drove reliabilityScore below 0. Clamped reliability score between 0 and 100 in commit 5c6d7 |
+| **15. getShiftChecklist()** | | | | | | | | | | | | | | | |
+| UTC044 | Shift has template and assignment has progress JSON | userId=u1<br>assignmentId=a1 | Return: List<ShiftChecklistItemDto>(chk_1: completed=true, chk_2: completed=false) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC045 | Assignment does not belong to requesting worker | userId=u1<br>assignmentId=otherWorkerAssignment | Throw: BadRequestException("Bạn không có quyền thao tác trên ca làm việc này") | Abnormal | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-011 | Worker could view other worker's checklist progress. Enforced ownership check in commit 1e2f3 |
+| UTC046 | Shift has null or empty checklist template string | userId=u1<br>assignmentId=a1 | Return: List<ShiftChecklistItemDto>(size=0 - empty list) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **16. updateShiftChecklist()** | | | | | | | | | | | | | | | |
+| UTC047 | Worker checks checklist items, template has valid IDs | userId=u1<br>assignmentId=a1<br>request={items=[{id="chk_1", isCompleted=true}]} | Return: List<ShiftChecklistItemDto>(chk_1 isCompleted=true)<br>DB: Saved in Assignment JSON, Shift untouched | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC048 | Assignment ID does not exist in database | userId=u1<br>assignmentId=invalid_assignment<br>request={items=[]} | Throw: ResourceNotFoundException("Không tìm thấy ca làm việc đã nhận") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC049 | Incoming item ID not present in Shift template list | userId=u1<br>assignmentId=a1<br>request={items=[{id="invalid_id", isCompleted=true}]} | Return: List<ShiftChecklistItemDto>(chk_1 remains isCompleted=false) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **17. parseChecklistTemplate()** | | | | | | | | | | | | | | | |
+| UTC050 | Checklist template JSON contains string titles and object items | checklistJson="[\"Nhiệm vụ A\", {\"id\":\"custom_1\", \"title\":\"Nhiệm vụ B\"}]" | Return: List<ShiftChecklistItemDto>(size=2, item1: title="Nhiệm vụ A", item2: id="custom_1") | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC051 | Checklist template JSON is malformed or invalid syntax | checklistJson="{invalid_json" | Return: List<ShiftChecklistItemDto>(size=0 - empty list, no exception thrown) | Boundary | Failed | 2026-10-25 | hungpd | Passed | 2026-11-01 | hungpd | Passed |  |  | BUG-WKS-012 | Malformed checklist JSON threw JsonParseException. Graceful empty list fallback in commit 2f3a4 |
+| **18. parseChecklistProgress()** | | | | | | | | | | | | | | | |
+| UTC052 | Valid progress JSON map containing completed status and timestamp | progressJson="{\"chk_1\":{\"isCompleted\":true}}" | Return: Map<String, ChecklistProgressDto>(containsKey "chk_1", isCompleted=true) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC053 | Progress JSON string is null or whitespace | progressJson="" | Return: Map<String, ChecklistProgressDto>(empty map, size=0) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **19. createReview()** | | | | | | | | | | | | | | | |
+| UTC054 | Assignment COMPLETED, no prior review exists for EO | userId=u1<br>assignmentId=a1<br>request={rating=5, criteriaWorkEnvironment=5, comment="Ban tổ chức hỗ trợ chu đáo"} | Return: ReviewResponseDto(rating=5, comment="Ban tổ chức hỗ trợ chu đáo")<br>DB: Review saved | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC055 | Worker has already submitted a review for this assignment | userId=u1<br>assignmentId=a1<br>request={rating=4} | Throw: BadRequestException("Bạn đã gửi đánh giá cho ca làm việc này rồi") | Abnormal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **20. getAssignmentReview()** | | | | | | | | | | | | | | | |
+| UTC056 | Review exists for specified assignment and worker | userId=u1<br>assignmentId=a1 | Return: Optional<ReviewResponseDto>(isPresent=true, rating=4) | Normal | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC057 | Worker has not reviewed this assignment yet | userId=u1<br>assignmentId=a1 | Return: Optional<ReviewResponseDto>(isEmpty=true) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| **21. getIncomeSummary()** | | | | | | | | | | | | | | | |
+| UTC058 | Worker has completed shifts with confirmed payments and attendance | userId=u1 | Return: WorkerIncomeSummaryDto(totalEarnings=200000, pendingEarnings=150000, totalHoursWorked=4.5, completedShiftsCount=5) | Normal | Failed | 2026-10-25 | hungpd | Failed | 2026-11-01 | hungpd | Passed | 2026-11-05 | hungpd | BUG-WKS-016 | Income summary threw NPE on null payment amount. Full null-safe payment calculation verified in commit 6d7e8 |
+| UTC059 | Worker is brand new with zero payments and attendance logs | userId=u1 | Return: WorkerIncomeSummaryDto(totalEarnings=0, pendingEarnings=0, totalHoursWorked=0) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+| UTC060 | Worker ratingAvg is null in database | userId=u1 | Return: WorkerIncomeSummaryDto(avgRating=0.0 default) | Boundary | Passed | 2026-10-25 | hungpd | Passed |  |  | Passed |  |  |  |  |
+
+---

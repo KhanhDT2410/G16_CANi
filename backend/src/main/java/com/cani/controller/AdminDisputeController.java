@@ -31,12 +31,36 @@ public class AdminDisputeController {
 
     /**
      * UC-109: Hàng đợi tranh chấp chưa xử lý (ưu tiên theo BR-57).
+     * Bao gồm cả đơn ESCALATED để Admin ra quyết định cuối (UC-102).
      * GET /api/v1/admin/disputes/queue
      */
     @GetMapping("/queue")
     public ResponseEntity<ApiResponse<List<DisputeQueueItemDto>>> getQueue() {
         List<DisputeQueueItemDto> queue = disputeService.getDisputeQueue();
         return ResponseEntity.ok(ApiResponse.ok(queue, "Lấy hàng đợi tranh chấp thành công"));
+    }
+
+    /**
+     * UC-109 (phân tầng CC): Hàng đợi chỉ gồm đơn đang được giao cho CC này.
+     * GET /api/v1/admin/disputes/queue/mine
+     */
+    @GetMapping("/queue/mine")
+    public ResponseEntity<ApiResponse<List<DisputeQueueItemDto>>> getMyQueue(
+            Authentication authentication
+    ) {
+        UUID actorId = currentUserId(authentication);
+        List<DisputeQueueItemDto> queue = disputeService.getDisputeQueueForCc(actorId);
+        return ResponseEntity.ok(ApiResponse.ok(queue, "Lấy hàng đợi tranh chấp được giao thành công"));
+    }
+
+    /**
+     * UC-99: Danh sách nhân sự Customer Care để chuyển đơn.
+     * GET /api/v1/admin/disputes/customer-care-staff
+     */
+    @GetMapping("/customer-care-staff")
+    public ResponseEntity<ApiResponse<List<CustomerCareStaffDto>>> getCustomerCareStaff() {
+        List<CustomerCareStaffDto> staff = disputeService.getCustomerCareStaff();
+        return ResponseEntity.ok(ApiResponse.ok(staff, "Lấy danh sách nhân sự Chăm sóc khách hàng thành công"));
     }
 
     /**

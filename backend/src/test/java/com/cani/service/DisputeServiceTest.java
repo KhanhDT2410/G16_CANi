@@ -271,6 +271,58 @@ class DisputeServiceTest {
         assertThat(queue.get(1).getId()).isEqualTo(older.getDisputeId());
     }
 
+    @Test
+    @DisplayName("UC-109/102: Đơn ESCALATED phải nằm trong hàng đợi để Admin ra quyết định cuối")
+    void shouldIncludeEscalatedDisputesInQueue() {
+        Dispute escalated = openDispute();
+        escalated.setStatus(DisputeStatus.ESCALATED);
+
+        when(disputeRepository.findByStatusIn(anyList())).thenReturn(List.of(escalated));
+
+        List<DisputeQueueItemDto> queue = disputeService.getDisputeQueue();
+
+        assertThat(queue).hasSize(1);
+        assertThat(queue.get(0).getStatus()).isEqualTo(DisputeStatus.ESCALATED);
+        assertThat(queue.get(0).isEscalated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("UC-109 (phân tầng CC): Hàng đợi riêng chỉ gồm đơn được giao cho CC này")
+    void shouldReturnQueueAssignedToCc() {
+        UUID ccUserId = UUID.randomUUID();
+        Dispute mine = openDispute();
+        mine.setAssignedTo(ccUserId);
+        mine.setStatus(DisputeStatus.INVESTIGATING);
+
+        when(disputeRepository.findByStatusInAndAssignedTo(anyList(), eq(ccUserId)))
+                .thenReturn(List.of(mine));
+
+        List<DisputeQueueItemDto> queue = disputeService.getDisputeQueueForCc(ccUserId);
+
+        assertThat(queue).hasSize(1);
+        assertThat(queue.get(0).getAssignedTo()).isEqualTo(ccUserId);
+        verify(disputeRepository).findByStatusInAndAssignedTo(anyList(), eq(ccUserId));
+    }
+
+    @Test
+    @DisplayName("UC-99: Danh sách CC kèm số đơn đang giao — phục vụ chuyển đơn")
+    void shouldListCustomerCareStaffWithAssignedCount() {
+        UUID ccUserId = UUID.randomUUID();
+        User cc = User.builder().userId(ccUserId).fullName("Lê Thị Hồng").email("hong@cani.vn")
+                .role(UserRole.CUSTOMER_CARE).build();
+
+        when(userRepository.findByRole(UserRole.CUSTOMER_CARE)).thenReturn(List.of(cc));
+        when(disputeRepository.findByStatusInAndAssignedTo(anyList(), eq(ccUserId)))
+                .thenReturn(List.of(openDispute(), openDispute()));
+
+        List<CustomerCareStaffDto> staff = disputeService.getCustomerCareStaff();
+
+        assertThat(staff).hasSize(1);
+        assertThat(staff.get(0).getUserId()).isEqualTo(ccUserId);
+        assertThat(staff.get(0).getFullName()).isEqualTo("Lê Thị Hồng");
+        assertThat(staff.get(0).getAssignedCount()).isEqualTo(2);
+    }
+
     // ------------------------------------------------------------------
 
     private Dispute openDispute() {

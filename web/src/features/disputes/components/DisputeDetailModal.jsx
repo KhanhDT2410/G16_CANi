@@ -11,6 +11,7 @@ const DisputeDetailModal = ({
   onAddEvidence,
   onDecide,
   onEscalate,
+  onTransfer,
 }) => {
   if (!dispute) return null;
 
@@ -24,6 +25,7 @@ const DisputeDetailModal = ({
   const canAddEvidence = dispute.status === 'OPEN' || dispute.status === 'INVESTIGATING';
   const canEscalate = dispute.status === 'RESOLVED' || dispute.status === 'UNVERIFIED';
   const canDecide = dispute.status === 'INVESTIGATING' || dispute.status === 'ESCALATED';
+  const canTransfer = dispute.status === 'OPEN' || dispute.status === 'INVESTIGATING';
 
   return (
     <div className="dispute-modal-overlay" onClick={onClose}>
@@ -168,6 +170,16 @@ const DisputeDetailModal = ({
               onClick={() => onEscalate(dispute)}
             >
               Kháng nghị lên Admin
+            </button>
+          )}
+          {canTransfer && onTransfer && (
+            <button
+              type="button"
+              className="btn-quick-fill"
+              style={{ color: 'var(--color-warning)', borderColor: 'var(--color-warning)', padding: '0.5rem 1rem' }}
+              onClick={() => onTransfer(dispute)}
+            >
+              Chuyển cho CSKH khác
             </button>
           )}
           <button

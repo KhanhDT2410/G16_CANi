@@ -20,6 +20,10 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, UU
 
     Optional<SupportTicket> findByReferenceNo(String referenceNo);
 
+    List<SupportTicket> findByStatusInAndAssignedTo(Collection<TicketStatus> statuses, UUID assignedTo);
+
+    long countByStatusInAndAssignedTo(Collection<TicketStatus> statuses, UUID assignedTo);
+
     long countByStatus(TicketStatus status);
 }
 

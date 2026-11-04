@@ -44,9 +44,21 @@ export const supportTicketApi = {
     return response.data?.data;
   },
 
+  /** SCR-25 (phân tầng CC): Hàng đợi riêng — chỉ phiếu đang được giao cho CC hiện tại */
+  getMyQueue: async () => {
+    const response = await apiClient.get('/v1/admin/support/tickets/queue/mine');
+    return response.data?.data;
+  },
+
+  /** SCR-25 / SCR-26: Danh sách nhân sự Customer Care để chuyển phiếu */
+  getCustomerCareStaff: async () => {
+    const response = await apiClient.get('/v1/admin/support/tickets/customer-care-staff');
+    return response.data?.data;
+  },
+
   /** SCR-25 / SCR-26: Phân công hoặc nhận ticket */
   assignTicket: async (id, targetCcUserId = null) => {
-    const body = targetCcUserId ? { targetCcUserId } : {};
+    const body = targetCcUserId ? { targetCcUserId } : null;
     const response = await apiClient.post(`/v1/admin/support/tickets/${id}/assign`, body);
     return response.data?.data;
   },

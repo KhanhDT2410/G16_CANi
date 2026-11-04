@@ -4,6 +4,8 @@ import { showToast } from '../../../components/common/Toast';
 
 export const useSupportTickets = (initialMode = 'queue') => {
   const [queue, setQueue] = useState([]);
+  const [myQueue, setMyQueue] = useState([]);
+  const [ccStaff, setCcStaff] = useState([]);
   const [myTickets, setMyTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -21,6 +23,33 @@ export const useSupportTickets = (initialMode = 'queue') => {
       setQueue([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Tải hàng đợi riêng: chỉ những phiếu được giao cho CC hiện tại (SCR-25)
+  const loadMyQueue = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await supportTicketApi.getMyQueue();
+      setMyQueue(data || []);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể tải hàng đợi phiếu được giao';
+      showToast(msg, 'warning');
+      setMyQueue([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Tải danh sách nhân sự Customer Care để chuyển phiếu (SCR-25 / SCR-26)
+  const loadCcStaff = useCallback(async () => {
+    try {
+      const data = await supportTicketApi.getCustomerCareStaff();
+      setCcStaff(data || []);
+      return data || [];
+    } catch {
+      setCcStaff([]);
+      return [];
     }
   }, []);
 
@@ -96,9 +125,12 @@ export const useSupportTickets = (initialMode = 'queue') => {
   const assignTicket = async (id, targetCcUserId = null) => {
     try {
       const updated = await supportTicketApi.assignTicket(id, targetCcUserId);
-      showToast('Tiếp nhận phân công phiếu hỗ trợ thành công', 'success');
+      showToast(
+        targetCcUserId ? 'Đã chuyển phiếu hỗ trợ thành công' : 'Tiếp nhận phân công phiếu hỗ trợ thành công',
+        'success'
+      );
       setSelectedTicket(updated);
-      await loadQueue();
+      await Promise.all([loadQueue(), loadMyQueue()]);
       return updated;
     } catch (err) {
       const msg = err.response?.data?.message || 'Không thể phân công phiếu hỗ trợ';
@@ -113,7 +145,7 @@ export const useSupportTickets = (initialMode = 'queue') => {
       const updated = await supportTicketApi.closeTicket(id, rationale);
       showToast('Đã đóng phiếu hỗ trợ thành công', 'success');
       setSelectedTicket(updated);
-      await loadQueue();
+      await Promise.all([loadQueue(), loadMyQueue()]);
       return updated;
     } catch (err) {
       const msg = err.response?.data?.message || 'Không thể đóng phiếu hỗ trợ';
@@ -140,19 +172,25 @@ export const useSupportTickets = (initialMode = 'queue') => {
   useEffect(() => {
     if (initialMode === 'queue') {
       loadQueue();
+      loadMyQueue();
+      loadCcStaff();
     } else {
       loadMyTickets();
     }
-  }, [initialMode, loadQueue, loadMyTickets]);
+  }, [initialMode, loadQueue, loadMyQueue, loadCcStaff, loadMyTickets]);
 
   return {
     queue,
+    myQueue,
+    ccStaff,
     myTickets,
     selectedTicket,
     loading,
     detailLoading,
     setSelectedTicket,
     loadQueue,
+    loadMyQueue,
+    loadCcStaff,
     loadMyTickets,
     loadTicketDetail,
     createTicket,
@@ -162,4 +200,3 @@ export const useSupportTickets = (initialMode = 'queue') => {
     resolveTicket,
   };
 };
-

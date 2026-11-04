@@ -330,7 +330,36 @@ public class SupportTicketService {
         List<SupportTicket> activeTickets = supportTicketRepository.findByStatusInOrderBySlaDeadlineAsc(
                 List.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS)
         );
+        return toQueueItems(activeTickets);
+    }
 
+    /**
+     * SCR-25 (phân tầng CC): Hàng đợi chỉ gồm các phiếu đang được giao cho CC này.
+     */
+    public List<SupportTicketQueueItemDto> getQueueForCc(UUID ccUserId) {
+        List<SupportTicket> activeTickets = supportTicketRepository.findByStatusInAndAssignedTo(
+                List.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS), ccUserId
+        );
+        return toQueueItems(activeTickets);
+    }
+
+    /**
+     * SCR-25 / SCR-26: Danh sách nhân sự Customer Care kèm số lượng phiếu đang xử lý để cân bằng tải.
+     */
+    public List<CustomerCareStaffDto> getCustomerCareStaff() {
+        return userRepository.findByRole(UserRole.CUSTOMER_CARE).stream()
+                .map(cc -> CustomerCareStaffDto.builder()
+                        .userId(cc.getUserId())
+                        .fullName(cc.getFullName())
+                        .email(cc.getEmail())
+                        .assignedCount(supportTicketRepository.countByStatusInAndAssignedTo(
+                                List.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS), cc.getUserId()
+                        ))
+                        .build())
+                .toList();
+    }
+
+    private List<SupportTicketQueueItemDto> toQueueItems(List<SupportTicket> activeTickets) {
         Instant now = Instant.now();
         Instant riskThreshold = now.plus(24, ChronoUnit.HOURS);
 

@@ -16,16 +16,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Service xử lý nghiệp vụ Dispute & Resolution (SRS FE-11, UC-96 → UC-104).
  *
  * Quy trình:
- * - Worker/EO nộp tranh chấp (UC-96, BR-52: cửa sổ 14 ngày, mô tả tối thiểu 50 ký tự)
+ * - Worker/EO nộp tranh chấp (UC-96, BR-52: cửa sổ 14 ngày, mô tả tối thiểu 50
+ * ký tự)
  * - Nạp bằng chứng (UC-98)
  * - CC nhận đơn và điều tra (UC-99, BR-53 SLA)
- * - CC ra quyết định (UC-100) → bên thua có quyền khiếu nại trong 7 ngày (UC-101, BR-54)
+ * - CC ra quyết định (UC-100) → bên thua có quyền khiếu nại trong 7 ngày
+ * (UC-101, BR-54)
  * - Admin quyết định cuối (UC-102, BR-68, ràng buộc không khiếu nại thêm)
  * - Penalty RS tự động khi quyết định WORKER_FAULT (UC-103, BR-55: −10 điểm)
  */
@@ -37,7 +38,9 @@ public class DisputeService {
 
     /** BR-52: tranh chấp chỉ được nộp trong 14 ngày kể từ khi ca kết thúc. */
     private static final int DISPUTE_WINDOW_DAYS = 14;
-    /** BR-53: CC ra quyết định trong 7 ngày làm việc (xấp xỉ 7 ngày lịch trong MVP). */
+    /**
+     * BR-53: CC ra quyết định trong 7 ngày làm việc (xấp xỉ 7 ngày lịch trong MVP).
+     */
     private static final int CC_DECISION_SLA_DAYS = 7;
     /** BR-54: bên liên quan được khiếu nại quyết định CC trong 7 ngày. */
     private static final int ESCALATION_WINDOW_DAYS = 7;
@@ -60,10 +63,11 @@ public class DisputeService {
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
-    private static final List<DisputeStatus> OPEN_STATUSES =
-            List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING);
-    private static final List<DisputeStatus> RESOLVED_STATUSES =
-            List.of(DisputeStatus.RESOLVED, DisputeStatus.UNVERIFIED);
+    private static final List<DisputeStatus> OPEN_STATUSES = List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING);
+    private static final List<DisputeStatus> QUEUE_STATUSES = List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING,
+            DisputeStatus.ESCALATED);
+    private static final List<DisputeStatus> RESOLVED_STATUSES = List.of(DisputeStatus.RESOLVED,
+            DisputeStatus.UNVERIFIED);
 
     // =========================================================================
     // UC-96: Nộp tranh chấp (Worker / Event Organizer)
@@ -118,9 +122,9 @@ public class DisputeService {
 
     public DisputeDetailResponseDto getDisputeDetail(UUID disputeId, UUID requesterId) {
         Dispute dispute = getDisputeOrThrow(disputeId);
-        DisputeStatus status = dispute.getStatus();
 
-        boolean isParty = dispute.getComplainantId().equals(requesterId) || dispute.getRespondentId().equals(requesterId);
+        boolean isParty = dispute.getComplainantId().equals(requesterId)
+                || dispute.getRespondentId().equals(requesterId);
         if (isParty) {
             return toDetailDto(dispute);
         }
@@ -239,7 +243,8 @@ public class DisputeService {
         if (targetCcUserId != null) {
             User target = currentUserOrThrow(assigneeId);
             if (target.getRole() != UserRole.CUSTOMER_CARE && target.getRole() != UserRole.ADMIN) {
-                throw new BadRequestException("Người nhận phân công phải có vai trò Chăm sóc khách hàng hoặc Quản trị viên");
+                throw new BadRequestException(
+                        "Người nhận phân công phải có vai trò Chăm sóc khách hàng hoặc Quản trị viên");
             }
         }
 
@@ -267,17 +272,50 @@ public class DisputeService {
     }
 
     // =========================================================================
-    // UC-99/109: Hàng đợi tranh chấp cho CC (BR-57: ưu tiên = SLA rủi ro, rồi đến nộp cũ nhất)
+    // UC-99/109: Hàng đợi tranh chấp cho CC (BR-57: ưu tiên = SLA rủi ro, rồi đến
+    // nộp cũ nhất)
     // =========================================================================
 
     public List<DisputeQueueItemDto> getDisputeQueue() {
         Instant slaRiskCutoff = Instant.now().plus(Duration.ofHours(24));
-        return disputeRepository.findByStatusIn(OPEN_STATUSES).stream()
+        return disputeRepository.findByStatusIn(QUEUE_STATUSES).stream()
                 .sorted(Comparator
-                        .<Dispute>comparingInt(d -> slaAtRisk(d, slaRiskCutoff) ? 0 : 1)
+                        .<Dispute>comparingInt(d -> d.getStatus() == DisputeStatus.ESCALATED ? 0
+                                : (slaAtRisk(d, slaRiskCutoff) ? 1 : 2))
                         .thenComparing(Dispute::getCreatedAt,
                                 Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(d -> toQueueItemDto(d, slaRiskCutoff))
+                .toList();
+    }
+
+    /**
+     * UC-109 (phân tầng CC): Hàng đợi chỉ gồm đơn đang được giao cho CC này.
+     */
+    public List<DisputeQueueItemDto> getDisputeQueueForCc(UUID ccUserId) {
+        Instant slaRiskCutoff = Instant.now().plus(Duration.ofHours(24));
+        return disputeRepository.findByStatusInAndAssignedTo(QUEUE_STATUSES, ccUserId).stream()
+                .sorted(Comparator
+                        .<Dispute>comparingInt(d -> d.getStatus() == DisputeStatus.ESCALATED ? 0
+                                : (slaAtRisk(d, slaRiskCutoff) ? 1 : 2))
+                        .thenComparing(Dispute::getCreatedAt,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(d -> toQueueItemDto(d, slaRiskCutoff))
+                .toList();
+    }
+
+    /**
+     * UC-99: Danh sách nhân sự Customer Care kèm số lượng đơn đang giao để phục vụ
+     * chuyển đơn.
+     */
+    public List<CustomerCareStaffDto> getCustomerCareStaff() {
+        return userRepository.findByRole(UserRole.CUSTOMER_CARE).stream()
+                .map(cc -> CustomerCareStaffDto.builder()
+                        .userId(cc.getUserId())
+                        .fullName(cc.getFullName())
+                        .email(cc.getEmail())
+                        .assignedCount(disputeRepository.findByStatusInAndAssignedTo(
+                                QUEUE_STATUSES, cc.getUserId()).size())
+                        .build())
                 .toList();
     }
 
@@ -304,11 +342,13 @@ public class DisputeService {
                 : (request.getOutcome() == DisputeOutcome.UNVERIFIED ? DisputeStatus.UNVERIFIED
                         : DisputeStatus.RESOLVED);
 
-        // BR-55: tự động trừ −10 RS nếu kết quả tìm thấy lỗi thuộc về Worker (trừ khi được miễn)
+        // BR-55: tự động trừ −10 RS nếu kết quả tìm thấy lỗi thuộc về Worker (trừ khi
+        // được miễn)
         boolean penaltyWaived = request.getPenaltyWaiverReason() != null
                 && !request.getPenaltyWaiverReason().isBlank();
         boolean penaltyApplied = false;
-        if (request.getOutcome() == DisputeOutcome.WORKER_FAULT && !penaltyWaived && !Boolean.TRUE.equals(dispute.getRsPenaltyApplied())) {
+        if (request.getOutcome() == DisputeOutcome.WORKER_FAULT && !penaltyWaived
+                && !Boolean.TRUE.equals(dispute.getRsPenaltyApplied())) {
             penaltyApplied = applyWorkerRsPenalty(dispute, actorId, request.getRationale());
             dispute.setRsPenaltyApplied(true);
         }
@@ -348,8 +388,10 @@ public class DisputeService {
     // =========================================================================
 
     /**
-     * BR-55/BR-61: khấu trừ −10 điểm RS của Worker khi bị kết tội, ghi ReliabilityLog,
-     * chận trong [0,100]. Không thay đổi gì nếu worker không tồn tại (ví dụ tài khoản đã bị xóa).
+     * BR-55/BR-61: khấu trừ −10 điểm RS của Worker khi bị kết tội, ghi
+     * ReliabilityLog,
+     * chận trong [0,100]. Không thay đổi gì nếu worker không tồn tại (ví dụ tài
+     * khoản đã bị xóa).
      */
     private boolean applyWorkerRsPenalty(Dispute dispute, UUID decidedBy, String rationale) {
         UUID workerPartyId = resolveWorkerPartyId(dispute.getComplainantId(), dispute.getRespondentId());
@@ -425,7 +467,8 @@ public class DisputeService {
     }
 
     /**
-     * Xác định hai bên của một ca làm việc: complainant = user gọi API, respondent = bên còn lại.
+     * Xác định hai bên của một ca làm việc: complainant = user gọi API, respondent
+     * = bên còn lại.
      */
     private PartyRef resolveParties(UUID requesterId, ShiftAssignment assignment) {
         boolean requesterIsWorker = workerRepository.findByUser_UserId(requesterId).isPresent();
@@ -436,7 +479,8 @@ public class DisputeService {
         }
 
         UUID workerUserId = assignment.getWorker() != null && assignment.getWorker().getUser() != null
-                ? assignment.getWorker().getUser().getUserId() : null;
+                ? assignment.getWorker().getUser().getUserId()
+                : null;
         UUID eoUserId = null;
         if (assignment.getShift() != null && assignment.getShift().getEvent() != null
                 && assignment.getShift().getEvent().getEventOrganizer() != null
@@ -506,8 +550,8 @@ public class DisputeService {
     }
 
     private void notifyCcTeam(Dispute dispute) {
-        userRepository.findByRole(UserRole.CUSTOMER_CARE).forEach(cc ->
-                saveNotification(cc, "Có tranh chấp mới trong hàng đợi",
+        userRepository.findByRole(UserRole.CUSTOMER_CARE)
+                .forEach(cc -> saveNotification(cc, "Có tranh chấp mới trong hàng đợi",
                         "Tranh chấp " + dispute.getDisputeId() + " (" + dispute.getType() + ") đang chờ phân công.",
                         dispute));
     }
@@ -517,7 +561,7 @@ public class DisputeService {
     // ------------------------------------------------------------------
 
     private void recordAudit(UUID actorUserId, String action, Dispute dispute,
-                             Map<String, String> oldValues, Map<String, String> newValues) {
+            Map<String, String> oldValues, Map<String, String> newValues) {
         try {
             AuditLog entry = AuditLog.builder()
                     .userId(actorUserId)
@@ -549,7 +593,7 @@ public class DisputeService {
                                 .createdAt(e.getCreatedAt())
                                 .build())
                         .toList();
-
+                        
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())
                 .assignmentId(dispute.getAssignmentId())
@@ -585,7 +629,7 @@ public class DisputeService {
                 .complainantId(dispute.getComplainantId())
                 .respondentId(dispute.getRespondentId())
                 .assignedTo(dispute.getAssignedTo())
-                .escalated(false)
+                .escalated(dispute.getStatus() == DisputeStatus.ESCALATED)
                 .slaAtRisk(slaAtRisk(dispute, slaRiskCutoff))
                 .build();
     }

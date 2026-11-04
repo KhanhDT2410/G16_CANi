@@ -41,6 +41,7 @@ const MainLayout = () => {
       default:
         return [
           { path: '/eo', label: 'Ban Tổ Chức (EO)' },
+          { path: '/support', label: 'Trung Tâm Hỗ Trợ' },
           ...commonItems,
         ];
     }

@@ -5,6 +5,8 @@ import { showToast } from '../../../components/common/Toast';
 export const useDisputes = (initialTab = 'queue') => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [queue, setQueue] = useState([]);
+  const [myQueue, setMyQueue] = useState([]);
+  const [ccStaff, setCcStaff] = useState([]);
   const [myDisputes, setMyDisputes] = useState([]);
   const [selectedDispute, setSelectedDispute] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -22,6 +24,31 @@ export const useDisputes = (initialTab = 'queue') => {
       setQueue([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Tải hàng đợi riêng: chỉ những đơn đang được giao cho CC hiện tại (UC-109)
+  const loadMyQueue = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await disputeApi.getMyDisputeQueue();
+      setMyQueue(data || []);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể tải hàng đợi tranh chấp được giao';
+      showToast(msg, 'warning');
+      setMyQueue([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Danh sách nhân sự CC để chuyển đơn (UC-99)
+  const loadCcStaff = useCallback(async () => {
+    try {
+      const data = await disputeApi.getCustomerCareStaff();
+      setCcStaff(data || []);
+    } catch {
+      setCcStaff([]);
     }
   }, []);
 
@@ -86,13 +113,19 @@ export const useDisputes = (initialTab = 'queue') => {
     }
   };
 
-  // UC-99: Phân công hoặc tự nhận xử lý
+  // UC-99: Phân công hoặc tự nhận xử lý (targetCcUserId = null → tự nhận)
   const assignDispute = async (disputeId, targetCcUserId = null) => {
     try {
       const updated = await disputeApi.assignDispute(disputeId, targetCcUserId);
-      showToast('Đã tiếp nhận phân công xử lý tranh chấp', 'success');
+      showToast(
+        targetCcUserId
+          ? 'Đã chuyển tranh chấp cho nhân sự phụ trách'
+          : 'Đã tiếp nhận phân công xử lý tranh chấp',
+        'success'
+      );
       setSelectedDispute(updated);
       loadQueue();
+      loadMyQueue();
       return updated;
     } catch (err) {
       const msg = err.response?.data?.message || 'Lỗi khi phân công tranh chấp';
@@ -136,21 +169,27 @@ export const useDisputes = (initialTab = 'queue') => {
   useEffect(() => {
     if (activeTab === 'queue') {
       loadQueue();
+    } else if (activeTab === 'my-queue') {
+      loadMyQueue();
     } else if (activeTab === 'my') {
       loadMyDisputes();
     }
-  }, [activeTab, loadQueue, loadMyDisputes]);
+  }, [activeTab, loadQueue, loadMyQueue, loadMyDisputes]);
 
   return {
     activeTab,
     setActiveTab,
     queue,
+    myQueue,
+    ccStaff,
     myDisputes,
     selectedDispute,
     setSelectedDispute,
     loading,
     detailLoading,
     loadQueue,
+    loadMyQueue,
+    loadCcStaff,
     loadMyDisputes,
     loadDisputeDetail,
     createDispute,

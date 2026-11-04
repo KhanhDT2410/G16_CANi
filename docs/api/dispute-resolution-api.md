@@ -104,7 +104,38 @@ OPEN ──CC nhận/chuyển đơn (UC-99)──> INVESTIGATING ──CC quyế
 ### 3.1. Hàng đợi tranh chấp (UC-109, BR-57)
 
 * **Endpoint:** `GET /api/v1/admin/disputes/queue`
-* **Response:** danh sách `DisputeQueueItemDto` (trạng thái `OPEN`/`INVESTIGATING`), sắp xếp: đơn có rủi ro SLA (`slaAtRisk = true`, còn <24h đến hạn) trước, rồi theo thời gian nộp cũ nhất.
+* **Phạm vi:** đơn `OPEN` / `INVESTIGATING` / **`ESCALATED`** (đơn kháng nghị phải ở trong hàng đợi để Admin ra quyết định cuối — UC-102/BR-68).
+* **Response:** danh sách `DisputeQueueItemDto` (trạng thái kể trên), sắp xếp: đơn có rủi ro SLA (`slaAtRisk = true`, còn <24h đến hạn) trước, rồi theo thời gian nộp cũ nhất. Cờ `escalated` = `true` với đơn đang ở `ESCALATED`.
+
+#### 3.1.1. Hàng đợi riêng theo CC (phân tầng vận hành)
+
+* **Endpoint:** `GET /api/v1/admin/disputes/queue/mine`
+* Khi đội CC có nhiều người, mỗi CC chỉ thấy đơn đang được giao cho mình (`assignedTo = user hiện tại`), cùng 3 trạng thái và thứ tự ưu tiên như hàng đợi chung.
+
+#### 3.1.2. Danh sách nhân sự CC (phục vụ chuyển đơn — UC-99)
+
+* **Endpoint:** `GET /api/v1/admin/disputes/customer-care-staff`
+* **Response:** `CustomerCareStaffDto[]`:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "userId": "f515d13e-5f0b-406b-ae4c-f0caf64c422f",
+      "fullName": "Lê Thị Hồng",
+      "email": "hong@cani.vn",
+      "assignedCount": 3
+    }
+  ]
+}
+```
+| Trường | Kiểu | Mô tả |
+| :--- | :--- | :--- |
+| `userId` | UUID | dùng làm `targetCcUserId` khi gọi endpoint assign |
+| `fullName` / `email` | string | hiển thị dropdown |
+| `assignedCount` | long | số đơn đang giao (mở + đang điều tra + kháng nghị) để cân bằng tải |
+
+> **UI:** FE thêm nút "Chuyển" trong hàng đợi/chi tiết tranh chấp (chỉ OPEN/INVESTIGATING) + tab lọc "Được giao tôi" — dùng các endpoint trên.
 
 ### 3.2. Gán / chuyển đơn (UC-99)
 
@@ -112,6 +143,7 @@ OPEN ──CC nhận/chuyển đơn (UC-99)──> INVESTIGATING ──CC quyế
 * **Body (tuỳ chọn):** `{ "targetCcUserId": "<uuid-cc-khác>" }` — bỏ trống = **CC tự nhận**.
 * Đơn `OPEN` được nhận → tự chuyển `INVESTIGATING`. Người nhận phải là role CC/ADMIN (nếu chỉ định).
 * Đơn đã quyết định / đã escalate → **400**.
+* Dùng `GET /v1/admin/disputes/customer-care-staff` để lấy danh sách CC nhận đơn (mục 3.1.2).
 
 ### 3.3. Ra quyết định (UC-100 cho CC · UC-102 cho Admin)
 

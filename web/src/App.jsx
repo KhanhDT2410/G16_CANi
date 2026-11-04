@@ -9,6 +9,7 @@ const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const CustomerCarePage = lazy(() => import('./pages/customer-care/CustomerCarePage'));
 const MobileShowcasePage = lazy(() => import('./pages/mobile-preview/MobileShowcasePage'));
+const SupportPage = lazy(() => import('./pages/support/SupportPage'));
 
 function PageFallback() {
   return (
@@ -44,6 +45,7 @@ function App() {
             <Route path="mobile-preview" element={<MobileShowcasePage />} />
             <Route path="customer-care" element={<CustomerCarePage />} />
             <Route path="admin" element={<AdminPage />} />
+            <Route path="support" element={<SupportPage />} />
             {/* Fallback route cho duong dan cu /cskh */}
             <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
           </Route>

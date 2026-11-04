@@ -15,8 +15,8 @@ class ProfileSecurityBlock extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Theme.of(context).profileX;
     final user = ref.watch(authStateProvider).user;
-    final hasVerifiedEmail = user?.email != null && user!.email.isNotEmpty;
-    final badgeText = hasVerifiedEmail ? 'Đã bảo vệ' : 'Cần cập nhật';
+    final hasVerifiedEmail = user?.emailVerified ?? false;
+    final badgeText = hasVerifiedEmail ? 'Đã bảo vệ' : 'Chưa xác thực email';
     final badgeBg = hasVerifiedEmail ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7);
     final badgeBorder = hasVerifiedEmail ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A);
     final badgeColor = hasVerifiedEmail ? const Color(0xFF15803D) : const Color(0xFFB45309);

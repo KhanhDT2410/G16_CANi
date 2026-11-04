@@ -33,7 +33,16 @@ class _WorkerProfileScreenState extends ConsumerState<WorkerProfileScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _refreshProfileData();
+      // Tránh double-fetch: Constructor của notifiers đã tự fetch khi lazy-init.
+      // Chỉ chủ động kích hoạt nếu state hiện đang rỗng và không trong quá trình tải.
+      final skillState = ref.read(skillVerificationProvider);
+      final ekycState = ref.read(ekycProvider);
+      if (skillState.skillPoints.isEmpty && !skillState.isLoading) {
+        ref.read(skillVerificationProvider.notifier).loadAll();
+      }
+      if (ekycState.result == null && !ekycState.isLoading) {
+        ref.read(ekycProvider.notifier).checkStatus();
+      }
     });
   }
 

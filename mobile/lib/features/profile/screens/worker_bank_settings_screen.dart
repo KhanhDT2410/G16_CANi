@@ -87,13 +87,14 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
         ),
       );
     } catch (e) {
+      debugPrint('Lỗi lưu thông tin ngân hàng vào storage: $e');
       if (!mounted) return;
       setState(() => _isSaving = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi khi lưu thông tin: $e'),
-          backgroundColor: const Color(0xFFDC2626),
+        const SnackBar(
+          content: Text('Không thể lưu thông tin vào thiết bị. Vui lòng thử lại.'),
+          backgroundColor: Color(0xFFDC2626),
         ),
       );
     }

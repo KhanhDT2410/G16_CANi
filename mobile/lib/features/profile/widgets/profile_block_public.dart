@@ -66,7 +66,9 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
                   setState(() => _isPublic = val);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(val ? 'Đã bật chế độ sẵn sàng nhận ca trên Radar' : 'Đã ẩn hồ sơ khỏi Radar tìm việc'),
+                      content: Text(val
+                          ? 'Đã bật chế độ sẵn sàng nhận ca trên Radar (Chế độ Demo)'
+                          : 'Đã ẩn hồ sơ khỏi Radar tìm việc (Chế độ Demo)'),
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -102,7 +104,7 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
                     Clipboard.setData(ClipboardData(text: profileUrl));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Đã sao chép link hồ sơ cá nhân vào clipboard!'),
+                        content: Text('Đã sao chép link hồ sơ cá nhân (Tính năng Web Demo)!'),
                         duration: Duration(seconds: 2),
                       ),
                     );

@@ -3,14 +3,11 @@ package com.cani.controller;
 import com.cani.dto.event.*;
 import com.cani.dto.response.ApiResponse;
 import com.cani.entity.Review;
-import com.cani.entity.User;
-import com.cani.exception.AppException;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.EoEventService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -35,10 +32,9 @@ public class EoEventController {
     @PostMapping
     public ResponseEntity<ApiResponse<EventResponseDto>> createEvent(
             @Valid @RequestBody CreateEventRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EventResponseDto created = eoEventService.createEvent(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(created, "Tạo sự kiện thành công (Trạng thái: DRAFT). Hãy thêm các ca làm việc và xuất bản sự kiện để mở tìm nhân sự."));
     }
@@ -51,10 +47,9 @@ public class EoEventController {
     public ResponseEntity<ApiResponse<EventResponseDto>> updateEvent(
             @PathVariable("eventId") UUID eventId,
             @Valid @RequestBody UpdateEventRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EventResponseDto updated = eoEventService.updateEvent(userId, eventId, request);
         return ResponseEntity.ok(ApiResponse.ok(updated, "Cập nhật sự kiện thành công!"));
     }
@@ -67,10 +62,9 @@ public class EoEventController {
     public ResponseEntity<ApiResponse<EventResponseDto>> cancelEvent(
             @PathVariable("eventId") UUID eventId,
             @RequestBody(required = false) Map<String, String> body,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         String reason = body != null ? body.get("reason") : "Ban tổ chức hủy sự kiện";
         EventResponseDto cancelled = eoEventService.cancelEvent(userId, eventId, reason);
         return ResponseEntity.ok(ApiResponse.ok(cancelled, "Đã hủy sự kiện thành công!"));
@@ -84,10 +78,9 @@ public class EoEventController {
     public ResponseEntity<ApiResponse<ShiftResponseDto>> addShift(
             @PathVariable("eventId") UUID eventId,
             @Valid @RequestBody CreateShiftRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftResponseDto shift = eoEventService.addShiftToEvent(userId, eventId, request);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Thêm ca làm việc thành công vào sự kiện."));
     }
@@ -100,10 +93,9 @@ public class EoEventController {
     public ResponseEntity<ApiResponse<ShiftResponseDto>> updateShift(
             @PathVariable("shiftId") UUID shiftId,
             @Valid @RequestBody UpdateShiftRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftResponseDto shift = eoEventService.updateShift(userId, shiftId, request);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Cập nhật ca làm việc thành công!"));
     }
@@ -116,10 +108,9 @@ public class EoEventController {
     public ResponseEntity<ApiResponse<ShiftResponseDto>> cancelShift(
             @PathVariable("shiftId") UUID shiftId,
             @RequestBody(required = false) Map<String, String> body,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         String reason = body != null ? body.get("reason") : "Ban tổ chức hủy ca";
         ShiftResponseDto shift = eoEventService.cancelShift(userId, shiftId, reason);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Đã hủy ca làm việc thành công!"));
@@ -132,10 +123,9 @@ public class EoEventController {
     @GetMapping("/shifts/{shiftId}/qr")
     public ResponseEntity<ApiResponse<ShiftQrCodeResponseDto>> getShiftQr(
             @PathVariable("shiftId") UUID shiftId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftQrCodeResponseDto qr = eoEventService.generateShiftQr(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(qr, "Lấy mã QR điểm danh ca thành công!"));
     }
@@ -147,10 +137,9 @@ public class EoEventController {
     @GetMapping("/shifts/{shiftId}/attendance")
     public ResponseEntity<ApiResponse<List<ShiftAttendanceDto>>> getShiftAttendance(
             @PathVariable("shiftId") UUID shiftId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<ShiftAttendanceDto> attendanceList = eoEventService.getShiftAttendanceList(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(attendanceList, "Lấy danh sách điểm danh ca thành công!"));
     }
@@ -162,10 +151,9 @@ public class EoEventController {
     @PostMapping("/assignments/{assignmentId}/verify")
     public ResponseEntity<ApiResponse<ShiftAttendanceDto>> verifyAttendance(
             @PathVariable("assignmentId") UUID assignmentId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftAttendanceDto verified = eoEventService.verifyAttendance(userId, assignmentId);
         return ResponseEntity.ok(ApiResponse.ok(verified, "Xác nhận hoàn thành ca và duyệt công cho Worker thành công!"));
     }
@@ -178,10 +166,9 @@ public class EoEventController {
     public ResponseEntity<ApiResponse<Review>> rateWorker(
             @PathVariable("assignmentId") UUID assignmentId,
             @Valid @RequestBody CreateEoReviewRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         Review review = eoEventService.rateWorker(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(review, "Đã gửi đánh giá Worker thành công!"));
     }
@@ -192,10 +179,9 @@ public class EoEventController {
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping
     public ResponseEntity<ApiResponse<List<EventResponseDto>>> getMyEvents(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<EventResponseDto> list = eoEventService.getMyEvents(userId);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách sự kiện thành công"));
     }
@@ -207,10 +193,9 @@ public class EoEventController {
     @GetMapping("/{eventId}")
     public ResponseEntity<ApiResponse<EventResponseDto>> getEventDetail(
             @PathVariable("eventId") UUID eventId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EventResponseDto detail = eoEventService.getEventDetail(userId, eventId);
         return ResponseEntity.ok(ApiResponse.ok(detail, "Lấy chi tiết sự kiện thành công"));
     }
@@ -222,10 +207,9 @@ public class EoEventController {
     @PostMapping("/{eventId}/publish")
     public ResponseEntity<ApiResponse<EventResponseDto>> publishEvent(
             @PathVariable("eventId") UUID eventId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EventResponseDto published = eoEventService.publishEvent(userId, eventId);
         return ResponseEntity.ok(ApiResponse.ok(published, "Xuất bản sự kiện thành công! Hệ thống đang tự động điều phối Matching tìm Worker phù hợp."));
     }
@@ -237,30 +221,10 @@ public class EoEventController {
     @PostMapping("/shifts/{shiftId}/publish")
     public ResponseEntity<ApiResponse<ShiftResponseDto>> publishShift(
             @PathVariable("shiftId") UUID shiftId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftResponseDto shift = eoEventService.publishShift(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Kích hoạt điều phối tìm Worker cho ca làm việc thành công!"));
-    }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        UUID callerId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            callerId = u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
-            try {
-                callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        if (callerId == null) {
-            throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
-        }
-        // An toàn: chặn IDOR — chỉ được thao tác với đúng userId của người đang đăng nhập.
-        if (explicitUserId != null && !explicitUserId.equals(callerId)) {
-            throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
-        }
-        return callerId;
     }
 }

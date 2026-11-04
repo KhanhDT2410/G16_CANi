@@ -2,13 +2,10 @@ package com.cani.controller;
 
 import com.cani.dto.notification.NotificationResponseDto;
 import com.cani.dto.response.ApiResponse;
-import com.cani.entity.User;
-import com.cani.exception.AppException;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -29,10 +26,9 @@ public class NotificationController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<NotificationResponseDto>>> getMyNotifications(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<NotificationResponseDto> list = notificationService.getMyNotifications(userId);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách thông báo thành công"));
     }
@@ -42,10 +38,9 @@ public class NotificationController {
      */
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponse<Long>> getUnreadCount(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         long count = notificationService.getUnreadCount(userId);
         return ResponseEntity.ok(ApiResponse.ok(count, "Lấy số lượng thông báo chưa đọc thành công"));
     }
@@ -56,10 +51,9 @@ public class NotificationController {
     @PatchMapping("/{id}/read")
     public ResponseEntity<ApiResponse<Void>> markAsRead(
             @PathVariable("id") UUID notificationId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         notificationService.markAsRead(userId, notificationId);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã đánh dấu thông báo là đã đọc"));
     }
@@ -69,30 +63,10 @@ public class NotificationController {
      */
     @PatchMapping("/read-all")
     public ResponseEntity<ApiResponse<Void>> markAllAsRead(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         notificationService.markAllAsRead(userId);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã đánh dấu tất cả thông báo là đã đọc"));
-    }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        UUID callerId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            callerId = u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
-            try {
-                callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        if (callerId == null) {
-            throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
-        }
-        // An toàn: chặn IDOR — chỉ được thao tác với đúng userId của người đang đăng nhập.
-        if (explicitUserId != null && !explicitUserId.equals(callerId)) {
-            throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
-        }
-        return callerId;
     }
 }

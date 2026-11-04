@@ -19,6 +19,7 @@ import 'package:cani/features/profile/widgets/profile_block_settings.dart';
 import 'package:cani/features/profile/widgets/profile_block_trust.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
 import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
+import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
 import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 
 class WorkerProfileScreen extends ConsumerStatefulWidget {

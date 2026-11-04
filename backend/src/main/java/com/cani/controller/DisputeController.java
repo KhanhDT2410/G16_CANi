@@ -3,14 +3,11 @@ package com.cani.controller;
 import com.cani.dto.dispute.CreateDisputeRequestDto;
 import com.cani.dto.dispute.DisputeResponseDto;
 import com.cani.dto.response.ApiResponse;
-import com.cani.entity.User;
-import com.cani.exception.AppException;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.DisputeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -37,10 +34,9 @@ public class DisputeController {
     @PostMapping
     public ResponseEntity<ApiResponse<DisputeResponseDto>> submitDispute(
             @Valid @RequestBody CreateDisputeRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeResponseDto response = disputeService.submitDispute(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Đã gửi khiếu nại thành công! Ban Chăm sóc Khách hàng (Customer Care) sẽ tiếp nhận xử lý trong vòng 24 giờ."));
     }
@@ -51,10 +47,9 @@ public class DisputeController {
     @PreAuthorize("hasAnyRole('WORKER', 'EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<DisputeResponseDto>>> getMyDisputes(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<DisputeResponseDto> list = disputeService.getMyDisputes(userId);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách khiếu nại thành công"));
     }
@@ -66,30 +61,10 @@ public class DisputeController {
     @GetMapping("/{disputeId}")
     public ResponseEntity<ApiResponse<DisputeResponseDto>> getDisputeDetail(
             @PathVariable("disputeId") UUID disputeId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeResponseDto response = disputeService.getDisputeDetail(userId, disputeId);
         return ResponseEntity.ok(ApiResponse.ok(response, "Lấy chi tiết khiếu nại thành công"));
     }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        UUID callerId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            callerId = u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
-            try {
-                callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        if (callerId == null) {
-            throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
-        }
-        if (explicitUserId != null && !explicitUserId.equals(callerId)) {
-            throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
-        }
-        return callerId;
-    }
 }
-

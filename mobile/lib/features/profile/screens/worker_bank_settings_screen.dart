@@ -76,7 +76,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
       _accountNumberCtrl.text = savedAccount ?? '';
       _accountNameCtrl.text = (savedName != null && savedName.isNotEmpty)
           ? savedName
-          : (user?.fullName?.toUpperCase() ?? '');
+          : (user?.fullName.toUpperCase() ?? '');
       _isLoading = false;
     });
   }

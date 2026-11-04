@@ -345,7 +345,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
               backgroundColor: Color(0xFF16A34A),
             ),
           );
-          _loadData();
+          _loadAllData();
         }
       } catch (err) {
         if (mounted) {

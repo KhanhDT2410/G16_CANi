@@ -5,7 +5,7 @@ import { showToast } from '../../../components/common/Toast';
  * EOAnalyticsTab
  * Màn hình Báo cáo & Thống kê Hiệu Quả Tổ Chức Sự Kiện (Clean Enterprise UI)
  */
-export default function EOAnalyticsTab({ events = [], payments = [] }) {
+export default function EOAnalyticsTab({ events = [], payments = [], onOpenVoucherModal }) {
   const [timeRange, setTimeRange] = useState('ALL');
 
   // Tính toán các chỉ số thống kê tổng hợp
@@ -114,6 +114,24 @@ export default function EOAnalyticsTab({ events = [], payments = [] }) {
               onClick={handleExportCSV}
             >
               Xuất Báo Cáo (.CSV)
+            </button>
+
+            <button
+              type="button"
+              style={{
+                backgroundColor: '#059669',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 6,
+                padding: '0.5rem 1rem',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              onClick={onOpenVoucherModal}
+              title="Xuất phiếu chi thù lao Mẫu số 02-TT / NĐ 52/2024/NĐ-CP"
+            >
+              Xuất Phiếu Chi (PDF)
             </button>
           </div>
         </div>

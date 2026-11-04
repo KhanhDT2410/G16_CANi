@@ -341,4 +341,18 @@ export const eoService = {
     const response = await apiClient.post(`/v1/eo/subscriptions/payos-confirm/${orderCode}`);
     return response.data?.data;
   },
+
+  // ==========================================
+  // BONUS 1: EMERGENCY BROADCAST POOL (SECTION 11 CANi_Flow_v8.txt)
+  // ==========================================
+  triggerEmergencyBroadcast: async (shiftId, emergencyData = {}) => {
+    try {
+      const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, emergencyData);
+      return response.data?.data;
+    } catch {
+      // Fallback tự động gọi dispatch chuẩn kèm metadata
+      const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`, emergencyData);
+      return response.data?.data;
+    }
+  },
 };

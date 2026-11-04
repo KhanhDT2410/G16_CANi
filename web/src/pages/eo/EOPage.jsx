@@ -18,6 +18,7 @@ import EoProfileTab from './components/EoProfileTab';
 import EOAnalyticsTab from './components/EOAnalyticsTab';
 import EOSettingsTab from './components/EOSettingsTab';
 import EOModals from './components/EOModals';
+import SettlementVoucherModal from './components/SettlementVoucherModal';
 
 import './EOPage.css';
 
@@ -103,6 +104,8 @@ export default function EOPage() {
     isOpen: false,
     assignment: null,
   });
+
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
 
   const handleNavClick = (navKey) => {
     setActiveNav(navKey);
@@ -246,6 +249,7 @@ export default function EOPage() {
                 payments.setShowPaymentModal(true);
               }}
               onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
+              onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
             />
           )}
 
@@ -254,7 +258,11 @@ export default function EOPage() {
           {(activeTab === 'profile' || activeTab === 'ekyc') && <EoProfileTab />}
 
           {activeTab === 'analytics' && (
-            <EOAnalyticsTab events={events.events} payments={payments.payments} />
+            <EOAnalyticsTab
+              events={events.events}
+              payments={payments.payments}
+              onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
+            />
           )}
 
           {activeTab === 'settings' && (
@@ -275,6 +283,20 @@ export default function EOPage() {
         setInviteModal={setInviteModal}
         disputeModal={disputeModal}
         setDisputeModal={setDisputeModal}
+      />
+
+      {/* Modal Xuất Phiếu Chi Thù Lao & Quyết Toán Kế Toán (Mẫu 02-TT / NĐ 52/2024/NĐ-CP) */}
+      <SettlementVoucherModal
+        isOpen={isVoucherModalOpen}
+        onClose={() => setIsVoucherModalOpen(false)}
+        events={events.events}
+        payments={payments.payments}
+        companyInfo={{
+          companyName: user?.companyName || user?.fullName || 'HUNG COMPANY',
+          taxCode: user?.taxCode || '0108923489',
+          address: user?.address || 'Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội',
+          organizerName: user?.fullName || 'Duy Hưng Phạm',
+        }}
       />
     </div>
   );

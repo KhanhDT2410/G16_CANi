@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { showToast } from '../../../components/common/Toast';
 import { eoService } from '../../../services/eoService';
+import EmergencyBroadcastModal from './EmergencyBroadcastModal';
 
 /**
  * EORecruitmentTab
@@ -18,6 +19,16 @@ export default function EORecruitmentTab({
   const [selectedEventFilter, setSelectedEventFilter] = useState('ALL');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [dispatchingShiftId, setDispatchingShiftId] = useState(null);
+  const [emergencyModal, setEmergencyModal] = useState({ isOpen: false, shift: null });
+  const [activeEmergencies, setActiveEmergencies] = useState({});
+
+  const handleEmergencySuccess = (shiftId, data) => {
+    setActiveEmergencies((prev) => ({
+      ...prev,
+      [shiftId]: data,
+    }));
+    onReloadEvents?.();
+  };
 
   // Gom toàn bộ ca làm việc (Shifts) từ các sự kiện
   const allShifts = useMemo(() => {
@@ -206,7 +217,7 @@ export default function EORecruitmentTab({
                 }}
               >
                 <div style={{ flex: 1, minWidth: 260 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
                     <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
                       {shift.jobType}
                     </h4>
@@ -222,6 +233,33 @@ export default function EORecruitmentTab({
                     >
                       {isFull ? 'Đã Tuyển Đủ' : `Cần tuyển ${required - confirmed} người nữa`}
                     </span>
+                    {activeEmergencies[shift.shiftId] && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          backgroundColor: '#fee2e2',
+                          color: '#b91c1c',
+                          border: '1px solid #fecdd3',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            backgroundColor: '#dc2626',
+                            display: 'inline-block',
+                          }}
+                        />
+                        Cứu Trợ Khẩn Cấp (+{formatCurrency(activeEmergencies[shift.shiftId].allowanceBonus)}đ/h • {activeEmergencies[shift.shiftId].expandedRadiusKm}km)
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.4rem' }}>
@@ -255,20 +293,41 @@ export default function EORecruitmentTab({
                 {/* Các thao tác tuyển dụng */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {!isFull && (
-                    <button
-                      type="button"
-                      disabled={dispatchingShiftId === shift.shiftId}
-                      className="eo-btn-primary"
-                      style={{
-                        fontSize: '0.8rem',
-                        padding: '0.45rem 0.85rem',
-                        backgroundColor: '#2563eb',
-                      }}
-                      onClick={() => handleTriggerDispatch(shift)}
-                      title="Quét lại mạng lưới Worker trong bán kính 15km"
-                    >
-                      {dispatchingShiftId === shift.shiftId ? 'Đang Quét Radar...' : 'Kích Hoạt Radar AI'}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        style={{
+                          background: '#dc2626',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '0.45rem 0.85rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                        }}
+                        onClick={() => setEmergencyModal({ isOpen: true, shift })}
+                        title="Kích hoạt Emergency Broadcast Pool diện rộng (Section 11 CANi_Flow_v8.txt)"
+                      >
+                        Cứu Trợ Khẩn Cấp
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={dispatchingShiftId === shift.shiftId}
+                        className="eo-btn-primary"
+                        style={{
+                          fontSize: '0.8rem',
+                          padding: '0.45rem 0.85rem',
+                          backgroundColor: '#2563eb',
+                        }}
+                        onClick={() => handleTriggerDispatch(shift)}
+                        title="Quét lại mạng lưới Worker trong bán kính 15km"
+                      >
+                        {dispatchingShiftId === shift.shiftId ? 'Đang Quét Radar...' : 'Kích Hoạt Radar AI'}
+                      </button>
+                    </>
                   )}
 
                   <button
@@ -330,6 +389,14 @@ export default function EORecruitmentTab({
           })}
         </div>
       )}
+
+      {/* Modal Cứu Trợ Ca Khẩn Cấp (Emergency Dispatch Pool - Section 11) */}
+      <EmergencyBroadcastModal
+        isOpen={emergencyModal.isOpen}
+        shift={emergencyModal.shift}
+        onClose={() => setEmergencyModal({ isOpen: false, shift: null })}
+        onSuccess={handleEmergencySuccess}
+      />
     </div>
   );
 }

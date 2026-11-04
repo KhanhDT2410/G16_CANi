@@ -11,9 +11,12 @@ import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
 import EOMetricsGrid from './components/EOMetricsGrid';
 import EOEventsTab from './components/EOEventsTab';
+import EORecruitmentTab from './components/EORecruitmentTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
-import EoEkycTab from './EoEkycTab';
+import EoProfileTab from './components/EoProfileTab';
+import EOAnalyticsTab from './components/EOAnalyticsTab';
+import EOSettingsTab from './components/EOSettingsTab';
 import EOModals from './components/EOModals';
 
 import './EOPage.css';
@@ -23,12 +26,38 @@ export default function EOPage() {
   const [searchParams] = useSearchParams();
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('events');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('cani_eo_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
-  // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_)
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('cani_eo_sidebar_collapsed', String(next));
+      } catch (e) {
+        console.warn('Lỗi lưu trạng thái sidebar:', e);
+      }
+      return next;
+    });
+  };
+
+  // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_) hoặc điều hướng tab (?tab=profile)
   useEffect(() => {
-    if (searchParams.get('tab') === 'subscription' || searchParams.has('vnp_ResponseCode')) {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'subscription' || searchParams.has('vnp_ResponseCode')) {
       setActiveTab('subscription');
       setActiveNav('subscription');
+    } else if (tabParam === 'profile' || tabParam === 'ekyc') {
+      setActiveTab('profile');
+      setActiveNav('profile');
+    } else if (tabParam && ['events', 'recruitment', 'payments', 'analytics', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam);
+      setActiveNav(tabParam);
     }
   }, [searchParams]);
 
@@ -59,27 +88,30 @@ export default function EOPage() {
   const handleNavClick = (navKey) => {
     setActiveNav(navKey);
     if (navKey === 'overview' || navKey === 'events') setActiveTab('events');
+    else if (navKey === 'recruitment') setActiveTab('recruitment');
     else if (navKey === 'payments') setActiveTab('payments');
     else if (navKey === 'subscription') setActiveTab('subscription');
-    else if (navKey === 'ekyc') setActiveTab('ekyc');
-    else if (navKey === 'recruitment') {
-      if (events.events.length > 0) {
-        shifts.setSelectedEventId(events.events[0].eventId);
-        shifts.setShowShiftModal(true);
-      } else {
-        events.setShowEventModal(true);
-      }
-    } else {
-      showToast('Tính năng đang được tối ưu trong bản cập nhật kế tiếp!', 'info');
-    }
+    else if (navKey === 'profile' || navKey === 'ekyc') setActiveTab('profile');
+    else if (navKey === 'analytics') setActiveTab('analytics');
+    else if (navKey === 'settings') setActiveTab('settings');
+  };
+
+  const switchTab = (tabKey) => {
+    setActiveTab(tabKey);
+    setActiveNav(tabKey);
   };
 
   const displayName = user?.fullName || user?.username || 'Duy Hưng';
 
   return (
     <div className="eo-dashboard-container">
-      <div className="eo-dashboard-layout">
-        <EOSidebar activeNav={activeNav} onNavClick={handleNavClick} />
+      <div className={`eo-dashboard-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <EOSidebar
+          activeNav={activeNav}
+          onNavClick={handleNavClick}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapse}
+        />
 
         <main className="eo-main-stream">
           <section className="eo-hero-banner">
@@ -97,17 +129,26 @@ export default function EOPage() {
           <EOMetricsGrid metrics={events.metrics} />
 
           <div className="eo-pill-tabs">
-            <button type="button" className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`} onClick={() => setActiveTab('events')}>
+            <button type="button" className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`} onClick={() => switchTab('events')}>
               Sự Kiện Của Tôi ({events.events.length})
             </button>
-            <button type="button" className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => setActiveTab('payments')}>
+            <button type="button" className={`pill-tab ${activeTab === 'recruitment' ? 'active' : ''}`} onClick={() => switchTab('recruitment')}>
+              Tuyển Dụng & Matching
+            </button>
+            <button type="button" className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => switchTab('payments')}>
               Thanh Toán & Khai Báo Lương ({payments.payments.length})
             </button>
-            <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => setActiveTab('subscription')}>
+            <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => switchTab('subscription')}>
               Gói Dịch Vụ & Quota (W-06)
             </button>
-            <button type="button" className={`pill-tab ${activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => setActiveTab('ekyc')}>
-              Định Danh Doanh Nghiệp (eKYC)
+            <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
+              Hồ Sơ & eKYC
+            </button>
+            <button type="button" className={`pill-tab ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => switchTab('analytics')}>
+              Báo Cáo & Thống Kê
+            </button>
+            <button type="button" className={`pill-tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => switchTab('settings')}>
+              Cài Đặt Hệ Thống
             </button>
           </div>
 
@@ -145,6 +186,18 @@ export default function EOPage() {
             />
           )}
 
+          {activeTab === 'recruitment' && (
+            <EORecruitmentTab
+              events={events.events}
+              onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
+              onOpenQr={shifts.handleOpenShiftQr}
+              onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+              onOpenAttendance={shifts.handleOpenAttendance}
+              onOpenCreateEvent={() => events.setShowEventModal(true)}
+              onReloadEvents={events.loadEvents}
+            />
+          )}
+
           {activeTab === 'payments' && (
             <EOPaymentsTab
               payments={payments.payments}
@@ -159,7 +212,15 @@ export default function EOPage() {
 
           {activeTab === 'subscription' && <EOSubscriptionTab />}
 
-          {activeTab === 'ekyc' && <EoEkycTab />}
+          {(activeTab === 'profile' || activeTab === 'ekyc') && <EoProfileTab />}
+
+          {activeTab === 'analytics' && (
+            <EOAnalyticsTab events={events.events} payments={payments.payments} />
+          )}
+
+          {activeTab === 'settings' && (
+            <EOSettingsTab onNavigateToSubscription={() => switchTab('subscription')} />
+          )}
         </main>
 
         <EORightSidebar />

@@ -127,6 +127,13 @@ export default function EOSubscriptionTab() {
         >
           Lịch Sử Giao Dịch ({history.length})
         </button>
+        <button
+          type="button"
+          className={`sub-tab-btn ${activeSubTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('settings')}
+        >
+          Cài Đặt Gói Cước & Hạn Mức
+        </button>
       </div>
 
       {/* 3. SUB-TAB: PLANS & PURCHASE (UC-10, UC-11) */}
@@ -302,6 +309,114 @@ export default function EOSubscriptionTab() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* 5. SUB-TAB: PACKAGE & QUOTA SETTINGS */}
+      {activeSubTab === 'settings' && (
+        <div className="sub-settings-container animate-fade-in-up" style={{ backgroundColor: '#ffffff', borderRadius: '1rem', border: '1px solid #e2e8f0', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+              Cài Đặt Gói Cước & Quota Vận Hành
+            </h3>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#64748b' }}>
+              Cấu hình hạn ngạch sự kiện, cảnh báo quota, cổng thanh toán VietQR mặc định và thông tin xuất hóa đơn VAT.
+            </p>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              showToast('Đã lưu cấu hình cài đặt gói cước thành công!', 'success');
+            }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+              <div className="eo-form-group">
+                <label>Gói Cước Mặc Định Khi Tạo Sự Kiện Mới</label>
+                <select className="eo-form-select" defaultValue="MATCHING_PLUS">
+                  <option value="MATCHING_PLUS">Gói Matching Radar AI (80,000 đ / sự kiện) - Tự động quét 15km</option>
+                  <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
+                </select>
+                <span className="eo-field-helper">Gói ưu tiên được chọn sẵn khi bạn tạo sự kiện mới.</span>
+              </div>
+
+              <div className="eo-form-group">
+                <label>Cổng Thanh Toán Ưu Tiên Mặc Định</label>
+                <select className="eo-form-select" defaultValue="PAYOS_VIETQR">
+                  <option value="PAYOS_VIETQR">PayOS VietQR MBBank (Tự động khớp tiền 24/7)</option>
+                  <option value="VNPAY">Cổng VNPay Sandbox Gateway</option>
+                  <option value="MANUAL">Chuyển khoản theo số tài khoản</option>
+                </select>
+                <span className="eo-field-helper">Phương thức xuất hiện đầu tiên tại Bước 3 thanh toán.</span>
+              </div>
+
+              <div className="eo-form-group">
+                <label>Ngưỡng Cảnh Báo Khi Sắp Hết Quota Sự Kiện</label>
+                <select className="eo-form-select" defaultValue="1">
+                  <option value="1">Khi còn &le; 1 sự kiện (Khuyên dùng)</option>
+                  <option value="2">Khi còn &le; 2 sự kiện</option>
+                  <option value="3">Khi còn &le; 3 sự kiện</option>
+                </select>
+                <span className="eo-field-helper">Gửi thông báo trên Dashboard và Email khi chạm ngưỡng.</span>
+              </div>
+
+              <div className="eo-form-group">
+                <label>Tự Động Mở PayOS VietQR Khi Hết Hạn Quota</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <input type="checkbox" id="autoQrCheck" defaultChecked style={{ width: 18, height: 18 }} />
+                  <label htmlFor="autoQrCheck" style={{ margin: 0, fontWeight: 500, cursor: 'pointer', fontSize: '0.85rem' }}>
+                    Tự động tạo mã QR VietQR khớp tiền khi tạo ca mà hết hạn mức
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                Thông Tin Xuất Hóa Đơn Điện Tử Doanh Nghiệp (VAT E-Invoice)
+              </h4>
+              <p style={{ margin: '0 0 1rem', fontSize: '0.825rem', color: '#64748b' }}>
+                Dùng để tự động xuất hóa đơn thuế giá trị gia tăng (VAT) cho mỗi giao dịch mua gói cước CANi.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                <div className="eo-form-group">
+                  <label>Tên Doanh Nghiệp / Công Ty *</label>
+                  <input type="text" className="eo-form-input" defaultValue="Công ty Cổ phần Sự kiện Quốc tế CANi" required />
+                </div>
+
+                <div className="eo-form-group">
+                  <label>Mã Số Thuế (MST) *</label>
+                  <input type="text" className="eo-form-input" defaultValue="0109887766" required />
+                </div>
+
+                <div className="eo-form-group">
+                  <label>Email Nhận Hóa Đơn Điện Tử *</label>
+                  <input type="email" className="eo-form-input" defaultValue="finance@cani.vn" required />
+                </div>
+
+                <div className="eo-form-group">
+                  <label>Người Đại Diện Doanh Nghiệp</label>
+                  <input type="text" className="eo-form-input" defaultValue="Phạm Duy Hưng" />
+                </div>
+
+                <div className="eo-form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Địa Chỉ Trụ Sở Đăng Ký Kinh Doanh *</label>
+                  <input type="text" className="eo-form-input" defaultValue="Tầng 8, Tòa nhà Innovation, Cầu Giấy, Hà Nội" required />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="submit"
+                className="eo-btn-primary"
+                style={{ padding: '0.6rem 1.5rem', fontSize: '0.9rem' }}
+              >
+                Lưu Cài Đặt Gói Cước
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

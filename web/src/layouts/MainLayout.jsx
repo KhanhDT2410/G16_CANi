@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth';
 import { ToastContainer } from '../components/common/Toast';
@@ -9,12 +10,29 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
 
+  const [userAvatar, setUserAvatar] = useState(() => {
+    try {
+      return localStorage.getItem('cani_eo_avatar') || user?.avatarUrl || null;
+    } catch {
+      return user?.avatarUrl || null;
+    }
+  });
+
+  useEffect(() => {
+    const handleAvatarUpdate = (e) => {
+      const newAvatar = e.detail?.avatarUrl || localStorage.getItem('cani_eo_avatar');
+      setUserAvatar(newAvatar);
+    };
+    window.addEventListener('cani_avatar_updated', handleAvatarUpdate);
+    return () => window.removeEventListener('cani_avatar_updated', handleAvatarUpdate);
+  }, []);
+
   // Phân quyền thanh điều hướng chuẩn đặc tả SEP490:
   // - Web Portal: Dành riêng cho Event Organizer (EO), Admin, Customer Care.
   // - Worker: Hoạt động độc lập 100% trên Mobile App (CANi Partner App).
   const getNavItems = () => {
     const commonItems = [
-      { path: '/mobile-preview', label: '📱 App Mobile Worker' },
+      { path: '/mobile-preview', label: 'App Mobile Worker' },
     ];
 
     if (!user) {
@@ -79,7 +97,20 @@ const MainLayout = () => {
 
         <div className="main-header-center">
           <div className="header-search-box">
-            <span className="header-search-icon">🔍</span>
+            <svg
+              className="header-search-svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
             <input
               type="text"
               placeholder="Tìm kiếm sự kiện, nhân sự, địa điểm..."
@@ -92,26 +123,58 @@ const MainLayout = () => {
           {isAuthenticated && user ? (
             <div className="user-header-group">
               <button type="button" className="header-notif-btn" title="Thông báo mới">
-                <span className="notif-icon">🔔</span>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
                 <span className="notif-badge-dot"></span>
               </button>
-              <div className="user-session-info">
-                <div className="user-avatar-badge" title={user.fullName || user.username}>
-                  {(user.fullName || user.username || 'D').charAt(0).toUpperCase()}
-                </div>
-                <div className="user-meta">
-                  <span className="user-greeting">
-                    Xin chào, <strong>{user.fullName || user.username}</strong>
-                  </span>
-                  <span className="user-role-pill">{user.role}</span>
-                </div>
+
+              <div className="user-header-compact">
+                <button
+                  type="button"
+                  className="user-avatar-btn"
+                  onClick={() => navigate('/eo?tab=profile')}
+                  title={`Xem hồ sơ: ${user.fullName || user.username || 'EO'}`}
+                >
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="Avatar" className="user-avatar-img" />
+                  ) : (
+                    <div className="user-avatar-badge">
+                      {(user.fullName || user.username || 'D').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="btn-logout"
+                  className="btn-logout-icon"
                   title="Đăng xuất"
                 >
-                  Đăng xuất
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
                 </button>
               </div>
             </div>

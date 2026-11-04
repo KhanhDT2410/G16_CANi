@@ -19,19 +19,50 @@
    ========================================================================== */
 .eo-dashboard-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 310px;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
   gap: 1.5rem;
   align-items: start;
   transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
 }
 
 .eo-dashboard-layout.sidebar-collapsed {
-  grid-template-columns: 74px minmax(0, 1fr) 310px;
+  grid-template-columns: 74px minmax(0, 1fr) 280px;
 }
 
-@media (max-width: 1280px) {
+/* Các tab quản trị chuyên sâu (Hồ sơ & eKYC, Cài đặt, Gói cước, Báo cáo) cần không gian rộng:
+   Widget panel tự động chuyển xuống dưới để giải phóng 100% chiều ngang */
+.eo-dashboard-layout.tab-profile,
+.eo-dashboard-layout.tab-ekyc,
+.eo-dashboard-layout.tab-settings,
+.eo-dashboard-layout.tab-subscription,
+.eo-dashboard-layout.tab-analytics {
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.eo-dashboard-layout.sidebar-collapsed.tab-profile,
+.eo-dashboard-layout.sidebar-collapsed.tab-ekyc,
+.eo-dashboard-layout.sidebar-collapsed.tab-settings,
+.eo-dashboard-layout.sidebar-collapsed.tab-subscription,
+.eo-dashboard-layout.sidebar-collapsed.tab-analytics {
+  grid-template-columns: 74px minmax(0, 1fr);
+}
+
+.eo-dashboard-layout.tab-profile .eo-widget-panel,
+.eo-dashboard-layout.tab-ekyc .eo-widget-panel,
+.eo-dashboard-layout.tab-settings .eo-widget-panel,
+.eo-dashboard-layout.tab-subscription .eo-widget-panel,
+.eo-dashboard-layout.tab-analytics .eo-widget-panel {
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+  gap: 1.25rem !important;
+  margin-top: 1rem;
+}
+
+@media (max-width: 1440px) {
   .eo-dashboard-layout {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
   }
   .eo-dashboard-layout.sidebar-collapsed {
     grid-template-columns: 74px minmax(0, 1fr);
@@ -273,6 +304,9 @@
   flex-direction: column;
   gap: 1.5rem;
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Hero Welcome Banner */

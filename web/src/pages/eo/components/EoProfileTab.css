@@ -3,9 +3,12 @@
    ========================================================================== */
 
 .eo-profile-container {
-  max-width: 1040px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 0 auto 2.5rem;
-  padding: 0 0.5rem;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 /* 1. HERO HEADER CARD */
@@ -20,12 +23,18 @@
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .profile-hero-left {
   display: flex;
   align-items: center;
   gap: 1.5rem;
+  flex: 1 1 340px;
+  min-width: 0;
 }
 
 .profile-avatar-wrapper {
@@ -86,6 +95,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .profile-name-row {
@@ -101,6 +111,7 @@
   color: #0f172a;
   margin: 0;
   letter-spacing: -0.02em;
+  word-break: break-word;
 }
 
 .profile-role-pill {
@@ -134,6 +145,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .profile-stat-box {
@@ -209,9 +221,13 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 1.125rem;
-  padding: 2rem;
+  padding: 1.75rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
   margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .profile-card-header {
@@ -244,18 +260,25 @@
 /* 4. FORM ELEMENTS */
 .profile-form-grid-2 {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.25rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .profile-form-group {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .profile-form-group.span-2 {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
 .profile-form-group label {
@@ -279,6 +302,8 @@
 
 .profile-input {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0.65rem 0.95rem;
   border: 1px solid #cbd5e1;
   border-radius: 0.625rem;
@@ -306,6 +331,8 @@
 
 .profile-textarea {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0.65rem 0.95rem;
   border: 1px solid #cbd5e1;
   border-radius: 0.625rem;
@@ -516,3 +543,4 @@
     grid-column: span 1;
   }
 }
+

@@ -105,7 +105,7 @@ export default function EOPage() {
 
   return (
     <div className="eo-dashboard-container">
-      <div className={`eo-dashboard-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <div className={`eo-dashboard-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} tab-${activeTab}`}>
         <EOSidebar
           activeNav={activeNav}
           onNavClick={handleNavClick}

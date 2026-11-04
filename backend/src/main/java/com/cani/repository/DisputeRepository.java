@@ -20,5 +20,9 @@ public interface DisputeRepository extends JpaRepository<Dispute, UUID>, JpaSpec
 
     List<Dispute> findByStatusIn(List<DisputeStatus> statuses);
 
+    List<Dispute> findByStatusInAndAssignedTo(List<DisputeStatus> statuses, UUID assignedTo);
+
+    List<Dispute> findByStatusInAndAssignedToIsNull(List<DisputeStatus> statuses);
+
     long countByStatus(DisputeStatus status);
 }

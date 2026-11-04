@@ -62,6 +62,14 @@ public class DisputeService {
 
     private static final List<DisputeStatus> OPEN_STATUSES =
             List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING);
+
+    /**
+     * Hàng đợi CC/Admin xử lý (UC-109).
+     * Bao gồm ESCALATED: đơn đã kháng nghị phải nằm trong hàng đợi để Admin
+     * ra quyết định cuối (UC-102, BR-68) — nếu thiếu, đơn sẽ biến mất khỏi UI.
+     */
+    private static final List<DisputeStatus> QUEUE_STATUSES =
+            List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING, DisputeStatus.ESCALATED);
     private static final List<DisputeStatus> RESOLVED_STATUSES =
             List.of(DisputeStatus.RESOLVED, DisputeStatus.UNVERIFIED);
 
@@ -271,13 +279,47 @@ public class DisputeService {
     // =========================================================================
 
     public List<DisputeQueueItemDto> getDisputeQueue() {
+        return toQueueItems(disputeRepository.findByStatusIn(QUEUE_STATUSES));
+    }
+
+    /**
+     * UC-109 (phân tầng CC): hàng đợi tranh chấp được gán cho đúng CC này.
+     * Khi đội CC có nhiều người, mỗi CC chỉ thấy đơn "của tôi đang xử lý".
+     */
+    public List<DisputeQueueItemDto> getDisputeQueueForCc(UUID ccUserId) {
+        return toQueueItems(disputeRepository.findByStatusInAndAssignedTo(QUEUE_STATUSES, ccUserId));
+    }
+
+    /**
+     * Đơn mở chưa ai nhận (assignedTo = null) — dùng để CC chọn "đơn chưa gán" khi tự nhận.
+     */
+    public List<DisputeQueueItemDto> getUnassignedQueue() {
+        return toQueueItems(disputeRepository.findByStatusInAndAssignedToIsNull(QUEUE_STATUSES));
+    }
+
+    private List<DisputeQueueItemDto> toQueueItems(List<Dispute> disputes) {
         Instant slaRiskCutoff = Instant.now().plus(Duration.ofHours(24));
-        return disputeRepository.findByStatusIn(OPEN_STATUSES).stream()
+        return disputes.stream()
                 .sorted(Comparator
                         .<Dispute>comparingInt(d -> slaAtRisk(d, slaRiskCutoff) ? 0 : 1)
                         .thenComparing(Dispute::getCreatedAt,
                                 Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(d -> toQueueItemDto(d, slaRiskCutoff))
+                .toList();
+    }
+
+    /**
+     * UC-99: Danh sách nhân sự Customer Care để CC chuyển đơn cho nhau.
+     * Kèm số đơn đang giao để CC cân bằng tải.
+     */
+    public List<CustomerCareStaffDto> getCustomerCareStaff() {
+        return userRepository.findByRole(UserRole.CUSTOMER_CARE).stream()
+                .map(cc -> CustomerCareStaffDto.builder()
+                        .userId(cc.getUserId())
+                        .fullName(cc.getFullName())
+                        .email(cc.getEmail())
+                        .assignedCount(disputeRepository.findByStatusInAndAssignedTo(QUEUE_STATUSES, cc.getUserId()).size())
+                        .build())
                 .toList();
     }
 
@@ -585,7 +627,7 @@ public class DisputeService {
                 .complainantId(dispute.getComplainantId())
                 .respondentId(dispute.getRespondentId())
                 .assignedTo(dispute.getAssignedTo())
-                .escalated(false)
+                .escalated(dispute.getStatus() == DisputeStatus.ESCALATED)
                 .slaAtRisk(slaAtRisk(dispute, slaRiskCutoff))
                 .build();
     }

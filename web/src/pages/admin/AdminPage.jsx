@@ -3,6 +3,7 @@ import { UserManagementView } from '../../features/admin-users';
 import { AdminDashboardView } from '../../features/admin-dashboard';
 import { DisputeCenterView } from '../../features/disputes';
 import { SupportTicketsCenterView } from '../../features/support-tickets';
+import { SystemConfigView } from '../../features/system-configs';
 import AdminEkycTab from './components/AdminEkycTab';
 import AdminSkillsTab from './components/AdminSkillsTab';
 import './AdminPage.css';
@@ -62,6 +63,12 @@ const AdminPage = () => {
         >
           Hỗ Trợ Khách Hàng (Tickets)
         </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'configs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('configs')}
+        >
+          Tham Số Hệ Thống
+        </button>
       </div>
 
       {/* Content */}
@@ -71,6 +78,7 @@ const AdminPage = () => {
       {activeTab === 'users' && <UserManagementView />}
       {activeTab === 'disputes' && <DisputeCenterView />}
       {activeTab === 'tickets' && <SupportTicketsCenterView />}
+      {activeTab === 'configs' && <SystemConfigView />}
     </div>
   );
 };

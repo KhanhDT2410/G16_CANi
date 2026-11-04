@@ -63,6 +63,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Tham số yêu cầu không đúng kiểu dữ liệu (UUID)."));
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("Bạn không có quyền truy cập tài nguyên này"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
         log.error("Unhandled exception occurred: ", ex);

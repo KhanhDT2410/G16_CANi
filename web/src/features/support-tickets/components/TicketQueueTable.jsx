@@ -4,7 +4,13 @@ import {
   TICKET_PRIORITY_CONFIG,
 } from '../types/ticket.constants';
 
-export const TicketQueueTable = ({ tickets, onOpenDetail, onAssign, loading }) => {
+export const TicketQueueTable = ({
+  tickets,
+  onOpenDetail,
+  onAssign,
+  onOpenTransferModal,
+  loading,
+}) => {
   const formatDateTime = (isoStr) => {
     if (!isoStr) return '—';
     return new Date(isoStr).toLocaleString('vi-VN', {
@@ -52,7 +58,7 @@ export const TicketQueueTable = ({ tickets, onOpenDetail, onAssign, loading }) =
                     {priorityConfig.label}
                   </span>
                 </td>
-                <td style={{ maxWidth: '280px', fontWeight: 500 }}>
+                <td style={{ maxWidth: '260px', fontWeight: 500 }}>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {t.subject}
                   </div>
@@ -86,6 +92,15 @@ export const TicketQueueTable = ({ tickets, onOpenDetail, onAssign, loading }) =
                         Tiếp Nhận
                       </button>
                     )}
+                    {t.status !== 'CLOSED' && onOpenTransferModal && (
+                      <button
+                        type="button"
+                        className="ticket-btn ticket-btn-secondary ticket-btn-sm"
+                        onClick={() => onOpenTransferModal(t)}
+                      >
+                        Chuyển
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="ticket-btn ticket-btn-primary ticket-btn-sm"
@@ -105,4 +120,3 @@ export const TicketQueueTable = ({ tickets, onOpenDetail, onAssign, loading }) =
 };
 
 export default TicketQueueTable;
-

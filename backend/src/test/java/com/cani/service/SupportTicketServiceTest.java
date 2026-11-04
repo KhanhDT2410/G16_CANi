@@ -397,4 +397,46 @@ class SupportTicketServiceTest {
         assertThat(ccView.getMessages()).hasSize(2);
         assertThat(ccView.getMessages()).anyMatch(m -> Boolean.TRUE.equals(m.getIsInternal()));
     }
+
+    @Test
+    @DisplayName("12. Phân tầng hàng đợi: getQueueForCc chỉ lấy ticket được gán cho đúng CC này")
+    void testGetQueueForCc() {
+        SupportTicket assignedTicket = SupportTicket.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .assignedTo(ccId)
+                .status(TicketStatus.IN_PROGRESS)
+                .slaDeadline(Instant.now().plus(4, ChronoUnit.HOURS))
+                .createdAt(Instant.now().minus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(supportTicketRepository.findByStatusInAndAssignedTo(anyList(), eq(ccId)))
+                .thenReturn(List.of(assignedTicket));
+
+        List<SupportTicketQueueItemDto> myQueue = supportTicketService.getQueueForCc(ccId);
+
+        assertThat(myQueue).hasSize(1);
+        assertThat(myQueue.get(0).getId()).isEqualTo(assignedTicket.getId());
+        assertThat(myQueue.get(0).getAssignedTo()).isEqualTo(ccId);
+        verify(supportTicketRepository).findByStatusInAndAssignedTo(anyList(), eq(ccId));
+    }
+
+    @Test
+    @DisplayName("13. Lấy danh sách nhân sự Customer Care kèm số lượng phiếu đang xử lý")
+    void testGetCustomerCareStaff() {
+        User cc1 = User.builder().userId(UUID.randomUUID()).fullName("Nguyễn Văn A").email("nva@cani.vn").role(UserRole.CUSTOMER_CARE).build();
+        User cc2 = User.builder().userId(UUID.randomUUID()).fullName("Trần Thị B").email("ttb@cani.vn").role(UserRole.CUSTOMER_CARE).build();
+
+        when(userRepository.findByRole(UserRole.CUSTOMER_CARE)).thenReturn(List.of(cc1, cc2));
+        when(supportTicketRepository.countByStatusInAndAssignedTo(anyList(), eq(cc1.getUserId()))).thenReturn(3L);
+        when(supportTicketRepository.countByStatusInAndAssignedTo(anyList(), eq(cc2.getUserId()))).thenReturn(1L);
+
+        var staffList = supportTicketService.getCustomerCareStaff();
+
+        assertThat(staffList).hasSize(2);
+        assertThat(staffList.get(0).getUserId()).isEqualTo(cc1.getUserId());
+        assertThat(staffList.get(0).getAssignedCount()).isEqualTo(3L);
+        assertThat(staffList.get(1).getUserId()).isEqualTo(cc2.getUserId());
+        assertThat(staffList.get(1).getAssignedCount()).isEqualTo(1L);
+    }
 }

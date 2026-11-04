@@ -38,6 +38,29 @@ public class AdminSupportTicketController {
     }
 
     /**
+     * SCR-25 (phân tầng CC): Hàng đợi chỉ gồm các phiếu đang được giao cho CC hiện tại xử lý.
+     * GET /api/v1/admin/support/tickets/queue/mine
+     */
+    @GetMapping("/queue/mine")
+    public ResponseEntity<ApiResponse<List<SupportTicketQueueItemDto>>> getMyQueue(
+            Authentication authentication
+    ) {
+        UUID actorId = currentUserId(authentication);
+        List<SupportTicketQueueItemDto> queue = supportTicketService.getQueueForCc(actorId);
+        return ResponseEntity.ok(ApiResponse.ok(queue, "Lấy hàng đợi phiếu hỗ trợ được giao thành công"));
+    }
+
+    /**
+     * SCR-25 / SCR-26: Danh sách nhân sự Customer Care để chuyển phiếu.
+     * GET /api/v1/admin/support/tickets/customer-care-staff
+     */
+    @GetMapping("/customer-care-staff")
+    public ResponseEntity<ApiResponse<List<CustomerCareStaffDto>>> getCustomerCareStaff() {
+        List<CustomerCareStaffDto> staff = supportTicketService.getCustomerCareStaff();
+        return ResponseEntity.ok(ApiResponse.ok(staff, "Lấy danh sách nhân sự Chăm sóc khách hàng thành công"));
+    }
+
+    /**
      * SCR-25 / SCR-26: Phân công hoặc CC tự nhận ticket (OPEN -> IN_PROGRESS).
      * POST /api/v1/admin/support/tickets/{id}/assign
      */

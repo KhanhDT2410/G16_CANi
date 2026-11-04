@@ -9,6 +9,7 @@ import EventCreateModal from './components/EventCreateModal';
 import ShiftCreateModal from './components/ShiftCreateModal';
 import PaymentDeclarationModal from './components/PaymentDeclarationModal';
 import PublishEventModal from './components/PublishEventModal';
+import { SupportTicketsCenterView } from '../../features/support-tickets';
 import './EOPage.css';
 
 const ROLES = [
@@ -415,6 +416,8 @@ const EOPage = () => {
       setActiveTab('payments');
     } else if (navKey === 'ekyc') {
       setActiveTab('ekyc');
+    } else if (navKey === 'support') {
+      setActiveTab('support');
     } else if (navKey === 'recruitment') {
       if (events.length > 0) {
         setSelectedEventId(events[0].eventId);
@@ -552,6 +555,15 @@ const EOPage = () => {
             >
               <span className="nav-icon">📈</span>
               <span className="nav-label">Báo cáo & thống kê</span>
+            </button>
+
+            <button
+              type="button"
+              className={`eo-nav-item ${activeNav === 'support' ? 'active' : ''}`}
+              onClick={() => handleNavClick('support')}
+            >
+              <span className="nav-icon">🎧</span>
+              <span className="nav-label">Hỗ trợ kỹ thuật</span>
             </button>
 
             <button
@@ -715,6 +727,13 @@ const EOPage = () => {
               onClick={() => setActiveTab('ekyc')}
             >
               Định Danh Doanh Nghiệp (eKYC)
+            </button>
+            <button
+              type="button"
+              className={`pill-tab ${activeTab === 'support' ? 'active' : ''}`}
+              onClick={() => setActiveTab('support')}
+            >
+              Hỗ Trợ Kỹ Thuật (Tickets)
             </button>
           </div>
 
@@ -982,6 +1001,13 @@ const EOPage = () => {
 
           {/* NỘI DUNG TAB 3: ĐỊNH DANH DOANH NGHIỆP E-KYC */}
           {activeTab === 'ekyc' && <EoEkycTab />}
+
+          {/* NỘI DUNG TAB 4: HỖ TRỢ KỸ THUẬT & PHIẾU YÊU CẦU (UC-105 / UC-106) */}
+          {activeTab === 'support' && (
+            <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
+              <SupportTicketsCenterView />
+            </div>
+          )}
         </main>
 
         {/* ========================================================= */}

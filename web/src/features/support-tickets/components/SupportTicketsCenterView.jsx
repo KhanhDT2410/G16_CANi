@@ -5,9 +5,7 @@ import TicketStatsBar from './TicketStatsBar';
 import TicketToolbar from './TicketToolbar';
 import TicketQueueTable from './TicketQueueTable';
 import MyTicketsTable from './MyTicketsTable';
-import TicketDetailModal from './TicketDetailModal';
-import CreateTicketModal from './CreateTicketModal';
-import CloseTicketModal from './CloseTicketModal';
+import TicketModalsGroup from './TicketModalsGroup';
 import './SupportTickets.css';
 
 export const SupportTicketsCenterView = () => {
@@ -16,11 +14,15 @@ export const SupportTicketsCenterView = () => {
 
   const {
     queue,
+    myQueue,
+    ccStaff,
     myTickets,
     selectedTicket,
     loading,
     detailLoading,
     loadQueue,
+    loadMyQueue,
+    loadCcStaff,
     loadMyTickets,
     loadTicketDetail,
     createTicket,
@@ -36,19 +38,22 @@ export const SupportTicketsCenterView = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [closingTicket, setClosingTicket] = useState(null);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [activeTicket, setActiveTicket] = useState(null);
 
   const stats = useMemo(() => {
     const total = queue.length;
+    const myCount = myQueue.length;
     const openCount = queue.filter((t) => t.status === 'OPEN').length;
     const inProgressCount = queue.filter((t) => t.status === 'IN_PROGRESS').length;
     const riskCount = queue.filter((t) => t.slaAtRisk).length;
-    return { total, openCount, inProgressCount, riskCount };
-  }, [queue]);
+    return { total, myCount, openCount, inProgressCount, riskCount };
+  }, [queue, myQueue]);
 
   const filteredQueue = useMemo(() => {
     if (!isStaff) return [];
-    return queue.filter((t) => {
+    const sourceList = activeFilter === 'MINE' ? myQueue : queue;
+    return sourceList.filter((t) => {
       if (activeFilter === 'OPEN' && t.status !== 'OPEN') return false;
       if (activeFilter === 'IN_PROGRESS' && t.status !== 'IN_PROGRESS') return false;
       if (activeFilter === 'SLA_RISK' && !t.slaAtRisk) return false;
@@ -59,7 +64,7 @@ export const SupportTicketsCenterView = () => {
       }
       return true;
     });
-  }, [queue, isStaff, activeFilter, searchTerm]);
+  }, [queue, myQueue, isStaff, activeFilter, searchTerm]);
 
   const handleOpenDetail = async (id) => {
     const detail = await loadTicketDetail(id);
@@ -67,8 +72,23 @@ export const SupportTicketsCenterView = () => {
   };
 
   const handleOpenCloseModal = (ticket) => {
-    setClosingTicket(ticket);
+    setActiveTicket(ticket);
     setIsCloseModalOpen(true);
+  };
+
+  const handleOpenTransferModal = (ticket) => {
+    setActiveTicket(ticket);
+    setIsTransferModalOpen(true);
+  };
+
+  const handleRefresh = () => {
+    if (isStaff) {
+      loadQueue();
+      loadMyQueue();
+      loadCcStaff();
+    } else {
+      loadMyTickets();
+    }
   };
 
   return (
@@ -86,7 +106,7 @@ export const SupportTicketsCenterView = () => {
           <button
             type="button"
             className="ticket-btn ticket-btn-secondary"
-            onClick={isStaff ? loadQueue : loadMyTickets}
+            onClick={handleRefresh}
             disabled={loading}
           >
             Làm Mới
@@ -120,6 +140,7 @@ export const SupportTicketsCenterView = () => {
           tickets={filteredQueue}
           onOpenDetail={handleOpenDetail}
           onAssign={(id) => assignTicket(id)}
+          onOpenTransferModal={handleOpenTransferModal}
           loading={loading}
         />
       ) : (
@@ -130,40 +151,45 @@ export const SupportTicketsCenterView = () => {
         />
       )}
 
-      <CreateTicketModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSubmit={createTicket}
-        loading={loading}
-      />
-
-      <TicketDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => {
+      <TicketModalsGroup
+        isCreateOpen={isCreateModalOpen}
+        onCreateClose={() => setIsCreateModalOpen(false)}
+        onCreateSubmit={createTicket}
+        isDetailOpen={isDetailModalOpen}
+        onDetailClose={() => {
           setIsDetailModalOpen(false);
           setSelectedTicket(null);
         }}
-        ticket={selectedTicket}
+        selectedTicket={selectedTicket}
         isStaff={isStaff}
         onReply={replyTicket}
         onAssign={assignTicket}
+        onOpenTransferModal={handleOpenTransferModal}
         onOpenCloseModal={handleOpenCloseModal}
         onResolve={resolveTicket}
-        loading={detailLoading}
-      />
-
-      <CloseTicketModal
-        isOpen={isCloseModalOpen}
-        onClose={() => {
-          setIsCloseModalOpen(false);
-          setClosingTicket(null);
+        detailLoading={detailLoading}
+        isTransferOpen={isTransferModalOpen}
+        onTransferClose={() => {
+          setIsTransferModalOpen(false);
+          setActiveTicket(null);
         }}
-        onConfirm={async (id, rationale) => {
-          const res = await closeTicket(id, rationale);
-          if (res) setIsDetailModalOpen(false);
+        onTransferConfirm={async (id, targetCcUserId) => {
+          const res = await assignTicket(id, targetCcUserId);
+          if (res && isDetailModalOpen) setIsDetailModalOpen(false);
           return res;
         }}
-        ticket={closingTicket}
+        activeTicket={activeTicket}
+        ccStaff={ccStaff}
+        isCloseOpen={isCloseModalOpen}
+        onCloseClose={() => {
+          setIsCloseModalOpen(false);
+          setActiveTicket(null);
+        }}
+        onCloseConfirm={async (id, rationale) => {
+          const res = await closeTicket(id, rationale);
+          if (res && isDetailModalOpen) setIsDetailModalOpen(false);
+          return res;
+        }}
         loading={loading}
       />
     </div>

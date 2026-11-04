@@ -147,7 +147,13 @@ const EventCreationWizardModal = ({
 
     setSubmitting(true);
     try {
-      const checklistJson = JSON.stringify(currentShift.checklistItems || []);
+      const checklistJson = JSON.stringify(
+        (currentShift.checklistItems || []).map((item, idx) =>
+          typeof item === 'object' && item.title
+            ? item
+            : { id: `chk_${idx + 1}`, title: String(item).trim() }
+        )
+      );
       const payload = {
         ...currentShift,
         checklist: checklistJson,

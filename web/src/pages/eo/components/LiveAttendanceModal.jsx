@@ -33,46 +33,10 @@ const LiveAttendanceModal = ({
     setLoading(true);
     try {
       const data = await eoService.getShiftAttendance(shift.shiftId);
-      if (data && data.length > 0) {
-        setAttendanceList(data);
-      } else {
-        // Fallback mockup nếu chưa có worker nào match
-        setAttendanceList([
-          {
-            assignmentId: 'assign-demo-1',
-            workerName: 'Nguyễn Văn An',
-            workerPhone: '0987654321',
-            workerReliabilityScore: 98,
-            workerRatingAvg: 4.9,
-            assignmentStatus: 'CHECKED_IN',
-            checkinTime: new Date(Date.now() - 3600000).toISOString(),
-            isOnTime: true,
-            checklistProgress: '3/4 việc',
-            eoConfirmed: false,
-            hasReviewedWorker: false,
-            agreedWage: (shift.hourlyWage || 50000) * 4,
-          },
-          {
-            assignmentId: 'assign-demo-2',
-            workerName: 'Trần Thị Hoa',
-            workerPhone: '0912345678',
-            workerReliabilityScore: 95,
-            workerRatingAvg: 4.8,
-            assignmentStatus: 'COMPLETED',
-            checkinTime: new Date(Date.now() - 14400000).toISOString(),
-            checkoutTime: new Date().toISOString(),
-            isOnTime: true,
-            hoursWorked: 4.0,
-            checklistProgress: '4/4 việc',
-            eoConfirmed: true,
-            hasReviewedWorker: false,
-            paymentStatus: 'CONFIRMED_FULL',
-            agreedWage: (shift.hourlyWage || 50000) * 4,
-          },
-        ]);
-      }
+      setAttendanceList(Array.isArray(data) ? data : []);
     } catch (e) {
       console.warn('Lỗi khi tải attendance list:', e);
+      setAttendanceList([]);
     } finally {
       setLoading(false);
     }
@@ -340,6 +304,13 @@ const LiveAttendanceModal = ({
                       </tr>
                     );
                   })}
+                  {attendanceList.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                        Chưa có nhân sự nào được phân công hoặc điểm danh trong ca này.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

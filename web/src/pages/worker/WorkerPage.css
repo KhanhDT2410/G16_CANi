@@ -398,3 +398,71 @@
   100% { width: 100%; transform: translateX(0); }
 }
 
+/* ==========================================================================
+   Responsive Breakpoints for Worker Portal
+   ========================================================================== */
+@media (max-width: 768px) {
+  .worker-container {
+    padding: 1rem 0.75rem 2.5rem;
+  }
+
+  .worker-profile-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.25rem;
+    gap: 1rem;
+  }
+
+  .worker-info-left {
+    width: 100%;
+    gap: 1rem;
+  }
+
+  .worker-stats-chips {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+
+  .worker-stat-chip {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: 120px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .worker-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+    scrollbar-width: thin;
+  }
+
+  .worker-tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0.6rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .proposals-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ekyc-images-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .confirm-btn-group {
+    flex-direction: column;
+  }
+
+  .btn-confirm-full,
+  .btn-dispute-trigger {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+

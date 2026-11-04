@@ -84,6 +84,10 @@ public class ShiftAssignment {
     @Column(name = "eo_confirmed_at")
     private Instant eoConfirmedAt;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "checklist_progress", columnDefinition = "jsonb")
+    private String checklistProgress;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

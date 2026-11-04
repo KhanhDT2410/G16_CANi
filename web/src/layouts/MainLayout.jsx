@@ -18,6 +18,34 @@ const MainLayout = () => {
     }
   });
 
+  const [headerSearch, setHeaderSearch] = useState(() => {
+    try {
+      return new URLSearchParams(location.search).get('q') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setHeaderSearch(val);
+    window.dispatchEvent(new CustomEvent('cani_global_search', { detail: { query: val } }));
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      window.dispatchEvent(new CustomEvent('cani_global_search', { detail: { query: headerSearch } }));
+      if (!location.pathname.startsWith('/eo')) {
+        navigate(`/eo?q=${encodeURIComponent(headerSearch)}`);
+      }
+    }
+  };
+
+  const handleClearSearch = () => {
+    setHeaderSearch('');
+    window.dispatchEvent(new CustomEvent('cani_global_search', { detail: { query: '' } }));
+  };
+
   useEffect(() => {
     const handleAvatarUpdate = (e) => {
       const newAvatar = e.detail?.avatarUrl || localStorage.getItem('cani_eo_avatar');
@@ -120,7 +148,29 @@ const MainLayout = () => {
               type="text"
               placeholder="Tìm kiếm sự kiện, nhân sự, địa điểm..."
               className="header-search-input"
+              value={headerSearch}
+              onChange={handleSearchChange}
+              onKeyDown={handleSearchKeyDown}
             />
+            {headerSearch && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1rem',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '0 4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Xóa tìm kiếm"
+              >
+                ×
+              </button>
+            )}
           </div>
         </div>
 

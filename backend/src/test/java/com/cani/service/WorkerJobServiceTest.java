@@ -56,6 +56,11 @@ class WorkerJobServiceTest {
     @Mock
     private DirectPaymentService directPaymentService;
 
+    @org.mockito.Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper()
+            .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
     @InjectMocks
     private WorkerJobService workerJobService;
 
@@ -136,5 +141,90 @@ class WorkerJobServiceTest {
 
         assertThat(pendingProposal.getStatus()).isEqualTo(ProposalStatus.REJECTED);
         verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("UC-45 Checklist: Parse an toàn template cả khi lưu mảng String cũ lẫn mảng Object")
+    void shouldParseStringArrayTemplateResiliently() {
+        String legacyStringArray = "[\"Có mặt trước 15-30 phút\", \"Đồng phục chỉn chu\"]";
+        List<com.cani.dto.worker.ShiftChecklistItemDto> items = workerJobService.parseChecklistTemplate(legacyStringArray);
+
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0).getId()).isEqualTo("chk_1");
+        assertThat(items.get(0).getTitle()).isEqualTo("Có mặt trước 15-30 phút");
+        assertThat(items.get(0).getIsCompleted()).isFalse();
+
+        String objectArray = "[{\"id\":\"chk_custom\",\"title\":\"Quét QR đầu ca\"}]";
+        List<com.cani.dto.worker.ShiftChecklistItemDto> objectItems = workerJobService.parseChecklistTemplate(objectArray);
+        assertThat(objectItems).hasSize(1);
+        assertThat(objectItems.get(0).getId()).isEqualTo("chk_custom");
+        assertThat(objectItems.get(0).getTitle()).isEqualTo("Quét QR đầu ca");
+    }
+
+    @Test
+    @DisplayName("UC-45 Checklist: getShiftChecklist merge đúng tiến độ riêng của từng Worker")
+    void shouldGetShiftChecklistMergedWithWorkerProgress() {
+        UUID assignmentId = UUID.randomUUID();
+        activeShift.setChecklist("[\"Có mặt trước 15 phút\", \"Đồng phục đúng quy định\"]");
+
+        ShiftAssignment assignment = ShiftAssignment.builder()
+                .assignmentId(assignmentId)
+                .shift(activeShift)
+                .worker(worker)
+                .checklistProgress("{\"chk_1\":{\"isCompleted\":true,\"completedAt\":\"2026-11-04T12:00:00Z\"}}")
+                .build();
+
+        when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(assignment));
+
+        List<com.cani.dto.worker.ShiftChecklistItemDto> checklist = workerJobService.getShiftChecklist(workerUser.getUserId(), assignmentId);
+
+        assertThat(checklist).hasSize(2);
+        assertThat(checklist.get(0).getId()).isEqualTo("chk_1");
+        assertThat(checklist.get(0).getIsCompleted()).isTrue();
+        assertThat(checklist.get(0).getCompletedAt()).isNotNull();
+
+        assertThat(checklist.get(1).getId()).isEqualTo("chk_2");
+        assertThat(checklist.get(1).getIsCompleted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("UC-45 Checklist: updateShiftChecklist chỉ lưu vào ShiftAssignment, KHÔNG ghi đè Shift")
+    void shouldUpdateShiftChecklistInAssignmentWithoutModifyingShift() {
+        UUID assignmentId = UUID.randomUUID();
+        String originalShiftChecklist = "[\"Việc 1\", \"Việc 2\"]";
+        activeShift.setChecklist(originalShiftChecklist);
+
+        ShiftAssignment assignment = ShiftAssignment.builder()
+                .assignmentId(assignmentId)
+                .shift(activeShift)
+                .worker(worker)
+                .checklistProgress(null)
+                .build();
+
+        when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(assignment));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> i.getArgument(0));
+
+        com.cani.dto.worker.UpdateChecklistRequestDto request = com.cani.dto.worker.UpdateChecklistRequestDto.builder()
+                .items(List.of(
+                        com.cani.dto.worker.ShiftChecklistItemDto.builder().id("chk_1").isCompleted(true).build()
+                ))
+                .build();
+
+        List<com.cani.dto.worker.ShiftChecklistItemDto> result = workerJobService.updateShiftChecklist(workerUser.getUserId(), assignmentId, request);
+
+        // Verify assignment saved with jsonb progress
+        verify(shiftAssignmentRepository, times(1)).save(assignment);
+        assertThat(assignment.getChecklistProgress()).contains("\"chk_1\"");
+        assertThat(assignment.getChecklistProgress()).contains("\"isCompleted\":true");
+
+        // Verify shift was NEVER modified or saved!
+        verify(shiftRepository, never()).save(any());
+        assertThat(activeShift.getChecklist()).isEqualTo(originalShiftChecklist);
+
+        // Result reflects merged progress
+        assertThat(result.get(0).getIsCompleted()).isTrue();
+        assertThat(result.get(1).getIsCompleted()).isFalse();
     }
 }

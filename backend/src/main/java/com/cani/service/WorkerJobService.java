@@ -12,6 +12,7 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -579,6 +583,7 @@ public class WorkerJobService {
 
     // =========================================================================
     // UC-45: CHECKLIST CÔNG VIỆC TRONG CA (SHIFT CHECKLIST)
+    // Tách Template (Shift) vs Tiến độ cá nhân (ShiftAssignment.checklistProgress)
     // =========================================================================
     @Transactional(readOnly = true)
     public List<ShiftChecklistItemDto> getShiftChecklist(UUID userId, UUID assignmentId) {
@@ -586,16 +591,25 @@ public class WorkerJobService {
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
 
         Shift shift = assignment.getShift();
-        if (shift == null || shift.getChecklist() == null || shift.getChecklist().isBlank()) {
+        String templateJson = shift != null ? shift.getChecklist() : null;
+        List<ShiftChecklistItemDto> templateItems = parseChecklistTemplate(templateJson);
+        if (templateItems.isEmpty()) {
             return List.of();
         }
 
-        try {
-            return objectMapper.readValue(shift.getChecklist(), new TypeReference<List<ShiftChecklistItemDto>>() {});
-        } catch (Exception e) {
-            log.error("Lỗi khi đọc JSON checklist của Shift {}: {}", shift.getShiftId(), e.getMessage());
-            return List.of();
+        Map<String, ChecklistProgressDto> progressMap = parseChecklistProgress(assignment.getChecklistProgress());
+        for (ShiftChecklistItemDto item : templateItems) {
+            ChecklistProgressDto prog = progressMap.get(item.getId());
+            if (prog != null && Boolean.TRUE.equals(prog.getIsCompleted())) {
+                item.setIsCompleted(true);
+                item.setCompletedAt(prog.getCompletedAt());
+            } else {
+                item.setIsCompleted(false);
+                item.setCompletedAt(null);
+            }
         }
+
+        return templateItems;
     }
 
     @Transactional
@@ -604,16 +618,103 @@ public class WorkerJobService {
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
 
         Shift shift = assignment.getShift();
-        if (shift != null) {
-            try {
-                shift.setChecklist(objectMapper.writeValueAsString(request.getItems()));
-                shiftRepository.save(shift);
-            } catch (Exception e) {
-                throw new BadRequestException("Không thể lưu checklist: " + e.getMessage());
+        String templateJson = shift != null ? shift.getChecklist() : null;
+        List<ShiftChecklistItemDto> templateItems = parseChecklistTemplate(templateJson);
+
+        Set<String> validIds = templateItems.stream()
+                .map(ShiftChecklistItemDto::getId)
+                .collect(Collectors.toSet());
+
+        Map<String, ChecklistProgressDto> progressMap = parseChecklistProgress(assignment.getChecklistProgress());
+
+        if (request != null && request.getItems() != null) {
+            Instant now = Instant.now();
+            for (ShiftChecklistItemDto incoming : request.getItems()) {
+                String itemId = incoming.getId();
+                // Validate itemId thuộc template (nếu template có danh mục id)
+                if (itemId != null && (validIds.isEmpty() || validIds.contains(itemId))) {
+                    boolean completed = Boolean.TRUE.equals(incoming.getIsCompleted());
+                    Instant completedAt = completed
+                            ? (incoming.getCompletedAt() != null ? incoming.getCompletedAt() : now)
+                            : null;
+                    progressMap.put(itemId, ChecklistProgressDto.builder()
+                            .isCompleted(completed)
+                            .completedAt(completedAt)
+                            .build());
+                }
             }
         }
 
-        return request.getItems();
+        try {
+            assignment.setChecklistProgress(objectMapper.writeValueAsString(progressMap));
+            shiftAssignmentRepository.save(assignment);
+        } catch (Exception e) {
+            log.error("Không thể lưu checklist progress của Assignment {}: {}", assignmentId, e.getMessage());
+            throw new BadRequestException("Không thể lưu tiến độ checklist: " + e.getMessage());
+        }
+
+        // Trả về danh sách template đã merge với tiến độ mới nhất của chính worker này
+        for (ShiftChecklistItemDto item : templateItems) {
+            ChecklistProgressDto prog = progressMap.get(item.getId());
+            if (prog != null && Boolean.TRUE.equals(prog.getIsCompleted())) {
+                item.setIsCompleted(true);
+                item.setCompletedAt(prog.getCompletedAt());
+            } else {
+                item.setIsCompleted(false);
+                item.setCompletedAt(null);
+            }
+        }
+
+        return templateItems;
+    }
+
+    public List<ShiftChecklistItemDto> parseChecklistTemplate(String checklistJson) {
+        if (checklistJson == null || checklistJson.isBlank()) {
+            return new ArrayList<>();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(checklistJson);
+            if (!root.isArray()) {
+                return new ArrayList<>();
+            }
+            List<ShiftChecklistItemDto> result = new ArrayList<>();
+            int index = 1;
+            for (JsonNode node : root) {
+                if (node.isTextual()) {
+                    result.add(ShiftChecklistItemDto.builder()
+                            .id("chk_" + index)
+                            .title(node.asText())
+                            .isCompleted(false)
+                            .build());
+                    index++;
+                } else if (node.isObject()) {
+                    String id = node.hasNonNull("id") ? node.get("id").asText() : ("chk_" + index);
+                    String title = node.hasNonNull("title") ? node.get("title").asText() : "";
+                    result.add(ShiftChecklistItemDto.builder()
+                            .id(id)
+                            .title(title)
+                            .isCompleted(false)
+                            .build());
+                    index++;
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("Không thể parse checklist template: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public Map<String, ChecklistProgressDto> parseChecklistProgress(String progressJson) {
+        if (progressJson == null || progressJson.isBlank()) {
+            return new HashMap<>();
+        }
+        try {
+            return objectMapper.readValue(progressJson, new TypeReference<Map<String, ChecklistProgressDto>>() {});
+        } catch (Exception e) {
+            log.warn("Không thể parse checklist progress map: {}", e.getMessage());
+            return new HashMap<>();
+        }
     }
 
     // =========================================================================

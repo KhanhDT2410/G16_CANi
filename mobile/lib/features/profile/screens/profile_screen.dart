@@ -1,11 +1,12 @@
 // CANi · tab "Tài khoản" — Worker profile screen.
-// Composition of profile blocks wired to the real aggregated providers.
+// Composition of profile blocks wired to the real aggregated providers with live auto-refresh.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/theme_provider.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/profile/providers/profile_providers.dart';
 import 'package:cani/features/profile/widgets/profile_block_cv.dart';
@@ -17,14 +18,48 @@ import 'package:cani/features/profile/widgets/profile_block_security.dart';
 import 'package:cani/features/profile/widgets/profile_block_settings.dart';
 import 'package:cani/features/profile/widgets/profile_block_trust.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
-import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
+import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
 import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 
-class WorkerProfileScreen extends ConsumerWidget {
+class WorkerProfileScreen extends ConsumerStatefulWidget {
   const WorkerProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WorkerProfileScreen> createState() => _WorkerProfileScreenState();
+}
+
+class _WorkerProfileScreenState extends ConsumerState<WorkerProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Tránh double-fetch: Constructor của notifiers đã tự fetch khi lazy-init.
+      // Chỉ chủ động kích hoạt nếu state hiện đang rỗng và không trong quá trình tải.
+      final skillState = ref.read(skillVerificationProvider);
+      final ekycState = ref.read(ekycProvider);
+      if (skillState.skillPoints.isEmpty && !skillState.isLoading) {
+        ref.read(skillVerificationProvider.notifier).loadAll();
+      }
+      if (ekycState.result == null && !ekycState.isLoading) {
+        ref.read(ekycProvider.notifier).checkStatus();
+      }
+    });
+  }
+
+  Future<void> _refreshProfileData() async {
+    try {
+      await Future.wait([
+        ref.read(skillVerificationProvider.notifier).loadAll(),
+        ref.read(ekycProvider.notifier).checkStatus(),
+      ]);
+    } catch (e) {
+      debugPrint('Lỗi nạp dữ liệu hồ sơ cá nhân: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final data = ref.watch(profileDataProvider);
     final t = Theme.of(context).profileX;
 
@@ -40,7 +75,7 @@ class WorkerProfileScreen extends ConsumerWidget {
       backgroundColor: t.canvas,
       appBar: _appBar(context, ref),
       body: RefreshIndicator(
-        onRefresh: () async {},
+        onRefresh: _refreshProfileData,
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 16),
           children: [

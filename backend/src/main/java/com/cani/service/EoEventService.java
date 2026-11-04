@@ -10,7 +10,7 @@ import com.cani.entity.enums.UserRole;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -295,11 +299,13 @@ public class EoEventService {
 
         List<ShiftAssignment> assignments = shiftAssignmentRepository.findByShift_ShiftId(shiftId);
         BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift);
-        String checklistSummary = computeChecklistSummary(shift.getChecklist());
         UUID eoUserId = resolveEoUserId(eo, userId);
 
         return assignments.stream()
-                .map(sa -> mapToShiftAttendanceDto(sa, eoUserId, agreedWage, checklistSummary))
+                .map(sa -> {
+                    String checklistSummary = computeChecklistSummary(shift.getChecklist(), sa.getChecklistProgress());
+                    return mapToShiftAttendanceDto(sa, eoUserId, agreedWage, checklistSummary);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -332,7 +338,7 @@ public class EoEventService {
 
         Shift shift = sa.getShift();
         BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift);
-        String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null);
+        String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
         return mapToShiftAttendanceDto(sa, resolveEoUserId(eo, userId), agreedWage, checklistSummary);
     }
 
@@ -515,16 +521,78 @@ public class EoEventService {
         return hourly.multiply(BigDecimal.valueOf(hours)).add(allowance);
     }
 
-    private String computeChecklistSummary(String checklistJson) {
-        if (checklistJson == null || checklistJson.isBlank()) {
+    private String computeChecklistSummary(String templateJson, String progressJson) {
+        if (templateJson == null || templateJson.isBlank()) {
             return "";
         }
-        try {
-            List<ShiftChecklistItemDto> items = objectMapper.readValue(checklistJson, new TypeReference<List<ShiftChecklistItemDto>>() {});
-            long completed = items.stream().filter(i -> Boolean.TRUE.equals(i.getIsCompleted())).count();
-            return completed + "/" + items.size() + " việc";
-        } catch (Exception ignored) {
+        List<ShiftChecklistItemDto> template = parseChecklistTemplate(templateJson);
+        if (template.isEmpty()) {
             return "";
+        }
+
+        int total = template.size();
+        if (progressJson == null || progressJson.isBlank()) {
+            return "0/" + total + " việc";
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(progressJson);
+            long completed = 0;
+            if (root.isObject()) {
+                Iterator<Map.Entry<String, JsonNode>> fields = root.fields();
+                while (fields.hasNext()) {
+                    Map.Entry<String, JsonNode> field = fields.next();
+                    JsonNode val = field.getValue();
+                    if (val.isObject() && val.has("isCompleted") && val.get("isCompleted").asBoolean()) {
+                        completed++;
+                    }
+                }
+            } else if (root.isArray()) {
+                for (JsonNode n : root) {
+                    if (n.has("isCompleted") && n.get("isCompleted").asBoolean()) {
+                        completed++;
+                    }
+                }
+            }
+            return completed + "/" + total + " việc";
+        } catch (Exception e) {
+            return "0/" + total + " việc";
+        }
+    }
+
+    private List<ShiftChecklistItemDto> parseChecklistTemplate(String checklistJson) {
+        if (checklistJson == null || checklistJson.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(checklistJson);
+            if (!root.isArray()) {
+                return Collections.emptyList();
+            }
+            List<ShiftChecklistItemDto> result = new ArrayList<>();
+            int index = 1;
+            for (JsonNode node : root) {
+                if (node.isTextual()) {
+                    result.add(ShiftChecklistItemDto.builder()
+                            .id("chk_" + index)
+                            .title(node.asText())
+                            .isCompleted(false)
+                            .build());
+                    index++;
+                } else if (node.isObject()) {
+                    String id = node.hasNonNull("id") ? node.get("id").asText() : ("chk_" + index);
+                    String title = node.hasNonNull("title") ? node.get("title").asText() : "";
+                    result.add(ShiftChecklistItemDto.builder()
+                            .id(id)
+                            .title(title)
+                            .isCompleted(false)
+                            .build());
+                    index++;
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            return Collections.emptyList();
         }
     }
 

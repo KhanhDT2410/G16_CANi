@@ -3,32 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:cani/core/constants/banks.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
-
-class BankInfo {
-  final String code;
-  final String name;
-  final String shortName;
-
-  const BankInfo({
-    required this.code,
-    required this.name,
-    required this.shortName,
-  });
-}
-
-const List<BankInfo> kSupportedBanks = [
-  BankInfo(code: 'MB', name: 'Ngân hàng Quân Đội (MBBank)', shortName: 'MBBank'),
-  BankInfo(code: 'VCB', name: 'Ngân hàng Ngoại Thương (Vietcombank)', shortName: 'Vietcombank'),
-  BankInfo(code: 'TCB', name: 'Ngân hàng Kỹ Thương (Techcombank)', shortName: 'Techcombank'),
-  BankInfo(code: 'BIDV', name: 'Ngân hàng Đầu tư & Phát triển (BIDV)', shortName: 'BIDV'),
-  BankInfo(code: 'CTG', name: 'Ngân hàng Công Thương (VietinBank)', shortName: 'VietinBank'),
-  BankInfo(code: 'ACB', name: 'Ngân hàng Á Châu (ACB)', shortName: 'ACB'),
-  BankInfo(code: 'TPB', name: 'Ngân hàng Tiên Phong (TPBank)', shortName: 'TPBank'),
-  BankInfo(code: 'VPB', name: 'Ngân hàng Việt Nam Thịnh Vượng (VPBank)', shortName: 'VPBank'),
-  BankInfo(code: 'VBA', name: 'Ngân hàng Nông nghiệp (Agribank)', shortName: 'Agribank'),
-  BankInfo(code: 'OCB', name: 'Ngân hàng Phương Đông (OCB)', shortName: 'OCB'),
-];
 
 class WorkerBankSettingsScreen extends ConsumerStatefulWidget {
   const WorkerBankSettingsScreen({super.key});
@@ -62,23 +38,28 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
   }
 
   Future<void> _loadSavedBankInfo() async {
-    final user = ref.read(authStateProvider).user;
-    final savedBank = await _storage.read(key: 'cani_worker_bank_code');
-    final savedAccount = await _storage.read(key: 'cani_worker_bank_account');
-    final savedName = await _storage.read(key: 'cani_worker_bank_owner');
+    try {
+      final user = ref.read(authStateProvider).user;
+      final savedBank = await _storage.read(key: 'cani_worker_bank_code');
+      final savedAccount = await _storage.read(key: 'cani_worker_bank_account');
+      final savedName = await _storage.read(key: 'cani_worker_bank_owner');
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      if (savedBank != null && kSupportedBanks.any((b) => b.code == savedBank)) {
-        _selectedBankCode = savedBank;
-      }
-      _accountNumberCtrl.text = savedAccount ?? '';
-      _accountNameCtrl.text = (savedName != null && savedName.isNotEmpty)
-          ? savedName
-          : (user?.fullName.toUpperCase() ?? '');
-      _isLoading = false;
-    });
+      setState(() {
+        if (savedBank != null && kSupportedBanks.any((b) => b.code == savedBank)) {
+          _selectedBankCode = savedBank;
+        }
+        _accountNumberCtrl.text = savedAccount ?? '';
+        _accountNameCtrl.text = (savedName != null && savedName.isNotEmpty)
+            ? savedName
+            : (user?.fullName?.toUpperCase() ?? '');
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _saveBankInfo() async {
@@ -89,19 +70,34 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
     final accountNum = _accountNumberCtrl.text.trim();
     final accountName = _accountNameCtrl.text.trim().toUpperCase();
 
-    await _storage.write(key: 'cani_worker_bank_code', value: bankCode);
-    await _storage.write(key: 'cani_worker_bank_account', value: accountNum);
-    await _storage.write(key: 'cani_worker_bank_owner', value: accountName);
+    try {
+      await Future.wait([
+        _storage.write(key: 'cani_worker_bank_code', value: bankCode),
+        _storage.write(key: 'cani_worker_bank_account', value: accountNum),
+        _storage.write(key: 'cani_worker_bank_owner', value: accountName),
+      ]);
 
-    if (!mounted) return;
-    setState(() => _isSaving = false);
+      if (!mounted) return;
+      setState(() => _isSaving = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã lưu tài khoản ngân hàng & cập nhật mã VietQR nhận lương!'),
-        backgroundColor: Color(0xFF059669),
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã lưu thông tin tài khoản trên thiết bị (Chế độ Demo)'),
+          backgroundColor: Color(0xFF059669),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Lỗi lưu thông tin ngân hàng vào storage: $e');
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể lưu thông tin vào thiết bị. Vui lòng thử lại.'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+    }
   }
 
   String _getVietQrUrl() {
@@ -241,7 +237,32 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+
+                    // CẢNH BÁO MINH BẠCH VỀ CHẾ ĐỘ DEMO & MONEY PATH
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Chế độ Demo (Lưu trên thiết bị) — Chưa đồng bộ cơ sở dữ liệu server. Ban Tổ Chức (EO) sẽ đối chiếu trực tiếp họ tên và CCCD khi chuyển khoản VietQR 247 sau ca làm việc.',
+                              style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
 
                     // THÔNG TIN GIẢI THÍCH CHUẨN NON-ESCROW
                     Container(

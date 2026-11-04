@@ -94,7 +94,13 @@ export function useShifts({ onReloadEvents }) {
     if (!selectedEventId) return;
     try {
       const checklistStr = Array.isArray(newShift.checklistItems)
-        ? JSON.stringify(newShift.checklistItems)
+        ? JSON.stringify(
+            newShift.checklistItems.map((item, idx) =>
+              typeof item === 'object' && item.title
+                ? item
+                : { id: `chk_${idx + 1}`, title: String(item).trim() }
+            )
+          )
         : (newShift.checklist || '[]');
 
       await eoService.addShiftToEvent(selectedEventId, {

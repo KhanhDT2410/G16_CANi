@@ -97,4 +97,20 @@ cani:
   firebase:
     enabled: ${FIREBASE_ENABLED:true}
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
+  subscription:
+    strict: ${SUBSCRIPTION_STRICT:false}
+  vnpay:
+    pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+    tmn-code: ${VNPAY_TMN_CODE:CANIVN01}
+    hash-secret: ${VNPAY_HASH_SECRET:RAIQUIOWGHG2CILNLNIZFYKTMPI4U0SZ}
+    return-url: ${VNPAY_RETURN_URL:http://localhost:5173/eo?tab=subscription}
+  payos:
+    endpoint: ${PAYOS_ENDPOINT:https://api-merchant.payos.vn}
+    client-id: ${PAYOS_CLIENT_ID:856cf773-33b5-4da1-8cf0-adf01233ba1a}
+    api-key: ${PAYOS_API_KEY:0e56b01d-3514-4ad9-901b-4afd203f1a44}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:04ec2256d44a67dfcaa6fb04c9a741365bff5cd9911afd8f96cadd3efaf1ddfc}
+    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?payos=success}
+    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?payos=cancel}
+
+
 

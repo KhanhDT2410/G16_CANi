@@ -442,4 +442,23 @@ class ProposalRepository {
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải thống kê thu nhập.'), e);
     }
   }
+
+  // UC-73: Worker tham gia ca làm việc qua Mã mời hoặc Quét QR mời (Invite Mode)
+  Future<bool> joinViaInviteCode(String code, {String? token}) async {
+    try {
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.post(
+        '/v1/workers/invites/join',
+        data: {'code': code.trim().toUpperCase()},
+        options: options,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      if (demoMode) {
+        log('Demo Mode: Giả lập tham gia ca qua mã mời $code thành công');
+        return true;
+      }
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tham gia ca qua mã mời này.'), e);
+    }
+  }
 }

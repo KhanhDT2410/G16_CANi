@@ -2,8 +2,7 @@ import React from 'react';
 
 /**
  * PublishEventModal
- * Modal xác nhận xuất bản sự kiện & kích hoạt Matching Engine
- * Hỗ trợ thanh toán phí qua VietQR NAPAS 247 hoặc trừ Quota gói hội viên SaaS
+ * Modal xác nhận xuất bản sự kiện & kích hoạt Matching Engine (Clean UI - No Emoji)
  */
 const PublishEventModal = ({
   isOpen,
@@ -17,16 +16,15 @@ const PublishEventModal = ({
   if (!isOpen || !event) return null;
 
   const workersCount = event.totalRequiredWorkers || 0;
-  const platformFee = Math.max(3000, workersCount * 3000);
+  const platformFee = Math.max(50000, workersCount * 3000);
   const eventIdCode = (event.eventId || 'EVT').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase();
   const transferMemo = `CANI PHI ${eventIdCode}`;
-  const vietQrUrl = `https://img.vietqr.io/image/MB-0987654321-compact2.png?amount=${platformFee}&addInfo=${encodeURIComponent(transferMemo)}&accountName=CONG%20TY%20CANI%20TECH`;
+  const vietQrUrl = `https://img.vietqr.io/image/MB-2622014789096-compact2.png?amount=${platformFee}&addInfo=${encodeURIComponent(transferMemo)}&accountName=PHAM%20DUY%20HUNG`;
 
   return (
     <div className="eo-modal-overlay">
       <div className="eo-modal-box publish-modal-box animate-fade-in-up">
         <div className="publish-modal-header">
-          <span className="publish-modal-icon">🚀</span>
           <div>
             <h3>Xác Nhận Xuất Bản & Kích Hoạt Matching</h3>
             <p>Hệ thống CANi sẽ quét ứng viên phù hợp theo độ tin cậy và bán kính điều phối</p>
@@ -67,7 +65,7 @@ const PublishEventModal = ({
         <div className="publish-fee-box">
           <div className="publish-fee-header">
             <span className="publish-fee-title">
-              ⚡ Phí dịch vụ điều phối (Platform Matching Fee):
+              Phí dịch vụ điều phối (Platform Matching Fee):
             </span>
             <span className="publish-fee-amount">
               {platformFee.toLocaleString()} đ
@@ -88,14 +86,14 @@ const PublishEventModal = ({
               className={`publish-tab-btn ${publishPayMethod === 'VIETQR' ? 'active' : ''}`}
               onClick={() => setPublishPayMethod('VIETQR')}
             >
-              📱 Quét Mã VietQR (Tự Động Điền Tiền)
+              Quét Mã VietQR (Tự Động Điền Tiền)
             </button>
             <button
               type="button"
               className={`publish-tab-btn ${publishPayMethod === 'SUBSCRIPTION' ? 'active' : ''}`}
               onClick={() => setPublishPayMethod('SUBSCRIPTION')}
             >
-              🎟️ Trừ Gói Quota Hội Viên (SaaS)
+              Trừ Gói Quota Hội Viên (SaaS)
             </button>
           </div>
 
@@ -110,24 +108,24 @@ const PublishEventModal = ({
                     className="vietqr-image"
                   />
                   <div className="vietqr-live-tag">
-                    <span className="pulse-dot" /> Quét bằng App Ngân Hàng bất kỳ
+                    Quét bằng App Ngân Hàng bất kỳ
                   </div>
                 </div>
               </div>
 
               <div className="vietqr-info-col">
                 <div className="vietqr-bank-badge">
-                  🏦 Ngân hàng Quân Đội (MBBank)
+                  Ngân hàng Quân Đội (MBBank)
                 </div>
 
                 <div className="vietqr-detail-row">
                   <span className="vietqr-lbl">Số tài khoản:</span>
                   <div className="vietqr-val-group">
-                    <strong>0987654321</strong>
+                    <strong>2622 0147 8909 6</strong>
                     <button
                       type="button"
                       className="vietqr-copy-btn"
-                      onClick={() => onCopyToClipboard('0987654321', 'Số tài khoản')}
+                      onClick={() => onCopyToClipboard('2622014789096', 'Số tài khoản')}
                     >
                       Sao chép
                     </button>
@@ -136,7 +134,7 @@ const PublishEventModal = ({
 
                 <div className="vietqr-detail-row">
                   <span className="vietqr-lbl">Chủ tài khoản:</span>
-                  <span className="vietqr-val">CONG TY CANI TECH</span>
+                  <span className="vietqr-val">PHAM DUY HUNG</span>
                 </div>
 
                 <div className="vietqr-detail-row">
@@ -170,7 +168,7 @@ const PublishEventModal = ({
                 </div>
 
                 <div className="vietqr-guide-box">
-                  💡 <em>Mẹo:</em> Khi bạn quét mã QR bằng App Mobile Banking (Vietcombank, MB, Techcombank, MoMo...), <strong>Số tiền ({platformFee.toLocaleString()} đ)</strong> và <strong>Nội dung ({transferMemo})</strong> sẽ tự động được điền sẵn 100%!
+                  Khi bạn quét mã QR bằng App Mobile Banking, Số tiền và Nội dung sẽ tự động được điền sẵn 100%.
                 </div>
               </div>
             </div>
@@ -206,12 +204,12 @@ const PublishEventModal = ({
           <button
             type="button"
             className="eo-btn-primary"
-            style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+            style={{ background: '#10b981' }}
             onClick={onExecutePublish}
           >
             {publishPayMethod === 'VIETQR'
-              ? '✅ Tôi Đã Chuyển Khoản & Kích Hoạt Tìm Người'
-              : '✅ Xác Nhận Trừ Quota & Kích Hoạt Tìm Người'}
+              ? 'Tôi Đã Chuyển Khoản & Kích Hoạt Tìm Người'
+              : 'Xác Nhận Trừ Quota & Kích Hoạt Tìm Người'}
           </button>
         </div>
       </div>

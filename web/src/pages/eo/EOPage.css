@@ -19,14 +19,53 @@
    ========================================================================== */
 .eo-dashboard-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 310px;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
   gap: 1.5rem;
   align-items: start;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
 }
 
-@media (max-width: 1280px) {
+.eo-dashboard-layout.sidebar-collapsed {
+  grid-template-columns: 74px minmax(0, 1fr) 280px;
+}
+
+/* Các tab quản trị chuyên sâu (Hồ sơ & eKYC, Cài đặt, Gói cước, Báo cáo) cần không gian rộng:
+   Widget panel tự động chuyển xuống dưới để giải phóng 100% chiều ngang */
+.eo-dashboard-layout.tab-profile,
+.eo-dashboard-layout.tab-ekyc,
+.eo-dashboard-layout.tab-settings,
+.eo-dashboard-layout.tab-subscription,
+.eo-dashboard-layout.tab-analytics {
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.eo-dashboard-layout.sidebar-collapsed.tab-profile,
+.eo-dashboard-layout.sidebar-collapsed.tab-ekyc,
+.eo-dashboard-layout.sidebar-collapsed.tab-settings,
+.eo-dashboard-layout.sidebar-collapsed.tab-subscription,
+.eo-dashboard-layout.sidebar-collapsed.tab-analytics {
+  grid-template-columns: 74px minmax(0, 1fr);
+}
+
+.eo-dashboard-layout.tab-profile .eo-widget-panel,
+.eo-dashboard-layout.tab-ekyc .eo-widget-panel,
+.eo-dashboard-layout.tab-settings .eo-widget-panel,
+.eo-dashboard-layout.tab-subscription .eo-widget-panel,
+.eo-dashboard-layout.tab-analytics .eo-widget-panel {
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+  gap: 1.25rem !important;
+  margin-top: 1rem;
+}
+
+@media (max-width: 1440px) {
   .eo-dashboard-layout {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .eo-dashboard-layout.sidebar-collapsed {
+    grid-template-columns: 74px minmax(0, 1fr);
   }
   .eo-widget-panel {
     grid-column: 1 / -1;
@@ -58,6 +97,89 @@
   gap: 1.5rem;
   position: sticky;
   top: 5rem;
+  transition: width 0.25s ease;
+}
+
+.eo-sidebar-toggle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.5rem 0.65rem;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 0.35rem;
+}
+
+.eo-sidebar-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.eo-collapse-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.eo-collapse-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Collapsed Sidebar Mode */
+.eo-sidebar.collapsed {
+  width: 74px;
+}
+
+.eo-sidebar.collapsed .eo-sidebar-nav {
+  padding: 0.5rem 0.35rem;
+}
+
+.eo-sidebar.collapsed .eo-sidebar-toggle-header {
+  justify-content: center;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.eo-sidebar.collapsed .eo-collapse-btn {
+  margin: 0 auto;
+}
+
+.eo-sidebar.collapsed .eo-nav-item {
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  gap: 0;
+}
+
+.eo-sidebar.collapsed .eo-nav-item .nav-label {
+  display: none;
+}
+
+.nav-svg-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.eo-nav-item:hover .nav-svg-icon {
+  color: var(--color-primary-600);
+}
+
+.eo-nav-item.active .nav-svg-icon {
+  color: var(--color-primary-600);
 }
 
 .eo-sidebar-nav {
@@ -182,6 +304,9 @@
   flex-direction: column;
   gap: 1.5rem;
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Hero Welcome Banner */
@@ -848,6 +973,13 @@
   top: 5rem;
 }
 
+.eo-right-sidebar,
+.eo-widget-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 .eo-widget-card {
   background: #ffffff;
   border-radius: 18px;
@@ -920,7 +1052,8 @@
   margin-bottom: 0.5rem;
 }
 
-.calendar-grid {
+.calendar-grid,
+.calendar-days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 3px;

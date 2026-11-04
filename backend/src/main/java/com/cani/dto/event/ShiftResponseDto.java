@@ -36,4 +36,5 @@ public class ShiftResponseDto {
     private Integer minReliabilityScore;
     private ExperienceLevel minExperienceLevel;
     private String dressCode;
+    private String checklist;
 }

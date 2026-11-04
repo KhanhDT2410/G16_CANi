@@ -6,6 +6,7 @@ import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/cancel_assignment_dialog.dart';
 import '../widgets/job_proposal_invite_card.dart';
+import '../widgets/payment_confirm_dialog.dart';
 import '../widgets/rate_eo_dialog.dart';
 import '../widgets/shift_assignment_card.dart';
 import '../widgets/shift_checklist_sheet.dart';
@@ -146,13 +147,27 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
-  Future<void> _confirmPayment(ShiftAssignmentItem item, String status) async {
+  Future<void> _openPaymentDialog(ShiftAssignmentItem a) async {
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (_) => PaymentConfirmDialog(assignment: a),
+    );
+    if (result != null && mounted) {
+      final status = result['status']!;
+      final comment = result['comment'] ?? '';
+      await _confirmPayment(a, status, comment: comment);
+    }
+  }
+
+  Future<void> _confirmPayment(ShiftAssignmentItem item, String status, {String comment = ''}) async {
     final isFull = status == 'RECEIVED_FULL' || status == 'CONFIRMED_FULL';
-    final apiStatus = isFull ? 'RECEIVED_FULL' : 'NOT_RECEIVED';
-    final localPaymentStatus = isFull ? 'CONFIRMED_FULL' : 'DISPUTED';
-    final comment = apiStatus == 'NOT_RECEIVED' ? 'Chưa nhận được tiền lương từ Ban tổ chức' : '';
+    final isPartial = status == 'RECEIVED_PARTIAL' || status == 'CONFIRMED_PARTIAL';
+    final localPaymentStatus = isFull
+        ? 'CONFIRMED_FULL'
+        : (isPartial ? 'CONFIRMED_PARTIAL' : 'DISPUTED');
+
     try {
-      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, apiStatus, comment);
+      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, status, comment);
       setState(() {
         final index = _assignments.indexWhere((a) => a.assignmentId == item.assignmentId);
         if (index != -1) {
@@ -171,17 +186,31 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
             paymentStatus: localPaymentStatus,
             declaredAmount: item.declaredAmount,
             paymentMethod: item.paymentMethod,
+            venueLat: item.venueLat,
+            venueLng: item.venueLng,
+            attendanceStatus: item.attendanceStatus,
+            checkinTime: item.checkinTime,
+            checkoutTime: item.checkoutTime,
+            hoursWorked: item.hoursWorked,
           );
         }
       });
 
       if (mounted) {
+        String msg = 'Đã xác nhận nhận đủ tiền thù lao!';
+        Color color = const Color(0xFF16A34A);
+        if (isPartial) {
+          msg = 'Đã ghi nhận tình trạng nhận một phần thù lao.';
+          color = const Color(0xFFD97706);
+        } else if (!isFull && !isPartial) {
+          msg = 'Đã gửi khiếu nại (Dispute). Đội ngũ CSKH CANi sẽ liên hệ hỗ trợ bạn!';
+          color = const Color(0xFFDC2626);
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isFull
-                ? 'Đã xác nhận nhận đủ tiền lương!'
-                : 'Đã gửi khiếu nại (Dispute). Đội ngũ CANi sẽ hỗ trợ bạn!'),
-            backgroundColor: isFull ? const Color(0xFF16A34A) : const Color(0xFFEA580C),
+            content: Text(msg),
+            backgroundColor: color,
           ),
         );
       }
@@ -265,6 +294,72 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
+  // UC-73: Nhập mã mời ca làm việc (Screen 092)
+  Future<void> _openInviteCodeDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nhập Mã Mời Tham Gia Ca', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'CANI-XXXXXX',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.confirmation_number_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () {
+              final code = controller.text.trim();
+              if (code.isNotEmpty) Navigator.pop(ctx, code);
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0066FF)),
+            child: const Text('Tham Gia'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      try {
+        await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 Tham gia ca làm thành công qua mã mời!'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+          _loadData();
+        }
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: $err'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final radarState = ref.watch(jobRadarProvider);
@@ -295,29 +390,36 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                           letterSpacing: -0.2,
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.35) : const Color(0xFFF0F7FF),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF2563EB).withValues(alpha: 0.5) : const Color(0xFFDBEAFE),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF0077FF), size: 22),
+                            tooltip: 'Nhập mã mời ca làm (Screen 092)',
+                            onPressed: _openInviteCodeDialog,
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.location_on, size: 14, color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF)),
-                            const SizedBox(width: 4),
-                            Text(
-                              locationLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
-                              ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F7FF),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: const Color(0xFFDBEAFE)),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 14, color: Color(0xFF0077FF)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  locationLabel,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0077FF),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -539,7 +641,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
           assignment: item,
           onNavigate: () => _openNavigationSheet(item),
           onQrScan: () => _openQrScanner(item, !isCheckedIn),
-          onConfirmPayment: (status) => _confirmPayment(item, status),
+          onConfirmPayment: () => _openPaymentDialog(item),
           onOpenChecklist: () => _openChecklistSheet(item),
           onCancelAssignment: () => _openCancelDialog(item),
           onRateOrganizer: () => _openRateDialog(item),

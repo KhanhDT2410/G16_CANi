@@ -1,25 +1,37 @@
 import MapModal from '../../../components/common/MapModal';
-import EventCreateModal from './EventCreateModal';
+import EventCreationWizardModal from './EventCreationWizardModal';
 import ShiftCreateModal from './ShiftCreateModal';
 import PaymentDeclarationModal from './PaymentDeclarationModal';
 import PublishEventModal from './PublishEventModal';
 import ShiftQrModal from './ShiftQrModal';
+import ShiftInviteModal from './ShiftInviteModal';
+import DisputeModal from './DisputeModal';
 import LiveAttendanceModal from './LiveAttendanceModal';
 import EditEventModal from './EditEventModal';
 import EditShiftModal from './EditShiftModal';
 import { ROLES } from '../hooks/useShifts';
 
-export default function EOModals({ events, shifts, payments, mapModal, setMapModal }) {
+export default function EOModals({
+  events,
+  shifts,
+  payments,
+  mapModal,
+  setMapModal,
+  inviteModal,
+  setInviteModal,
+  disputeModal,
+  setDisputeModal,
+}) {
   return (
     <>
-      <EventCreateModal
+      <EventCreationWizardModal
         isOpen={events.showEventModal}
         onClose={() => events.setShowEventModal(false)}
+        onSuccess={events.loadEvents}
         newEvent={events.newEvent}
         setNewEvent={events.setNewEvent}
         locating={events.locating}
         onGetCurrentLocation={events.handleGetCurrentLocation}
-        onSubmit={events.handleCreateEvent}
       />
 
       <ShiftCreateModal
@@ -57,6 +69,20 @@ export default function EOModals({ events, shifts, payments, mapModal, setMapMod
         onClose={() => shifts.setSelectedShiftForQr(null)}
         qrData={shifts.qrModalData}
         loading={shifts.loadingQr}
+      />
+
+      <ShiftInviteModal
+        isOpen={Boolean(inviteModal?.isOpen)}
+        onClose={() => setInviteModal({ isOpen: false, shift: null, event: null })}
+        shift={inviteModal?.shift}
+        event={inviteModal?.event}
+      />
+
+      <DisputeModal
+        isOpen={Boolean(disputeModal?.isOpen)}
+        onClose={() => setDisputeModal({ isOpen: false, assignment: null })}
+        assignment={disputeModal?.assignment}
+        onSuccess={payments?.loadPayments}
       />
 
       <LiveAttendanceModal

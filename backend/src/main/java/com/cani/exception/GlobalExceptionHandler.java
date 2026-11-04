@@ -50,8 +50,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
         log.error("Unhandled exception occurred: ", ex);
+        String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? "Lỗi hệ thống: " + ex.getMessage()
+                : "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."));
+                .body(ApiResponse.error(msg));
     }
 }

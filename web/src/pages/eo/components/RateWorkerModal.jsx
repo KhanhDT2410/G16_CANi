@@ -52,8 +52,8 @@ const RateWorkerModal = ({
     <div className="eo-modal-overlay">
       <div className="eo-modal-box" style={{ maxWidth: 520 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0 }}>⭐ Đánh Giá Nhân Sự Sau Ca Làm</h3>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+          <h3 style={{ margin: 0 }}>Đánh Giá Nhân Sự Sau Ca Làm</h3>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}>Đóng</button>
         </div>
 
         <div style={{ background: '#f8fafc', padding: '0.8rem 1rem', borderRadius: 8, marginBottom: '1.2rem', border: '1px solid #e2e8f0' }}>
@@ -158,7 +158,7 @@ const RateWorkerModal = ({
                       fontWeight: active ? 600 : 400,
                     }}
                   >
-                    {active ? '✓ ' : '+ '}{tag}
+                    {active ? '• ' : '+ '}{tag}
                   </button>
                 );
               })}

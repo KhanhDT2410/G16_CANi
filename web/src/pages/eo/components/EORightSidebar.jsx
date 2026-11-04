@@ -4,33 +4,24 @@ import { showToast } from '../../../components/common/Toast';
 const RECENT_NOTIFICATIONS = [
   {
     id: 1,
-    icon: '👤',
-    color: '#3b82f6',
-    bgColor: '#eff6ff',
     title: 'Nguyễn Văn A đã ứng tuyển vào ca Lễ tân',
     time: '10 phút trước',
   },
   {
     id: 2,
-    icon: '✓',
-    color: '#10b981',
-    bgColor: '#ecfdf5',
     title: 'Sự kiện Summer Fest 2026 đã được duyệt',
     time: '1 giờ trước',
   },
   {
     id: 3,
-    icon: '💳',
-    color: '#f59e0b',
-    bgColor: '#fffbeb',
     title: 'Yêu cầu xác nhận lương từ Trần Thị B',
     time: 'Hôm qua',
   },
 ];
 
 export default function EORightSidebar() {
-  const [calendarDate, setCalendarDate] = useState({ month: 9, year: 2026 });
-  const [selectedDay, setSelectedDay] = useState(20);
+  const [calendarDate, setCalendarDate] = useState({ month: new Date().getMonth(), year: new Date().getFullYear() });
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
 
   const renderCalendarDays = () => {
     const daysInMonth = new Date(calendarDate.year, calendarDate.month + 1, 0).getDate();
@@ -39,6 +30,7 @@ export default function EORightSidebar() {
     const prevMonthDays = new Date(calendarDate.year, calendarDate.month, 0).getDate();
     const cells = [];
 
+    // Các ngày của tháng trước (làm mờ)
     for (let i = 0; i < startWeekdayOffset; i++) {
       cells.push(
         <div key={`empty-${i}`} className="calendar-day-cell dim">
@@ -47,6 +39,7 @@ export default function EORightSidebar() {
       );
     }
 
+    // Các ngày của tháng hiện tại
     for (let day = 1; day <= daysInMonth; day++) {
       const isSelected = day === selectedDay;
       const hasEvent = day === 15 || day === 20;
@@ -68,17 +61,17 @@ export default function EORightSidebar() {
   };
 
   return (
-    <aside className="eo-right-sidebar">
+    <aside className="eo-right-sidebar eo-widget-panel">
       {/* Widget 1: Lịch mini tháng & chọn ngày */}
       <div className="eo-widget-card calendar-widget">
         <div className="widget-header">
           <h4 className="widget-title">
             Tháng {calendarDate.month + 1}, {calendarDate.year}
           </h4>
-          <div className="calendar-nav-arrows">
+          <div className="calendar-nav-buttons">
             <button
               type="button"
-              className="cal-arrow-btn"
+              className="cal-btn"
               title="Tháng trước"
               onClick={() => {
                 setCalendarDate((prev) => {
@@ -87,11 +80,11 @@ export default function EORightSidebar() {
                 });
               }}
             >
-              &larr;
+              &lt;
             </button>
             <button
               type="button"
-              className="cal-arrow-btn"
+              className="cal-btn"
               title="Tháng sau"
               onClick={() => {
                 setCalendarDate((prev) => {
@@ -100,7 +93,7 @@ export default function EORightSidebar() {
                 });
               }}
             >
-              &rarr;
+              &gt;
             </button>
           </div>
         </div>
@@ -116,8 +109,8 @@ export default function EORightSidebar() {
           <span className="weekend">CN</span>
         </div>
 
-        {/* Lưới các ngày trong tháng */}
-        <div className="calendar-days-grid">{renderCalendarDays()}</div>
+        {/* Lưới các ngày trong tháng (7 cột chuẩn) */}
+        <div className="calendar-grid">{renderCalendarDays()}</div>
       </div>
 
       {/* Widget 2: Thông báo và hoạt động gần đây */}
@@ -127,24 +120,24 @@ export default function EORightSidebar() {
           <button
             type="button"
             className="widget-link-btn"
-            onClick={() => showToast('Mở trung tâm thông báo!', 'info')}
+            onClick={() => showToast('Mở trung tâm thông báo', 'info')}
           >
             Tất cả
           </button>
         </div>
 
-        <div className="notification-items-list">
+        <div className="notification-list">
           {RECENT_NOTIFICATIONS.map((item) => (
-            <div key={item.id} className="notification-item-row">
+            <div key={item.id} className="notification-item">
               <div
-                className="noti-avatar"
-                style={{ backgroundColor: item.bgColor, color: item.color }}
+                className="notif-avatar"
+                style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}
               >
-                {item.icon}
+                {item.id}
               </div>
-              <div className="noti-content-wrap">
-                <p className="noti-text">{item.title}</p>
-                <span className="noti-time-stamp">{item.time}</span>
+              <div className="notif-body">
+                <p className="notif-title">{item.title}</p>
+                <span className="notif-time">{item.time}</span>
               </div>
             </div>
           ))}
@@ -153,4 +146,3 @@ export default function EORightSidebar() {
     </aside>
   );
 }
-

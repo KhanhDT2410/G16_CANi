@@ -21,10 +21,7 @@ import 'cccd_qr_scanner_screen.dart';
 class EkycVerificationScreen extends ConsumerStatefulWidget {
   final bool isOnboarding;
 
-  const EkycVerificationScreen({
-    super.key,
-    this.isOnboarding = false,
-  });
+  const EkycVerificationScreen({super.key, this.isOnboarding = false});
 
   @override
   ConsumerState<EkycVerificationScreen> createState() =>
@@ -57,9 +54,9 @@ class _EkycVerificationScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể chọn ảnh: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không thể chọn ảnh: $e')));
       }
     }
   }
@@ -67,9 +64,7 @@ class _EkycVerificationScreenState
   Future<void> _openQrScanner() async {
     final notifier = ref.read(ekycProvider.notifier);
     final result = await Navigator.of(context).push<CccdCardInfo>(
-      MaterialPageRoute(
-        builder: (_) => const CccdQrScannerScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const CccdQrScannerScreen()),
     );
 
     if (result != null && mounted) {
@@ -136,8 +131,10 @@ class _EkycVerificationScreenState
                         color: Color(0xFFF5F3FF),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.qr_code_scanner,
-                          color: Color(0xFF7C3AED)),
+                      child: const Icon(
+                        Icons.qr_code_scanner,
+                        color: Color(0xFF7C3AED),
+                      ),
                     ),
                     title: const Text(
                       'Quét mã QR góc thẻ CCCD',
@@ -149,13 +146,13 @@ class _EkycVerificationScreenState
                     ),
                     subtitle: const Text(
                       'Đọc đúng 100% dữ liệu Bộ Công An (không dùng AI)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios,
-                        size: 14, color: Color(0xFF94A3B8)),
+                    trailing: const Icon(
+                      Icons.arrow_forward_ios,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
                     onTap: () {
                       Navigator.of(ctx).pop();
                       _openQrScanner();
@@ -170,7 +167,10 @@ class _EkycVerificationScreenState
                       color: Color(0xFFECFDF5),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.camera_alt, color: Color(0xFF10B981)),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      color: Color(0xFF10B981),
+                    ),
                   ),
                   title: const Text(
                     'Chụp trực tiếp bằng Camera',
@@ -182,21 +182,22 @@ class _EkycVerificationScreenState
                   ),
                   subtitle: const Text(
                     'Có khung căn chỉnh thẻ CCCD & tự động hướng dẫn',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                    ),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
-                  trailing: const Icon(Icons.arrow_forward_ios,
-                      size: 14, color: Color(0xFF94A3B8)),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: Color(0xFF94A3B8),
+                  ),
                   onTap: () async {
                     Navigator.of(ctx).pop();
-                    final result =
-                        await Navigator.of(context).push<CardScanResult>(
-                      MaterialPageRoute(
-                        builder: (_) => CardScannerScreen(scanType: scanType),
-                      ),
-                    );
+                    final result = await Navigator.of(context)
+                        .push<CardScanResult>(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                CardScannerScreen(scanType: scanType),
+                          ),
+                        );
                     if (result != null) {
                       onPicked(result.bytes, result.fileName);
                     }
@@ -210,8 +211,10 @@ class _EkycVerificationScreenState
                       color: Color(0xFFEFF6FF),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.photo_library,
-                        color: Color(0xFF0077FF)),
+                    child: const Icon(
+                      Icons.photo_library,
+                      color: Color(0xFF0077FF),
+                    ),
                   ),
                   title: const Text(
                     'Chọn ảnh từ Thư viện máy',
@@ -223,13 +226,13 @@ class _EkycVerificationScreenState
                   ),
                   subtitle: const Text(
                     'Tải ảnh đã chụp sẵn trong bộ nhớ thiết bị',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF64748B),
-                    ),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
-                  trailing: const Icon(Icons.arrow_forward_ios,
-                      size: 14, color: Color(0xFF94A3B8)),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: Color(0xFF94A3B8),
+                  ),
                   onTap: () {
                     Navigator.of(ctx).pop();
                     _pickImage(onPicked);
@@ -304,7 +307,10 @@ class _EkycVerificationScreenState
                   onPressed: () => Navigator.of(ctx).pop(true),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                    side: const BorderSide(
+                      color: Color(0xFFE2E8F0),
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -395,9 +401,7 @@ class _EkycVerificationScreenState
   Widget _buildTopHeader(BuildContext context, {bool isResultView = false}) {
     return Row(
       children: [
-        AppBackButton(
-          onTap: _handlePostponeOrExit,
-        ),
+        AppBackButton(onTap: _handlePostponeOrExit),
         const SizedBox(width: 14),
         Expanded(
           child: Text(
@@ -458,10 +462,7 @@ class _EkycVerificationScreenState
         ),
         const SizedBox(height: 16),
         if (state.hasConfirmedInfo) ...[
-          EkycConfirmedInfoCard(
-            state: state,
-            onEditInfo: _openConfirmDialog,
-          ),
+          EkycConfirmedInfoCard(state: state, onEditInfo: _openConfirmDialog),
           const SizedBox(height: 16),
         ],
         EkycCaptureBox(
@@ -533,8 +534,8 @@ class _EkycVerificationScreenState
             item.isApproved
                 ? 'Chúc mừng! Hồ sơ của bạn đã được phê duyệt thành công.'
                 : (item.isPending
-                    ? 'Hồ sơ đã gửi thành công, đang chờ CSKH kiểm duyệt.'
-                    : 'Định danh chưa hoàn tất, vui lòng thử lại.'),
+                      ? 'Hồ sơ đã gửi thành công, đang chờ CSKH kiểm duyệt.'
+                      : 'Định danh chưa hoàn tất, vui lòng thử lại.'),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,
@@ -587,9 +588,15 @@ class _EkycVerificationScreenState
                   Navigator.of(context).maybePop();
                 }
               },
-              icon: const Icon(Icons.rocket_launch, color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.rocket_launch,
+                color: Colors.white,
+                size: 20,
+              ),
               label: Text(
-                widget.isOnboarding ? 'Bắt đầu nhận việc ngay' : 'Hoàn tất & Về trang chủ',
+                widget.isOnboarding
+                    ? 'Bắt đầu nhận việc ngay'
+                    : 'Hoàn tất & Về trang chủ',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -657,7 +664,11 @@ class _EkycVerificationScreenState
                   Navigator.of(context).maybePop();
                 }
               },
-              icon: const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.check_circle_outline,
+                color: Colors.white,
+                size: 20,
+              ),
               label: const Text(
                 'Tôi đã hiểu & Về trang chủ',
                 style: TextStyle(
@@ -768,6 +779,7 @@ class _EkycVerificationScreenState
     );
   }
 
+  //// Nút gửi hồ sơ thẩm định eKYC
   Widget _buildSubmitButton(EkycState state, EkycNotifier notifier) {
     final isReady = state.isReadyToSubmit;
 
@@ -807,7 +819,8 @@ class _EkycVerificationScreenState
                   );
                   // Không gọi _navigateToHome() tại đây để người dùng nhìn thấy kết quả chi tiết
                 } else {
-                  final err = ref.read(ekycProvider).errorMessage ??
+                  final err =
+                      ref.read(ekycProvider).errorMessage ??
                       'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.';
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -845,7 +858,9 @@ class _EkycVerificationScreenState
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    state.isLoading ? 'Đang gửi hồ sơ xác thực...' : 'Gửi Hồ Sơ Xác Thực eKYC',
+                    state.isLoading
+                        ? 'Đang gửi hồ sơ xác thực...'
+                        : 'Gửi Hồ Sơ Xác Thực eKYC',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,

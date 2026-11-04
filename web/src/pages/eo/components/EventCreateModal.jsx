@@ -53,7 +53,7 @@ const EventCreateModal = ({
                 disabled={locating}
                 title="Tự động phát hiện vị trí GPS hiện tại và lấy địa chỉ"
               >
-                {locating ? '🔄 Đang định vị...' : '📍 Lấy vị trí hiện tại'}
+                {locating ? 'Đang định vị...' : 'Lấy vị trí hiện tại'}
               </button>
             </div>
             <input
@@ -65,7 +65,7 @@ const EventCreateModal = ({
               onChange={(e) => setNewEvent({ ...newEvent, venueAddress: e.target.value })}
             />
             <span className="eo-field-helper">
-              💡 Tọa độ GPS giúp hệ thống quét và ưu tiên các Worker trong bán kính &le; 15km.
+              Tọa độ GPS giúp hệ thống quét và ưu tiên các Worker trong bán kính &le; 15km.
             </span>
           </div>
 

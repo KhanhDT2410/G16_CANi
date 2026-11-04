@@ -8,6 +8,7 @@ const EventShiftsDrawer = ({
   event,
   onAddShift,
   onOpenQr,
+  onOpenInvite,
   onOpenAttendance,
   onEditShift,
   onCancelShift,
@@ -47,7 +48,7 @@ const EventShiftsDrawer = ({
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>📅 Danh Sách Ca Làm Việc Thuộc Sự Kiện</span>
+          <span>Danh Sách Ca Làm Việc Thuộc Sự Kiện</span>
           <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal' }}>
             ({shifts.length} ca)
           </span>
@@ -110,12 +111,12 @@ const EventShiftsDrawer = ({
                     </span>
                     {shift.dressCode && (
                       <span style={{ fontSize: '0.75rem', color: '#64748b', background: '#e2e8f0', padding: '2px 6px', borderRadius: 4 }}>
-                        👔 {shift.dressCode}
+                        Đồng phục: {shift.dressCode}
                       </span>
                     )}
                   </div>
                   <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
-                    🕒 {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')} • 👥 <strong>{shift.confirmedWorkers || 0}/{shift.requiredWorkers || 0}</strong> Nhân sự • 💰 <strong style={{ color: '#059669' }}>{Number(shift.hourlyWage || 50000).toLocaleString()} đ/h</strong>
+                    {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')} • <strong>{shift.confirmedWorkers || 0}/{shift.requiredWorkers || 0}</strong> Nhân sự • <strong style={{ color: '#059669' }}>{Number(shift.hourlyWage || 50000).toLocaleString()} đ/h</strong>
                   </div>
                 </div>
 
@@ -139,7 +140,28 @@ const EventShiftsDrawer = ({
                     }}
                     title="Hiển thị mã QR Check-in / Check-out cho Worker quét"
                   >
-                    📱 Mã QR
+                    Mã QR
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenInvite && onOpenInvite(shift, event)}
+                    style={{
+                      background: '#7c3aed',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '6px 12px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                    title="Lấy link & mã mời trực tiếp cho Worker (Invite Mode - UC-72)"
+                  >
+                    Mã Mời
                   </button>
 
                   <button
@@ -160,7 +182,7 @@ const EventShiftsDrawer = ({
                     }}
                     title="Theo dõi điểm danh, duyệt công và đánh giá Worker"
                   >
-                    📋 Điểm Danh
+                    Điểm Danh
                   </button>
 
                   <button
@@ -177,7 +199,7 @@ const EventShiftsDrawer = ({
                     }}
                     title="Chỉnh sửa thông tin ca này"
                   >
-                    ✏️ Sửa
+                    Sửa
                   </button>
 
                   {shift.status !== 'CANCELLED' && (
@@ -195,7 +217,7 @@ const EventShiftsDrawer = ({
                       }}
                       title="Hủy ca làm việc này"
                     >
-                      ❌ Hủy
+                      Hủy
                     </button>
                   )}
                 </div>

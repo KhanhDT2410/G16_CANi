@@ -117,7 +117,7 @@ const LiveAttendanceModal = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.2rem' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <h3 style={{ margin: 0 }}>📋 Theo Dõi Điểm Danh & Vận Hành Ca</h3>
+                <h3 style={{ margin: 0 }}>Theo Dõi Điểm Danh & Vận Hành Ca</h3>
                 <span style={{
                   padding: '3px 10px',
                   borderRadius: 12,
@@ -152,7 +152,7 @@ const LiveAttendanceModal = ({
                   gap: 4,
                 }}
               >
-                📱 Hiển Thị Mã QR Ca
+                Mã QR Ca
               </button>
               <button
                 type="button"
@@ -168,14 +168,14 @@ const LiveAttendanceModal = ({
                 }}
                 title="Làm mới dữ liệu"
               >
-                🔄
+                Làm mới
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}
               >
-                ✕
+                Đóng
               </button>
             </div>
           </div>
@@ -183,7 +183,7 @@ const LiveAttendanceModal = ({
           {/* Table / List */}
           {loading ? (
             <div style={{ padding: '3rem 0', textAlign: 'center', color: '#64748b' }}>
-              🔄 Đang tải danh sách điểm danh nhân sự...
+              Đang tải danh sách điểm danh nhân sự...
             </div>
           ) : attendanceList.length === 0 ? (
             <div style={{ padding: '3rem 0', textAlign: 'center', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
@@ -224,17 +224,17 @@ const LiveAttendanceModal = ({
                         <td style={{ padding: '12px 14px' }}>
                           {isCheckedIn && (
                             <span style={{ background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
-                              🟢 Đã Check-in {item.isOnTime ? '(Đúng giờ)' : '(Trễ ca)'}
+                              Đã Check-in {item.isOnTime ? '(Đúng giờ)' : '(Trễ ca)'}
                             </span>
                           )}
                           {isCompleted && (
                             <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
-                              🏁 Đã Hoàn Thành
+                              Đã Hoàn Thành
                             </span>
                           )}
                           {!isCheckedIn && !isCompleted && (
                             <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
-                              ⏳ Chờ Đến Ca
+                              Chờ Đến Ca
                             </span>
                           )}
                         </td>
@@ -256,7 +256,7 @@ const LiveAttendanceModal = ({
                         {/* Trạng thái thanh toán */}
                         <td style={{ padding: '12px 14px' }}>
                           {item.paymentStatus === 'CONFIRMED_FULL' && (
-                            <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Đã thanh toán</span>
+                            <span style={{ color: '#16a34a', fontWeight: 600 }}>Đã thanh toán</span>
                           )}
                           {item.paymentStatus === 'DECLARED_PENDING_WORKER' && (
                             <span style={{ color: '#d97706', fontWeight: 500 }}>Chờ worker xác nhận</span>
@@ -279,7 +279,7 @@ const LiveAttendanceModal = ({
                                 fontWeight: 600,
                               }}
                             >
-                              💵 Khai báo lương
+                              Khai báo lương
                             </button>
                           )}
                         </td>
@@ -304,11 +304,11 @@ const LiveAttendanceModal = ({
                                   fontWeight: 500,
                                 }}
                               >
-                                {verifyingId === item.assignmentId ? 'Đang duyệt...' : '✓ Duyệt Công'}
+                                {verifyingId === item.assignmentId ? 'Đang duyệt...' : 'Duyệt Công'}
                               </button>
                             ) : (
                               <span style={{ color: '#16a34a', fontSize: '0.75rem', fontWeight: 600, padding: '4px 0' }}>
-                                ✓ Đã duyệt công
+                                Đã duyệt công
                               </span>
                             )}
 

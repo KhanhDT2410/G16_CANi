@@ -46,9 +46,11 @@ public class Dispute {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evidence", columnDefinition = "jsonb")
     private String evidence;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "messages", columnDefinition = "jsonb")
     private String messages;
 

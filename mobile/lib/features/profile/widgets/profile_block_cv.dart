@@ -17,6 +17,19 @@ class ProfileCvBlock extends ConsumerWidget {
     final data = ref.watch(profileDataProvider);
     final user = data.user;
 
+    // Phân định chính xác 4 trạng thái eKYC
+    final ekycStatusText = data.isEkycApproved
+        ? 'Đã xác thực hợp lệ'
+        : (data.isEkycPending
+            ? 'Đang chờ duyệt'
+            : (data.isEkycRejected ? 'Cần bổ sung / Bị từ chối' : 'Chưa gửi hồ sơ'));
+
+    final ekycStatusColor = data.isEkycApproved
+        ? const Color(0xFF059669)
+        : (data.isEkycPending
+            ? const Color(0xFFD97706)
+            : (data.isEkycRejected ? const Color(0xFFDC2626) : const Color(0xFF64748B)));
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -76,10 +89,8 @@ class ProfileCvBlock extends ConsumerWidget {
           _InfoRow(
             icon: Icons.badge_outlined,
             label: 'Định danh CCCD (eKYC)',
-            value: data.isEkycApproved
-                ? 'Đã xác thực hợp lệ'
-                : (data.isEkycPending ? 'Đang chờ duyệt' : 'Chưa xác thực'),
-            valueColor: data.isEkycApproved ? const Color(0xFF059669) : const Color(0xFFB45309),
+            value: ekycStatusText,
+            valueColor: ekycStatusColor,
           ),
           const Divider(height: 14, color: Color(0xFFF1F5F9)),
 
@@ -124,21 +135,25 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: t.accentDeep),
         const SizedBox(width: 10),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: t.text,
+                fontWeight: FontWeight.w500,
+              ),
+        ),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: t.text,
-                  fontWeight: FontWeight.w500,
-                ),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w600,
-            color: valueColor ?? (isHighlight ? const Color(0xFF0066FF) : t.text),
+            value,
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w600,
+              color: valueColor ?? (isHighlight ? const Color(0xFF0066FF) : t.text),
+            ),
           ),
         ),
       ],

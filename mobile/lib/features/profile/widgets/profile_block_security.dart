@@ -15,6 +15,11 @@ class ProfileSecurityBlock extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Theme.of(context).profileX;
     final user = ref.watch(authStateProvider).user;
+    final hasVerifiedEmail = user?.email != null && user!.email.isNotEmpty;
+    final badgeText = hasVerifiedEmail ? 'Đã bảo vệ' : 'Cần cập nhật';
+    final badgeBg = hasVerifiedEmail ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7);
+    final badgeBorder = hasVerifiedEmail ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A);
+    final badgeColor = hasVerifiedEmail ? const Color(0xFF15803D) : const Color(0xFFB45309);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -40,14 +45,14 @@ class ProfileSecurityBlock extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
+                  color: badgeBg,
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  border: Border.all(color: badgeBorder),
                 ),
-                child: const Text(
-                  'An toàn',
+                child: Text(
+                  badgeText,
                   style: TextStyle(
-                    color: Color(0xFF15803D),
+                    color: badgeColor,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                   ),

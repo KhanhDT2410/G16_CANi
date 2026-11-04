@@ -1,5 +1,5 @@
 // CANi · tab "Tài khoản" — Block 7 · Public Profile / Hồ sơ công khai.
-// Cho phép Worker bật/tắt hiển thị công khai trên Matching Radar và chia sẻ link profile.
+// Cho phép Worker bật/tắt hiển thị công khai trên Matching Radar và chia sẻ link profile (Privacy-first).
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,13 +16,16 @@ class ProfilePublicProfileBlock extends ConsumerStatefulWidget {
 }
 
 class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfileBlock> {
-  bool _isPublic = true;
+  // Privacy-first: Mặc định không công khai rộng rãi khi chưa chủ động opt-in
+  bool _isPublic = false;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).profileX;
     final user = ref.watch(authStateProvider).user;
-    final workerCode = user?.id.substring(0, 8) ?? 'worker';
+    final workerCode = (user != null && user.id.length >= 8)
+        ? user.id.substring(0, 8)
+        : (user?.id ?? 'worker');
     final profileUrl = 'https://cani.vn/p/$workerCode';
 
     return Container(
@@ -85,8 +88,13 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
               children: [
                 Expanded(
                   child: Text(
-                    profileUrl,
-                    style: TextStyle(fontSize: 12, color: t.accentDeep, fontWeight: FontWeight.w600),
+                    '$profileUrl (Sắp ra mắt)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: t.muted,
+                      fontWeight: FontWeight.w600,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
                 InkWell(
@@ -109,6 +117,11 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '* Tính năng hiển thị chi tiết hồ sơ Web công khai đang được cập nhật ở phiên bản tiếp theo.',
+            style: TextStyle(fontSize: 10.5, color: t.muted, fontStyle: FontStyle.italic),
           ),
         ],
       ),

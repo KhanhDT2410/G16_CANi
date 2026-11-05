@@ -6,6 +6,7 @@ import com.cani.entity.User;
 import com.cani.entity.enums.NotificationType;
 import com.cani.repository.NotificationRepository;
 import com.cani.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final FcmService fcmService;
+    private final ObjectMapper objectMapper;
 
     /**
      * Tạo thông báo lưu vào Database (In-App) và đồng thời bắn Push Notification (FCM) đến điện thoại
@@ -40,6 +42,17 @@ public class NotificationService {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + targetUserId));
 
+        // Chuẩn hóa JSON hợp lệ cho cột PostgreSQL jsonb
+        String jsonData = null;
+        if (dataPayload != null) {
+            try {
+                jsonData = objectMapper.writeValueAsString(dataPayload);
+            } catch (Exception ex) {
+                log.warn("[NotificationService] Không thể chuyển đổi dataPayload sang JSON: {}", ex.getMessage());
+                jsonData = "{}";
+            }
+        }
+
         // 1. Lưu vào Database (Kênh In-App Notification vĩnh viễn)
         Notification notification = Notification.builder()
                 .user(user)
@@ -49,7 +62,7 @@ public class NotificationService {
                 .referenceType(referenceType)
                 .referenceId(referenceId)
                 .isRead(false)
-                .data(dataPayload != null ? dataPayload.toString() : null)
+                .data(jsonData)
                 .build();
 
         Notification saved = notificationRepository.save(notification);

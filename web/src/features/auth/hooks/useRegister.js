@@ -9,7 +9,9 @@ export const useRegister = () => {
     fullName: '',
     email: '',
     phone: '',
+    organizerType: 'ENTERPRISE', // 'ENTERPRISE' | 'INDIVIDUAL'
     companyName: '',
+    taxId: '',
     password: '',
     confirmPassword: '',
     otpCode: '',
@@ -98,9 +100,15 @@ export const useRegister = () => {
       setErrorMessage('Vui lòng nhập số điện thoại liên hệ.');
       return;
     }
-    if (!formData.companyName?.trim()) {
-      setErrorMessage('Vui lòng nhập tên công ty hoặc đơn vị tổ chức sự kiện.');
-      return;
+    if (formData.organizerType === 'ENTERPRISE') {
+      if (!formData.companyName?.trim()) {
+        setErrorMessage('Doanh nghiệp bắt buộc phải nhập Tên công ty / Đơn vị tổ chức.');
+        return;
+      }
+      if (!formData.taxId?.trim()) {
+        setErrorMessage('Doanh nghiệp bắt buộc phải nhập Mã số kinh doanh / Mã số thuế.');
+        return;
+      }
     }
     if (!formData.otpCode?.trim() || formData.otpCode.trim().length !== 6) {
       setErrorMessage('Vui lòng nhập chính xác mã xác thực OTP 6 số đã gửi về email.');
@@ -124,11 +132,17 @@ export const useRegister = () => {
     setSuccessMessage('');
 
     try {
+      const finalCompanyName = formData.organizerType === 'ENTERPRISE'
+        ? formData.companyName.trim()
+        : (formData.companyName?.trim() || formData.fullName.trim());
+
       await authApi.register({
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
-        companyName: formData.companyName.trim(),
+        organizerType: formData.organizerType,
+        companyName: finalCompanyName,
+        taxId: formData.taxId?.trim() || null,
         password: formData.password,
         otpCode: formData.otpCode.trim(),
         accountType: 'EVENT_ORGANIZER',

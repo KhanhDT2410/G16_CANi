@@ -109,7 +109,12 @@ public class AuthService {
                             .user(finalUser)
                             .build());
             if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
-                eo.setCompanyName(request.getCompanyName());
+                eo.setCompanyName(request.getCompanyName().trim());
+            } else if ("INDIVIDUAL".equalsIgnoreCase(request.getOrganizerType()) || eo.getCompanyName() == null) {
+                eo.setCompanyName(request.getFullName().trim());
+            }
+            if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+                eo.setTaxId(request.getTaxId().trim());
             }
             eventOrganizerRepository.save(eo);
         } else {

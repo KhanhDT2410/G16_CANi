@@ -38,10 +38,10 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/" element={<MainLayout />}>
-            <Route index element={<Navigate to="/eo" replace />} />
+            <Route index element={<Navigate to="/login" replace />} />
             <Route path="eo" element={<EOPage />} />
             {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về EO nếu truy cập trên Web */}
-            <Route path="worker" element={<Navigate to="/eo" replace />} />
+            <Route path="worker" element={<Navigate to="/login" replace />} />
             <Route path="mobile-preview" element={<MobileShowcasePage />} />
             <Route path="customer-care" element={<CustomerCarePage />} />
             <Route path="admin" element={<AdminPage />} />

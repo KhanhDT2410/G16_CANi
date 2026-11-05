@@ -1,9 +1,9 @@
 # CANi — Project Context (Handoff Document)
 
 > **Mục đích:** Chấm điểm (snapshot) toàn bộ trạng thái hệ thống để session Claude Code mới khôi phục ngữ cảnh nhanh. Đọc cùng `CLAUDE.md` (nguyên tắc) và `AGENTS.md` (chuẩn code team).
-> **Đã cập nhật lần cuối:** 05/11/2026. Mọi mục "Đã kiểm chứng" dưới đây đều được xác nhận bằng lệnh (compile / test / inspect code) tại thời điểm ghi.
+> **Đã cập nhật lần cuối:** 05/11/2026 (sau phiên fix CC 403). Mọi mục "Đã kiểm chứng" dưới đây đều được xác nhận bằng lệnh (compile / test / inspect code) tại thời điểm ghi.
 >
-> **⚠️ Đọc trước khi code (Critical):** Commit hiện tại (HEAD) **CHƯA compile được** vì thiếu một số file. Chi tiết trong mục "Git & Work in Progress" và "Known Issues — #1".
+> **Đọc trước khi code:** `HANDOFF.md` (root) — trạng thái chính xác của phiên gần nhất + việc tiếp theo. File này là snapshot tổng quan.
 
 ---
 
@@ -89,9 +89,10 @@ Flyway tại `backend/src/main/resources/db/migration/` (hiện **đến V13**).
 | **UC-87 User Management** | ✅ `AdminUserController/Service` (list+filter, detail, lock/unlock + audit) | ✅ `UserManagementView` (tab users) | ✅ `AdminUserControllerTest` (4) | |
 | **UC-47 Skill Verification** | ✅ submit (Vision AI) + queue + review (+25 SP) | ✅ tab "Hàng Đợi Kỹ Năng AI" | ✅ `SkillVerificationServiceTest`, `SkillVerificationFlowTest` | |
 | **eKYC (worker + EO)** | ✅ queue + manual review (APPROVED/REJECTED) | ✅ tab "Hàng Đợi eKYC" | ✅ `WorkerEkycServiceTest`, `EventOrganizerEkycServiceTest` | |
-| **UC-96→104/109 Dispute** | ✅ `DisputeService`, `DisputeController` (public), `AdminDisputeController` (queue, **queue/mine**, **customer-care-staff**, assign, decision) + `V12` | ✅ feature `disputes` (2 view: CC/Admin queue + user "của tôi", 5+1 modal) | ✅ `DisputeServiceTest` (12) | **Lưu ý:** `queue/mine` + `customer-care-staff` hiện chỉ có trong **working tree**, chưa commit (thiếu `DisputeRepository`/`DisputeService`) — xem Known Issue #1 |
+| **UC-96→104/109 Dispute** | ✅ `DisputeService`, `DisputeController` (public), `AdminDisputeController` (queue, **queue/mine**, **customer-care-staff**, assign, decision) + `V12` | ✅ feature `disputes` (2 view: CC/Admin queue + user "của tôi", 5+1 modal) | ✅ `DisputeServiceTest` (12) | đã commit `ba29a55` |
 | **UC-105/106 Support Ticket** | ✅ `SupportTicketService`, `SupportTicketController`, `AdminSupportTicketController` (queue, **queue/mine**, **customer-care-staff**, assign, reply, close) + `V13` | ✅ feature `support-tickets` (view user + staff, 6 component + `TransferTicketModal`) | ✅ `SupportTicketServiceTest` (13) | commit ở `9cb0cb1` |
-| **System Config** | ✅ `SystemConfigController` (`/v1/admin/configs`, `hasRole('ADMIN')`), `SystemConfigService/Repository`, DTO | ✅ feature `system-configs` (tab "Tham Số Hệ Thống") | ✅ `SystemConfigServiceTest` (9) + `SystemConfigControllerTest` (8) | **Untracked** (chưa commit); security dùng wildcard ADMIN — CC không truy cập (đúng design UC-114/115 chỉ Admin) |
+| **System Config (UC-114/115)** | ✅ `SystemConfigController` (`/v1/admin/configs`, `hasRole('ADMIN')`), `SystemConfigService/Repository`, DTO | ✅ feature `system-configs` (tab "Tham Số Hệ Thống") | ✅ `SystemConfigServiceTest` (9) + `SystemConfigControllerTest` (8) | đã commit `ba29a55`; CC không truy cập (đúng design UC-114/115 chỉ Admin) |
+| **CC access eKYC/Skill queue** | ✅ rule `SecurityConfig` mở CC cho ekyc/eo-ekyc/skills admin + `H2DataSeeder` seed `cc@cani.vn` | ✅ feature slice dùng chung `ekyc-verification` + `skill-verification`, tab mới trong `CustomerCarePage` | ✅ `CustomerCareQueueSecurityTest` (13) | **Xong, CHƯA COMMIT** — xem `HANDOFF.md` §3 |
 | **Auth + eKYC/OTP** | ✅ `AuthService`, `AuthController`, `EmailOtpService`, `VnptEkycClient` | ✅ feature `auth` | ✅ `AuthControllerTest` (3), `EmailOtpServiceTest` | |
 | **Payment / Matching** | ✅ `DirectPaymentController/Service`, `MatchingDispatchService` | — | ✅ `DirectPaymentServiceTest`, `MatchingDispatchServiceTest` | |
 | **Worker eKYC + Skill** | ✅ | — | ✅ | |
@@ -122,67 +123,65 @@ SystemConfigControllerTest, AdminDashboardServiceTest, AdminUserControllerTest
 ### Phân quyền CC trong các module khác (BR-59)
 - **Dispute:** CC (level-1) + Admin (final decision) cùng dùng `/v1/admin/disputes/**`; CC chỉ quyết ở `INVESTIGATING`, Admin quyết cuối ở `ESCALATED` (BR-68).
 - **Support Ticket:** CC + Admin dùng `/v1/admin/support/**`; tự nhận/transfer giữa các CC (điểm "queue/mine" + "customer-care-staff").
-- **eKYC/Skill queue:** hiện CC chưa có rule riêng trong `SecurityConfig` (chỉ disputes + support) → **CC bị 403** khi xem eKYC/skill queue. Xem Known Issue #3.
+- **eKYC/Skill queue:** CC **đã có** quyền — `SecurityConfig` mở `hasAnyRole("ADMIN","CUSTOMER_CARE")` cho `/api/v1/admin/ekyc/**`, `/api/v1/admin/eo-ekyc/**`, `/api/v1/workers/skills/admin/**` (fix đã code, **chưa commit** — xem `HANDOFF.md`). FE: 2 tab eKYC/skill trong `CustomerCarePage` dùng chung feature slice với `AdminPage`.
 
 ---
 
 ## 7. Git & Work in Progress
 
 **Branch hiện tại:** `quyth-clean`
-**HEAD:** `9cb0cb1 "Chỉnh sửa ticket support"`
+**HEAD:** `df3ab8d "skill CLI"`
 
 ### Commit gần nhất (đã commit, sạch)
 | Commit | Nội dung |
 |---|---|
-| `9cb0cb1` Chỉnh sửa ticket support | FE-12: `/queue/mine` + `/customer-care-staff` cho support, `TransferTicketModal`, route `/support`, tab configs (untracked), docs |
+| `df3ab8d` skill CLI | `HANDOFF.md` + `docs/PROJECT_CONTEXT.md` |
+| `ba29a55` Cấu hình hệ thống | System Config module (UC-114/115) + dispute `queue/mine` & `customer-care-staff` backend + global 403 handler + FE `features/system-configs/` + docs |
+| `9cb0cb1` Chỉnh sửa ticket support | FE-12: `/queue/mine` + `/customer-care-staff` cho support, `TransferTicketModal`, route `/support`, docs |
 | `f786a46` Fix Escalate Dispute | FE dispute: `queue/mine` + `customer-care-staff`, `TransferDisputeModal`, tab "Được giao tôi" + ESCALATED, docs, test +3 |
 | `24cb802` Front End Ticket Support | Feature `support-tickets` (FE-12) |
-| `b002727` chỉnh sửa Admin Dashboard | W-38 dashboard |
-| `8f9e8c8` chỉnh sửa giao diện eKYC Admin | |
-| `14102ec` Hoàn thiện backend FE11-Ticket | Backend support ticket + V13 |
 
 ### ⚠️ WORKING TREE CHƯA COMMIT (git status)
 ```
- M backend/.../exception/GlobalExceptionHandler.java   # thêm AccessDenied → 403
- M backend/.../repository/DisputeRepository.java       # + findByStatusInAndAssignedTo(+IsNull)
- M backend/.../service/DisputeService.java              # + QUEUE_STATUSES, getDisputeQueueForCc, getUnassignedQueue, toQueueItems
- M web/src/pages/admin/AdminPage.jsx                    # tab "Tham Số Hệ Thống"
-?? backend/.../controller/SystemConfigController.java
-?? backend/.../dto/admin/config/
-?? backend/.../repository/SystemConfigRepository.java
-?? backend/.../service/SystemConfigService.java
-?? backend/.../test/.../SystemConfig{Service,Controller}Test.java
-?? docs/api/system-config-api.md
-?? web/src/features/system-configs/
+ M backend/.../config/H2DataSeeder.java            # seed user cc@cani.vn (role CUSTOMER_CARE)
+ M backend/.../config/SecurityConfig.java         # CC cho ekyc/eo-ekyc/skills admin
+ M web/src/App.jsx                                # route /eo, /worker → /login  (ngoài phạm vi task 403 — cần user xác nhận)
+ M web/src/features/disputes/components/DisputeCenterView.jsx  # xóa dead code escalatedCount
+ M web/src/pages/admin/AdminPage.jsx              # dùng feature slice thay AdminEkycTab/AdminSkillsTab
+ M web/src/pages/customer-care/CustomerCarePage.jsx # +2 tab eKYC/skill
+ D web/src/pages/admin/components/AdminEkycTab.jsx    # → features/ekyc-verification/
+ D web/src/pages/admin/components/AdminSkillsTab.jsx  # → features/skill-verification/
+?? backend/.../test/.../CustomerCareQueueSecurityTest.java   # 13 test
+?? web/src/features/ekyc-verification/            # 5 folder theo AGENTS.md §1
+?? web/src/features/skill-verification/
 ```
 
-**Trạng thái:** code **đã compile + 49/49 test pass + build xanh** trên working tree. Nhưng nếu commit hiện tại (HEAD) được checkout lại, nó **thiếu** `DisputeService`/`DisputeRepository` nên **không compile được** (mà FE `f786a46` đã gọi các method đó). → Cần commit working tree để làm cho commit hợp lệ (Known Issue #1).
+**Trạng thái:** code **đã verify — 62/62 test pass (BUILD SUCCESS) + `vite build` xanh**. Chưa commit.
+Chi tiết đầy đủ: `HANDOFF.md` §2–§3.
 
 ---
 
 ## 8. Known Issues & Unfinished Tasks
 
-1. **🔴 HEAD không compile — cần commit working tree.** `f786a46` (FE dispute) tham chiếu `getDisputeQueueForCc` / `customer-care-staff` (backend) nhưng backend đó **chưa commit** (ở `DisputeService.java`/`DisputeRepository.java` — hiện là modified, chưa push). **Hành động:** commit toàn bộ working tree (mục 7) thành 1–2 commit; sau đó `git checkout f786a46` vẫn cần backend mới. *Đã kiểm chứng:* `git show 9cb0cb1:…/DisputeService.java` = 0 matches `getDisputeQueueForCc`.
-2. **🟡 CC bị 403 trên eKYC/Skill queue (SRS yêu cầu CC được xem).** `SecurityConfig` chỉ mở CC cho `disputes` + `support`; eKYC (`/v1/admin/ekyc/**`, `/v1/admin/eo-ekyc/**`) và skill (`/v1/workers/skills/admin/**`) vẫn `hasRole("ADMIN")` duy nhất → CC 403. *Lưu ý:* đây là issue từ trước, chưa phải việc của FE-12.
-3. **🟡 `AdminPage.jsx` (UC-86/87 view) 893 dòng + eKYC/skill queue inline** — vượt chuẩn <200 dòng (AGENTS.md §1). Các tab queue hiện mới tách thành component; eKYC/skill vẫn dính trong `AdminPage.jsx` → nên tách `AdminEkycTab`/`AdminSkillsTab` (đã tồn tại trong tree).
-4. **🟡 Support ticket `reference_no` suffix 8 ký tự** (đã fix từ 4 → 8 trong `SupportTicketService`), vẫn UNIQUE constraint — rủi ro va chạm thấp nhưng không loại trừ. Ghi chú: hiện tại dùng `UUID.randomUUID().substring(0,8).toUpperCase()`.
-5. **Unfinished (SRS, chưa code):** UC-74/54/56 RS Appeals + No-show; UC-108 Revenue Dashboard (FE mock, chưa backend); UC-110 FAQ (thiếu entity); UC-111 dashboard mở rộng (metrics disputes/assignments/RS); auto-escalation SLA job (inventory SRS). Mobile chưa có feature support-ticket/dispute (đang chờ backend).
-6. **Backend không có devtools:** mọi lần sửa backend phải **restart** (đã xảy ra 2 lần "lỗi hệ thống" do chạy code cũ). Kiểm tra bằng `curl /api/health` + grep mapping trong startup log.
+1. **🟡 Chưa commit fix CC 403 (eKYC/skill queue).** Code + test đã xong và verify; cần commit (2 commit rõ ràng — xem `HANDOFF.md` §8.4).
+2. **🟡 CSS orphan** trong `web/src/pages/admin/AdminPage.css` (`.admin-verif-card`, `.admin-card-top`, `.admin-img-box`, `.admin-action-row`, `.admin-card-list`) sau khi xóa 2 tab cũ — dọn được nhưng **giữ `.btn-admin-approve`** (còn `UserStatusModal.jsx` dùng).
+3. **🟡 `dev-token` bypass ngoài profile `h2`** — `JwtConfig.java:30-40` vẫn chấp nhận `dev-token-*` trên mọi profile → bypass xác thực JWT trên `local`. `AuthService.login:147-152` cũng fallback không verify password. Chưa sửa, cần quyết định.
+4. **🟡 IDOR còn sót ở controller cũ** — `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` query-param: `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:40`, `DirectPaymentController:102`, `EoEventController:120`.
+5. **🟡 Support ticket `reference_no` suffix 8 ký tự** (đã fix từ 4 → 8), vẫn UNIQUE constraint — rủi ro va chạm thấp.
+6. **🟡 E2E tay chưa chạy** cho fix CC 403 (queue eKYC/skill từ API thật, duyệt/từ chối 1 hồ sơ).
+7. **Unfinished (SRS, chưa code):** UC-74/54/56 RS Appeals + No-show; UC-108 Revenue Dashboard (FE mock, chưa backend); UC-110 FAQ (thiếu entity); UC-111 dashboard mở rộng (metrics disputes/assignments/RS); auto-escalation SLA job (inventory SRS). Mobile chưa có feature support-ticket/dispute (đang chờ backend).
+8. **Backend không có devtools:** mọi lần sửa backend phải **restart** (đã xảy ra 2 lần "lỗi hệ thống" do chạy code cũ). Kiểm tra bằng `curl /api/health` + grep mapping trong startup log.
 
 ---
 
 ## 9. Bước làm tiếp được khuyến nghị (thứ tự)
 
-1. **Commit working tree ngay** (giải Known Issue #1) — tách 2 commit rõ ràng:
-   - `backend: add dispute queue/mine + customer-care-staff & global 403 handler` (3 file `M` + test)
-   - `backend: system config module + web configs tab` (SystemConfig* + AdminPage + docs)
-2. **Fix Known Issue #2** (2 dòng `SecurityConfig`): thêm
-   ```java
-   .requestMatchers("/api/v1/admin/ekyc/**", "/api/v1/admin/eo-ekyc/**").hasAnyRole("ADMIN","CUSTOMER_CARE")
-   ```
-   đặt trước wildcard; kèm test. (CC 403 fix — SRS UC-47 yêu cầu.)
-3. **Kiểm tra lại đầu cuối bằng E2E thật** (bật backend + frontend, đăng nhập tài khoản `admin@`/`cskh@`/`worker@` trên profile h2, click qua: tạo ticket → CC queue → nhận/transfer → đóng; nộp dispute → CC → escalate → Admin final).
-4. **Tách `AdminPage.jsx`** (Known Issue #3) — rút eKYC/skill queue ra component riêng, chuẩn <200 dòng.
+> Chi tiết bổ sung trong `HANDOFF.md` (nguồn chính cho việc tiếp theo).
+
+1. **Xác nhận thay đổi `App.jsx`** (route `/eo`, `/worker` → `/login`) — ngoài phạm vi task 403: giữ hay revert?
+2. **Dọn CSS orphan** trong `AdminPage.css` (giữ `.btn-admin-approve`).
+3. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` (password bất kỳ — `AuthService.login` fallback không verify) → `/customer-care` → 2 tab eKYC/skill → xác nhận queue từ API thật → duyệt/từ chối 1 hồ sơ.
+4. **Commit** working tree (2 commit: backend security + test · web feature slices). Kèm cập nhật `HANDOFF.md`/`PROJECT_CONTEXT.md`.
 5. **Unfinished (theo priority SRS):** Revenue Dashboard (UC-108) → FAQ (UC-110) → RS Appeals/No-show (UC-74) → dashboard mở rộng (UC-111).
 
 ---

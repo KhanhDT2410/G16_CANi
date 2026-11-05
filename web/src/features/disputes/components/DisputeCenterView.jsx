@@ -40,10 +40,6 @@ export const DisputeCenterView = () => {
   const [queueFilter, setQueueFilter] = useState('ALL');
   const [queueScope, setQueueScope] = useState('ALL');
 
-  const escalatedCount = useMemo(
-    () => queue.filter((item) => item.status === 'ESCALATED').length,
-    [queue]
-  );
   const riskCount = useMemo(() => queue.filter((item) => item.slaAtRisk).length, [queue]);
 
   // Hàng đợi hiển thị: phạm vi (tất cả / của tôi) + bộ lọc trạng thái

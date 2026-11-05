@@ -290,9 +290,9 @@ const EventCreationWizardModal = ({
             <button
               type="button"
               onClick={handleClose}
-              style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#94a3b8' }}
+              style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b', fontWeight: 600 }}
             >
-              Dong
+              Đóng
             </button>
           </div>
 
@@ -301,9 +301,9 @@ const EventCreationWizardModal = ({
             
             {[
               { num: 1, label: '1. Sự Kiện' },
-              { num: 2, label: `2. Các Ca Làm (${shiftsList.length})` },
-              { num: 3, label: '3. Thanh Toán Gói' },
-              { num: 4, label: '4. Bắt Đầu Matching' },
+              { num: 2, label: '2. Các Ca Làm' },
+              { num: 3, label: '3. Thanh Toán' },
+              { num: 4, label: '4. Bắt Đầu Tìm Kiếm' },
             ].map((st) => {
               const isActive = currentStep === st.num;
               const isPassed = currentStep > st.num;
@@ -442,7 +442,7 @@ const EventCreationWizardModal = ({
                 disabled={submitting}
                 className="eo-btn-primary"
               >
-                {submitting ? 'Đang tạo sự kiện...' : 'Tiếp tục: Tạo các Ca làm việc'}
+                {submitting ? 'Đang tạo...' : 'Tiếp Tục'}
               </button>
             </div>
           </form>
@@ -456,7 +456,7 @@ const EventCreationWizardModal = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>
-                  Bước 2: Thiết Lập Danh Sách Ca Làm Việc (Shifts)
+                  Bước 2: Thiết Lập Danh Sách Ca Làm Việc
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0.25rem 0 0' }}>
                   Sự kiện: <strong>{createdEvent?.name || newEvent.name}</strong>. Một sự kiện có thể chia làm nhiều ca khác nhau.
@@ -470,7 +470,7 @@ const EventCreationWizardModal = ({
                   style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
                   onClick={() => setIsAddingShift(true)}
                 >
-                  + Thêm Ca Làm Mới
+                  Thêm Ca Mới
                 </button>
               )}
             </div>
@@ -560,31 +560,34 @@ const EventCreationWizardModal = ({
                     <button
                       type="button"
                       onClick={() => setIsAddingShift(false)}
-                      style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem' }}
+                      style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
                     >
-                      Thu gọn
+                      Thu Gọn
                     </button>
                   )}
                 </div>
 
                 <div className="eo-form-group">
                   <label>Vị Trí / Vai Trò Cần Tuyển *</label>
-                  <select
-                    className="eo-form-select"
+                  <input
+                    type="text"
+                    list="wizard-roles-list"
+                    className="eo-form-input"
+                    placeholder="Nhập vị trí hoặc chọn gợi ý (VD: Phục vụ bàn, Lễ tân, MC, Điều phối...)"
                     value={currentShift.jobType}
                     onChange={(e) => handleRoleChange(e.target.value)}
-                  >
+                    required
+                  />
+                  <datalist id="wizard-roles-list">
                     {ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
+                      <option key={role} value={role} />
                     ))}
-                  </select>
+                  </datalist>
 
                   {WAGE_RECOMMENDATIONS_MAP[currentShift.jobType] && (
                     <div className="wage-recommendation-badge animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
                       <div>
-                        <strong>Gợi ý Ma trận Lương (Wage Matrix 4D):</strong>{' '}
+                        <strong>Gợi ý Ma trận Lương:</strong>{' '}
                         <span className="wage-range">
                           {WAGE_RECOMMENDATIONS_MAP[currentShift.jobType].min.toLocaleString()} đ -{' '}
                           {WAGE_RECOMMENDATIONS_MAP[currentShift.jobType].max.toLocaleString()} đ / giờ
@@ -763,7 +766,7 @@ const EventCreationWizardModal = ({
                     className="eo-btn-primary"
                     style={{ background: '#2563eb' }}
                   >
-                    {submitting ? 'Đang lưu ca...' : 'Lưu Ca Vào Sự Kiện'}
+                    {submitting ? 'Đang lưu...' : 'Lưu Ca'}
                   </button>
                 </div>
               </form>
@@ -772,7 +775,7 @@ const EventCreationWizardModal = ({
             {/* ĐIỀU HƯỚNG CUỐI BƯỚC 2 */}
             <div className="eo-modal-footer">
               <button type="button" className="eo-btn-secondary" onClick={() => setCurrentStep(1)}>
-                Quay lại
+                Quay Lại
               </button>
               <button
                 type="button"
@@ -784,7 +787,7 @@ const EventCreationWizardModal = ({
                   cursor: shiftsList.length > 0 ? 'pointer' : 'not-allowed',
                 }}
               >
-                Tiếp tục: Thanh toán gói ({shiftsList.length} ca)
+                Tiếp Tục
               </button>
             </div>
           </div>
@@ -817,7 +820,7 @@ const EventCreationWizardModal = ({
                   color: payMethod === 'VIETQR' ? '#1d4ed8' : '#475569',
                 }}
               >
-                Thanh toán PayOS VietQR (MBBank)
+                Thanh Toán VietQR
               </button>
 
               <button
@@ -834,7 +837,7 @@ const EventCreationWizardModal = ({
                   color: payMethod === 'SUBSCRIPTION' ? '#1d4ed8' : '#475569',
                 }}
               >
-                Trừ Quota Gói Hội Viên (SaaS)
+                Trừ Gói Hội Viên
               </button>
             </div>
 
@@ -911,7 +914,7 @@ const EventCreationWizardModal = ({
 
             <div className="eo-modal-footer" style={{ marginTop: '1.5rem' }}>
               <button type="button" className="eo-btn-secondary" onClick={() => setCurrentStep(2)}>
-                Quay lại danh sách ca
+                Quay Lại
               </button>
               <button
                 type="button"
@@ -919,19 +922,19 @@ const EventCreationWizardModal = ({
                 onClick={handleStep3ConfirmPayment}
                 style={{ background: '#10b981', border: 'none' }}
               >
-                {payMethod === 'VIETQR' ? 'Tôi Đã Chuyển Khoản & Tiếp Tục' : 'Xác Nhận Trừ Quota & Tiếp Tục'}
+                Xác Nhận Thanh Toán
               </button>
             </div>
           </div>
         )}
 
         {/* ======================================================== */}
-        {/* BƯỚC 4: BẮT ĐẦU MATCHING RADAR ENGINE                   */}
+        {/* BƯỚC 4: BẮT ĐẦU TÌM KIẾM NHÂN SỰ                       */}
         {/* ======================================================== */}
         {currentStep === 4 && (
           <div className="animate-fade-in-up" style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', margin: '0 0 0.5rem' }}>
-              Tất Cả Đã Sẵn Sàng Để Matching
+              Tất Cả Đã Sẵn Sàng Để Tìm Kiếm Nhân Sự
             </h3>
             <p style={{ color: '#64748b', fontSize: '0.95rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
               Sự kiện <strong>{createdEvent?.name || newEvent.name}</strong> đã hoàn tất thiết lập <strong>{shiftsList.length} ca làm việc</strong> và thanh toán gói dịch vụ.
@@ -967,7 +970,7 @@ const EventCreationWizardModal = ({
                 onClick={handleClose}
                 disabled={submitting}
               >
-                Để sau (Giữ bản nháp)
+                Để Sau
               </button>
               <button
                 type="button"
@@ -985,7 +988,7 @@ const EventCreationWizardModal = ({
                   boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
                 }}
               >
-                {submitting ? 'Đang kích hoạt Radar...' : 'Bắt Đầu Matching'}
+                {submitting ? 'Đang tìm kiếm...' : 'Bắt Đầu Tìm Kiếm'}
               </button>
             </div>
           </div>

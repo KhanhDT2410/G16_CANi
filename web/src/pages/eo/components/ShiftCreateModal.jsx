@@ -58,32 +58,35 @@ const ShiftCreateModal = ({
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#9ca3af' }}
+            style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b', fontWeight: 600 }}
           >
-            Dong
+            Đóng
           </button>
         </div>
 
         <form onSubmit={onSubmit}>
           <div className="eo-form-group">
             <label>Vị Trí / Vai Trò Cần Tuyển *</label>
-            <select
-              className="eo-form-select"
+            <input
+              type="text"
+              list="create-shift-roles-list"
+              className="eo-form-input"
+              placeholder="Nhập vị trí hoặc chọn gợi ý (VD: Phục vụ bàn, Lễ tân, MC, Kỹ thuật...)"
               value={newShift.jobType}
               onChange={(e) => onRoleChange ? onRoleChange(e.target.value) : setNewShift({ ...newShift, jobType: e.target.value })}
-            >
+              required
+            />
+            <datalist id="create-shift-roles-list">
               {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
+                <option key={role} value={role} />
               ))}
-            </select>
+            </datalist>
 
-            {/* Gợi ý Ma trận Lương Wage Matrix 4D */}
+            {/* Gợi ý Ma trận Lương */}
             {wageRecommendationsMap[newShift.jobType] && (
               <div className="wage-recommendation-badge animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
                 <div>
-                  <strong>Gợi ý Ma trận Lương (Wage Matrix 4D):</strong>{' '}
+                  <strong>Gợi ý Ma trận Lương:</strong>{' '}
                   <span className="wage-range">
                     {wageRecommendationsMap[newShift.jobType].min.toLocaleString()} đ -{' '}
                     {wageRecommendationsMap[newShift.jobType].max.toLocaleString()} đ / giờ

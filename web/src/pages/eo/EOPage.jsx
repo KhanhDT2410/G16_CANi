@@ -189,19 +189,19 @@ export default function EOPage() {
 
           <div className="eo-pill-tabs">
             <button type="button" className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`} onClick={() => switchTab('events')}>
-              Sự Kiện Của Tôi ({events.events.length})
+              Sự Kiện Của Tôi
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'recruitment' ? 'active' : ''}`} onClick={() => switchTab('recruitment')}>
-              Tuyển Dụng & Matching
+              Tuyển Dụng & Điều Phối
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => switchTab('payments')}>
-              Thanh Toán & Khai Báo Lương ({payments.payments.length})
+              Thanh Toán & Khai Báo Lương
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => switchTab('subscription')}>
-              Gói Dịch Vụ & Quota (W-06)
+              Gói Dịch Vụ & Quota
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
-              Hồ Sơ & eKYC
+              Hồ Sơ & Xác Thực
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => switchTab('analytics')}>
               Báo Cáo & Thống Kê

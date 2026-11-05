@@ -85,7 +85,7 @@ export default function EOEventsTab({
               className="eo-btn-primary"
               onClick={onOpenCreateEvent}
             >
-              + Tạo Sự Kiện Mới
+              Tạo Sự Kiện Mới
             </button>
           </div>
         ) : (
@@ -174,7 +174,7 @@ export default function EOEventsTab({
                       })
                     }
                   >
-                    Bản đồ
+                    Bản Đồ
                   </button>
 
                   <button
@@ -182,7 +182,7 @@ export default function EOEventsTab({
                     className="btn-action-outline"
                     onClick={() => onOpenAddShift(evt.eventId)}
                   >
-                    + Thêm Ca
+                    Thêm Ca
                   </button>
 
                   <button
@@ -212,7 +212,7 @@ export default function EOEventsTab({
                       className="btn-action-publish"
                       onClick={() => onOpenConfirmPublish(evt)}
                     >
-                      Kích Hoạt Matching
+                      Bắt Đầu Tìm Kiếm
                     </button>
                   )}
 
@@ -221,9 +221,7 @@ export default function EOEventsTab({
                     className="btn-action-primary"
                     onClick={() => setExpandedEventId(expandedEventId === evt.eventId ? null : evt.eventId)}
                   >
-                    {expandedEventId === evt.eventId
-                      ? 'Thu Gọn'
-                      : `Quản Lý Ca (${evt.shifts?.length || evt.totalShifts || 0})`}
+                    {expandedEventId === evt.eventId ? 'Thu Gọn' : 'Quản Lý Ca'}
                   </button>
                 </div>
               </div>

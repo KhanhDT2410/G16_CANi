@@ -77,15 +77,20 @@ const EditShiftModal = ({
         <form onSubmit={handleSubmit}>
           <div className="eo-form-group">
             <label>Vị Trí Công Việc *</label>
-            <select
+            <input
+              type="text"
+              list="edit-shift-roles-list"
               className="eo-form-input"
+              placeholder="Nhập vị trí hoặc chọn gợi ý..."
               value={formData.jobType}
               onChange={(e) => setFormData({ ...formData, jobType: e.target.value })}
-            >
+              required
+            />
+            <datalist id="edit-shift-roles-list">
               {roles.map((role) => (
-                <option key={role} value={role}>{role}</option>
+                <option key={role} value={role} />
               ))}
-            </select>
+            </datalist>
           </div>
 
           <div className="eo-form-group">

@@ -26,7 +26,7 @@ const PublishEventModal = ({
       <div className="eo-modal-box publish-modal-box animate-fade-in-up">
         <div className="publish-modal-header">
           <div>
-            <h3>Xác Nhận Xuất Bản & Kích Hoạt Matching</h3>
+            <h3>Xác Nhận Xuất Bản & Bắt Đầu Tìm Kiếm</h3>
             <p>Hệ thống CANi sẽ quét ứng viên phù hợp theo độ tin cậy và bán kính điều phối</p>
           </div>
         </div>
@@ -65,7 +65,7 @@ const PublishEventModal = ({
         <div className="publish-fee-box">
           <div className="publish-fee-header">
             <span className="publish-fee-title">
-              Phí dịch vụ điều phối (Platform Matching Fee):
+              Phí dịch vụ điều phối:
             </span>
             <span className="publish-fee-amount">
               {platformFee.toLocaleString()} đ
@@ -74,7 +74,7 @@ const PublishEventModal = ({
           <div className="publish-fee-detail">
             Định mức: <strong>3.000 VNĐ / slot ứng viên cần tuyển</strong> &times; {workersCount} người.
             <br />
-            <em>(Phí duy trì nền tảng, đối soát chấm công và kích hoạt thuật toán lọc ứng viên Matching Engine)</em>
+            <em>(Phí duy trì nền tảng, đối soát chấm công và tìm kiếm ứng viên phù hợp)</em>
           </div>
         </div>
 
@@ -86,14 +86,14 @@ const PublishEventModal = ({
               className={`publish-tab-btn ${publishPayMethod === 'VIETQR' ? 'active' : ''}`}
               onClick={() => setPublishPayMethod('VIETQR')}
             >
-              Quét Mã VietQR (Tự Động Điền Tiền)
+              Quét Mã VietQR
             </button>
             <button
               type="button"
               className={`publish-tab-btn ${publishPayMethod === 'SUBSCRIPTION' ? 'active' : ''}`}
               onClick={() => setPublishPayMethod('SUBSCRIPTION')}
             >
-              Trừ Gói Quota Hội Viên (SaaS)
+              Trừ Gói Hội Viên
             </button>
           </div>
 
@@ -199,7 +199,7 @@ const PublishEventModal = ({
             className="eo-btn-secondary"
             onClick={onClose}
           >
-            Để sau (Giữ bản nháp)
+            Để Sau
           </button>
           <button
             type="button"
@@ -207,9 +207,7 @@ const PublishEventModal = ({
             style={{ background: '#10b981' }}
             onClick={onExecutePublish}
           >
-            {publishPayMethod === 'VIETQR'
-              ? 'Tôi Đã Chuyển Khoản & Kích Hoạt Tìm Người'
-              : 'Xác Nhận Trừ Quota & Kích Hoạt Tìm Người'}
+            Bắt Đầu Tìm Kiếm
           </button>
         </div>
       </div>

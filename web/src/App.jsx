@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import RequireRole from './features/auth/components/RequireRole';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const EOPage = lazy(() => import('./pages/eo/EOPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
@@ -31,9 +32,10 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
@@ -75,6 +77,7 @@ function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+  </ErrorBoundary>
   );
 }
 

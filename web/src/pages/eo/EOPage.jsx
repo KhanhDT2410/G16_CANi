@@ -25,6 +25,12 @@ import './EOPage.css';
 export default function EOPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Custom Domain Hooks - Khởi tạo sớm trước effect và local state
+  const events = useEvents();
+  const shifts = useShifts({ onReloadEvents: events.loadEvents });
+  const payments = usePayments();
+
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('events');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -67,10 +73,11 @@ export default function EOPage() {
   }, [setSearchParams]);
 
   // Lắng nghe tìm kiếm toàn cục từ Header Search Box
+  const { setSearchQuery } = events;
   useEffect(() => {
     const handleGlobalSearch = (e) => {
       const q = e.detail?.query ?? '';
-      events.setSearchQuery(q);
+      setSearchQuery(q);
       if (q.trim()) {
         setActiveTab((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
         setActiveNav((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
@@ -78,7 +85,7 @@ export default function EOPage() {
     };
     window.addEventListener('cani_global_search', handleGlobalSearch);
     return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
-  }, [events]);
+  }, [setSearchQuery]);
 
   // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_) hoặc điều hướng tab (?tab=profile)
   useEffect(() => {
@@ -94,10 +101,6 @@ export default function EOPage() {
       setActiveNav(tabParam);
     }
   }, [searchParams]);
-
-  const events = useEvents();
-  const shifts = useShifts({ onReloadEvents: events.loadEvents });
-  const payments = usePayments();
 
   const [mapModal, setMapModal] = useState({
     isOpen: false,

@@ -201,7 +201,7 @@ export default function EOPage() {
               Gói Dịch Vụ & Quota
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
-              Hồ Sơ & Xác Thực
+              Hồ Sơ
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => switchTab('analytics')}>
               Báo Cáo & Thống Kê
@@ -287,7 +287,7 @@ export default function EOPage() {
           )}
         </main>
 
-        <EORightSidebar />
+        {(activeTab === 'events' || activeNav === 'overview') && <EORightSidebar />}
       </div>
 
       <EOModals

@@ -57,6 +57,7 @@ public class WorkerJobService {
     private final WorkerAvailabilityRepository workerAvailabilityRepository;
     private final ReviewRepository reviewRepository;
     private final PaymentRepository paymentRepository;
+    private final ProposalStatusUpdater proposalStatusUpdater;
     private final ObjectMapper objectMapper;
 
     /**
@@ -107,8 +108,7 @@ public class WorkerJobService {
         }
 
         if (proposal.getExpiresAt() != null && proposal.getExpiresAt().isBefore(Instant.now())) {
-            proposal.setStatus(ProposalStatus.EXPIRED);
-            dispatchProposalRepository.save(proposal);
+            proposalStatusUpdater.updateStatusInNewTransaction(proposal.getProposalId(), ProposalStatus.EXPIRED);
             throw new BadRequestException("Rất tiếc! Đề xuất việc làm này đã hết hạn phản hồi.");
         }
 
@@ -125,8 +125,7 @@ public class WorkerJobService {
         // 2. ATOMIC CONCURRENCY CHECK: Tăng confirmed_workers một cách nguyên tử
         int updatedRows = shiftRepository.incrementConfirmedWorkersAtomic(shift.getShiftId());
         if (updatedRows == 0) {
-            proposal.setStatus(ProposalStatus.REJECTED);
-            dispatchProposalRepository.save(proposal);
+            proposalStatusUpdater.updateStatusInNewTransaction(proposal.getProposalId(), ProposalStatus.REJECTED);
             throw new BadRequestException("Rất tiếc! Ca làm việc này vừa được người khác nhận đủ trước bạn ít giây.");
         }
 
@@ -204,6 +203,9 @@ public class WorkerJobService {
     public AttendanceCheckResponseDto checkinAssignment(UUID userId, UUID assignmentId, AttendanceCheckRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
+        if (assignment.getStatus() != AssignmentStatus.CONFIRMED) {
+            throw new BadRequestException("Chỉ có thể check-in cho ca làm việc ở trạng thái CONFIRMED (Trạng thái hiện tại: " + assignment.getStatus() + ")");
+        }
 
         Shift shift = assignment.getShift();
         Instant now = Instant.now();
@@ -213,11 +215,12 @@ public class WorkerJobService {
         if (qrContent.startsWith("CANI_CHECKOUT:")) {
             throw new BadRequestException("Đây là mã QR Check-out (Kết ca). Vui lòng quét mã QR Check-in để vào ca làm việc!");
         }
-        if (qrContent.startsWith("CANI_CHECKIN:") && shift != null && shift.getShiftId() != null) {
-            String scannedShiftPart = qrContent.substring("CANI_CHECKIN:".length()).trim();
-            if (!scannedShiftPart.isEmpty() && !scannedShiftPart.startsWith(shift.getShiftId().toString())) {
-                throw new BadRequestException("Mã QR Check-in này không thuộc ca làm việc hiện tại của bạn!");
-            }
+        if (!qrContent.startsWith("CANI_CHECKIN:") || shift == null || shift.getShiftId() == null) {
+            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-in chính thức của sự kiện!");
+        }
+        String scannedShiftPart = qrContent.substring("CANI_CHECKIN:".length()).trim();
+        if (!scannedShiftPart.equalsIgnoreCase(shift.getShiftId().toString())) {
+            throw new BadRequestException("Mã QR Check-in này không thuộc ca làm việc hiện tại của bạn!");
         }
 
         // 2. Kiểm tra khoảng cách Geofence nếu có tọa độ
@@ -229,9 +232,9 @@ public class WorkerJobService {
             if (targetLat != null && targetLng != null) {
                 double distanceKm = MatchingDispatchService.calculateDistance(
                         request.getLat(), request.getLng(), targetLat, targetLng);
-                if (!qrContent.startsWith("CANI_CHECKIN:") && distanceKm > 0.2) {
+                if (distanceKm > 0.2) {
                     throw new BadRequestException(String.format(
-                            "Vị trí hiện tại của bạn cách điểm sự kiện %.2f km (vượt quá bán kính điểm danh 200m). Vui lòng đến đúng điểm sự kiện hoặc quét mã QR chính thức tại quầy Ban tổ chức.",
+                            "Vị trí hiện tại của bạn cách điểm sự kiện %.2f km (vượt quá bán kính điểm danh 200m). Vui lòng đến đúng điểm sự kiện để check-in.",
                             distanceKm));
                 }
             }
@@ -248,7 +251,7 @@ public class WorkerJobService {
         }
 
         boolean isOnTime = shift == null || shift.getStartTime() == null ||
-                now.isBefore(shift.getStartTime().plus(Duration.ofMinutes(15)));
+                !now.isAfter(shift.getStartTime().plus(Duration.ofMinutes(15)));
 
         AttendanceStatus status = isOnTime ? AttendanceStatus.ON_TIME : AttendanceStatus.LATE;
 
@@ -290,17 +293,21 @@ public class WorkerJobService {
     public AttendanceCheckResponseDto checkoutAssignment(UUID userId, UUID assignmentId, AttendanceCheckRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
+        if (assignment.getStatus() != AssignmentStatus.CHECKED_IN) {
+            throw new BadRequestException("Chỉ có thể check-out cho ca làm việc đang ở trạng thái CHECKED_IN (Trạng thái hiện tại: " + assignment.getStatus() + ")");
+        }
         Shift shift = assignment.getShift();
 
         String qrContent = request != null && request.getQrContent() != null ? request.getQrContent().trim() : "";
         if (qrContent.startsWith("CANI_CHECKIN:")) {
             throw new BadRequestException("Đây là mã QR Check-in (Vào ca). Vui lòng quét mã QR Check-out để kết thúc ca làm việc!");
         }
-        if (qrContent.startsWith("CANI_CHECKOUT:") && shift != null && shift.getShiftId() != null) {
-            String scannedShiftPart = qrContent.substring("CANI_CHECKOUT:".length()).trim();
-            if (!scannedShiftPart.isEmpty() && !scannedShiftPart.startsWith(shift.getShiftId().toString())) {
-                throw new BadRequestException("Mã QR Check-out này không thuộc ca làm việc hiện tại của bạn!");
-            }
+        if (!qrContent.startsWith("CANI_CHECKOUT:") || shift == null || shift.getShiftId() == null) {
+            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-out chính thức của ca làm việc!");
+        }
+        String scannedShiftPart = qrContent.substring("CANI_CHECKOUT:".length()).trim();
+        if (!scannedShiftPart.equalsIgnoreCase(shift.getShiftId().toString())) {
+            throw new BadRequestException("Mã QR Check-out này không thuộc ca làm việc hiện tại của bạn!");
         }
 
         AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
@@ -553,16 +560,7 @@ public class WorkerJobService {
         shiftAssignmentRepository.save(assignment);
 
         if (shift != null) {
-            if (shift.getConfirmedWorkers() != null && shift.getConfirmedWorkers() > 0) {
-                shift.setConfirmedWorkers(shift.getConfirmedWorkers() - 1);
-            }
-            if (shift.getRemainingWorkers() != null) {
-                shift.setRemainingWorkers(shift.getRemainingWorkers() + 1);
-            }
-            if (shift.getStatus() == ShiftStatus.FULLY_STAFFED) {
-                shift.setStatus(ShiftStatus.ACTIVE);
-            }
-            shiftRepository.save(shift);
+            shiftRepository.decrementConfirmedWorkersAtomic(shift.getShiftId());
 
             Event event = shift.getEvent();
             if (event != null && event.getTotalConfirmedWorkers() != null && event.getTotalConfirmedWorkers() > 0) {

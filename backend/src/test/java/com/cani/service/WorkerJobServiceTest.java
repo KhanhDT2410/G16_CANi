@@ -63,6 +63,9 @@ class WorkerJobServiceTest {
     private ReviewRepository reviewRepository;
 
     @Mock
+    private ProposalStatusUpdater proposalStatusUpdater;
+
+    @Mock
     private PaymentRepository paymentRepository;
 
     @Spy
@@ -289,8 +292,31 @@ class WorkerJobServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("vừa được người khác nhận đủ");
 
-        assertThat(pendingProposal.getStatus()).isEqualTo(ProposalStatus.REJECTED);
+        verify(proposalStatusUpdater).updateStatusInNewTransaction(eq(pendingProposal.getProposalId()), eq(ProposalStatus.REJECTED));
         verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+
+    @Test
+    @DisplayName("UTC010b - acceptProposal() - Boundary: Đề xuất hết hạn gọi updateStatusInNewTransaction EXPIRED và ném BadRequestException")
+    void acceptProposal_Boundary_ExpiredProposalUpdatesStatusInNewTxAndThrowsBadRequest() {
+        UUID proposalId = UUID.randomUUID();
+        DispatchProposal expiredProposal = DispatchProposal.builder()
+                .proposalId(proposalId)
+                .worker(worker)
+                .shift(activeShift)
+                .status(ProposalStatus.PENDING)
+                .expiresAt(Instant.now().minus(1, ChronoUnit.HOURS))
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(proposalId)).thenReturn(Optional.of(expiredProposal));
+
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, proposalId))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("hết hạn phản hồi");
+
+        verify(proposalStatusUpdater).updateStatusInNewTransaction(eq(proposalId), eq(ProposalStatus.EXPIRED));
     }
 
     // =========================================================================
@@ -394,7 +420,7 @@ class WorkerJobServiceTest {
     @DisplayName("UTC017 - checkinAssignment() - Abnormal: Quét nhầm mã QR Check-out ném BadRequestException")
     void checkinAssignment_Abnormal_ScannedCheckoutQrThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder().qrContent("CANI_CHECKOUT:xyz").build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
@@ -409,7 +435,7 @@ class WorkerJobServiceTest {
     @DisplayName("UTC018 - checkinAssignment() - Abnormal: Quét mã QR ca khác ném BadRequestException")
     void checkinAssignment_Abnormal_ScannedMismatchShiftQrThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
                 .qrContent("CANI_CHECKIN:" + UUID.randomUUID()).build();
 
@@ -439,6 +465,61 @@ class WorkerJobServiceTest {
 
         assertThat(res.getAttendanceStatus()).isEqualTo(AttendanceStatus.LATE);
         assertThat(res.getIsOnTime()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("UTC019b - checkinAssignment() - Abnormal: Ca làm việc chưa CONFIRMED (đã CANCELLED) ném BadRequestException")
+    void checkinAssignment_Abnormal_AssignmentNotConfirmedThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CANCELLED).build();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
+                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkinAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ có thể check-in cho ca làm việc ở trạng thái CONFIRMED");
+    }
+
+    @Test
+    @DisplayName("UTC019c - checkinAssignment() - Abnormal: Khoảng cách GPS vượt quá 200m ném BadRequestException")
+    void checkinAssignment_Abnormal_DistanceGreaterThan200mThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
+                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId())
+                .lat(11.5).lng(107.5) // ~100km away
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkinAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("vượt quá bán kính điểm danh 200m");
+    }
+
+    @Test
+    @DisplayName("UTC019d - checkinAssignment() - Boundary: Điểm danh đúng chuẩn mốc biên 15 phút ghi nhận ON_TIME")
+    void checkinAssignment_Boundary_ExactlyFifteenMinutesOnTime() {
+        UUID assignmentId = UUID.randomUUID();
+        activeShift.setStartTime(Instant.now().minus(14, ChronoUnit.MINUTES).minus(50, ChronoUnit.SECONDS));
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
+                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)).thenReturn(Optional.empty());
+        when(attendanceLogRepository.save(any(AttendanceLog.class))).thenAnswer(i -> i.getArgument(0));
+
+        AttendanceCheckResponseDto res = workerJobService.checkinAssignment(userId, assignmentId, req);
+
+        assertThat(res.getAttendanceStatus()).isEqualTo(AttendanceStatus.ON_TIME);
+        assertThat(res.getIsOnTime()).isTrue();
     }
 
     // =========================================================================
@@ -471,7 +552,7 @@ class WorkerJobServiceTest {
     @DisplayName("UTC021 - checkoutAssignment() - Abnormal: Quét nhầm mã QR Check-in ném BadRequestException")
     void checkoutAssignment_Abnormal_ScannedCheckinQrThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder().qrContent("CANI_CHECKIN:abc").build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
@@ -486,7 +567,7 @@ class WorkerJobServiceTest {
     @DisplayName("UTC022 - checkoutAssignment() - Abnormal: Chưa từng check-in ném BadRequestException")
     void checkoutAssignment_Abnormal_NoCheckinRecordThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
                 .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
 
@@ -503,7 +584,7 @@ class WorkerJobServiceTest {
     @DisplayName("UTC023 - checkoutAssignment() - Boundary: Đã check-out trước đó ném BadRequestException")
     void checkoutAssignment_Boundary_AlreadyCheckedOutThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
         AttendanceLog log = AttendanceLog.builder()
                 .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS)).checkoutTime(Instant.now().minus(1, ChronoUnit.HOURS)).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
@@ -516,6 +597,23 @@ class WorkerJobServiceTest {
         assertThatThrownBy(() -> workerJobService.checkoutAssignment(userId, assignmentId, req))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Bạn đã check-out hoàn thành ca");
+    }
+
+
+    @Test
+    @DisplayName("UTC023b - checkoutAssignment() - Abnormal: Ca làm việc chưa CHECKED_IN (vẫn CONFIRMED) ném BadRequestException")
+    void checkoutAssignment_Abnormal_AssignmentNotCheckedInThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
+                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkoutAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ có thể check-out cho ca làm việc đang ở trạng thái CHECKED_IN");
     }
 
     // =========================================================================
@@ -780,7 +878,7 @@ class WorkerJobServiceTest {
 
         assertThat(sa.getStatus()).isEqualTo(AssignmentStatus.CANCELLED);
         assertThat(worker.getReliabilityScore()).isEqualTo(85); // 90 - 5 = 85
-        verify(shiftRepository).save(activeShift);
+        verify(shiftRepository).decrementConfirmedWorkersAtomic(eq(activeShift.getShiftId()));
         verify(matchingDispatchService).dispatchForShift(activeShift.getShiftId());
     }
 
@@ -874,7 +972,7 @@ class WorkerJobServiceTest {
     void getShiftChecklist_Boundary_NullOrEmptyShiftChecklistReturnsEmptyList() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setChecklist(null);
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -924,7 +1022,7 @@ class WorkerJobServiceTest {
     void updateShiftChecklist_Boundary_InvalidItemIdIgnored() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setChecklist("[\"Việc 1\"]");
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -988,7 +1086,7 @@ class WorkerJobServiceTest {
     @DisplayName("UTC054 - createReview() - Normal: Worker gửi đánh giá EO thành công")
     void createReview_Success_CreatesReviewForOrganizer() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         CreateReviewRequestDto req = CreateReviewRequestDto.builder()
                 .rating(5).criteriaWorkEnvironment(5).criteriaSupport(5).criteriaPaymentTiming(5)
                 .comment("Ban tổ chức hỗ trợ chu đáo").build();
@@ -1013,7 +1111,7 @@ class WorkerJobServiceTest {
     @DisplayName("UTC055 - createReview() - Abnormal: Đã đánh giá trước đó ném BadRequestException")
     void createReview_Abnormal_DuplicateReviewThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1103,4 +1201,18 @@ class WorkerJobServiceTest {
 
         assertThat(summary.getAvgRating()).isEqualTo(BigDecimal.ZERO);
     }
+
+    @Test
+    @DisplayName("UTC060b - getIncomeSummary() - Boundary: Payment có cả declaredAmount và agreedAmount đều null tính bằng ZERO an toàn")
+    void getIncomeSummary_Boundary_NullPaymentAmountsCalculatesZeroGracefully() {
+        Payment nullAmountPayment = Payment.builder().declaredAmount(null).agreedAmount(null).status(PaymentStatus.CONFIRMED_FULL).build();
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(paymentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId())).thenReturn(List.of(nullAmountPayment));
+        when(attendanceLogRepository.findByWorker_WorkerId(worker.getWorkerId())).thenReturn(List.of());
+
+        WorkerIncomeSummaryDto summary = workerJobService.getIncomeSummary(userId);
+
+        assertThat(summary.getTotalEarnings()).isEqualTo(BigDecimal.ZERO);
+    }
+
 }

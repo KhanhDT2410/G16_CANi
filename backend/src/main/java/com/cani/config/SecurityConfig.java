@@ -43,6 +43,10 @@ public class SecurityConfig {
                     "/api/health",
                     "/actuator/health",
                     "/api/auth/**",
+                    "/v3/api-docs",
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
                     "/api/v1/workers/skills/taxonomy",
                     "/api/v1/workers/skills/tiers/config"
                 ).permitAll()

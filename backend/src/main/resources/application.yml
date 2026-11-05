@@ -112,5 +112,13 @@ cani:
     return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?payos=success}
     cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?payos=cancel}
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
 
 

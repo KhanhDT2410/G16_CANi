@@ -1,13 +1,22 @@
 # HANDOFF.md — Chuyển phiên Claude Code
 
 > **Mục đích:** cho hội thoại mới khôi phục đúng trạng thái công việc. Đọc kèm `CLAUDE.md` (nguyên tắc), `AGENTS.md` (chuẩn code team), `docs/PROJECT_CONTEXT.md` (snapshot chi tiết).
-> **Cập nhật:** 05/11/2026 (phiên sau `df3ab8d`). Đã đối chiếu với code + git thực tế, có chạy test/build.
+> **Cập nhật:** 05/11/2026 (sau commit `07a6af7`). Đã đối chiếu với code + git thực tế, có chạy test/build.
 
 ---
 
-## 1. Phiên này đã làm gì
+## 0. Trạng thái hiện tại (đọc đầu tiên)
 
-**Fix CC 403 trên hàng đợi eKYC / Skill Verification** (Known Issue #2 cũ) — gồm backend lẫn frontend.
+- **Toàn bộ fix CC 403 đã được COMMIT và PUSH** → `07a6af7` "fix ekyc" (23 files). Working tree **SẠCH**.
+- **Phía BACKEND đã xong và đã test**: CC có quyền eKYC/skill.
+- **Phía FRONTEND bị ẩn theo yêu cầu nhóm**: import + tab + view eKYC/skill trong `AdminPage.jsx` và `CustomerCarePage.jsx` đều bị **comment out** ("Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm"). → **UI chưa hiển thị dù backend đã sẵn sàng.** Feature slice vẫn còn nguyên trong `web/src/features/ekyc-verification/` và `features/skill-verification/`.
+- **Verify lại tại phiên này:** 62/62 test pass (BUILD SUCCESS) + `npx vite build` ✓ built in 1.76s.
+
+---
+
+## 1. Phiên trước đã làm gì
+
+**Fix CC 403 trên hàng đợi eKYC / Skill Verification** (Known Issue #2 cũ) — gồm backend lẫn frontend. **Đã commit `07a6af7`.**
 
 **Phân tích đã khoanh vùng trước khi code (nguyên nhân gốc):**
 403 nằm ở **tầng URL rule** của `SecurityConfig`, **không** phải `@PreAuthorize`:
@@ -26,12 +35,14 @@ Endpoint bị chặn trước khi fix:
 
 ## 2. Trạng thái Git
 
-- **Branch:** `quyth-clean` · **HEAD:** `df3ab8d` "skill CLI" · **Main:** `main` (`702a91c`).
-- **Working tree: CÓ thay đổi chưa commit** (chi tiết §3). Lần commit gần nhất trước đó: `ba29a55` "Cấu hình hệ thống".
+- **Branch:** `quyth-clean` · **HEAD:** `07a6af7` "fix ekyc" · **đã push** → `origin/quyth-clean` ✅
+- **Working tree: SẠCH** (không có thay đổi chưa commit).
+- **Main:** `main` (`702a91c`). Nhánh khác: `quyth`, `duong`, `hung`, `minhtb`, `test`, `backup/quyth-with-duong-merge`.
+- Commit `07a6af7` gộp **toàn bộ** backend + FE + docs + `HANDOFF.md`/`PROJECT_CONTEXT.md` trong **1** commit (23 files, +1122/−420) — không tách 2 commit như dự kiến.
 
 ---
 
-## 3. Thay đổi chưa commit (đã verify: 62 test pass + vite build xanh)
+## 3. Nội dung commit `07a6af7` "fix ekyc" (23 files, +1122/−420)
 
 ### Backend — modified
 | File | Nội dung |
@@ -45,17 +56,17 @@ Endpoint bị chặn trước khi fix:
 ### Web — modified
 | File | Nội dung |
 |---|---|
-| `pages/admin/AdminPage.jsx` | Đổi import `AdminEkycTab`/`AdminSkillsTab` → `EkycVerificationView`/`SkillVerificationView` từ feature slice. |
-| `pages/customer-care/CustomerCarePage.jsx` | **+2 tab**: "Hàng Đợi eKYC", "Hàng Đợi Kỹ Năng AI" (104 dòng, <200 ✅). Thêm `flexWrap: 'wrap'` cho thanh tab. |
+| `pages/admin/AdminPage.jsx` | Import + 2 tab + 2 view eKYC/skill **đã bị comment out** (xem §0). Đồng thời đổi mô tả header → "Giám sát vận hành, quản trị người dùng và cấu hình hệ thống". |
+| `pages/customer-care/CustomerCarePage.jsx` | 2 tab "Hàng Đợi eKYC" / "Hàng Đợi Kỹ Năng AI" **đã bị comment out** (xem §0). Giữ `flexWrap: 'wrap'` cho thanh tab. |
 | `features/disputes/components/DisputeCenterView.jsx` | Xóa dead code `escalatedCount` (useMemo không còn dùng; `:154` đã tự filter). `grep escalatedCount` toàn repo → 0 match. |
-| `App.jsx` | ⚠️ **Thay đổi ngoài phạm vi fix 403** — đổi route `/eo` và `/worker` từ `<Navigate to="/eo">` sang `<Navigate to="/login">`. Đây là chỉnh sửa của user, **chưa được review/không thuộc task 403** → cần user xác nhận giữ hay revert. |
+| `App.jsx` | Route index `/` và `/worker`: `<Navigate to="/eo">` → `<Navigate to="/login">`. Thêm route fallback `/cskh` → `/customer-care` (`App.jsx:49-50`). |
 
 ### Web — deleted
 - `pages/admin/components/AdminEkycTab.jsx` (175 dòng) — chuyển thành feature slice.
 - `pages/admin/components/AdminSkillsTab.jsx` (147 dòng) — chuyển thành feature slice.
 - → Thư mục `web/src/pages/admin/components/` **đã bị xóa hoàn toàn** (không còn file nào).
 
-### Web — new (2 feature slice đầy đủ theo `AGENTS.md` §1)
+### Web — new (2 feature slice đầy đủ theo `AGENTS.md` §1) — ĐÃ TẠO NHƯNG CHƯA DÙNG (bị comment out)
 ```
 features/ekyc-verification/
   api/ekycVerificationApi.js          getWorkerEkycQueue, reviewWorkerEkyc, getEoEkycQueue, reviewEoEkyc
@@ -72,6 +83,7 @@ features/skill-verification/
   types/skill-verification.constants.js
   index.js
 ```
+→ Code trong 2 slice này là bản **đã bỏ mock fallback** (đã verify: `grep -rn "Mock Fallback\|fallback = \[\|mockData" web/src/` → 0 match).
 
 ---
 
@@ -98,47 +110,46 @@ npx vite build (web/)                                              → ✓ built
 
 ---
 
-## 6. Lỗi còn tồn tại
+## 6. Lỗi / việc còn tồn tại
 
-1. 🟡 **CSS orphan trong `web/src/pages/admin/AdminPage.css`** — sau khi xóa 2 tab cũ, các class `.admin-verif-card` (:86), `.admin-card-top` (:94), `.admin-img-box` (:108, :116), `.admin-action-row` (:131), `.admin-card-list` (:80) **không còn component nào dùng**. Riêng `.btn-admin-approve` (:138) **vẫn được** `features/admin-users/components/UserStatusModal.jsx:93` dùng lại → **đừng xóa** class này.
-2. 🟡 `App.jsx` đổi route `/eo`,`/worker` → `/login` (ngoài phạm vi task, chưa verify) — cần user xác nhận.
-3. 🟡 `reference_no` ticket suffix 8 ký tự — vẫn còn rủi ro va chạm UNIQUE (thấp).
-4. 🟡 **`dev-token` bypass ngoài profile `h2`** (chưa sửa, cần quyết định): `JwtConfig.java:30-40` — bean `@Profile("!h2")` vẫn chấp nhận token `dev-token-*`, tự dựng JWT `alg=none`, claim email cố định `worker@cani.vn` → bypass được xác thực JWT trên cả profile `local` (Supabase thật). Nên gỡ nhánh này hoặc giới hạn theo property/env **không phụ thuộc profile**.
+1. 🔴 **UI eKYC/skill bị ẩn theo yêu cầu nhóm** — trong `AdminPage.jsx` và `CustomerCarePage.jsx`, import + tab + view đều bị comment out ("Tạm thời ẩn … theo yêu cầu nhóm để xem xét thêm"). Backend đã sẵn sàng + test pass nhưng **người dùng chưa thấy được màn hình**. Khi nhóm đồng ý bật: bỏ comment ở 4 chỗ (2 import, 2 khối render) + 2 khối tab trong `CustomerCarePage.jsx` → rồi chạy lại `npx vite build`.
+2. 🟡 **CSS orphan trong `web/src/pages/admin/AdminPage.css`** — sau khi xóa 2 tab cũ, các class `.admin-verif-card` (:86), `.admin-card-top` (:94), `.admin-img-box` (:108, :116), `.admin-action-row` (:131), `.admin-card-list` (:80) **không còn component nào dùng**. Riêng `.btn-admin-approve` (:138) **vẫn được** `features/admin-users/components/UserStatusModal.jsx:93` dùng lại → **đừng xóa** class này.
+3. 🟡 **E2E tay chưa chạy** — bật backend profile `h2` + web, đăng nhập `cc@cani.vn`, xác nhận queue eKYC/skill load từ API thật, duyệt/từ chối 1 hồ sơ, xác nhận request có quyền (không 403). Lưu ý: UI đang bị ẩn nên **phải bật lại tab trước** (mục 1) hoặc test bằng `curl`.
+4. 🟡 `reference_no` ticket suffix 8 ký tự — vẫn còn rủi ro va chạm UNIQUE (thấp).
+5. 🟡 **`dev-token` bypass ngoài profile `h2`** (chưa sửa, cần quyết định): `JwtConfig.java:30-40` — bean `@Profile("!h2")` vẫn chấp nhận token `dev-token-*`, tự dựng JWT `alg=none`, claim email cố định `worker@cani.vn` → bypass được xác thực JWT trên cả profile `local` (Supabase thật). Nên gỡ nhánh này hoặc giới hạn theo property/env **không phụ thuộc profile**.
    - Lưu ý liên quan: `AuthService.login:147-152` fallback khi Supabase lỗi → tìm user theo email, **không verify password**, trả `dev-token-<uuid>`. Hệ quả: profile `h2`, đăng nhập `cc@cani.vn` với **bất kỳ password nào** cũng vào được → thuận tiện cho E2E.
-5. 🟡 **IDOR còn sót ở controller cũ:** `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` từ query-param — `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:40`, `DirectPaymentController:102`, `EoEventController:120`. `CLAUDE.md` quy định "không lấy userId từ request" → nên bỏ tham số `explicitUserId`. Module mới (dispute/ticket/config) đã tuân thủ đúng.
-6. 🟡 E2E tay chưa chạy (xem §5).
+6. 🟡 **IDOR còn sót ở controller cũ:** `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` từ query-param — `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:40`, `DirectPaymentController:102`, `EoEventController:120`. `CLAUDE.md` quy định "không lấy userId từ request" → nên bỏ tham số `explicitUserId`. Module mới (dispute/ticket/config) đã tuân thủ đúng.
+7. 🟡 `App.jsx` đổi route `/eo`,`/worker` → `/login` + thêm route `/cskh` → `/customer-care` — **đã commit** nhưng chưa verify E2E (ảnh hưởng: user chưa đăng nhập vào `/` sẽ ra `/login` thay vì `/eo`).
 
 ---
 
 ## 7. Quyết định kỹ thuật đã thống nhất (đừng làm lại)
 
-- **Tách feature slice dùng chung** thay vì import chéo giữa `pages/admin/components/` và `pages/customer-care/` → 2 slice `ekyc-verification` + `skill-verification`, `AdminPage` và `CustomerCarePage` cùng dùng.
+- **Tách feature slice dùng chung** thay vì import chéo giữa `pages/admin/components/` và `pages/customer-care/` → 2 slice `ekyc-verification` + `skill-verification`, `AdminPage` và `CustomerCarePage` cùng dùng (hiện đang comment out chờ nhóm duyệt).
 - **Thứ tự rule `SecurityConfig` là quyết định** — matcher đầu tiên thắng; rule CC **phải** trước wildcard `/api/v1/admin/**`.
 - **Không mở quyền CC cho System Config** — UC-114/115 chỉ Admin, cố ý dùng wildcard ADMIN.
 - **Ưu tiên hiển thị lỗi thật thay vì mock** — không được bật mock fallback mặc định trong các queue dùng cho nghiệp vụ thật.
 - **Không cần migration** cho fix này (chỉ đổi SecurityConfig + seeder + FE).
 - **Audit:** fix này không thêm action audit mới → `AdminDashboardService.formatActionDescription` không cần sửa.
+- **Nhóm quyết ẩn UI eKYC/skill để xem xét** → giữ nguyên feature slice trong repo, chỉ comment ở tầng page; khi bật lại không cần viết lại code.
 
 ---
 
 ## 8. Việc tiếp theo (thứ tự)
 
-1. **Xác nhận với user** về thay đổi `App.jsx` (route `/eo`, `/worker` → `/login`): giữ hay revert? → đây là thay đổi ngoài phạm vi task.
-2. **Dọn CSS orphan** `AdminPage.css` (mục §6.1) — giữ `.btn-admin-approve`.
-3. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` → `/customer-care` → 2 tab mới → xác nhận queue từ API thật (không mock) → duyệt/từ chối 1 hồ sơ → xác nhận request có quyền.
-4. **Commit** (chưa commit!): tách 2 commit —
-   - `backend: allow Customer Care to access eKYC & skill verification queues` (SecurityConfig + H2DataSeeder + CustomerCareQueueSecurityTest)
-   - `web: extract ekyc/skill verification queues into shared feature slices` (2 feature slice + AdminPage + CustomerCarePage + xóa 2 tab cũ + DisputeCenterView)
-   - Nếu giữ thay đổi `App.jsx` → tách commit riêng hoặc bỏ khỏi commit trên.
-5. **Cập nhật `docs/PROJECT_CONTEXT.md`** — §5 (System Config / dispute đã commit), §7 (working tree), §8 Known Issue #1 (đã resolve), #2 (đã fix). Phần này hiện **stale**.
-6. **SRS chưa code, theo priority:** UC-108 Revenue Dashboard → UC-110 FAQ → UC-74/54/56 RS Appeals/No-show → UC-111 dashboard mở rộng → auto-escalation SLA job.
+1. **Hỏi nhóm/nhận chỉ thị bật lại UI eKYC/skill** (mục §6.1) — nếu bật: bỏ comment 4 chỗ ở `AdminPage.jsx` + 2 khỗi ở `CustomerCarePage.jsx`, chạy `npx vite build`.
+2. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` → `/customer-care` → tab eKYC/skill → queue từ API thật → duyệt/từ chối 1 hồ sơ → xác nhận không 403.
+3. **Dọn CSS orphan** `AdminPage.css` (mục §6.2) — giữ `.btn-admin-approve`.
+4. **Cập nhật `docs/PROJECT_CONTEXT.md`** §7 (working tree → sạch, HEAD `07a6af7`) + §8 Known Issue (CC 403 đã fix & commit) + ghi nhận UI đang bị ẩn.
+5. **SRS chưa code, theo priority:** UC-108 Revenue Dashboard → UC-110 FAQ → UC-74/54/56 RS Appeals/No-show → UC-111 dashboard mở rộng → auto-escalation SLA job.
+6. **Quyết định còn treo:** `dev-token` bypass (mục §6.5) và IDOR controller cũ (mục §6.6).
 
 ---
 
 ## 9. Module đã hoàn thành (không làm lại)
 
 ✅ **Đã commit:** Dispute UC-96→104/109 (`f786a46`, `ba29a55`) · Support Ticket UC-105/106 (`9cb0cb1`) · System Config UC-114/115 (`ba29a55`) · Dashboard UC-86 · User Mgmt UC-87 · Skill Verification UC-47 · eKYC worker + EO · Auth + OTP · Payment/Matching.
-✅ **Xong, chưa commit:** CC access eKYC/skill queue (phiên này).
+✅ **Đã commit `07a6af7`:** CC access eKYC/skill queue — **backend đã xong + test 13 case**; FE có feature slice nhưng **UI đang bị ẩn** chờ nhóm duyệt.
 ❌ **Chưa bắt đầu:** UC-108, UC-110, UC-74/54/56, UC-111, auto-escalation SLA; mobile chưa có feature support-ticket/dispute.
 
 ---

@@ -9,4 +9,5 @@ export { default as CreateDisputeModal } from './components/CreateDisputeModal';
 export { default as AddEvidenceModal } from './components/AddEvidenceModal';
 export { default as DisputeDecisionModal } from './components/DisputeDecisionModal';
 export { default as EscalateModal } from './components/EscalateModal';
+export { default as TransferDisputeModal } from './components/TransferDisputeModal';
 

@@ -5,6 +5,7 @@ import {
   TICKET_PRIORITY_CONFIG,
 } from '../types/ticket.constants';
 import TicketMessageThread from './TicketMessageThread';
+import TicketInfoGrid from './TicketInfoGrid';
 import { showToast } from '../../../components/common/Toast';
 
 export const TicketDetailModal = ({
@@ -14,6 +15,7 @@ export const TicketDetailModal = ({
   isStaff,
   onReply,
   onAssign,
+  onOpenTransferModal,
   onOpenCloseModal,
   onResolve,
   loading,
@@ -79,26 +81,14 @@ export const TicketDetailModal = ({
             </div>
           )}
 
-          <div className="ticket-info-grid">
-            <div className="ticket-info-item">
-              <span className="label">Danh mục</span>
-              <span className="val">{categoryConfig.label}</span>
-            </div>
-            <div className="ticket-info-item">
-              <span className="label">Mức độ ưu tiên</span>
-              <span className="val">
-                <span className={`ticket-badge ${priorityConfig.badgeClass}`}>{priorityConfig.label}</span>
-              </span>
-            </div>
-            <div className="ticket-info-item">
-              <span className="label">Hạn cam kết SLA</span>
-              <span className="val">{formatDateTime(ticket.slaDeadline)}</span>
-            </div>
-            <div className="ticket-info-item">
-              <span className="label">Chuyên viên phụ trách</span>
-              <span className="val">{ticket.assignedTo ? ticket.assignedTo.substring(0, 8) + '...' : 'Chưa phân công'}</span>
-            </div>
-          </div>
+          <TicketInfoGrid
+            categoryLabel={categoryConfig.label}
+            priorityLabel={priorityConfig.label}
+            priorityBadgeClass={priorityConfig.badgeClass}
+            slaDeadline={ticket.slaDeadline}
+            assignedTo={ticket.assignedTo}
+            formatDateTime={formatDateTime}
+          />
 
           <div>
             <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
@@ -160,6 +150,16 @@ export const TicketDetailModal = ({
               disabled={loading}
             >
               Tiếp Nhận Phiếu (Tự Gán)
+            </button>
+          )}
+          {isStaff && ticket.status !== 'CLOSED' && onOpenTransferModal && (
+            <button
+              type="button"
+              className="ticket-btn ticket-btn-secondary"
+              onClick={() => onOpenTransferModal(ticket)}
+              disabled={loading}
+            >
+              Chuyển Phiếu Cho CC Khác
             </button>
           )}
           {isStaff && ticket.status !== 'CLOSED' && (

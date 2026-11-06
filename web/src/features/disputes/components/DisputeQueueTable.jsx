@@ -1,6 +1,6 @@
 import { DISPUTE_STATUS_CONFIG, DISPUTE_TYPE_LABELS } from '../types/dispute.constants';
 
-const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide }) => {
+const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide, onTransfer }) => {
   if (loading) {
     return <div className="dispute-empty">Đang tải dữ liệu hàng đợi...</div>;
   }
@@ -85,6 +85,17 @@ const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide }) => 
                         onClick={() => onAssign(item.id)}
                       >
                         Nhận xử lý
+                      </button>
+                    )}
+                    {(item.status === 'OPEN' || item.status === 'INVESTIGATING') && (
+                      <button
+                        type="button"
+                        className="btn-quick-fill"
+                        style={{ margin: 0, color: 'var(--color-warning)', borderColor: 'var(--color-warning)' }}
+                        onClick={() => onTransfer(item)}
+                        title="Chuyển tranh chấp cho nhân sự Chăm sóc khách hàng khác"
+                      >
+                        Chuyển
                       </button>
                     )}
                     {(item.status === 'INVESTIGATING' || item.status === 'ESCALATED') && (

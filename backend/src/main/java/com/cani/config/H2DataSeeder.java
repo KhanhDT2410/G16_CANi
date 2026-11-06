@@ -132,5 +132,21 @@ public class H2DataSeeder implements CommandLineRunner {
             userRepository.save(user);
             log.info("==> [H2 Profile] Seeded default Admin user: {}", adminEmail);
         }
+
+        // Seed default Customer Care user if not exists
+        String ccEmail = "cc@cani.vn";
+        if (!userRepository.existsByEmail(ccEmail)) {
+            User cc = User.builder()
+                .userId(UUID.fromString("11111111-1111-1111-1111-111111111111"))
+                .email(ccEmail)
+                .fullName("Nhân viên CSKH")
+                .role(UserRole.CUSTOMER_CARE)
+                .status(UserStatus.ACTIVE)
+                .phone("0912345678")
+                .emailVerified(true)
+                .build();
+            userRepository.save(cc);
+            log.info("==> [H2 Profile] Seeded default Customer Care user: {} (id: {})", ccEmail, cc.getUserId());
+        }
     }
 }

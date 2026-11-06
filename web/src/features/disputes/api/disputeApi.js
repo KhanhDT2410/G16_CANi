@@ -44,6 +44,18 @@ export const disputeApi = {
     return response.data?.data;
   },
 
+  /** UC-109: Hàng đợi riêng — chỉ đơn đang được giao cho CC hiện tại */
+  getMyDisputeQueue: async () => {
+    const response = await apiClient.get('/v1/admin/disputes/queue/mine');
+    return response.data?.data;
+  },
+
+  /** UC-99: Danh sách nhân sự CC để chuyển đơn */
+  getCustomerCareStaff: async () => {
+    const response = await apiClient.get('/v1/admin/disputes/customer-care-staff');
+    return response.data?.data;
+  },
+
   /** UC-99: Nhận đơn hoặc chuyển đơn */
   assignDispute: async (id, targetCcUserId = null) => {
     const body = targetCcUserId ? { targetCcUserId } : null;

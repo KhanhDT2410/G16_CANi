@@ -11,6 +11,13 @@ export const TicketToolbar = ({ activeFilter, onFilterChange, searchTerm, onSear
         </button>
         <button
           type="button"
+          className={`tickets-tab-btn ${activeFilter === 'MINE' ? 'active' : ''}`}
+          onClick={() => onFilterChange('MINE')}
+        >
+          Được Giao Cho Tôi ({stats.myCount || 0})
+        </button>
+        <button
+          type="button"
           className={`tickets-tab-btn ${activeFilter === 'OPEN' ? 'active' : ''}`}
           onClick={() => onFilterChange('OPEN')}
         >
@@ -46,4 +53,3 @@ export const TicketToolbar = ({ activeFilter, onFilterChange, searchTerm, onSear
 };
 
 export default TicketToolbar;
-

@@ -1,4 +1,4 @@
-# CANi Project - AI Agent & Developer Guidelines
+bạn # CANi Project - AI Agent & Developer Guidelines
 
 This repository is a monorepo for **CANi - Event Staffing Platform**:
 - `backend/`: Java 21, Spring Boot 3.5.1, PostgreSQL, Flyway, Maven.

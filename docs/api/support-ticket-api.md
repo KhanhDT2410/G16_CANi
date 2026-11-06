@@ -158,7 +158,7 @@ OPEN ──CC nhận/gán (SCR-25/26)──> IN_PROGRESS ──CC/Admin đóng k
   "data": [
     {
       "id": "7fa41890-a548-4cb9-99a3-5c661ef65b90",
-      "referenceNo": "TKT-20261031-1A2B",
+      "referenceNo": "TKT-20261031-1A2B3C4D",
       "category": "BILLING",
       "priority": "HIGH",
       "subject": "Lỗi thanh toán ca làm việc ngày 30/10",
@@ -176,7 +176,36 @@ OPEN ──CC nhận/gán (SCR-25/26)──> IN_PROGRESS ──CC/Admin đóng k
 
 ---
 
-### 3.2. Phân công hoặc nhận ticket (SCR-25 / SCR-26)
+### 3.2. Hàng đợi riêng của chuyên viên (SCR-25: Phân tầng CC)
+* **Endpoint:** `GET /api/v1/admin/support/tickets/queue/mine`
+* **Quyền:** `CUSTOMER_CARE` hoặc `ADMIN`
+* **Mô tả:** Chỉ trả về các ticket đang mở (`OPEN` hoặc `IN_PROGRESS`) đã được phân công cho chính tài khoản đang đăng nhập (`assignedTo = currentUserId`).
+
+---
+
+### 3.3. Danh sách nhân sự Customer Care (SCR-25 / SCR-26)
+* **Endpoint:** `GET /api/v1/admin/support/tickets/customer-care-staff`
+* **Quyền:** `CUSTOMER_CARE` hoặc `ADMIN`
+* **Mô tả:** Trả về danh sách chuyên viên Customer Care kèm số lượng phiếu đang xử lý (`assignedCount`) để hỗ trợ chuyển giao và cân bằng tải công việc.
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Lấy danh sách nhân sự Chăm sóc khách hàng thành công",
+  "data": [
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "fullName": "Nguyễn Văn A",
+      "email": "cskh1@cani.vn",
+      "assignedCount": 3
+    }
+  ]
+}
+```
+
+---
+
+### 3.4. Phân công hoặc nhận ticket (SCR-25 / SCR-26)
 * **Endpoint:** `POST /api/v1/admin/support/tickets/{id}/assign`
 * **Quyền:** `CUSTOMER_CARE` hoặc `ADMIN`
 * **Request Body (Tùy chọn):**

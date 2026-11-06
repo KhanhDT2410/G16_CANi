@@ -14,6 +14,11 @@ import EOPaymentsTab from './components/EOPaymentsTab';
 import EoEkycTab from './EoEkycTab';
 import EOModals from './components/EOModals';
 
+import EventCreateModal from './components/EventCreateModal';
+import ShiftCreateModal from './components/ShiftCreateModal';
+import PaymentDeclarationModal from './components/PaymentDeclarationModal';
+import PublishEventModal from './components/PublishEventModal';
+import { SupportTicketsCenterView } from '../../features/support-tickets';
 import './EOPage.css';
 
 export default function EOPage() {
@@ -39,6 +44,7 @@ export default function EOPage() {
     if (navKey === 'overview' || navKey === 'events') setActiveTab('events');
     else if (navKey === 'payments') setActiveTab('payments');
     else if (navKey === 'ekyc') setActiveTab('ekyc');
+    else if (navKey === 'support') setActiveTab('support');
     else if (navKey === 'recruitment') {
       if (events.events.length > 0) {
         shifts.setSelectedEventId(events.events[0].eventId);
@@ -83,6 +89,13 @@ export default function EOPage() {
             <button type="button" className={`pill-tab ${activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => setActiveTab('ekyc')}>
               Định Danh Doanh Nghiệp (eKYC)
             </button>
+            <button
+              type="button"
+              className={`pill-tab ${activeTab === 'support' ? 'active' : ''}`}
+              onClick={() => setActiveTab('support')}
+            >
+              Hỗ Trợ Kỹ Thuật (Tickets)
+            </button>
           </div>
 
           {activeTab === 'events' && (
@@ -122,10 +135,17 @@ export default function EOPage() {
           )}
 
           {activeTab === 'ekyc' && <EoEkycTab />}
+
+          {/* NỘI DUNG TAB 4: HỖ TRỢ KỸ THUẬT & PHIẾU YÊU CẦU (UC-105 / UC-106) */}
+          {activeTab === 'support' && (
+            <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
+              <SupportTicketsCenterView />
+            </div>
+          )}
         </main>
 
         <EORightSidebar />
-      </div>
+      </div >
 
       <EOModals
         events={events}
@@ -134,6 +154,6 @@ export default function EOPage() {
         mapModal={mapModal}
         setMapModal={setMapModal}
       />
-    </div>
+    </div >
   );
 }

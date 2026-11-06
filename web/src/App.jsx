@@ -10,6 +10,7 @@ const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const CustomerCarePage = lazy(() => import('./pages/customer-care/CustomerCarePage'));
 const MobileShowcasePage = lazy(() => import('./pages/mobile-preview/MobileShowcasePage'));
+const SupportPage = lazy(() => import('./pages/support/SupportPage'));
 
 function PageFallback() {
   return (
@@ -48,7 +49,7 @@ function App() {
               }
             />
             {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về EO nếu truy cập trên Web */}
-            <Route path="worker" element={<Navigate to="/eo" replace />} />
+            <Route path="worker" element={<Navigate to="/login" replace />} />
             <Route path="mobile-preview" element={<MobileShowcasePage />} />
             <Route
               path="customer-care"
@@ -66,12 +67,13 @@ function App() {
                 </RequireRole>
               }
             />
+            <Route path="support" element={<SupportPage />} />
             {/* Fallback route cho duong dan cu /cskh */}
             <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
-          </Route>
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+          </Route >
+        </Routes >
+      </Suspense >
+    </BrowserRouter >
   );
 }
 

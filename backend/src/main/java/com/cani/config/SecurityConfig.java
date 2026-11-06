@@ -46,7 +46,18 @@ public class SecurityConfig {
                     "/api/v1/workers/skills/taxonomy",
                     "/api/v1/workers/skills/tiers/config"
                 ).permitAll()
-                .requestMatchers("/api/v1/workers/skills/admin/**").hasRole("ADMIN")
+                // Thẩm định chứng chỉ kỹ năng (UC-47): Customer Care cùng quyền kiểm duyệt với Admin
+                .requestMatchers("/api/v1/workers/skills/admin/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                // Module tranh chấp (UC-99/100/102/109): Customer Care cùng quyền với Admin
+                // (BR-59: CC có thẩm quyền quyết định Level-1; Admin quyết định cuối).
+                .requestMatchers("/api/v1/admin/disputes/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                .requestMatchers("/api/v1/disputes/**").authenticated()
+                // Module phiếu hỗ trợ (UC-105/106, SCR-25/26): Customer Care & Admin quản lý queue & detail
+                .requestMatchers("/api/v1/admin/support/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                .requestMatchers("/api/v1/support/**").authenticated()
+                // Thẩm định hồ sơ eKYC Worker và Doanh nghiệp: Customer Care cùng quyền kiểm duyệt với Admin
+                .requestMatchers("/api/v1/admin/ekyc/**", "/api/v1/admin/eo-ekyc/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers(
                     "/api/v1/workers/skills/**",
                     "/api/v1/workers/ekyc/**",

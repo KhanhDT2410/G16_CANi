@@ -10,6 +10,7 @@ const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const CustomerCarePage = lazy(() => import('./pages/customer-care/CustomerCarePage'));
 const MobileShowcasePage = lazy(() => import('./pages/mobile-preview/MobileShowcasePage'));
+const SupportPage = lazy(() => import('./pages/support/SupportPage'));
 
 function PageFallback() {
   return (
@@ -51,7 +52,7 @@ function App() {
             <Route path="profile" element={<Navigate to="/eo?tab=profile" replace />} />
             <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
             {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về EO nếu truy cập trên Web */}
-            <Route path="worker" element={<Navigate to="/eo" replace />} />
+            <Route path="worker" element={<Navigate to="/login" replace />} />
             <Route path="mobile-preview" element={<MobileShowcasePage />} />
             <Route
               path="customer-care"
@@ -66,6 +67,14 @@ function App() {
               element={
                 <RequireRole allowedRoles={['ADMIN']}>
                   <AdminPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="support"
+              element={
+                <RequireRole allowedRoles={['EVENT_ORGANIZER', 'CUSTOMER_CARE', 'ADMIN']}>
+                  <SupportPage />
                 </RequireRole>
               }
             />

@@ -1,0 +1,88 @@
+import { useAdminDashboard } from '../hooks/useAdminDashboard';
+import MetricsCards from './MetricsCards';
+import RecentActivitiesList from './RecentActivitiesList';
+import { LayoutDashboardIcon, RefreshCwIcon, AlertCircleIcon } from './Icons';
+import './AdminDashboard.css';
+
+/**
+ * Component chính cho Bảng điều khiển Quản trị & Phân tích số liệu (UC-86)
+ */
+const AdminDashboardView = ({ onNavigateTab }) => {
+  const { metrics, activities, loading, refreshing, error, isDemoFallback, refresh } = useAdminDashboard();
+
+  if (loading) {
+    return (
+      <div className="dashboard-container">
+        <div className="skeleton" style={{ height: '56px', borderRadius: '12px' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+          <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
+          <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
+          <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
+        </div>
+        <div className="skeleton" style={{ height: '350px', borderRadius: '12px' }} />
+      </div>
+    );
+  }
+
+  if (error && !metrics) {
+    return (
+      <div className="dashboard-container">
+        <div className="dashboard-error-state">
+          <div className="dashboard-error-icon">
+            <AlertCircleIcon size={36} />
+          </div>
+          <h3 className="dashboard-error-title">Không thể tải Bảng điều khiển</h3>
+          <p className="dashboard-error-desc">{error}</p>
+          <button
+            type="button"
+            className="dashboard-refresh-btn"
+            onClick={refresh}
+          >
+            <RefreshCwIcon size={14} />
+            <span>Thử lại</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dashboard-container animate-fade-in-up">
+      {/* Thanh công cụ / Tiêu đề */}
+      <div className="dashboard-toolbar">
+        <div className="dashboard-toolbar-title">
+          <div className="metric-icon-box dashboard">
+            <LayoutDashboardIcon size={18} />
+          </div>
+          <span>Tổng Quan Vận Hành Nền Tảng</span>
+          {isDemoFallback && (
+            <span
+              className="dashboard-demo-badge"
+              title="Backend đang tắt hoặc chưa đăng nhập Admin - Hiển thị dữ liệu mẫu để bạn test giao diện"
+            >
+              <span className="dashboard-demo-dot" />
+              <span>Chế độ Demo (Offline)</span>
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="dashboard-refresh-btn"
+          onClick={refresh}
+          disabled={refreshing}
+        >
+          <RefreshCwIcon size={14} spinning={refreshing} />
+          <span>{refreshing ? 'Đang cập nhật...' : 'Làm mới'}</span>
+        </button>
+      </div>
+
+      {/* Các khối thẻ chỉ số (User, Verifications, Operations) */}
+      <MetricsCards metrics={metrics} onNavigateTab={onNavigateTab} />
+
+      {/* Danh sách 10 hoạt động quản trị gần nhất */}
+      <RecentActivitiesList activities={activities} />
+    </div>
+  );
+};
+
+export default AdminDashboardView;

@@ -17,6 +17,7 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     List<Shift> findByEvent_EventId(UUID eventId);
     List<Shift> findByEvent_EventIdAndStatus(UUID eventId, ShiftStatus status);
     List<Shift> findByStatus(ShiftStatus status);
+    long countByStatus(ShiftStatus status);
 
     @Modifying
     @Query("UPDATE Shift s SET s.confirmedWorkers = s.confirmedWorkers + 1, s.remainingWorkers = CASE WHEN (s.remainingWorkers > 0) THEN s.remainingWorkers - 1 ELSE 0 END, s.status = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN com.cani.entity.enums.ShiftStatus.FULLY_STAFFED ELSE s.status END WHERE s.shiftId = :shiftId AND s.confirmedWorkers < s.requiredWorkers")

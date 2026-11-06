@@ -19,6 +19,7 @@ import EOAnalyticsTab from './components/EOAnalyticsTab';
 import EOSettingsTab from './components/EOSettingsTab';
 import EOModals from './components/EOModals';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
+import { SupportTicketsCenterView } from '../../features/support-tickets';
 
 import './EOPage.css';
 
@@ -89,7 +90,7 @@ export default function EOPage() {
     } else if (tabParam === 'profile' || tabParam === 'ekyc') {
       setActiveTab('profile');
       setActiveNav('profile');
-    } else if (tabParam && ['events', 'recruitment', 'payments', 'analytics', 'settings'].includes(tabParam)) {
+    } else if (tabParam && ['events', 'recruitment', 'payments', 'analytics', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
@@ -131,6 +132,7 @@ export default function EOPage() {
     else if (navKey === 'profile' || navKey === 'ekyc') target = 'profile';
     else if (navKey === 'analytics') target = 'analytics';
     else if (navKey === 'settings') target = 'settings';
+    else if (navKey === 'support') target = 'support';
     
     setActiveTab(target);
     try {
@@ -205,6 +207,9 @@ export default function EOPage() {
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => switchTab('settings')}>
               Cài Đặt Hệ Thống
+            </button>
+            <button type="button" className={`pill-tab ${activeTab === 'support' ? 'active' : ''}`} onClick={() => switchTab('support')}>
+              Hỗ Trợ Kỹ Thuật (Tickets)
             </button>
           </div>
 
@@ -281,6 +286,13 @@ export default function EOPage() {
 
           {activeTab === 'settings' && (
             <EOSettingsTab onNavigateToSubscription={() => switchTab('subscription')} />
+          )}
+
+          {/* NỘI DUNG TAB HỖ TRỢ KỸ THUẬT & PHIẾU YÊU CẦU (UC-105 / UC-106) */}
+          {activeTab === 'support' && (
+            <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
+              <SupportTicketsCenterView />
+            </div>
           )}
         </main>
 

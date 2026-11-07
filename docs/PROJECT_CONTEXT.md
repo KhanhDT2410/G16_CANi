@@ -130,17 +130,39 @@ SystemConfigControllerTest, AdminDashboardServiceTest, AdminUserControllerTest
 ## 7. Git & Work in Progress
 
 **Branch hiện tại:** `quyth-clean` (đã push → `origin/quyth-clean`)
-**HEAD:** `07a6af7 "fix ekyc"`
-**Working tree: SẠCH** ✅
+**HEAD:** `cc3a75e "Update project context and handoff documentation"`
+**✅ Bộ docs test-case đã commit 07/11/2026** (xem dưới)
 
 ### Commit gần nhất
 | Commit | Nội dung |
 |---|---|
-| `07a6af7` fix ekyc | **Fix CC 403** eKYC/skill queue: `SecurityConfig` mở CC cho ekyc/eo-ekyc/skills admin · `H2DataSeeder` seed `cc@cani.vn` · `CustomerCareQueueSecurityTest` (13 test) · 2 feature slice FE `ekyc-verification` + `skill-verification` (bỏ mock fallback) · xóa `AdminEkycTab`/`AdminSkillsTab` · +2 tab CC (**đang comment out chờ nhóm duyệt**) · `App.jsx` route `/`,`/worker` → `/login`, thêm `/cskh` → `/customer-care` · `HANDOFF.md` + `PROJECT_CONTEXT.md` |
+| `cc3a75e` Update project context and handoff documentation | `HANDOFF.md` + `docs/PROJECT_CONTEXT.md` + `AGENTS.md` (sửa typo dòng tiêu đề) |
+| `07a6af7` fix ekyc | **Fix CC 403** eKYC/skill queue: `SecurityConfig` mở CC cho ekyc/eo-ekyc/skills admin · `H2DataSeeder` seed `cc@cani.vn` · `CustomerCareQueueSecurityTest` (13 test) · 2 feature slice FE `ekyc-verification` + `skill-verification` (bỏ mock fallback) · xóa `AdminEkycTab`/`AdminSkillsTab` · +2 tab CC (**đang comment out chờ nhóm duyệt**) · `App.jsx` route `/`,`/worker` → `/login`, thêm `/cskh` → `/customer-care` · docs |
 | `df3ab8d` skill CLI | `HANDOFF.md` + `docs/PROJECT_CONTEXT.md` |
 | `ba29a55` Cấu hình hệ thống | System Config module (UC-114/115) + dispute `queue/mine` & `customer-care-staff` backend + global 403 handler + FE `features/system-configs/` + docs |
 | `9cb0cb1` Chỉnh sửa ticket support | FE-12: `/queue/mine` + `/customer-care-staff` cho support, `TransferTicketModal`, route `/support`, docs |
-| `f786a46` Fix Escalate Dispute | FE dispute: `queue/mine` + `customer-care-staff`, `TransferDisputeModal`, tab "Được giao tôi" + ESCALATED, docs, test +3 |
+
+### ✅ Bộ docs test-case (đã commit 07/11/2026 — không có source code)
+```
+docs/requirements/Report-5.1_Unit Test.xlsx            báo cáo unit test (binary 320 KB)
+docs/requirements/unit-test-report-standard.md         chuẩn SE unit test report (IEEE 829 / ISO 29119) — đổi tên từ "SKILL (1).md"
+docs/requirements/generate_service_unit_test_sheet.py script openpyxl sinh sheet unit test theo service
+docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.md      47 test case phân hệ Admin/CC
+docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.csv     bản Google Sheets
+docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     bản copy-paste
+```
+- 3 file test-case do agent sinh ra theo yêu cầu điền test case vào RP5.1.
+- Đã sửa kèm: đường dẫn `tools/...` → `docs/requirements/...` (trong md + docstring script), `run.md` `cd Code/*` → `cd *`, `dispute-resolution-api.md` dòng 146 thiếu `/api`.
+
+### 🟡 So sánh với nhánh khác (07/11/2026) — chưa merge
+| So sánh | Ahead | Behind |
+|---|---|---|
+| `quyth-clean` vs `origin/main` | 27 | 0 |
+| `quyth-clean` vs `origin/duong` / `origin/hung` | 21 | **71** |
+| `quyth-clean` vs `origin/minhtb` | 21 | 61 |
+| `quyth-clean` vs `origin/test` | 0 | 39 |
+
+> **`origin/duong` + `origin/hung` đã fix sẵn 2/3 hạng mục P0** (dev-token bypass + IDOR toàn bộ controller) — xem `HANDOFF.md` §0. Overlap 18 file với nhánh này. **Vấn đề migration V12/V13 cần hỏi leader** (commit `4278929`).
 
 > Chi tiết đầy đủ: `HANDOFF.md` §0–§3.
 
@@ -149,14 +171,17 @@ SystemConfigControllerTest, AdminDashboardServiceTest, AdminUserControllerTest
 ## 8. Known Issues & Unfinished Tasks
 
 1. **🔴 UI eKYC/skill đang bị ẩn** — import + tab + view trong `AdminPage.jsx` và `CustomerCarePage.jsx` bị comment out ("Tạm thời ẩn … theo yêu cầu nhóm để xem xét thêm"). Backend đã sẵn sàng + 13 test pass, nhưng người dùng chưa thấy màn hình. Bật lại: bỏ comment 4 chỗ ở `AdminPage.jsx` + 2 khối ở `CustomerCarePage.jsx`.
-2. **🟡 E2E tay chưa chạy** cho fix CC 403 (queue eKYC/skill từ API thật, duyệt/từ chối 1 hồ sơ).
-3. **🟡 CSS orphan** trong `web/src/pages/admin/AdminPage.css` (`.admin-verif-card`, `.admin-card-top`, `.admin-img-box`, `.admin-action-row`, `.admin-card-list`) sau khi xóa 2 tab cũ — dọn được nhưng **giữ `.btn-admin-approve`** (còn `UserStatusModal.jsx` dùng).
-4. **🟡 `dev-token` bypass ngoài profile `h2`** — `JwtConfig.java:30-40` vẫn chấp nhận `dev-token-*` trên mọi profile → bypass xác thực JWT trên `local`. `AuthService.login:147-152` cũng fallback không verify password. Chưa sửa, cần quyết định.
-5. **🟡 IDOR còn sót ở controller cũ** — `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` query-param: `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:40`, `DirectPaymentController:102`, `EoEventController:120`.
-6. **🟡 Support ticket `reference_no` suffix 8 ký tự** (đã fix từ 4 → 8), vẫn UNIQUE constraint — rủi ro va chạm thấp.
-7. **🟡 `App.jsx` route `/`,`/worker` → `/login`** — đã commit, chưa verify E2E (user chưa đăng nhập vào `/` giờ ra `/login` thay vì `/eo`).
-8. **Unfinished (SRS, chưa code):** UC-74/54/56 RS Appeals + No-show; UC-108 Revenue Dashboard (FE mock, chưa backend); UC-110 FAQ (thiếu entity); UC-111 dashboard mở rộng (metrics disputes/assignments/RS); auto-escalation SLA job (inventory SRS). Mobile chưa có feature support-ticket/dispute (đang chờ backend).
-9. **Backend không có devtools:** mọi lần sửa backend phải **restart** (đã xảy ra 2 lần "lỗi hệ thống" do chạy code cũ). Kiểm tra bằng `curl /api/health` + grep mapping trong startup log.
+2. **✅ 6 file test-case/unit-test docs đã commit** (07/11/2026) — `SKILL (1).md` đã đổi tên `unit-test-report-standard.md`, đường dẫn `tools/...` đã hiệu chỉnh (md + docstring script), kèm sửa `run.md` + `dispute-resolution-api.md`.
+3. **🟡 E2E tay chưa chạy** cho fix CC 403 (queue eKYC/skill từ API thật, duyệt/từ chối 1 hồ sơ).
+4. **🟡 CSS orphan** trong `web/src/pages/admin/AdminPage.css` (`.admin-verif-card`, `.admin-card-top`, `.admin-img-box`, `.admin-action-row`, `.admin-card-list`) sau khi xóa 2 tab cũ — dọn được nhưng **giữ `.btn-admin-approve`** (còn `UserStatusModal.jsx` dùng).
+5. **🟡 `dev-token` bypass ngoài profile `h2`** — ⚠️ **ĐÃ CÓ FIX TRÊN `origin/duong`/`origin/hung`, chưa merge.** Nhánh này vẫn còn: `JwtConfig.java:30-40` chấp nhận `dev-token-*` trên mọi profile → bypass JWT trên `local`; `AuthService.login:147-152` fallback không verify password. Bản fix nhóm: xóa nhánh `dev-token` khỏi bean `!h2` + gate `AuthService` bằng `environment.acceptsProfiles("h2")` (profile khác → 503). → **Merge + verify, không tự code lại.**
+6. **🟡 IDOR còn sót ở controller cũ** — ⚠️ **ĐÃ CÓ FIX TRÊN `origin/duong`/`origin/hung`, chưa merge.** Nhánh này vẫn còn `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` query-param: `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:153`, `DirectPaymentController:102`, `EoEventController:120`. Bản fix nhóm: xóa `explicitUserId` toàn bộ, dùng `com.cani.security.SecurityUtils.getCurrentUserId(authentication)`. Mobile không cần sửa (`ekyc_repository.dart:42,56` vẫn gửi param, Spring bỏ qua).
+7. **🟡 Support ticket `reference_no` suffix 8 ký tự** (đã fix từ 4 → 8), vẫn UNIQUE constraint — rủi ro va chạm thấp.
+8. **🟡 `App.jsx` route `/`,`/worker` → `/login`** — đã commit, chưa verify E2E (user chưa đăng nhập vào `/` giờ ra `/login` thay vì `/eo`).
+9. **🟡 Test class còn thiếu trong scope:** `EoEventServiceTest` (chưa có); `AuthServiceTest` (chưa có dù SKILL standard mô tả mẫu 29 ca — kiểm tra scope trước).
+10. **Unfinished (SRS, chưa code):** UC-74/54/56 RS Appeals + No-show; UC-108 Revenue Dashboard (FE mock, chưa backend); UC-110 FAQ (thiếu entity); UC-111 dashboard mở rộng (metrics disputes/assignments/RS); UC-113 RBAC; UC-107 duyệt đăng ký EO; UC-117 màn hình notification (SCR-10); UC-121 trang truy vấn audit độc lập. Mobile chưa có feature support-ticket/dispute (đang chờ backend).
+    > Auto-escalation SLA job **không tính là thiếu** — `plan-fe12-support-tickets.md` §7.4 chốt "YAGNI, không viết scheduler"; cờ `slaAtRisk` đã đủ cho MVP.
+11. **Backend không có devtools:** mọi lần sửa backend phải **restart** (đã xảy ra 2 lần "lỗi hệ thống" do chạy code cũ). Kiểm tra bằng `curl /api/health` + grep mapping trong startup log.
 
 ---
 
@@ -164,11 +189,13 @@ SystemConfigControllerTest, AdminDashboardServiceTest, AdminUserControllerTest
 
 > Chi tiết bổ sung trong `HANDOFF.md` (nguồn chính cho việc tiếp theo).
 
-1. **Bật lại UI eKYC/skill** khi nhóm duyệt (bỏ comment ở `AdminPage.jsx` + `CustomerCarePage.jsx`) → `npx vite build`.
-2. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` (password bất kỳ — `AuthService.login` fallback không verify) → `/customer-care` → tab eKYC/skill → xác nhận queue từ API thật → duyệt/từ chối 1 hồ sơ.
-3. **Dọn CSS orphan** trong `AdminPage.css` (giữ `.btn-admin-approve`).
-4. **Unfinished (theo priority SRS):** Revenue Dashboard (UC-108) → FAQ (UC-110) → RS Appeals/No-show (UC-74) → dashboard mở rộng (UC-111).
-5. **Quyết định còn treo:** `dev-token` bypass + IDOR controller cũ.
+1. ~~**Xử lý 6 file test-case/unit-test docs đang staged**~~ → ✅ xong 07/11/2026 (đã commit).
+2. **Hỏi leader 2 việc:** ① merge vào `test` hay `main`? ② commit `4278929` (duong) "align V12/V13 + promote V14" — V12/V13 đã apply Supabase chưa? (sửa migration đã áp dụng là vi phạm quy tắc repo).
+3. **Sau khi leader merge → pull/rebase về `quyth-clean`**, chạy regression + `curl /api/health`, rồi **verify P0** (không code lại): profile `local` → `dev-token-*` phải 401; profile `h2` → vẫn 200; `GET .../status?userId=<khác>` → dữ liệu của chính caller.
+4. **Bật lại UI eKYC/skill** khi nhóm duyệt (bỏ comment ở `AdminPage.jsx` + `CustomerCarePage.jsx`) → `npx vite build`.
+5. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` (password bất kỳ — fallback h2 không verify) → `/customer-care` → tab eKYC/skill → xác nhận queue từ API thật → duyệt/từ chối 1 hồ sơ.
+6. **Dọn CSS orphan** trong `AdminPage.css` (giữ `.btn-admin-approve`).
+7. **Unfinished (theo priority SRS):** Revenue Dashboard (UC-108) → FAQ (UC-110) → RS Appeals/No-show (UC-74) → duyệt đăng ký EO (UC-107) → dashboard mở rộng (UC-111).
 
 ---
 
@@ -214,6 +241,8 @@ SystemConfigControllerTest, AdminDashboardServiceTest, AdminUserControllerTest
 | API User Mgmt (UC-87) | `docs/api/admin-user-management-api.md` |
 | API Skill / Auth | `docs/api/skill-verification-api.md`, `docs/api/auth-postman-guide.md` |
 | Plan FE-12 | `docs/plan-fe12-support-tickets.md` |
+| Test case Admin/CC (47 ca) | `docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.md` (+ `.csv`, `.tsv`) |
+| Chuẩn báo cáo unit test | `docs/requirements/unit-test-report-standard.md` · script `docs/requirements/generate_service_unit_test_sheet.py` |
 | DB design | `docs/database/DBDesign.txt` |
 | Migration | `backend/src/main/resources/db/migration/` (đến V13) |
 

@@ -1,16 +1,24 @@
 # HANDOFF.md — Chuyển phiên Claude Code
 
 > **Mục đích:** cho hội thoại mới khôi phục đúng trạng thái công việc. Đọc kèm `CLAUDE.md` (nguyên tắc), `AGENTS.md` (chuẩn code team), `docs/PROJECT_CONTEXT.md` (snapshot chi tiết).
-> **Cập nhật:** 05/11/2026 (sau commit `07a6af7`). Đã đối chiếu với code + git thực tế, có chạy test/build.
+> **Cập nhật:** 07/11/2026 (sau commit docs test-case). Đã đối chiếu với code + git thực tế.
 
 ---
 
 ## 0. Trạng thái hiện tại (đọc đầu tiên)
 
-- **Toàn bộ fix CC 403 đã được COMMIT và PUSH** → `07a6af7` "fix ekyc" (23 files). Working tree **SẠCH**.
-- **Phía BACKEND đã xong và đã test**: CC có quyền eKYC/skill.
-- **Phía FRONTEND bị ẩn theo yêu cầu nhóm**: import + tab + view eKYC/skill trong `AdminPage.jsx` và `CustomerCarePage.jsx` đều bị **comment out** ("Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm"). → **UI chưa hiển thị dù backend đã sẵn sàng.** Feature slice vẫn còn nguyên trong `web/src/features/ekyc-verification/` và `features/skill-verification/`.
-- **Verify lại tại phiên này:** 62/62 test pass (BUILD SUCCESS) + `npx vite build` ✓ built in 1.76s.
+- **Fix CC 403 đã COMMIT và PUSH** → `07a6af7` "fix ekyc" (23 files). Backend xong + test 13 case.
+- **UI eKYC/skill đang bị ẩn theo yêu cầu nhóm** (import + tab + view trong `AdminPage.jsx` và `CustomerCarePage.jsx` bị comment out: *"Tạm thời ẩn … theo yêu cầu nhóm để xem xét thêm"*). Feature slice vẫn nguyên vẹn trong `web/src/features/ekyc-verification/` + `features/skill-verification/` (đã bỏ mock fallback) → bật lại chỉ cần bỏ comment.
+- **HEAD:** `cc3a75e` "Update project context and handoff documentation" → đã push `origin/quyth-clean`.
+- **Bộ docs test-case đã COMMIT** (mục §3.1): 47 test case phân hệ Admin/CC + chuẩn báo cáo unit test IEEE 829 + script generator. Working tree sạch (trừ thay đổi docs lần này).
+- **🔴 Đối chiếu nhánh khác (07/11/2026) — cần quyết định của nhóm:** `origin/duong` và `origin/hung` **đã fix sẵn 2/3 hạng mục P0** mà repo này còn để mở:
+  - `JwtConfig`: nhánh `dev-token-*` **đã xóa** khỏi bean `@Profile("!h2")` → chỉ profile `h2` chấp nhận.
+  - `AuthService.login`: fallback `dev-token` **đã gate** bằng `environment.acceptsProfiles("h2")`; profile khác khi Supabase lỗi → 503 thay vì cấp token.
+  - **IDOR: đã xóa `explicitUserId` khỏi TẤT CẢ controller** (kể cả `WorkerJobController`, `DirectPaymentController`, `EoEventController` — vốn nằm ngoài phạm vi phân hệ Admin/CC), dùng class mới `com.cani.security.SecurityUtils.getCurrentUserId(authentication)`.
+  → **Không tự code lại P0.** Ưu tiên pull/rebase theo hướng dẫn leader rồi **verify** bằng test + curl.
+- **🟡 Vấn đề migration cần nhờ leader:** commit `4278929` trên `origin/duong` *"align V12, V13 và promote checklist to V14"* — nếu V12/V13 đã apply lên Supabase thì việc sửa nội dung migration đã áp dụng sẽ vi phạm quy tắc "không sửa migration đã áp dụng" (`CLAUDE.md` §Backend). Cần hỏi leader trước khi merge.
+- **🟡 Worktree vs nhánh khác:** `quyth-clean` vs `origin/duong` có **18 file overlap** từ merge-base `aff086c` (gồm `SecurityConfig.java`, `H2DataSeeder.java`, `GlobalExceptionHandler.java`, `AuthService.java`, `JwtConfig.java`, `DisputeService.java`, `SkillVerificationService.java`, `App.jsx`, `EOPage.jsx`, `pom.xml`) → merge tay có rủi ro cao, nên để leader merge `test`/`main` rồi kéo về.
+- **Verify (phiên trước):** 62/62 test pass BUILD SUCCESS + `npx vite build` ✓ 1.76s.
 
 ---
 
@@ -35,10 +43,11 @@ Endpoint bị chặn trước khi fix:
 
 ## 2. Trạng thái Git
 
-- **Branch:** `quyth-clean` · **HEAD:** `07a6af7` "fix ekyc" · **đã push** → `origin/quyth-clean` ✅
-- **Working tree: SẠCH** (không có thay đổi chưa commit).
+- **Branch:** `quyth-clean` · **HEAD:** `cc3a75e` "Update project context and handoff documentation" · **đã push** → `origin/quyth-clean` ✅
+- **✅ Bộ docs test-case đã commit** (chi tiết §3.1). Không có file source code nào bị sửa trong đợt này.
 - **Main:** `main` (`702a91c`). Nhánh khác: `quyth`, `duong`, `hung`, `minhtb`, `test`, `backup/quyth-with-duong-merge`.
-- Commit `07a6af7` gộp **toàn bộ** backend + FE + docs + `HANDOFF.md`/`PROJECT_CONTEXT.md` trong **1** commit (23 files, +1122/−420) — không tách 2 commit như dự kiến.
+- Commit `07a6af7` gộp **toàn bộ** backend + FE + docs trong **1** commit (23 files, +1122/−420). Commit `cc3a75e` chỉ cập nhật 3 file docs.
+- **🟡 So sánh nhánh (07/11/2026):** `quyth-clean` **ahead 27** / **behind 0** so với `origin/main`; **ahead 21 / behind 71** so với `origin/duong` và `origin/hung`; **ahead 0 / behind 39** so với `origin/test`. `origin/test` có vẻ là nhánh tổng hợp mới nhất (3 merge `quyth-clean` gần đây).
 
 ---
 
@@ -85,6 +94,24 @@ features/skill-verification/
 ```
 → Code trong 2 slice này là bản **đã bỏ mock fallback** (đã verify: `grep -rn "Mock Fallback\|fallback = \[\|mockData" web/src/` → 0 match).
 
+### 3.1 — ✅ Bộ docs test-case ĐÃ COMMIT (07/11/2026 — toàn bộ là docs, không có source code)
+```
+A  docs/requirements/Report-5.1_Unit Test.xlsx            (320 KB, binary — báo cáo unit test)
+A  docs/requirements/unit-test-report-standard.md         (208 dòng — chuẩn SE unit test report, IEEE 829 / ISO 29119)
+A  docs/requirements/generate_service_unit_test_sheet.py  (279 dòng — script openpyxl sinh sheet unit test theo service)
+A  docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.md      (47 ca kiểm thử phân hệ Admin/CC: UC-86/87/114/115/96→109/105/106 + eKYC/skill)
+A  docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.csv     (bản Google Sheets)
+A  docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     (bản copy-paste)
+```
+- **Nguồn gốc:** 3 file test-case do agent sinh ra theo yêu cầu điền test case vào RP5.1 (Report 5.1 Unit Test).
+- **Đã xử lý trong lần commit này:**
+  - `SKILL (1).md` → **đổi tên** thành `docs/requirements/unit-test-report-standard.md` (bỏ khoảng trắng + "(1)" là dấu file tải về).
+  - Sửa đường dẫn sai trong `unit-test-report-standard.md` §5 Bước 3: `tools/generate_service_unit_test_sheet.py` (trỏ về `C:/Users/ASUS/Downloads/...` của máy khác) → `docs/requirements/generate_service_unit_test_sheet.py`.
+  - Sửa docstring `generate_service_unit_test_sheet.py`: `Module:`/`Usage:` → `docs/requirements/...`.
+  - Sửa `run.md`: `cd Code/backend|web|mobile` → `cd backend|web|mobile` (đường dẫn tương đối trong repo).
+  - Sửa `docs/api/dispute-resolution-api.md`: dòng 146 thiếu `/api` trong `GET /v1/admin/disputes/customer-care-staff` → `/api/v1/...`.
+- **Ghi chú:** 3 file test-case **không trùng** với nhóm — `origin/duong` chỉ sửa `docs/UNIT_TEST_REPORT_EXPORT.md` (file khác) và không có thư mục `docs/test-cases/` → không conflict khi merge.
+
 ---
 
 ## 4. Điểm quan trọng: mock fallback đã gỡ (fix ẩn bug 403)
@@ -116,9 +143,12 @@ npx vite build (web/)                                              → ✓ built
 2. 🟡 **CSS orphan trong `web/src/pages/admin/AdminPage.css`** — sau khi xóa 2 tab cũ, các class `.admin-verif-card` (:86), `.admin-card-top` (:94), `.admin-img-box` (:108, :116), `.admin-action-row` (:131), `.admin-card-list` (:80) **không còn component nào dùng**. Riêng `.btn-admin-approve` (:138) **vẫn được** `features/admin-users/components/UserStatusModal.jsx:93` dùng lại → **đừng xóa** class này.
 3. 🟡 **E2E tay chưa chạy** — bật backend profile `h2` + web, đăng nhập `cc@cani.vn`, xác nhận queue eKYC/skill load từ API thật, duyệt/từ chối 1 hồ sơ, xác nhận request có quyền (không 403). Lưu ý: UI đang bị ẩn nên **phải bật lại tab trước** (mục 1) hoặc test bằng `curl`.
 4. 🟡 `reference_no` ticket suffix 8 ký tự — vẫn còn rủi ro va chạm UNIQUE (thấp).
-5. 🟡 **`dev-token` bypass ngoài profile `h2`** (chưa sửa, cần quyết định): `JwtConfig.java:30-40` — bean `@Profile("!h2")` vẫn chấp nhận token `dev-token-*`, tự dựng JWT `alg=none`, claim email cố định `worker@cani.vn` → bypass được xác thực JWT trên cả profile `local` (Supabase thật). Nên gỡ nhánh này hoặc giới hạn theo property/env **không phụ thuộc profile**.
-   - Lưu ý liên quan: `AuthService.login:147-152` fallback khi Supabase lỗi → tìm user theo email, **không verify password**, trả `dev-token-<uuid>`. Hệ quả: profile `h2`, đăng nhập `cc@cani.vn` với **bất kỳ password nào** cũng vào được → thuận tiện cho E2E.
-6. 🟡 **IDOR còn sót ở controller cũ:** `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` từ query-param — `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:40`, `DirectPaymentController:102`, `EoEventController:120`. `CLAUDE.md` quy định "không lấy userId từ request" → nên bỏ tham số `explicitUserId`. Module mới (dispute/ticket/config) đã tuân thủ đúng.
+5. 🟡 **`dev-token` bypass ngoài profile `h2`** — ⚠️ **ĐÃ CÓ BẢN FIX TRÊN `origin/duong`/`origin/hung`, chưa merge vào nhánh này.** Trên nhánh này vẫn còn: `JwtConfig.java:30-40` — bean `@Profile("!h2")` chấp nhận token `dev-token-*`, tự dựng JWT `alg=none`, claim email cố định `worker@cani.vn` → bypass xác thực JWT trên profile `local` (Supabase thật). `AuthService.login:147-152` fallback khi Supabase lỗi → tìm user theo email, **không verify password**, trả `dev-token-<uuid>`.
+   - **Bản fix của nhóm (đã có, chỉ cần merge + verify):** xóa nhánh `dev-token` khỏi bean `!h2`; `AuthService` gate fallback bằng `environment.acceptsProfiles("h2")`, profile khác khi Supabase lỗi → **503** thay vì cấp token. → **Không tự code lại.**
+   - Hệ quả hiện tại (profile `h2`): đăng nhập `cc@cani.vn` với **bất kỳ password nào** cũng vào được → thuận tiện cho E2E (giữ nguyên sau merge).
+6. 🟡 **IDOR ở controller cũ** — ⚠️ **ĐÃ CÓ BẢN FIX TRÊN `origin/duong`/`origin/hung`, chưa merge vào nhánh này.** Trên nhánh này vẫn còn `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` từ query-param — `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:153`, `DirectPaymentController:102`, `EoEventController:120`.
+   - **Bản fix của nhóm:** xóa `explicitUserId` khỏi **toàn bộ** controller, dùng class mới `com.cani.security.SecurityUtils.getCurrentUserId(authentication)` (chỉ đọc principal). Module mới (dispute/ticket/config) đã tuân thủ đúng từ trước. → **Không tự code lại.**
+   - Mobile không cần sửa: `mobile/lib/features/ekyc/data/ekyc_repository.dart:42,56` vẫn gửi `userId` nhưng Spring bỏ qua param không khai báo.
 7. 🟡 `App.jsx` đổi route `/eo`,`/worker` → `/login` + thêm route `/cskh` → `/customer-care` — **đã commit** nhưng chưa verify E2E (ảnh hưởng: user chưa đăng nhập vào `/` sẽ ra `/login` thay vì `/eo`).
 
 ---
@@ -137,12 +167,14 @@ npx vite build (web/)                                              → ✓ built
 
 ## 8. Việc tiếp theo (thứ tự)
 
-1. **Hỏi nhóm/nhận chỉ thị bật lại UI eKYC/skill** (mục §6.1) — nếu bật: bỏ comment 4 chỗ ở `AdminPage.jsx` + 2 khỗi ở `CustomerCarePage.jsx`, chạy `npx vite build`.
-2. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` → `/customer-care` → tab eKYC/skill → queue từ API thật → duyệt/từ chối 1 hồ sơ → xác nhận không 403.
-3. **Dọn CSS orphan** `AdminPage.css` (mục §6.2) — giữ `.btn-admin-approve`.
-4. **Cập nhật `docs/PROJECT_CONTEXT.md`** §7 (working tree → sạch, HEAD `07a6af7`) + §8 Known Issue (CC 403 đã fix & commit) + ghi nhận UI đang bị ẩn.
-5. **SRS chưa code, theo priority:** UC-108 Revenue Dashboard → UC-110 FAQ → UC-74/54/56 RS Appeals/No-show → UC-111 dashboard mở rộng → auto-escalation SLA job.
-6. **Quyết định còn treo:** `dev-token` bypass (mục §6.5) và IDOR controller cũ (mục §6.6).
+1. ~~**Xử lý 6 file docs đang staged (chưa commit)**~~ → ✅ **Đã xong 07/11/2026** (mục §3.1): restore 3 file test-case từ git objects, đổi tên `SKILL (1).md`, sửa đường dẫn sai trong `unit-test-report-standard.md` / `generate_service_unit_test_sheet.py` / `run.md` / `dispute-resolution-api.md`.
+2. **Hỏi leader 2 việc** (mục §0): ① merge vào đâu — `test` hay `main`? ② commit `4278929` của duong "align V12/V13 + promote V14" có hợp lệ không, tức V12/V13 đã apply Supabase chưa?
+3. **Sau khi leader merge → pull/rebase về `quyth-clean`**, chạy regression set + `curl /api/health`, rồi **verify P0** (thay vì code lại): profile `local` → `dev-token-*` phải 401; profile `h2` → vẫn 200; `GET .../status?userId=<khác>` → trả dữ liệu của chính caller.
+4. **Hỏi nhóm/nhận chỉ thị bật lại UI eKYC/skill** (mục §6.1) — nếu bật: bỏ comment 4 chỗ ở `AdminPage.jsx` + 2 khối ở `CustomerCarePage.jsx`, chạy `npx vite build`.
+5. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` → `/customer-care` → tab eKYC/skill → queue từ API thật → duyệt/từ chối 1 hồ sơ → xác nhận không 403.
+6. **Dọn CSS orphan** `AdminPage.css` (mục §6.2) — giữ `.btn-admin-approve`.
+7. **Test class còn thiếu trong scope:** `EoEventServiceTest` (chưa có); `AuthServiceTest` (chưa có dù SKILL standard mô tả mẫu 29 ca — kiểm tra scope trước).
+8. **SRS chưa code, theo priority:** UC-108 Revenue Dashboard → UC-110 FAQ → UC-74/54/56 RS Appeals/No-show → UC-111 dashboard mở rộng. (Auto-escalation SLA job: `plan-fe12-support-tickets.md` §7.4 ghi rõ "YAGNI — không viết scheduler", cờ `slaAtRisk` đã đủ cho MVP.)
 
 ---
 

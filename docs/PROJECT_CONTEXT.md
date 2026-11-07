@@ -162,7 +162,7 @@ docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     bản copy-paste
 | `quyth-clean` vs `origin/minhtb` | 21 | 61 |
 | `quyth-clean` vs `origin/test` | 0 | 39 |
 
-> **`origin/duong` + `origin/hung` đã fix sẵn 2/3 hạng mục P0** (dev-token bypass + IDOR toàn bộ controller) — xem `HANDOFF.md` §0. Overlap 18 file với nhánh này. **Vấn đề migration V12/V13 cần hỏi leader** (commit `4278929`).
+> **`origin/duong` + `origin/hung` đã fix sẵn 2/3 hạng mục P0** (dev-token bypass + IDOR toàn bộ controller) — **phần trong phạm vi Admin/CC đã được áp dụng trên nhánh này 07/11/2026 theo đúng hướng code của duong** (xem `HANDOFF.md` §0). Overlap 18 file với nhánh này. **Vấn đề migration V12/V13 cần hỏi leader** (commit `4278929`).
 
 > Chi tiết đầy đủ: `HANDOFF.md` §0–§3.
 
@@ -174,8 +174,9 @@ docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     bản copy-paste
 2. **✅ 6 file test-case/unit-test docs đã commit** (07/11/2026) — `SKILL (1).md` đã đổi tên `unit-test-report-standard.md`, đường dẫn `tools/...` đã hiệu chỉnh (md + docstring script), kèm sửa `run.md` + `dispute-resolution-api.md`.
 3. **🟡 E2E tay chưa chạy** cho fix CC 403 (queue eKYC/skill từ API thật, duyệt/từ chối 1 hồ sơ).
 4. **🟡 CSS orphan** trong `web/src/pages/admin/AdminPage.css` (`.admin-verif-card`, `.admin-card-top`, `.admin-img-box`, `.admin-action-row`, `.admin-card-list`) sau khi xóa 2 tab cũ — dọn được nhưng **giữ `.btn-admin-approve`** (còn `UserStatusModal.jsx` dùng).
-5. **🟡 `dev-token` bypass ngoài profile `h2`** — ⚠️ **ĐÃ CÓ FIX TRÊN `origin/duong`/`origin/hung`, chưa merge.** Nhánh này vẫn còn: `JwtConfig.java:30-40` chấp nhận `dev-token-*` trên mọi profile → bypass JWT trên `local`; `AuthService.login:147-152` fallback không verify password. Bản fix nhóm: xóa nhánh `dev-token` khỏi bean `!h2` + gate `AuthService` bằng `environment.acceptsProfiles("h2")` (profile khác → 503). → **Merge + verify, không tự code lại.**
-6. **🟡 IDOR còn sót ở controller cũ** — ⚠️ **ĐÃ CÓ FIX TRÊN `origin/duong`/`origin/hung`, chưa merge.** Nhánh này vẫn còn `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` query-param: `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:153`, `DirectPaymentController:102`, `EoEventController:120`. Bản fix nhóm: xóa `explicitUserId` toàn bộ, dùng `com.cani.security.SecurityUtils.getCurrentUserId(authentication)`. Mobile không cần sửa (`ekyc_repository.dart:42,56` vẫn gửi param, Spring bỏ qua).
+5. ✅ **`dev-token` bypass ngoài profile `h2`** — **ĐÃ VÁ 07/11/2026.** `JwtConfig.java` xóa nhánh `dev-token` khỏi bean `@Profile("!h2")`; `AuthService.login:149-162` gate fallback bằng `environment.acceptsProfiles("h2")`, profile khác → `AppException` 503. Profile `h2` không đổi hành vi. Test: `AuthServiceDevTokenTest` (3).
+6. ✅ **IDOR ở 2 controller eKYC** — **ĐÃ VÁ 07/11/2026 (phạm vi Admin/CC).** Thêm `com.cani.security.SecurityUtils.getCurrentUserId(Authentication)`; `WorkerEkycController` + `EventOrganizerEkycController` bỏ `@RequestParam userId` ở 6 endpoint + helper `resolveUserId(authentication, explicitUserId)`. Mobile không cần sửa. Test: `EkycUserIdParamIgnoredTest` (4).
+   - **🟡 Còn lại 3 controller Worker/EO ngoài phạmvi** — `WorkerJobController` (7 endpoint), `DirectPaymentController` (4), `EoEventController` (6) vẫn còn `explicitUserId` → xử lý khi merge module (bản fix đã có trên `origin/duong`).
 7. **🟡 Support ticket `reference_no` suffix 8 ký tự** (đã fix từ 4 → 8), vẫn UNIQUE constraint — rủi ro va chạm thấp.
 8. **🟡 `App.jsx` route `/`,`/worker` → `/login`** — đã commit, chưa verify E2E (user chưa đăng nhập vào `/` giờ ra `/login` thay vì `/eo`).
 9. **🟡 Test class còn thiếu trong scope:** `EoEventServiceTest` (chưa có); `AuthServiceTest` (chưa có dù SKILL standard mô tả mẫu 29 ca — kiểm tra scope trước).
@@ -192,6 +193,7 @@ docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     bản copy-paste
 1. ~~**Xử lý 6 file test-case/unit-test docs đang staged**~~ → ✅ xong 07/11/2026 (đã commit).
 2. **Hỏi leader 2 việc:** ① merge vào `test` hay `main`? ② commit `4278929` (duong) "align V12/V13 + promote V14" — V12/V13 đã apply Supabase chưa? (sửa migration đã áp dụng là vi phạm quy tắc repo).
 3. **Sau khi leader merge → pull/rebase về `quyth-clean`**, chạy regression + `curl /api/health`, rồi **verify P0** (không code lại): profile `local` → `dev-token-*` phải 401; profile `h2` → vẫn 200; `GET .../status?userId=<khác>` → dữ liệu của chính caller.
+   > **Khi merge vào nhánh `test`:** phần P0 đã vá trên nhánh này có thể conflict text với bản của duong → **resolve bằng cách lấy bản của duong** (logic tương đương + cover thêm 3 controller Worker/EO). Không tự viết lại.
 4. **Bật lại UI eKYC/skill** khi nhóm duyệt (bỏ comment ở `AdminPage.jsx` + `CustomerCarePage.jsx`) → `npx vite build`.
 5. **E2E tay** profile `h2` + web: đăng nhập `cc@cani.vn` (password bất kỳ — fallback h2 không verify) → `/customer-care` → tab eKYC/skill → xác nhận queue từ API thật → duyệt/từ chối 1 hồ sơ.
 6. **Dọn CSS orphan** trong `AdminPage.css` (giữ `.btn-admin-approve`).

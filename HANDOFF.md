@@ -15,7 +15,8 @@
   - `JwtConfig`: nhánh `dev-token-*` **đã xóa** khỏi bean `@Profile("!h2")` → chỉ profile `h2` chấp nhận.
   - `AuthService.login`: fallback `dev-token` **đã gate** bằng `environment.acceptsProfiles("h2")`; profile khác khi Supabase lỗi → 503 thay vì cấp token.
   - **IDOR: đã xóa `explicitUserId` khỏi TẤT CẢ controller** (kể cả `WorkerJobController`, `DirectPaymentController`, `EoEventController` — vốn nằm ngoài phạm vi phân hệ Admin/CC), dùng class mới `com.cani.security.SecurityUtils.getCurrentUserId(authentication)`.
-  → **Không tự code lại P0.** Ưu tiên pull/rebase theo hướng dẫn leader rồi **verify** bằng test + curl.
+  → **✅ Đã áp dụng trên nhánh này (07/11/2026)** cho phần trong phạm vi Admin/CC (2 controller eKYC + JwtConfig + AuthService), **theo đúng hướng code của duong** để giảm conflict khi merge. Phần 3 controller Worker/EO deferred đến khi merge module.
+  → **Khi merge vào nhánh `test`:** các thay đổi này có thể **conflict text** với bản của duong (cùng file, khác dòng context) → resolve bằng cách **lấy bản của duong** (logic tương đương, đã cover thêm 3 controller Worker/EO). **Không tự viết lại.**
 - **🟡 Vấn đề migration cần nhờ leader:** commit `4278929` trên `origin/duong` *"align V12, V13 và promote checklist to V14"* — nếu V12/V13 đã apply lên Supabase thì việc sửa nội dung migration đã áp dụng sẽ vi phạm quy tắc "không sửa migration đã áp dụng" (`CLAUDE.md` §Backend). Cần hỏi leader trước khi merge.
 - **🟡 Worktree vs nhánh khác:** `quyth-clean` vs `origin/duong` có **18 file overlap** từ merge-base `aff086c` (gồm `SecurityConfig.java`, `H2DataSeeder.java`, `GlobalExceptionHandler.java`, `AuthService.java`, `JwtConfig.java`, `DisputeService.java`, `SkillVerificationService.java`, `App.jsx`, `EOPage.jsx`, `pom.xml`) → merge tay có rủi ro cao, nên để leader merge `test`/`main` rồi kéo về.
 - **Verify (phiên trước):** 62/62 test pass BUILD SUCCESS + `npx vite build` ✓ 1.76s.
@@ -143,12 +144,18 @@ npx vite build (web/)                                              → ✓ built
 2. 🟡 **CSS orphan trong `web/src/pages/admin/AdminPage.css`** — sau khi xóa 2 tab cũ, các class `.admin-verif-card` (:86), `.admin-card-top` (:94), `.admin-img-box` (:108, :116), `.admin-action-row` (:131), `.admin-card-list` (:80) **không còn component nào dùng**. Riêng `.btn-admin-approve` (:138) **vẫn được** `features/admin-users/components/UserStatusModal.jsx:93` dùng lại → **đừng xóa** class này.
 3. 🟡 **E2E tay chưa chạy** — bật backend profile `h2` + web, đăng nhập `cc@cani.vn`, xác nhận queue eKYC/skill load từ API thật, duyệt/từ chối 1 hồ sơ, xác nhận request có quyền (không 403). Lưu ý: UI đang bị ẩn nên **phải bật lại tab trước** (mục 1) hoặc test bằng `curl`.
 4. 🟡 `reference_no` ticket suffix 8 ký tự — vẫn còn rủi ro va chạm UNIQUE (thấp).
-5. 🟡 **`dev-token` bypass ngoài profile `h2`** — ⚠️ **ĐÃ CÓ BẢN FIX TRÊN `origin/duong`/`origin/hung`, chưa merge vào nhánh này.** Trên nhánh này vẫn còn: `JwtConfig.java:30-40` — bean `@Profile("!h2")` chấp nhận token `dev-token-*`, tự dựng JWT `alg=none`, claim email cố định `worker@cani.vn` → bypass xác thực JWT trên profile `local` (Supabase thật). `AuthService.login:147-152` fallback khi Supabase lỗi → tìm user theo email, **không verify password**, trả `dev-token-<uuid>`.
-   - **Bản fix của nhóm (đã có, chỉ cần merge + verify):** xóa nhánh `dev-token` khỏi bean `!h2`; `AuthService` gate fallback bằng `environment.acceptsProfiles("h2")`, profile khác khi Supabase lỗi → **503** thay vì cấp token. → **Không tự code lại.**
-   - Hệ quả hiện tại (profile `h2`): đăng nhập `cc@cani.vn` với **bất kỳ password nào** cũng vào được → thuận tiện cho E2E (giữ nguyên sau merge).
-6. 🟡 **IDOR ở controller cũ** — ⚠️ **ĐÃ CÓ BẢN FIX TRÊN `origin/duong`/`origin/hung`, chưa merge vào nhánh này.** Trên nhánh này vẫn còn `resolveUserId(authentication, explicitUserId)` ưu tiên `userId` từ query-param — `WorkerEkycController:104`, `EventOrganizerEkycController:96`, `WorkerJobController:153`, `DirectPaymentController:102`, `EoEventController:120`.
-   - **Bản fix của nhóm:** xóa `explicitUserId` khỏi **toàn bộ** controller, dùng class mới `com.cani.security.SecurityUtils.getCurrentUserId(authentication)` (chỉ đọc principal). Module mới (dispute/ticket/config) đã tuân thủ đúng từ trước. → **Không tự code lại.**
-   - Mobile không cần sửa: `mobile/lib/features/ekyc/data/ekyc_repository.dart:42,56` vẫn gửi `userId` nhưng Spring bỏ qua param không khai báo.
+5. ✅ **`dev-token` bypass ngoài profile `h2`** — **ĐÃ VÁ 07/11/2026 trên nhánh này.**
+   - `JwtConfig.java` — xóa nhánh `dev-token` khỏi bean `@Profile("!h2")`; chỉ bean `@Profile("h2")` còn chấp nhận `dev-token-*`.
+   - `AuthService.login:149-162` — fallback "Supabase lỗi → dev-token" **chỉ chạy khi `environment.acceptsProfiles("h2")`**; profile khác → ném `AppException` **503** ("Dịch vụ xác thực tạm thời không khả dụng"), không cấp token và không lộ ra việc email tồn tại hay không.
+   - Hành vi profile `h2` **không đổi**: đăng nhập `cc@cani.vn` bằng bất kỳ password nào vẫn vào được → thuận tiện cho E2E.
+   - Test: `AuthServiceDevTokenTest` (3 test).
+6. ✅ **IDOR ở 2 controller eKYC** — **ĐÃ VÁ 07/11/2026 trên nhánh này (phạm vi phân hệ Admin/CC).**
+   - Thêm `com.cani.security.SecurityUtils.getCurrentUserId(Authentication)` — chỉ đọc `principal instanceof User`, không nhận userId từ request (đúng quy tắc `CLAUDE.md`).
+   - `WorkerEkycController` + `EventOrganizerEkycController` — xóa `@RequestParam userId` ở 6 endpoint (submit/status/review ×2) và helper `resolveUserId(authentication, explicitUserId)`.
+   - Endpoint review: `adminUserId` giờ = người CC/Admin đang đăng nhập → không thể giả mạo reviewer.
+   - Mobile **không cần sửa**: `mobile/lib/features/ekyc/data/ekyc_repository.dart:42,56` vẫn gửi `userId` nhưng Spring bỏ qua param không khai báo.
+   - Test: `EkycUserIdParamIgnoredTest` (4 test).
+   - **🟡 Còn lại 3 controller Worker/EO ngoài phạm vi** — `WorkerJobController` (7 endpoint), `DirectPaymentController` (4 endpoint), `EoEventController` (6 endpoint) vẫn còn `explicitUserId` → xử lý khi merge module (bản fix tương ứng đã có trên `origin/duong`).
 7. 🟡 `App.jsx` đổi route `/eo`,`/worker` → `/login` + thêm route `/cskh` → `/customer-care` — **đã commit** nhưng chưa verify E2E (ảnh hưởng: user chưa đăng nhập vào `/` sẽ ra `/login` thay vì `/eo`).
 
 ---

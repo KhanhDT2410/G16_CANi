@@ -9,6 +9,7 @@ import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
+import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
@@ -16,6 +17,7 @@ import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -37,6 +39,7 @@ public class AuthService {
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
     private final EmailOtpService emailOtpService;
+    private final Environment environment;
 
     @Transactional
     public UserDto register(RegisterRequest request) {
@@ -143,13 +146,19 @@ public class AuthService {
             accessToken = session.getAccessToken();
             refreshToken = session.getRefreshToken();
             expiresIn = session.getExpiresIn();
-        } else {
+        } else if (environment.acceptsProfiles("h2")) {
+            // Chỉ profile h2 (dev offline, H2DataSeeder) được phép fallback dev-token.
             User localUser = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không chính xác"));
             userId = localUser.getUserId();
             accessToken = "dev-token-" + userId;
             refreshToken = "dev-refresh-" + userId;
             expiresIn = 86400L;
+        } else {
+            // Supabase GoTrue không khả dụng ở profile khác h2 → 503 thay vì dev-token (auth bypass).
+            log.error("Supabase GoTrue không khả dụng, không thể cấp token cho {}", request.getEmail());
+            throw new AppException("Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại sau.",
+                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         User user = userRepository.findById(userId)

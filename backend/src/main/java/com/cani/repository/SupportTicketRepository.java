@@ -28,5 +28,7 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, UU
     long countByStatus(TicketStatus status);
 
     long countByCategory(TicketCategory category);
+
+    List<SupportTicket> findByStatusInAndSlaDeadlineBefore(Collection<TicketStatus> statuses, java.time.Instant now);
 }
 

@@ -22,4 +22,6 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
     long countByStatus(com.cani.entity.enums.UserStatus status);
 
     java.util.List<com.cani.entity.User> findByRole(com.cani.entity.enums.UserRole role);
+
+    java.util.List<com.cani.entity.User> findByRoleAndStatus(com.cani.entity.enums.UserRole role, com.cani.entity.enums.UserStatus status);
 }

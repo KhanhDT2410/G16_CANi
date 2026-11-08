@@ -63,6 +63,13 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/faqs/**").permitAll()
                 // Thẩm định hồ sơ eKYC Worker và Doanh nghiệp: Customer Care cùng quyền kiểm duyệt với Admin
                 .requestMatchers("/api/v1/admin/ekyc/**", "/api/v1/admin/eo-ekyc/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                // Module Kháng cáo điểm uy tín Worker (UC-94, SRS FE-10): Customer Care cùng quyền xử lý với Admin
+                // ĐẶT TRƯỚC wildcard /api/v1/admin/** để Customer Care không bị 403 Forbidden.
+                .requestMatchers("/api/v1/admin/appeals/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                .requestMatchers("/api/v1/workers/appeals/**").hasRole("WORKER")
+                // Module Doanh thu (UC-108, SRS FE-12): Admin / Finance quản lý bảng doanh thu
+                // Ghi chú: Hệ thống hiện tại chưa cấu hình role FINANCE riêng biệt, phân quyền sử dụng ADMIN theo quy ước
+                .requestMatchers("/api/v1/admin/revenue/**").hasRole("ADMIN")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/v1/workers/skills/**").authenticated()
                 .anyRequest().authenticated()

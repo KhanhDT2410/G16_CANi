@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DisputeCenterView } from '../../features/disputes';
 import { SupportTicketsCenterView } from '../../features/support-tickets';
 import { FaqView } from '../../features/faqs';
+import { RsAppealsView } from '../../features/rs-appeals';
 // Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm
 // import { EkycVerificationView } from '../../features/ekyc-verification';
 // import { SkillVerificationView } from '../../features/skill-verification';
@@ -76,6 +77,23 @@ export const CustomerCarePage = () => {
         >
           Câu Hỏi Thường Gặp (FAQ)
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('appeals')}
+          style={{
+            padding: '0.6rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.92rem',
+            borderRadius: '6px',
+            border: activeTab === 'appeals' ? '1px solid #2563eb' : '1px solid transparent',
+            background: activeTab === 'appeals' ? '#eff6ff' : 'transparent',
+            color: activeTab === 'appeals' ? '#2563eb' : '#64748b',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          Kháng Cáo Điểm RS (UC-94)
+        </button>
 
         {/* Tạm thời ẩn 2 nút Hàng đợi eKYC và Kỹ năng AI theo yêu cầu nhóm để xem xét thêm */}
         {/*
@@ -119,6 +137,7 @@ export const CustomerCarePage = () => {
       {activeTab === 'tickets' && <SupportTicketsCenterView />}
       {activeTab === 'disputes' && <DisputeCenterView />}
       {activeTab === 'faqs' && <FaqView />}
+      {activeTab === 'appeals' && <RsAppealsView />}
       {/* Tạm thời ẩn view eKYC và Kỹ năng AI
       {activeTab === 'ekyc' && <EkycVerificationView />}
       {activeTab === 'skills' && <SkillVerificationView />}

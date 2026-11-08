@@ -5,6 +5,8 @@ import { DisputeCenterView } from '../../features/disputes';
 import { SupportTicketsCenterView } from '../../features/support-tickets';
 import { SystemConfigView } from '../../features/system-configs';
 import { FaqView } from '../../features/faqs';
+import { RevenueDashboardView } from '../../features/revenue-dashboard';
+import { RsAppealsView } from '../../features/rs-appeals';
 // Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm
 // import { EkycVerificationView } from '../../features/ekyc-verification';
 // import { SkillVerificationView } from '../../features/skill-verification';
@@ -69,6 +71,18 @@ const AdminPage = () => {
           Hỗ Trợ Khách Hàng (Tickets)
         </button>
         <button
+          className={`admin-tab-btn ${activeTab === 'revenue' ? 'active' : ''}`}
+          onClick={() => setActiveTab('revenue')}
+        >
+          Doanh Thu & Tài Chính
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'appeals' ? 'active' : ''}`}
+          onClick={() => setActiveTab('appeals')}
+        >
+          Kháng Cáo RS
+        </button>
+        <button
           className={`admin-tab-btn ${activeTab === 'faqs' ? 'active' : ''}`}
           onClick={() => setActiveTab('faqs')}
         >
@@ -88,6 +102,8 @@ const AdminPage = () => {
       {activeTab === 'ekyc' && <EkycVerificationView onCountChange={setEkycCount} />}
       {activeTab === 'skills' && <SkillVerificationView onCountChange={setSkillCount} />}
       */}
+      {activeTab === 'revenue' && <RevenueDashboardView />}
+      {activeTab === 'appeals' && <RsAppealsView />}
       {activeTab === 'users' && <UserManagementView />}
       {activeTab === 'disputes' && <DisputeCenterView />}
       {activeTab === 'tickets' && <SupportTicketsCenterView />}

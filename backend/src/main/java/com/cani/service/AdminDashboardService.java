@@ -169,6 +169,12 @@ public class AdminDashboardService {
             case "UPDATE_FAQ" -> "Cập nhật câu hỏi thường gặp";
             case "PUBLISH_FAQ" -> "Xuất bản câu hỏi thường gặp";
             case "ARCHIVE_FAQ" -> "Lưu trữ câu hỏi thường gặp";
+            case "SUBMIT_RS_APPEAL" -> "Nộp kháng cáo điểm uy tín";
+            case "APPROVE_RS_APPEAL" -> "Chấp thuận kháng cáo điểm uy tín";
+            case "REJECT_RS_APPEAL" -> "Từ chối kháng cáo điểm uy tín";
+            case "SLA_BREACH_TICKET" -> "Cảnh báo quá hạn SLA phiếu hỗ trợ";
+            case "SLA_BREACH_DISPUTE_CC" -> "Cảnh báo quá hạn SLA tranh chấp (Customer Care)";
+            case "SLA_BREACH_DISPUTE_ESCALATED" -> "Cảnh báo quá hạn SLA tranh chấp khiếu nại (Admin)";
             default -> {
                 if (action.contains("USER")) yield "Quản trị người dùng";
                 if (action.contains("EKYC")) yield "Xử lý hồ sơ eKYC";

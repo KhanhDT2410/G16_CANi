@@ -93,3 +93,6 @@ cani:
       access-token: ${VNPT_EKYC_ACCESS_TOKEN:}
       mac-address: ${VNPT_EKYC_MAC_ADDRESS:TEST1}
       timeout-ms: 25000
+  sla-scan:
+    enabled: ${SLA_SCAN_ENABLED:true}
+    cron: ${SLA_SCAN_CRON:0 */15 * * * *}

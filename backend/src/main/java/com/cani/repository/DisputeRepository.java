@@ -25,4 +25,6 @@ public interface DisputeRepository extends JpaRepository<Dispute, UUID>, JpaSpec
     List<Dispute> findByStatusInAndAssignedToIsNull(List<DisputeStatus> statuses);
 
     long countByStatus(DisputeStatus status);
+
+    List<Dispute> findByStatusInAndSlaDeadlineBefore(List<DisputeStatus> statuses, java.time.Instant now);
 }

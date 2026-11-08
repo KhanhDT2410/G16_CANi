@@ -76,6 +76,8 @@ Flyway tại `backend/src/main/resources/db/migration/` (hiện **đến V13**).
 | V11 | `user_device_tokens` (FCM đa thiết bị) |
 | V12 | `dispute_resolution` (tranh chấp: evidence, escalation, penalty) |
 | V13 | `support_tickets` (ticket + messages + SLA) |
+| V14 | `split_shift_checklist_template_and_progress` (UC-45: tiến độ checklist worker) |
+| V15 | `faq` (quản lý câu hỏi thường gặp FAQ & Help Center, view_count, RLS deny-all) |
 
 ---
 
@@ -92,6 +94,7 @@ Flyway tại `backend/src/main/resources/db/migration/` (hiện **đến V13**).
 | **UC-96→104/109 Dispute** | ✅ `DisputeService`, `DisputeController` (public), `AdminDisputeController` (queue, **queue/mine**, **customer-care-staff**, assign, decision) + `V12` | ✅ feature `disputes` (2 view: CC/Admin queue + user "của tôi", 5+1 modal) | ✅ `DisputeServiceTest` (12) | đã commit `ba29a55` |
 | **UC-105/106 Support Ticket** | ✅ `SupportTicketService`, `SupportTicketController`, `AdminSupportTicketController` (queue, **queue/mine**, **customer-care-staff**, assign, reply, close) + `V13` | ✅ feature `support-tickets` (view user + staff, 6 component + `TransferTicketModal`) | ✅ `SupportTicketServiceTest` (13) | commit ở `9cb0cb1` |
 | **System Config (UC-114/115)** | ✅ `SystemConfigController` (`/v1/admin/configs`, `hasRole('ADMIN')`), `SystemConfigService/Repository`, DTO | ✅ feature `system-configs` (tab "Tham Số Hệ Thống") | ✅ `SystemConfigServiceTest` (9) + `SystemConfigControllerTest` (8) | đã commit `ba29a55`; CC không truy cập (đúng design UC-114/115 chỉ Admin) |
+| **UC-110 Manage FAQ & Help Center** | ✅ `FaqService`, `FaqController` (`/v1/faqs`, `permitAll()`), `AdminFaqController` (`/v1/admin/faqs`, `ADMIN`+`CC`) + `V15` + Deflection Rate + Audit | ✅ feature `faqs` (`FaqView`, `FaqCard`, `FaqEditorModal`, `FaqPublicList`, `useFaqs`) gắn vào `AdminPage`, `CustomerCarePage`, `SupportPage` | ✅ `FaqServiceTest` (11) | UC-110a/b/c; branch `quyth-clean`, chưa merge vào `test` |
 | **CC access eKYC/Skill queue** | ✅ rule `SecurityConfig` mở CC cho ekyc/eo-ekyc/skills admin + `H2DataSeeder` seed `cc@cani.vn` | 🟡 feature slice `ekyc-verification` + `skill-verification` đã tạo nhưng **UI đang bị comment out** chờ nhóm duyệt | ✅ `CustomerCareQueueSecurityTest` (13) | commit `07a6af7` |
 | **Auth + eKYC/OTP** | ✅ `AuthService`, `AuthController`, `EmailOtpService`, `VnptEkycClient` | ✅ feature `auth` | ✅ `AuthControllerTest` (3), `EmailOtpServiceTest` | |
 | **Payment / Matching** | ✅ `DirectPaymentController/Service`, `MatchingDispatchService` | — | ✅ `DirectPaymentServiceTest`, `MatchingDispatchServiceTest` | |
@@ -130,29 +133,24 @@ SystemConfigControllerTest, AdminDashboardServiceTest, AdminUserControllerTest
 ## 7. Git & Work in Progress
 
 **Branch hiện tại:** `quyth-clean` (đã push → `origin/quyth-clean`)
-**HEAD:** `cc3a75e "Update project context and handoff documentation"`
-**✅ Bộ docs test-case đã commit 07/11/2026** (xem dưới)
+**HEAD:** `41fb598 "fix(security): chan dev-token bypass profile h2 + va IDOR userId trong 2 controller eKYC"`
+**🟡 Working tree: 13 file modified + 14 untracked** — xem `HANDOFF.md` §3.2–§3.3
 
 ### Commit gần nhất
 | Commit | Nội dung |
 |---|---|
+| `41fb598` fix(security) | **P0 security:** `SecurityUtils.getCurrentUserId()` + bỏ `@RequestParam userId` ở 6 endpoint eKYC (2 controller) · `JwtConfig` xóa nhánh `dev-token` khỏi `@Profile("!h2")` · `AuthService` gate fallback dev-token bằng `acceptsProfiles("h2")`, profile khác → 503 · 2 test class mới (7 test) · ⚠️ **phần dev-token ĐÃ BỊ REVERT trên đĩa — xem `HANDOFF.md` §0.1** |
+| `ed3238b` docs | Bộ docs test-case 47 ca Admin/CC + `unit-test-report-standard.md` (IEEE 829) + script generator + `Report-5.1_Unit Test.xlsx` + sửa `run.md`, `dispute-resolution-api.md`, `AGENTS.md` |
 | `cc3a75e` Update project context and handoff documentation | `HANDOFF.md` + `docs/PROJECT_CONTEXT.md` + `AGENTS.md` (sửa typo dòng tiêu đề) |
 | `07a6af7` fix ekyc | **Fix CC 403** eKYC/skill queue: `SecurityConfig` mở CC cho ekyc/eo-ekyc/skills admin · `H2DataSeeder` seed `cc@cani.vn` · `CustomerCareQueueSecurityTest` (13 test) · 2 feature slice FE `ekyc-verification` + `skill-verification` (bỏ mock fallback) · xóa `AdminEkycTab`/`AdminSkillsTab` · +2 tab CC (**đang comment out chờ nhóm duyệt**) · `App.jsx` route `/`,`/worker` → `/login`, thêm `/cskh` → `/customer-care` · docs |
 | `df3ab8d` skill CLI | `HANDOFF.md` + `docs/PROJECT_CONTEXT.md` |
 | `ba29a55` Cấu hình hệ thống | System Config module (UC-114/115) + dispute `queue/mine` & `customer-care-staff` backend + global 403 handler + FE `features/system-configs/` + docs |
 | `9cb0cb1` Chỉnh sửa ticket support | FE-12: `/queue/mine` + `/customer-care-staff` cho support, `TransferTicketModal`, route `/support`, docs |
 
-### ✅ Bộ docs test-case (đã commit 07/11/2026 — không có source code)
-```
-docs/requirements/Report-5.1_Unit Test.xlsx            báo cáo unit test (binary 320 KB)
-docs/requirements/unit-test-report-standard.md         chuẩn SE unit test report (IEEE 829 / ISO 29119) — đổi tên từ "SKILL (1).md"
-docs/requirements/generate_service_unit_test_sheet.py script openpyxl sinh sheet unit test theo service
-docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.md      47 test case phân hệ Admin/CC
-docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.csv     bản Google Sheets
-docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     bản copy-paste
-```
-- 3 file test-case do agent sinh ra theo yêu cầu điền test case vào RP5.1.
-- Đã sửa kèm: đường dẫn `tools/...` → `docs/requirements/...` (trong md + docstring script), `run.md` `cd Code/*` → `cd *`, `dispute-resolution-api.md` dòng 146 thiếu `/api`.
+### 🟡 Module UC-110 FAQ & Help Center — code hoàn thiện + test pass, CHƯA COMMIT (14 file untracked)
+Backend: `Faq` + `FaqCategory`/`FaqStatus` enum + `FaqRepository` + `FaqService` + `FaqController` (`/api/v1/faqs`, permitAll) + `AdminFaqController` (`/api/v1/admin/faqs`, CC+Admin) + 5 DTO + `V15__faq.sql` + `FaqServiceTest` (11 test PASS) + `countByCategory` + 4 nhãn audit.
+Frontend: `features/faqs/` (mọi component < 200 dòng) + tab FAQ trong `AdminPage` / `CustomerCarePage` / `SupportPage` + ErrorBoundary trong `App.jsx`.
+Docs: `docs/api/faq-api.md`. Ngoài ra: `V14__split_shift_checklist_template_and_progress.sql` (checkout từ `origin/duong`) + `all_ucs_srs.txt` (121 dòng trích UC từ SRS).
 
 ### 🟡 So sánh với nhánh khác (07/11/2026) — chưa merge
 | So sánh | Ahead | Behind |
@@ -163,6 +161,7 @@ docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     bản copy-paste
 | `quyth-clean` vs `origin/test` | 0 | 39 |
 
 > **`origin/duong` + `origin/hung` đã fix sẵn 2/3 hạng mục P0** (dev-token bypass + IDOR toàn bộ controller) — **phần trong phạm vi Admin/CC đã được áp dụng trên nhánh này 07/11/2026 theo đúng hướng code của duong** (xem `HANDOFF.md` §0). Overlap 18 file với nhánh này. **Vấn đề migration V12/V13 cần hỏi leader** (commit `4278929`).
+> ⚠️ **8/11/2026:** phần `dev-token` của commit `41fb598` **đã bị revert trong working tree** → xem `HANDOFF.md` §0.1 (cần hỏi user trước khi commit).
 
 > Chi tiết đầy đủ: `HANDOFF.md` §0–§3.
 
@@ -170,18 +169,18 @@ docs/test-cases/TEST_CASES_ADMIN_CUSTOMER_CARE.tsv     bản copy-paste
 
 ## 8. Known Issues & Unfinished Tasks
 
-1. **🔴 UI eKYC/skill đang bị ẩn** — import + tab + view trong `AdminPage.jsx` và `CustomerCarePage.jsx` bị comment out ("Tạm thời ẩn … theo yêu cầu nhóm để xem xét thêm"). Backend đã sẵn sàng + 13 test pass, nhưng người dùng chưa thấy màn hình. Bật lại: bỏ comment 4 chỗ ở `AdminPage.jsx` + 2 khối ở `CustomerCarePage.jsx`.
-2. **✅ 6 file test-case/unit-test docs đã commit** (07/11/2026) — `SKILL (1).md` đã đổi tên `unit-test-report-standard.md`, đường dẫn `tools/...` đã hiệu chỉnh (md + docstring script), kèm sửa `run.md` + `dispute-resolution-api.md`.
-3. **🟡 E2E tay chưa chạy** cho fix CC 403 (queue eKYC/skill từ API thật, duyệt/từ chối 1 hồ sơ).
-4. **🟡 CSS orphan** trong `web/src/pages/admin/AdminPage.css` (`.admin-verif-card`, `.admin-card-top`, `.admin-img-box`, `.admin-action-row`, `.admin-card-list`) sau khi xóa 2 tab cũ — dọn được nhưng **giữ `.btn-admin-approve`** (còn `UserStatusModal.jsx` dùng).
-5. ✅ **`dev-token` bypass ngoài profile `h2`** — **ĐÃ VÁ 07/11/2026.** `JwtConfig.java` xóa nhánh `dev-token` khỏi bean `@Profile("!h2")`; `AuthService.login:149-162` gate fallback bằng `environment.acceptsProfiles("h2")`, profile khác → `AppException` 503. Profile `h2` không đổi hành vi. Test: `AuthServiceDevTokenTest` (3).
-6. ✅ **IDOR ở 2 controller eKYC** — **ĐÃ VÁ 07/11/2026 (phạm vi Admin/CC).** Thêm `com.cani.security.SecurityUtils.getCurrentUserId(Authentication)`; `WorkerEkycController` + `EventOrganizerEkycController` bỏ `@RequestParam userId` ở 6 endpoint + helper `resolveUserId(authentication, explicitUserId)`. Mobile không cần sửa. Test: `EkycUserIdParamIgnoredTest` (4).
+1. **🔴 Fix dev-token đã bị REVERT trong working tree** — commit `41fb598` xóa nhánh `dev-token` khỏi `JwtConfig` bean `@Profile("!h2")` + gate `AuthService.login` bằng `acceptsProfiles("h2")` (profile khác → 503) + thêm `AuthServiceDevTokenTest`. **Trên đĩa hiện tại: `JwtConfig.java:29-42` CÓ LẠI nhánh `dev-token-*`; `AuthService.java:146-153` ĐÃ BỎ gate; `AuthServiceDevTokenTest.java` ĐÃ BỊ XÓA.** → Hỏi user lý do revert, rồi restore (`git checkout HEAD -- <3 file>`) hoặc giữ nguyên. Chi tiết: `HANDOFF.md` §0.1.
+2. **🔴 UI eKYC/skill đang bị ẩn** — import + tab + view trong `AdminPage.jsx` và `CustomerCarePage.jsx` bị comment out ("Tạm thời ẩn … theo yêu cầu nhóm để xem xét thêm"). Backend đã sẵn sàng + 13 test pass, nhưng người dùng chưa thấy màn hình. Bật lại: bỏ comment 4 chỗ ở `AdminPage.jsx` + 2 khối ở `CustomerCarePage.jsx`.
+3. **🟡 Module UC-110 FAQ chưa commit** — 14 file untracked (chi tiết §7). Verify 08/11/2026: `FaqServiceTest` 11 test PASS.
+4. **🟡 E2E tay chưa chạy** cho fix CC 403 (queue eKYC/skill từ API thật, duyệt/từ chối 1 hồ sơ).
+5. **🟡 CSS orphan** trong `web/src/pages/admin/AdminPage.css` (`.admin-verif-card`, `.admin-card-top`, `.admin-img-box`, `.admin-action-row`, `.admin-card-list`) sau khi xóa 2 tab cũ — dọn được nhưng **giữ `.btn-admin-approve`** (còn `UserStatusModal.jsx` dùng).
+6. ✅ **IDOR ở 2 controller eKYC** — **ĐÃ VÁ 07/11/2026 (phạm vi Admin/CC), VẪN NGUYÊN trên đĩa.** Thêm `com.cani.security.SecurityUtils.getCurrentUserId(Authentication)`; `WorkerEkycController` + `EventOrganizerEkycController` bỏ `@RequestParam userId` ở 6 endpoint + helper `resolveUserId(authentication, explicitUserId)`. Mobile không cần sửa. Test: `EkycUserIdParamIgnoredTest` (4 — verify 08/11: PASS).
    - **🟡 Còn lại 3 controller Worker/EO ngoài phạmvi** — `WorkerJobController` (7 endpoint), `DirectPaymentController` (4), `EoEventController` (6) vẫn còn `explicitUserId` → xử lý khi merge module (bản fix đã có trên `origin/duong`).
 7. **🟡 Support ticket `reference_no` suffix 8 ký tự** (đã fix từ 4 → 8), vẫn UNIQUE constraint — rủi ro va chạm thấp.
-8. **🟡 `App.jsx` route `/`,`/worker` → `/login`** — đã commit, chưa verify E2E (user chưa đăng nhập vào `/` giờ ra `/login` thay vì `/eo`).
-9. **🟡 Test class còn thiếu trong scope:** `EoEventServiceTest` (chưa có); `AuthServiceTest` (chưa có dù SKILL standard mô tả mẫu 29 ca — kiểm tra scope trước).
-10. **Unfinished (SRS, chưa code):** UC-74/54/56 RS Appeals + No-show; UC-108 Revenue Dashboard (FE mock, chưa backend); UC-110 FAQ (thiếu entity); UC-111 dashboard mở rộng (metrics disputes/assignments/RS); UC-113 RBAC; UC-107 duyệt đăng ký EO; UC-117 màn hình notification (SCR-10); UC-121 trang truy vấn audit độc lập. Mobile chưa có feature support-ticket/dispute (đang chờ backend).
-    > Auto-escalation SLA job **không tính là thiếu** — `plan-fe12-support-tickets.md` §7.4 chốt "YAGNI, không viết scheduler"; cờ `slaAtRisk` đã đủ cho MVP.
+8. **🟡 `App.jsx` route `/`,`/worker` → `/login`** — đã commit, chưa verify E2E (user chưa đăng nhập vào `/` giờ ra `/login` thay vì `/eo`). Phần ErrorBoundary mới **chưa commit**.
+9. **🟡 Test class còn thiếu trong scope:** `EoEventServiceTest` (chưa có); `AuthServiceTest` (chưa có dù chuẩn unit test mô tả mẫu 29 ca — kiểm tra scope trước).
+10. **Unfinished (SRS, chưa code):** UC-74/54/56 RS Appeals + No-show; UC-108 Revenue Dashboard (FE mock, chưa backend); UC-111 dashboard mở rộng (metrics disputes/assignments/RS); UC-113 RBAC; UC-107 duyệt đăng ký EO; UC-117 màn hình notification (SCR-10); UC-121 trang truy vấn audit độc lập. Mobile chưa có feature support-ticket/dispute (đang chờ backend).
+    > UC-110 FAQ **đã xong**, chờ commit. Auto-escalation SLA job **không tính là thiếu** — `plan-fe12-support-tickets.md` §7.4 chốt "YAGNI, không viết scheduler"; cờ `slaAtRisk` đã đủ cho MVP.
 11. **Backend không có devtools:** mọi lần sửa backend phải **restart** (đã xảy ra 2 lần "lỗi hệ thống" do chạy code cũ). Kiểm tra bằng `curl /api/health` + grep mapping trong startup log.
 
 ---

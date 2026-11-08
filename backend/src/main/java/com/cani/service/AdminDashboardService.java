@@ -165,6 +165,10 @@ public class AdminDashboardService {
             case "REPLY_TICKET" -> "Trả lời ticket hỗ trợ";
             case "ASSIGN_TICKET" -> "Phân công ticket hỗ trợ";
             case "CLOSE_TICKET" -> "Đóng ticket hỗ trợ";
+            case "CREATE_FAQ" -> "Tạo câu hỏi thường gặp";
+            case "UPDATE_FAQ" -> "Cập nhật câu hỏi thường gặp";
+            case "PUBLISH_FAQ" -> "Xuất bản câu hỏi thường gặp";
+            case "ARCHIVE_FAQ" -> "Lưu trữ câu hỏi thường gặp";
             default -> {
                 if (action.contains("USER")) yield "Quản trị người dùng";
                 if (action.contains("EKYC")) yield "Xử lý hồ sơ eKYC";

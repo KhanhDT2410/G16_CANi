@@ -78,7 +78,7 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
               >
                 {Object.keys(FAQ_CATEGORY).map((catKey) => (
                   <option key={catKey} value={catKey}>
-                    {FAQ_CATEGORY_CONFIG[catKey]?.icon} {FAQ_CATEGORY_CONFIG[catKey]?.label}
+                    {FAQ_CATEGORY_CONFIG[catKey]?.label}
                   </option>
                 ))}
               </select>

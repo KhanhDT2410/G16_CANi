@@ -66,6 +66,23 @@
   font-weight: 600;
 }
 
+.rev-btn-refresh-clean {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.rev-btn-refresh-clean:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
 .rev-btn-refresh-icon {
   width: 32px;
   height: 32px;

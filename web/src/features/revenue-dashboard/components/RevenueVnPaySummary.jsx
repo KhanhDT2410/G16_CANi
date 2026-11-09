@@ -38,7 +38,6 @@ export const RevenueVnPaySummary = ({ vnpaySummary }) => {
 
       {vnpaySummary.dataReliabilityNote && (
         <div className="rev-notice-alert">
-          <span className="rev-notice-icon">ℹ</span>
           <span>{vnpaySummary.dataReliabilityNote}</span>
         </div>
       )}

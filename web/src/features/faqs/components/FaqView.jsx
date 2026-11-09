@@ -83,10 +83,10 @@ export const FaqView = () => {
             }}
             disabled={loading}
           >
-            🔄 Làm mới
+            Làm mới
           </button>
           <button type="button" className="faq-btn-primary" onClick={handleOpenCreate}>
-            ➕ Thêm Câu Hỏi Mới
+            Thêm Câu Hỏi Mới
           </button>
         </div>
       </div>
@@ -110,10 +110,10 @@ export const FaqView = () => {
         <div className="faq-stat-card">
           <span className="faq-stat-label">Lượt xem theo Danh mục</span>
           <div className="faq-stat-cats">
-            <span>👤 Tài khoản: {analytics?.viewsByCategory?.ACCOUNT || 0}</span>
-            <span>📅 Ca làm: {analytics?.viewsByCategory?.SHIFT || 0}</span>
-            <span>💳 Thù lao: {analytics?.viewsByCategory?.PAYMENT || 0}</span>
-            <span>⚖️ Khiếu nại: {analytics?.viewsByCategory?.DISPUTE || 0}</span>
+            <span>Tài khoản: {analytics?.viewsByCategory?.ACCOUNT || 0}</span>
+            <span>Ca làm: {analytics?.viewsByCategory?.SHIFT || 0}</span>
+            <span>Thù lao: {analytics?.viewsByCategory?.PAYMENT || 0}</span>
+            <span>Khiếu nại: {analytics?.viewsByCategory?.DISPUTE || 0}</span>
           </div>
         </div>
       </div>

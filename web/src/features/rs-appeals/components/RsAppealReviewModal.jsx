@@ -40,14 +40,14 @@ export const RsAppealReviewModal = ({ appeal, isOpen, onClose, onSubmit, submitt
                   className={`btn-choice approve ${approved ? 'active' : ''}`}
                   onClick={() => setApproved(true)}
                 >
-                  ✓ Chấp Thuận (+{appeal.penaltyAmount} RS)
+                  Chấp Thuận (+{appeal.penaltyAmount} RS)
                 </button>
                 <button
                   type="button"
                   className={`btn-choice reject ${!approved ? 'active' : ''}`}
                   onClick={() => setApproved(false)}
                 >
-                  ✕ Từ Chối Kháng Cáo
+                  Từ Chối Kháng Cáo
                 </button>
               </div>
             </div>

@@ -8,7 +8,7 @@ import { FAQ_CATEGORY_CONFIG, FAQ_STATUS_CONFIG } from '../types/faq.constants';
 export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const catConfig = FAQ_CATEGORY_CONFIG[faq.category] || { label: faq.category, icon: '❓', badgeClass: '' };
+  const catConfig = FAQ_CATEGORY_CONFIG[faq.category] || { label: faq.category, badgeClass: '' };
   const statusConfig = FAQ_STATUS_CONFIG[faq.status] || { label: faq.status, badgeClass: '' };
 
   const isArchived = faq.status === 'ARCHIVED';
@@ -20,13 +20,13 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
       <div className="faq-card-header">
         <div className="faq-card-meta">
           <span className={`faq-category-badge ${catConfig.badgeClass}`}>
-            <span className="faq-cat-icon">{catConfig.icon}</span> {catConfig.label}
+            {catConfig.label}
           </span>
           <span className={`faq-status-badge ${statusConfig.badgeClass}`}>
             {statusConfig.label}
           </span>
           <span className="faq-views-badge" title="Lượt xem trên Help Center">
-            👁️ {faq.viewCount || 0} lượt xem
+            {faq.viewCount || 0} lượt xem
           </span>
         </div>
 
@@ -39,7 +39,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
               disabled={isActionLoading}
               title="Chỉnh sửa câu hỏi"
             >
-              ✏️ Sửa
+              Sửa
             </button>
           )}
 
@@ -51,7 +51,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
               disabled={isActionLoading}
               title="Xuất bản lên Help Center"
             >
-              🚀 Xuất bản
+              Xuất bản
             </button>
           )}
 
@@ -63,7 +63,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
               disabled={isActionLoading}
               title="Lưu trữ câu hỏi này"
             >
-              📦 Lưu trữ
+              Lưu trữ
             </button>
           )}
         </div>
@@ -80,7 +80,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
             className="faq-expand-btn"
             onClick={() => setIsExpanded(!isExpanded)}
           >
-            {isExpanded ? 'Thu gọn ▲' : 'Xem đầy đủ ▼'}
+            {isExpanded ? 'Thu gọn' : 'Xem đầy đủ'}
           </button>
         )}
       </div>

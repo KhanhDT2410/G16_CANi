@@ -14,7 +14,7 @@ const MainLayout = () => {
   // - Worker: Hoạt động độc lập 100% trên Mobile App (CANi Partner App).
   const getNavItems = () => {
     const commonItems = [
-      { path: '/mobile-preview', label: '📱 App Mobile Worker' },
+      { path: '/mobile-preview', label: 'App Mobile Worker' },
     ];
 
     if (!user) {

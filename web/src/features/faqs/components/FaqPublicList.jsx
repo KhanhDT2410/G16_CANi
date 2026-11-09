@@ -43,7 +43,6 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
         <h2>Trung Tâm Trợ Giúp & Câu Hỏi Thường Gặp (Help Center)</h2>
         <p>Tìm kiếm câu trả lời nhanh chóng cho các thắc mắc về tài khoản, ca làm việc, thù lao và khiếu nại</p>
         <div className="faq-search-box">
-          <span className="faq-search-icon">🔍</span>
           <input
             type="text"
             placeholder="Nhập từ khóa tìm kiếm câu hỏi (vd: tài khoản, mật khẩu, lương, hủy ca)..."
@@ -64,7 +63,7 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
           className={`faq-cat-pill ${activeCategory === 'ALL' ? 'active' : ''}`}
           onClick={() => setActiveCategory('ALL')}
         >
-          🌟 Tất cả ({publicFaqs.length})
+          Tất cả ({publicFaqs.length})
         </button>
         {Object.keys(FAQ_CATEGORY).map((catKey) => {
           const cfg = FAQ_CATEGORY_CONFIG[catKey];
@@ -76,7 +75,7 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
               className={`faq-cat-pill ${activeCategory === catKey ? 'active' : ''}`}
               onClick={() => setActiveCategory(catKey)}
             >
-              {cfg.icon} {cfg.label} ({count})
+              {cfg.label} ({count})
             </button>
           );
         })}
@@ -87,13 +86,11 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
           <div className="faq-loading-box">Đang tải danh sách câu hỏi trợ giúp...</div>
         ) : filteredFaqs.length === 0 ? (
           <div className="faq-empty-box">
-            <span>ℹ️</span>
             <p>Không tìm thấy câu hỏi thường gặp nào phù hợp với tìm kiếm của bạn.</p>
           </div>
         ) : (
           filteredFaqs.map((faq) => {
             const isExpanded = expandedId === faq.id;
-            const cfg = FAQ_CATEGORY_CONFIG[faq.category];
             return (
               <div key={faq.id} className={`faq-accordion-item ${isExpanded ? 'open' : ''}`}>
                 <button
@@ -102,12 +99,11 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                   onClick={() => handleToggle(faq)}
                 >
                   <div className="faq-acc-title">
-                    <span className="faq-acc-icon">{cfg?.icon || '❓'}</span>
                     <span className="faq-acc-question">{faq.question}</span>
                   </div>
                   <div className="faq-acc-meta">
-                    <span className="faq-acc-views">👁️ {faq.viewCount || 0}</span>
-                    <span className="faq-chevron">{isExpanded ? '▲' : '▼'}</span>
+                    <span className="faq-acc-views">{faq.viewCount || 0} lượt xem</span>
+                    <span className="faq-chevron">{isExpanded ? 'Thu gọn' : 'Chi tiết'}</span>
                   </div>
                 </button>
                 {isExpanded && (

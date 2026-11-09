@@ -10,10 +10,10 @@ export const FAQ_CATEGORY = {
 };
 
 export const FAQ_CATEGORY_CONFIG = {
-  ACCOUNT: { label: 'Tài khoản & Hồ sơ', badgeClass: 'faq-badge-account', icon: '👤' },
-  SHIFT: { label: 'Ca làm & Lịch trình', badgeClass: 'faq-badge-shift', icon: '📅' },
-  PAYMENT: { label: 'Thanh toán & Thù lao', badgeClass: 'faq-badge-payment', icon: '💳' },
-  DISPUTE: { label: 'Tranh chấp & Khiếu nại', badgeClass: 'faq-badge-dispute', icon: '⚖️' },
+  ACCOUNT: { label: 'Tài khoản & Hồ sơ', badgeClass: 'faq-badge-account' },
+  SHIFT: { label: 'Ca làm & Lịch trình', badgeClass: 'faq-badge-shift' },
+  PAYMENT: { label: 'Thanh toán & Thù lao', badgeClass: 'faq-badge-payment' },
+  DISPUTE: { label: 'Tranh chấp & Khiếu nại', badgeClass: 'faq-badge-dispute' },
 };
 
 export const FAQ_STATUS = {

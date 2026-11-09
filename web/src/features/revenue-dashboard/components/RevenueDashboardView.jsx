@@ -77,8 +77,8 @@ export const RevenueDashboardView = () => {
           >
             Quý này (90 ngày)
           </button>
-          <button className="rev-btn-refresh-icon" title="Làm mới" onClick={handleRefresh}>
-            ↻
+          <button className="rev-btn-refresh-clean" title="Làm mới" onClick={handleRefresh}>
+            Làm mới
           </button>
         </div>
       </div>

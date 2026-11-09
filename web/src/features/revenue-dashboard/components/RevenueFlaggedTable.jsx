@@ -15,7 +15,7 @@ export const RevenueFlaggedTable = ({ flaggedTransactions }) => {
       <div className="rev-flagged-header">
         <div>
           <h3 className="rev-panel-title" style={{ color: '#b91c1c' }}>
-            ⚠ Giao Dịch Cần Theo Dõi (Rủi Ro & Khiếu Nại)
+            Giao Dịch Cần Theo Dõi (Rủi Ro & Khiếu Nại)
           </h3>
           <p className="rev-panel-desc">
             Danh sách các giao dịch thanh toán đang bị tranh chấp (DISPUTED) hoặc chưa xác minh (UNVERIFIED)

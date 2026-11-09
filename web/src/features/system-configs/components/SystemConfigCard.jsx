@@ -59,7 +59,7 @@ const SystemConfigCard = ({
           onClick={() => onOpenEditModal(config)}
           title="Chỉnh sửa chi tiết & mô tả"
         >
-          ⚙ Chi tiết
+          Chi tiết
         </button>
       </div>
 

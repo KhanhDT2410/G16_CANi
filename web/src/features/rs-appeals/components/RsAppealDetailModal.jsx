@@ -64,7 +64,7 @@ export const RsAppealDetailModal = ({ appeal, isOpen, onClose, onReview }) => {
                 rel="noreferrer"
                 className="btn-evidence-link"
               >
-                📎 Mở liên kết tài liệu minh chứng
+                Mở liên kết tài liệu minh chứng
               </a>
             </div>
           )}

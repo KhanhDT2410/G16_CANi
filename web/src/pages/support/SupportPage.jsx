@@ -35,7 +35,7 @@ export const SupportPage = () => {
             transition: 'all 0.2s',
           }}
         >
-          ❓ Câu Hỏi Thường Gặp (Help Center)
+          Câu Hỏi Thường Gặp (Help Center)
         </button>
         <button
           type="button"
@@ -52,7 +52,7 @@ export const SupportPage = () => {
             transition: 'all 0.2s',
           }}
         >
-          🎫 Phiếu Hỗ Trợ (Tickets)
+          Phiếu Hỗ Trợ (Tickets)
         </button>
       </div>
 

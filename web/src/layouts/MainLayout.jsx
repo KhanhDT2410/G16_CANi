@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth';
 import { ToastContainer } from '../components/common/Toast';
 import CaniLogo from '../components/common/CaniLogo';
+import { SupportChatWidget } from '../features/support-tickets';
 import './MainLayout.css';
 
 const MainLayout = () => {
@@ -142,6 +143,9 @@ const MainLayout = () => {
           </span>
         </div>
       </footer>
+
+      {/* Bong bóng chat hỗ trợ trực tuyến toàn sàn (ADM-04) */}
+      <SupportChatWidget />
     </div>
   );
 };

@@ -18,6 +18,9 @@ public class FaqResponseDto {
     private FaqCategory category;
     private String question;
     private String answer;
+    private String imageUrl;
+    private String attachmentUrl;
+    private String attachmentName;
     private FaqStatus status;
     private UUID authorId;
     private String authorName;

@@ -31,9 +31,9 @@ export const RsAppealsView = () => {
       {/* Header bar */}
       <div className="appeals-header-bar">
         <div>
-          <h2 className="appeals-title">Hàng Đợi Kháng Cáo Điểm Uy Tín (RS Appeals)</h2>
+          <h2 className="appeals-title">Hàng Đợi Kháng Cáo Điểm Uy Tín</h2>
           <p className="appeals-sub">
-            Xem xét các trường hợp Worker khiếu nại điểm phạt do lý do bất khả kháng (force majeure)
+            Xem xét các trường hợp người lao động khiếu nại điểm phạt do lý do bất khả kháng
           </p>
         </div>
 
@@ -47,9 +47,9 @@ export const RsAppealsView = () => {
             }}
           >
             <option value="">Tất cả trạng thái</option>
-            <option value="SUBMITTED">Chờ duyệt (SUBMITTED)</option>
+            <option value="SUBMITTED">Chờ xét duyệt</option>
             <option value="UNDER_REVIEW">Đang xem xét</option>
-            <option value="APPROVED">Đã chấp thuận (+RS)</option>
+            <option value="APPROVED">Đã chấp thuận (Hoàn điểm)</option>
             <option value="REJECTED">Đã từ chối</option>
           </select>
 

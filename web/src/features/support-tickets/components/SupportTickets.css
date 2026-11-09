@@ -45,39 +45,45 @@
 
 .ticket-stat-card {
   padding: 1rem 1.25rem;
-  background: var(--color-surface-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.ticket-stat-card:hover {
+  border-color: #cbd5e1;
 }
 
 .ticket-stat-card.risk-card {
-  border-color: #ef4444;
-  background: #fef2f2;
+  border-left: 3px solid #dc2626;
+  background: #ffffff;
 }
 
 .ticket-stat-label {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: #64748b;
+  letter-spacing: 0.02em;
 }
 
 .ticket-stat-card.risk-card .ticket-stat-label {
-  color: #b91c1c;
+  color: #64748b;
 }
 
 .ticket-stat-value {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--color-text-main);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
 .ticket-stat-card.risk-card .ticket-stat-value {
-  color: #dc2626;
+  color: #0f172a;
 }
 
 /* Tabs & Toolbar */
@@ -119,9 +125,53 @@
   border-color: var(--color-primary);
 }
 
+/* Badge bộ lọc trạng thái tinh gọn thay cho dãy tab */
+.tickets-active-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.95rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  font-size: 0.84rem;
+}
+
+.tickets-active-filter-pill .pill-prefix {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.tickets-active-filter-pill .pill-category-name {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.tickets-active-filter-pill .pill-count-badge {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  font-weight: 600;
+  font-size: 0.76rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: 9999px;
+}
+
 .tickets-search-box {
   display: flex;
   align-items: center;
+  position: relative;
+}
+
+.tickets-search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px;
 }
 
 .tickets-search-input {

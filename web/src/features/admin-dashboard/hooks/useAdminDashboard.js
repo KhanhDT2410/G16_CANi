@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminDashboardApi } from '../api/adminDashboardApi';
+import { revenueApi } from '../../revenue-dashboard/api/revenueApi';
 import { showToast } from '../../../components/common/Toast';
 
 const MOCK_FALLBACK_METRICS = {
@@ -10,6 +11,14 @@ const MOCK_FALLBACK_METRICS = {
     customerCareCount: 4,
     adminCount: 2,
     lockedUsersCount: 3,
+  },
+  revenue: {
+    totalPackageRevenue: 45000000,
+    totalPackageSales: 15,
+    totalPaymentVolume: 128500000,
+    totalPaymentTransactions: 84,
+    combinedVolume: 173500000,
+    growthRate: 18.5,
   },
   verifications: {
     pendingWorkerEkycCount: 6,
@@ -84,12 +93,26 @@ export const useAdminDashboard = () => {
     setError(null);
 
     try {
-      const [metricsData, activitiesData] = await Promise.all([
+      const [metricsData, activitiesData, revenueData] = await Promise.all([
         adminDashboardApi.getMetrics(),
         adminDashboardApi.getRecentActivities(),
+        revenueApi.getRevenueSummary().catch(() => null),
       ]);
 
       if (metricsData) {
+        if (revenueData?.currentPeriod) {
+          metricsData.revenue = {
+            totalPackageRevenue: revenueData.currentPeriod.totalPackageRevenue || 0,
+            totalPackageSales: revenueData.currentPeriod.totalPackageSales || 0,
+            totalPaymentVolume: revenueData.currentPeriod.totalPaymentVolume || 0,
+            totalPaymentTransactions: revenueData.currentPeriod.totalPaymentTransactions || 0,
+            combinedVolume: revenueData.currentPeriod.combinedVolume || 0,
+            growthRate: revenueData.growth?.packageRevenueGrowthRate ?? 0,
+          };
+        } else if (!metricsData.revenue) {
+          metricsData.revenue = MOCK_FALLBACK_METRICS.revenue;
+        }
+
         setMetrics(metricsData);
         setActivities(activitiesData || []);
         setIsDemoFallback(false);

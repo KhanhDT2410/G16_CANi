@@ -34,9 +34,9 @@ export const NoShowView = ({ onNavigateAppeal }) => {
       {/* Header Bar */}
       <div className="noshow-header-bar">
         <div>
-          <h2 className="noshow-title">Quản Lý Vi Phạm No-Show</h2>
+          <h2 className="noshow-title">Quản Lý Vi Phạm Vắng Mặt</h2>
           <p className="noshow-sub">
-            Theo dõi, chế tài vắng mặt ca trực và kích hoạt điều phối nhân sự thay thế (UC-88)
+            Theo dõi, chế tài vắng mặt ca làm việc và kích hoạt điều phối nhân sự thay thế
           </p>
         </div>
 

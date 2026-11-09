@@ -53,7 +53,7 @@ const AdminDashboardView = ({ onNavigateTab }) => {
               title="Backend đang tắt hoặc chưa đăng nhập Admin - Hiển thị dữ liệu mẫu để bạn test giao diện"
             >
               <span className="dashboard-demo-dot" />
-              <span>Chế độ Demo (Offline)</span>
+              <span>Dữ liệu mẫu</span>
             </span>
           )}
         </div>

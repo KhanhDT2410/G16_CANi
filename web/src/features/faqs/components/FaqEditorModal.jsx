@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG } from '../types/faq.constants';
 
 /**
- * Modal tạo mới hoặc chỉnh sửa câu hỏi thường gặp (FAQ).
+ * Modal tạo mới hoặc chỉnh sửa câu hỏi thường gặp (FAQ) kèm ảnh và tệp đính kèm (ADM-08).
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading }) => {
@@ -11,6 +11,9 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
   const [category, setCategory] = useState(FAQ_CATEGORY.ACCOUNT);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [attachmentName, setAttachmentName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -18,10 +21,16 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
       setCategory(initialFaq.category || FAQ_CATEGORY.ACCOUNT);
       setQuestion(initialFaq.question || '');
       setAnswer(initialFaq.answer || '');
+      setImageUrl(initialFaq.imageUrl || '');
+      setAttachmentUrl(initialFaq.attachmentUrl || '');
+      setAttachmentName(initialFaq.attachmentName || '');
     } else {
       setCategory(FAQ_CATEGORY.ACCOUNT);
       setQuestion('');
       setAnswer('');
+      setImageUrl('');
+      setAttachmentUrl('');
+      setAttachmentName('');
     }
     setErrorMsg('');
   }, [initialFaq, isOpen]);
@@ -51,6 +60,9 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
       category,
       question: trimmedQuestion,
       answer: trimmedAnswer,
+      imageUrl: imageUrl.trim() || null,
+      attachmentUrl: attachmentUrl.trim() || null,
+      attachmentName: attachmentName.trim() || null,
     });
   };
 
@@ -91,7 +103,7 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
               </label>
               <textarea
                 id="faq-question"
-                rows={3}
+                rows={2}
                 placeholder="Ví dụ: Làm sao để đặt lại mật khẩu hoặc đổi số điện thoại?"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
@@ -103,17 +115,74 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
             <div className="faq-form-group">
               <label htmlFor="faq-answer">
                 Nội dung trả lời chi tiết <span className="req">*</span>
-                <span className="faq-char-count">Tối thiểu 20 ký tự (hiện có: {answer.length})</span>
+                <span className="faq-char-count">Tối thiểu 20 ký tự ({answer.length})</span>
               </label>
               <textarea
                 id="faq-answer"
-                rows={6}
+                rows={4}
                 placeholder="Nhập nội dung giải đáp rõ ràng, từng bước hướng dẫn người dùng tự thao tác..."
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 disabled={loading}
               />
             </div>
+
+            {/* Đính kèm ảnh minh họa & tệp tài liệu (ADM-08) */}
+            <div className="faq-form-row">
+              <div className="faq-form-group flex-1">
+                <label htmlFor="faq-image-url">🖼️ Đường dẫn ảnh minh họa</label>
+                <input
+                  id="faq-image-url"
+                  type="url"
+                  placeholder="https://.../anh-minh-hoa.png"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="faq-form-group flex-1">
+                <label htmlFor="faq-attachment-url">📎 Đường dẫn tệp đính kèm</label>
+                <input
+                  id="faq-attachment-url"
+                  type="url"
+                  placeholder="https://.../tai-lieu-huong-dan.pdf"
+                  value={attachmentUrl}
+                  onChange={(e) => setAttachmentUrl(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {attachmentUrl && (
+              <div className="faq-form-group">
+                <label htmlFor="faq-attachment-name">Tên hiển thị tệp đính kèm</label>
+                <input
+                  id="faq-attachment-name"
+                  type="text"
+                  placeholder="Ví dụ: huong-dan-checkin-su-kien.pdf"
+                  value={attachmentName}
+                  onChange={(e) => setAttachmentName(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {imageUrl && (
+              <div className="faq-preview-box">
+                <span className="faq-preview-label">Xem trước ảnh:</span>
+                <img
+                  src={imageUrl}
+                  alt="Xem trước ảnh"
+                  className="faq-modal-image-preview"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                  onLoad={(e) => {
+                    e.target.style.display = 'block';
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="faq-modal-footer">
@@ -140,4 +209,3 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
 };
 
 export default FaqEditorModal;
-

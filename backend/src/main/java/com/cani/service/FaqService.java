@@ -98,6 +98,9 @@ public class FaqService {
                 .category(req.getCategory())
                 .question(req.getQuestion().trim())
                 .answer(req.getAnswer().trim())
+                .imageUrl(req.getImageUrl() != null && !req.getImageUrl().isBlank() ? req.getImageUrl().trim() : null)
+                .attachmentUrl(req.getAttachmentUrl() != null && !req.getAttachmentUrl().isBlank() ? req.getAttachmentUrl().trim() : null)
+                .attachmentName(req.getAttachmentName() != null && !req.getAttachmentName().isBlank() ? req.getAttachmentName().trim() : null)
                 .status(FaqStatus.DRAFT)
                 .authorId(authorId)
                 .viewCount(0)
@@ -127,6 +130,9 @@ public class FaqService {
         faq.setCategory(req.getCategory());
         faq.setQuestion(req.getQuestion().trim());
         faq.setAnswer(req.getAnswer().trim());
+        faq.setImageUrl(req.getImageUrl() != null && !req.getImageUrl().isBlank() ? req.getImageUrl().trim() : null);
+        faq.setAttachmentUrl(req.getAttachmentUrl() != null && !req.getAttachmentUrl().isBlank() ? req.getAttachmentUrl().trim() : null);
+        faq.setAttachmentName(req.getAttachmentName() != null && !req.getAttachmentName().isBlank() ? req.getAttachmentName().trim() : null);
 
         Faq saved = faqRepository.save(faq);
         recordAudit(actorId, "UPDATE_FAQ", saved, oldValues,
@@ -278,6 +284,9 @@ public class FaqService {
                 .category(faq.getCategory())
                 .question(faq.getQuestion())
                 .answer(faq.getAnswer())
+                .imageUrl(faq.getImageUrl())
+                .attachmentUrl(faq.getAttachmentUrl())
+                .attachmentName(faq.getAttachmentName())
                 .status(faq.getStatus())
                 .authorId(faq.getAuthorId())
                 .authorName(authorName)
@@ -295,6 +304,9 @@ public class FaqService {
                 .category(faq.getCategory())
                 .question(faq.getQuestion())
                 .answer(faq.getAnswer())
+                .imageUrl(faq.getImageUrl())
+                .attachmentUrl(faq.getAttachmentUrl())
+                .attachmentName(faq.getAttachmentName())
                 .viewCount(faq.getViewCount() != null ? faq.getViewCount() : 0)
                 .build();
     }

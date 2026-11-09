@@ -1,42 +1,34 @@
-export const TicketToolbar = ({ activeFilter, onFilterChange, searchTerm, onSearchChange, stats }) => {
+const FILTER_LABELS = {
+  ALL: 'Tất Cả',
+  MINE: 'Được Giao Cho Tôi',
+  OPEN: 'Chờ Tiếp Nhận',
+  IN_PROGRESS: 'Đang Xử Lý',
+  SLA_RISK: 'Sắp Quá Hạn SLA',
+};
+
+/**
+ * Thanh công cụ tìm kiếm và thông tin bộ lọc cho Phiếu Hỗ Trợ (ADM-02).
+ * Danh mục trạng thái đã được chuyển sang menu xổ xuống ở thanh Sidebar chính.
+ * Tiêu chuẩn < 200 dòng theo AGENTS.md.
+ */
+export const TicketToolbar = ({ activeFilter = 'ALL', onFilterChange, searchTerm, onSearchChange, stats }) => {
+  const currentCount =
+    activeFilter === 'MINE'
+      ? stats.myCount || 0
+      : activeFilter === 'OPEN'
+      ? stats.openCount
+      : activeFilter === 'IN_PROGRESS'
+      ? stats.inProgressCount
+      : activeFilter === 'SLA_RISK'
+      ? stats.riskCount
+      : stats.total;
+
   return (
     <div className="tickets-toolbar">
-      <div className="tickets-tabs">
-        <button
-          type="button"
-          className={`tickets-tab-btn ${activeFilter === 'ALL' ? 'active' : ''}`}
-          onClick={() => onFilterChange('ALL')}
-        >
-          Tất Cả ({stats.total})
-        </button>
-        <button
-          type="button"
-          className={`tickets-tab-btn ${activeFilter === 'MINE' ? 'active' : ''}`}
-          onClick={() => onFilterChange('MINE')}
-        >
-          Được Giao Cho Tôi ({stats.myCount || 0})
-        </button>
-        <button
-          type="button"
-          className={`tickets-tab-btn ${activeFilter === 'OPEN' ? 'active' : ''}`}
-          onClick={() => onFilterChange('OPEN')}
-        >
-          Chờ Tiếp Nhận ({stats.openCount})
-        </button>
-        <button
-          type="button"
-          className={`tickets-tab-btn ${activeFilter === 'IN_PROGRESS' ? 'active' : ''}`}
-          onClick={() => onFilterChange('IN_PROGRESS')}
-        >
-          Đang Xử Lý ({stats.inProgressCount})
-        </button>
-        <button
-          type="button"
-          className={`tickets-tab-btn ${activeFilter === 'SLA_RISK' ? 'active' : ''}`}
-          onClick={() => onFilterChange('SLA_RISK')}
-        >
-          SLA Nguy Cơ ({stats.riskCount})
-        </button>
+      <div className="tickets-active-filter-pill">
+        <span className="pill-prefix">Trạng thái:</span>
+        <span className="pill-category-name">{FILTER_LABELS[activeFilter] || 'Tất Cả'}</span>
+        <span className="pill-count-badge">{currentCount} phiếu</span>
       </div>
 
       <div className="tickets-search-box">
@@ -47,6 +39,15 @@ export const TicketToolbar = ({ activeFilter, onFilterChange, searchTerm, onSear
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
         />
+        {searchTerm && (
+          <button
+            type="button"
+            className="tickets-search-clear"
+            onClick={() => onSearchChange('')}
+          >
+            ✕
+          </button>
+        )}
       </div>
     </div>
   );

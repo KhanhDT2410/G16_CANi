@@ -1,26 +1,34 @@
 import { CONFIG_CATEGORIES } from '../types/systemConfig.constants';
 
-const SystemConfigHeader = ({
+/**
+ * Thanh tiêu đề và công cụ cho Tham số hệ thống (ADM-09).
+ * Danh mục đã được chuyển sang menu xổ xuống ở Sidebar chính.
+ * Tiêu chuẩn < 200 dòng theo AGENTS.md.
+ */
+export const SystemConfigHeader = ({
   totalCount,
   dirtyCount,
   searchTerm,
   onSearchChange,
   selectedCategory,
-  onCategoryChange,
+  categoryCounts,
   onSaveBulk,
   onResetChanges,
   onRefresh,
   saving,
   loading,
 }) => {
+  const currentCategoryInfo = CONFIG_CATEGORIES[selectedCategory] || { label: 'Tất cả tham số' };
+  const currentCount = categoryCounts ? categoryCounts[selectedCategory] ?? 0 : totalCount;
+
   return (
     <div className="sys-config-header">
       {/* Top Banner */}
       <div className="sys-config-topbar">
         <div>
-          <h2 className="sys-config-title">Tham Số Cấu Hình Toàn Sàn</h2>
+          <h2 className="sys-config-title">Tham Số & Quy Tắc Nghiệp Vụ Toàn Sàn</h2>
           <p className="sys-config-subtitle">
-            Quản trị và điều chỉnh các ngưỡng vận hành, tỷ lệ hoa hồng và quy tắc hệ thống theo thời gian thực (Zero-Downtime).
+            Quản trị và điều chỉnh thuật toán ghép ca Matching, tỷ lệ hoa hồng, ngưỡng uy tín và các quy tắc vận hành theo thời gian thực.
           </p>
         </div>
 
@@ -52,18 +60,18 @@ const SystemConfigHeader = ({
             disabled={loading || saving}
             title="Tải lại dữ liệu"
           >
-            ↻
+            Làm mới
           </button>
         </div>
       </div>
 
-      {/* Control Bar: Search & Category Tabs */}
+      {/* Control Bar: Search & Active Group Indicator (Thay thế dãy tab cũ) */}
       <div className="sys-config-controls">
         <div className="sys-config-search-wrapper">
           <input
             type="text"
             className="sys-config-search-input"
-            placeholder="Tìm kiếm theo tên tham số, key hoặc mô tả..."
+            placeholder="Tìm kiếm theo tên tham số, key hoặc mô tả quy tắc..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -72,24 +80,17 @@ const SystemConfigHeader = ({
               type="button"
               className="sys-config-search-clear"
               onClick={() => onSearchChange('')}
+              title="Xóa tìm kiếm"
             >
-              ✕
+              Xóa
             </button>
           )}
         </div>
 
-        <div className="sys-config-category-tabs">
-          {Object.values(CONFIG_CATEGORIES).map((cat) => (
-            <button
-              key={cat.key}
-              type="button"
-              className={`sys-config-cat-btn ${selectedCategory === cat.key ? 'active' : ''}`}
-              onClick={() => onCategoryChange(cat.key)}
-            >
-              {cat.label}
-              {cat.key === 'ALL' && <span className="cat-count-badge">{totalCount}</span>}
-            </button>
-          ))}
+        <div className="sys-config-active-group-pill">
+          <span className="pill-prefix">Phân nhóm:</span>
+          <span className="pill-category-name">{currentCategoryInfo.label}</span>
+          <span className="pill-count-badge">{currentCount} tham số</span>
         </div>
       </div>
     </div>

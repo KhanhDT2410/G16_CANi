@@ -109,6 +109,44 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                 {isExpanded && (
                   <div className="faq-accordion-body">
                     <div className="faq-acc-answer">{faq.answer}</div>
+                    {(faq.imageUrl || faq.attachmentUrl) && (
+                      <div className="faq-attachments-container">
+                        {faq.imageUrl && (
+                          <div className="faq-attachment-card">
+                            <span className="faq-attachment-title">🖼️ Hình ảnh minh họa:</span>
+                            <div className="faq-image-wrapper">
+                              <img
+                                src={faq.imageUrl}
+                                alt="Minh họa"
+                                className="faq-image-thumb"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                              <a
+                                href={faq.imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="faq-view-image-link"
+                              >
+                                Xem ảnh kích thước đầy đủ ↗
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                        {faq.attachmentUrl && (
+                          <div className="faq-attachment-card">
+                            <span className="faq-attachment-title">📎 Tài liệu đính kèm:</span>
+                            <a
+                              href={faq.attachmentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="faq-attachment-file-btn"
+                            >
+                              📄 {faq.attachmentName || 'Tải tệp đính kèm'} ↗
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

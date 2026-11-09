@@ -64,7 +64,12 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
           <tbody>
             {payments.map((p) => (
               <tr key={p.paymentId}>
-                <td style={{ fontWeight: 600 }}>{p.assignmentId}</td>
+                <td
+                  style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  title={p.assignmentId}
+                >
+                  {p.assignmentId?.length > 14 ? `${p.assignmentId.substring(0, 8)}...` : p.assignmentId}
+                </td>
                 <td>{p.workerName}</td>
                 <td>{p.jobType}</td>
                 <td style={{ fontWeight: 600 }}>

@@ -6,7 +6,7 @@ import FaqEditorModal from './FaqEditorModal';
 import './Faq.css';
 
 /**
- * Màn hình Quản trị Câu hỏi thường gặp (Admin & Customer Care - UC-110a/c).
+ * Màn hình Quản trị Câu hỏi thường gặp (Admin & Customer Care - ADM-08).
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const FaqView = () => {
@@ -24,6 +24,7 @@ export const FaqView = () => {
 
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [sortBy, setSortBy] = useState('VIEWS_DESC');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState(null);
@@ -48,8 +49,8 @@ export const FaqView = () => {
     setEditingFaq(null);
   };
 
-  const filteredFaqs = useMemo(() => {
-    return faqs.filter((f) => {
+  const filteredAndSortedFaqs = useMemo(() => {
+    const list = faqs.filter((f) => {
       if (activeStatus !== 'ALL' && f.status !== activeStatus) return false;
       if (activeCategory !== 'ALL' && f.category !== activeCategory) return false;
       if (searchTerm.trim()) {
@@ -60,16 +61,25 @@ export const FaqView = () => {
       }
       return true;
     });
-  }, [faqs, activeStatus, activeCategory, searchTerm]);
+
+    return list.sort((a, b) => {
+      if (sortBy === 'VIEWS_DESC') return (b.viewCount || 0) - (a.viewCount || 0);
+      if (sortBy === 'NEWEST') return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      if (sortBy === 'OLDEST') return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      if (sortBy === 'TITLE_AZ') return (a.question || '').localeCompare(b.question || '', 'vi');
+      if (sortBy === 'TITLE_ZA') return (b.question || '').localeCompare(a.question || '', 'vi');
+      return 0;
+    });
+  }, [faqs, activeStatus, activeCategory, searchTerm, sortBy]);
 
   return (
     <div className="faq-view-container">
       {/* Header */}
       <div className="faq-header">
         <div>
-          <h2>Quản Lý Câu Hỏi Thường Gặp (FAQ & Help Center)</h2>
+          <h2>Quản Lý Câu Hỏi Thường Gặp & Trợ Giúp</h2>
           <p className="faq-subtitle">
-            Tạo, xuất bản và theo dõi hiệu quả bài viết giải đáp thắc mắc người dùng (SRS UC-110)
+            Tạo, xuất bản và theo dõi hiệu quả bài viết giải đáp thắc mắc người dùng
           </p>
         </div>
         <div className="faq-header-actions">
@@ -93,17 +103,17 @@ export const FaqView = () => {
       {/* Analytics Summary */}
       <div className="faq-analytics-grid">
         <div className="faq-stat-card">
-          <span className="faq-stat-label">Tổng lượt xem FAQ</span>
+          <span className="faq-stat-label">Tổng lượt xem câu hỏi</span>
           <span className="faq-stat-value">{analytics?.totalViews ?? 0}</span>
-          <span className="faq-stat-desc">Đọc qua Help Center</span>
+          <span className="faq-stat-desc">Đọc qua trung tâm trợ giúp</span>
         </div>
         <div className="faq-stat-card highlight">
-          <span className="faq-stat-label">Tỷ lệ giảm tải Ticket (Deflection Rate)</span>
+          <span className="faq-stat-label">Tỷ lệ giải đáp tự động</span>
           <span className="faq-stat-value">
             {analytics?.ticketDeflectionRate != null ? `${analytics.ticketDeflectionRate}%` : '0%'}
           </span>
           <span className="faq-stat-desc" title={analytics?.calculationFormula}>
-            Ticket thuộc danh mục đã có FAQ giải đáp
+            Yêu cầu thuộc danh mục đã có giải đáp sẵn
           </span>
         </div>
         <div className="faq-stat-card">
@@ -124,9 +134,7 @@ export const FaqView = () => {
           <select value={activeStatus} onChange={(e) => setActiveStatus(e.target.value)}>
             <option value="ALL">Tất cả trạng thái</option>
             {Object.keys(FAQ_STATUS).map((k) => (
-              <option key={k} value={k}>
-                {FAQ_STATUS_CONFIG[k].label}
-              </option>
+              <option key={k} value={k}>{FAQ_STATUS_CONFIG[k].label}</option>
             ))}
           </select>
 
@@ -134,28 +142,35 @@ export const FaqView = () => {
           <select value={activeCategory} onChange={(e) => setActiveCategory(e.target.value)}>
             <option value="ALL">Tất cả danh mục</option>
             {Object.keys(FAQ_CATEGORY).map((k) => (
-              <option key={k} value={k}>
-                {FAQ_CATEGORY_CONFIG[k].label}
-              </option>
+              <option key={k} value={k}>{FAQ_CATEGORY_CONFIG[k].label}</option>
             ))}
+          </select>
+
+          <label>Sắp xếp:</label>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="VIEWS_DESC">Lượt xem nhiều nhất</option>
+            <option value="NEWEST">Mới nhất</option>
+            <option value="OLDEST">Cũ nhất</option>
+            <option value="TITLE_AZ">Tiêu đề (A → Z)</option>
+            <option value="TITLE_ZA">Tiêu đề (Z → A)</option>
           </select>
         </div>
 
         <div className="faq-search-inline">
           <input
             type="text"
-            placeholder="Tìm theo nội dung câu hỏi hoặc đáp án..."
+            placeholder="Tìm kiếm theo tiêu đề câu hỏi hoặc đáp án..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Cards List */}
+      {/* Accordion Cards List */}
       <div className="faq-cards-list">
         {loading && faqs.length === 0 ? (
           <div className="faq-loading-placeholder">Đang tải danh sách câu hỏi...</div>
-        ) : filteredFaqs.length === 0 ? (
+        ) : filteredAndSortedFaqs.length === 0 ? (
           <div className="faq-empty-state">
             <p>Không có câu hỏi thường gặp nào phù hợp với bộ lọc.</p>
             <button type="button" className="faq-btn-secondary" onClick={handleOpenCreate}>
@@ -163,7 +178,7 @@ export const FaqView = () => {
             </button>
           </div>
         ) : (
-          filteredFaqs.map((faq) => (
+          filteredAndSortedFaqs.map((faq) => (
             <FaqCard
               key={faq.id}
               faq={faq}
@@ -192,4 +207,3 @@ export const FaqView = () => {
 };
 
 export default FaqView;
-

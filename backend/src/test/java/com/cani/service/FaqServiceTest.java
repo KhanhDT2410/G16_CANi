@@ -310,5 +310,34 @@ class FaqServiceTest {
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getId()).isEqualTo(faqId);
     }
+
+    @Test
+    @DisplayName("12. Tạo và cập nhật FAQ kèm ảnh và tệp đính kèm thành công (ADM-08)")
+    void createAndUpdateFaq_WithAttachments_Success() {
+        CreateFaqRequestDto req = CreateFaqRequestDto.builder()
+                .category(FaqCategory.SHIFT)
+                .question("Hướng dẫn quét mã QR check-in ca làm việc?")
+                .answer("Người lao động mở ứng dụng, chọn mục Điểm danh và quét mã QR tại bàn tiếp đón của sự kiện.")
+                .imageUrl("https://cani.vn/assets/qr-guide.png")
+                .attachmentUrl("https://cani.vn/docs/quy-trinh-checkin.pdf")
+                .attachmentName("quy-trinh-checkin.pdf")
+                .build();
+
+        when(faqRepository.save(any(Faq.class))).thenAnswer(invocation -> {
+            Faq f = invocation.getArgument(0);
+            f.setId(faqId);
+            return f;
+        });
+
+        User author = User.builder().userId(authorId).fullName("Admin Hệ Thống").role(UserRole.ADMIN).build();
+        when(userRepository.findById(authorId)).thenReturn(Optional.of(author));
+
+        FaqResponseDto result = faqService.createFaq(authorId, req);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getImageUrl()).isEqualTo("https://cani.vn/assets/qr-guide.png");
+        assertThat(result.getAttachmentUrl()).isEqualTo("https://cani.vn/docs/quy-trinh-checkin.pdf");
+        assertThat(result.getAttachmentName()).isEqualTo("quy-trinh-checkin.pdf");
+    }
 }
 

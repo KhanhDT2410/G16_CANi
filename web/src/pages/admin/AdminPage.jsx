@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { UserManagementView } from '../../features/admin-users';
 import { AdminDashboardView } from '../../features/admin-dashboard';
 import { DisputeCenterView } from '../../features/disputes';
@@ -8,115 +8,130 @@ import { FaqView } from '../../features/faqs';
 import { RevenueDashboardView } from '../../features/revenue-dashboard';
 import { RsAppealsView } from '../../features/rs-appeals';
 import { NoShowView } from '../../features/no-shows';
+import AdminSidebar from './components/AdminSidebar';
 // Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm
 // import { EkycVerificationView } from '../../features/ekyc-verification';
 // import { SkillVerificationView } from '../../features/skill-verification';
 import './AdminPage.css';
 
+const TAB_METADATA = {
+  dashboard: {
+    title: 'Bảng Điều Khiển & Chỉ Số',
+    subtitle: 'Tổng hợp số liệu người dùng, thẩm định và hoạt động vận hành thời gian thực',
+  },
+  revenue: {
+    title: 'Doanh Thu & Tài Chính',
+    subtitle: 'Theo dõi dòng tiền, phân tích gói đăng ký doanh nghiệp và lịch sử giao dịch',
+  },
+  users: {
+    title: 'Quản Trị Người Dùng',
+    subtitle: 'Tra cứu danh sách, kiểm tra hồ sơ chi tiết và phân quyền khóa hoặc mở tài khoản',
+  },
+  noshows: {
+    title: 'Xử Lý Vi Phạm Vắng Mặt',
+    subtitle: 'Giám sát vắng mặt không phép, tự động trừ điểm uy tín và điều động nhân sự thay thế',
+  },
+  appeals: {
+    title: 'Kháng Cáo Điểm Uy Tín',
+    subtitle: 'Thẩm định bằng chứng và xét duyệt khiếu nại hoàn trả điểm uy tín cho người lao động',
+  },
+  tickets: {
+    title: 'Phiếu Hỗ Trợ Khách Hàng',
+    subtitle: 'Hàng đợi tiếp nhận phiếu, phản hồi trực tiếp và ghi chú nội bộ bảo mật',
+  },
+  disputes: {
+    title: 'Tranh Chấp & Khiếu Nại',
+    subtitle: 'Tiếp nhận đơn khiếu nại hợp đồng ca làm việc, phân công và ra phán quyết cuối cùng',
+  },
+  faqs: {
+    title: 'Câu Hỏi Thường Gặp',
+    subtitle: 'Quản lý kho tri thức trợ giúp, kiểm soát trạng thái xuất bản và đo lường giảm tải',
+  },
+  configs: {
+    title: 'Tham Số Hệ Thống',
+    subtitle: 'Cấu hình linh hoạt các tham số thuật toán ghép ca, ngưỡng vi phạm và quy tắc nền tảng',
+  },
+};
+
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  // const [ekycCount, setEkycCount] = useState(0);
-  // const [skillCount, setSkillCount] = useState(0);
+  const [configCategory, setConfigCategory] = useState('ALL');
+  const [ticketFilter, setTicketFilter] = useState('ALL');
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('cani_admin_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleCollapse = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('cani_admin_sidebar_collapsed', String(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
+
+  const currentMeta = useMemo(() => {
+    return TAB_METADATA[activeTab] || {
+      title: 'Cổng Quản Trị Hệ Thống',
+      subtitle: 'Giám sát vận hành, quản trị người dùng và cấu hình hệ thống',
+    };
+  }, [activeTab]);
 
   return (
-    <div className="admin-container">
-      <div className="admin-header">
-        <h1>
-          Cổng Quản Trị Hệ Thống
-          <span className="admin-badge">ADMIN PORTAL</span>
-        </h1>
-        <p style={{ color: '#6b7280', margin: 0 }}>
-          Giám sát vận hành, quản trị người dùng và cấu hình hệ thống
-        </p>
-      </div>
+    <div className="admin-layout animate-fade-in">
+      {/* Sidebar bên trái thu gọn/mở rộng */}
+      <AdminSidebar
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        activeConfigCategory={configCategory}
+        onSelectConfigCategory={setConfigCategory}
+        activeTicketFilter={ticketFilter}
+        onSelectTicketFilter={setTicketFilter}
+        collapsed={collapsed}
+        onToggleCollapse={handleToggleCollapse}
+      />
 
-      {/* Tabs */}
-      <div className="admin-tabs">
-        <button
-          className={`admin-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
-          Bảng Điều Khiển
-        </button>
-        {/* Tạm thời ẩn 2 nút Hàng đợi eKYC và Kỹ năng AI theo yêu cầu nhóm để xem xét thêm */}
-        {/*
-        <button
-          className={`admin-tab-btn ${activeTab === 'ekyc' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ekyc')}
-        >
-          Hàng Đợi eKYC Căn Cước {ekycCount > 0 ? `(${ekycCount})` : ''}
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'skills' ? 'active' : ''}`}
-          onClick={() => setActiveTab('skills')}
-        >
-          Hàng Đợi Kỹ Năng AI {skillCount > 0 ? `(${skillCount})` : ''}
-        </button>
-        */}
-        <button
-          className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
-        >
-          Quản Trị Người Dùng
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'disputes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('disputes')}
-        >
-          Tranh Chấp & Khiếu Nại
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'tickets' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tickets')}
-        >
-          Hỗ Trợ Khách Hàng (Tickets)
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'revenue' ? 'active' : ''}`}
-          onClick={() => setActiveTab('revenue')}
-        >
-          Doanh Thu & Tài Chính
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'appeals' ? 'active' : ''}`}
-          onClick={() => setActiveTab('appeals')}
-        >
-          Kháng Cáo RS
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'noshows' ? 'active' : ''}`}
-          onClick={() => setActiveTab('noshows')}
-        >
-          Xử Lý No-Show
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'faqs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('faqs')}
-        >
-          Câu Hỏi Thường Gặp
-        </button>
-        <button
-          className={`admin-tab-btn ${activeTab === 'configs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('configs')}
-        >
-          Tham Số Hệ Thống
-        </button>
-      </div>
+      {/* Khu vực nội dung chính */}
+      <main className="admin-main-wrapper">
+        <header className="admin-topbar">
+          <div className="admin-topbar-left">
+            <h1 className="admin-topbar-title">
+              {currentMeta.title}
+              <span className="admin-badge">QUẢN TRỊ VIÊN</span>
+            </h1>
+            <p className="admin-topbar-subtitle">{currentMeta.subtitle}</p>
+          </div>
+        </header>
 
-      {/* Content */}
-      {activeTab === 'dashboard' && <AdminDashboardView onNavigateTab={setActiveTab} />}
-      {/* Tạm thời ẩn view eKYC và Kỹ năng AI
-      {activeTab === 'ekyc' && <EkycVerificationView onCountChange={setEkycCount} />}
-      {activeTab === 'skills' && <SkillVerificationView onCountChange={setSkillCount} />}
-      */}
-      {activeTab === 'revenue' && <RevenueDashboardView />}
-      {activeTab === 'appeals' && <RsAppealsView />}
-      {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
-      {activeTab === 'users' && <UserManagementView />}
-      {activeTab === 'disputes' && <DisputeCenterView />}
-      {activeTab === 'tickets' && <SupportTicketsCenterView />}
-      {activeTab === 'faqs' && <FaqView />}
-      {activeTab === 'configs' && <SystemConfigView />}
+        <section className="admin-content-card">
+          {activeTab === 'dashboard' && <AdminDashboardView onNavigateTab={setActiveTab} />}
+          {activeTab === 'revenue' && <RevenueDashboardView />}
+          {activeTab === 'appeals' && <RsAppealsView />}
+          {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
+          {activeTab === 'users' && <UserManagementView />}
+          {activeTab === 'disputes' && <DisputeCenterView />}
+          {activeTab === 'tickets' && (
+            <SupportTicketsCenterView
+              activeFilter={ticketFilter}
+              onFilterChange={setTicketFilter}
+            />
+          )}
+          {activeTab === 'faqs' && <FaqView />}
+          {activeTab === 'configs' && (
+            <SystemConfigView
+              activeCategory={configCategory}
+              onCategoryChange={setConfigCategory}
+            />
+          )}
+        </section>
+      </main>
     </div>
   );
 };

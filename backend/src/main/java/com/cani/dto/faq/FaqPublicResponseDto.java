@@ -16,6 +16,9 @@ public class FaqPublicResponseDto {
     private FaqCategory category;
     private String question;
     private String answer;
+    private String imageUrl;
+    private String attachmentUrl;
+    private String attachmentName;
     private Integer viewCount;
 }
 

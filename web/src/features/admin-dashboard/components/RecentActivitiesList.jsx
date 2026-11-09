@@ -31,7 +31,7 @@ const RecentActivitiesList = ({ activities = [] }) => {
     <div className="recent-activities-card">
       <div className="activities-header">
         <div className="activities-title">
-          <span>Nhật Ký Quản Trị Gần Nhất (Audit Logs)</span>
+          <span>Nhật Ký Quản Trị Gần Nhất</span>
         </div>
         <span className="activities-header-meta">
           Tối đa 10 hoạt động mới nhất

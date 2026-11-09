@@ -23,5 +23,14 @@ public class CreateFaqRequestDto {
     @NotBlank(message = "Câu trả lời không được để trống")
     @Size(min = 20, message = "Câu trả lời phải có ít nhất 20 ký tự")
     private String answer;
+
+    @Size(max = 1000, message = "Đường dẫn ảnh không được vượt quá 1000 ký tự")
+    private String imageUrl;
+
+    @Size(max = 1000, message = "Đường dẫn tệp đính kèm không được vượt quá 1000 ký tự")
+    private String attachmentUrl;
+
+    @Size(max = 255, message = "Tên tệp đính kèm không được vượt quá 255 ký tự")
+    private String attachmentName;
 }
 

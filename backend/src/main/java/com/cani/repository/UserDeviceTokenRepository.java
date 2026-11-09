@@ -19,10 +19,10 @@ public interface UserDeviceTokenRepository extends JpaRepository<UserDeviceToken
     List<UserDeviceToken> findByUser_UserIdAndIsActiveTrue(UUID userId);
 
     @Modifying
-    @Query("UPDATE UserDeviceToken t SET t.isActive = false, t.updatedAt = CURRENT_TIMESTAMP WHERE t.fcmToken = :token")
+    @Query("UPDATE UserDeviceToken t SET t.isActive = false, t.updatedAt = CURRENT_INSTANT WHERE t.fcmToken = :token")
     void deactivateToken(@Param("token") String token);
 
     @Modifying
-    @Query("UPDATE UserDeviceToken t SET t.isActive = false, t.updatedAt = CURRENT_TIMESTAMP WHERE t.user.userId = :userId AND t.fcmToken = :token")
+    @Query("UPDATE UserDeviceToken t SET t.isActive = false, t.updatedAt = CURRENT_INSTANT WHERE t.user.userId = :userId AND t.fcmToken = :token")
     void deactivateTokenForUser(@Param("userId") UUID userId, @Param("token") String token);
 }

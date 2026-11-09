@@ -2,7 +2,7 @@ spring:
   application:
     name: cani-backend
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active: ${SPRING_PROFILES_ACTIVE:h2}
 
   servlet:
     multipart:

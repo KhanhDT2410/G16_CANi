@@ -27,4 +27,15 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             @Param("endTime") Instant endTime,
             @Param("activeStatuses") List<AssignmentStatus> activeStatuses
     );
+
+    @Query("SELECT sa FROM ShiftAssignment sa " +
+           "JOIN FETCH sa.shift s " +
+           "JOIN FETCH sa.worker w " +
+           "JOIN FETCH w.user u " +
+           "WHERE sa.status = :status " +
+           "AND s.startTime <= :thresholdTime")
+    List<ShiftAssignment> findPotentialNoShows(
+            @Param("status") AssignmentStatus status,
+            @Param("thresholdTime") Instant thresholdTime
+    );
 }

@@ -48,4 +48,3 @@ public final class SecurityUtils {
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ADMIN".equals(a.getAuthority()));
     }
 }
-

@@ -143,7 +143,7 @@ OPEN ──CC nhận/chuyển đơn (UC-99)──> INVESTIGATING ──CC quyế
 * **Body (tuỳ chọn):** `{ "targetCcUserId": "<uuid-cc-khác>" }` — bỏ trống = **CC tự nhận**.
 * Đơn `OPEN` được nhận → tự chuyển `INVESTIGATING`. Người nhận phải là role CC/ADMIN (nếu chỉ định).
 * Đơn đã quyết định / đã escalate → **400**.
-* Dùng `GET /v1/admin/disputes/customer-care-staff` để lấy danh sách CC nhận đơn (mục 3.1.2).
+* Dùng `GET /api/v1/admin/disputes/customer-care-staff` để lấy danh sách CC nhận đơn (mục 3.1.2).
 
 ### 3.3. Ra quyết định (UC-100 cho CC · UC-102 cho Admin)
 

@@ -20,7 +20,6 @@ import EOSettingsTab from './components/EOSettingsTab';
 import EOModals from './components/EOModals';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
 import { SupportTicketsCenterView } from '../../features/support-tickets';
-
 import './EOPage.css';
 
 export default function EOPage() {
@@ -297,7 +296,7 @@ export default function EOPage() {
         </main>
 
         <EORightSidebar />
-      </div>
+      </div >
 
       <EOModals
         events={events}
@@ -324,6 +323,6 @@ export default function EOPage() {
           organizerName: user?.fullName || 'Duy Hưng Phạm',
         }}
       />
-    </div>
+    </div >
   );
 }

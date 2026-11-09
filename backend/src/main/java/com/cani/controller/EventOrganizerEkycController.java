@@ -4,6 +4,7 @@ import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
 import com.cani.dto.response.ApiResponse;
+
 import com.cani.security.SecurityUtils;
 import com.cani.service.EventOrganizerEkycService;
 import jakarta.validation.Valid;
@@ -39,8 +40,7 @@ public class EventOrganizerEkycController {
 
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.submitEkyc(
-                userId, frontImage, backImage, selfieImage, businessLicenseImage
-        );
+                userId, frontImage, backImage, selfieImage, businessLicenseImage);
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
@@ -116,6 +116,7 @@ public class EventOrganizerEkycController {
 
         UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.adminReviewEkyc(adminUserId, verificationId, request);
-        return ResponseEntity.ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC doanh nghiệp thành công: " + result.getStatus()));
+        return ResponseEntity
+                .ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC doanh nghiệp thành công: " + result.getStatus()));
     }
 }

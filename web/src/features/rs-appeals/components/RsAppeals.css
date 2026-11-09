@@ -1,0 +1,502 @@
+/* Styles cho UC-94: RS Penalty & Appeals */
+
+.appeals-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.appeals-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #ffffff;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.appeals-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.appeals-sub {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.appeals-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.appeals-filter-select {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 0.875rem;
+  background: #fff;
+  color: #374151;
+}
+
+.btn-appeals-refresh {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-appeals-refresh:hover {
+  background: #f3f4f6;
+}
+
+/* Table */
+.appeal-table-container {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.appeal-table-wrapper {
+  overflow-x: auto;
+}
+
+.appeal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.appeal-table th {
+  background: #f9fafb;
+  color: #4b5563;
+  font-weight: 600;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.appeal-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.worker-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.worker-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.worker-email {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.penalty-amount-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+.reason-cell {
+  display: flex;
+  flex-direction: column;
+  max-width: 320px;
+}
+
+.reason-code-title {
+  font-weight: 600;
+  color: #374151;
+}
+
+.reason-snippet {
+  font-size: 0.75rem;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appeal-status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.appeal-action-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-appeal-detail {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+
+.btn-appeal-review {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.appeal-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.appeal-page-info {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.appeal-page-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-appeal-page {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.btn-appeal-page:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.appeal-empty-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+}
+
+/* Modals */
+.appeal-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.appeal-modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  max-width: 580px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.appeal-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.appeal-modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+  color: #111827;
+}
+
+.appeal-modal-sub {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 2px 0 0 0;
+}
+
+.btn-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #9ca3af;
+}
+
+.appeal-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.detail-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: #f9fafb;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+
+.detail-label {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.detail-val {
+  color: #111827;
+}
+
+.detail-val.penalty {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.detail-val.highlight {
+  color: #4f46e5;
+  font-weight: 700;
+}
+
+.detail-box {
+  background: #fdf8f6;
+  border: 1px solid #fed7aa;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.detail-box-title {
+  margin: 0 0 8px 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.detail-box-reason {
+  margin: 0 0 6px 0;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.detail-box-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.btn-evidence-link {
+  display: inline-block;
+  padding: 8px 14px;
+  background: #eef2ff;
+  color: #4f46e5;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.detail-decision-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.appeal-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #f9fafb;
+}
+
+.review-choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-choice-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.review-choice-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-choice {
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  background: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-choice.approve.active {
+  border-color: #059669;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.btn-choice.reject.active {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.review-hint-box {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.review-hint-box.approve {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.review-hint-box.reject {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-label .req {
+  color: #dc2626;
+}
+
+.form-textarea {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.form-err {
+  color: #dc2626;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.btn-approve-submit {
+  background: #059669 !important;
+}
+
+.btn-reject-submit {
+  background: #dc2626 !important;
+}
+
+.btn-primary {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.appeals-loading-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+}
+
+.appeals-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px auto;
+}
+

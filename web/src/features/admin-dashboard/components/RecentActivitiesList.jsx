@@ -1,5 +1,3 @@
-import { ActivityLogIcon } from './Icons';
-
 /**
  * Danh sách 10 hoạt động quản trị gần nhất từ bảng audit_logs
  */
@@ -33,9 +31,6 @@ const RecentActivitiesList = ({ activities = [] }) => {
     <div className="recent-activities-card">
       <div className="activities-header">
         <div className="activities-title">
-          <div className="metric-icon-box activities">
-            <ActivityLogIcon size={18} />
-          </div>
           <span>Nhật Ký Quản Trị Gần Nhất (Audit Logs)</span>
         </div>
         <span className="activities-header-meta">

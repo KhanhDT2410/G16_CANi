@@ -1,0 +1,528 @@
+/* Styles cho UC-108: Revenue Dashboard */
+
+.rev-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 0;
+}
+
+.rev-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #ffffff;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.rev-page-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.rev-page-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.rev-date-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rev-date-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.rev-date-pill {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  border-radius: 20px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rev-date-pill:hover {
+  background: #f3f4f6;
+}
+
+.rev-date-pill.active {
+  background: #4f46e5;
+  color: #ffffff;
+  border-color: #4f46e5;
+  font-weight: 600;
+}
+
+.rev-btn-refresh-clean {
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s ease;
+}
+
+.rev-btn-refresh-clean:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.rev-btn-refresh-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+/* 4 Thẻ KPI */
+.rev-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+.rev-metric-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 18px 20px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.rev-metric-card.primary {
+  border-left: 4px solid #4f46e5;
+}
+
+.rev-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rev-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.rev-growth-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.rev-growth-tag.positive {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.rev-growth-tag.negative {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.rev-growth-tag.neutral {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.rev-card-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.rev-card-sub {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Breakdown Row */
+.rev-breakdown-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.rev-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.rev-panel-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.rev-panel-desc {
+  font-size: 0.825rem;
+  color: #6b7280;
+  margin: 0 0 16px 0;
+}
+
+.rev-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rev-breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rev-item-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.rev-item-name {
+  font-weight: 600;
+  color: #374151;
+}
+
+.rev-item-val {
+  font-weight: 700;
+  color: #111827;
+}
+
+.rev-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rev-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.rev-progress-fill.primary {
+  background: #4f46e5;
+}
+
+.rev-progress-fill.accent {
+  background: #0ea5e9;
+}
+
+.rev-progress-fill.mode {
+  background: #10b981;
+}
+
+.rev-item-sub {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* VNPay Box */
+.rev-vnpay-box {
+  border-left: 4px solid #0284c7;
+}
+
+.rev-vnpay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.rev-vnpay-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.rev-vnpay-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.rev-vnpay-stat {
+  background: #f9fafb;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rev-vnpay-stat.success {
+  border-left: 3px solid #10b981;
+}
+
+.rev-vnpay-stat.pending {
+  border-left: 3px solid #f59e0b;
+}
+
+.rev-vnpay-stat.alert {
+  border-left: 3px solid #ef4444;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.stat-money {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.stat-hint {
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+
+.rev-notice-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #1e40af;
+}
+
+/* Flagged Table */
+.rev-flagged-panel {
+  border: 1px solid #fca5a5;
+  background: #fffafa;
+}
+
+.rev-flagged-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.rev-flagged-count {
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.rev-flag-reason {
+  color: #b91c1c;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.flagged-row {
+  background: #fff5f5;
+}
+
+/* Tables */
+.rev-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rev-controls-group {
+  display: flex;
+  gap: 8px;
+}
+
+.rev-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #374151;
+}
+
+.rev-table-wrapper {
+  overflow-x: auto;
+}
+
+.rev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.rev-table th {
+  background: #f9fafb;
+  color: #4b5563;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.rev-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #1f2937;
+}
+
+.rev-amount-highlight {
+  font-weight: 700;
+  color: #111827;
+}
+
+.rev-type-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.rev-type-tag.package {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.rev-type-tag.payment {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.rev-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.rev-badge.method {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.rev-badge.status-disputed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.rev-badge.status-active,
+.rev-badge.status-confirmed_full {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.rev-badge.status-unverified {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.rev-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.rev-page-info {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.rev-page-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.rev-btn-page {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.rev-btn-page:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rev-loading-box,
+.rev-error-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+}
+
+.rev-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 16px auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

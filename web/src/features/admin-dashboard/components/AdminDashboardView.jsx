@@ -1,7 +1,6 @@
 import { useAdminDashboard } from '../hooks/useAdminDashboard';
 import MetricsCards from './MetricsCards';
 import RecentActivitiesList from './RecentActivitiesList';
-import { LayoutDashboardIcon, RefreshCwIcon, AlertCircleIcon } from './Icons';
 import './AdminDashboard.css';
 
 /**
@@ -28,9 +27,6 @@ const AdminDashboardView = ({ onNavigateTab }) => {
     return (
       <div className="dashboard-container">
         <div className="dashboard-error-state">
-          <div className="dashboard-error-icon">
-            <AlertCircleIcon size={36} />
-          </div>
           <h3 className="dashboard-error-title">Không thể tải Bảng điều khiển</h3>
           <p className="dashboard-error-desc">{error}</p>
           <button
@@ -38,7 +34,6 @@ const AdminDashboardView = ({ onNavigateTab }) => {
             className="dashboard-refresh-btn"
             onClick={refresh}
           >
-            <RefreshCwIcon size={14} />
             <span>Thử lại</span>
           </button>
         </div>
@@ -51,9 +46,6 @@ const AdminDashboardView = ({ onNavigateTab }) => {
       {/* Thanh công cụ / Tiêu đề */}
       <div className="dashboard-toolbar">
         <div className="dashboard-toolbar-title">
-          <div className="metric-icon-box dashboard">
-            <LayoutDashboardIcon size={18} />
-          </div>
           <span>Tổng Quan Vận Hành Nền Tảng</span>
           {isDemoFallback && (
             <span
@@ -71,7 +63,6 @@ const AdminDashboardView = ({ onNavigateTab }) => {
           onClick={refresh}
           disabled={refreshing}
         >
-          <RefreshCwIcon size={14} spinning={refreshing} />
           <span>{refreshing ? 'Đang cập nhật...' : 'Làm mới'}</span>
         </button>
       </div>

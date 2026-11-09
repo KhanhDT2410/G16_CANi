@@ -46,13 +46,31 @@ const EventShiftsDrawer = ({
         borderTop: '1px dashed #cbd5e1',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>Danh Sách Ca Làm Việc Thuộc Sự Kiện</span>
-          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b' }}>
+            Danh Sách Ca Làm Việc
+          </h4>
+          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
             ({shifts.length} ca)
           </span>
-        </h4>
+          {event.eventId && (
+            <span
+              style={{
+                fontSize: '0.72rem',
+                color: '#64748b',
+                background: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontFamily: 'monospace',
+              }}
+              title="Mã định danh kỹ thuật sự kiện"
+            >
+              Mã ID: {event.eventId}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           style={{

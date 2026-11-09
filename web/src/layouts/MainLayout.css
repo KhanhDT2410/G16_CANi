@@ -122,6 +122,46 @@
   margin: 0 1.5rem;
 }
 
+/* Role Pill Badge in Header */
+.header-role-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header-role-pill:hover {
+  background: #dbeafe;
+}
+
+.role-dot-badge {
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  letter-spacing: 0.05em;
+}
+
+.role-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.role-chevron {
+  font-size: 0.7rem;
+  color: #60a5fa;
+}
+
 .header-search-box {
   display: flex;
   align-items: center;
@@ -131,6 +171,21 @@
   padding: 0.45rem 1rem;
   border-radius: var(--radius-full);
   transition: all var(--transition-fast);
+}
+
+/* Shortcut Ctrl K Badge */
+.header-search-shortcut {
+  font-family: inherit;
+  font-size: 0.675rem;
+  font-weight: 700;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  padding: 0.15rem 0.45rem;
+  border-radius: 5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  letter-spacing: 0.02em;
+  margin-left: auto;
 }
 
 .header-search-box:focus-within {
@@ -189,6 +244,27 @@
   transform: translateY(-1px);
 }
 
+.header-help-btn {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all var(--transition-fast);
+}
+
+.header-help-btn:hover {
+  background: #ffffff;
+  border-color: var(--color-primary-300);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
 .notif-icon {
   font-size: 0.95rem;
 }
@@ -207,7 +283,39 @@
 .user-header-compact {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.65rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.user-header-compact:hover {
+  background: #f1f5f9;
+}
+
+.user-meta-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.user-meta-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.user-meta-email {
+  font-size: 0.725rem;
+  color: #64748b;
+}
+
+.user-meta-arrow {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-left: 0.2rem;
 }
 
 .user-avatar-btn {

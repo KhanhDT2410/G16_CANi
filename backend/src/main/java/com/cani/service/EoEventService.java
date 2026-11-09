@@ -415,8 +415,12 @@ public class EoEventService {
         if (subscriptionService != null) {
             try {
                 subscriptionService.validateAndDeductEventQuota(eo);
+            } catch (BadRequestException e) {
+                // Quota exceeded hoặc chưa mua gói: Chặn không cho bypass xuất bản sự kiện
+                throw e;
             } catch (Exception e) {
-                log.info("Không trừ quota sự kiện: {}", e.getMessage());
+                // Chế độ chịu lỗi (Fault-tolerant): Nếu service gói cước gặp sự cố hệ thống, cho phép tiếp tục
+                log.warn("Cảnh báo sự cố SubscriptionService khi trừ quota sự kiện: {}", e.getMessage());
             }
         }
 
@@ -462,8 +466,8 @@ public class EoEventService {
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
-                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
-                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
+                    if (user.getRole() != UserRole.EVENT_ORGANIZER) {
+                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện (Chỉ tài khoản Ban tổ chức mới có quyền tạo và quản lý sự kiện)");
                     }
                     return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
                 });

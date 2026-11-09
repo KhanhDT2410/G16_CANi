@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import RateWorkerModal from './RateWorkerModal';
@@ -22,13 +22,7 @@ const LiveAttendanceModal = ({
   const [selectedForReview, setSelectedForReview] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && shift) {
-      loadAttendance();
-    }
-  }, [isOpen, shift]);
-
-  const loadAttendance = async () => {
+  const loadAttendance = useCallback(async () => {
     if (!shift?.shiftId) return;
     setLoading(true);
     try {
@@ -40,7 +34,13 @@ const LiveAttendanceModal = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [shift?.shiftId]);
+
+  useEffect(() => {
+    if (isOpen && shift) {
+      loadAttendance();
+    }
+  }, [isOpen, shift, loadAttendance]);
 
   const handleVerify = async (assignmentId) => {
     setVerifyingId(assignmentId);

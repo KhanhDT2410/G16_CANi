@@ -346,25 +346,47 @@ public class SubscriptionService {
     }
 
     /**
-     * Xác nhận thanh toán thành công qua PayOS theo orderCode
+     * Xác nhận thanh toán PayOS theo người dùng đăng nhập (Tránh Cross-Tenant Leak & IDOR)
+     */
+    @Transactional
+    public SubscriptionResponseDto confirmPayOSPaymentForUser(UUID userId, long orderCode) {
+        EventOrganizer eo = getEoOrThrow(userId);
+        PendingOrder order = pendingOrders.remove("PAYOS_" + orderCode);
+
+        if (order != null) {
+            if (!order.eoId().equals(eo.getEoId())) {
+                log.warn("Cảnh báo bảo mật: User {} cố kích hoạt đơn hàng PayOS {} thuộc về EO {}", userId, orderCode, order.eoId());
+                throw new BadRequestException("Giao dịch không thuộc về tài khoản Ban tổ chức hiện tại");
+            }
+            return activateSubscription(eo, order.planType(), "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode);
+        }
+
+        // Trường hợp reload lại trang hoặc Webhook đã xử lý kích hoạt trước đó cho chính EO này
+        Instant now = Instant.now();
+        List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
+        if (!activeSubs.isEmpty()) {
+            return mapToDto(activeSubs.get(0));
+        }
+
+        throw new BadRequestException("Giao dịch không tồn tại hoặc đã được xử lý trước đó: " + orderCode);
+    }
+
+    /**
+     * Xác nhận thanh toán thành công qua PayOS theo orderCode (Dành cho Webhook hoặc hệ thống nội bộ)
      */
     @Transactional
     public SubscriptionResponseDto confirmPayOSPayment(long orderCode) {
         PendingOrder order = pendingOrders.remove("PAYOS_" + orderCode);
         if (order == null) {
-            // Trường hợp reload lại trang sau khi đã kích hoạt
-            EventOrganizer eo = eventOrganizerRepository.findAll().stream()
-                    .filter(e -> e.getSubscription() != null && e.getSubscription().getStatus() == SubscriptionStatus.ACTIVE)
-                    .findFirst()
-                    .orElse(null);
-            if (eo != null && eo.getSubscription() != null) {
-                return mapToDto(eo.getSubscription());
-            }
-            throw new BadRequestException("Giao dịch không tồn tại hoặc đã được kích hoạt trước đó");
+            log.info("PayOS Webhook/Internal: Giao dịch PAYOS_{} đã được xử lý trước đó hoặc không còn trong hàng đợi.", orderCode);
+            return SubscriptionResponseDto.builder()
+                    .planName("PayOS Webhook Accepted")
+                    .status(SubscriptionStatus.ACTIVE)
+                    .build();
         }
 
         EventOrganizer eo = eventOrganizerRepository.findById(order.eoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện: " + order.eoId()));
 
         return activateSubscription(eo, order.planType(), "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode);
     }

@@ -48,7 +48,9 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/api/v1/workers/skills/taxonomy",
-                    "/api/v1/workers/skills/tiers/config"
+                    "/api/v1/workers/skills/tiers/config",
+                    "/api/v1/eo/subscriptions/payos-webhook",
+                    "/api/v1/eo/subscriptions/vnpay-callback"
                 ).permitAll()
                 .requestMatchers("/api/v1/workers/skills/admin/**").hasRole("ADMIN")
                 .requestMatchers(

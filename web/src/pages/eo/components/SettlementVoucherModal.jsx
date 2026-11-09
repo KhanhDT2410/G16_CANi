@@ -70,9 +70,7 @@ export default function SettlementVoucherModal({
 }) {
   const [selectedEventId, setSelectedEventId] = useState('ALL');
 
-  if (!isOpen) return null;
-
-  // Lọc thanh toán theo sự kiện được chọn
+  // Lọc thanh toán theo sự kiện được chọn (gọi hook ở cấp cao nhất)
   const filteredPayments = useMemo(() => {
     if (selectedEventId === 'ALL') return payments;
     return payments.filter((p) => p.eventId === selectedEventId || p.event_id === selectedEventId);
@@ -86,9 +84,10 @@ export default function SettlementVoucherModal({
     return events.find((e) => e.eventId === selectedEventId) || { name: 'Sự kiện điều phối CANi', venueAddress: '' };
   }, [events, selectedEventId]);
 
+  if (!isOpen) return null;
+
   const totalAmount = filteredPayments.reduce((acc, p) => acc + (p.declaredAmount || p.agreedAmount || 0), 0);
   const totalAgreed = filteredPayments.reduce((acc, p) => acc + (p.agreedAmount || 0), 0);
-  const totalAllowance = Math.max(0, totalAmount - totalAgreed);
   const amountInWords = numberToVietnameseWords(totalAmount);
 
   const today = new Date();

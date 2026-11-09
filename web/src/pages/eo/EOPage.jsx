@@ -171,15 +171,32 @@ export default function EOPage() {
           {/* Hero Banner & Metrics Grid chỉ hiển thị ở tab Sự kiện / Tổng quan */}
           {(activeTab === 'events' || activeNav === 'overview') && (
             <>
-              <section className="eo-hero-banner">
-                <div className="hero-content">
-                  <h1 className="hero-greeting">Chào mừng bạn quay trở lại, {displayName}!</h1>
-                  <p className="hero-subtitle">
-                    Hôm nay bạn có <strong>{events.events.length} sự kiện</strong> sắp diễn ra. Hãy kiểm tra danh sách điểm danh và phân công ca làm nhé.
+              <section className="eo-hero-banner-clean">
+                <div className="hero-clean-left">
+                  <h1 className="hero-clean-greeting">Chào mừng trở lại, {displayName}!</h1>
+                  <p className="hero-clean-subtitle">
+                    Quản lý sự kiện, tuyển dụng và điều phối nhân sự dễ dàng trên CANi.
                   </p>
-                  <button type="button" className="hero-action-btn" onClick={() => events.setShowEventModal(true)}>
-                    <span className="btn-plus-icon">+</span> Tạo Sự Kiện Mới
-                  </button>
+                </div>
+                <div className="hero-clean-right">
+                  <div className="hero-3d-calendar-stage">
+                    <div className="hero-3d-calendar-card">
+                      <div className="hero-calendar-spiral-top">
+                        <span className="spiral-ring" />
+                        <span className="spiral-ring" />
+                        <span className="spiral-ring" />
+                      </div>
+                      <div className="hero-calendar-body">
+                        <div className="hero-calendar-check-circle">✓</div>
+                      </div>
+                    </div>
+                    <div className="hero-coordinator-badge">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </section>
 
@@ -189,26 +206,30 @@ export default function EOPage() {
 
           <div className="eo-pill-tabs">
             <button type="button" className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`} onClick={() => switchTab('events')}>
-              Sự Kiện Của Tôi
+              Quản lý sự kiện
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'recruitment' ? 'active' : ''}`} onClick={() => switchTab('recruitment')}>
-              Tuyển Dụng & Điều Phối
+              Tuyển dụng & Điều phối
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => switchTab('payments')}>
-              Thanh Toán & Khai Báo Lương
+              Thanh toán & Lương
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => switchTab('subscription')}>
-              Gói Dịch Vụ & Quota
+              Thanh toán
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
-              Hồ Sơ
+              Hồ sơ tổ chức
             </button>
-            <button type="button" className={`pill-tab ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => switchTab('analytics')}>
-              Báo Cáo & Thống Kê
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => switchTab('settings')}>
-              Cài Đặt Hệ Thống
-            </button>
+            {activeTab === 'analytics' && (
+              <button type="button" className="pill-tab active" onClick={() => switchTab('analytics')}>
+                Báo cáo & Thống kê
+              </button>
+            )}
+            {activeTab === 'settings' && (
+              <button type="button" className="pill-tab active" onClick={() => switchTab('settings')}>
+                Cài đặt hệ thống
+              </button>
+            )}
           </div>
 
           {activeTab === 'events' && (
@@ -287,7 +308,20 @@ export default function EOPage() {
           )}
         </main>
 
-        {(activeTab === 'events' || activeNav === 'overview') && <EORightSidebar />}
+        {(activeTab === 'events' || activeNav === 'overview') && (
+          <EORightSidebar
+            metrics={events.metrics}
+            onOpenQr={() => {
+              if (events.events.length > 0 && events.events[0].totalShifts > 0) {
+                shifts.handleOpenShiftQr(events.events[0].eventId, events.events[0].name);
+              } else {
+                showToast('Chưa có ca làm việc nào để tạo mã QR điểm danh.', 'warning');
+              }
+            }}
+            onOpenRecruitment={() => switchTab('recruitment')}
+            onOpenSubscription={() => switchTab('subscription')}
+          />
+        )}
       </div>
 
       <EOModals

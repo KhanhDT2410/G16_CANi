@@ -1,128 +1,208 @@
 ---
-name: unit-test-report
-description: Unified Unit Testing & Reporting standard for CANi platform. Enforces AAA pattern, Normal/Abnormal/Boundary test design, and 100% compatibility with Report-5.1_Unit Test.xlsx template and Excel formulas.
+name: se-unit-test-report
+description: Chuẩn mực Kỹ nghệ Phần mềm chuyên sâu (IEEE 829 / ISO 29119) để thiết kế, tạo lập, tự động hóa và duy trì Báo cáo Kiểm thử Đơn vị (Unit Test Specification & Report) định dạng Excel. Áp dụng cho các dịch vụ Backend Spring Boot 3 (JUnit 5, Mockito), bao gồm kiến trúc sổ tính 4 tầng, ma trận truy vết (Traceability Matrix), kỹ thuật thiết kế ca kiểm thử N/A/B, quy trình quản lý khuyết tật (Defect Lifecycle) qua 3 vòng kiểm thử (Rounds 1-3), và bộ script tự động hóa bằng Python/openpyxl không gây sai lệch số liệu.
 ---
 
-# Unified Unit Test & Report Skill for CANi Platform
+# SE Unit Test Report Specification & Methodology Standard (IEEE 829 / ISO 29119)
 
-> **Tiêu chuẩn Kỹ nghệ Phần mềm:** Skill này định nghĩa quy trình chuẩn hóa từ thiết kế, cài đặt, thực thi Unit Test đến xuất báo cáo nghiệm thu kỹ thuật. Mọi thành viên và AI Agent khi tham gia dự án **CANi** bắt buộc phải tuân thủ nghiêm ngặt để đảm bảo chất lượng phần mềm (Software Quality Assurance) và tính tương thích 100% với file biểu mẫu `Report-5.1_Unit Test.xlsx`.
-
----
-
-## 1. Nguyên Tắc Thiết Kế Unit Test (Test Design Standards)
-
-Mỗi phương thức nghiệp vụ (`methodName`) thuộc tầng Service hoặc Business Logic bắt buộc phải được bao phủ bởi 3 nhóm kịch bản thử nghiệm:
-
-### 1.1. Phân nhóm Kịch bản Kiểm thử (Test Types)
-1. **Normal Case (`Normal`):**
-   - Kiểm thử luồng chạy lý tưởng (Happy Path) với dữ liệu đầu vào hoàn toàn hợp lệ.
-   - Dữ liệu trả về đúng định dạng, các mock repository/dependency được gọi đúng số lần và đúng tham số.
-2. **Abnormal Case (`Abnormal`):**
-   - Kiểm thử các luồng ngoại lệ, lỗi nghiệp vụ: Người dùng không đủ quyền hạn, tài nguyên không tồn tại (`ResourceNotFoundException`), dữ liệu không hợp lệ (`BadRequestException`), xung đột trạng thái (`AppException`), lỗi dịch vụ bên thứ ba (Supabase, VNPT eKYC, Gemini Vision, FCM).
-   - Đảm bảo hệ thống ném ra đúng Exception Type và thông báo lỗi rõ ràng, không làm lộ stack trace nội bộ.
-3. **Boundary Case (`Boundary`):**
-   - Kiểm thử các giá trị biên của miền dữ liệu:
-     * Số học: Min, Max, 0, số âm, số lượng nhân sự tối thiểu/tối đa trong 1 ca làm việc.
-     * Chuỗi / Ký tự: Chuỗi rỗng `""`, chuỗi đạt giới hạn ký tự tối đa (ví dụ mô tả sự kiện 1000 ký tự), ký tự đặc biệt, định dạng email/CCCD biên.
-     * Thời gian: Ca làm việc bắt đầu ngay tại thời điểm hiện tại (`leadTime = 0`), ca kéo dài qua đêm (23:00 - 05:00), khoảng cách địa lý sát mép bán kính radar (ví dụ đúng 20.0 km).
-
-### 1.2. Cấu trúc Triển khai (AAA Pattern)
-Mọi hàm test đều phải phân tách rõ ràng 3 giai đoạn:
-- **Arrange (Given):** Chuẩn bị mock objects, dữ liệu đầu vào (DTO, Entity) và cấu hình hành vi của mock (`when(...).thenReturn(...)` hoặc `when(...).thenThrow(...)`).
-- **Act (When):** Thực thi trực tiếp phương thức cần kiểm thử (SUT - System Under Test).
-- **Assert (Then):** Kiểm tra tính đúng đắn của kết quả trả về (`assertEquals`, `assertNotNull`), xác minh Exception (`assertThrows`) và kiểm tra tương tác mock (`verify(repo, times(1)).save(...)`, `verify(..., never())...`).
-
-### 1.3. Nguyên tắc Cô Lập Tuyệt Đối (Test Isolation)
-- **Zero Real External Dependency:** Unit Test KHÔNG ĐƯỢC kết nối vào Database thật, không gọi API thật của VNPT eKYC, Supabase hay Firebase FCM.
-- Tất cả các Repository, RestClient, External Service bắt buộc phải được thay thế bằng `@Mock` (Mockito) trong Backend hoặc Fake/Stub/Mocktail trong Mobile.
-- Test chạy độc lập, không phụ thuộc vào thứ tự thực thi và có thời gian chạy dưới 50ms cho mỗi test case.
+> **Mục đích tài liệu:** Cung cấp quy chuẩn Kỹ nghệ Phần mềm (Software Engineering Standards) toàn diện để toàn bộ thành viên trong nhóm (Developers, QA/Testers, Tech Leads) và AI Agents đồng bộ thực hiện việc viết, thẩm định và duy trì tài liệu Kiểm thử Đơn vị (Unit Test Report) cho tất cả các dịch vụ (Services) của dự án.
 
 ---
 
-## 2. Quy Tắc Tương Thích Tuyệt Đối Với Excel Template (`Report-5.1_Unit Test.xlsx`)
+## 1. NGUYÊN LÝ KỸ NGHỆ PHẦN MỀM CỐT LÕI (CORE PRINCIPLES)
 
-Để đảm bảo các công thức tự động trong Excel (`COUNTIF`, `SUM`, tỉ lệ %) hoạt động chính xác khi copy dữ liệu vào file Excel:
+### 1.1. Bản chất Kim tự tháp Kiểm thử (Testing Pyramid) & Phạm vi Unit Test
+1. **Kiểm thử Đơn vị là gì (Unit Test Boundary):**
+   - Kiểm thử tập trung vào **từng đơn vị mã nguồn nhỏ nhất (Unit of Code)** — điển hình là một hàm/phương thức nghiệp vụ (`public method`) trong các lớp Service (ví dụ: `AuthService`, `JobService`, `EventService`).
+   - Môi trường thực thi: Hoàn toàn trong bộ nhớ máy ảo JVM (`In-memory`), tốc độ mili-giây, cô lập 100% khỏi cơ sở dữ liệu vật lý (PostgreSQL, MySQL), mạng Internet, và các dịch vụ bên thứ ba (Supabase, VNPay, Firebase).
+2. **Tiền điều kiện chuẩn mực (Pre-conditions / Mocking Setup):**
+   - **BẮT BUỘC:** Mô tả trạng thái giả lập của các phụ thuộc qua thư viện Mocking (Mockito): `@Mock`, `@InjectMocks`, `when(repo.findById(...)).thenReturn(...)`, `SecurityContextHolder mock Authentication (Role=...)`.
+   - **TUYỆT ĐỐI CẤM:** Không bao giờ ghi *"Can connect with server"*, *"Database đã bật"*, hay *"Đã đăng nhập trên UI"*. Đây là dấu hiệu vi phạm nghiêm trọng ranh giới giữa Unit Test và Integration/System Test.
 
-### 2.1. Cấu Trúc Cột (16 Cột Chuẩn Bắt Buộc)
-| Cột | Tên Cột Excel | Định Dạng & Quy Tắc Giá Trị |
-|---|---|---|
-| **A** | **Test Case ID** | **Dòng phân cách hàm:** Điền `methodName()` (Cột B..P để trống).<br>**Dòng test case:** Điền `UTC001`, `UTC002`, `UTC003`... tăng dần liên tục trong toàn bộ Sheet. Tiền tố `UTC` là bắt buộc để ô `B3` (`=COUNTIF(A13:A1005,"UTC*")`) đếm chính xác. |
-| **B** | **Pre-conditions** | Điều kiện tiên quyết và trạng thái mock (ví dụ: `User authenticated as EO; ShiftRepository mocked`). Nếu không có ghi `N/A`. |
-| **C** | **Input parameters** | Tham số truyền vào dạng cặp key-value: `userId=...; dto.title="Event A"; dto.maxWorkers=5`. Nếu không có ghi `N/A` hoặc `none`. |
-| **D** | **Expected Results** | **BẮT BUỘC** viết đúng 3 thành phần (xuống dòng bằng `<br>` trong bảng Markdown):<br>`Return: <giá trị hoặc kiểu DTO trả về / null>`<br>`Exception: <Tên Exception Class hoặc N/A>`<br>`Log Message: <Nội dung thông báo lỗi hoặc N/A>` |
-| **E** | **Type** | Chỉ nhận 1 trong 3 giá trị chính xác (phân biệt hoa thường): `Normal`, `Abnormal`, hoặc `Boundary` (để khớp với công thức `=COUNTIF($E12:$E1003,B8)` tại dòng 9 của Excel). |
-| **F** | **Round 1** | Trạng thái thực thi Vòng 1: `Passed`, `Failed`, hoặc `Pending`. |
-| **G** | **Test date** | Ngày thực thi kiểm thử (`YYYY-MM-DD`). |
-| **H** | **Tester** | Tên hoặc User code của tester / developer. |
-| **I** | **Round 2** | Trạng thái Vòng 2: `Passed`, `Failed`, `Pending`, hoặc `N/A`. |
-| **J** | **Test date** | Ngày thực thi Vòng 2 (nếu có). |
-| **K** | **Tester** | Tester Vòng 2. |
-| **L** | **Round 3** | Trạng thái Vòng 3 (Final Round): `Passed`, `Failed`, `Pending`, hoặc `N/A`. |
-| **M** | **Test date** | Ngày thực thi Vòng 3 (nếu có). |
-| **N** | **Tester** | Tester Vòng 3. |
-| **O** | **Defect IDs** | Mã lỗi ghi nhận trong Jira/Issue Tracker (ví dụ: `BUG-102`). Nếu không có lỗi ghi để trống. |
-| **P** | **Note** | Ghi chú thêm nếu có. |
+### 1.2. Kỹ thuật Thiết kế Ca Kiểm thử (Test Design Techniques)
+Mỗi phương thức nghiệp vụ cần được bao phủ tối thiểu theo 3 kỹ thuật:
+1. **Normal (N) - Phân vùng tương đương hợp lệ (Happy Path):**
+   - Đầu vào chuẩn, đầy đủ dữ liệu theo Business Rules (BR).
+   - Kỳ vọng: Trả về DTO/Entity hợp lệ, gọi hàm lưu (`repository.save()`), ghi log kiểm toán.
+   - **Tỷ trọng khuyến nghị:** `~35% - 40%`.
+2. **Abnormal (A) - Phân vùng tương đương bất thường (Unhappy Path):**
+   - Đầu vào vi phạm: Sai định dạng, thiếu trường bắt buộc, tài khoản bị khóa, thực thể không tồn tại, vi phạm quyền hạn (Access Denied).
+   - Kỳ vọng: Ném ra đúng lớp ngoại lệ nghiệp vụ (`AppException`, `BadRequestException`, `ResourceNotFoundException`, `UnauthorizedException`) kèm HTTP Status (400, 401, 403, 404, 409).
+   - **Tỷ trọng khuyến nghị:** `~35% - 40%`.
+3. **Boundary (B) - Phân tích giá trị biên (Boundary Value Analysis - BVA):**
+   - Kiểm thử tại chính xác các giá trị ngưỡng biên (`Min`, `Min-1`, `Max`, `Max+1`, `0`, `null`, rỗng `""`, chuỗi dài kịch trần, bán kính Geofence đúng 150m vs 151m, thời gian OTP hết hạn tại giây thứ 300 vs 301).
+   - **Tỷ trọng khuyến nghị:** `~20% - 25%`.
 
-### 2.2. Điểm Lưu Ý Sống Còn Về Công Thức `Test Statistics`
-> **CẢNH BÁO KỸ THUẬT TỪ SENIOR QA:**
-> Trong file Excel mẫu `Report-5.1_Unit Test.xlsx`, ô `C12` của sheet `Test Statistics` lấy dữ liệu từ công thức `=ModuleName1!B7` (tương ứng với hàng **Round 3 Passed**).
-> - Nếu một Test Case đã đạt `Passed` ngay từ **Round 1** và không có lỗi: Khi ghi nhận kết quả, cần điền `Passed` cho cả Round 2 và Round 3 (hoặc điền `Passed` tại Round 3 với tư cách là Final Acceptance) để công thức tổng hợp tại sheet `Test Statistics` không bị ghi nhận là 0 Passed!
-> - Nếu kịch bản có bug ở Round 1: Round 1 ghi `Failed`, sau khi fix code ở Round 2 ghi `Passed`, Round 3 ghi `Passed`.
+### 1.3. Quy định Ngôn ngữ Tài liệu (Bilingual Consistency Rule)
+- **Tiếng Anh (Toàn bộ phần kỹ thuật & mô tả):** Tất cả Tiêu đề cột, Tên Test Case, Pre-conditions, Input Parameters, Type, Round Status, Defect ID, Root Cause & Fix Notes phải viết bằng **Tiếng Anh chuyên ngành**.
+- **Tiếng Việt (Thông điệp ngoại lệ hệ thống):** Các chuỗi thông báo lỗi nghiệp vụ hiển thị cho người dùng do hệ thống trả về trong `Expected Results` được **giữ nguyên Tiếng Việt** nguyên bản trong code (ví dụ: `BadRequestException("Mã OTP không hợp lệ hoặc đã hết hạn")`) để đảm bảo tính truy vết 1:1 với mã nguồn `backend`.
 
 ---
 
-## 3. Quy Trình Thực Thi 4 Bước Cho AI & Thành Viên Nhóm
+## 2. KIẾN TRÚC WORKBOOK CHUẨN 4 TẦNG (4-TIER WORKBOOK ARCHITECTURE)
 
-Khi được giao nhiệm vụ viết Unit Test và báo cáo cho một Module:
+Một tệp Excel Unit Test Specification hoàn chỉnh tuân thủ cấu trúc sau:
 
 ```
-[BƯỚC 1: Phân Tích Logic] ──> [BƯỚC 2: Viết Code Test] ──> [BƯỚC 3: Chạy Test CLI] ──> [BƯỚC 4: Xuất Markdown & TSV]
+[Cover]                    --> Tầng 1: Quản lý phiên bản, SCM, Metadata & Lịch sử sửa đổi
+   │
+   ├──> [Test Cases]       --> Tầng 2: Mục lục 35+ Functions, Traceability Matrix & Môi trường JVM
+   │
+   ├──> [Test Statistics]  --> Tầng 3: Dashboard thống kê động (Zero-Drift Dynamic Formulas)
+   │
+   └──> [Detail Sheets]    --> Tầng 4: Chi tiết từng Service (AuthService, JobService, EventService...)
 ```
 
-### Bước 1: Phân Tích Logic Nghiệp Vụ Của Method
-1. Đọc mã nguồn phương thức trong Service (`backend/src/main/java/com/cani/service/...`).
-2. Xác định các trường hợp:
-   - Happy Path (`Normal`).
-   - Các nhánh validate, check null, check quyền, check trạng thái (`Abnormal`).
-   - Các điểm biên của giá trị (`Boundary`).
+### Tầng 1: Sheet `Cover`
+- **Metadata:** Project Name (`G16 - CANi`), Project Code (`SEP490_G16`), Document Code (`SEP490_G16_Report_5.1_Unit_Test_v2.0`), Issue Date, Author/Lead Tester.
+- **Record of Change:** Bảng theo dõi lịch sử chỉnh sửa tài liệu qua các phiên bản (v1.0 $\rightarrow$ v2.0), có cột `Reference` trỏ tới Commit SHA trên Git.
 
-### Bước 2: Viết Mã Nguồn Unit Test
-1. Tạo hoặc cập nhật file test tương ứng trong `backend/src/test/java/com/cani/service/...`.
-2. Sử dụng `@ExtendWith(MockitoExtension.class)`, `@InjectMocks`, `@Mock`.
-3. Đặt tên phương thức test rõ ràng theo quy ước:
-   `should<DoSomething>_When<Condition>()`
-4. Viết assertions chặt chẽ: Kiểm tra từng trường dữ liệu quan trọng của DTO trả về, không chỉ `assertNotNull`.
+### Tầng 2: Sheet `Test Cases` (Mục lục truy vết hệ thống)
+- **Test Environment Setup:** Khai báo cấu hình JVM (OpenJDK 21), Test Runner (JUnit 5.10.2 / Surefire Plugin), Mockito Core 5.11.0, AssertJ 3.25.3.
+- **Bảng Ma trận Truy vết:**
+  `No` | `Feature Name` | `Class Name` | `Function Name` | `Function Code (Optional)` | `Sheet Name` | `Description` | `Pre-Condition`
 
-### Bước 3: Chạy Lệnh Kiểm Thử Trên Terminal
-1. Chạy lệnh:
-   - Backend: `./mvnw test -Dtest=TenClassTest` (hoặc `.\mvnw.cmd test -Dtest=TenClassTest` trên Windows).
-   - Mobile: `flutter test test/...`
-2. Kiểm tra log đảm bảo `BUILD SUCCESS` và `Failures: 0, Errors: 0`.
-3. Ghi lại ngày test thực tế và kết quả `Passed`.
-
-### Bước 4: Xuất Báo Cáo Markdown Khớp Excel & Khối TSV
-Tạo hoặc cập nhật file `docs/UNIT_TEST_REPORT_EXPORT.md` với đầy đủ cấu trúc:
-1. Sheet `Cover`
-2. Sheet `Test Cases` (Môi trường & Danh mục Sheet)
-3. Sheet `Test Statistics` (Bảng thống kê tỷ lệ % khớp công thức)
-4. Từng Sheet `<ModuleName>` gồm:
-   - Header thống kê module
-   - Bảng Markdown 16 cột
-   - **Khối TSV (Tab-Separated Values):** Đặt trong `<details><summary>Copy nhanh vào Excel (TSV)</summary>` để người dùng copy trực tiếp 1 lần và dán thẳng vào ô `A12` của sheet trong file Excel mà không bị lỗi cột hay vỡ dòng.
+### Tầng 3: Sheet `Test Statistics` (Dashboard số liệu tự động)
+- **Nguyên tắc bất di bất dịch:** **TUYỆT ĐỐI KHÔNG GÕ TAY SỐ LIỆU.** Toàn bộ số liệu phải lấy động từ các Detail Sheet.
+- Cột thống kê: `Passed`, `Failed`, `Pending`, `Untested`, `N (Normal)`, `A (Abnormal)`, `B (Boundary)`, `Total Test Cases`, `Success Rate`.
+- **Định luật bảo toàn số học (Zero Discrepancy Law):**
+  $$\text{Total Test Cases} = \text{Passed} + \text{Failed} + \text{Pending} + \text{Untested} = N + A + B$$
+  Tổng ngang và tổng dọc phải khớp nhau chính xác từng đơn vị. Không để xảy ra hụt số.
 
 ---
 
-## 4. Quy Cách Định Dạng Khối TSV Copy-Paste Excel
+## 3. QUY CHUẨN THIẾT KẾ DETAIL SHEET (DETAIL SHEET SPECIFICATION)
 
-Trong khối TSV:
-- Giữa các cột phân cách bằng đúng ký tự `\t` (Tab).
-- Nội dung ô `Expected Results` có nhiều dòng (Return, Exception, Log Message) phải được bọc trong dấu ngoặc kép `"` và xuống dòng bằng `\n` thực tế. Khi paste vào Excel, toàn bộ nội dung sẽ nằm gọn gàng trong 1 ô mà không bị nhảy dòng sang các row khác.
+Đây là chuẩn mực áp dụng cho sheet của **mọi lớp Service** (`AuthService`, `JobService`, `EventService`, v.v.).
 
-Ví dụ định dạng dòng TSV chuẩn:
-```tsv
-createShift()	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A	N/A
-UTC001	User authenticated as EO	userId=u1; dto.title=""	"Return: null
-Exception: BadRequestException
-Log Message: Title is required"	Abnormal	Passed	2026-11-03	CANi_Tester	Passed	2026-11-03	CANi_Tester	Passed	2026-11-03	CANi_Tester		
+### 3.1. Cấu trúc Khối KPI Header (Rows 2 – 9)
+- **Ô `B3` (Tổng số ca kiểm thử):**
+  `=COUNTIF(A13:A500, "UTC*")`
+- **Bảng Theo dõi các Vòng Kiểm thử (Rows 4 – 7):**
+  - Hàng 4 (Tiêu đề): `A4: Testing Round` | `B4: Passed` | `C4: Failed` | `D4: Pending`
+  - Hàng 5 (Round 1): `B5: =COUNTIF($F13:$F500,B4)` | `C5: =COUNTIF($F13:$F500,C4)` | `D5: =COUNTIF($F13:$F500,D4)`
+  - Hàng 6 (Round 2): `B6: =COUNTIF($I13:$I500,B4)` | `C6: =COUNTIF($I13:$I500,C4)` | `D6: =COUNTIF($I13:$I500,D4)`
+  - Hàng 7 (Round 3): `B7: =COUNTIF($L13:$L500,B4)` | `C7: =COUNTIF($L13:$L500,C4)` | `D7: =COUNTIF($L13:$L500,D4)`
+- **Bảng Phân loại Kỹ thuật (Rows 8 – 9):**
+  - Hàng 8 (Tiêu đề): `A8: Testing Type` | `B8: Normal` | `C8: Abnormal` | `D8: Boundary`
+  - Hàng 9 (Số lượng): `B9: =COUNTIF($E13:$E500,B8)` | `C9: =COUNTIF($E13:$E500,C8)` | `D9: =COUNTIF($E13:$E500,D8)`
+
+### 3.2. Cấu trúc Các Cột Chi tiết (Row 11: Header, Row 12+: Dữ liệu)
+Mỗi sheet chi tiết phải có đầy đủ 16 cột (A đến P) và 1 vùng tra cứu tại cột T:
+
+| Cột | Chữ | Tên Cột (Header) | Chiều rộng | Căn lề | Định dạng dữ liệu & Mô tả chi tiết |
+| :---: | :---: | :--- | :---: | :---: | :--- |
+| **1** | **A** | `Test Case ID` | 14 | Center | Mã định danh duy nhất: `UTC001`, `UTC002`... tăng tuần tự. |
+| **2** | **B** | `Pre-conditions (Mocking Setup)` | 34 | Left | Thiết lập Mocking trong JUnit: `@Mock`, `when(...)`, `SecurityContext`. |
+| **3** | **C** | `Input parameters` | 32 | Left | Tham số truyền vào hàm, DTO payload, giá trị biên. |
+| **4** | **D** | `Expected Results` | 45 | Left | DTO trả về, Ngoại lệ ném ra (thông điệp TV), xác minh `verify()`. |
+| **5** | **E** | `Type` | 14 | Center | Dropdown: `Normal`, `Abnormal`, `Boundary`. |
+| **6** | **F** | `Round 1` | 12 | Center | **Trạng thái Round 1: KHÔNG TÔ MÀU NỀN**, Dropdown 4 giá trị. |
+| **7** | **G** | `Test date` | 12 | Center | Ngày chạy Round 1 (`YYYY-MM-DD`). |
+| **8** | **H** | `Tester` | 12 | Center | Tên tài khoản tester thực tế (ví dụ: `minhtb`, `hungpd`). |
+| **9** | **I** | `Round 2` | 12 | Center | **Trạng thái Round 2: KHÔNG TÔ MÀU NỀN**, Dropdown 4 giá trị. |
+| **10** | **J** | `Test date` | 12 | Center | Ngày chạy Round 2 (`YYYY-MM-DD`). |
+| **11** | **K** | `Tester` | 12 | Center | Tên tài khoản tester chạy retest. |
+| **12** | **L** | `Round 3` | 12 | Center | **Trạng thái Round 3: KHÔNG TÔ MÀU NỀN**, Dropdown 4 giá trị. |
+| **13** | **M** | `Test date` | 12 | Center | Ngày nghiệm thu hồi quy (`YYYY-MM-DD`). |
+| **14** | **N** | `Tester` | 12 | Center | Tên tester nghiệm thu. |
+| **15** | **O** | `Defect IDs` | 16 | Center | Mã lỗi nếu Round 1 fail (`BUG-<SERVICE>-xxx`), **Font Đỏ Đậm `#C00000`**. |
+| **16** | **P** | `Note & Root Cause Fix` | 45 | Left | Giải thích nguyên nhân gốc rễ và giải pháp sửa code cụ thể. |
+| **20** | **T** | *(Lookup Table)* | 10 | Center | Bảng giá trị chuẩn: `T2=Passed`, `T3=Failed`, `T4=Pending`, `T5=N/A`. |
+
+### 3.3. Quy tắc Định dạng Thị giác (Visual & Styling Standards)
+1. **Tiêu đề Bảng (Row 11):**
+   - Nền Xanh Navy đậm `#1F4E78`, chữ trắng in đậm (`Font(color="FFFFFF", bold=True)`), căn giữa, chiều cao dòng 28pt.
+2. **Dải Phân cách Phương thức (Method Section Banner):**
+   - Chiều cao dòng 24pt, nền Xanh nhạt `#D9E1F2`, chữ Xanh Navy đậm `#1F4E78` in đậm.
+   - Nội dung ô A: Đánh số và tên hàm đầy đủ, ví dụ: `1. register(RegisterRequest request)`.
+   - **QUY TẮC SỐNG CÒN:** **TUYỆT ĐỐI KHÔNG điền chữ `Pending`, `Passed` hay bất kỳ giá trị nào vào các cột F, I, L trên dòng phân cách phương thức này.** Nếu điền, hàm `COUNTIF` sẽ đếm sai số ca kiểm thử!
+3. **Màu sắc các Cột Round (F, I, L):**
+   - **XÓA MÀU TOÀN BỘ (Uncolored):** Đặt `fill_type=None` (không dùng nền vàng, xanh hay đỏ).
+   - Chữ màu đen tiêu chuẩn (`color="000000"`), kích thước 10pt, căn giữa.
+4. **Cấu hình Dropdown (Data Validation):**
+   - Cột Round (F, I, L): Danh sách `formula1='"Passed,Failed,Pending,N/A"'`. **Bắt buộc phải có `Failed`**.
+   - Cột Type (E): Danh sách `formula1='"Normal,Abnormal,Boundary"'`.
+
+---
+
+## 4. QUY TRÌNH QUẢN LÝ VÒNG KIỂM THỬ (MULTI-ROUND LIFECYCLE)
+
+Một báo cáo đạt chuẩn SE cấp đại học và công nghiệp phải phản ánh đúng **hành trình QA qua thời gian**, không phải một báo cáo giả lập "tất cả Passed ngay từ đầu":
+
+```
+  Sprint Baseline (Round 1)       Fix & Retest (Round 2)         Release Sign-off (Round 3)
+┌───────────────────────────┐   ┌──────────────────────────┐   ┌──────────────────────────┐
+│  Thực thi toàn bộ kịch bản│   │ Retest các ca bị Failed  │   │ Kiểm thử hồi quy toàn bộ │
+│  Phát hiện lỗi thực tế:   │──>│ Xác nhận Dev đã fix xong │──>│ Đảm bảo hệ thống ổn định │
+│  - 25 Passed, 4 Failed    │   │ - Failed -> Passed       │   │ - 100% Passed            │
+│  - Ghi mã BUG-xxx & Note  │   │ - Chưa chạy: Pending     │   │ - Nghiệm thu đóng gói    │
+└───────────────────────────┘   └──────────────────────────┘   └──────────────────────────┘
 ```
 
+- **Quy tắc khi Dự án đang trong quá trình phát triển (In-Progress Sprints):**
+  - Nếu nhóm đang ở Round 1: Round 1 điền đúng kết quả (`Passed` / `Failed`). Round 2 và Round 3 **để trạng thái `Pending`**.
+  - Không điền `N/A` vào các ca kiểm thử hợp lệ; `N/A` chỉ áp dụng nếu chức năng đó bị hủy bỏ khỏi phạm vi dự án.
+
+---
+
+## 5. HƯỚNG DẪN TỪNG BƯỚC CHO THÀNH VIÊN TRONG NHÓM (SOP)
+
+Khi một thành viên (hoặc Subagent) được giao làm báo cáo cho một Service mới (ví dụ: `JobService`):
+
+### Bước 1: Khảo sát Mã nguồn Java Service
+1. Mở tệp mã nguồn: `backend/src/main/java/com/cani/service/<Service>.java`.
+2. Liệt kê danh sách tất cả các phương thức `public`.
+3. Với mỗi phương thức, xác định:
+   - DTO đầu vào, DTO đầu ra.
+   - Các điều kiện ném lỗi (Validation, Business Rules, Security Role).
+   - Tối thiểu 3 - 5 Test Cases cho mỗi phương thức (1 Normal, 1-2 Abnormal, 1 Boundary).
+
+### Bước 2: Cập nhật Sheet `Test Cases` (Mục lục)
+- Mở sheet `Test Cases`, chèn các dòng tương ứng với các function của Service vào bảng:
+  - `Feature Name`: Tên phân hệ nghiệp vụ.
+  - `Class Name`: Tên lớp (ví dụ: `JobService`).
+  - `Function Name`: Tên nghiệp vụ (ví dụ: `Create Job Post`).
+  - `Function Code`: Mã quản lý (ví dụ: `FC-JOB-01`).
+  - `Sheet Name`: Tên sheet tương ứng (ví dụ: `JobService`).
+
+### Bước 3: Tạo Sheet Chi tiết mới
+Sử dụng script Python chuẩn hóa có sẵn trong repo hoặc copy theo format mẫu:
+- File script mẫu: [`tools/generate_service_unit_test_sheet.py`](file:///c:/Users/ASUS/Downloads/antig-%20CANi/tools/generate_service_unit_test_sheet.py).
+- Khai báo danh sách các method và test cases.
+- Chạy lệnh:
+  ```powershell
+  python tools/generate_service_unit_test_sheet.py
+  ```
+
+### Bước 4: Liên kết vào Sheet `Test Statistics`
+1. Mở sheet `Test Statistics`.
+2. Thêm một hàng mới cho Service vừa tạo:
+   - Cột C (Passed): `=JobService!B5` (Nếu tính theo Round 1) hoặc `=JobService!B7` (Nếu tính theo Round 3)
+   - Cột D (Failed): `=JobService!C5` hoặc `=JobService!C7`
+   - Cột E (Pending): `=JobService!D5` hoặc `=JobService!D7`
+   - Cột G (Normal): `=JobService!B9`
+   - Cột H (Abnormal): `=JobService!C9`
+   - Cột I (Boundary): `=JobService!D9`
+   - Cột J (Total): `=JobService!B3`
+   - Cột K (Success Rate): `=C{row}/J{row}`
+
+### Bước 5: Kiểm toán Tính toàn vẹn Số học (Pre-Flight Audit)
+Trước khi commit code hoặc gửi cho Leader:
+1. Đảm bảo không có ô nào xuất hiện lỗi `#REF!`, `#VALUE!`, `#NAME?`.
+2. Kiểm tra tổng ngang: `Passed + Failed + Pending = Total = Normal + Abnormal + Boundary`.
+3. Kiểm tra các dòng banner tên hàm: Tuyệt đối không chứa chữ `Pending` hay `Passed`.
+4. Kiểm tra dropdown các cột Round: Bấm thử xem có xuất hiện đầy đủ 4 tùy chọn `Passed, Failed, Pending, N/A` hay không.
+
+---
+
+## 6. DANH MỤC CÁC SERVICE TRỌNG TÂM CẦN TRIỂN KHAI CHO DỰ ÁN CANi
+
+Toàn bộ nhóm bám sát danh mục 6 Service cốt lõi này để phân chia công việc:
+
+1. **`AuthService` (Đã hoàn thành mẫu chuẩn):** 8 phương thức, 29 Test Cases.
+2. **`JobService` (Tuyển dụng & Tìm việc tức thì):** 7 phương thức (`createJob`, `searchJobs`, `applyJob`, `acceptApplication`, `cancelJob`, `completeJob`, `getJobDetails`).
+3. **`EventService` (Quản lý Sự kiện & Địa điểm):** 6 phương thức (`createEvent`, `updateEvent`, `publishEvent`, `assignStaff`, `closeEvent`, `getEventSummary`).
+4. **`AttendanceService` (Điểm danh QR & Geofence 150m):** 5 phương thức (`generateDynamicQr`, `checkInWithGeofence`, `checkOutWithGeofence`, `verifyAttendanceStatus`, `manualOverrideAttendance`).
+5. **`MatchingDispatchService` (Thuật toán ghép nối WSM & Phân phối việc làm):** 5 phương thức (`calculateWsmMatchingScore`, `filterQualifiedWorkers`, `dispatchJobBatch`, `handleWorkerAcceptance`, `reDispatchOnTimeout`).
+6. **`PaymentService` (Thanh toán cọc & Tự động quyết toán):** 4 phương thức (`createEscrowDeposit`, `processWorkerPayout`, `refundOrganizer`, `verifyWebhookSignature`).

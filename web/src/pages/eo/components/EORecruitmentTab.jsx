@@ -89,42 +89,153 @@ export default function EORecruitmentTab({
     }
   };
 
+  // Tính toán góc và chu vi Donut SVG (bán kính r = 38, chu vi C ≈ 238.76)
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const totalBase = totalPositions || 1;
+  const confirmedLen = (totalConfirmed / totalBase) * circumference;
+  const missingLen = (totalMissing / totalBase) * circumference;
+
   return (
     <div className="eo-recruitment-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* 1. HEADER & KPI CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Tổng Ca Đang Tuyển</span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0.35rem 0' }}>
-            {allShifts.length}
+      {/* 1. HEADER & RECRUITMENT FULFILLMENT OVERVIEW (Biểu Đồ Tròn Donut Tuyển Dụng) */}
+      <div className="recruitment-overview-grid">
+        {/* Card 1: Tổng ca đang tuyển */}
+        <div className="eo-widget-card recruitment-shifts-summary-card">
+          <div className="recruitment-card-top">
+            <div className="recruitment-icon-box blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <div className="recruitment-meta-group">
+              <span className="recruitment-meta-title">Tổng ca đang tuyển</span>
+              <div className="recruitment-data-row">
+                <span className="recruitment-big-number">{allShifts.length}</span>
+                <span className="recruitment-badge-sub">ca làm việc</span>
+              </div>
+            </div>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>Trên {events.length} sự kiện</span>
+          <div className="recruitment-bottom-sub">
+            <span className="recruitment-dot green" />
+            <span>Phân bổ trên <strong>{events.length}</strong> sự kiện</span>
+          </div>
         </div>
 
-        <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Chỉ Tiêu Cần Tuyển</span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#2563eb', margin: '0.35rem 0' }}>
-            {totalPositions}
+        {/* Card 2: Biểu đồ Donut Tiến độ Lấp đầy Nhân sự */}
+        <div className="eo-widget-card recruitment-donut-card">
+          <div className="recruitment-donut-header">
+            <div className="recruitment-donut-title-group">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              <h4 className="recruitment-donut-title">Tiến độ lấp đầy nhân sự</h4>
+            </div>
+            {totalMissing > 0 ? (
+              <span className="radar-status-pill warning">
+                <span className="pulse-dot warning" />
+                Cần bù {totalMissing} nhân sự
+              </span>
+            ) : (
+              <span className="radar-status-pill success">
+                <span className="pulse-dot success" />
+                Đã đạt 100% chỉ tiêu
+              </span>
+            )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Tổng nhân sự theo ma trận ca</span>
-        </div>
 
-        <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Nhân Sự Đã Khớp (Chốt)</span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', margin: '0.35rem 0' }}>
-            {totalConfirmed}
-          </div>
-          <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 600 }}>Tỉ lệ lấp đầy: {overallFillRate}%</span>
-        </div>
+          <div className="recruitment-donut-body">
+            {/* Vòng tròn Donut SVG */}
+            <div className="recruitment-donut-chart-box">
+              <svg viewBox="0 0 100 100" className="recruitment-donut-svg">
+                {/* Vòng nền xám */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r={radius}
+                  fill="none"
+                  stroke="#f1f5f9"
+                  strokeWidth="11"
+                />
 
-        <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Nhân Sự Còn Thiếu</span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: totalMissing > 0 ? '#dc2626' : '#059669', margin: '0.35rem 0' }}>
-            {totalMissing}
+                {/* Cung tròn nhân sự còn thiếu (Đỏ cam #f43f5e) */}
+                {missingLen > 0 && (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="none"
+                    stroke="#f43f5e"
+                    strokeWidth="11"
+                    strokeDasharray={`${missingLen} ${circumference}`}
+                    strokeDashoffset={-confirmedLen}
+                    transform="rotate(-90 50 50)"
+                    strokeLinecap={totalConfirmed === 0 ? 'butt' : 'round'}
+                  />
+                )}
+
+                {/* Cung tròn nhân sự đã khớp (Xanh ngọc #10b981) */}
+                {confirmedLen > 0 && (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="11"
+                    strokeDasharray={`${confirmedLen} ${circumference}`}
+                    strokeDashoffset="0"
+                    transform="rotate(-90 50 50)"
+                    strokeLinecap="round"
+                  />
+                )}
+
+                {/* Text trung tâm */}
+                <text x="50" y="47" textAnchor="middle" dominantBaseline="middle" className="recruitment-donut-num">
+                  {overallFillRate}%
+                </text>
+                <text x="50" y="63" textAnchor="middle" dominantBaseline="middle" className="recruitment-donut-sub">
+                  Đã chốt
+                </text>
+              </svg>
+            </div>
+
+            {/* Chi tiết số liệu (Metrics Breakdown) */}
+            <div className="recruitment-breakdown-grid">
+              <div className="recruitment-breakdown-item target">
+                <span className="breakdown-label">
+                  <span className="breakdown-dot blue" />
+                  Chỉ tiêu ca
+                </span>
+                <span className="breakdown-val">{totalPositions}</span>
+                <span className="breakdown-desc">Nhân sự cần tuyển</span>
+              </div>
+
+              <div className="recruitment-breakdown-item confirmed">
+                <span className="breakdown-label">
+                  <span className="breakdown-dot emerald" />
+                  Đã khớp (chốt)
+                </span>
+                <span className="breakdown-val text-emerald">{totalConfirmed}</span>
+                <span className="breakdown-desc">Tỉ lệ: {overallFillRate}%</span>
+              </div>
+
+              <div className="recruitment-breakdown-item missing">
+                <span className="breakdown-label">
+                  <span className="breakdown-dot rose" />
+                  Còn thiếu
+                </span>
+                <span className="breakdown-val text-rose">{totalMissing}</span>
+                <span className="breakdown-desc">{totalMissing > 0 ? 'Cần radar matching' : 'Đã đủ ca'}</span>
+              </div>
+            </div>
           </div>
-          <span style={{ fontSize: '0.75rem', color: totalMissing > 0 ? '#dc2626' : '#059669' }}>
-            {totalMissing > 0 ? 'Cần kích hoạt Matching Radar' : 'Đã đủ toàn bộ nhân sự'}
-          </span>
         </div>
       </div>
 

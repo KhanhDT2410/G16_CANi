@@ -1,4 +1,5 @@
 import React from 'react';
+import { showToast } from '../../../components/common/Toast';
 import { useSubscription } from '../hooks/useSubscription';
 import PayOSQrModal from './PayOSQrModal';
 import './EOSubscriptionTab.css';
@@ -14,7 +15,6 @@ export default function EOSubscriptionTab() {
     setActiveSubTab,
     payOSModalData,
     setPayOSModalData,
-    handlePurchaseVNPay,
     handlePurchasePayOS,
     handleConfirmPayOS,
     handleSimulateDemo,
@@ -50,9 +50,9 @@ export default function EOSubscriptionTab() {
       <div className="sub-current-card">
         <div className="sub-current-header">
           <div className="sub-current-title-group">
-            <h2>Gói Dịch Vụ & Hạn Mức Điều Phối</h2>
+            <h2>Thanh toán</h2>
             <p className="sub-current-subtitle">
-              Mô hình thanh toán theo Sự kiện (Pay-per-Event Quota). Tuân thủ mô hình Non-Escrow & Nghị định 52/2024/NĐ-CP.
+              Mô hình thanh toán theo Sự kiện (Pay-per-Event Quota) qua Cổng PayOS VietQR tự động. Tuân thủ mô hình Non-Escrow.
             </p>
           </div>
           <div>
@@ -141,9 +141,9 @@ export default function EOSubscriptionTab() {
         <>
           <div className="demo-sandbox-notice">
             <div className="demo-notice-content">
-              <h4>Môi Trường Thử Nghiệm VNPay Sandbox Gateway & Non-Escrow Compliance</h4>
+              <h4>Cổng Thanh Toán PayOS VietQR & Non-Escrow Compliance</h4>
               <p>
-                Hệ thống CANi tích hợp Cổng thanh toán <strong>PayOS VietQR</strong> và <strong>VNPay Sandbox</strong>. Khi chọn hình thức thanh toán, bạn có thể quét mã VietQR tự động khớp tiền hoặc bấm <strong>"[Demo] Giả lập thanh toán"</strong> để kích hoạt gói ngay lập tức phục vụ demo hội đồng.
+                Hệ thống CANi tích hợp Cổng thanh toán <strong>PayOS VietQR</strong>. Khi chọn hình thức thanh toán, bạn có thể quét mã VietQR tự động khớp tiền hoặc bấm <strong>"[Demo] Giả lập thanh toán"</strong> để kích hoạt gói ngay lập tức phục vụ demo hội đồng.
               </p>
             </div>
           </div>
@@ -188,28 +188,14 @@ export default function EOSubscriptionTab() {
                       <button
                         type="button"
                         className="btn-purchase-vnpay"
-                        style={{ background: '#059669' }}
+                        style={{ background: '#2563eb', width: '100%' }}
                         disabled={purchasingPlan !== null}
                         onClick={() => handlePurchasePayOS(plan.planType)}
                       >
                         {purchasingPlan === plan.planType ? (
                           'Đang khởi tạo PayOS...'
                         ) : (
-                          'Quét Mã VietQR (PayOS MBBank)'
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn-purchase-vnpay"
-                        style={{ background: '#0284c7' }}
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handlePurchaseVNPay(plan.planType)}
-                      >
-                        {purchasingPlan === plan.planType ? (
-                          'Đang kết nối VNPay...'
-                        ) : (
-                          `Thanh toán VNPay Sandbox (${formatCurrency(plan.price)} đ)`
+                          'Thanh toán qua PayOS VietQR'
                         )}
                       </button>
 
@@ -343,11 +329,10 @@ export default function EOSubscriptionTab() {
               <div className="eo-form-group">
                 <label>Cổng Thanh Toán Ưu Tiên Mặc Định</label>
                 <select className="eo-form-select" defaultValue="PAYOS_VIETQR">
-                  <option value="PAYOS_VIETQR">PayOS VietQR MBBank (Tự động khớp tiền 24/7)</option>
-                  <option value="VNPAY">Cổng VNPay Sandbox Gateway</option>
-                  <option value="MANUAL">Chuyển khoản theo số tài khoản</option>
+                  <option value="PAYOS_VIETQR">PayOS VietQR (Tự động khớp tiền 24/7)</option>
+                  <option value="MANUAL">Chuyển khoản trực tiếp theo số tài khoản</option>
                 </select>
-                <span className="eo-field-helper">Phương thức xuất hiện đầu tiên tại Bước 3 thanh toán.</span>
+                <span className="eo-field-helper">Phương thức xuất hiện mặc định khi thanh toán.</span>
               </div>
 
               <div className="eo-form-group">

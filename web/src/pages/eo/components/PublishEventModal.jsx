@@ -1,213 +1,189 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { eoService } from '../../../services/eoService';
 
 /**
  * PublishEventModal
- * Modal xác nhận xuất bản sự kiện & kích hoạt Matching Engine (Clean UI - No Emoji)
+ * Modal xác nhận xuất bản sự kiện & kích hoạt Matching Engine theo mô hình GÓI CƯỚC (Subscription Quota)
+ * ĐÃ LOẠI BỎ hoàn toàn cơ chế tính phí lắt nhắt theo đầu người (3.000đ/slot).
  */
 const PublishEventModal = ({
   isOpen,
   onClose,
   onExecutePublish,
   event,
-  publishPayMethod,
-  setPublishPayMethod,
-  onCopyToClipboard,
 }) => {
+  const [currentSub, setCurrentSub] = useState(null);
+  const [loadingSub, setLoadingSub] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingSub(true);
+      eoService.getCurrentSubscription()
+        .then((res) => {
+          setCurrentSub(res || null);
+        })
+        .catch((err) => {
+          console.warn('Không thể lấy thông tin gói cước hiện tại, áp dụng chế độ trải nghiệm:', err);
+          setCurrentSub(null);
+        })
+        .finally(() => {
+          setLoadingSub(false);
+        });
+    }
+  }, [isOpen]);
+
   if (!isOpen || !event) return null;
 
-  const workersCount = event.totalRequiredWorkers || 0;
-  const platformFee = Math.max(50000, workersCount * 3000);
-  const eventIdCode = (event.eventId || 'EVT').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase();
-  const transferMemo = `CANI PHI ${eventIdCode}`;
-  const vietQrUrl = `https://img.vietqr.io/image/MB-2622014789096-compact2.png?amount=${platformFee}&addInfo=${encodeURIComponent(transferMemo)}&accountName=PHAM%20DUY%20HUNG`;
+  const totalWorkers = event.totalRequiredWorkers || 0;
+  const totalShifts = event.totalShifts || 0;
+  const totalCost = event.totalEstimatedCost || 0;
+
+  const hasActiveQuota = currentSub && currentSub.status === 'ACTIVE' && (currentSub.remainingEvents > 0);
+  const remainingQuota = currentSub?.remainingEvents ?? 0;
+  const planName = currentSub?.planName || (currentSub?.planType === 'MATCHING_PLUS' ? 'Gói Matching Radar AI' : 'Gói Hội Viên CANi');
 
   return (
     <div className="eo-modal-overlay">
-      <div className="eo-modal-box publish-modal-box animate-fade-in-up">
+      <div className="eo-modal-box publish-modal-box animate-fade-in-up" style={{ maxWidth: '620px' }}>
         <div className="publish-modal-header">
           <div>
-            <h3>Xác Nhận Xuất Bản & Bắt Đầu Tìm Kiếm</h3>
-            <p>Hệ thống CANi sẽ quét ứng viên phù hợp theo độ tin cậy và bán kính điều phối</p>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', margin: '0 0 0.25rem' }}>
+              Xác Nhận Xuất Bản Sự Kiện
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: '#64748b' }}>
+              Hệ thống CANi sẽ kích hoạt Matching Engine để quét và ghép nối nhân sự theo bán kính
+            </p>
           </div>
         </div>
 
-        {/* Thông tin tóm tắt sự kiện */}
+        {/* 1. Thông tin tóm tắt sự kiện */}
         <div className="publish-summary-card">
-          <div className="publish-summary-title">
+          <div className="publish-summary-title" style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>
             {event.name}
           </div>
           <div className="publish-grid">
             <div className="publish-grid-item">
               <span className="lbl">Số ca làm việc:</span>
-              <span className="val">{event.totalShifts || 0} ca</span>
+              <span className="val">{totalShifts} ca</span>
             </div>
             <div className="publish-grid-item">
               <span className="lbl">Tổng nhân sự tuyển:</span>
-              <span className="val highlight">
-                {event.totalRequiredWorkers || 0} người
+              <span className="val highlight" style={{ color: '#2563eb', fontWeight: 700 }}>
+                {totalWorkers} người
               </span>
             </div>
             <div className="publish-grid-item full-width">
-              <span className="lbl">Tổng ngân sách lương dự kiến:</span>
-              <span className="val wage">
-                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                  event.totalEstimatedCost || 0
-                )}
+              <span className="lbl">Tổng dự toán thù lao chi trả Worker:</span>
+              <span className="val wage" style={{ color: '#059669', fontSize: '1.1rem', fontWeight: 800 }}>
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalCost)}
               </span>
-              <div className="sub-note">
-                (Thanh toán trực tiếp giữa EO & Worker sau khi kết thúc ca làm - CANi không giữ cọc)
+              <div className="sub-note" style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                (Thanh toán trực tiếp giữa Ban Tổ Chức & Worker sau khi kết thúc ca làm việc - CANi không thu cọc lương theo mô hình Non-Escrow)
               </div>
             </div>
           </div>
         </div>
 
-        {/* Phí Dịch Vụ Điều Phối Của Hệ Thống */}
-        <div className="publish-fee-box">
-          <div className="publish-fee-header">
-            <span className="publish-fee-title">
-              Phí dịch vụ điều phối:
-            </span>
-            <span className="publish-fee-amount">
-              {platformFee.toLocaleString()} đ
-            </span>
-          </div>
-          <div className="publish-fee-detail">
-            Định mức: <strong>3.000 VNĐ / slot ứng viên cần tuyển</strong> &times; {workersCount} người.
-            <br />
-            <em>(Phí duy trì nền tảng, đối soát chấm công và tìm kiếm ứng viên phù hợp)</em>
-          </div>
-        </div>
-
-        {/* Lựa chọn phương thức thanh toán phí */}
-        <div className="publish-payment-methods">
-          <div className="publish-method-tabs">
-            <button
-              type="button"
-              className={`publish-tab-btn ${publishPayMethod === 'VIETQR' ? 'active' : ''}`}
-              onClick={() => setPublishPayMethod('VIETQR')}
+        {/* 2. Trạng thái Hạn mức Gói Cước & Chính sách Khuyến Mãi */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          {loadingSub ? (
+            <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
+              Đang kiểm tra hạn mức gói dịch vụ...
+            </div>
+          ) : hasActiveQuota ? (
+            /* TRƯỜNG HỢP 1: ĐANG CÓ GÓI HỘI VIÊN VÀ CÒN LƯỢT */
+            <div
+              style={{
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '12px',
+                padding: '1.15rem',
+              }}
             >
-              Quét Mã VietQR
-            </button>
-            <button
-              type="button"
-              className={`publish-tab-btn ${publishPayMethod === 'SUBSCRIPTION' ? 'active' : ''}`}
-              onClick={() => setPublishPayMethod('SUBSCRIPTION')}
-            >
-              Trừ Gói Hội Viên
-            </button>
-          </div>
-
-          {/* Tab 1: VietQR tự động sinh theo chuẩn NAPAS 247 */}
-          {publishPayMethod === 'VIETQR' && (
-            <div className="vietqr-container animate-fade-in-up">
-              <div className="vietqr-qr-col">
-                <div className="vietqr-image-wrapper">
-                  <img
-                    src={vietQrUrl}
-                    alt="Mã VietQR Thanh Toán Phí Điều Phối"
-                    className="vietqr-image"
-                  />
-                  <div className="vietqr-live-tag">
-                    Quét bằng App Ngân Hàng bất kỳ
-                  </div>
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span
+                  style={{
+                    backgroundColor: '#dcfce7',
+                    color: '#166534',
+                    fontSize: '0.775rem',
+                    fontWeight: 700,
+                    padding: '0.25rem 0.65rem',
+                    borderRadius: '20px',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Đang Sử Dụng: {planName}
+                </span>
+                <span style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: 600 }}>
+                  Còn {remainingQuota} lượt sự kiện
+                </span>
               </div>
-
-              <div className="vietqr-info-col">
-                <div className="vietqr-bank-badge">
-                  Ngân hàng Quân Đội (MBBank)
-                </div>
-
-                <div className="vietqr-detail-row">
-                  <span className="vietqr-lbl">Số tài khoản:</span>
-                  <div className="vietqr-val-group">
-                    <strong>2622 0147 8909 6</strong>
-                    <button
-                      type="button"
-                      className="vietqr-copy-btn"
-                      onClick={() => onCopyToClipboard('2622014789096', 'Số tài khoản')}
-                    >
-                      Sao chép
-                    </button>
-                  </div>
-                </div>
-
-                <div className="vietqr-detail-row">
-                  <span className="vietqr-lbl">Chủ tài khoản:</span>
-                  <span className="vietqr-val">PHAM DUY HUNG</span>
-                </div>
-
-                <div className="vietqr-detail-row">
-                  <span className="vietqr-lbl">Số tiền cần nạp:</span>
-                  <div className="vietqr-val-group">
-                    <span className="vietqr-amount-highlight">
-                      {platformFee.toLocaleString()} đ
-                    </span>
-                    <button
-                      type="button"
-                      className="vietqr-copy-btn"
-                      onClick={() => onCopyToClipboard(platformFee.toString(), 'Số tiền')}
-                    >
-                      Sao chép
-                    </button>
-                  </div>
-                </div>
-
-                <div className="vietqr-detail-row">
-                  <span className="vietqr-lbl">Nội dung chuyển khoản:</span>
-                  <div className="vietqr-val-group">
-                    <code className="vietqr-memo-code">{transferMemo}</code>
-                    <button
-                      type="button"
-                      className="vietqr-copy-btn"
-                      onClick={() => onCopyToClipboard(transferMemo, 'Nội dung CK')}
-                    >
-                      Sao chép
-                    </button>
-                  </div>
-                </div>
-
-                <div className="vietqr-guide-box">
-                  Khi bạn quét mã QR bằng App Mobile Banking, Số tiền và Nội dung sẽ tự động được điền sẵn 100%.
-                </div>
+              <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#374151', lineHeight: 1.5 }}>
+                Khi xác nhận, hệ thống sẽ <strong>trừ 1 lượt sự kiện</strong> trong gói cước của bạn và tự động kích hoạt Matching Radar AI để đề xuất các Worker phù hợp nhất trong bán kính 15km.
+              </p>
+              <div style={{ marginTop: '0.5rem', fontSize: '0.775rem', color: '#16a34a', fontWeight: 600 }}>
+                ✓ Miễn phí toàn bộ phí điều phối & tìm kiếm theo chính sách gói.
               </div>
             </div>
-          )}
-
-          {/* Tab 2: Trừ Quota gói Hội viên */}
-          {publishPayMethod === 'SUBSCRIPTION' && (
-            <div className="subscription-quota-box animate-fade-in-up">
-              <div className="quota-header">
-                <span className="quota-badge">GÓI MATCHING PLUS (Doanh Nghiệp)</span>
-                <span className="quota-status">Đang hoạt động</span>
+          ) : (
+            /* TRƯỜNG HỢP 2: CHƯA CÓ GÓI HOẶC ĐÃ HẾT LƯỢT -> BẬT CHÍNH SÁCH ƯU ĐÃI CHÀO MỪNG */
+            <div
+              style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '12px',
+                padding: '1.15rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '1.25rem' }}>🎁</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e40af' }}>
+                  ƯU ĐÃI CHÀO MỪNG: TẶNG 1 SỰ KIỆN TRẢI NGHIỆM MIỄN PHÍ
+                </span>
               </div>
-              <div className="quota-body">
-                <p>
-                  Số lượt tạo sự kiện còn lại trong gói: <strong>3 lượt</strong>.
-                </p>
-                <p style={{ fontSize: '0.825rem', color: '#64748b' }}>
-                  Khi kích hoạt, hệ thống sẽ tự động trừ <strong>1 lượt quota</strong> sự kiện và miễn phí toàn bộ phí matching theo chính sách gói.
-                </p>
+              <p style={{ margin: '0.25rem 0 0.5rem', fontSize: '0.85rem', color: '#334155', lineHeight: 1.5 }}>
+                Chào mừng bạn đến với CANi! Bạn được <strong>tặng miễn phí 100%</strong> lượt xuất bản và kích hoạt Matching Radar AI cho sự kiện này để trải nghiệm tốc độ kết nối nhân sự tự động.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  Phí kích hoạt sự kiện: <strong style={{ color: '#059669', textDecoration: 'line-through' }}>80.000 VNĐ</strong>
+                </span>
+                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#16a34a' }}>
+                  0 VNĐ (Miễn Phí)
+                </span>
               </div>
             </div>
           )}
         </div>
 
-        <div className="eo-modal-footer">
+        {/* Footer Actions */}
+        <div className="eo-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <button
             type="button"
             className="eo-btn-secondary"
             onClick={onClose}
+            style={{ padding: '0.6rem 1.25rem', borderRadius: '8px', cursor: 'pointer' }}
           >
             Để Sau
           </button>
           <button
             type="button"
             className="eo-btn-primary"
-            style={{ background: '#10b981' }}
+            style={{
+              background: '#10b981',
+              color: '#ffffff',
+              padding: '0.6rem 1.5rem',
+              borderRadius: '8px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
             onClick={onExecutePublish}
           >
-            Bắt Đầu Tìm Kiếm
+            <span>{hasActiveQuota ? 'Xuất Bản & Trừ 1 Lượt Gói' : 'Kích Hoạt Miễn Phí (0 VNĐ)'}</span>
           </button>
         </div>
       </div>

@@ -105,9 +105,11 @@ public class SubscriptionController {
      */
     @PostMapping("/payos-confirm/{orderCode}")
     public ResponseEntity<ApiResponse<SubscriptionResponseDto>> confirmPayOS(
-            @PathVariable("orderCode") long orderCode
+            @PathVariable("orderCode") long orderCode,
+            Authentication authentication
     ) {
-        SubscriptionResponseDto response = subscriptionService.confirmPayOSPayment(orderCode);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        SubscriptionResponseDto response = subscriptionService.confirmPayOSPaymentForUser(userId, orderCode);
         return ResponseEntity.ok(ApiResponse.ok(response, "Xác nhận thanh toán VietQR thành công! Gói cước đã được kích hoạt."));
     }
 

@@ -10,7 +10,7 @@ const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const CustomerCarePage = lazy(() => import('./pages/customer-care/CustomerCarePage'));
-const MobileShowcasePage = lazy(() => import('./pages/mobile-preview/MobileShowcasePage'));
+const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
 
 function PageFallback() {
   return (
@@ -36,15 +36,15 @@ function App() {
       <BrowserRouter>
         <Suspense fallback={<PageFallback />}>
           <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<Navigate to="/login" replace />} />
+          <Route element={<MainLayout />}>
             <Route
               path="eo"
               element={
-                <RequireRole allowedRoles={['EVENT_ORGANIZER', 'ADMIN']}>
+                <RequireRole allowedRoles={['EVENT_ORGANIZER']}>
                   <EOPage />
                 </RequireRole>
               }
@@ -52,9 +52,9 @@ function App() {
             {/* Direct routes to EO Profile */}
             <Route path="profile" element={<Navigate to="/eo?tab=profile" replace />} />
             <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
-            {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về EO nếu truy cập trên Web */}
-            <Route path="worker" element={<Navigate to="/eo" replace />} />
-            <Route path="mobile-preview" element={<MobileShowcasePage />} />
+            {/* Worker & Mobile Simulator không khả dụng trên Web Portal, tự động điều hướng về Trang chủ */}
+            <Route path="worker" element={<Navigate to="/" replace />} />
+            <Route path="mobile-preview" element={<Navigate to="/" replace />} />
             <Route
               path="customer-care"
               element={

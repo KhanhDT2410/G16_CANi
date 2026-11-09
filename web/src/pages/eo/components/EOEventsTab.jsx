@@ -1,5 +1,5 @@
+import React, { useState } from 'react';
 import SkeletonCard from '../../../components/common/SkeletonLoader';
-import { showToast } from '../../../components/common/Toast';
 import EventShiftsDrawer from './EventShiftsDrawer';
 
 export default function EOEventsTab({
@@ -25,221 +25,333 @@ export default function EOEventsTab({
   onEditShift,
   onCancelShift,
 }) {
-  const copyToClipboard = (text, label) => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      showToast(`Đã sao chép ${label}: ${text}`, 'success');
+  const [activeMenuEventId, setActiveMenuEventId] = useState(null);
+
+  const toggleKebabMenu = (e, eventId) => {
+    e.stopPropagation();
+    setActiveMenuEventId((prev) => (prev === eventId ? null : eventId));
+  };
+
+  const closeMenu = () => setActiveMenuEventId(null);
+
+  const formatStatusBadge = (status) => {
+    switch (status) {
+      case 'DRAFT':
+        return <span className="table-status-pill yellow"><span className="status-dot-solid" />Bản nháp</span>;
+      case 'ACTIVE':
+        return <span className="table-status-pill green"><span className="status-dot-solid" />Đang diễn ra</span>;
+      case 'UPCOMING':
+        return <span className="table-status-pill blue"><span className="status-dot-solid" />Sắp diễn ra</span>;
+      case 'APPROVED':
+        return <span className="table-status-pill purple"><span className="status-dot-solid" />Đã duyệt</span>;
+      case 'COMPLETED':
+        return <span className="table-status-pill gray"><span className="status-dot-solid" />Đã hoàn thành</span>;
+      case 'CANCELLED':
+        return <span className="table-status-pill red"><span className="status-dot-solid" />Đã hủy</span>;
+      default:
+        return <span className="table-status-pill blue"><span className="status-dot-solid" />{status}</span>;
     }
   };
 
   return (
-    <section className="eo-events-section animate-fade-in-up">
-      {/* Thanh Tìm Kiếm & Lọc */}
-      <div className="eo-filter-bar">
-        <div className="filter-title-group">
-          <h3 className="section-title">Danh sách sự kiện</h3>
+    <section className="eo-events-section-card animate-fade-in-up" onClick={closeMenu}>
+      {/* 1. Header Bar: Tiêu đề + Tìm kiếm + Lọc + Nút Tạo Sự Kiện Mới */}
+      <div className="table-card-header-bar">
+        <div className="table-header-title-group">
+          <h3 className="table-card-heading">Danh sách sự kiện</h3>
         </div>
-        <div className="filter-controls">
-          <div className="search-input-wrapper">
+
+        <div className="table-header-actions-group">
+          <div className="table-search-input-wrapper">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#94a3b8"
+              strokeWidth="2.5"
+              className="search-lens-icon"
+            >
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
             <input
               type="text"
               placeholder="Tìm kiếm theo tên sự kiện..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="event-search-input"
-              style={{ paddingLeft: '0.85rem' }}
+              className="table-search-input"
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="ACTIVE">Đang diễn ra</option>
-            <option value="DRAFT">Bản nháp</option>
-          </select>
+          <div className="table-select-wrapper">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="table-filter-select"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang diễn ra</option>
+              <option value="DRAFT">Bản nháp</option>
+              <option value="UPCOMING">Sắp diễn ra</option>
+            </select>
+          </div>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="filter-select"
+          <div className="table-select-wrapper">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="table-filter-select"
+            >
+              <option value="NEWEST">Mới nhất</option>
+              <option value="OLDEST">Cũ nhất</option>
+              <option value="UPCOMING">Sắp diễn ra</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            className="table-btn-create-event"
+            onClick={onOpenCreateEvent}
           >
-            <option value="NEWEST">Mới nhất</option>
-            <option value="NAME">Tên sự kiện (A-Z)</option>
-            <option value="WORKERS">Số lượng nhân sự</option>
-          </select>
+            <span>+</span>
+            <span>Tạo sự kiện mới</span>
+          </button>
         </div>
       </div>
 
-      {/* Danh sách thẻ sự kiện */}
-      <div className="eo-events-list">
+      {/* 2. Bảng Danh Sách Sự Kiện (Table View Chuẩn Mockup Bản 3) */}
+      <div className="table-responsive-wrapper">
         {loading ? (
-          <SkeletonCard count={2} height="220px" />
+          <div style={{ padding: '1.5rem' }}>
+            <SkeletonCard count={3} height="80px" />
+          </div>
         ) : filteredEvents.length === 0 ? (
-          <div className="eo-empty-state">
-            <p className="empty-text">Không tìm thấy sự kiện nào phù hợp.</p>
+          <div className="eo-empty-state-card">
+            <div className="empty-calendar-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <p className="empty-text">Chưa tìm thấy sự kiện nào trong danh sách.</p>
             <button
               type="button"
-              className="eo-btn-primary"
+              className="table-btn-create-event"
               onClick={onOpenCreateEvent}
+              style={{ margin: '0 auto' }}
             >
-              Tạo Sự Kiện Mới
+              + Tạo Sự Kiện Đầu Tiên
             </button>
           </div>
         ) : (
-          filteredEvents.map((evt) => (
-            <article key={evt.eventId} className="eo-event-card-modern">
-              <div className="event-card-thumbnail">
-                <img
-                  src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=600&q=80"
-                  alt={evt.name}
-                  className="thumbnail-img"
-                />
-                <div className="thumbnail-overlay">
-                  <span className="thumbnail-badge">SỰ KIỆN LIVE</span>
-                </div>
-              </div>
+          <table className="cani-modern-table">
+            <thead>
+              <tr>
+                <th style={{ width: '32%' }}>Sự kiện ⇅</th>
+                <th style={{ width: '22%' }}>Địa điểm</th>
+                <th style={{ width: '12%' }}>Nhân sự</th>
+                <th style={{ width: '15%' }}>Dự toán chi phí</th>
+                <th style={{ width: '12%' }}>Trạng thái</th>
+                <th style={{ width: '7%', textAlign: 'center' }}>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEvents.map((evt, idx) => {
+                const isExpanded = expandedEventId === evt.eventId;
+                const isMenuOpen = activeMenuEventId === evt.eventId;
 
-              <div className="event-card-details">
-                <div className="card-top-row">
-                  <h2 className="event-title">{evt.name}</h2>
-                  <div className="card-top-actions">
-                    <span className={`status-badge-modern ${evt.status === 'ACTIVE' ? 'active' : 'draft'}`}>
-                      <span className="dot-pulse"></span>
-                      {evt.status === 'ACTIVE' ? 'Đang diễn ra' : evt.status === 'DRAFT' ? 'Bản nháp' : evt.status}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn-kebab"
-                      title="Tùy chọn khác"
-                      onClick={() => showToast(`Tùy chọn cho sự kiện: ${evt.name}`, 'info')}
+                // Ảnh minh họa ngẫu nhiên nhưng cố định theo index
+                const demoImages = [
+                  'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=150&q=80',
+                  'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=150&q=80',
+                  'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=150&q=80',
+                  'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=150&q=80',
+                ];
+                const thumbImg = demoImages[idx % demoImages.length];
+
+                return (
+                  <React.Fragment key={evt.eventId}>
+                    <tr
+                      className={`event-table-row ${isExpanded ? 'row-expanded' : ''}`}
+                      onClick={() => setExpandedEventId(isExpanded ? null : evt.eventId)}
                     >
-                      ⋮
-                    </button>
-                  </div>
-                </div>
+                      {/* Cột 1: Thumbnail + Tên sự kiện */}
+                      <td>
+                        <div className="table-event-cell">
+                          <img
+                            src={thumbImg}
+                            alt={evt.name}
+                            className="event-row-thumb"
+                          />
+                          <div className="event-row-meta">
+                            <span className="event-row-title" title={evt.name}>
+                              {evt.name}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-                <div className="event-code-row">
-                  <span className="event-code-text">Mã: {evt.eventId || 'EVT-98721'}</span>
-                  <button
-                    type="button"
-                    className="btn-copy-code"
-                    title="Sao chép mã sự kiện"
-                    onClick={() => copyToClipboard(evt.eventId || 'EVT-98721', 'Mã sự kiện')}
-                  >
-                    Sao chép
-                  </button>
-                </div>
+                      {/* Cột 2: Địa điểm */}
+                      <td>
+                        <div className="table-venue-cell">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" style={{ flexShrink: 0 }}>
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                          </svg>
+                          <span className="venue-address-text" title={evt.venueAddress}>
+                            {evt.venueAddress}
+                          </span>
+                        </div>
+                      </td>
 
-                <div className="event-location-row">
-                  <span className="location-text">{evt.venueAddress}</span>
-                </div>
+                      {/* Cột 3: Nhân sự (0/5, 12/20) */}
+                      <td>
+                        <div className="table-workers-cell">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" style={{ flexShrink: 0 }}>
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                          </svg>
+                          <span className="workers-count">
+                            {evt.totalConfirmedWorkers || 0}/{evt.totalRequiredWorkers || 0}
+                          </span>
+                        </div>
+                      </td>
 
-                <div className="event-metrics-row">
-                  <div className="meta-chip">
-                    <span className="chip-label">
-                      <strong>{evt.totalConfirmedWorkers || 0}/{evt.totalRequiredWorkers || 0}</strong> Nhân sự
-                    </span>
-                  </div>
+                      {/* Cột 4: Dự toán chi phí */}
+                      <td>
+                        <span className="table-cost-amount">
+                          {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
+                            evt.totalEstimatedCost || 1020000
+                          )}
+                        </span>
+                      </td>
 
-                  <div className="meta-chip">
-                    <span className="chip-label">
-                      <strong>{evt.totalShifts || 0}</strong> Ca làm việc
-                    </span>
-                  </div>
+                      {/* Cột 5: Trạng thái Badge */}
+                      <td>
+                        {formatStatusBadge(evt.status)}
+                      </td>
 
-                  <div className="meta-chip wage">
-                    <span className="chip-label wage-amount">
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(
-                        evt.totalEstimatedCost || 0
-                      )} Dự toán
-                    </span>
-                  </div>
-                </div>
+                      {/* Cột 6: Thao tác Kebab */}
+                      <td style={{ textAlign: 'center', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="btn-kebab-menu"
+                          onClick={(e) => toggleKebabMenu(e, evt.eventId)}
+                          title="Tùy chọn sự kiện"
+                        >
+                          ⋮
+                        </button>
 
-                <div className="event-card-actions">
-                  <button
-                    type="button"
-                    className="btn-action-map"
-                    onClick={() =>
-                      onOpenMap({
-                        isOpen: true,
-                        eventName: evt.name,
-                        venueAddress: evt.venueAddress,
-                        lat: evt.venueLat || 10.7328,
-                        lng: evt.venueLng || 106.7214,
-                        radiusKm: 15,
-                      })
-                    }
-                  >
-                    Bản Đồ
-                  </button>
+                        {/* Dropdown Menu Thao tác */}
+                        {isMenuOpen && (
+                          <div className="table-kebab-dropdown" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="dropdown-item"
+                              onClick={() => {
+                                setExpandedEventId(isExpanded ? null : evt.eventId);
+                                closeMenu();
+                              }}
+                            >
+                              <span>{isExpanded ? 'Thu gọn ca làm' : `Quản lý ${evt.totalShifts || 0} ca`}</span>
+                            </button>
 
-                  <button
-                    type="button"
-                    className="btn-action-outline"
-                    onClick={() => onOpenAddShift(evt.eventId)}
-                  >
-                    Thêm Ca
-                  </button>
+                            {evt.status === 'DRAFT' && (
+                              <button
+                                type="button"
+                                className="dropdown-item text-blue"
+                                onClick={() => {
+                                  onOpenConfirmPublish(evt);
+                                  closeMenu();
+                                }}
+                              >
+                                <span>Kích hoạt Matching</span>
+                              </button>
+                            )}
 
-                  <button
-                    type="button"
-                    className="btn-action-outline"
-                    onClick={() => onOpenEditEvent(evt)}
-                    title="Chỉnh sửa thông tin sự kiện"
-                  >
-                    Sửa
-                  </button>
+                            <button
+                              type="button"
+                              className="dropdown-item"
+                              onClick={() => {
+                                onOpenAddShift(evt.eventId);
+                                closeMenu();
+                              }}
+                            >
+                              <span>Thêm ca làm</span>
+                            </button>
 
-                  {evt.status !== 'CANCELLED' && evt.status !== 'COMPLETED' && (
-                    <button
-                      type="button"
-                      className="btn-action-map"
-                      style={{ color: '#ef4444', borderColor: '#fca5a5' }}
-                      onClick={() => onCancelEvent(evt)}
-                      title="Hủy sự kiện này"
-                    >
-                      Hủy
-                    </button>
-                  )}
+                            <button
+                              type="button"
+                              className="dropdown-item"
+                              onClick={() => {
+                                onOpenMap({
+                                  isOpen: true,
+                                  eventName: evt.name,
+                                  venueAddress: evt.venueAddress,
+                                  lat: evt.venueLat || 10.7328,
+                                  lng: evt.venueLng || 106.7214,
+                                  radiusKm: 15,
+                                });
+                                closeMenu();
+                              }}
+                            >
+                              <span>Xem bản đồ Radar</span>
+                            </button>
 
-                  {evt.status === 'DRAFT' && (
-                    <button
-                      type="button"
-                      className="btn-action-publish"
-                      onClick={() => onOpenConfirmPublish(evt)}
-                    >
-                      Bắt Đầu Tìm Kiếm
-                    </button>
-                  )}
+                            <button
+                              type="button"
+                              className="dropdown-item"
+                              onClick={() => {
+                                onOpenEditEvent(evt);
+                                closeMenu();
+                              }}
+                            >
+                              <span>Chỉnh sửa sự kiện</span>
+                            </button>
 
-                  <button
-                    type="button"
-                    className="btn-action-primary"
-                    onClick={() => setExpandedEventId(expandedEventId === evt.eventId ? null : evt.eventId)}
-                  >
-                    {expandedEventId === evt.eventId ? 'Thu Gọn' : 'Quản Lý Ca'}
-                  </button>
-                </div>
-              </div>
+                            {evt.status !== 'CANCELLED' && evt.status !== 'COMPLETED' && (
+                              <button
+                                type="button"
+                                className="dropdown-item text-danger"
+                                onClick={() => {
+                                  onCancelEvent(evt);
+                                  closeMenu();
+                                }}
+                              >
+                                <span>Hủy sự kiện</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
 
-              {/* DRAWER DANH SÁCH CA LÀM VIỆC & ĐIỂM DANH QR */}
-              {expandedEventId === evt.eventId && (
-                <EventShiftsDrawer
-                  event={evt}
-                  onAddShift={onOpenAddShift}
-                  onOpenQr={onOpenQr}
-                  onOpenInvite={onOpenInvite}
-                  onOpenAttendance={onOpenAttendance}
-                  onEditShift={onEditShift}
-                  onCancelShift={onCancelShift}
-                />
-              )}
-            </article>
-          ))
+                    {/* Hàng mở rộng Drawer Quản lý Ca làm việc khi được bấm */}
+                    {isExpanded && (
+                      <tr className="drawer-expanded-row">
+                        <td colSpan={6} style={{ padding: 0 }}>
+                          <div className="drawer-container-inside-table">
+                            <EventShiftsDrawer
+                              event={evt}
+                              onAddShift={onOpenAddShift}
+                              onOpenQr={onOpenQr}
+                              onOpenInvite={onOpenInvite}
+                              onOpenAttendance={onOpenAttendance}
+                              onEditShift={onEditShift}
+                              onCancelShift={onCancelShift}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </section>

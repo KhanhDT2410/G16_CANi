@@ -227,7 +227,7 @@ export default function EoProfileTab() {
     try {
       localStorage.setItem('cani_eo_bank_info', JSON.stringify(bankInfo));
       showToast('Cập nhật tài khoản chi trả thù lao thành công!', 'success');
-    } catch (err) {
+    } catch {
       showToast('Lỗi lưu thông tin ngân hàng', 'error');
     }
   };
@@ -253,6 +253,14 @@ export default function EoProfileTab() {
   };
 
   const ekycStatus = ekycData?.status || 'NOT_SUBMITTED';
+
+  if (loading) {
+    return (
+      <div style={{ padding: '3rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div className="cani-spinner" />
+      </div>
+    );
+  }
 
   return (
     <div className="eo-profile-container animate-fade-in-up">

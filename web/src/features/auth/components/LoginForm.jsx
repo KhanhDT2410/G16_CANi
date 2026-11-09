@@ -18,9 +18,9 @@ export const LoginForm = () => {
   return (
     <div className="auth-card">
       <div className="auth-header">
-        <CaniLogo variant="full" height={52} className="auth-logo-center" />
-        <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng Nhập</h2>
-        <p className="auth-subtitle">Cổng Quản Trị & Tổ Chức Sự Kiện</p>
+        <CaniLogo variant="full" height={44} className="auth-logo-center" />
+        <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng nhập</h2>
+        <p className="auth-subtitle">Cổng quản lý dành cho Ban Tổ Chức Sự Kiện</p>
       </div>
 
       {errorMessage && (
@@ -34,13 +34,25 @@ export const LoginForm = () => {
           <label className="form-label" htmlFor="email">
             Địa chỉ Email
           </label>
-          <div className="input-wrapper">
+          <div className="input-wrapper has-left-icon">
+            <svg
+              className="input-field-icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#64748b"
+              strokeWidth="2"
+            >
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
             <input
               id="email"
               name="email"
               type="email"
-              className="form-input"
-              placeholder="admin@cani.vn hoặc eo@company.com"
+              className="form-input with-icon"
+              placeholder="customer@petshop.vn"
               value={formData.email}
               onChange={handleChange}
               autoComplete="username"
@@ -54,12 +66,24 @@ export const LoginForm = () => {
           <label className="form-label" htmlFor="password">
             Mật khẩu
           </label>
-          <div className="input-wrapper">
+          <div className="input-wrapper has-left-icon">
+            <svg
+              className="input-field-icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#64748b"
+              strokeWidth="2"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
             <input
               id="password"
               name="password"
               type={showPassword ? 'text' : 'password'}
-              className="form-input"
+              className="form-input with-icon with-eye"
               placeholder="••••••••"
               value={formData.password}
               onChange={handleChange}
@@ -72,8 +96,19 @@ export const LoginForm = () => {
               className="toggle-password-btn"
               onClick={toggleShowPassword}
               tabIndex={-1}
+              title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
             >
-              {showPassword ? 'Ẩn' : 'Hiện'}
+              {showPassword ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              )}
             </button>
           </div>
         </div>
@@ -94,14 +129,17 @@ export const LoginForm = () => {
           </a>
         </div>
 
-        <button type="submit" className="btn-submit" disabled={isLoading}>
+        <button type="submit" className="btn-submit btn-pill-primary" disabled={isLoading}>
           {isLoading ? (
             <>
               <span className="spinner" />
               Đang xác thực...
             </>
           ) : (
-            'Đăng nhập'
+            <>
+              <span className="btn-submit-arrow">→</span>
+              <span>Đăng nhập</span>
+            </>
           )}
         </button>
       </form>
@@ -112,20 +150,9 @@ export const LoginForm = () => {
 
       <button
         type="button"
-        className="btn-demo"
+        className="btn-google-pill"
         onClick={handleGoogleLogin}
         disabled={isLoading}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.75rem',
-          backgroundColor: '#ffffff',
-          color: '#374151',
-          border: '1px solid #d1d5db',
-          fontWeight: 500,
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-        }}
       >
         <svg width="18" height="18" viewBox="0 0 18 18">
           <path
@@ -149,7 +176,7 @@ export const LoginForm = () => {
       </button>
 
       <div className="auth-footer">
-        Đại diện Ban Tổ Chức? <a href="/register">Đăng ký tài khoản mới</a>
+        Chưa có tài khoản đại diện Ban Tổ Chức? <a href="/register">Đăng ký ngay</a>
       </div>
     </div>
   );

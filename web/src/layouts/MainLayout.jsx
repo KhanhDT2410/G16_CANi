@@ -55,45 +55,6 @@ const MainLayout = () => {
     return () => window.removeEventListener('cani_avatar_updated', handleAvatarUpdate);
   }, []);
 
-  // Phân quyền thanh điều hướng chuẩn đặc tả SEP490:
-  // - Web Portal: Dành riêng cho Event Organizer (EO), Admin, Customer Care.
-  // - Worker: Hoạt động độc lập 100% trên Mobile App (CANi Partner App).
-  const getNavItems = () => {
-    const commonItems = [
-      { path: '/mobile-preview', label: 'App Mobile Worker' },
-    ];
-
-    if (!user) {
-      return [
-        { path: '/eo', label: 'Ban Tổ Chức (EO)' },
-        ...commonItems,
-      ];
-    }
-    switch (user.role) {
-      case 'ADMIN':
-        return [
-          { path: '/admin', label: 'Admin Portal' },
-          { path: '/customer-care', label: 'Customer Care' },
-          { path: '/eo', label: 'Xem Cổng EO' },
-          ...commonItems,
-        ];
-      case 'CUSTOMER_CARE':
-        return [
-          { path: '/customer-care', label: 'Customer Care' },
-          { path: '/eo', label: 'Xem Cổng EO' },
-          ...commonItems,
-        ];
-      case 'EVENT_ORGANIZER':
-      default:
-        return [
-          { path: '/eo', label: 'Ban Tổ Chức (EO)' },
-          ...commonItems,
-        ];
-    }
-  };
-
-  const navItems = getNavItems();
-
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -112,20 +73,11 @@ const MainLayout = () => {
           <Link to="/eo" className="main-logo-group" title="CANi EVENT PLATFORM - Cần Ai, Có CANi">
             <CaniLogo variant="horizontal" height={36} />
           </Link>
-          <nav className="main-nav">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`nav-link ${isActive ? 'active' : ''}`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <div className="header-role-pill">
+            <span className="role-dot-badge">EO</span>
+            <span className="role-text">Ban Tổ Chức (EO)</span>
+            <span className="role-chevron">▾</span>
+          </div>
         </div>
 
         <div className="main-header-center">
@@ -152,6 +104,7 @@ const MainLayout = () => {
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
             />
+            <kbd className="header-search-shortcut">Ctrl K</kbd>
             {headerSearch && (
               <button
                 type="button"
@@ -194,44 +147,72 @@ const MainLayout = () => {
                 <span className="notif-badge-dot"></span>
               </button>
 
-              <div className="user-header-compact">
-                <button
-                  type="button"
-                  className="user-avatar-btn"
-                  onClick={handleOpenProfile}
-                  title={`Xem hồ sơ: ${user.fullName || user.username || 'EO'}`}
+              <button
+                type="button"
+                className="header-help-btn"
+                title="Trung tâm trợ giúp"
+                onClick={() => window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail: { tab: 'settings' } }))}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  {userAvatar ? (
-                    <img src={userAvatar} alt="Avatar" className="user-avatar-img" />
-                  ) : (
-                    <div className="user-avatar-badge">
-                      {(user.fullName || user.username || 'D').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </button>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </button>
 
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="btn-logout-icon"
-                  title="Đăng xuất"
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                  </svg>
-                </button>
+              <div
+                className="user-header-compact"
+                onClick={handleOpenProfile}
+                title={`Hồ sơ: ${user.fullName || user.username || 'EO'}`}
+              >
+                <div className="user-avatar-badge">
+                  {userAvatar ? (
+                    <img
+                      src={userAvatar}
+                      alt="Avatar"
+                      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    (user.fullName || user.username || 'D').charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="user-meta-info">
+                  <span className="user-meta-name">{user.fullName || user.username || 'Duy Hưng Phạm'}</span>
+                  <span className="user-meta-email">{user.email || 'hung.company@gmail.com'}</span>
+                </div>
+                <span className="user-meta-arrow">▾</span>
               </div>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="btn-logout-icon"
+                title="Đăng xuất"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+              </button>
             </div>
           ) : (
             <div className="auth-nav-actions">

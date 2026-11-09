@@ -145,6 +145,20 @@ class EoEventServiceTest {
     }
 
     @Test
+    @DisplayName("UTC002b - createEvent() - Abnormal: User exists with role=ADMIN; Blocked from creating event")
+    void createEvent_ThrowsBadRequest_WhenUserIsAdmin() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.empty());
+        User adminUser = User.builder().userId(userId).role(UserRole.ADMIN).build();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(adminUser));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder().name("Sự kiện Admin").venueAddress("TP HCM").build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("Tài khoản không phải là Nhà tổ chức sự kiện"));
+        verify(eventRepository, never()).save(any(Event.class));
+    }
+
+    @Test
     @DisplayName("UTC003 - createEvent() - Boundary: User authenticated as EO; EventRepository mocked")
     void createEvent_Success_BoundaryCoordinatesAndCurrentDate() {
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
@@ -1278,6 +1292,22 @@ class EoEventServiceTest {
 
         assertNotNull(result);
         assertEquals(EventStatus.ACTIVE, result.getStatus());
+    }
+
+    @Test
+    @DisplayName("UTC056b - publishEvent() - Abnormal: Subscription quota exceeded; Throws BadRequestException")
+    void publishEvent_ThrowsBadRequest_WhenSubscriptionQuotaExceeded() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.DRAFT).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+        doThrow(new BadRequestException("Bạn cần mua Gói dịch vụ để tạo sự kiện")).when(subscriptionService).validateAndDeductEventQuota(any());
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.publishEvent(userId, eventId));
+        assertTrue(ex.getMessage().contains("Bạn cần mua Gói dịch vụ để tạo sự kiện"));
+        verify(matchingDispatchService, never()).dispatchForShift(any());
+        verify(eventRepository, never()).save(any());
     }
 
     @Test

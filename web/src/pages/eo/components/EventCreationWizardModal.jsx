@@ -49,7 +49,7 @@ const EventCreationWizardModal = ({
   const [newChecklistItem, setNewChecklistItem] = useState('');
 
   // State cho Bước 3: Thanh toán
-  const [payMethod, setPayMethod] = useState('VIETQR'); // 'VIETQR' | 'SUBSCRIPTION'
+  const [payMethod, setPayMethod] = useState('SUBSCRIPTION'); // 'SUBSCRIPTION' | 'VIETQR'
   const [payOSData, setPayOSData] = useState(null);
   const [loadingPayOS, setLoadingPayOS] = useState(false);
 
@@ -794,18 +794,35 @@ const EventCreationWizardModal = ({
         )}
 
         {/* ======================================================== */}
-        {/* BƯỚC 3: THANH TOÁN THEO GÓI (PAYOS VIETQR HOẶC QUOTA)    */}
+        {/* BƯỚC 3: XÁC NHẬN GÓI CƯỚC & ƯU ĐÃI (SUBSCRIPTION QUOTA) */}
         {/* ======================================================== */}
         {currentStep === 3 && (
           <div className="animate-fade-in-up">
             <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>
-              Bước 3: Thanh Toán Phí Đăng Tin Theo Gói
+              Bước 3: Xác Nhận Hạn Mức Gói Cước & Chính Sách Điều Phối
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.25rem' }}>
-              Sự kiện <strong>{createdEvent?.name}</strong> gồm <strong>{shiftsList.length} ca làm việc</strong> và <strong>{totalWorkers} nhân sự cần tuyển</strong>.
+              Sự kiện <strong>{createdEvent?.name}</strong> gồm <strong>{shiftsList.length} ca làm việc</strong> và <strong>{totalWorkers} nhân sự cần tuyển</strong>. Áp dụng theo mô hình Gói Cước dịch vụ CANi.
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={() => setPayMethod('SUBSCRIPTION')}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  borderRadius: '0.5rem',
+                  border: payMethod === 'SUBSCRIPTION' ? '2px solid #10b981' : '1px solid #e2e8f0',
+                  backgroundColor: payMethod === 'SUBSCRIPTION' ? '#f0fdf4' : '#ffffff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  color: payMethod === 'SUBSCRIPTION' ? '#15803d' : '#475569',
+                }}
+              >
+                Gói Hội Viên & Ưu Đãi (Khuyên Dùng)
+              </button>
+
               <button
                 type="button"
                 onClick={() => setPayMethod('VIETQR')}
@@ -820,24 +837,7 @@ const EventCreationWizardModal = ({
                   color: payMethod === 'VIETQR' ? '#1d4ed8' : '#475569',
                 }}
               >
-                Thanh Toán VietQR
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPayMethod('SUBSCRIPTION')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: payMethod === 'SUBSCRIPTION' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                  backgroundColor: payMethod === 'SUBSCRIPTION' ? '#eff6ff' : '#ffffff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  color: payMethod === 'SUBSCRIPTION' ? '#1d4ed8' : '#475569',
-                }}
-              >
-                Trừ Gói Hội Viên
+                Nạp Thêm Gói Mới (PayOS VietQR)
               </button>
             </div>
 
@@ -850,7 +850,7 @@ const EventCreationWizardModal = ({
                     style={{ width: '100%', maxWidth: '230px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
                   />
                   <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '0.5rem' }}>
-                    Tự động điền số tiền & nội dung khi quét
+                    {loadingPayOS ? 'Đang kết nối cổng PayOS...' : 'Tự động điền số tiền & nội dung khi quét'}
                   </div>
                 </div>
 
@@ -903,12 +903,16 @@ const EventCreationWizardModal = ({
 
             {payMethod === 'SUBSCRIPTION' && (
               <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.75rem', padding: '1.25rem' }}>
-                <div style={{ fontWeight: 700, color: '#15803d', marginBottom: '0.4rem' }}>
-                  Gói Dịch Vụ Hội Viên Hoạt Động (Matching Plus)
+                <div style={{ fontWeight: 700, color: '#15803d', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>🎁</span>
+                  <span>Gói Dịch Vụ Hội Viên / Ưu Đãi Sự Kiện Đầu Tiên</span>
                 </div>
-                <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0 }}>
-                  Hệ thống sẽ tự động trừ <strong>1 lượt quota sự kiện</strong> trong gói hội viên của bạn. Bao gồm toàn bộ {shiftsList.length} ca làm việc và {totalWorkers} vị trí nhân sự.
+                <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>
+                  Hệ thống sẽ tự động trừ <strong>1 lượt quota sự kiện</strong> trong gói hội viên của bạn (hoặc tự động kích hoạt <strong>Ưu Đãi Chào Mừng Miễn Phí</strong> nếu đây là sự kiện đầu tiên của bạn). Bao gồm trọn gói toàn bộ {shiftsList.length} ca làm việc và {totalWorkers} vị trí nhân sự.
                 </p>
+                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
+                  ✓ Miễn phí toàn bộ phí Matching Radar AI và đối soát chấm công theo chính sách gói.
+                </div>
               </div>
             )}
 
@@ -922,7 +926,7 @@ const EventCreationWizardModal = ({
                 onClick={handleStep3ConfirmPayment}
                 style={{ background: '#10b981', border: 'none' }}
               >
-                Xác Nhận Thanh Toán
+                Xác Nhận & Tiếp Tục
               </button>
             </div>
           </div>

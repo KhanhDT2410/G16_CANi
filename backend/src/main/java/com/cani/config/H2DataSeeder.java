@@ -1,16 +1,8 @@
 package com.cani.config;
 
-import com.cani.entity.EventOrganizer;
-import com.cani.entity.Skill;
-import com.cani.entity.User;
-import com.cani.entity.Worker;
-import com.cani.entity.enums.UserRole;
-import com.cani.entity.enums.UserStatus;
-import com.cani.entity.enums.VerificationStatus;
-import com.cani.repository.EventOrganizerRepository;
-import com.cani.repository.SkillRepository;
-import com.cani.repository.UserRepository;
-import com.cani.repository.WorkerRepository;
+import com.cani.entity.*;
+import com.cani.entity.enums.*;
+import com.cani.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;

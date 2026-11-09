@@ -1,4 +1,5 @@
 import React from 'react';
+import { showToast } from '../../../components/common/Toast';
 
 /**
  * EventShiftsDrawer
@@ -55,7 +56,8 @@ const EventShiftsDrawer = ({
             ({shifts.length} ca)
           </span>
           {event.eventId && (
-            <span
+            <button
+              type="button"
               style={{
                 fontSize: '0.72rem',
                 color: '#64748b',
@@ -64,11 +66,21 @@ const EventShiftsDrawer = ({
                 padding: '2px 8px',
                 borderRadius: '6px',
                 fontFamily: 'monospace',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
               }}
-              title="Mã định danh kỹ thuật sự kiện"
+              title={`Nhấp để sao chép mã sự kiện: ${event.eventId}`}
+              onClick={() => {
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(event.eventId);
+                  showToast('Đã sao chép mã sự kiện', 'success');
+                }
+              }}
             >
-              Mã ID: {event.eventId}
-            </span>
+              Mã: {event.eventId.length > 12 ? `${event.eventId.substring(0, 8)}...` : event.eventId}
+            </button>
           )}
         </div>
         <button

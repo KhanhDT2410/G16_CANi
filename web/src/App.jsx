@@ -11,7 +11,6 @@ const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const CustomerCarePage = lazy(() => import('./pages/customer-care/CustomerCarePage'));
 const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
-const MobileShowcasePage = lazy(() => import('./pages/mobile-preview/MobileShowcasePage'));
 const SupportPage = lazy(() => import('./pages/support/SupportPage'));
 
 function PageFallback() {
@@ -56,7 +55,7 @@ function App() {
               <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
               {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về Login nếu truy cập trên Web */}
               <Route path="worker" element={<Navigate to="/login" replace />} />
-              <Route path="mobile-preview" element={<MobileShowcasePage />} />
+              <Route path="mobile-preview" element={<Navigate to="/" replace />} />
               <Route
                 path="customer-care"
                 element={

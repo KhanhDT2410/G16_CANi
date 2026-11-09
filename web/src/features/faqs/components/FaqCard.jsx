@@ -13,7 +13,6 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
 
   const isArchived = faq.status === 'ARCHIVED';
   const isDraft = faq.status === 'DRAFT';
-  const isPublished = faq.status === 'PUBLISHED';
 
   return (
     <div className={`faq-card ${isArchived ? 'archived' : ''}`}>

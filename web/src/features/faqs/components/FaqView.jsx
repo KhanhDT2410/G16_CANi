@@ -14,7 +14,6 @@ export const FaqView = () => {
     faqs,
     analytics,
     loading,
-    analyticsLoading,
     loadFaqs,
     loadAnalytics,
     createFaq,

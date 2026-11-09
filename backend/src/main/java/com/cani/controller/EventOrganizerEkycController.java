@@ -6,6 +6,7 @@ import com.cani.dto.response.ApiResponse;
 import com.cani.entity.User;
 import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.EventOrganizerEkycService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -138,20 +138,20 @@ class EkycUserIdParamIgnoredTest {
     }
 
     @Test
-    @DisplayName("Không có token — truy vấn trạng thái eKYC Worker bị từ chối (400 Bad Request)")
+    @DisplayName("Không có token — truy vấn trạng thái eKYC Worker bị từ chối (401 Unauthorized)")
     void workerEkycStatus_rejectedWithoutToken() throws Exception {
-        // Route /api/v1/workers/ekyc/** là permitAll() nên request tới được controller.
-        // SecurityUtils ném BadRequestException vì không xác định được người dùng → 400.
+        // Route /api/v1/workers/ekyc/** được bảo vệ bởi .authenticated() trong SecurityConfig.
+        // Khi không có Bearer token, Spring Security chặn lại → 401 Unauthorized.
         mockMvc.perform(get("/api/v1/workers/ekyc/status"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("Không có token — truy vấn trạng thái eKYC doanh nghiệp bị từ chối (400 Bad Request)")
+    @DisplayName("Không có token — truy vấn trạng thái eKYC doanh nghiệp bị từ chối (401 Unauthorized)")
     void eoEkycStatus_rejectedWithoutToken() throws Exception {
-        // Route /api/v1/eo/ekyc/** là permitAll() nên request tới được controller.
-        // SecurityUtils ném BadRequestException vì không xác định được người dùng → 400.
+        // Route /api/v1/eo/ekyc/** được bảo vệ bởi .authenticated() trong SecurityConfig.
+        // Khi không có Bearer token, Spring Security chặn lại → 401 Unauthorized.
         mockMvc.perform(get("/api/v1/eo/ekyc/status"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnauthorized());
     }
 }

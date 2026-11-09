@@ -84,65 +84,7 @@ public class H2DataSeeder implements CommandLineRunner {
             log.info("==> [H2 Profile] Seeded default Worker user: {} (id: {})", workerEmail, savedUser.getUserId());
         }
 
-        // 2. Seed Event Organizer user (eo@cani.vn)
-        String eoEmail = "eo@cani.vn";
-        if (!userRepository.existsByEmail(eoEmail)) {
-            User user = User.builder()
-                    .userId(UUID.fromString("11111111-1111-1111-1111-111111111111"))
-                    .email(eoEmail)
-                    .fullName("Phạm Duy Hưng (EO)")
-                    .role(UserRole.EVENT_ORGANIZER)
-                    .status(UserStatus.ACTIVE)
-                    .phone("0912345678")
-                    .emailVerified(true)
-                    .build();
-            User savedUser = userRepository.save(user);
-
-            EventOrganizer eo = EventOrganizer.builder()
-                    .user(savedUser)
-                    .companyName("CANi Event Management")
-                    .taxId("0109876543")
-                    .address("799 Nguyễn Văn Linh, Quận 7, TP.HCM")
-                    .verificationStatus(VerificationStatus.APPROVED)
-                    .verifiedAt(Instant.now())
-                    .build();
-            eventOrganizerRepository.save(eo);
-            log.info("==> [H2 Profile] Seeded default EO user: {} (id: {})", eoEmail, savedUser.getUserId());
-        }
-
-        // 3. Seed Customer Care user (cskh@cani.vn)
-        String cskhEmail = "cskh@cani.vn";
-        if (!userRepository.existsByEmail(cskhEmail)) {
-            User user = User.builder()
-                    .userId(UUID.fromString("33333333-3333-3333-3333-333333333333"))
-                    .email(cskhEmail)
-                    .fullName("Bộ Phận CSKH")
-                    .role(UserRole.CUSTOMER_CARE)
-                    .status(UserStatus.ACTIVE)
-                    .phone("0903333333")
-                    .emailVerified(true)
-                    .build();
-            userRepository.save(user);
-            log.info("==> [H2 Profile] Seeded default CSKH user: {}", cskhEmail);
-        }
-
-        // 4. Seed Admin user (admin@cani.vn)
-        String adminEmail = "admin@cani.vn";
-        if (!userRepository.existsByEmail(adminEmail)) {
-            User user = User.builder()
-                    .userId(UUID.fromString("22222222-2222-2222-2222-222222222222"))
-                    .email(adminEmail)
-                    .fullName("Quản Trị Viên Hệ Thống")
-                    .role(UserRole.ADMIN)
-                    .status(UserStatus.ACTIVE)
-                    .phone("0909999999")
-                    .emailVerified(true)
-                    .build();
-            userRepository.save(user);
-            log.info("==> [H2 Profile] Seeded default Admin user: {}", adminEmail);
-        }
-
-        // Seed default Customer Care user if not exists
+        // 2. Seed Customer Care user (cc@cani.vn & cskh@cani.vn)
         String ccEmail = "cc@cani.vn";
         if (!userRepository.existsByEmail(ccEmail)) {
             User cc = User.builder()
@@ -158,7 +100,22 @@ public class H2DataSeeder implements CommandLineRunner {
             log.info("==> [H2 Profile] Seeded default Customer Care user: {} (id: {})", ccEmail, cc.getUserId());
         }
 
-        // Seed default Admin user if not exists
+        String cskhEmail = "cskh@cani.vn";
+        if (!userRepository.existsByEmail(cskhEmail)) {
+            User user = User.builder()
+                    .userId(UUID.fromString("33333333-3333-3333-3333-333333333333"))
+                    .email(cskhEmail)
+                    .fullName("Bộ Phận CSKH")
+                    .role(UserRole.CUSTOMER_CARE)
+                    .status(UserStatus.ACTIVE)
+                    .phone("0903333333")
+                    .emailVerified(true)
+                    .build();
+            userRepository.save(user);
+            log.info("==> [H2 Profile] Seeded default CSKH user: {}", cskhEmail);
+        }
+
+        // 3. Seed Admin user (admin@cani.vn)
         String adminEmail = "admin@cani.vn";
         if (!userRepository.existsByEmail(adminEmail)) {
             User admin = User.builder()
@@ -174,7 +131,7 @@ public class H2DataSeeder implements CommandLineRunner {
             log.info("==> [H2 Profile] Seeded default Admin user: {} (id: {})", adminEmail, admin.getUserId());
         }
 
-        // Seed default Event Organizer (EO) and test subscriptions & revenue data
+        // 4. Seed default Event Organizer (EO) and test subscriptions & revenue data
         String eoEmail = "eo@cani.vn";
         EventOrganizer eo = null;
         if (!userRepository.existsByEmail(eoEmail)) {

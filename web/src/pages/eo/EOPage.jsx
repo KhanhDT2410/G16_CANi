@@ -215,7 +215,7 @@ export default function EOPage() {
               Thanh toán & Lương
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => switchTab('subscription')}>
-              Thanh toán
+              Gói dịch vụ
             </button>
             <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
               Hồ sơ tổ chức

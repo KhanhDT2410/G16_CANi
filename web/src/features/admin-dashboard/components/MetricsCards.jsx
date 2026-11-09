@@ -1,5 +1,3 @@
-import { UsersIcon, ClockAlertIcon, CalendarEventsIcon, ArrowRightIcon } from './Icons';
-
 /**
  * Thẻ hiển thị các khối chỉ số vận hành nền tảng (User, Verifications, Operations)
  */
@@ -14,9 +12,6 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
       <div className="dashboard-metric-section">
         <div className="metric-section-header">
           <div className="metric-section-title">
-            <div className="metric-icon-box users">
-              <UsersIcon size={18} />
-            </div>
             <span>Người Dùng Nền Tảng</span>
           </div>
           <span className="metric-section-badge badge-blue">Tài khoản</span>
@@ -36,7 +31,6 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
               onClick={() => onNavigateTab('users')}
             >
               <span>Quản lý</span>
-              <ArrowRightIcon size={12} />
             </button>
           )}
         </div>
@@ -69,9 +63,6 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
       <div className="dashboard-metric-section">
         <div className="metric-section-header">
           <div className="metric-section-title">
-            <div className="metric-icon-box verifications">
-              <ClockAlertIcon size={18} />
-            </div>
             <span>Hàng Đợi Chờ Thẩm Định</span>
           </div>
           <span className="metric-section-badge badge-red">
@@ -114,9 +105,6 @@ const MetricsCards = ({ metrics, onNavigateTab }) => {
       <div className="dashboard-metric-section">
         <div className="metric-section-header">
           <div className="metric-section-title">
-            <div className="metric-icon-box operations">
-              <CalendarEventsIcon size={18} />
-            </div>
             <span>Sự Kiện & Ca Làm Việc</span>
           </div>
           <span className="metric-section-badge badge-green">

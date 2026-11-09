@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { DisputeCenterView } from '../../features/disputes';
 import { SupportTicketsCenterView } from '../../features/support-tickets';
+import { FaqView } from '../../features/faqs';
+import { RsAppealsView } from '../../features/rs-appeals';
+import { NoShowView } from '../../features/no-shows';
 // Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm
 // import { EkycVerificationView } from '../../features/ekyc-verification';
 // import { SkillVerificationView } from '../../features/skill-verification';
@@ -58,6 +61,57 @@ export const CustomerCarePage = () => {
         >
           Tranh Chấp & Khiếu Nại (Disputes)
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('faqs')}
+          style={{
+            padding: '0.6rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.92rem',
+            borderRadius: '6px',
+            border: activeTab === 'faqs' ? '1px solid #2563eb' : '1px solid transparent',
+            background: activeTab === 'faqs' ? '#eff6ff' : 'transparent',
+            color: activeTab === 'faqs' ? '#2563eb' : '#64748b',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          Câu Hỏi Thường Gặp (FAQ)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('appeals')}
+          style={{
+            padding: '0.6rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.92rem',
+            borderRadius: '6px',
+            border: activeTab === 'appeals' ? '1px solid #2563eb' : '1px solid transparent',
+            background: activeTab === 'appeals' ? '#eff6ff' : 'transparent',
+            color: activeTab === 'appeals' ? '#2563eb' : '#64748b',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          Kháng Cáo Điểm RS (UC-94)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('noshows')}
+          style={{
+            padding: '0.6rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.92rem',
+            borderRadius: '6px',
+            border: activeTab === 'noshows' ? '1px solid #2563eb' : '1px solid transparent',
+            background: activeTab === 'noshows' ? '#eff6ff' : 'transparent',
+            color: activeTab === 'noshows' ? '#2563eb' : '#64748b',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          Vi Phạm No-Show (UC-88)
+        </button>
 
         {/* Tạm thời ẩn 2 nút Hàng đợi eKYC và Kỹ năng AI theo yêu cầu nhóm để xem xét thêm */}
         {/*
@@ -100,6 +154,9 @@ export const CustomerCarePage = () => {
 
       {activeTab === 'tickets' && <SupportTicketsCenterView />}
       {activeTab === 'disputes' && <DisputeCenterView />}
+      {activeTab === 'faqs' && <FaqView />}
+      {activeTab === 'appeals' && <RsAppealsView />}
+      {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
       {/* Tạm thời ẩn view eKYC và Kỹ năng AI
       {activeTab === 'ekyc' && <EkycVerificationView />}
       {activeTab === 'skills' && <SkillVerificationView />}

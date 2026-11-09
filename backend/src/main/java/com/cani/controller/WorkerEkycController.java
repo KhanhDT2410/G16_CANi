@@ -35,7 +35,6 @@ public class WorkerEkycController {
             @RequestParam("frontImage") MultipartFile frontImage,
             @RequestParam("backImage") MultipartFile backImage,
             @RequestParam("selfieImage") MultipartFile selfieImage,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             @RequestParam(value = "cccdNumber", required = false) String cccdNumber,
             @RequestParam(value = "fullName", required = false) String fullName,
             @RequestParam(value = "dob", required = false) String dob,
@@ -46,7 +45,7 @@ public class WorkerEkycController {
             @RequestParam(value = "expiryDate", required = false) String expiryDate,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.submitEkyc(
                 userId, frontImage, backImage, selfieImage,
                 cccdNumber, fullName, dob, gender,
@@ -69,10 +68,9 @@ public class WorkerEkycController {
      */
     @GetMapping("/workers/ekyc/status")
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> getMyEkycStatus(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.getMyEkycStatus(userId);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy thông tin trạng thái eKYC thành công"));
     }
@@ -95,10 +93,9 @@ public class WorkerEkycController {
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> adminReviewEkyc(
             @PathVariable UUID verificationId,
             @Valid @RequestBody EkycAdminReviewRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID adminUserId = resolveUserId(authentication, explicitUserId);
+        UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.adminReviewEkyc(adminUserId, verificationId, request);
         return ResponseEntity.ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC thành công: " + result.getStatus()));
     }
@@ -110,12 +107,14 @@ public class WorkerEkycController {
         } else if (authentication != null && authentication.getName() != null) {
             try {
                 callerId = UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
         if (callerId == null) {
             throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
         }
-        // An toàn: chặn IDOR — chỉ được thao tác với đúng userId của người đang đăng nhập.
+        // An toàn: chặn IDOR — chỉ được thao tác với đúng userId của người đang đăng
+        // nhập.
         if (explicitUserId != null && !explicitUserId.equals(callerId)) {
             throw new AppException("Không có quyền thao tác thay cho người dùng khác", HttpStatus.FORBIDDEN);
         }

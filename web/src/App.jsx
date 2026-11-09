@@ -1,7 +1,47 @@
-import { lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import RequireRole from './features/auth/components/RequireRole';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('[CANi App Crash]', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '3rem 2rem', maxWidth: '640px', margin: '4rem auto', textAlign: 'center', fontFamily: 'system-ui, sans-serif' }}>
+          <h2 style={{ color: '#dc2626', marginBottom: '1rem' }}>Đã xảy ra lỗi giao diện</h2>
+          <pre style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '8px', color: '#b91c1c', textAlign: 'left', overflowX: 'auto', fontSize: '0.85rem' }}>
+            {this.state.error?.message || String(this.state.error)}
+          </pre>
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: '0.6rem 1.25rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Tải lại trang
+            </button>
+            <button
+              onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
+              style={{ padding: '0.6rem 1.25rem', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Xóa Cache & Đăng nhập lại
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const EOPage = lazy(() => import('./pages/eo/EOPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));

@@ -97,4 +97,6 @@ cani:
   firebase:
     enabled: ${FIREBASE_ENABLED:true}
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
-
+  sla-scan:
+    enabled: ${SLA_SCAN_ENABLED:true}
+    cron: ${SLA_SCAN_CRON:0 */15 * * * *}

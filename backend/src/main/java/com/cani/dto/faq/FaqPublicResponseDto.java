@@ -1,0 +1,21 @@
+package com.cani.dto.faq;
+
+import com.cani.entity.enums.FaqCategory;
+import lombok.*;
+
+import java.util.UUID;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class FaqPublicResponseDto {
+
+    private UUID id;
+    private FaqCategory category;
+    private String question;
+    private String answer;
+    private Integer viewCount;
+}
+

@@ -21,7 +21,6 @@ const SystemConfigList = ({
   if (configs.length === 0) {
     return (
       <div className="sys-config-empty-state">
-        <span className="empty-icon">🔍</span>
         <h3>Không tìm thấy tham số cấu hình</h3>
         <p>Thử thay đổi từ khóa tìm kiếm hoặc chọn danh mục khác.</p>
       </div>

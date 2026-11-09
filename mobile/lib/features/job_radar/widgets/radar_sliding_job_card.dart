@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
@@ -18,6 +19,7 @@ class RadarSlidingJobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = shift;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final matchScore = math.max(72, math.min(99, (98 - (s.distanceKm * 1.6)).round()));
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
@@ -67,7 +69,7 @@ class RadarSlidingJobCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '96%',
+                      '$matchScore%',
                       style: TextStyle(
                         fontFamily: 'Be Vietnam Pro',
                         fontWeight: FontWeight.w800,

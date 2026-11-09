@@ -20,5 +20,7 @@ public interface RsAppealRepository extends JpaRepository<RsAppeal, UUID> {
     Page<RsAppeal> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     boolean existsByReliabilityLog_LogId(UUID logId);
+
+    java.util.Optional<RsAppeal> findByReliabilityLog_LogId(UUID logId);
 }
 

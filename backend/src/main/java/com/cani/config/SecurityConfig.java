@@ -67,6 +67,9 @@ public class SecurityConfig {
                 // ĐẶT TRƯỚC wildcard /api/v1/admin/** để Customer Care không bị 403 Forbidden.
                 .requestMatchers("/api/v1/admin/appeals/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 .requestMatchers("/api/v1/workers/appeals/**").hasRole("WORKER")
+                // Module Quản lý vi phạm No-show (UC-88, SRS FE-09): Customer Care cùng quyền xử lý với Admin
+                // ĐẶT TRƯỚC wildcard /api/v1/admin/** để Customer Care không bị 403 Forbidden.
+                .requestMatchers("/api/v1/admin/no-shows/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Module Doanh thu (UC-108, SRS FE-12): Admin / Finance quản lý bảng doanh thu
                 // Ghi chú: Hệ thống hiện tại chưa cấu hình role FINANCE riêng biệt, phân quyền sử dụng ADMIN theo quy ước
                 .requestMatchers("/api/v1/admin/revenue/**").hasRole("ADMIN")

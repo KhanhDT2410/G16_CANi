@@ -7,6 +7,7 @@ import { SystemConfigView } from '../../features/system-configs';
 import { FaqView } from '../../features/faqs';
 import { RevenueDashboardView } from '../../features/revenue-dashboard';
 import { RsAppealsView } from '../../features/rs-appeals';
+import { NoShowView } from '../../features/no-shows';
 // Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm
 // import { EkycVerificationView } from '../../features/ekyc-verification';
 // import { SkillVerificationView } from '../../features/skill-verification';
@@ -83,6 +84,12 @@ const AdminPage = () => {
           Kháng Cáo RS
         </button>
         <button
+          className={`admin-tab-btn ${activeTab === 'noshows' ? 'active' : ''}`}
+          onClick={() => setActiveTab('noshows')}
+        >
+          Xử Lý No-Show
+        </button>
+        <button
           className={`admin-tab-btn ${activeTab === 'faqs' ? 'active' : ''}`}
           onClick={() => setActiveTab('faqs')}
         >
@@ -104,6 +111,7 @@ const AdminPage = () => {
       */}
       {activeTab === 'revenue' && <RevenueDashboardView />}
       {activeTab === 'appeals' && <RsAppealsView />}
+      {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
       {activeTab === 'users' && <UserManagementView />}
       {activeTab === 'disputes' && <DisputeCenterView />}
       {activeTab === 'tickets' && <SupportTicketsCenterView />}

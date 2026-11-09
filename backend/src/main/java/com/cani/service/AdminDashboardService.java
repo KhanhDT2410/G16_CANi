@@ -172,6 +172,8 @@ public class AdminDashboardService {
             case "SUBMIT_RS_APPEAL" -> "Nộp kháng cáo điểm uy tín";
             case "APPROVE_RS_APPEAL" -> "Chấp thuận kháng cáo điểm uy tín";
             case "REJECT_RS_APPEAL" -> "Từ chối kháng cáo điểm uy tín";
+            case "MARK_NO_SHOW" -> "Xác nhận nhân sự vắng mặt (No-show)";
+            case "AUTO_NO_SHOW_SCAN" -> "Hệ thống tự động quét vi phạm No-show";
             case "SLA_BREACH_TICKET" -> "Cảnh báo quá hạn SLA phiếu hỗ trợ";
             case "SLA_BREACH_DISPUTE_CC" -> "Cảnh báo quá hạn SLA tranh chấp (Customer Care)";
             case "SLA_BREACH_DISPUTE_ESCALATED" -> "Cảnh báo quá hạn SLA tranh chấp khiếu nại (Admin)";

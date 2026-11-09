@@ -2,7 +2,7 @@ spring:
   application:
     name: cani-backend
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active: ${SPRING_PROFILES_ACTIVE:h2}
 
   servlet:
     multipart:
@@ -111,6 +111,9 @@ cani:
     checksum-key: ${PAYOS_CHECKSUM_KEY:04ec2256d44a67dfcaa6fb04c9a741365bff5cd9911afd8f96cadd3efaf1ddfc}
     return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?payos=success}
     cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?payos=cancel}
+  sla-scan:
+    enabled: ${SLA_SCAN_ENABLED:true}
+    cron: ${SLA_SCAN_CRON:0 */15 * * * *}
 
 springdoc:
   api-docs:
@@ -119,6 +122,3 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
-
-
-

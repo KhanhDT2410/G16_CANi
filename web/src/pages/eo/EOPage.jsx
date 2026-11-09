@@ -20,6 +20,7 @@ import EOSettingsTab from './components/EOSettingsTab';
 import EOModals from './components/EOModals';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
 
+import { SupportTicketsCenterView } from '../../features/support-tickets';
 import './EOPage.css';
 
 export default function EOPage() {
@@ -132,6 +133,7 @@ export default function EOPage() {
     else if (navKey === 'payments') target = 'payments';
     else if (navKey === 'subscription') target = 'subscription';
     else if (navKey === 'profile' || navKey === 'ekyc') target = 'profile';
+    else if (navKey === 'support') target = 'support';
     else if (navKey === 'analytics') target = 'analytics';
     else if (navKey === 'settings') target = 'settings';
     
@@ -220,6 +222,13 @@ export default function EOPage() {
             <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
               Hồ sơ tổ chức
             </button>
+            <button
+              type="button"
+              className={`pill-tab ${activeTab === 'support' ? 'active' : ''}`}
+              onClick={() => switchTab('support')}
+            >
+              Hỗ trợ kỹ thuật
+            </button>
             {activeTab === 'analytics' && (
               <button type="button" className="pill-tab active" onClick={() => switchTab('analytics')}>
                 Báo cáo & Thống kê
@@ -295,6 +304,13 @@ export default function EOPage() {
 
           {(activeTab === 'profile' || activeTab === 'ekyc') && <EoProfileTab />}
 
+          {/* Hỗ trợ kỹ thuật & Phiếu yêu cầu (UC-105 / UC-106) */}
+          {activeTab === 'support' && (
+            <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
+              <SupportTicketsCenterView />
+            </div>
+          )}
+
           {activeTab === 'analytics' && (
             <EOAnalyticsTab
               events={events.events}
@@ -349,6 +365,6 @@ export default function EOPage() {
           organizerName: user?.fullName || 'Duy Hưng Phạm',
         }}
       />
-    </div>
+    </div >
   );
 }

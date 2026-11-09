@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import RequireRole from './features/auth/components/RequireRole';
@@ -11,6 +11,8 @@ const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const CustomerCarePage = lazy(() => import('./pages/customer-care/CustomerCarePage'));
 const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
+const MobileShowcasePage = lazy(() => import('./pages/mobile-preview/MobileShowcasePage'));
+const SupportPage = lazy(() => import('./pages/support/SupportPage'));
 
 function PageFallback() {
   return (
@@ -36,48 +38,49 @@ function App() {
       <BrowserRouter>
         <Suspense fallback={<PageFallback />}>
           <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/auth/callback" element={<AuthCallbackPage />} />
-          <Route element={<MainLayout />}>
-            <Route
-              path="eo"
-              element={
-                <RequireRole allowedRoles={['EVENT_ORGANIZER']}>
-                  <EOPage />
-                </RequireRole>
-              }
-            />
-            {/* Direct routes to EO Profile */}
-            <Route path="profile" element={<Navigate to="/eo?tab=profile" replace />} />
-            <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
-            {/* Worker & Mobile Simulator không khả dụng trên Web Portal, tự động điều hướng về Trang chủ */}
-            <Route path="worker" element={<Navigate to="/" replace />} />
-            <Route path="mobile-preview" element={<Navigate to="/" replace />} />
-            <Route
-              path="customer-care"
-              element={
-                <RequireRole allowedRoles={['CUSTOMER_CARE', 'ADMIN']}>
-                  <CustomerCarePage />
-                </RequireRole>
-              }
-            />
-            <Route
-              path="admin"
-              element={
-                <RequireRole allowedRoles={['ADMIN']}>
-                  <AdminPage />
-                </RequireRole>
-              }
-            />
-            {/* Fallback route cho duong dan cu /cskh */}
-            <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
-          </Route>
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
-  </ErrorBoundary>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route element={<MainLayout />}>
+              <Route
+                path="eo"
+                element={
+                  <RequireRole allowedRoles={['EVENT_ORGANIZER']}>
+                    <EOPage />
+                  </RequireRole>
+                }
+              />
+              {/* Direct routes to EO Profile */}
+              <Route path="profile" element={<Navigate to="/eo?tab=profile" replace />} />
+              <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
+              {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về Login nếu truy cập trên Web */}
+              <Route path="worker" element={<Navigate to="/login" replace />} />
+              <Route path="mobile-preview" element={<MobileShowcasePage />} />
+              <Route
+                path="customer-care"
+                element={
+                  <RequireRole allowedRoles={['CUSTOMER_CARE', 'ADMIN']}>
+                    <CustomerCarePage />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="admin"
+                element={
+                  <RequireRole allowedRoles={['ADMIN']}>
+                    <AdminPage />
+                  </RequireRole>
+                }
+              />
+              <Route path="support" element={<SupportPage />} />
+              {/* Fallback route cho duong dan cu /cskh */}
+              <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

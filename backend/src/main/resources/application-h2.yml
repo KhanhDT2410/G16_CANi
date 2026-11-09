@@ -38,3 +38,5 @@ cani:
       model: ${GEMINI_MODEL:gemini-3.5-flash}
   ekyc:
     provider: mock
+  sla-scan:
+    enabled: false

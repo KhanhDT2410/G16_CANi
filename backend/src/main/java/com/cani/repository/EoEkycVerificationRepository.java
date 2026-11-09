@@ -25,4 +25,9 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
      * Lấy danh sách hồ sơ eKYC chờ duyệt (PENDING_REVIEW) cho Admin thẩm định
      */
     List<EoEkycVerification> findByStatusOrderByCreatedAtAsc(String status);
+
+    /**
+     * Đếm số lượng hồ sơ eKYC theo trạng thái
+     */
+    long countByStatus(String status);
 }

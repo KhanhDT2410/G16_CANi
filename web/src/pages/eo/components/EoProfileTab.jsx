@@ -254,8 +254,15 @@ export default function EoProfileTab() {
       }
 
       const result = await eoService.submitEkyc(formData);
-      showToast('Đã nộp hồ sơ eKYC thành công! Hệ thống đang xử lý thẩm định.', 'success');
       setEkycData(result);
+      if (result?.status === 'REJECTED') {
+        showToast(result.routingReason || 'Hồ sơ định danh eKYC không hợp lệ hoặc bị trùng CCCD!', 'error');
+      } else if (result?.status === 'PENDING_REVIEW') {
+        showToast(result.routingReason || 'Đã nộp hồ sơ eKYC! Đang chờ Admin thẩm định.', 'info');
+      } else {
+        showToast('Xác thực định danh eKYC thành công!', 'success');
+      }
+      await loadData();
       try {
         window.dispatchEvent(new CustomEvent('cani_ekyc_updated'));
       } catch (e) {
@@ -863,22 +870,32 @@ export default function EoProfileTab() {
 
               <div className="info-grid">
                 <div className="info-item">
-                  <span className="info-label">Người đại diện pháp luật</span>
-                  <span className="info-val">{ekycData.representativeName || profile.fullName}</span>
+                  <span className="info-label">Họ và tên trên CCCD</span>
+                  <span className="info-val">{ekycData.representativeName || '—'}</span>
                 </div>
                 <div className="info-item">
                   <span className="info-label">Số CCCD (Bảo mật NĐ 13)</span>
-                  <span className="info-val">{ekycData.cccdNumberMasked || '001099******'}</span>
+                  <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Ngày sinh & Giới tính</span>
+                  <span className="info-val">
+                    {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
+                  </span>
                 </div>
                 <div className="info-item">
                   <span className="info-label">Độ khớp khuôn mặt (Face Match)</span>
                   <span className="info-val" style={{ color: '#16a34a' }}>
-                    {ekycData.faceMatchScore ? `${ekycData.faceMatchScore}%` : '98.5% (VNPT eKYC)'}
+                    {ekycData.faceMatchScore != null ? `${Number(ekycData.faceMatchScore).toFixed(1)}%` : '—'}
                   </span>
                 </div>
                 <div className="info-item">
-                  <span className="info-label">Địa chỉ đăng ký</span>
-                  <span className="info-val">{ekycData.residenceAddress || profile.address}</span>
+                  <span className="info-label">Quê quán</span>
+                  <span className="info-val">{ekycData.originAddress || '—'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Nơi thường trú (Trên CCCD)</span>
+                  <span className="info-val">{ekycData.residenceAddress || '—'}</span>
                 </div>
               </div>
             </div>
@@ -887,11 +904,33 @@ export default function EoProfileTab() {
               {ekycStatus === 'PENDING_REVIEW' && (
                 <div style={{ backgroundColor: '#fefce8', border: '1px solid #fef08a', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
                   <div style={{ fontWeight: 700, color: '#854d0e', marginBottom: '0.25rem' }}>
-                    Hồ sơ eKYC đang được đội ngũ CSKH thẩm định
+                    Hồ sơ eKYC đang chờ Admin / CSKH thẩm định
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#a16207' }}>
-                    Hệ thống đã tiếp nhận dữ liệu CCCD của bạn. Thời gian xét duyệt tự động trong vòng 15-30 phút làm việc.
+                  <div style={{ fontSize: '0.875rem', color: '#a16207', marginBottom: '0.75rem' }}>
+                    {ekycData?.routingReason || 'Hệ thống đã bóc tách thông tin CCCD của bạn và đang chờ Admin phê duyệt.'}
                   </div>
+                  {ekycData && (
+                    <div className="info-grid" style={{ marginTop: '0.75rem' }}>
+                      <div className="info-item">
+                        <span className="info-label">Họ và tên trên CCCD</span>
+                        <span className="info-val">{ekycData.representativeName || '—'}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Số CCCD (Bảo mật NĐ 13)</span>
+                        <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Ngày sinh & Giới tính</span>
+                        <span className="info-val">
+                          {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
+                        </span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Nơi thường trú (Trên CCCD)</span>
+                        <span className="info-val">{ekycData.residenceAddress || '—'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

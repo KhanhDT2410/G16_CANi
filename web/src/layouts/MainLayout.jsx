@@ -74,11 +74,6 @@ const MainLayout = () => {
           <Link to="/eo" className="main-logo-group" title="CANi EVENT PLATFORM - Cần Ai, Có CANi">
             <CaniLogo variant="horizontal" height={36} />
           </Link>
-          <div className="header-role-pill">
-            <span className="role-dot-badge">EO</span>
-            <span className="role-text">Ban Tổ Chức (EO)</span>
-            <span className="role-chevron">▾</span>
-          </div>
         </div>
 
         <div className="main-header-center">
@@ -105,7 +100,6 @@ const MainLayout = () => {
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
             />
-            <kbd className="header-search-shortcut">Ctrl K</kbd>
             {headerSearch && (
               <button
                 type="button"

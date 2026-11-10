@@ -46,7 +46,7 @@ const LiveAttendanceModal = ({
     setVerifyingId(assignmentId);
     try {
       await eoService.verifyAttendance(assignmentId);
-      showToast('Đã xác nhận hoàn thành ca và duyệt công cho Worker!', 'success');
+      showToast('Đã xác nhận hoàn thành ca và duyệt công cho nhân sự!', 'success');
       loadAttendance();
     } catch (e) {
       console.error(e);

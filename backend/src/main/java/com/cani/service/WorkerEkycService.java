@@ -37,6 +37,9 @@ public class WorkerEkycService {
     private final EkycProvider ekycProvider;
     private final UserRepository userRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.EoEkycVerificationRepository eoEkycVerificationRepository;
+
     @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
     private boolean ekycStrict;
 
@@ -97,8 +100,11 @@ public class WorkerEkycService {
                 if (worker.getFullName() != null && !worker.getFullName().isBlank()) {
                     ekycResult.setFullName(worker.getFullName().toUpperCase());
                 }
-                String uniqueSuffix = String.format("%06d", Math.abs(worker.getWorkerId().hashCode()) % 1_000_000);
-                ekycResult.setIdNumber("001202" + uniqueSuffix);
+                if (ekycResult.getIdNumber() == null || "001202012345".equals(ekycResult.getIdNumber())) {
+                    int imageSeed = Arrays.hashCode(frontBytes);
+                    String uniqueSuffix = String.format("%06d", Math.abs(imageSeed) % 1_000_000);
+                    ekycResult.setIdNumber("001202" + uniqueSuffix);
+                }
                 if (ekycStrict) {
                     ekycResult.setRoutingDecision("MANUAL_REVIEW");
                     ekycResult.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
@@ -144,7 +150,21 @@ public class WorkerEkycService {
             String maskedNumber = maskCccd(rawIdNumber);
 
             // 3. Kiểm tra chống gian lận dùng trùng CCCD cho nhiều tài khoản (trừ khi là chính worker này nộp lại)
-            if (idHash != null && ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(idHash, "APPROVED", worker.getWorkerId())) {
+            boolean isDuplicateWorkerCccd = false;
+            if (idHash != null) {
+                isDuplicateWorkerCccd = ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(
+                        idHash, "APPROVED", worker.getWorkerId());
+                if (!isDuplicateWorkerCccd) {
+                    isDuplicateWorkerCccd = ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(
+                            idHash, List.of("APPROVED", "PENDING_REVIEW"), worker.getWorkerId());
+                }
+                if (!isDuplicateWorkerCccd && eoEkycVerificationRepository != null && userId != null) {
+                    isDuplicateWorkerCccd = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_User_UserIdNot(
+                            idHash, List.of("APPROVED", "PENDING_REVIEW"), userId);
+                }
+            }
+
+            if (isDuplicateWorkerCccd) {
                 ekycResult.setRoutingDecision("REJECTED");
                 ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
             }

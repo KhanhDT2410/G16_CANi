@@ -13,6 +13,8 @@ export default function EOEventsTab({
   setSortBy,
   expandedEventId,
   setExpandedEventId,
+  onOpenEventDetail,
+  onDeleteEvent,
   onOpenCreateEvent,
   onOpenAddShift,
   onOpenEditEvent,
@@ -180,7 +182,15 @@ export default function EOEventsTab({
                     >
                       {/* Cột 1: Thumbnail + Tên sự kiện */}
                       <td>
-                        <div className="table-event-cell">
+                        <div
+                          className="table-event-cell"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenEventDetail?.(evt);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                          title="Nhấn để xem chi tiết sự kiện & nhân sự"
+                        >
                           <img
                             src={thumbImg}
                             alt={evt.name}
@@ -189,6 +199,9 @@ export default function EOEventsTab({
                           <div className="event-row-meta">
                             <span className="event-row-title" title={evt.name}>
                               {evt.name}
+                            </span>
+                            <span className="event-row-hint" style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>
+                              Chi tiết sự kiện & nhân sự &rarr;
                             </span>
                           </div>
                         </div>
@@ -234,20 +247,67 @@ export default function EOEventsTab({
                         {formatStatusBadge(evt.status)}
                       </td>
 
-                      {/* Cột 6: Thao tác Kebab */}
+                      {/* Cột 6: Thao tác Kebab & Xóa */}
                       <td style={{ textAlign: 'center', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="btn-kebab-menu"
-                          onClick={(e) => toggleKebabMenu(e, evt.eventId)}
-                          title="Tùy chọn sự kiện"
-                        >
-                          ⋮
-                        </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                          {evt.status === 'CANCELLED' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteEvent?.(evt);
+                              }}
+                              title="Xóa sự kiện đã hủy khỏi danh sách"
+                              style={{
+                                background: '#fee2e2',
+                                border: '1px solid #fecaca',
+                                color: '#dc2626',
+                                borderRadius: '6px',
+                                width: '28px',
+                                height: '28px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              </svg>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn-kebab-menu"
+                            onClick={(e) => toggleKebabMenu(e, evt.eventId)}
+                            title="Tùy chọn sự kiện"
+                          >
+                            ⋮
+                          </button>
+                        </div>
 
                         {/* Dropdown Menu Thao tác */}
                         {isMenuOpen && (
                           <div className="table-kebab-dropdown" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="dropdown-item"
+                              style={{ color: '#2563eb', fontWeight: 700 }}
+                              onClick={() => {
+                                onOpenEventDetail?.(evt);
+                                closeMenu();
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                              <span>Chi tiết sự kiện & nhân sự</span>
+                            </button>
+
                             <button
                               type="button"
                               className="dropdown-item"
@@ -324,6 +384,23 @@ export default function EOEventsTab({
                                 <span>Hủy sự kiện</span>
                               </button>
                             )}
+
+                            {(evt.status === 'CANCELLED' || evt.status === 'DRAFT') && (
+                              <button
+                                type="button"
+                                className="dropdown-item text-danger"
+                                onClick={() => {
+                                  onDeleteEvent?.(evt);
+                                  closeMenu();
+                                }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                <span>Xóa khỏi danh sách</span>
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -336,6 +413,7 @@ export default function EOEventsTab({
                           <div className="drawer-container-inside-table">
                             <EventShiftsDrawer
                               event={evt}
+                              onOpenDetail={onOpenEventDetail}
                               onAddShift={onOpenAddShift}
                               onOpenQr={onOpenQr}
                               onOpenInvite={onOpenInvite}

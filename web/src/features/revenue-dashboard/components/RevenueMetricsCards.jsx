@@ -35,7 +35,7 @@ export const RevenueMetricsCards = ({ currentPeriod, growth }) => {
           {formatCurrency(currentPeriod.totalPaymentVolume)}
         </div>
         <div className="rev-card-sub">
-          {currentPeriod.totalPaymentTransactions} giao dịch điều phối Non-Escrow
+          {currentPeriod.totalPaymentTransactions} giao dịch điều phối trực tiếp
         </div>
       </div>
 

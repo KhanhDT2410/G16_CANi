@@ -9,6 +9,7 @@ import DisputeModal from './DisputeModal';
 import LiveAttendanceModal from './LiveAttendanceModal';
 import EditEventModal from './EditEventModal';
 import EditShiftModal from './EditShiftModal';
+import EventDetailModal from './EventDetailModal';
 import { ROLES } from '../hooks/useShifts';
 
 export default function EOModals({
@@ -21,9 +22,22 @@ export default function EOModals({
   setInviteModal,
   disputeModal,
   setDisputeModal,
+  detailEvent,
+  setDetailEvent,
+  onNavigateToRecruitment,
 }) {
   return (
     <>
+      <EventDetailModal
+        isOpen={Boolean(detailEvent)}
+        onClose={() => setDetailEvent(null)}
+        event={detailEvent}
+        onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
+        onOpenQr={shifts.handleOpenShiftQr}
+        onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+        onOpenAttendance={shifts.handleOpenAttendance}
+        onNavigateToRecruitment={onNavigateToRecruitment}
+      />
       <EventCreationWizardModal
         isOpen={events.showEventModal}
         onClose={() => events.setShowEventModal(false)}

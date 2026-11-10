@@ -47,4 +47,25 @@ public class FaqController {
         FaqPublicResponseDto result = faqService.getPublicFaqById(id);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy thông tin chi tiết câu hỏi thường gặp thành công"));
     }
+
+    /**
+     * Phục vụ hiển thị ảnh FAQ đã tải lên từ thiết bị.
+     * GET /api/v1/faqs/images/{filename}
+     */
+    @GetMapping("/images/{filename:.+}")
+    public ResponseEntity<org.springframework.core.io.Resource> getFaqImage(
+            @PathVariable("filename") String filename
+    ) {
+        org.springframework.core.io.Resource resource = faqService.loadFaqImage(filename);
+        String contentType = "image/jpeg";
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".png")) contentType = "image/png";
+        else if (lower.endsWith(".webp")) contentType = "image/webp";
+        else if (lower.endsWith(".gif")) contentType = "image/gif";
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                .body(resource);
+    }
 }

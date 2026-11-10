@@ -26,16 +26,17 @@ export const RegisterForm = () => {
         <CaniLogo variant="full" height={52} className="auth-logo-center" />
         <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng Ký Nhà Tổ Chức</h2>
         <p className="auth-subtitle">
-          Tạo tài khoản dành riêng cho Ban Tổ Chức & Doanh Nghiệp Sự Kiện
+          Tạo tài khoản dành riêng cho Nhà Tổ Chức Sự Kiện trên CANi
         </p>
       </div>
 
-      <div className="worker-perks-box" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534', marginBottom: '1.25rem' }}>
-        <div className="worker-perks-title" style={{ color: '#15803d' }}>
-          <span>Quyền lợi Nhà Tổ Chức (Event Organizer):</span>
+      <div className="worker-perks-box" style={{ backgroundColor: '#fefce8', borderColor: '#fde047', color: '#854d0e', marginBottom: '1.25rem' }}>
+        <div className="worker-perks-title" style={{ color: '#a16207', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <span>⚠️ Quy định tạo sự kiện & tuyển dụng:</span>
         </div>
-        <div>• Đăng tải không giới hạn ca làm, tuyển chọn nhân sự sự kiện chất lượng cao.</div>
-        <div>• Tự động khớp ca, quản lý điểm danh QR thời gian thực và thanh toán tự động, minh bạch.</div>
+        <div style={{ fontSize: '0.825rem', marginTop: '0.25rem' }}>
+          Sau khi đăng ký tài khoản thành công, bạn cần <strong>hoàn tất định danh eKYC</strong> thì mới có thể tạo sự kiện và tuyển chọn nhân sự.
+        </div>
       </div>
 
       {/* Đăng ký nhanh bằng Google */}
@@ -129,7 +130,7 @@ export const RegisterForm = () => {
                 onChange={handleChange}
                 disabled={isLoading}
               />
-              Doanh Nghiệp / Công Ty
+              Hộ Kinh Doanh / Doanh Nghiệp
             </label>
 
             <label
@@ -156,14 +157,14 @@ export const RegisterForm = () => {
                 onChange={handleChange}
                 disabled={isLoading}
               />
-              Cá Nhân / Đội Nhóm
+              Cá Nhân / Ban Tổ Chức Tự Do
             </label>
           </div>
         </div>
 
         <div className="form-group">
           <label className="form-label" htmlFor="fullName">
-            {formData.organizerType === 'ENTERPRISE' ? 'Họ và tên người đại diện pháp luật *' : 'Họ và tên cá nhân tổ chức *'}
+            {formData.organizerType === 'ENTERPRISE' ? 'Họ và tên người đại diện pháp luật *' : 'Họ và tên người tổ chức sự kiện *'}
           </label>
           <input
             id="fullName"
@@ -183,14 +184,14 @@ export const RegisterForm = () => {
           <div className="form-row">
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label" htmlFor="companyName">
-                Tên công ty / Doanh nghiệp *
+                Tên Hộ kinh doanh / Doanh nghiệp *
               </label>
               <input
                 id="companyName"
                 name="companyName"
                 type="text"
                 className="form-input"
-                placeholder="Công ty TNHH Sự Kiện CANi"
+                placeholder="VD: Hộ kinh doanh Sự Kiện CANi"
                 value={formData.companyName}
                 onChange={handleChange}
                 disabled={isLoading}
@@ -200,7 +201,7 @@ export const RegisterForm = () => {
 
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label" htmlFor="taxId">
-                Mã số kinh doanh / Mã số thuế *
+                Mã số thuế (MST) / Số ĐKKD *
               </label>
               <input
                 id="taxId"
@@ -218,7 +219,7 @@ export const RegisterForm = () => {
         ) : (
           <div className="form-group">
             <label className="form-label" htmlFor="companyName">
-              Tên thương hiệu / Nhóm sự kiện (Tùy chọn)
+              Tên thương hiệu / Đơn vị tổ chức (Tùy chọn)
             </label>
             <input
               id="companyName"
@@ -236,7 +237,7 @@ export const RegisterForm = () => {
         <div className="form-row">
           <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label" htmlFor="email">
-              Địa chỉ Email doanh nghiệp
+              Địa chỉ Email liên hệ *
             </label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input

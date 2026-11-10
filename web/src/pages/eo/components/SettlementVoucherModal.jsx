@@ -234,13 +234,13 @@ export default function SettlementVoucherModal({
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
             <div style={{ textAlign: 'left', maxWidth: '55%' }}>
               <div style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '11pt' }}>
-                {companyInfo.companyName || 'BAN TỔ CHỨC SỰ KIỆN CANI'}
+                {companyInfo.companyName || 'BAN TỔ CHỨC SỰ KIỆN'}
               </div>
               <div style={{ fontSize: '10pt' }}>
-                MST: {companyInfo.taxCode || '0108923489'}
+                MST: {companyInfo.taxCode || 'Chưa cập nhật'}
               </div>
               <div style={{ fontSize: '10pt', color: '#334155' }}>
-                Địa chỉ: {companyInfo.address || 'Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội'}
+                Địa chỉ: {companyInfo.address || 'Chưa cập nhật địa chỉ'}
               </div>
             </div>
 
@@ -285,7 +285,7 @@ export default function SettlementVoucherModal({
               - Lý do chi: Quyết toán thù lao ca làm việc, hỗ trợ phụ cấp và điều phối nhân sự sự kiện.
             </div>
             <div style={{ marginBottom: '0.35rem' }}>
-              - Phương thức thanh toán: <strong>Chuyển khoản trực tiếp VietQR NAPAS 247 (Non-Escrow)</strong>
+              - Phương thức thanh toán: <strong>Chuyển khoản trực tiếp VietQR NAPAS 247</strong>
             </div>
           </div>
 
@@ -387,15 +387,15 @@ export default function SettlementVoucherModal({
               <div style={{ fontWeight: 'bold' }}>Kế Toán Thanh Toán</div>
               <div style={{ fontSize: '9.5pt', fontStyle: 'italic' }}>(Ký, ghi rõ họ tên)</div>
               <div style={{ height: 60 }} />
-              <div style={{ fontWeight: 600 }}>{companyInfo.accountantName || 'Trần Thị Kế Toán'}</div>
+              <div style={{ fontWeight: 600 }}>{companyInfo.accountantName || 'Bộ phận Kế toán'}</div>
             </div>
 
             <div>
-              <div style={{ fontWeight: 'bold' }}>Trưởng Ban Tổ Chức (EO)</div>
+              <div style={{ fontWeight: 'bold' }}>Trưởng Ban Tổ Chức</div>
               <div style={{ fontSize: '9.5pt', fontStyle: 'italic' }}>(Ký, đóng dấu, họ tên)</div>
               <div style={{ height: 60 }} />
               <div style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>
-                {companyInfo.organizerName || 'Duy Hưng Phạm'}
+                {companyInfo.organizerName || 'Đại diện Ban Tổ Chức'}
               </div>
             </div>
           </div>

@@ -23,7 +23,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
       return;
     }
     if (!isDescValid) {
-      showToast('Mô tả tranh chấp phải từ 50 đến 3000 ký tự theo quy định BR-52', 'warning');
+      showToast('Mô tả tranh chấp phải từ 50 đến 3000 ký tự', 'warning');
       return;
     }
 
@@ -47,14 +47,14 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
     <div className="dispute-modal-overlay" onClick={onClose}>
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
-          <h3>Nộp Đơn Tranh Chấp & Khiếu Nại (UC-96)</h3>
+          <h3>Nộp Đơn Tranh Chấp & Khiếu Nại</h3>
           <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
             <div className="dispute-modal-notice">
-              Quy tắc BR-52: Đơn chỉ được nộp trong vòng 14 ngày kể từ khi ca kết thúc, mô tả tối thiểu 50 ký tự.
+              Lưu ý: Đơn chỉ được nộp trong vòng 14 ngày kể từ khi ca kết thúc, mô tả tối thiểu 50 ký tự.
             </div>
 
             <div className="dispute-field-group">

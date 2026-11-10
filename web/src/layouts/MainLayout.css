@@ -25,7 +25,9 @@
 .main-header-left {
   display: flex;
   align-items: center;
-  gap: 2.25rem;
+  gap: 1.5rem;
+  flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .main-logo-group {
@@ -33,6 +35,7 @@
   align-items: center;
   gap: 0.75rem;
   text-decoration: none;
+  flex-shrink: 0;
   transition: transform var(--transition-fast);
 }
 
@@ -122,46 +125,6 @@
   margin: 0 1.5rem;
 }
 
-/* Role Pill Badge in Header */
-.header-role-pill {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.825rem;
-  font-weight: 700;
-  color: #1d4ed8;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.header-role-pill:hover {
-  background: #dbeafe;
-}
-
-.role-dot-badge {
-  background: #2563eb;
-  color: #ffffff;
-  font-size: 0.65rem;
-  font-weight: 800;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  letter-spacing: 0.05em;
-}
-
-.role-text {
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.role-chevron {
-  font-size: 0.7rem;
-  color: #60a5fa;
-}
-
 .header-search-box {
   display: flex;
   align-items: center;
@@ -171,21 +134,6 @@
   padding: 0.45rem 1rem;
   border-radius: var(--radius-full);
   transition: all var(--transition-fast);
-}
-
-/* Shortcut Ctrl K Badge */
-.header-search-shortcut {
-  font-family: inherit;
-  font-size: 0.675rem;
-  font-weight: 700;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #64748b;
-  padding: 0.15rem 0.45rem;
-  border-radius: 5px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  letter-spacing: 0.02em;
-  margin-left: auto;
 }
 
 .header-search-box:focus-within {

@@ -143,6 +143,12 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // Xóa sự kiện khỏi danh sách (Soft Delete)
+  deleteEvent: async (eventId) => {
+    const response = await apiClient.delete(`/v1/eo/events/${eventId}`);
+    return response.data?.data;
+  },
+
   // UC-18: Cập nhật ca làm việc
   updateShift: async (shiftId, shiftData) => {
     const response = await apiClient.put(`/v1/eo/events/shifts/${shiftId}`, shiftData);

@@ -1,25 +1,320 @@
-/* AdminPage.css - Giao diện Quản trị Hệ thống */
+/* AdminPage.css - Giao diện Quản trị Hệ thống (ADM-01 Sidebar Layout) */
 
-.admin-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+/* Bố cục 2 cột chính: Sidebar bên trái + Khung nội dung bên phải */
+.admin-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  width: 100%;
+  padding-bottom: 2rem;
+  font-family: var(--font-family, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   color: #1f2937;
 }
 
-.admin-header {
-  margin-bottom: 2rem;
+/* Sidebar bên trái */
+.admin-sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: #ffffff;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 0.75rem;
+  padding: 1rem 0.75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  position: sticky;
+  top: 5.5rem;
+  max-height: calc(100vh - 6.5rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease;
+  flex-shrink: 0;
+  z-index: 10;
 }
 
-.admin-header h1 {
-  font-size: 1.875rem;
+/* Sidebar trạng thái thu gọn */
+.admin-sidebar.collapsed {
+  width: 72px;
+  min-width: 72px;
+  padding: 1rem 0.5rem 1.25rem;
+  align-items: center;
+}
+
+/* Header của Sidebar: Logo / Tiêu đề và nút toggle thu gọn/mở rộng */
+.admin-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  margin-bottom: 0.25rem;
+  width: 100%;
+}
+
+.admin-sidebar.collapsed .admin-sidebar-header {
+  justify-content: center;
+  padding: 0.25rem 0 0.75rem;
+}
+
+.admin-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sidebar-brand-badge {
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.7rem;
   font-weight: 800;
-  color: #111827;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-brand-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sidebar-collapse-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: #f8fafc;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* Menu danh sách các nhóm */
+.admin-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.sidebar-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.sidebar-group-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.35rem 0.5rem 0.15rem;
+}
+
+.sidebar-group-divider {
+  height: 1px;
+  background-color: var(--color-border, #e2e8f0);
+  margin: 0.35rem 0.25rem;
+  width: calc(100% - 0.5rem);
+}
+
+.sidebar-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+}
+
+/* Từng mục điều hướng trong Sidebar */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  text-align: left;
+}
+
+.sidebar-nav-item:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.sidebar-nav-item.active {
+  background: #fef2f2;
+  color: #dc2626;
+  font-weight: 600;
+  border-color: #fee2e2;
+}
+
+.admin-sidebar.collapsed .sidebar-nav-item {
+  justify-content: center;
+  padding: 0.6rem 0;
+}
+
+.sidebar-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-item-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-active-indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: #dc2626;
+  border-radius: 0 3px 3px 0;
+}
+
+/* Mục có menu con xổ xuống (ADM-09: Tham số hệ thống) */
+.sidebar-expandable-item-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.sidebar-arrow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-arrow-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #0f172a;
+}
+
+.sidebar-nav-item.active .sidebar-arrow-btn {
+  color: #dc2626;
+}
+
+.sidebar-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-left: 1.25rem;
+  padding-left: 0.65rem;
+  border-left: 2px solid #e2e8f0;
+  margin-top: 0.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.sidebar-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.42rem 0.6rem;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.sidebar-submenu-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.sidebar-submenu-item.active {
+  background: #fee2e2;
+  color: #dc2626;
+  font-weight: 600;
+  border-color: #fecaca;
+}
+
+.submenu-bullet {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.sidebar-submenu-item.active .submenu-bullet {
+  opacity: 1;
+}
+
+/* Khu vực nội dung bên phải */
+.admin-main-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.admin-topbar {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.admin-topbar-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
   margin: 0 0 0.25rem 0;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.admin-topbar-subtitle {
+  font-size: 0.88rem;
+  color: #64748b;
+  margin: 0;
 }
 
 .admin-badge {
@@ -32,109 +327,11 @@
   text-transform: uppercase;
 }
 
-.admin-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
+.admin-content-card {
+  min-width: 0;
 }
 
-.admin-metric-card {
-  background: #ffffff;
-  padding: 1.25rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.admin-tabs {
-  display: flex;
-  gap: 0.5rem;
-  border-bottom: 2px solid #e5e7eb;
-  margin-bottom: 1.5rem;
-}
-
-.admin-tab-btn {
-  padding: 0.75rem 1.25rem;
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: #6b7280;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: -2px;
-}
-
-.admin-tab-btn:hover {
-  color: #111827;
-}
-
-.admin-tab-btn.active {
-  color: #dc2626;
-  border-bottom-color: #dc2626;
-}
-
-/* Verification Cards */
-.admin-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.admin-verif-card {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.admin-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-}
-
-.admin-images-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1rem;
-  margin: 1.25rem 0;
-}
-
-.admin-img-box {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  overflow: hidden;
-  text-align: center;
-}
-
-.admin-img-box img {
-  width: 100%;
-  height: 120px;
-  object-fit: cover;
-  display: block;
-}
-
-.admin-img-label {
-  padding: 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #4b5563;
-  background: #f3f4f6;
-}
-
-.admin-action-row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
+/* Giữ lại các style tiện ích & tương thích ngược cho các view con */
 .btn-admin-approve {
   background: #10b981;
   color: #ffffff;
@@ -166,52 +363,31 @@
   background: #fecaca;
 }
 
-/* ==========================================================================
-   Responsive Breakpoints for Admin Portal
-   ========================================================================== */
+/* Responsive khi màn hình nhỏ (< 900px) */
 @media (max-width: 900px) {
-  .admin-container {
-    padding: 1rem 0.75rem 2.5rem;
+  .admin-layout {
+    flex-direction: column;
   }
 
-  .admin-tabs {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    flex-wrap: nowrap;
-    scrollbar-width: thin;
-    padding-bottom: 0.25rem;
+  .admin-sidebar {
+    width: 100%;
+    min-width: 100%;
+    position: static;
+    max-height: none;
   }
 
-  .admin-tab-btn {
-    white-space: nowrap;
-    flex-shrink: 0;
-    padding: 0.6rem 1rem;
-    font-size: 0.875rem;
+  .admin-sidebar.collapsed {
+    width: 100%;
+    min-width: 100%;
   }
 
-  .admin-images-grid {
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 0.75rem;
+  .sidebar-group-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  .admin-header h1 {
-    font-size: 1.4rem;
-    flex-wrap: wrap;
-  }
-
-  .admin-metrics {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .admin-card-top {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
   .admin-action-row {
     flex-direction: column;
     width: 100%;
@@ -224,4 +400,3 @@
     padding: 0.7rem;
   }
 }
-

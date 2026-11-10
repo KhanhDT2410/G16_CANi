@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { ROLES, WAGE_RECOMMENDATIONS_MAP } from '../hooks/useShifts';
+import { getCoordinatesFromAddress } from '../utils/geoUtils';
 
 /**
  * EventCreationWizardModal
@@ -115,9 +116,26 @@ const EventCreationWizardModal = ({
 
     setSubmitting(true);
     try {
+      let eventPayload = { ...newEvent };
+      // Tự động phân giải tọa độ GPS theo địa chỉ nếu có
+      if (eventPayload.venueAddress?.trim()) {
+        try {
+          const coords = await getCoordinatesFromAddress(eventPayload.venueAddress);
+          if (coords && coords.lat && coords.lng) {
+            eventPayload.venueLat = coords.lat;
+            eventPayload.venueLng = coords.lng;
+            setNewEvent((prev) => ({ ...prev, venueLat: coords.lat, venueLng: coords.lng }));
+          }
+        } catch {
+          // Bỏ qua lỗi mạng, sử dụng fallback an toàn
+        }
+      }
+      eventPayload.venueLat = eventPayload.venueLat || 10.7328;
+      eventPayload.venueLng = eventPayload.venueLng || 106.7214;
+
       let evt = createdEvent;
       if (!evt) {
-        evt = await eoService.createEvent(newEvent);
+        evt = await eoService.createEvent(eventPayload);
         setCreatedEvent(evt);
       }
       setCurrentStep(2);
@@ -362,7 +380,7 @@ const EventCreationWizardModal = ({
               Bước 1: Khởi Tạo Sự Kiện & Địa Điểm
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.25rem' }}>
-              Nhập tên sự kiện và tọa độ GPS tổ chức để định vị bán kính tìm kiếm ứng viên.
+              Nhập tên sự kiện và địa chỉ tổ chức để hệ thống tự động định vị tìm kiếm nhân sự phù hợp.
             </p>
 
             <div className="eo-form-group">
@@ -390,7 +408,7 @@ const EventCreationWizardModal = ({
 
             <div className="eo-form-group">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <label style={{ margin: 0 }}>Địa Điểm Tổ Chức (Venue Address) *</label>
+                <label style={{ margin: 0 }}>Địa Điểm Tổ Chức *</label>
                 <button
                   type="button"
                   className="eo-btn-gps"
@@ -408,29 +426,9 @@ const EventCreationWizardModal = ({
                 value={newEvent.venueAddress}
                 onChange={(e) => setNewEvent({ ...newEvent, venueAddress: e.target.value })}
               />
-            </div>
-
-            <div className="eo-form-row">
-              <div className="eo-form-group">
-                <label>Tọa Độ Vĩ Độ (Lat)</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="eo-form-input"
-                  value={newEvent.venueLat}
-                  onChange={(e) => setNewEvent({ ...newEvent, venueLat: parseFloat(e.target.value) })}
-                />
-              </div>
-              <div className="eo-form-group">
-                <label>Tọa Độ Kinh Độ (Lng)</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="eo-form-input"
-                  value={newEvent.venueLng}
-                  onChange={(e) => setNewEvent({ ...newEvent, venueLng: parseFloat(e.target.value) })}
-                />
-              </div>
+              <span className="eo-field-helper" style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.35rem', display: 'block' }}>
+                Hệ thống tự động định vị tọa độ GPS để quét và ghép nối nhân sự trong bán kính phù hợp.
+              </span>
             </div>
 
             <div className="eo-modal-footer">
@@ -908,7 +906,7 @@ const EventCreationWizardModal = ({
                   <span>Gói Dịch Vụ Hội Viên / Ưu Đãi Sự Kiện Đầu Tiên</span>
                 </div>
                 <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>
-                  Hệ thống sẽ tự động trừ <strong>1 lượt quota sự kiện</strong> trong gói hội viên của bạn (hoặc tự động kích hoạt <strong>Ưu Đãi Chào Mừng Miễn Phí</strong> nếu đây là sự kiện đầu tiên của bạn). Bao gồm trọn gói toàn bộ {shiftsList.length} ca làm việc và {totalWorkers} vị trí nhân sự.
+                  Hệ thống sẽ tự động trừ <strong>1 lượt đăng sự kiện</strong> trong gói dịch vụ của bạn (hoặc tự động kích hoạt <strong>Ưu Đãi Chào Mừng Miễn Phí</strong> nếu đây là sự kiện đầu tiên của bạn). Bao gồm trọn gói toàn bộ {shiftsList.length} ca làm việc và {totalWorkers} vị trí nhân sự.
                 </p>
                 <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
                   ✓ Miễn phí toàn bộ phí Matching Radar AI và đối soát chấm công theo chính sách gói.

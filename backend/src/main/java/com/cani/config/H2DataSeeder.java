@@ -33,6 +33,7 @@ public class H2DataSeeder implements CommandLineRunner {
     private final PaymentRepository paymentRepository;
     private final ReliabilityLogRepository reliabilityLogRepository;
     private final RsAppealRepository rsAppealRepository;
+    private final FaqRepository faqRepository;
 
     @Override
     public void run(String... args) {
@@ -135,7 +136,7 @@ public class H2DataSeeder implements CommandLineRunner {
         }
 
         // 4. Seed default Event Organizer (EO) and test subscriptions & revenue data
-        String eoEmail = "eo@cani.vn";
+        String eoEmail = "demo.eo@cani.vn";
         EventOrganizer eo = null;
         if (!userRepository.existsByEmail(eoEmail)) {
             User eoUser = User.builder()
@@ -408,6 +409,104 @@ public class H2DataSeeder implements CommandLineRunner {
 
                 shiftRepository.saveAll(List.of(shift1, shift2, shift3));
                 log.info("==> [H2 Profile] Seeded {} demo Events and {} ACTIVE Shifts for Job Radar Map successfully.", 3, 3);
+            }
+
+            if (faqRepository.count() == 0) {
+                List<Faq> faqs = List.of(
+                        // ACCOUNT (3 câu)
+                        Faq.builder()
+                                .category(FaqCategory.ACCOUNT)
+                                .question("Quy trình xác thực định danh (eKYC) trên ứng dụng CANi diễn ra như thế nào?")
+                                .answer("Người lao động cần chụp rõ nét hai mặt Căn cước công dân (CCCD) gắn chip và một ảnh chân dung selfie khớp khuôn mặt. Hệ thống VNPT eKYC tích hợp của CANi sẽ tự động trích xuất thông tin OCR và đối soát sinh trắc học để kích hoạt tài khoản nhận ca trong vòng 1-3 phút.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.ACCOUNT)
+                                .question("Điểm uy tín (RS - Reliability Score) là gì và ảnh hưởng như thế nào đến việc nhận ca làm?")
+                                .answer("Điểm uy tín (RS) khởi điểm của mỗi tài khoản là 80 điểm. Hoàn thành tốt ca làm và nhận đánh giá 5 sao từ nhà tổ chức sẽ được cộng điểm; vi phạm hủy ca sát giờ hoặc vắng mặt không phép (No-show) sẽ bị trừ 25 điểm. Nếu điểm RS dưới 60, hệ thống sẽ tạm dừng đề xuất ca tự động; nếu giảm dưới 20 điểm, tài khoản sẽ bị tự động khóa để bảo vệ uy tín nền tảng.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.ACCOUNT)
+                                .question("Làm thế nào để nâng bậc Điểm Kỹ Năng (Skill Points - SP) cho các vị trí chuyên môn?")
+                                .answer("Mỗi ca làm hoàn thành thành công theo từng loại kỹ năng (Phục vụ bàn, Lễ tân, Thu ngân, Pha chế, Kỹ thuật AV, v.v.) sẽ tích lũy Điểm Kỹ Năng (SP). Người lao động cũng có thể tải lên chứng chỉ chuyên môn hoặc tham gia bài kiểm tra thẩm định AI để nâng hạng từ Cơ bản (Tier 1) lên Chuyên nghiệp (Tier 2) và Trưởng nhóm (Tier 3) để nhận thù lao cao hơn.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+
+                        // SHIFT (3 câu)
+                        Faq.builder()
+                                .category(FaqCategory.SHIFT)
+                                .question("Thuật toán Ghép nối tự động (Matching Engine) hoạt động dựa trên các tiêu chí nào?")
+                                .answer("Hệ thống tự động chấm Điểm Phù Hợp (Matching Score) theo 4 trọng số nghiệp vụ: Khoảng cách GPS địa lý (W_dist = 40%), Điểm đánh giá sao trung bình (W_rating = 30%), Số ca làm đã hoàn thành (W_exp = 20%) và Điểm uy tín sàn (W_rs = 10%). Người lao động có điểm phù hợp cao nhất trong bán kính tối đa (15 km) sẽ được ưu tiên nhận đề xuất nhận ca trước.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.SHIFT)
+                                .question("Quy trình quét mã QR Check-in và Check-out tại sự kiện được thực hiện ra sao?")
+                                .answer("Trước giờ bắt đầu ca làm 15-30 phút, người lao động có mặt tại địa điểm tổ chức, mở ứng dụng CANi và quét mã QR do Quản lý sự kiện (Event Coordinator) hiển thị tại bàn tiếp đón. Khi kết thúc ca, người lao động thực hiện quét mã QR Check-out lần 2 để hệ thống chốt số giờ làm việc thực tế và chuyển sang trạng thái chờ đối soát thù lao.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.SHIFT)
+                                .question("Tôi có thể hủy ca làm việc sau khi đã bấm Chấp nhận không?")
+                                .answer("Người lao động có thể hủy ca tự do trước thời điểm bắt đầu ca trên 24 giờ mà không bị phạt. Nếu hủy ca trong vòng 4 đến 24 giờ trước ca làm, bạn sẽ bị trừ 8 điểm uy tín (RS). Nếu hủy ca sát giờ dưới 4 tiếng hoặc không đến làm việc, hệ thống sẽ tự động ghi nhận lỗi No-show và trừ 25 điểm RS.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+
+                        // PAYMENT (3 câu)
+                        Faq.builder()
+                                .category(FaqCategory.PAYMENT)
+                                .question("Phương thức thanh toán thù lao trực tiếp (Non-Escrow) trên CANi vận hành như thế nào?")
+                                .answer("Sau khi ca làm việc kết thúc và hoàn tất Check-out, Nhà tổ chức sự kiện (EO) có thời hạn 48 giờ để thực hiện chuyển khoản thù lao trực tiếp vào số tài khoản ngân hàng của người lao động. Khi chuyển khoản thành công, EO đính kèm ảnh chụp biên lai giao dịch trên Cổng EO để hệ thống xác nhận thanh toán.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.PAYMENT)
+                                .question("Nhà tổ chức sự kiện có phải trả phí hoa hồng khi tuyển dụng nhân sự trên sàn không?")
+                                .answer("Trong giai đoạn hiện tại (MVP), tỷ lệ hoa hồng nền tảng áp dụng là 0.00%. Nhà tổ chức chỉ chi trả đúng mức thù lao theo thỏa thuận trên hợp đồng ca làm việc cho người lao động và phí gói đăng ký dịch vụ (Subscription) hàng tháng nếu sử dụng các tính năng nâng cao (Radar tìm nhân sự khẩn cấp, Đề xuất AI).")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.PAYMENT)
+                                .question("Các phương thức thanh toán gói đăng ký dịch vụ (Subscription) được hỗ trợ?")
+                                .answer("Nhà tổ chức sự kiện có thể nâng cấp và gia hạn các gói dịch vụ (Gói Cơ bản, Gói Doanh nghiệp, Gói Sự kiện lớn) thông qua cổng thanh toán trực tuyến PayOS (hỗ trợ VietQR quét mã chuyển khoản nhanh 24/7) hoặc cổng VNPAY (thẻ ATM nội địa, Visa/MasterCard, ví điện tử).")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+
+                        // DISPUTE (3 câu)
+                        Faq.builder()
+                                .category(FaqCategory.DISPUTE)
+                                .question("Khi nào người lao động hoặc nhà tổ chức nên gửi đơn Tranh chấp & Khiếu nại?")
+                                .answer("Người dùng có thể tạo đơn khiếu nại trong các trường hợp: Nhà tổ chức chậm trễ thanh toán thù lao quá 48 giờ sau ca làm, thù lao nhận được không đúng thỏa thuận ban đầu, bị xếp lỗi No-show oan uổng do lỗi kỹ thuật quét QR, hoặc phát sinh mâu thuẫn về khối lượng công việc thực tế tại sự kiện.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.DISPUTE)
+                                .question("Quy trình giải quyết tranh chấp (Dispute Resolution) qua bộ phận Chăm sóc khách hàng?")
+                                .answer("Khi nhận được đơn khiếu nại, nhân viên CSKH (Customer Care) sẽ tiếp nhận xử lý Cấp độ 1 trong vòng 24 giờ làm việc. CSKH mở luồng hội thoại đối soát 3 bên trực tiếp, kiểm tra nhật ký GPS, thời gian quét QR và hình ảnh chứng từ thanh toán. Nếu hai bên không thống nhất, Admin sẽ ra phán quyết chung thẩm cuối cùng.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build(),
+                        Faq.builder()
+                                .category(FaqCategory.DISPUTE)
+                                .question("Làm thế nào để người lao động nộp đơn Kháng cáo điểm uy tín (RS Appeal) khi bị trừ điểm No-show?")
+                                .answer("Nếu bị ghi nhận No-show do trường hợp bất khả kháng (ốm đau đột xuất có giấy khám bệnh, tai nạn giao thông, sự cố bất khả kháng trên đường đi), người lao động vào mục Hồ sơ -> Lịch sử điểm uy tín -> chọn vi phạm và bấm Kháng cáo. Sau khi tải lên tài liệu minh chứng hợp lệ, bộ phận CSKH sẽ thẩm định và hoàn trả lại điểm RS đã trừ trong vòng 48 giờ.")
+                                .status(FaqStatus.PUBLISHED)
+                                .publishedAt(Instant.now())
+                                .build()
+                );
+                faqRepository.saveAll(faqs);
+                log.info("==> [H2 Profile] Seeded {} standard business FAQs successfully.", faqs.size());
             }
         }
     }

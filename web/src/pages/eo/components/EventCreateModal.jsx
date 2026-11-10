@@ -45,7 +45,7 @@ const EventCreateModal = ({
 
           <div className="eo-form-group">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-              <label style={{ margin: 0 }}>Địa Điểm Tổ Chức (Venue Address) *</label>
+              <label style={{ margin: 0 }}>Địa Điểm Tổ Chức *</label>
               <button
                 type="button"
                 className="eo-btn-gps"
@@ -64,32 +64,9 @@ const EventCreateModal = ({
               value={newEvent.venueAddress}
               onChange={(e) => setNewEvent({ ...newEvent, venueAddress: e.target.value })}
             />
-            <span className="eo-field-helper">
-              Tọa độ GPS giúp hệ thống quét và ưu tiên các Worker trong bán kính &le; 15km.
+            <span className="eo-field-helper" style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.35rem', display: 'block' }}>
+              Hệ thống tự động định vị tọa độ GPS để quét và ưu tiên các Worker trong bán kính &le; 15km.
             </span>
-          </div>
-
-          <div className="eo-form-row">
-            <div className="eo-form-group">
-              <label>Tọa Độ Vĩ Độ (Lat)</label>
-              <input
-                type="number"
-                step="any"
-                className="eo-form-input"
-                value={newEvent.venueLat}
-                onChange={(e) => setNewEvent({ ...newEvent, venueLat: parseFloat(e.target.value) })}
-              />
-            </div>
-            <div className="eo-form-group">
-              <label>Tọa Độ Kinh Độ (Lng)</label>
-              <input
-                type="number"
-                step="any"
-                className="eo-form-input"
-                value={newEvent.venueLng}
-                onChange={(e) => setNewEvent({ ...newEvent, venueLng: parseFloat(e.target.value) })}
-              />
-            </div>
           </div>
 
           <div className="eo-modal-footer">

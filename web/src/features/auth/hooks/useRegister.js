@@ -49,7 +49,7 @@ export const useRegister = () => {
 
   const handleSendOtp = async () => {
     if (!formData.email?.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ email doanh nghiệp trước khi lấy mã OTP.');
+      setErrorMessage('Vui lòng nhập địa chỉ email trước khi lấy mã OTP.');
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -93,7 +93,7 @@ export const useRegister = () => {
       return;
     }
     if (!formData.email.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ email doanh nghiệp.');
+      setErrorMessage('Vui lòng nhập địa chỉ email.');
       return;
     }
     if (!formData.phone?.trim()) {
@@ -102,11 +102,11 @@ export const useRegister = () => {
     }
     if (formData.organizerType === 'ENTERPRISE') {
       if (!formData.companyName?.trim()) {
-        setErrorMessage('Doanh nghiệp bắt buộc phải nhập Tên công ty / Đơn vị tổ chức.');
+        setErrorMessage('Hộ kinh doanh / Doanh nghiệp bắt buộc phải nhập Tên đơn vị / thương hiệu.');
         return;
       }
       if (!formData.taxId?.trim()) {
-        setErrorMessage('Doanh nghiệp bắt buộc phải nhập Mã số kinh doanh / Mã số thuế.');
+        setErrorMessage('Hộ kinh doanh / Doanh nghiệp bắt buộc phải nhập Mã số thuế / ĐKKD.');
         return;
       }
     }
@@ -148,10 +148,10 @@ export const useRegister = () => {
         accountType: 'EVENT_ORGANIZER',
       });
 
-      setSuccessMessage('Đăng ký tài khoản thành công! Đang chuyển hướng đến trang đăng nhập...');
+      setSuccessMessage('Đăng ký tài khoản thành công! Lưu ý: Bạn cần hoàn tất định danh eKYC thì mới có thể tạo sự kiện và tuyển dụng nhân sự trên CANi.');
       setTimeout(() => {
         navigate('/login');
-      }, 1500);
+      }, 2500);
     } catch (err) {
       setErrorMessage(err.message || 'Đăng ký tài khoản không thành công. Vui lòng thử lại.');
     } finally {

@@ -20,7 +20,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isRationaleValid) {
-      showToast('Lý do quyết định phải từ 100 đến 5000 ký tự theo quy định BR-55/BR-68.', 'warning');
+      showToast('Lý do quyết định phải từ 100 đến 5000 ký tự.', 'warning');
       return;
     }
 
@@ -46,8 +46,8 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
           <div>
             <h3>
               {isEscalated
-                ? 'Phán Quyết Cuối Cùng Của Admin (UC-102)'
-                : 'Ban Hành Quyết Định Giải Quyết (UC-100)'}
+                ? 'Phán Quyết Cuối Cùng Của Quản Trị Viên'
+                : 'Ban Hành Quyết Định Giải Quyết'}
             </h3>
             <span className="dispute-modal-subtitle">
               Mã đơn: <code>{dispute.id}</code> (Trạng thái hiện tại: <strong>{dispute.status}</strong>)
@@ -75,7 +75,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
 
             {outcome === DISPUTE_OUTCOMES.WORKER_FAULT && (
               <div className="dispute-rule-notice">
-                <strong>Quy tắc BR-55:</strong> Kết quả <code>WORKER_FAULT</code> sẽ tự động khấu trừ <strong>-10 điểm RS</strong> của Worker (trừ khi có lý do miễn trừ hợp lệ bên dưới).
+                <strong>Lưu ý:</strong> Kết quả <code>WORKER_FAULT</code> sẽ tự động khấu trừ <strong>-10 điểm uy tín</strong> của nhân sự (trừ khi có lý do miễn trừ hợp lệ bên dưới).
               </div>
             )}
 

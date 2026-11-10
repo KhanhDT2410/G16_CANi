@@ -38,7 +38,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
           <div>
-            <h3>Nạp Bằng Chứng Tranh Chấp (UC-98)</h3>
+            <h3>Nạp Bằng Chứng Tranh Chấp</h3>
             <span className="dispute-modal-subtitle">
               Đơn: <code>{dispute.id}</code>
             </span>

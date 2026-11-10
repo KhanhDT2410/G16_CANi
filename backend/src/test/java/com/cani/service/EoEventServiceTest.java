@@ -90,6 +90,7 @@ class EoEventServiceTest {
                 .eoId(eoId)
                 .user(mockUser)
                 .companyName("Cani Event Co")
+                .verificationStatus(VerificationStatus.APPROVED)
                 .build();
 
         ReflectionTestUtils.setField(eoEventService, "subscriptionService", subscriptionService);
@@ -128,6 +129,27 @@ class EoEventServiceTest {
         assertEquals(EventStatus.DRAFT, result.getStatus());
         verify(eventRepository, times(1)).save(any(Event.class));
         verify(subscriptionService, never()).validateAndDeductEventQuota(any(EventOrganizer.class));
+    }
+
+    @Test
+    @DisplayName("UTC001_EKYC - createEvent() - Abnormal: EO not yet verified eKYC (status=PENDING)")
+    void createEvent_ThrowsBadRequest_WhenEoNotVerifiedEkyc() {
+        EventOrganizer unverifiedEo = EventOrganizer.builder()
+                .eoId(eoId)
+                .user(mockUser)
+                .companyName("Unverified EO")
+                .verificationStatus(VerificationStatus.PENDING)
+                .build();
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(unverifiedEo));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("Sự kiện chưa eKYC")
+                .venueAddress("Hà Nội")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("chưa hoàn tất định danh eKYC"));
+        verify(eventRepository, never()).save(any(Event.class));
     }
 
     @Test
@@ -1398,7 +1420,7 @@ class EoEventServiceTest {
         Shift shift1 = Shift.builder().shiftId(UUID.randomUUID()).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
-        when(eventRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eoId)).thenReturn(List.of(event1, event2));
+        when(eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eoId)).thenReturn(List.of(event1, event2));
         when(shiftRepository.findByEvent_EventId(e1)).thenReturn(List.of(shift1));
         when(shiftRepository.findByEvent_EventId(e2)).thenReturn(Collections.emptyList());
 
@@ -1414,7 +1436,7 @@ class EoEventServiceTest {
     @DisplayName("UTC062 - getMyEvents() - Boundary: User authenticated as EO; EO has 0 events")
     void getMyEvents_Success_BoundaryZeroEvents_ReturnsEmptyList() {
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
-        when(eventRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eoId)).thenReturn(Collections.emptyList());
+        when(eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eoId)).thenReturn(Collections.emptyList());
 
         List<EventResponseDto> list = eoEventService.getMyEvents(userId);
 
@@ -1429,7 +1451,7 @@ class EoEventServiceTest {
         Event eOld = Event.builder().eventId(UUID.randomUUID()).name("Sự kiện Cũ").build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
-        when(eventRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eoId)).thenReturn(List.of(eNew, eOld));
+        when(eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eoId)).thenReturn(List.of(eNew, eOld));
         when(shiftRepository.findByEvent_EventId(any())).thenReturn(Collections.emptyList());
 
         List<EventResponseDto> list = eoEventService.getMyEvents(userId);

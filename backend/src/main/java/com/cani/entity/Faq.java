@@ -40,6 +40,15 @@ public class Faq {
     @Column(name = "answer", nullable = false, columnDefinition = "TEXT")
     private String answer;
 
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
+    @Column(name = "attachment_url", length = 1000)
+    private String attachmentUrl;
+
+    @Column(name = "attachment_name", length = 255)
+    private String attachmentName;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "status", nullable = false)

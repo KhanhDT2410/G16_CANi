@@ -98,6 +98,9 @@ public class FaqService {
                 .category(req.getCategory())
                 .question(req.getQuestion().trim())
                 .answer(req.getAnswer().trim())
+                .imageUrl(req.getImageUrl() != null && !req.getImageUrl().isBlank() ? req.getImageUrl().trim() : null)
+                .attachmentUrl(req.getAttachmentUrl() != null && !req.getAttachmentUrl().isBlank() ? req.getAttachmentUrl().trim() : null)
+                .attachmentName(req.getAttachmentName() != null && !req.getAttachmentName().isBlank() ? req.getAttachmentName().trim() : null)
                 .status(FaqStatus.DRAFT)
                 .authorId(authorId)
                 .viewCount(0)
@@ -127,6 +130,9 @@ public class FaqService {
         faq.setCategory(req.getCategory());
         faq.setQuestion(req.getQuestion().trim());
         faq.setAnswer(req.getAnswer().trim());
+        faq.setImageUrl(req.getImageUrl() != null && !req.getImageUrl().isBlank() ? req.getImageUrl().trim() : null);
+        faq.setAttachmentUrl(req.getAttachmentUrl() != null && !req.getAttachmentUrl().isBlank() ? req.getAttachmentUrl().trim() : null);
+        faq.setAttachmentName(req.getAttachmentName() != null && !req.getAttachmentName().isBlank() ? req.getAttachmentName().trim() : null);
 
         Faq saved = faqRepository.save(faq);
         recordAudit(actorId, "UPDATE_FAQ", saved, oldValues,
@@ -278,6 +284,9 @@ public class FaqService {
                 .category(faq.getCategory())
                 .question(faq.getQuestion())
                 .answer(faq.getAnswer())
+                .imageUrl(faq.getImageUrl())
+                .attachmentUrl(faq.getAttachmentUrl())
+                .attachmentName(faq.getAttachmentName())
                 .status(faq.getStatus())
                 .authorId(faq.getAuthorId())
                 .authorName(authorName)
@@ -295,8 +304,74 @@ public class FaqService {
                 .category(faq.getCategory())
                 .question(faq.getQuestion())
                 .answer(faq.getAnswer())
+                .imageUrl(faq.getImageUrl())
+                .attachmentUrl(faq.getAttachmentUrl())
+                .attachmentName(faq.getAttachmentName())
                 .viewCount(faq.getViewCount() != null ? faq.getViewCount() : 0)
                 .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Quản lý upload & phục vụ file ảnh đính kèm FAQ từ thiết bị
+    // ------------------------------------------------------------------
+
+    private static final String UPLOAD_DIR = "uploads/faqs";
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp", "gif");
+
+    public String uploadFaqImage(org.springframework.web.multipart.MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Tệp tải lên không được để trống");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String ext = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        }
+
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            throw new BadRequestException("Chỉ chấp nhận các định dạng ảnh: " + String.join(", ", ALLOWED_EXTENSIONS));
+        }
+
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BadRequestException("Dung lượng tệp ảnh không được vượt quá 5MB");
+        }
+
+        try {
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(UPLOAD_DIR);
+            if (!java.nio.file.Files.exists(uploadPath)) {
+                java.nio.file.Files.createDirectories(uploadPath);
+            }
+
+            String savedFilename = "faq_" + UUID.randomUUID().toString().replace("-", "") + "." + ext;
+            java.nio.file.Path targetPath = uploadPath.resolve(savedFilename);
+            java.nio.file.Files.copy(file.getInputStream(), targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+            return "/api/v1/faqs/images/" + savedFilename;
+        } catch (java.io.IOException e) {
+            log.error("Lỗi khi lưu tệp ảnh FAQ: {}", e.getMessage(), e);
+            throw new BadRequestException("Không thể lưu tệp ảnh: " + e.getMessage());
+        }
+    }
+
+    public org.springframework.core.io.Resource loadFaqImage(String filename) {
+        try {
+            // Ngăn chặn Path Traversal
+            if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                throw new BadRequestException("Tên tệp không hợp lệ");
+            }
+
+            java.nio.file.Path filePath = java.nio.file.Paths.get(UPLOAD_DIR).resolve(filename).normalize();
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            } else {
+                throw new ResourceNotFoundException("Không tìm thấy tệp ảnh: " + filename);
+            }
+        } catch (java.net.MalformedURLException e) {
+            throw new ResourceNotFoundException("Đường dẫn tệp không hợp lệ: " + filename);
+        }
     }
 }
 

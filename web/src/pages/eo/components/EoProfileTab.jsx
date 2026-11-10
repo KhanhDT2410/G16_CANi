@@ -1,19 +1,72 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { eoService } from '../../../services/eoService';
 import { useAuth } from '../../../features/auth';
+import { authApi } from '../../../features/auth/api/authApi';
 import { showToast } from '../../../components/common/Toast';
 import './EoProfileTab.css';
 import '../EoEkycTab.css';
+
+// Hàm che thông tin nhạy cảm
+const maskEmail = (email) => {
+  if (!email || typeof email !== 'string') return '';
+  const atIndex = email.indexOf('@');
+  if (atIndex <= 1) return email;
+  const name = email.slice(0, atIndex);
+  const domain = email.slice(atIndex);
+  if (name.length <= 3) {
+    return `${name.charAt(0)}****${domain}`;
+  }
+  return `${name.slice(0, 3)}****${name.slice(-1)}${domain}`;
+};
+
+const maskPhone = (phone) => {
+  if (!phone || typeof phone !== 'string') return '';
+  const digits = phone.trim();
+  if (digits.length <= 6) return '****';
+  return `${digits.slice(0, 3)}****${digits.slice(-3)}`;
+};
 
 export default function EoProfileTab() {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
 
-  const [activeSection, setActiveSection] = useState('PROFILE'); // 'PROFILE' | 'EKYC' | 'BANK' | 'SECURITY' | 'REPUTATION'
+  const [activeSection, setActiveSection] = useState('PROFILE'); // 'PROFILE' | 'EKYC' | 'SECURITY'
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [submittingEkyc, setSubmittingEkyc] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [isBusinessEntity, setIsBusinessEntity] = useState(false);
+
+  // Ẩn / Hiện thông tin nhạy cảm
+  const [showSensitive, setShowSensitive] = useState({
+    email: false,
+    phone: false,
+    formPhone: false,
+    formEmail: false,
+  });
+
+  const toggleSensitive = (field) => {
+    setShowSensitive((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  // State Bảo mật & Đổi mật khẩu qua OTP (hỗ trợ tài khoản Google / Quên mật khẩu)
+  const [securityMode, setSecurityMode] = useState('CURRENT_PASSWORD'); // 'CURRENT_PASSWORD' | 'EMAIL_OTP'
+  const [otpStep, setOtpStep] = useState(1);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpNewPassword, setOtpNewPassword] = useState('');
+  const [otpConfirmPassword, setOtpConfirmPassword] = useState('');
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [showOtpPassword, setShowOtpPassword] = useState(false);
+
+  useEffect(() => {
+    let timer;
+    if (otpCountdown > 0) {
+      timer = setTimeout(() => setOtpCountdown((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [otpCountdown]);
 
   // Avatar State & Sync
   const [avatarUrl, setAvatarUrl] = useState(() => {
@@ -24,18 +77,20 @@ export default function EoProfileTab() {
     }
   });
 
-  // Hồ Sơ Doanh Nghiệp
+  // Hồ Sơ Nhà Tổ Chức - Khởi tạo từ thông tin người dùng thực tế
   const [profile, setProfile] = useState({
-    companyName: 'Công ty Cổ phần Sự kiện & Truyền thông CANi',
-    taxId: '0109876543',
-    address: 'Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội',
-    fullName: user?.fullName || 'Phạm Duy Hưng',
-    phone: '0987654321',
-    email: user?.email || 'hungpd@cani.vn',
-    industry: 'Tổ chức sự kiện biểu diễn, thể thao & hội nghị cấp cao',
-    bio: 'Đơn vị tổ chức sự kiện chuyên nghiệp với hơn 5 năm kinh nghiệm điều phối nhân sự quy mô lớn tại Hà Nội và TP.HCM.',
-    ratingAvg: 5.0,
-    totalEventsCompleted: 2,
+    companyName: '',
+    taxId: '',
+    address: '',
+    fullName: user?.fullName || user?.username || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
+    industry: '',
+    bio: '',
+    ratingAvg: 0,
+    totalEventsCompleted: 0,
+    businessLicenseUrl: '',
+    businessVerificationStatus: 'NOT_REGISTERED',
   });
 
   // Trạng thái eKYC
@@ -55,23 +110,6 @@ export default function EoProfileTab() {
     businessLicenseImage: null,
   });
 
-  // Tài khoản ngân hàng chi trả Non-Escrow (MBBank VietQR)
-  const [bankInfo, setBankInfo] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cani_eo_bank_info');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.warn('Lỗi đọc cani_eo_bank_info:', e);
-    }
-    return {
-      bankName: 'MBBank (Ngân hàng TMCP Quân Đội)',
-      accountNumber: '2622 0147 8909 6',
-      accountHolder: 'PHAM DUY HUNG',
-      branch: 'Hội sở chính Hà Nội',
-      note: 'Dùng cho thanh toán VietQR chuyển khoản thù lao trực tiếp cho nhân sự sau ca làm.',
-    };
-  });
-
   // Form Đổi Mật Khẩu
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -89,6 +127,8 @@ export default function EoProfileTab() {
       ]);
 
       if (profileRes.status === 'fulfilled' && profileRes.value) {
+        const hasTax = Boolean(profileRes.value.taxId && profileRes.value.taxId.trim());
+        setIsBusinessEntity(hasTax);
         setProfile((prev) => ({
           ...prev,
           companyName: profileRes.value.companyName || prev.companyName,
@@ -99,6 +139,8 @@ export default function EoProfileTab() {
           email: profileRes.value.email || prev.email,
           ratingAvg: profileRes.value.ratingAvg || prev.ratingAvg,
           totalEventsCompleted: profileRes.value.totalEventsCompleted ?? prev.totalEventsCompleted,
+          businessLicenseUrl: profileRes.value.businessLicenseUrl || '',
+          businessVerificationStatus: profileRes.value.businessVerificationStatus || (hasTax ? 'AWAITING_LICENSE_UPLOAD' : 'NOT_REGISTERED'),
         }));
       }
 
@@ -167,7 +209,7 @@ export default function EoProfileTab() {
     setSavingProfile(true);
     try {
       const res = await eoService.updateEoProfile(profile);
-      showToast('Lưu thông tin hồ sơ doanh nghiệp thành công!', 'success');
+      showToast('Lưu thông tin hồ sơ nhà tổ chức thành công!', 'success');
       if (res) {
         setProfile((prev) => ({
           ...prev,
@@ -212,23 +254,24 @@ export default function EoProfileTab() {
       }
 
       const result = await eoService.submitEkyc(formData);
-      showToast('Đã nộp hồ sơ eKYC thành công! Hệ thống đang xử lý thẩm định.', 'success');
       setEkycData(result);
+      if (result?.status === 'REJECTED') {
+        showToast(result.routingReason || 'Hồ sơ định danh eKYC không hợp lệ hoặc bị trùng CCCD!', 'error');
+      } else if (result?.status === 'PENDING_REVIEW') {
+        showToast(result.routingReason || 'Đã nộp hồ sơ eKYC! Đang chờ Admin thẩm định.', 'info');
+      } else {
+        showToast('Xác thực định danh eKYC thành công!', 'success');
+      }
+      await loadData();
+      try {
+        window.dispatchEvent(new CustomEvent('cani_ekyc_updated'));
+      } catch (e) {
+        console.warn('Lỗi dispatch cani_ekyc_updated:', e);
+      }
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi nộp hồ sơ eKYC', 'error');
     } finally {
       setSubmittingEkyc(false);
-    }
-  };
-
-  // Cập nhật thông tin tài khoản ngân hàng
-  const handleSaveBankInfo = (e) => {
-    e.preventDefault();
-    try {
-      localStorage.setItem('cani_eo_bank_info', JSON.stringify(bankInfo));
-      showToast('Cập nhật tài khoản chi trả thù lao thành công!', 'success');
-    } catch {
-      showToast('Lỗi lưu thông tin ngân hàng', 'error');
     }
   };
 
@@ -250,6 +293,67 @@ export default function EoProfileTab() {
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       showToast('Đã đổi mật khẩu tài khoản thành công!', 'success');
     }, 800);
+  };
+
+  // Gửi mã OTP khôi phục / thiết lập mật khẩu qua Email (Dành cho Google OAuth / Quên mật khẩu)
+  const handleSendOtp = async () => {
+    const targetEmail = profile.email || user?.email;
+    if (!targetEmail) {
+      showToast('Không tìm thấy địa chỉ email tài khoản để nhận mã OTP', 'error');
+      return;
+    }
+    setIsSendingOtp(true);
+    try {
+      await authApi.resetPassword({ email: targetEmail.trim().toLowerCase() });
+      setOtpStep(2);
+      setOtpCountdown(60);
+      showToast(`Đã gửi mã xác thực 6 số đến email ${targetEmail}!`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Không thể gửi mã xác thực OTP. Vui lòng thử lại sau.', 'error');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Xác nhận OTP và thiết lập mật khẩu mới
+  const handleConfirmOtpReset = async (e) => {
+    e.preventDefault();
+    const targetEmail = profile.email || user?.email;
+    if (!targetEmail) {
+      showToast('Không tìm thấy địa chỉ email tài khoản', 'error');
+      return;
+    }
+    if (!otpCode || otpCode.trim().length !== 6) {
+      showToast('Vui lòng nhập đúng mã OTP 6 chữ số', 'error');
+      return;
+    }
+    if (!otpNewPassword || otpNewPassword.length < 8) {
+      showToast('Mật khẩu mới phải có tối thiểu 8 ký tự', 'error');
+      return;
+    }
+    if (otpNewPassword !== otpConfirmPassword) {
+      showToast('Mật khẩu xác nhận không khớp', 'error');
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      await authApi.confirmResetPassword({
+        email: targetEmail.trim().toLowerCase(),
+        otp: otpCode.trim(),
+        newPassword: otpNewPassword,
+      });
+      showToast('Thiết lập mật khẩu mới thành công! Bạn có thể sử dụng mật khẩu này để đăng nhập trực tiếp.', 'success');
+      setOtpCode('');
+      setOtpNewPassword('');
+      setOtpConfirmPassword('');
+      setOtpStep(1);
+      setSecurityMode('CURRENT_PASSWORD');
+    } catch (err) {
+      showToast(err.message || 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.', 'error');
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
   const ekycStatus = ekycData?.status || 'NOT_SUBMITTED';
@@ -297,10 +401,10 @@ export default function EoProfileTab() {
 
           <div className="profile-hero-info">
             <div className="profile-name-row">
-              <h2 className="profile-org-name">{profile.companyName}</h2>
+              <h2 className="profile-org-name">{profile.companyName || 'Chưa cập nhật tên tổ chức'}</h2>
               <span className="profile-role-pill">Ban Tổ Chức Sự Kiện</span>
               {ekycStatus === 'APPROVED' ? (
-                <span className="status-pill approved" title="Doanh nghiệp đã được xác thực eKYC">
+                <span className="status-pill approved" title="Nhà tổ chức đã được xác thực eKYC">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                   </svg>
@@ -319,20 +423,68 @@ export default function EoProfileTab() {
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>
                 </svg>
-                Người đại diện: <strong>{profile.fullName}</strong>
+                Người đại diện: <strong>{profile.fullName || 'Chưa cập nhật'}</strong>
               </span>
               <span className="profile-meta-item">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                   <polyline points="22,6 12,13 2,6"></polyline>
                 </svg>
-                {profile.email}
+                <span className="sensitive-masked">
+                  {profile.email
+                    ? (showSensitive.email ? profile.email : maskEmail(profile.email))
+                    : 'Chưa có email'}
+                </span>
+                {profile.email && (
+                  <button
+                    type="button"
+                    className="btn-toggle-eye"
+                    onClick={() => toggleSensitive('email')}
+                    title={showSensitive.email ? 'Ẩn email' : 'Hiện email'}
+                  >
+                    {showSensitive.email ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    )}
+                  </button>
+                )}
               </span>
               <span className="profile-meta-item">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                 </svg>
-                {profile.phone}
+                <span className="sensitive-masked">
+                  {profile.phone
+                    ? (showSensitive.phone ? profile.phone : maskPhone(profile.phone))
+                    : 'Chưa cập nhật SĐT'}
+                </span>
+                {profile.phone && (
+                  <button
+                    type="button"
+                    className="btn-toggle-eye"
+                    onClick={() => toggleSensitive('phone')}
+                    title={showSensitive.phone ? 'Ẩn số điện thoại' : 'Hiện số điện thoại'}
+                  >
+                    {showSensitive.phone ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    )}
+                  </button>
+                )}
               </span>
             </div>
 
@@ -360,16 +512,14 @@ export default function EoProfileTab() {
 
         <div className="profile-hero-right">
           <div className="profile-stat-box">
-            <div className="profile-stat-value">{profile.totalEventsCompleted || 2}</div>
+            <div className="profile-stat-value">{profile.totalEventsCompleted ?? 0}</div>
             <div className="profile-stat-label">Sự kiện đã chạy</div>
           </div>
           <div className="profile-stat-box">
-            <div className="profile-stat-value" style={{ color: '#16a34a' }}>5.0 / 5.0</div>
+            <div className="profile-stat-value" style={{ color: '#16a34a' }}>
+              {profile.totalEventsCompleted > 0 && profile.ratingAvg ? `${profile.ratingAvg.toFixed(1)} / 5.0` : '—'}
+            </div>
             <div className="profile-stat-label">Độ uy tín tuyển dụng</div>
-          </div>
-          <div className="profile-stat-box">
-            <div className="profile-stat-value" style={{ color: '#2563eb' }}>100%</div>
-            <div className="profile-stat-label">Tuân thủ Non-Escrow</div>
           </div>
         </div>
       </div>
@@ -386,7 +536,7 @@ export default function EoProfileTab() {
             <line x1="3" y1="9" x2="21" y2="9"></line>
             <line x1="9" y1="21" x2="9" y2="9"></line>
           </svg>
-          1. Thông Tin Doanh Nghiệp
+          1. Thông Tin Nhà Tổ Chức
         </button>
 
         <button
@@ -397,19 +547,7 @@ export default function EoProfileTab() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
-          2. Định Danh eKYC Doanh Nghiệp
-        </button>
-
-        <button
-          type="button"
-          className={`profile-subnav-btn ${activeSection === 'BANK' ? 'active' : ''}`}
-          onClick={() => setActiveSection('BANK')}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-            <line x1="1" y1="10" x2="23" y2="10"></line>
-          </svg>
-          3. Tài Khoản Ngân Hàng Chi Trả
+          2. Xác Thực Định Danh eKYC
         </button>
 
         <button
@@ -421,93 +559,222 @@ export default function EoProfileTab() {
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
-          4. Bảo Mật & Mật Khẩu
-        </button>
-
-        <button
-          type="button"
-          className={`profile-subnav-btn ${activeSection === 'REPUTATION' ? 'active' : ''}`}
-          onClick={() => setActiveSection('REPUTATION')}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="8" r="7"></circle>
-            <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-          </svg>
-          5. Huy Hiệu Tín Nhiệm & Pháp Lý
+          3. Bảo Mật & Mật Khẩu
         </button>
       </nav>
 
       {/* 3. NỘI DUNG TỪNG PHÂN HỆ */}
 
-      {/* SECTION 1: THÔNG TIN DOANH NGHIỆP */}
+      {/* SECTION 1: THÔNG TIN NHÀ TỔ CHỨC */}
       {activeSection === 'PROFILE' && (
         <div className="profile-card">
           <div className="profile-card-header">
             <div className="profile-card-header-left">
-              <h3>Hồ Sơ Doanh Nghiệp & Đơn Vị Tổ Chức Sự Kiện</h3>
+              <h3>Hồ Sơ Nhà Tổ Chức Sự Kiện</h3>
               <p>Thông tin thương hiệu chính thức xuất hiện trên trang tuyển dụng và bảng phân công nhân sự.</p>
             </div>
           </div>
 
           <form onSubmit={handleSaveProfile}>
+            {/* Toggle / Nút bấm Đăng Ký Hộ Kinh Doanh & Trạng thái Admin Duyệt */}
+            <div style={{
+              backgroundColor: isBusinessEntity ? '#eff6ff' : '#f8fafc',
+              border: isBusinessEntity ? '1.5px solid #3b82f6' : '1px dashed #cbd5e1',
+              borderRadius: '0.875rem',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.25rem',
+              transition: 'all 0.2s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={isBusinessEntity}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsBusinessEntity(checked);
+                      if (!checked) {
+                        handleProfileFieldChange('taxId', '');
+                      }
+                    }}
+                    style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 700, fontSize: '0.925rem', color: isBusinessEntity ? '#1d4ed8' : '#334155' }}>
+                    Đăng ký tư cách Hộ kinh doanh / Doanh nghiệp (Có Mã Số Thuế)
+                  </span>
+                </label>
+
+                {/* Trạng thái xác nhận từ Admin */}
+                {isBusinessEntity ? (
+                  profile.businessVerificationStatus === 'APPROVED' ? (
+                    <span className="status-pill approved" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                      ĐÃ ĐƯỢC ADMIN XÁC NHẬN HỘ KINH DOANH
+                    </span>
+                  ) : profile.businessVerificationStatus === 'PENDING_REVIEW' ? (
+                    <span className="status-pill pending" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      ⏳ ĐÃ NỘP GPKD - ĐANG CHỜ ADMIN XÁC NHẬN
+                    </span>
+                  ) : (
+                    <span className="status-pill none" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#b45309' }}>
+                      ⚠️ CẦN ADMIN XÁC NHẬN (NỘP GPKD TẠI EKYC)
+                    </span>
+                  )
+                ) : (
+                  <span style={{
+                    fontSize: '0.775rem',
+                    padding: '0.25rem 0.65rem',
+                    borderRadius: '9999px',
+                    fontWeight: 600,
+                    backgroundColor: '#e2e8f0',
+                    color: '#475569',
+                  }}>
+                    Mặc định: Cá nhân / Nhà tổ chức
+                  </span>
+                )}
+              </div>
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.825rem', color: '#64748b', lineHeight: 1.45 }}>
+                {isBusinessEntity
+                  ? 'Khi đăng ký Hộ kinh doanh / Doanh nghiệp, bạn cần điền Mã số thuế và nộp Giấy phép đăng ký kinh doanh tại mục eKYC để Ban Quản Trị (Admin) thẩm định và phê duyệt tư cách pháp nhân.'
+                  : 'Tài khoản cá nhân / ban tổ chức tự do không bắt buộc có Mã số thuế. Nếu bạn là Hộ kinh doanh hoặc Doanh nghiệp có MST, hãy tích vào ô trên để mở khóa ô điền Mã số thuế.'}
+              </p>
+              {isBusinessEntity && profile.businessVerificationStatus !== 'APPROVED' && profile.businessVerificationStatus !== 'PENDING_REVIEW' && (
+                <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection('EKYC')}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                    }}
+                  >
+                    <span>Nộp Giấy phép ĐKKD để Admin duyệt</span>
+                    <span>→</span>
+                  </button>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    (Tải ảnh Giấy phép ĐKKD tại Tab 2. Xác Thực Định Danh eKYC)
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div className="profile-form-grid-2">
               <div className="profile-form-group">
-                <label>Tên Doanh Nghiệp / Công Ty / Đơn Vị Tổ Chức *</label>
+                <label>Tên Nhà Tổ Chức / Đơn Vị Sự Kiện *</label>
                 <input
                   type="text"
                   required
                   className="profile-input"
                   value={profile.companyName}
                   onChange={(e) => handleProfileFieldChange('companyName', e.target.value)}
-                  placeholder="VD: Công ty TNHH Truyền Thông CANI"
+                  placeholder="VD: Ban Tổ Chức Festival hoặc Tên Đơn Vị"
                 />
               </div>
 
               <div className="profile-form-group">
-                <label>Mã Số Thuế (MST) / Số ĐKKD *</label>
+                <label>
+                  Mã Số Thuế (MST) / Số ĐKKD {isBusinessEntity ? '*' : '(Chỉ mở cho Hộ kinh doanh)'}
+                </label>
                 <input
                   type="text"
-                  required
+                  required={isBusinessEntity}
+                  disabled={!isBusinessEntity}
                   className="profile-input"
+                  style={{
+                    backgroundColor: !isBusinessEntity ? '#f1f5f9' : '#ffffff',
+                    cursor: !isBusinessEntity ? 'not-allowed' : 'text',
+                    color: !isBusinessEntity ? '#94a3b8' : 'inherit',
+                  }}
                   value={profile.taxId}
                   onChange={(e) => handleProfileFieldChange('taxId', e.target.value)}
-                  placeholder="VD: 0109876543"
+                  placeholder={isBusinessEntity ? "VD: 0109876543 hoặc 0312345678" : "Bấm nút đăng ký hộ kinh doanh phía trên để điền MST"}
                 />
               </div>
 
               <div className="profile-form-group">
-                <label>Người Đại Diện Pháp Luật / Trưởng Ban Tổ Chức *</label>
+                <label>Họ & Tên Trưởng Ban / Người Đại Diện *</label>
                 <input
                   type="text"
                   required
                   className="profile-input"
                   value={profile.fullName}
                   onChange={(e) => handleProfileFieldChange('fullName', e.target.value)}
-                  placeholder="VD: Phạm Duy Hưng"
+                  placeholder="VD: Nguyễn Văn A"
                 />
               </div>
 
               <div className="profile-form-group">
                 <label>Số Điện Thoại Hotline / Zalo Điều Phối *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={profile.phone}
-                  onChange={(e) => handleProfileFieldChange('phone', e.target.value)}
-                  placeholder="VD: 0987654321"
-                />
+                <div className="profile-input-wrapper">
+                  <input
+                    type={showSensitive.formPhone ? 'text' : 'password'}
+                    required
+                    className="profile-input"
+                    value={profile.phone}
+                    onChange={(e) => handleProfileFieldChange('phone', e.target.value)}
+                    placeholder="VD: 0901234567"
+                  />
+                  <button
+                    type="button"
+                    className="profile-input-eye-btn"
+                    onClick={() => toggleSensitive('formPhone')}
+                    title={showSensitive.formPhone ? 'Ẩn số điện thoại' : 'Hiện số điện thoại'}
+                  >
+                    {showSensitive.formPhone ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="profile-form-group">
-                <label>Email Nhận Báo Cáo & Hóa Đơn VAT</label>
-                <input
-                  type="email"
-                  className="profile-input"
-                  value={profile.email}
-                  onChange={(e) => handleProfileFieldChange('email', e.target.value)}
-                  placeholder="VD: contact@cani.vn"
-                />
+                <label>Email Nhận Báo Cáo & Hóa Đơn VAT (Tùy chọn)</label>
+                <div className="profile-input-wrapper">
+                  <input
+                    type={showSensitive.formEmail ? 'text' : 'password'}
+                    className="profile-input"
+                    value={profile.email}
+                    onChange={(e) => handleProfileFieldChange('email', e.target.value)}
+                    placeholder="VD: contact@cani.vn"
+                  />
+                  <button
+                    type="button"
+                    className="profile-input-eye-btn"
+                    onClick={() => toggleSensitive('formEmail')}
+                    title={showSensitive.formEmail ? 'Ẩn email' : 'Hiện email'}
+                  >
+                    {showSensitive.formEmail ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="profile-form-group">
@@ -522,14 +789,14 @@ export default function EoProfileTab() {
               </div>
 
               <div className="profile-form-group span-2">
-                <label>Địa Chỉ Trụ Sở Công Ty / Văn Phòng Điều Hành *</label>
+                <label>Địa Chỉ Liên Hệ / Văn Phòng *</label>
                 <input
                   type="text"
                   required
                   className="profile-input"
                   value={profile.address}
                   onChange={(e) => handleProfileFieldChange('address', e.target.value)}
-                  placeholder="VD: Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội"
+                  placeholder="VD: Số 123 Đường Cầu Giấy, Hà Nội"
                 />
               </div>
 
@@ -562,18 +829,18 @@ export default function EoProfileTab() {
         </div>
       )}
 
-      {/* SECTION 2: ĐỊNH DANH eKYC DOANH NGHIỆP */}
+      {/* SECTION 2: ĐỊNH DANH eKYC NHÀ TỔ CHỨC */}
       {activeSection === 'EKYC' && (
         <div className="profile-card">
           <div className="profile-card-header">
             <div className="profile-card-header-left">
-              <h3>Xác Thực Định Danh Doanh Nghiệp (eKYC 4.0)</h3>
-              <p>Tuân thủ Nghị định 13/2023/NĐ-CP và Luật Căn cước công dân. Nâng cao độ uy tín tuyển dụng.</p>
+              <h3>Xác Thực Định Danh Nhà Tổ Chức (eKYC 4.0)</h3>
+              <p>Tuân thủ Nghị định 13/2023/NĐ-CP và Luật Căn cước. Nâng cao độ uy tín tuyển dụng và mở khóa tính năng tạo sự kiện.</p>
             </div>
 
             <div>
               {ekycStatus === 'APPROVED' && (
-                <span className="status-pill approved">ĐÃ CHỨNG THỰC UY TÍN</span>
+                <span className="status-pill approved">ĐÃ XÁC THỰC UY TÍN</span>
               )}
               {ekycStatus === 'PENDING_REVIEW' && (
                 <span className="status-pill pending">ĐANG CHỜ DUYỆT</span>
@@ -595,30 +862,40 @@ export default function EoProfileTab() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
-                Doanh nghiệp đã hoàn tất thẩm định định danh eKYC điện tử.
+                Nhà tổ chức đã hoàn tất thẩm định định danh eKYC điện tử.
               </div>
               <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
-                Tin tuyển dụng của bạn được đóng dấu Huy hiệu Doanh nghiệp Uy tín, tự động kích hoạt Matching Radar AI với độ ưu tiên cao nhất.
+                Hồ sơ của bạn được đóng dấu Huy hiệu Nhà Tổ Chức Uy Tín, mở khóa toàn quyền tạo sự kiện và tuyển dụng nhân sự trên CANi.
               </div>
 
               <div className="info-grid">
                 <div className="info-item">
-                  <span className="info-label">Người đại diện pháp luật</span>
-                  <span className="info-val">{ekycData.representativeName || profile.fullName}</span>
+                  <span className="info-label">Họ và tên trên CCCD</span>
+                  <span className="info-val">{ekycData.representativeName || '—'}</span>
                 </div>
                 <div className="info-item">
                   <span className="info-label">Số CCCD (Bảo mật NĐ 13)</span>
-                  <span className="info-val">{ekycData.cccdNumberMasked || '001099******'}</span>
+                  <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Ngày sinh & Giới tính</span>
+                  <span className="info-val">
+                    {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
+                  </span>
                 </div>
                 <div className="info-item">
                   <span className="info-label">Độ khớp khuôn mặt (Face Match)</span>
                   <span className="info-val" style={{ color: '#16a34a' }}>
-                    {ekycData.faceMatchScore ? `${ekycData.faceMatchScore}%` : '98.5% (VNPT eKYC)'}
+                    {ekycData.faceMatchScore != null ? `${Number(ekycData.faceMatchScore).toFixed(1)}%` : '—'}
                   </span>
                 </div>
                 <div className="info-item">
-                  <span className="info-label">Địa chỉ đăng ký</span>
-                  <span className="info-val">{ekycData.residenceAddress || profile.address}</span>
+                  <span className="info-label">Quê quán</span>
+                  <span className="info-val">{ekycData.originAddress || '—'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Nơi thường trú (Trên CCCD)</span>
+                  <span className="info-val">{ekycData.residenceAddress || '—'}</span>
                 </div>
               </div>
             </div>
@@ -627,11 +904,33 @@ export default function EoProfileTab() {
               {ekycStatus === 'PENDING_REVIEW' && (
                 <div style={{ backgroundColor: '#fefce8', border: '1px solid #fef08a', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
                   <div style={{ fontWeight: 700, color: '#854d0e', marginBottom: '0.25rem' }}>
-                    Hồ sơ eKYC đang được đội ngũ CSKH thẩm định
+                    Hồ sơ eKYC đang chờ Admin / CSKH thẩm định
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#a16207' }}>
-                    Hệ thống đã tiếp nhận dữ liệu CCCD của bạn. Thời gian xét duyệt tự động trong vòng 15-30 phút làm việc.
+                  <div style={{ fontSize: '0.875rem', color: '#a16207', marginBottom: '0.75rem' }}>
+                    {ekycData?.routingReason || 'Hệ thống đã bóc tách thông tin CCCD của bạn và đang chờ Admin phê duyệt.'}
                   </div>
+                  {ekycData && (
+                    <div className="info-grid" style={{ marginTop: '0.75rem' }}>
+                      <div className="info-item">
+                        <span className="info-label">Họ và tên trên CCCD</span>
+                        <span className="info-val">{ekycData.representativeName || '—'}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Số CCCD (Bảo mật NĐ 13)</span>
+                        <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Ngày sinh & Giới tính</span>
+                        <span className="info-val">
+                          {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
+                        </span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Nơi thường trú (Trên CCCD)</span>
+                        <span className="info-val">{ekycData.residenceAddress || '—'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -731,8 +1030,8 @@ export default function EoProfileTab() {
                         <polyline points="10 9 9 9 8 9"></polyline>
                       </svg>
                     )}
-                    <div className="upload-label">Giấy Phép ĐKKD (Tùy chọn)</div>
-                    <div className="upload-hint">Bản chụp GPKD hoặc giấy ủy quyền</div>
+                    <div className="upload-label">Giấy Phép ĐKKD (Dành cho Hộ kinh doanh)</div>
+                    <div className="upload-hint">Bản chụp ĐKKD — Admin CANi sẽ trực tiếp thẩm định & phê duyệt</div>
                   </label>
                 </div>
 
@@ -756,248 +1055,244 @@ export default function EoProfileTab() {
         </div>
       )}
 
-      {/* SECTION 3: TÀI KHOẢN NGÂN HÀNG CHI TRẢ THÙ LAO */}
-      {activeSection === 'BANK' && (
-        <div className="profile-card">
-          <div className="profile-card-header">
-            <div className="profile-card-header-left">
-              <h3>Tài Khoản Ngân Hàng Chi Trả Thù Lao (Non-Escrow)</h3>
-              <p>Hệ thống CANi kết nối VietQR NAPAS 247 để chuyển lương trực tiếp từ tài khoản EO sang tài khoản Worker.</p>
-            </div>
-          </div>
-
-          <div className="bank-preview-card">
-            <div className="bank-card-top">
-              <div className="bank-name-badge">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                </svg>
-                {bankInfo.bankName}
-              </div>
-              <div className="bank-card-chip"></div>
-            </div>
-
-            <div className="bank-account-number">{bankInfo.accountNumber}</div>
-
-            <div className="bank-card-bottom">
-              <div>
-                <div className="bank-holder-label">Chủ Tài Khoản / Người Thụ Hưởng</div>
-                <div className="bank-holder-name">{bankInfo.accountHolder}</div>
-              </div>
-              <span className="bank-method-badge">VietQR NAPAS 247 Direct</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveBankInfo}>
-            <div className="profile-form-grid-2">
-              <div className="profile-form-group">
-                <label>Ngân Hàng *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={bankInfo.bankName}
-                  onChange={(e) => setBankInfo({ ...bankInfo, bankName: e.target.value })}
-                  placeholder="VD: MBBank (Ngân hàng Quân Đội)"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Số Tài Khoản Ngân Hàng *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={bankInfo.accountNumber}
-                  onChange={(e) => setBankInfo({ ...bankInfo, accountNumber: e.target.value })}
-                  placeholder="VD: 2622 0147 8909 6"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Tên Chủ Tài Khoản (In hoa không dấu) *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={bankInfo.accountHolder}
-                  onChange={(e) => setBankInfo({ ...bankInfo, accountHolder: e.target.value.toUpperCase() })}
-                  placeholder="VD: PHAM DUY HUNG"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Chi Nhánh Mở Tài Khoản</label>
-                <input
-                  type="text"
-                  className="profile-input"
-                  value={bankInfo.branch}
-                  onChange={(e) => setBankInfo({ ...bankInfo, branch: e.target.value })}
-                  placeholder="VD: Hội sở chính Hà Nội"
-                />
-              </div>
-
-              <div className="profile-form-group span-2">
-                <label>Ghi Chú Thanh Toán Non-Escrow</label>
-                <input
-                  type="text"
-                  className="profile-input"
-                  value={bankInfo.note}
-                  onChange={(e) => setBankInfo({ ...bankInfo, note: e.target.value })}
-                  placeholder="Ghi chú xuất hiện khi quét mã QR thanh toán lương"
-                />
-              </div>
-            </div>
-
-            <div className="profile-actions-bar">
-              <button type="submit" className="profile-btn-primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                </svg>
-                Lưu Tài Khoản Ngân Hàng
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* SECTION 4: BẢO MẬT & MẬT KHẨU */}
+      {/* SECTION 3: BẢO MẬT & MẬT KHẨU */}
       {activeSection === 'SECURITY' && (
         <div className="profile-card">
           <div className="profile-card-header">
             <div className="profile-card-header-left">
-              <h3>Bảo Mật Tài Khoản & Đổi Mật Khẩu</h3>
+              <h3>Bảo Mật Tài Khoản & Mật Khẩu</h3>
               <p>Quản lý mật khẩu đăng nhập cổng portal và phiên làm việc bảo mật của ban tổ chức.</p>
             </div>
           </div>
 
-          <form onSubmit={handleChangePassword}>
-            <div className="profile-form-grid-2">
-              <div className="profile-form-group span-2">
-                <label>Mật Khẩu Hiện Tại *</label>
-                <input
-                  type="password"
-                  required
-                  className="profile-input"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  placeholder="Nhập mật khẩu hiện tại"
-                />
+          {/* Bộ chọn phương thức đổi / thiết lập mật khẩu */}
+          <div className="security-mode-tabs">
+            <button
+              type="button"
+              className={`security-tab-btn ${securityMode === 'CURRENT_PASSWORD' ? 'active' : ''}`}
+              onClick={() => setSecurityMode('CURRENT_PASSWORD')}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              Đổi Mật Khẩu (Bằng Mật Khẩu Hiện Tại)
+            </button>
+            <button
+              type="button"
+              className={`security-tab-btn ${securityMode === 'EMAIL_OTP' ? 'active' : ''}`}
+              onClick={() => setSecurityMode('EMAIL_OTP')}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              Thiết Lập / Đặt Lại Qua Email OTP (Dành Cho Google OAuth)
+            </button>
+          </div>
+
+          {securityMode === 'CURRENT_PASSWORD' ? (
+            <form onSubmit={handleChangePassword}>
+              <div className="profile-form-grid-2">
+                <div className="profile-form-group span-2">
+                  <label>Mật Khẩu Hiện Tại *</label>
+                  <input
+                    type="password"
+                    required
+                    className="profile-input"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                    placeholder="Nhập mật khẩu hiện tại"
+                  />
+                  <div style={{ marginTop: '0.45rem', fontSize: '0.8rem', color: '#64748b' }}>
+                    Đăng nhập bằng Google hoặc không nhớ mật khẩu cũ?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setSecurityMode('EMAIL_OTP')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#2563eb',
+                        fontWeight: 600,
+                        padding: 0,
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      Bấm vào đây để nhận mã OTP qua Email
+                    </button>
+                  </div>
+                </div>
+
+                <div className="profile-form-group">
+                  <label>Mật Khẩu Mới *</label>
+                  <input
+                    type="password"
+                    required
+                    className="profile-input"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    placeholder="Tối thiểu 8 ký tự"
+                  />
+                </div>
+
+                <div className="profile-form-group">
+                  <label>Nhập Lại Mật Khẩu Mới *</label>
+                  <input
+                    type="password"
+                    required
+                    className="profile-input"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    placeholder="Xác nhận lại mật khẩu mới"
+                  />
+                </div>
               </div>
 
-              <div className="profile-form-group">
-                <label>Mật Khẩu Mới *</label>
-                <input
-                  type="password"
-                  required
-                  className="profile-input"
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  placeholder="Tối thiểu 8 ký tự"
-                />
+              <div style={{ margin: '1rem 0', fontSize: '0.825rem', color: '#64748b' }}>
+                Mật khẩu an toàn nên bao gồm cả chữ hoa, chữ thường, số và ký tự đặc biệt để bảo vệ tài khoản khỏi xâm nhập trái phép.
               </div>
 
-              <div className="profile-form-group">
-                <label>Nhập Lại Mật Khẩu Mới *</label>
-                <input
-                  type="password"
-                  required
-                  className="profile-input"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  placeholder="Xác nhận lại mật khẩu mới"
-                />
+              <div className="profile-actions-bar">
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="profile-btn-primary"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                  {changingPassword ? 'Đang cập nhật...' : 'Cập Nhật Mật Khẩu'}
+                </button>
               </div>
-            </div>
+            </form>
+          ) : (
+            <div>
+              <div style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '0.875rem',
+                padding: '1.25rem',
+                marginBottom: '1.5rem',
+              }}>
+                <div style={{ fontWeight: 700, fontSize: '0.925rem', color: '#1e40af', marginBottom: '0.35rem' }}>
+                  Thiết lập mật khẩu trực tiếp qua mã OTP Email
+                </div>
+                <p style={{ margin: 0, fontSize: '0.825rem', color: '#1e3a8a', lineHeight: 1.5 }}>
+                  Dành riêng cho bạn nếu đăng nhập bằng Google hoặc không có mật khẩu cũ. Hệ thống CANi sẽ gửi mã OTP gồm 6 chữ số đến email để xác minh quyền sở hữu tài khoản mà không cần mật khẩu hiện tại.
+                </p>
+              </div>
 
-            <div style={{ margin: '1rem 0', fontSize: '0.825rem', color: '#64748b' }}>
-              Mật khẩu an toàn nên bao gồm cả chữ hoa, chữ thường, số và ký tự đặc biệt để bảo vệ tài khoản khỏi xâm nhập trái phép.
-            </div>
+              <form onSubmit={handleConfirmOtpReset}>
+                <div className="profile-form-grid-2">
+                  <div className="profile-form-group span-2">
+                    <label>Địa Chỉ Email Nhận Mã OTP</label>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        disabled
+                        className="profile-input"
+                        style={{ backgroundColor: '#f1f5f9', color: '#334155', flex: '1 1 240px' }}
+                        value={showSensitive.email ? (profile.email || user?.email) : maskEmail(profile.email || user?.email)}
+                      />
+                      <button
+                        type="button"
+                        disabled={isSendingOtp || otpCountdown > 0}
+                        onClick={handleSendOtp}
+                        className="profile-btn-primary"
+                        style={{ padding: '0.65rem 1.25rem', whiteSpace: 'nowrap', minWidth: '170px' }}
+                      >
+                        {isSendingOtp ? 'Đang gửi...' : otpCountdown > 0 ? `Gửi lại sau (${otpCountdown}s)` : 'Gửi mã OTP qua Email'}
+                      </button>
+                    </div>
+                  </div>
 
-            <div className="profile-actions-bar">
-              <button
-                type="submit"
-                disabled={changingPassword}
-                className="profile-btn-primary"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-                {changingPassword ? 'Đang cập nhật...' : 'Cập Nhật Mật Khẩu'}
-              </button>
+                  {otpStep >= 2 && (
+                    <>
+                      <div className="profile-form-group span-2">
+                        <label>Nhập Mã Xác Thực OTP (6 số từ Email) *</label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={6}
+                          className="profile-input"
+                          style={{ fontSize: '1.2rem', letterSpacing: '0.35em', fontWeight: 700, textAlign: 'center' }}
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                          placeholder="••••••"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="profile-form-group">
+                        <label>Mật Khẩu Mới *</label>
+                        <div className="profile-input-wrapper">
+                          <input
+                            type={showOtpPassword ? 'text' : 'password'}
+                            required
+                            minLength={8}
+                            className="profile-input"
+                            value={otpNewPassword}
+                            onChange={(e) => setOtpNewPassword(e.target.value)}
+                            placeholder="Tối thiểu 8 ký tự"
+                          />
+                          <button
+                            type="button"
+                            className="profile-input-eye-btn"
+                            onClick={() => setShowOtpPassword(!showOtpPassword)}
+                            title={showOtpPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          >
+                            {showOtpPassword ? (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                              </svg>
+                            ) : (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="profile-form-group">
+                        <label>Xác Nhận Lại Mật Khẩu Mới *</label>
+                        <input
+                          type={showOtpPassword ? 'text' : 'password'}
+                          required
+                          minLength={8}
+                          className="profile-input"
+                          value={otpConfirmPassword}
+                          onChange={(e) => setOtpConfirmPassword(e.target.value)}
+                          placeholder="Nhập lại mật khẩu mới"
+                        />
+                      </div>
+
+                      <div className="profile-actions-bar span-2">
+                        <button
+                          type="submit"
+                          disabled={isResettingPassword}
+                          className="profile-btn-primary"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                          {isResettingPassword ? 'Đang xác thực & cập nhật...' : 'Xác Nhận & Cập Nhật Mật Khẩu'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </form>
             </div>
-          </form>
+          )}
         </div>
       )}
 
-      {/* SECTION 5: HUY HIỆU TÍN NHIỆM & PHÁP LÝ */}
-      {activeSection === 'REPUTATION' && (
-        <div className="profile-card">
-          <div className="profile-card-header">
-            <div className="profile-card-header-left">
-              <h3>Huy Hiệu Tín Nhiệm & Tuân Thủ Pháp Lý Sàn CANi</h3>
-              <p>Hệ thống chứng nhận chuẩn hóa năng lực tổ chức sự kiện chuyên nghiệp.</p>
-            </div>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '1.25rem', backgroundColor: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Huy Hiệu Doanh Nghiệp Xác Minh</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Cấp bởi Sàn CANi Platform</div>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.825rem', color: '#475569', margin: 0 }}>
-                Chứng nhận pháp nhân có giấy phép hoạt động hợp pháp và người đại diện CCCD được đối soát điện tử.
-              </p>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '1.25rem', backgroundColor: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Cam Kết Non-Escrow Chuẩn Mực</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Chi trả thù lao đúng hạn 100%</div>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.825rem', color: '#475569', margin: 0 }}>
-                EO thực hiện đối soát và chi trả lương trực tiếp ngay sau khi ca kết thúc thông qua mã QR NAPAS 247.
-              </p>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '1.25rem', backgroundColor: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Chỉ Số Đánh Giá Tuyệt Đối (5.0/5.0)</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Dựa trên phản hồi thực tế từ Worker</div>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.825rem', color: '#475569', margin: 0 }}>
-                Môi trường làm việc văn minh, đối xử tôn trọng và phân công checklist công việc chuyên nghiệp.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 

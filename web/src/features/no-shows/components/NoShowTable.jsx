@@ -28,7 +28,7 @@ export const NoShowTable = ({ items, loading, onSelectDetail }) => {
             <th>Thời Gian Ca</th>
             <th>Mức Phạt RS</th>
             <th>Nguồn Phát Hiện</th>
-            <th>Kháng Cáo (UC-94)</th>
+            <th>Kháng Cáo</th>
             <th style={{ textAlign: 'center' }}>Thao Tác</th>
           </tr>
         </thead>

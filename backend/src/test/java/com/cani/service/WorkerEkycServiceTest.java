@@ -88,7 +88,7 @@ class WorkerEkycServiceTest {
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
-        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(false);
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(any(), any(), any())).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
             v.setId(UUID.randomUUID());
@@ -119,7 +119,7 @@ class WorkerEkycServiceTest {
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
-        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(false);
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(any(), any(), any())).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
             v.setId(UUID.randomUUID());
@@ -146,7 +146,7 @@ class WorkerEkycServiceTest {
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(aiResult);
-        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(true);
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(any(), any(), any())).thenReturn(true);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
             v.setId(UUID.randomUUID());
@@ -175,7 +175,7 @@ class WorkerEkycServiceTest {
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
         when(ekycProvider.getProviderName()).thenReturn("MOCK_EKYC");
-        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(any(), eq("APPROVED"), any())).thenReturn(false);
+        when(ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(any(), any(), any())).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);
             v.setId(UUID.randomUUID());

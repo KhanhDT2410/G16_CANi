@@ -135,7 +135,7 @@ public class H2DataSeeder implements CommandLineRunner {
         }
 
         // 4. Seed default Event Organizer (EO) and test subscriptions & revenue data
-        String eoEmail = "eo@cani.vn";
+        String eoEmail = "demo.eo@cani.vn";
         EventOrganizer eo = null;
         if (!userRepository.existsByEmail(eoEmail)) {
             User eoUser = User.builder()

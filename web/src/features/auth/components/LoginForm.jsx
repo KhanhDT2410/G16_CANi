@@ -52,7 +52,7 @@ export const LoginForm = () => {
               name="email"
               type="email"
               className="form-input with-icon"
-              placeholder="eo@cani.vn"
+              placeholder="name@company.com"
               value={formData.email}
               onChange={handleChange}
               autoComplete="username"
@@ -177,10 +177,6 @@ export const LoginForm = () => {
 
       <div className="auth-footer">
         Chưa có tài khoản đại diện Ban Tổ Chức? <a href="/register">Đăng ký ngay</a>
-      </div>
-
-      <div className="auth-demo-hint" style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
-        Tài khoản thử nghiệm: <code style={{ backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#0f172a' }}>eo@cani.vn</code> | <code style={{ backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#0f172a' }}>Password123!</code>
       </div>
     </div>
   );

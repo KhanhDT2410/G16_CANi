@@ -28,19 +28,21 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
           <span className="faq-accordion-chevron" aria-hidden="true">
             {isExpanded ? '▾' : '▸'}
           </span>
-          <h4 className="faq-accordion-title">{faq.question}</h4>
-          <div className="faq-accordion-tags">
-            <span className={`faq-category-badge ${catConfig.badgeClass}`}>
-              {catConfig.label}
-            </span>
-            <span className={`faq-status-badge ${statusConfig.badgeClass}`}>
-              {statusConfig.label}
-            </span>
-            {hasAttachment && (
-              <span className="faq-has-attachment-badge" title="Có ảnh hoặc tệp đính kèm">
-                📎 Đính kèm
+          <div className="faq-accordion-heading-group">
+            <h4 className="faq-accordion-title">{faq.question}</h4>
+            <div className="faq-accordion-tags">
+              <span className={`faq-category-badge ${catConfig.badgeClass}`}>
+                {catConfig.label}
               </span>
-            )}
+              <span className={`faq-status-badge ${statusConfig.badgeClass}`}>
+                {statusConfig.label}
+              </span>
+              {hasAttachment && (
+                <span className="faq-has-attachment-badge" title="Có ảnh hoặc tệp đính kèm">
+                  📎 Đính kèm
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

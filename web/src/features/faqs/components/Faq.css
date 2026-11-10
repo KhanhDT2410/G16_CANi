@@ -404,6 +404,12 @@
   background: #ffffff;
 }
 
+.faq-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
 .faq-modal-header h3 {
   margin: 0;
   font-size: 1.125rem;

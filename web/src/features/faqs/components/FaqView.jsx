@@ -37,14 +37,24 @@ export const FaqView = () => {
     setIsModalOpen(true);
   };
 
-  const handleModalSubmit = async (payload) => {
-    if (editingFaq?.id) {
-      await updateFaq(editingFaq.id, payload);
-    } else {
-      await createFaq(payload);
+  const handleModalSubmit = async (payload, shouldPublish = false) => {
+    try {
+      if (editingFaq?.id) {
+        await updateFaq(editingFaq.id, payload);
+        if (shouldPublish && editingFaq.status !== 'PUBLISHED') {
+          await publishFaq(editingFaq.id);
+        }
+      } else {
+        const created = await createFaq(payload);
+        if (shouldPublish && created?.id) {
+          await publishFaq(created.id);
+        }
+      }
+      setIsModalOpen(false);
+      setEditingFaq(null);
+    } catch {
+      // Lỗi đã được hiển thị toast qua useFaqs
     }
-    setIsModalOpen(false);
-    setEditingFaq(null);
   };
 
   const filteredAndSortedFaqs = useMemo(() => {

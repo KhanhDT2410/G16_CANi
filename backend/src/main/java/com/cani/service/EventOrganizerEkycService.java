@@ -121,6 +121,15 @@ public class EventOrganizerEkycService {
                 status = "PENDING_REVIEW";
             }
 
+            // Nếu nộp giấy phép ĐKKD (Hộ kinh doanh / Doanh nghiệp), bắt buộc chuyển PENDING_REVIEW để Admin thẩm định và xác nhận
+            boolean hasBusinessLicense = (businessLicenseFile != null && !businessLicenseFile.isEmpty());
+            if (hasBusinessLicense && !"REJECTED".equals(status)) {
+                decision = "MANUAL_REVIEW";
+                status = "PENDING_REVIEW";
+                result.setRoutingDecision("MANUAL_REVIEW");
+                result.setRoutingReason("Hồ sơ đăng ký Hộ kinh doanh kèm Giấy phép ĐKKD đang chờ Admin kiểm tra và xác nhận.");
+            }
+
             // Mock link storage (Trong thực tế sẽ upload lên S3/Firebase/Supabase Storage)
             String frontUrl = "https://storage.cani.vn/ekyc/eo_front_" + UUID.randomUUID() + ".jpg";
             String backUrl = "https://storage.cani.vn/ekyc/eo_back_" + UUID.randomUUID() + ".jpg";
@@ -194,6 +203,21 @@ public class EventOrganizerEkycService {
     public EoProfileDto getEoProfile(UUID userId) {
         EventOrganizer eo = getOrCreateEo(userId);
         User u = eo.getUser();
+
+        EoEkycVerification latestVerification = eoEkycVerificationRepository
+                .findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId())
+                .orElse(null);
+
+        String businessLicenseUrl = latestVerification != null ? latestVerification.getBusinessLicenseUrl() : null;
+        String businessVerificationStatus = "NOT_REGISTERED";
+        if (eo.getTaxId() != null && !eo.getTaxId().isBlank()) {
+            if (latestVerification != null && latestVerification.getBusinessLicenseUrl() != null) {
+                businessVerificationStatus = latestVerification.getStatus(); // "PENDING_REVIEW", "APPROVED", "REJECTED"
+            } else {
+                businessVerificationStatus = "AWAITING_LICENSE_UPLOAD";
+            }
+        }
+
         return EoProfileDto.builder()
                 .eoId(eo.getEoId())
                 .userId(u != null ? u.getUserId() : userId)
@@ -208,6 +232,8 @@ public class EventOrganizerEkycService {
                 .ratingAvg(eo.getRatingAvg())
                 .ratingCount(eo.getRatingCount())
                 .totalEventsCompleted(eo.getTotalEventsCompleted())
+                .businessLicenseUrl(businessLicenseUrl)
+                .businessVerificationStatus(businessVerificationStatus)
                 .build();
     }
 

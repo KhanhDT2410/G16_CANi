@@ -104,3 +104,4 @@ export default function EkycRequiredModal({ isOpen, onClose, onNavigateToEkyc, e
     </div>
   );
 }
+

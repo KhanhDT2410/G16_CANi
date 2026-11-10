@@ -406,3 +406,4 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetSuccess })
     </div>
   );
 }
+

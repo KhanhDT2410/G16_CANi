@@ -3,6 +3,7 @@ import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { ROLES, WAGE_RECOMMENDATIONS_MAP } from '../hooks/useShifts';
 import { getCoordinatesFromAddress } from '../utils/geoUtils';
+import VenueLocationPicker from './VenueLocationPicker';
 
 /**
  * EventCreationWizardModal
@@ -406,30 +407,22 @@ const EventCreationWizardModal = ({
               />
             </div>
 
-            <div className="eo-form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <label style={{ margin: 0 }}>Địa Điểm Tổ Chức *</label>
-                <button
-                  type="button"
-                  className="eo-btn-gps"
-                  onClick={onGetCurrentLocation}
-                  disabled={locating}
-                >
-                  {locating ? 'Đang định vị...' : 'Lấy vị trí hiện tại'}
-                </button>
-              </div>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                placeholder="Nhập địa chỉ hoặc bấm nút lấy vị trí hiện tại..."
-                value={newEvent.venueAddress}
-                onChange={(e) => setNewEvent({ ...newEvent, venueAddress: e.target.value })}
-              />
-              <span className="eo-field-helper" style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.35rem', display: 'block' }}>
-                Hệ thống tự động định vị tọa độ GPS để quét và ghép nối nhân sự trong bán kính phù hợp.
-              </span>
-            </div>
+            <VenueLocationPicker
+              address={newEvent.venueAddress}
+              lat={newEvent.venueLat}
+              lng={newEvent.venueLng}
+              onLocationChange={({ address, lat, lng }) => {
+                setNewEvent((prev) => ({
+                  ...prev,
+                  venueAddress: address,
+                  venueLat: lat,
+                  venueLng: lng,
+                }));
+              }}
+              onGetCurrentLocation={onGetCurrentLocation}
+              locating={locating}
+              required
+            />
 
             <div className="eo-modal-footer">
               <button type="button" className="eo-btn-secondary" onClick={handleClose}>

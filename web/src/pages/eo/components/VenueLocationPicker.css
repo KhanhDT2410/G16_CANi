@@ -1,0 +1,227 @@
+.venue-picker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  margin-bottom: 1.15rem;
+}
+
+.venue-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.venue-picker-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.venue-picker-gps-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2563eb;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.venue-picker-gps-btn:hover:not(:disabled) {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.venue-picker-gps-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Ô nhập liệu và dropdown gợi ý */
+.venue-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.venue-search-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.venue-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: #64748b;
+  pointer-events: none;
+  font-size: 0.9rem;
+}
+
+.venue-search-input {
+  width: 100%;
+  padding: 0.6rem 2.25rem 0.6rem 2.25rem;
+  font-size: 0.88rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.venue-search-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.venue-search-clear-btn {
+  position: absolute;
+  right: 0.65rem;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.venue-search-clear-btn:hover {
+  color: #475569;
+  background-color: #f1f5f9;
+}
+
+/* Dropdown gợi ý địa điểm */
+.venue-suggestions-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  max-height: 230px;
+  overflow-y: auto;
+  z-index: 1050;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0;
+}
+
+.venue-suggestion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.venue-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.venue-suggestion-item:hover {
+  background-color: #f1f5f9;
+}
+
+.venue-suggestion-icon {
+  margin-top: 0.15rem;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.venue-suggestion-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  overflow: hidden;
+}
+
+.venue-suggestion-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.venue-suggestion-address {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.venue-suggestions-loading {
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem;
+  color: #64748b;
+  text-align: center;
+}
+
+/* Khung Bản đồ Leaflet */
+.venue-map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 210px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.venue-leaflet-map {
+  width: 100%;
+  height: 100%;
+  background-color: #f8fafc;
+}
+
+/* Thanh thông tin dưới bản đồ */
+.venue-map-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.venue-map-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #475569;
+}
+
+.venue-gps-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid #bfdbfe;
+}

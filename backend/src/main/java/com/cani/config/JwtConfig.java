@@ -61,9 +61,15 @@ public class JwtConfig {
                         String subject = payload.hasNonNull("sub")
                                 ? payload.get("sub").asText()
                                 : "08d4cbd3-9d94-4307-99c5-b66484d5de84";
-                        String email = payload.hasNonNull("email")
-                                ? payload.get("email").asText()
-                                : "worker@cani.vn";
+
+                        String email = null;
+                        if (payload.hasNonNull("email")) {
+                            email = payload.get("email").asText();
+                        } else if (payload.path("user_metadata").hasNonNull("email")) {
+                            email = payload.path("user_metadata").get("email").asText();
+                        } else {
+                            email = "worker@cani.vn";
+                        }
 
                         Jwt.Builder builder = Jwt.withTokenValue(safeToken)
                                 .header("alg", "none")

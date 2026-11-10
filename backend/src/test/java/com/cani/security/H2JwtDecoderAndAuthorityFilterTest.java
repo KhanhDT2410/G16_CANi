@@ -96,6 +96,24 @@ class H2JwtDecoderAndAuthorityFilterTest {
     }
 
     @Test
+    @DisplayName("H2JwtDecoder: Trích xuất email từ user_metadata khi payload root không có trường email")
+    void h2JwtDecoder_extractsEmailFromUserMetadata() {
+        // Arrange
+        String header = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"alg\":\"ES256\"}".getBytes(StandardCharsets.UTF_8));
+        String payloadJson = "{\"sub\":\"12345678-1234-1234-1234-123456789abc\",\"user_metadata\":{\"email\":\"from_meta@example.com\",\"full_name\":\"Meta User\"}}";
+        String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
+        String rawJwt = header + "." + payload + ".sig";
+
+        JwtDecoder decoder = jwtConfig.h2JwtDecoder();
+
+        // Act
+        Jwt decoded = decoder.decode(rawJwt);
+
+        // Assert
+        assertThat(decoded.getClaimAsString("email")).isEqualTo("from_meta@example.com");
+    }
+
+    @Test
     @DisplayName("H2JwtDecoder: dev-token-<userId> tra cứu email tương ứng từ UserRepository")
     void h2JwtDecoder_devTokenWithUserId_looksUpEmail() {
         // Arrange
@@ -161,3 +179,4 @@ class H2JwtDecoderAndAuthorityFilterTest {
                 .containsExactly("ROLE_EVENT_ORGANIZER");
     }
 }
+

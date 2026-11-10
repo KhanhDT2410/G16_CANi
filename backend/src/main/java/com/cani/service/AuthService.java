@@ -191,8 +191,17 @@ public class AuthService {
         try {
             // 1. Xác thực chữ ký token từ Supabase bằng JWKS ES256
             Jwt jwt = jwtDecoder.decode(request.getSupabaseAccessToken());
-            UUID userId = UUID.fromString(jwt.getSubject());
             String email = jwt.getClaimAsString("email");
+            if (email == null || email.isBlank()) {
+                throw new BadRequestException("Không tìm thấy thông tin email từ phiên xác thực Google");
+            }
+
+            UUID userId;
+            try {
+                userId = UUID.fromString(jwt.getSubject());
+            } catch (Exception e) {
+                userId = UUID.nameUUIDFromBytes(email.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
 
             User user = userRepository.findById(userId)
                     .or(() -> userRepository.findByEmail(email))
@@ -238,6 +247,16 @@ public class AuthService {
 
                 return saved;
             });
+
+            // Nếu user đã tồn tại nhưng có role là WORKER (và không phải tài khoản seed worker@cani.vn)
+            // khi đăng nhập/đăng ký từ Web Portal với targetRole là EVENT_ORGANIZER, tự động nâng cấp sang EVENT_ORGANIZER
+            if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())
+                    && user.getRole() == UserRole.WORKER
+                    && !"worker@cani.vn".equalsIgnoreCase(user.getEmail())) {
+                log.info("Cập nhật vai trò người dùng {} sang EVENT_ORGANIZER theo yêu cầu từ Web Portal", user.getEmail());
+                user.setRole(UserRole.EVENT_ORGANIZER);
+                user = userRepository.save(user);
+            }
 
             if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
                 throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG } from '../types/faq.constants';
 import FaqImageUploader from './FaqImageUploader';
 
 /**
  * Modal tạo mới hoặc chỉnh sửa câu hỏi thường gặp (FAQ) kèm ảnh và tệp đính kèm (ADM-08).
+ * Render qua createPortal để luôn căn giữa chuẩn xác trên viewport, không bị tụt lề.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading }) => {
@@ -67,15 +69,15 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
     });
   };
 
-  return (
-    <div className="faq-modal-overlay" onClick={onClose}>
+  const modalNode = (
+    <div className="faq-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="faq-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="faq-modal-header">
           <h3>{isEditMode ? 'Chỉnh Sửa Câu Hỏi Thường Gặp' : 'Tạo Câu Hỏi Thường Gặp Mới'}</h3>
           <button type="button" className="faq-modal-close" onClick={onClose}>×</button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="faq-modal-form">
           <div className="faq-modal-body">
             {errorMsg && <div className="faq-error-banner">{errorMsg}</div>}
 
@@ -120,7 +122,7 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
               </label>
               <textarea
                 id="faq-answer"
-                rows={4}
+                rows={3}
                 placeholder="Nhập nội dung giải đáp rõ ràng, từng bước hướng dẫn người dùng tự thao tác..."
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
@@ -187,6 +189,8 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
 };
 
 export default FaqEditorModal;

@@ -339,5 +339,36 @@ class FaqServiceTest {
         assertThat(result.getAttachmentUrl()).isEqualTo("https://cani.vn/docs/quy-trinh-checkin.pdf");
         assertThat(result.getAttachmentName()).isEqualTo("quy-trinh-checkin.pdf");
     }
+
+    @Test
+    @DisplayName("13. uploadFaqImage tải ảnh hợp lệ từ local trả về đường dẫn URL")
+    void uploadFaqImage_ValidImage_ReturnsUrl() {
+        org.springframework.mock.web.MockMultipartFile mockFile = new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                "test-guide.png",
+                "image/png",
+                "fake-image-bytes".getBytes()
+        );
+
+        String url = faqService.uploadFaqImage(mockFile);
+
+        assertThat(url).startsWith("/api/v1/faqs/images/faq_");
+        assertThat(url).endsWith(".png");
+    }
+
+    @Test
+    @DisplayName("14. uploadFaqImage tệp không đúng định dạng ảnh ném lỗi BadRequestException")
+    void uploadFaqImage_InvalidExtension_ThrowsBadRequest() {
+        org.springframework.mock.web.MockMultipartFile mockFile = new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                "malicious.exe",
+                "application/octet-stream",
+                "binary-data".getBytes()
+        );
+
+        assertThatThrownBy(() -> faqService.uploadFaqImage(mockFile))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ chấp nhận các định dạng ảnh");
+    }
 }
 

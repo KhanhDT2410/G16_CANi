@@ -57,6 +57,18 @@ export const faqApi = {
     return response.data?.data;
   },
 
+  /** Tải ảnh minh họa từ thiết bị lên máy chủ */
+  uploadImage: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/v1/admin/faqs/upload-image', formData, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    });
+    return response.data?.data?.url;
+  },
+
   /** UC-110c: Lấy thống kê view count và deflection rate */
   getFaqAnalytics: async () => {
     const response = await apiClient.get('/v1/admin/faqs/analytics');

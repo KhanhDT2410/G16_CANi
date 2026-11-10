@@ -102,3 +102,7 @@ CLAUDE.md
 # Temporary backup directories
 web_backup_*/
 
+# Local uploads
+uploads/
+backend/uploads/
+

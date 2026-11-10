@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG } from '../types/faq.constants';
+import FaqImageUploader from './FaqImageUploader';
 
 /**
  * Modal tạo mới hoặc chỉnh sửa câu hỏi thường gặp (FAQ) kèm ảnh và tệp đính kèm (ADM-08).
@@ -127,21 +128,19 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
               />
             </div>
 
-            {/* Đính kèm ảnh minh họa & tệp tài liệu (ADM-08) */}
+            {/* Tải ảnh từ thiết bị (Kéo & Thả) hoặc nhập URL (ADM-08) */}
+            <div className="faq-form-group">
+              <FaqImageUploader
+                imageUrl={imageUrl}
+                onImageChange={setImageUrl}
+                disabled={loading}
+              />
+            </div>
+
+            {/* Đính kèm tài liệu đính kèm (PDF/Doc) */}
             <div className="faq-form-row">
               <div className="faq-form-group flex-1">
-                <label htmlFor="faq-image-url">🖼️ Đường dẫn ảnh minh họa</label>
-                <input
-                  id="faq-image-url"
-                  type="url"
-                  placeholder="https://.../anh-minh-hoa.png"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-              <div className="faq-form-group flex-1">
-                <label htmlFor="faq-attachment-url">📎 Đường dẫn tệp đính kèm</label>
+                <label htmlFor="faq-attachment-url">Đường dẫn tệp tài liệu đính kèm</label>
                 <input
                   id="faq-attachment-url"
                   type="url"
@@ -151,38 +150,20 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
                   disabled={loading}
                 />
               </div>
+              {attachmentUrl && (
+                <div className="faq-form-group flex-1">
+                  <label htmlFor="faq-attachment-name">Tên hiển thị tệp tài liệu</label>
+                  <input
+                    id="faq-attachment-name"
+                    type="text"
+                    placeholder="Ví dụ: huong-dan-checkin-su-kien.pdf"
+                    value={attachmentName}
+                    onChange={(e) => setAttachmentName(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              )}
             </div>
-
-            {attachmentUrl && (
-              <div className="faq-form-group">
-                <label htmlFor="faq-attachment-name">Tên hiển thị tệp đính kèm</label>
-                <input
-                  id="faq-attachment-name"
-                  type="text"
-                  placeholder="Ví dụ: huong-dan-checkin-su-kien.pdf"
-                  value={attachmentName}
-                  onChange={(e) => setAttachmentName(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-            )}
-
-            {imageUrl && (
-              <div className="faq-preview-box">
-                <span className="faq-preview-label">Xem trước ảnh:</span>
-                <img
-                  src={imageUrl}
-                  alt="Xem trước ảnh"
-                  className="faq-modal-image-preview"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                  onLoad={(e) => {
-                    e.target.style.display = 'block';
-                  }}
-                />
-              </div>
-            )}
           </div>
 
           <div className="faq-modal-footer">

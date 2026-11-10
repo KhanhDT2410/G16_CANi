@@ -25,7 +25,7 @@ This repository is a monorepo for **CANi - Event Staffing Platform**:
 - **Clean React JSX:** Write clean, readable React components (`.jsx`). Use prop destructuring and meaningful variable names.
 - **Component Size:** Keep components under 200 lines. Break large UI blocks into smaller subcomponents.
 - **State Management:** Keep state as local as possible. Use custom hooks to isolate complex state logic from UI rendering.
-- **Styling & Assets:** Follow existing CSS/styling conventions. Do not introduce ad-hoc CSS frameworks without explicit team agreement.
+- **Styling & Assets:** Follow existing CSS/styling conventions. Do not introduce ad-hoc CSS frameworks without explicit team agreement. All web screens, layout components, colors, and typography MUST adhere to the design system in [docs/UI_DESIGN_SPECIFICATION.md](docs/UI_DESIGN_SPECIFICATION.md).
 
 ---
 

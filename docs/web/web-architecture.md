@@ -1,6 +1,7 @@
 # CANi Web - Chuẩn Kiến Trúc & Cấu Trúc Dự Án (Web Architecture)
 
 > **Mục tiêu:** Xây dựng cấu trúc mã nguồn Frontend chuẩn hóa, mở rộng tốt (Scalable), giảm thiểu tối đa xung đột khi nhiều thành viên cùng phát triển song song bằng AI. Dự án sử dụng **React 18 + Vite thuần JavaScript (JSX)**.
+> **Quy chuẩn UI/UX:** Mọi màn hình và component phải tuân thủ Design System chuẩn tại [docs/UI_DESIGN_SPECIFICATION.md](../UI_DESIGN_SPECIFICATION.md).
 
 ---
 

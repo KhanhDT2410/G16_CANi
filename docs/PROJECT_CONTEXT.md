@@ -47,6 +47,7 @@ Yêu cầu nghiệp vụ (SRS/SDS) nằm trong file `.docx` tại `docs/requirem
 ## 3. Frontend Web
 
 **Pattern Feature-Driven (Vertical Slice):** mỗi feature trong `src/features/<tên>/{api,components,hooks,types,index.js}` (chuẩn full trong `AGENTS.md` §1). `apiClient` dùng chung ở `src/services/api.js` (baseURL `${VITE_API_BASE_URL}/api`, gắn `cani_token` từ localStorage, 401 → redirect /login).
+**Design System & UI Spec:** Toàn bộ giao diện Portal tuân thủ quy chuẩn thiết kế tại [`docs/UI_DESIGN_SPECIFICATION.md`](UI_DESIGN_SPECIFICATION.md) (màu sắc, typography, card elevation, responsive).
 
 **Routes hiện có (`App.jsx`):** `/admin` (AdminPage, nhiều tab), `/customer-care` (CustomerCarePage: tickets + disputes), `/eo` (EO; worker redirect sang đây), `/support` (SupportPage — user view của support tickets), `/worker`, `/mobile-preview`, `/auth/callback`, `/login`, `/register`.
 

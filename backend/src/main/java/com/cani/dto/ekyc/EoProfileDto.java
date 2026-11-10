@@ -25,5 +25,7 @@ public class EoProfileDto {
     private BigDecimal ratingAvg;
     private Integer ratingCount;
     private Integer totalEventsCompleted;
+    private String businessLicenseUrl;
+    private String businessVerificationStatus;
 }
 

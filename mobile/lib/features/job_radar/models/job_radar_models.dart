@@ -15,6 +15,7 @@ class NearbyShiftItem {
   final int requiredWorkers;
   final int confirmedWorkers;
   final int remainingWorkers;
+  final String? imageUrl;
 
   const NearbyShiftItem({
     required this.shiftId,
@@ -33,6 +34,7 @@ class NearbyShiftItem {
     required this.requiredWorkers,
     required this.confirmedWorkers,
     required this.remainingWorkers,
+    this.imageUrl,
   });
 
   factory NearbyShiftItem.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class NearbyShiftItem {
       requiredWorkers: (json['requiredWorkers'] as num?)?.toInt() ?? 1,
       confirmedWorkers: (json['confirmedWorkers'] as num?)?.toInt() ?? 0,
       remainingWorkers: (json['remainingWorkers'] as num?)?.toInt() ?? 1,
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 }

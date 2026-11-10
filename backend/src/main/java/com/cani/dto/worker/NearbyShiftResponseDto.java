@@ -30,4 +30,5 @@ public class NearbyShiftResponseDto {
     private Integer requiredWorkers;
     private Integer confirmedWorkers;
     private Integer remainingWorkers;
+    private String imageUrl;
 }

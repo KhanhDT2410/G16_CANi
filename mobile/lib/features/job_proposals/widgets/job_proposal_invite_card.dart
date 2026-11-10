@@ -120,6 +120,40 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           ),
           const SizedBox(height: 10),
 
+          // Ảnh đồng phục / ca làm nếu có
+          if (p.imageUrl != null && p.imageUrl!.trim().isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                children: [
+                  Image.network(
+                    p.imageUrl!.trim(),
+                    height: 110,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
+                  ),
+                  Positioned(
+                    bottom: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Đồng phục / Ca làm',
+                        style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
           // Địa chỉ & Thời gian
           Row(
             children: [

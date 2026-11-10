@@ -6,7 +6,7 @@ import { showToast } from '../../../components/common/Toast';
  * Màn hình Cài đặt Tổng thể cho Ban Tổ Chức (EO), bao gồm Cài đặt Gói Cước, Hóa Đơn & Tiêu Chuẩn Tuyển Dụng
  */
 export default function EOSettingsTab({ onNavigateToSubscription }) {
-  const [activeSection, setActiveSection] = useState('PACKAGE'); // 'PACKAGE' | 'RECRUITMENT' | 'INVOICE' | 'NOTIFICATIONS'
+  const [activeSection, setActiveSection] = useState('PACKAGE'); // 'PACKAGE' | 'RECRUITMENT' | 'NOTIFICATIONS'
 
   const [packageSettings, setPackageSettings] = useState({
     defaultPlan: 'MATCHING_PLUS', // 'INVITE_ONLY' | 'MATCHING_PLUS'
@@ -22,14 +22,6 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
     defaultAllowance: 20000,
     requireDressCode: true,
     autoApproveAboveScore: 85,
-  });
-
-  const [invoiceSettings, setInvoiceSettings] = useState({
-    companyName: '',
-    taxId: '',
-    invoiceEmail: '',
-    legalAddress: '',
-    representativeName: '',
   });
 
   const [notificationSettings, setNotificationSettings] = useState({
@@ -48,9 +40,6 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
       const savedRec = localStorage.getItem('cani_eo_recruitment_settings');
       if (savedRec) setRecruitmentSettings(JSON.parse(savedRec));
 
-      const savedInv = localStorage.getItem('cani_eo_invoice_settings');
-      if (savedInv) setInvoiceSettings(JSON.parse(savedInv));
-
       const savedNotif = localStorage.getItem('cani_eo_notif_settings');
       if (savedNotif) setNotificationSettings(JSON.parse(savedNotif));
     } catch (e) {
@@ -63,7 +52,6 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
     try {
       localStorage.setItem('cani_eo_package_settings', JSON.stringify(packageSettings));
       localStorage.setItem('cani_eo_recruitment_settings', JSON.stringify(recruitmentSettings));
-      localStorage.setItem('cani_eo_invoice_settings', JSON.stringify(invoiceSettings));
       localStorage.setItem('cani_eo_notif_settings', JSON.stringify(notificationSettings));
       showToast('Đã lưu cấu hình cài đặt thành công!', 'success');
     } catch {
@@ -130,23 +118,6 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
           }}
         >
           Tiêu Chuẩn Tuyển Dụng & Matching
-        </button>
-
-        <button
-          type="button"
-          className={`sub-tab-btn ${activeSection === 'INVOICE' ? 'active' : ''}`}
-          onClick={() => setActiveSection('INVOICE')}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: 6,
-            background: activeSection === 'INVOICE' ? '#eff6ff' : 'transparent',
-            color: activeSection === 'INVOICE' ? '#1d4ed8' : '#64748b',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Hóa Đơn Điện Tử (VAT)
         </button>
 
         <button
@@ -323,75 +294,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
         </div>
       )}
 
-      {/* SECTION 3: HÓA ĐƠN ĐIỆN TỬ (VAT) */}
-      {activeSection === 'INVOICE' && (
-        <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
-          <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-            Thông Tin Xuất Hóa Đơn Điện Tử Doanh Nghiệp (VAT E-Invoice)
-          </h4>
-          <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
-            Dùng để tự động xuất hóa đơn giá trị gia tăng (VAT 8-10%) cho mỗi giao dịch mua gói cước dịch vụ CANi.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div className="eo-form-group">
-              <label>Tên Doanh Nghiệp / Công Ty *</label>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.companyName}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, companyName: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group">
-              <label>Mã Số Thuế (MST) *</label>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.taxId}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, taxId: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group">
-              <label>Email Nhận Hóa Đơn Điện Tử *</label>
-              <input
-                type="email"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.invoiceEmail}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, invoiceEmail: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group">
-              <label>Người Đại Diện Pháp Luật</label>
-              <input
-                type="text"
-                className="eo-form-input"
-                value={invoiceSettings.representativeName}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, representativeName: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group" style={{ gridColumn: '1 / -1' }}>
-              <label>Địa Chỉ Trụ Sở Doanh Nghiệp (Theo GPKD) *</label>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.legalAddress}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, legalAddress: e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SECTION 4: THÔNG BÁO & VẬN HÀNH */}
+      {/* SECTION 3: THÔNG BÁO & VẬN HÀNH */}
       {activeSection === 'NOTIFICATIONS' && (
         <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
           <h4 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>

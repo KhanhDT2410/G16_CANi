@@ -352,43 +352,7 @@ export default function EOSubscriptionTab() {
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
-              <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
-                Thông Tin Xuất Hóa Đơn Điện Tử Doanh Nghiệp (VAT E-Invoice)
-              </h4>
-              <p style={{ margin: '0 0 1rem', fontSize: '0.825rem', color: '#64748b' }}>
-                Dùng để tự động xuất hóa đơn thuế giá trị gia tăng (VAT) cho mỗi giao dịch mua gói cước CANi.
-              </p>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                <div className="eo-form-group">
-                  <label>Tên Doanh Nghiệp / Công Ty *</label>
-                  <input type="text" className="eo-form-input" placeholder="VD: Công ty TNHH Sự Kiện ABC" defaultValue="" required />
-                </div>
-
-                <div className="eo-form-group">
-                  <label>Mã Số Thuế (MST) *</label>
-                  <input type="text" className="eo-form-input" placeholder="VD: 0109876543" defaultValue="" required />
-                </div>
-
-                <div className="eo-form-group">
-                  <label>Email Nhận Hóa Đơn Điện Tử *</label>
-                  <input type="email" className="eo-form-input" placeholder="VD: ketoan@congty.com" defaultValue="" required />
-                </div>
-
-                <div className="eo-form-group">
-                  <label>Người Đại Diện Doanh Nghiệp</label>
-                  <input type="text" className="eo-form-input" placeholder="VD: Nguyễn Văn A" defaultValue="" />
-                </div>
-
-                <div className="eo-form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Địa Chỉ Trụ Sở Đăng Ký Kinh Doanh *</label>
-                  <input type="text" className="eo-form-input" placeholder="VD: Số 123 Đường ABC, Quận 1, TP.HCM" defaultValue="" required />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
               <button
                 type="submit"
                 className="eo-btn-primary"

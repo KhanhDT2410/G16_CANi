@@ -189,7 +189,7 @@ const EventShiftsDrawer = ({
                       alignItems: 'center',
                       gap: 4,
                     }}
-                    title="Lấy link & mã mời trực tiếp cho Worker (Invite Mode - UC-72)"
+                    title="Lấy link & mã mời trực tiếp cho nhân sự"
                   >
                     Mã Mời
                   </button>

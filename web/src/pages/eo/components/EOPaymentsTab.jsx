@@ -123,7 +123,7 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
                         cursor: 'pointer',
                       }}
                       onClick={() => onOpenDisputeModal && onOpenDisputeModal(p)}
-                      title="Gửi khiếu nại tranh chấp lên Customer Care (UC-96)"
+                      title="Gửi khiếu nại tranh chấp lên bộ phận CSKH"
                     >
                       Khiếu Nại
                     </button>

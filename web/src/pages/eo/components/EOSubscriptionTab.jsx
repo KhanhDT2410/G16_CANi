@@ -50,9 +50,9 @@ export default function EOSubscriptionTab() {
       <div className="sub-current-card">
         <div className="sub-current-header">
           <div className="sub-current-title-group">
-            <h2>Thanh toán</h2>
+            <h2>Gói Dịch Vụ Sự Kiện</h2>
             <p className="sub-current-subtitle">
-              Mô hình thanh toán theo Sự kiện (Pay-per-Event Quota) qua Cổng PayOS VietQR tự động. Tuân thủ mô hình Non-Escrow.
+              Quản lý số lượng sự kiện và phương thức tuyển dụng nhân sự trên nền tảng CANi.
             </p>
           </div>
           <div>
@@ -102,7 +102,7 @@ export default function EOSubscriptionTab() {
           <div className="sub-metric-item">
             <span className="sub-metric-label">Hạn sử dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem', color: '#e2e8f0' }}>
-              {currentSubscription?.endDate ? formatDate(currentSubscription.endDate) : 'Vô thời hạn (theo Quota)'}
+              {currentSubscription?.endDate ? formatDate(currentSubscription.endDate) : 'Theo số lượng sự kiện'}
             </span>
             <span className="sub-metric-hint">
               Mã giao dịch: {currentSubscription?.transactionRef || 'N/A'}
@@ -111,14 +111,14 @@ export default function EOSubscriptionTab() {
         </div>
       </div>
 
-      {/* 2. SUB-NAVIGATION TABS (W-06 SPEC) */}
+      {/* 2. SUB-NAVIGATION TABS */}
       <div className="sub-tabs-bar">
         <button
           type="button"
           className={`sub-tab-btn ${activeSubTab === 'plans' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('plans')}
         >
-          Danh Mục Gói Cước (UC-10, UC-11)
+          Danh Mục Gói Dịch Vụ
         </button>
         <button
           type="button"
@@ -136,18 +136,9 @@ export default function EOSubscriptionTab() {
         </button>
       </div>
 
-      {/* 3. SUB-TAB: PLANS & PURCHASE (UC-10, UC-11) */}
+      {/* 3. SUB-TAB: PLANS & PURCHASE */}
       {activeSubTab === 'plans' && (
         <>
-          <div className="demo-sandbox-notice">
-            <div className="demo-notice-content">
-              <h4>Cổng Thanh Toán PayOS VietQR & Non-Escrow Compliance</h4>
-              <p>
-                Hệ thống CANi tích hợp Cổng thanh toán <strong>PayOS VietQR</strong>. Khi chọn hình thức thanh toán, bạn có thể quét mã VietQR tự động khớp tiền hoặc bấm <strong>"[Demo] Giả lập thanh toán"</strong> để kích hoạt gói ngay lập tức phục vụ demo hội đồng.
-              </p>
-            </div>
-          </div>
-
           {loading ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
               Đang tải danh mục gói cước từ máy chủ...
@@ -204,9 +195,8 @@ export default function EOSubscriptionTab() {
                         className="btn-demo-simulate"
                         disabled={purchasingPlan !== null}
                         onClick={() => handleSimulateDemo(plan.planType)}
-                        title="Dành riêng cho Hội đồng chấm đồ án: Giả lập thanh toán thành công tức thì"
                       >
-                        [Demo Sandbox] Giả Lập Thành Công
+                        Thử nghiệm kích hoạt
                       </button>
                     </div>
                   </div>
@@ -217,7 +207,7 @@ export default function EOSubscriptionTab() {
         </>
       )}
 
-      {/* 4. SUB-TAB: TRANSACTION HISTORY (UC-12) */}
+      {/* 4. SUB-TAB: TRANSACTION HISTORY */}
       {activeSubTab === 'history' && (
         <div className="sub-history-container">
           {history.length === 0 ? (
@@ -240,7 +230,7 @@ export default function EOSubscriptionTab() {
                   <th>Gói Cước</th>
                   <th>Số Tiền</th>
                   <th>Cổng TT</th>
-                  <th>Quota Sự Kiện</th>
+                  <th>Số Sự Kiện</th>
                   <th>Thời Gian Mua</th>
                   <th>Trạng Thái</th>
                 </tr>
@@ -303,10 +293,10 @@ export default function EOSubscriptionTab() {
         <div className="sub-settings-container animate-fade-in-up" style={{ backgroundColor: '#ffffff', borderRadius: '1rem', border: '1px solid #e2e8f0', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-              Cài Đặt Gói Cước & Quota Vận Hành
+              Cài Đặt Gói Dịch Vụ
             </h3>
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#64748b' }}>
-              Cấu hình hạn ngạch sự kiện, cảnh báo quota, cổng thanh toán VietQR mặc định và thông tin xuất hóa đơn VAT.
+              Cấu hình hạn ngạch sự kiện, cảnh báo khi hết lượt, cổng thanh toán VietQR mặc định và thông tin xuất hóa đơn VAT.
             </p>
           </div>
 
@@ -336,7 +326,7 @@ export default function EOSubscriptionTab() {
               </div>
 
               <div className="eo-form-group">
-                <label>Ngưỡng Cảnh Báo Khi Sắp Hết Quota Sự Kiện</label>
+                <label>Ngưỡng Cảnh Báo Khi Sắp Hết Lượt Tạo Sự Kiện</label>
                 <select className="eo-form-select" defaultValue="1">
                   <option value="1">Khi còn &le; 1 sự kiện (Khuyên dùng)</option>
                   <option value="2">Khi còn &le; 2 sự kiện</option>
@@ -346,7 +336,7 @@ export default function EOSubscriptionTab() {
               </div>
 
               <div className="eo-form-group">
-                <label>Tự Động Mở PayOS VietQR Khi Hết Hạn Quota</label>
+                <label>Tự Động Tạo Mã QR Thanh Toán Khi Hết Lượt</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <input type="checkbox" id="autoQrCheck" defaultChecked style={{ width: 18, height: 18 }} />
                   <label htmlFor="autoQrCheck" style={{ margin: 0, fontWeight: 500, cursor: 'pointer', fontSize: '0.85rem' }}>
@@ -367,27 +357,27 @@ export default function EOSubscriptionTab() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
                 <div className="eo-form-group">
                   <label>Tên Doanh Nghiệp / Công Ty *</label>
-                  <input type="text" className="eo-form-input" defaultValue="Công ty Cổ phần Sự kiện Quốc tế CANi" required />
+                  <input type="text" className="eo-form-input" placeholder="VD: Công ty TNHH Sự Kiện ABC" defaultValue="" required />
                 </div>
 
                 <div className="eo-form-group">
                   <label>Mã Số Thuế (MST) *</label>
-                  <input type="text" className="eo-form-input" defaultValue="0109887766" required />
+                  <input type="text" className="eo-form-input" placeholder="VD: 0109876543" defaultValue="" required />
                 </div>
 
                 <div className="eo-form-group">
                   <label>Email Nhận Hóa Đơn Điện Tử *</label>
-                  <input type="email" className="eo-form-input" defaultValue="finance@cani.vn" required />
+                  <input type="email" className="eo-form-input" placeholder="VD: ketoan@congty.com" defaultValue="" required />
                 </div>
 
                 <div className="eo-form-group">
                   <label>Người Đại Diện Doanh Nghiệp</label>
-                  <input type="text" className="eo-form-input" defaultValue="Phạm Duy Hưng" />
+                  <input type="text" className="eo-form-input" placeholder="VD: Nguyễn Văn A" defaultValue="" />
                 </div>
 
                 <div className="eo-form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Địa Chỉ Trụ Sở Đăng Ký Kinh Doanh *</label>
-                  <input type="text" className="eo-form-input" defaultValue="Tầng 8, Tòa nhà Innovation, Cầu Giấy, Hà Nội" required />
+                  <input type="text" className="eo-form-input" placeholder="VD: Số 123 Đường ABC, Quận 1, TP.HCM" defaultValue="" required />
                 </div>
               </div>
             </div>

@@ -196,64 +196,6 @@ export default function EORightSidebar({ metrics, events = [], onOpenQr, onOpenR
           <span>Tổng nhu cầu: <strong>{required}</strong> nhân sự</span>
         </div>
       </div>
-
-      {/* 3. Widget Thao Tác Nhanh (Gợi ý đắt giá từ Bản 2) */}
-      <div className="eo-widget-card quick-actions-widget">
-        <div className="widget-header">
-          <h4 className="widget-title">Thao tác nhanh</h4>
-        </div>
-
-        <div className="quick-action-buttons-grid">
-          <button
-            type="button"
-            className="quick-action-btn"
-            onClick={() => {
-              if (onOpenQr) onOpenQr();
-              else showToast('Mở trình quét mã QR điểm danh ca', 'info');
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
-              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-            </svg>
-            <span className="action-label">Quét Check-in</span>
-          </button>
-
-          <button
-            type="button"
-            className="quick-action-btn"
-            onClick={() => {
-              if (onOpenRecruitment) onOpenRecruitment();
-              else showToast('Mở giao diện điều phối tuyển dụng khẩn cấp', 'info');
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="8.5" cy="7" r="4"></circle>
-              <line x1="20" y1="8" x2="20" y2="14"></line>
-              <line x1="23" y1="11" x2="17" y2="11"></line>
-            </svg>
-            <span className="action-label">Tuyển nhân sự</span>
-          </button>
-
-          <button
-            type="button"
-            className="quick-action-btn"
-            onClick={() => {
-              if (onOpenSubscription) onOpenSubscription();
-              else showToast('Mở thanh toán gói cước', 'info');
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2">
-              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-              <line x1="1" y1="10" x2="23" y2="10"></line>
-            </svg>
-            <span className="action-label">Thanh toán</span>
-          </button>
-        </div>
-      </div>
     </aside>
   );
 }

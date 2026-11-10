@@ -95,6 +95,11 @@ public class SkillVerificationService {
             throw new BadRequestException("Không thể đọc nội dung tệp tải lên: " + e.getMessage());
         }
 
+        String workerName = worker.getFullName() != null && !worker.getFullName().isBlank()
+                ? worker.getFullName()
+                : (worker.getUser() != null ? worker.getUser().getFullName() : "");
+        String filename = file != null ? file.getOriginalFilename() : "";
+
         // 1. Call Vision AI OUTSIDE of database transaction
         SkillVerificationAiResultDto aiResult = skillVisionAiClient.verifyDocument(
                 fileBytes, contentType, taxonomyNames
@@ -119,6 +124,23 @@ public class SkillVerificationService {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Worker not found: " + workerId));
 
+        // Identity Cross-Check: So khớp họ tên Worker với tên người nhận trên chứng chỉ
+        String workerFullName = worker.getFullName() != null && !worker.getFullName().isBlank()
+                ? worker.getFullName()
+                : (worker.getUser() != null ? worker.getUser().getFullName() : "");
+        String recipient = aiResult.getRecipientName();
+
+        if (recipient != null && !recipient.isBlank() && !workerFullName.isBlank()) {
+            boolean matches = isNameMatching(workerFullName, recipient);
+            if (!matches) {
+                log.warn("Skill verification identity mismatch: Worker '{}' vs Certificate '{}'", workerFullName, recipient);
+                aiResult.setRoutingDecision(RoutingDecision.REJECT);
+                aiResult.setOverallConfidence(0.15);
+                aiResult.setRoutingReason("Họ tên trên chứng chỉ (" + recipient.trim()
+                        + ") không trùng khớp với tên tài khoản của bạn (" + workerFullName.trim() + "). Vui lòng nộp chứng chỉ chính chủ!");
+            }
+        }
+
         String resolvedJobType = resolveJobType(aiResult, requestedSkill);
 
         SkillVerificationStatus status;
@@ -126,7 +148,7 @@ public class SkillVerificationService {
 
         // Collect skills to approve
         List<Skill> approvedSkills = new ArrayList<>();
-        if (aiResult.getRoutingDecision() == RoutingDecision.AUTO_APPROVE) {
+        if (aiResult.getRoutingDecision() == RoutingDecision.AUTO_APPROVE && aiResult.getOverallConfidence() >= 0.80) {
             status = SkillVerificationStatus.APPROVED;
 
             // Match extracted skills with database skills
@@ -152,8 +174,11 @@ public class SkillVerificationService {
             spAwarded = Math.max(25, approvedSkills.size() * VerificationTier.AI_DOCUMENT.getSpVerify());
         } else if (aiResult.getRoutingDecision() == RoutingDecision.ADMIN_REVIEW) {
             status = SkillVerificationStatus.PENDING_REVIEW;
+            spAwarded = 0;
         } else {
+            // Immediate feedback: REJECTED with actionable guidance so worker can retake immediately
             status = SkillVerificationStatus.REJECTED;
+            spAwarded = 0;
         }
 
         String extractedSkillsJson = null;
@@ -341,6 +366,99 @@ public class SkillVerificationService {
         return pending.stream()
                 .map(req -> mapToResponseDto(req, null, req.getWorker()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Admin Skill Audit Log: View all verification requests with AI breakdown and image previews.
+     */
+    @Transactional(readOnly = true)
+    public List<SkillVerificationResponseDto> getAllVerificationsForAdmin(SkillVerificationStatus status) {
+        List<SkillVerificationRequest> list = (status != null)
+                ? verificationRequestRepository.findByStatusOrderByCreatedAtDesc(status)
+                : verificationRequestRepository.findAllByOrderByCreatedAtDesc();
+
+        return list.stream()
+                .map(req -> mapToResponseDto(req, null, req.getWorker()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Admin Post-Audit Revocation: Revoke an approved verification if fraud/tampering is discovered.
+     */
+    @Transactional
+    public SkillVerificationResponseDto revokeVerification(UUID verificationId, UUID adminUserId, String reason) {
+        SkillVerificationRequest req = verificationRequestRepository.findById(verificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu thẩm định với ID: " + verificationId));
+
+        if (req.getStatus() == SkillVerificationStatus.APPROVED) {
+            Worker worker = req.getWorker();
+            int spToDeduct = req.getSpAwarded() != null ? req.getSpAwarded() : 25;
+
+            // Deduct SP from WorkerSkillPoint
+            if (req.getJobType() != null) {
+                workerSkillPointRepository.findByWorker_WorkerIdAndJobType(worker.getWorkerId(), req.getJobType())
+                        .ifPresent(sp -> {
+                            int currentVerify = sp.getSpVerify() != null ? sp.getSpVerify() : 0;
+                            sp.setSpVerify(Math.max(0, currentVerify - spToDeduct));
+                            sp.setTotalSp(Math.max(0, sp.getTotalSp() - spToDeduct));
+                            SkillTier tier = SkillTier.fromTotalSp(sp.getTotalSp());
+                            sp.setTier(tier);
+                            workerSkillPointRepository.save(sp);
+                        });
+            }
+
+            // Reset WorkerSkill verification tier back to SELF_DECLARED
+            if (req.getSkill() != null) {
+                workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(worker.getWorkerId(), req.getSkill().getSkillId())
+                        .ifPresent(ws -> {
+                            if (ws.getVerificationTier() == VerificationTier.AI_DOCUMENT) {
+                                ws.setVerificationTier(VerificationTier.SELF_DECLARED);
+                                ws.setSpVerifyAwarded(0);
+                                workerSkillRepository.save(ws);
+                            }
+                        });
+            }
+
+            req.setStatus(SkillVerificationStatus.REJECTED);
+            req.setReviewedBy(adminUserId);
+            req.setReviewNotes("THU HỒI BỞI ADMIN: " + (reason != null ? reason : "Phát hiện chứng chỉ không hợp lệ"));
+            req.setSpAwarded(0);
+            SkillVerificationRequest saved = verificationRequestRepository.save(req);
+            log.info("Admin {} revoked skill verification {} for worker {}", adminUserId, verificationId, worker.getWorkerId());
+            return mapToResponseDto(saved, null, worker);
+        }
+
+        return mapToResponseDto(req, null, req.getWorker());
+    }
+
+    public static boolean isNameMatching(String workerName, String recipientName) {
+        if (workerName == null || recipientName == null) {
+            return false;
+        }
+        String normWorker = removeDiacritics(workerName.trim().toLowerCase());
+        String normRecipient = removeDiacritics(recipientName.trim().toLowerCase());
+
+        if (normWorker.equals(normRecipient)) {
+            return true;
+        }
+
+        String[] wTokens = normWorker.split("\\s+");
+        String[] rTokens = normRecipient.split("\\s+");
+        if (wTokens.length >= 2 && rTokens.length >= 2) {
+            boolean firstMatches = wTokens[0].equals(rTokens[0]);
+            boolean lastMatches = wTokens[wTokens.length - 1].equals(rTokens[rTokens.length - 1]);
+            if (firstMatches && lastMatches) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static String removeDiacritics(String str) {
+        if (str == null) return "";
+        String nfd = java.text.Normalizer.normalize(str, java.text.Normalizer.Form.NFD);
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+        return pattern.matcher(nfd).replaceAll("").replace('đ', 'd').replace('Đ', 'd');
     }
 
     private void applyApprovedSkills(Worker worker, List<Skill> skills, String jobType, UUID requestId) {

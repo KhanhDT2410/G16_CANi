@@ -241,4 +241,133 @@ class SkillVerificationServiceTest {
         assertEquals(900, configs.get(6).getMinSp());
         assertNull(configs.get(6).getNextTierMinSp());
     }
+
+    @Test
+    @DisplayName("Algorithm Test: Fuzzy Vietnamese name matching handles accents, uppercase, and minor variations")
+    void testNameMatchingAlgorithm() {
+        assertTrue(SkillVerificationService.isNameMatching("Phạm Duy Hưng", "PHAM DUY HUNG"));
+        assertTrue(SkillVerificationService.isNameMatching("Nguyen Van An", "nguyen van an"));
+        assertTrue(SkillVerificationService.isNameMatching("Nguyễn Thị Mai", "NGUYỄN THỊ MAI"));
+        assertTrue(SkillVerificationService.isNameMatching("Lê Văn Đức", "Le Duc")); // middle name omitted
+
+        assertFalse(SkillVerificationService.isNameMatching("Nguyen Van An", "Tran Van B"));
+        assertFalse(SkillVerificationService.isNameMatching("Phạm Duy Hưng", "Nguyen Van An"));
+        assertFalse(SkillVerificationService.isNameMatching(null, "Nguyen Van An"));
+        assertFalse(SkillVerificationService.isNameMatching("Nguyen Van An", null));
+    }
+
+    @Test
+    @DisplayName("Fraud Defense: Identity mismatch between certificate and worker profile must force REJECT")
+    void testSubmitVerification_NameMismatch_ForcesReject() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "cert.jpg", "image/jpeg", "dummy-cert-bytes".getBytes()
+        );
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findByIsActiveTrue()).thenReturn(List.of(mockSkill));
+
+        // Certificate belongs to another person: "Trần Văn Khác"
+        SkillVerificationAiResultDto aiResult = SkillVerificationAiResultDto.builder()
+                .recipientName("Trần Văn Khác")
+                .institution("Trường Du lịch Saigontourist")
+                .hasSealOrSignature(true)
+                .overallConfidence(0.95)
+                .routingDecision(RoutingDecision.AUTO_APPROVE)
+                .routingReason("Valid certificate")
+                .extractedSkills(List.of(ExtractedSkillDto.builder()
+                        .skillName("Bartender")
+                        .taxonomyRole("Pha chế (Bartender/Barista)")
+                        .confidenceScore(0.95)
+                        .build()))
+                .build();
+
+        when(skillVisionAiClient.verifyDocument(any(), any(), any())).thenReturn(aiResult);
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class)))
+                .thenAnswer(invocation -> {
+                    SkillVerificationRequest req = invocation.getArgument(0);
+                    req.setId(UUID.randomUUID());
+                    return req;
+                });
+
+        SkillVerificationResponseDto response = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "Borrowing friend's cert"
+        );
+
+        assertNotNull(response);
+        assertEquals(RoutingDecision.REJECT, response.getRoutingDecision());
+        assertEquals(SkillVerificationStatus.REJECTED, response.getStatus());
+        assertEquals(0, response.getSpAwarded());
+        assertTrue(response.getRoutingReason().contains("không trùng khớp"));
+
+        verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
+        verify(workerSkillPointRepository, never()).save(any(WorkerSkillPoint.class));
+    }
+
+    @Test
+    @DisplayName("Admin Post-Audit: Admin revoking an approved verification deducts awarded SP and downgrades skill")
+    void testRevokeVerification_AdminRevokeApprovedSkill() {
+        UUID reqId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+
+        SkillVerificationRequest approvedReq = SkillVerificationRequest.builder()
+                .id(reqId)
+                .worker(mockWorker)
+                .skill(mockSkill)
+                .jobType("Pha chế (Bartender/Barista)")
+                .status(SkillVerificationStatus.APPROVED)
+                .spAwarded(25)
+                .build();
+
+        WorkerSkillPoint wsp = WorkerSkillPoint.builder()
+                .worker(mockWorker)
+                .jobType("Pha chế (Bartender/Barista)")
+                .spVerify(25)
+                .totalSp(25)
+                .tier(SkillTier.STARTER)
+                .build();
+
+        WorkerSkill ws = WorkerSkill.builder()
+                .worker(mockWorker)
+                .skill(mockSkill)
+                .verificationTier(VerificationTier.AI_DOCUMENT)
+                .spVerifyAwarded(25)
+                .build();
+
+        when(verificationRequestRepository.findById(reqId)).thenReturn(Optional.of(approvedReq));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(workerId, "Pha chế (Bartender/Barista)"))
+                .thenReturn(Optional.of(wsp));
+        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.of(ws));
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> i.getArgument(0));
+
+        SkillVerificationResponseDto res = verificationService.revokeVerification(reqId, adminId, "Phát hiện chứng chỉ photoshop");
+
+        assertNotNull(res);
+        assertEquals(SkillVerificationStatus.REJECTED, res.getStatus());
+        assertEquals(0, res.getSpAwarded());
+        assertEquals(0, wsp.getSpVerify());
+        assertEquals(0, wsp.getTotalSp());
+        assertEquals(VerificationTier.SELF_DECLARED, ws.getVerificationTier());
+        assertEquals(0, ws.getSpVerifyAwarded());
+    }
+
+    @Test
+    @DisplayName("Admin Audit Log: Admin retrieves all verification records with full AI breakdown")
+    void testGetAllVerificationsForAdmin() {
+        SkillVerificationRequest req1 = SkillVerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .worker(mockWorker)
+                .status(SkillVerificationStatus.APPROVED)
+                .institution("Trường Saigontourist")
+                .hasSealOrSignature(true)
+                .overallConfidence(java.math.BigDecimal.valueOf(0.92))
+                .build();
+
+        when(verificationRequestRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(req1));
+
+        List<SkillVerificationResponseDto> all = verificationService.getAllVerificationsForAdmin(null);
+        assertEquals(1, all.size());
+        assertEquals("Trường Saigontourist", all.get(0).getInstitution());
+        assertTrue(all.get(0).getHasSealOrSignature());
+    }
 }

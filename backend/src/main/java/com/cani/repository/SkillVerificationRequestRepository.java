@@ -15,5 +15,9 @@ public interface SkillVerificationRequestRepository extends JpaRepository<SkillV
 
     List<SkillVerificationRequest> findByStatusOrderByCreatedAtAsc(SkillVerificationStatus status);
 
+    List<SkillVerificationRequest> findAllByOrderByCreatedAtDesc();
+
+    List<SkillVerificationRequest> findByStatusOrderByCreatedAtDesc(SkillVerificationStatus status);
+
     long countByStatus(SkillVerificationStatus status);
 }

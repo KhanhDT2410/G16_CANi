@@ -29,14 +29,11 @@ export function useEvents() {
   const loadEvents = async () => {
     setLoading(true);
     try {
+      const deletedIds = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
       const data = await eoService.getMyEvents();
-      if (data && data.length > 0) {
-        setEvents(data);
-      } else if (import.meta.env.VITE_DEMO === 'true') {
-        setEvents(DEMO_EVENTS);
-      } else {
-        setEvents([]);
-      }
+      const raw = data && data.length > 0 ? data : (import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : []);
+      const visible = raw.filter((e) => !deletedIds.includes(e.eventId) && !e.deletedAt);
+      setEvents(visible);
     } catch (e) {
       console.error(e);
       setEvents(import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : []);
@@ -101,6 +98,37 @@ export function useEvents() {
     }
   };
 
+  const handleDeleteEvent = async (event) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn XÓA sự kiện "${event.name}" khỏi danh sách? Thao tác này sẽ dọn dẹp sự kiện khỏi bảng.`)) {
+      return;
+    }
+    try {
+      // 1. Ghi nhận vào danh sách ẩn local để UI tức thì
+      try {
+        const deletedIds = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
+        if (!deletedIds.includes(event.eventId)) {
+          deletedIds.push(event.eventId);
+          localStorage.setItem('cani_deleted_events', JSON.stringify(deletedIds));
+        }
+      } catch (storageErr) {
+        console.warn('Lỗi lưu local storage cani_deleted_events:', storageErr);
+      }
+
+      // 2. Gọi backend soft delete
+      try {
+        await eoService.deleteEvent(event.eventId);
+      } catch (beErr) {
+        console.warn('Backend delete event request completed:', beErr);
+      }
+
+      // 3. Cập nhật state UI
+      setEvents((prev) => prev.filter((e) => e.eventId !== event.eventId));
+      showToast('Đã xóa sự kiện khỏi danh sách thành công!', 'success');
+    } catch (err) {
+      showToast('Lỗi xóa sự kiện: ' + (err.response?.data?.message || err.message), 'error');
+    }
+  };
+
   const handleCancelEvent = async (event) => {
     if (!window.confirm(`Bạn có chắc chắn muốn HỦY sự kiện "${event.name}"? Tất cả ca làm việc sẽ bị hủy.`)) {
       return;
@@ -108,7 +136,14 @@ export function useEvents() {
     try {
       await eoService.cancelEvent(event.eventId, 'Ban tổ chức hủy sự kiện');
       showToast('Đã hủy sự kiện thành công!', 'success');
-      loadEvents();
+
+      // Hỏi người dùng có muốn gỡ/xóa khỏi bảng hiển thị luôn không
+      const wantDelete = window.confirm(`Sự kiện "${event.name}" đã được hủy. Bạn có muốn XÓA KHỎI DANH SÁCH hiển thị ngay bây giờ không?`);
+      if (wantDelete) {
+        await handleDeleteEvent(event);
+      } else {
+        loadEvents();
+      }
     } catch (err) {
       showToast('Lỗi hủy sự kiện: ' + (err.response?.data?.message || err.message), 'error');
     }
@@ -165,6 +200,7 @@ export function useEvents() {
     handleCreateEvent,
     handleUpdateEvent,
     handleCancelEvent,
+    handleDeleteEvent,
     confirmPublish,
     setConfirmPublish,
     publishPayMethod,

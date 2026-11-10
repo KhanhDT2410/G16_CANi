@@ -7,6 +7,7 @@ import { showToast } from '../../../components/common/Toast';
  */
 const EventShiftsDrawer = ({
   event,
+  onOpenDetail,
   onAddShift,
   onOpenQr,
   onOpenInvite,
@@ -83,22 +84,49 @@ const EventShiftsDrawer = ({
             </button>
           )}
         </div>
-        <button
-          type="button"
-          style={{
-            background: '#eff6ff',
-            color: '#1d4ed8',
-            border: '1px solid #bfdbfe',
-            borderRadius: 6,
-            padding: '5px 12px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-          onClick={() => onAddShift(event.eventId)}
-        >
-          + Thêm Ca Mới
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {onOpenDetail && (
+            <button
+              type="button"
+              style={{
+                background: '#f8fafc',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                borderRadius: 6,
+                padding: '5px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+              onClick={() => onOpenDetail(event)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              Xem chi tiết sự kiện & nhân sự
+            </button>
+          )}
+          <button
+            type="button"
+            style={{
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              borderRadius: 6,
+              padding: '5px 12px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+            onClick={() => onAddShift(event.eventId)}
+          >
+            + Thêm Ca Mới
+          </button>
+        </div>
       </div>
 
       {shifts.length === 0 ? (

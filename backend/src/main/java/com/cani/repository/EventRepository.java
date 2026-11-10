@@ -14,6 +14,7 @@ import java.util.UUID;
 @Repository
 public interface EventRepository extends JpaRepository<Event, UUID> {
     List<Event> findByEventOrganizer_EoIdOrderByCreatedAtDesc(UUID eoId);
+    List<Event> findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(UUID eoId);
     List<Event> findByStatus(EventStatus status);
     Optional<Event> findByEventIdAndEventOrganizer_EoId(UUID eventId, UUID eoId);
     long countByStatus(EventStatus status);

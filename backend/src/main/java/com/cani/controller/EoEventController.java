@@ -201,6 +201,20 @@ public class EoEventController {
     }
 
     /**
+     * Xóa Sự kiện khỏi danh sách của EO (Soft delete)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @DeleteMapping("/{eventId}")
+    public ResponseEntity<ApiResponse<Void>> deleteEvent(
+            @PathVariable("eventId") UUID eventId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        eoEventService.deleteEvent(userId, eventId);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã xóa sự kiện khỏi danh sách thành công!"));
+    }
+
+    /**
      * EO xuất bản Sự kiện và tự động kích hoạt Matching Engine (Non-Escrow)
      */
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")

@@ -36,26 +36,32 @@ export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
         evt.eventId?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchStatus =
         statusFilter === 'ALL' ||
-        (statusFilter === 'ACTIVE' && evt.status === 'ACTIVE') ||
-        (statusFilter === 'DRAFT' && evt.status === 'DRAFT');
+        evt.status === statusFilter;
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
       if (sortBy === 'NAME') return (a.name || '').localeCompare(b.name || '');
       if (sortBy === 'WORKERS') return (b.totalRequiredWorkers || 0) - (a.totalRequiredWorkers || 0);
-      return 0;
+      if (sortBy === 'OLDEST') return new Date(a.createdAt || a.eventDate || 0) - new Date(b.createdAt || b.eventDate || 0);
+      return new Date(b.createdAt || b.eventDate || 0) - new Date(a.createdAt || a.eventDate || 0);
     });
 }
 
 export function calculateEventMetrics(events) {
-  const totalEvents = events.length;
-  const totalRequiredWorkers = events.reduce((sum, e) => sum + (e.totalRequiredWorkers || 0), 0);
-  const totalConfirmedWorkers = events.reduce((sum, e) => sum + (e.totalConfirmedWorkers || 0), 0);
-  const totalEstimatedCost = events.reduce((sum, e) => sum + (e.totalEstimatedCost || 0), 0);
+  // Loại trừ các sự kiện đã hủy khỏi số liệu vận hành và tuyển dụng
+  const nonCancelled = events.filter((e) => e.status !== 'CANCELLED');
+  const activeEvents = events.filter((e) => e.status === 'ACTIVE' || e.status === 'APPROVED');
+
+  const totalEvents = nonCancelled.length;
+  const activeEventsCount = activeEvents.length;
+  const totalRequiredWorkers = nonCancelled.reduce((sum, e) => sum + (e.totalRequiredWorkers || 0), 0);
+  const totalConfirmedWorkers = nonCancelled.reduce((sum, e) => sum + (e.totalConfirmedWorkers || 0), 0);
+  const totalEstimatedCost = nonCancelled.reduce((sum, e) => sum + (e.totalEstimatedCost || 0), 0);
   const fillRate = totalRequiredWorkers > 0 ? Math.round((totalConfirmedWorkers / totalRequiredWorkers) * 100) : 0;
 
   return {
     totalEvents,
+    activeEventsCount,
     totalRequiredWorkers,
     totalConfirmedWorkers,
     totalEstimatedCost,

@@ -385,11 +385,23 @@ public class EoEventService {
     @Transactional(readOnly = true)
     public List<EventResponseDto> getMyEvents(UUID userId) {
         EventOrganizer eo = getEoOrThrow(userId);
-        List<Event> events = eventRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId());
+        List<Event> events = eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId());
         return events.stream().map(e -> {
             List<Shift> shifts = shiftRepository.findByEvent_EventId(e.getEventId());
             return mapToEventResponseDto(e, shifts);
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Xóa mềm Sự kiện khỏi danh sách của EO (Soft Delete)
+     */
+    @Transactional
+    public void deleteEvent(UUID userId, UUID eventId) {
+        EventOrganizer eo = getEoOrThrow(userId);
+        Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
+        event.setDeletedAt(Instant.now());
+        eventRepository.save(event);
+        log.info("EO {} đã xóa sự kiện {}", userId, eventId);
     }
 
     /**

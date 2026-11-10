@@ -1,7 +1,8 @@
-export default function EOMetricsGrid({ metrics }) {
-  const { totalEvents, totalRequiredWorkers, totalConfirmedWorkers, totalEstimatedCost, fillRate } = metrics || {};
+export default function EOMetricsGrid({ metrics, onOpenActiveEventDetail }) {
+  const { totalEvents, activeEventsCount, totalRequiredWorkers, totalConfirmedWorkers, totalEstimatedCost, fillRate } = metrics || {};
 
   const safeEvents = totalEvents ?? 0;
+  const safeActive = activeEventsCount ?? 0;
   const safeRequired = totalRequiredWorkers ?? 0;
   const safeConfirmed = totalConfirmedWorkers ?? 0;
   const safeCost = totalEstimatedCost ?? 0;
@@ -10,7 +11,14 @@ export default function EOMetricsGrid({ metrics }) {
   return (
     <section className="eo-metrics-grid">
       {/* 1. Tổng sự kiện */}
-      <div className="eo-metric-card-modern">
+      <div
+        className={`eo-metric-card-modern ${safeActive > 0 && onOpenActiveEventDetail ? 'clickable-metric-card' : ''}`}
+        onClick={() => {
+          if (safeActive > 0 && onOpenActiveEventDetail) onOpenActiveEventDetail();
+        }}
+        title={safeActive > 0 ? 'Bấm để xem chi tiết sự kiện đang hoạt động' : undefined}
+        style={safeActive > 0 && onOpenActiveEventDetail ? { cursor: 'pointer' } : undefined}
+      >
         <div className="metric-card-top">
           <div className="metric-icon-box blue">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -24,13 +32,19 @@ export default function EOMetricsGrid({ metrics }) {
             <span className="metric-title-text">Tổng sự kiện</span>
             <div className="metric-data-row">
               <span className="metric-big-number">{safeEvents}</span>
-              {safeEvents > 0 && (
-                <span className="metric-trend-pill green">Đang hoạt động</span>
+              {safeActive > 0 ? (
+                <span className="metric-trend-pill green">{safeActive} Đang hoạt động</span>
+              ) : safeEvents > 0 ? (
+                <span className="metric-trend-pill yellow">Bản nháp</span>
+              ) : (
+                <span className="metric-trend-pill neutral">0 hoạt động</span>
               )}
             </div>
           </div>
         </div>
-        <div className="metric-bottom-sub">Sự kiện trên hệ thống</div>
+        <div className="metric-bottom-sub">
+          {safeActive > 0 && onOpenActiveEventDetail ? 'Nhấn để xem chi tiết sự kiện' : 'Sự kiện trên hệ thống'}
+        </div>
       </div>
 
       {/* 2. Nhân sự cần tuyển */}

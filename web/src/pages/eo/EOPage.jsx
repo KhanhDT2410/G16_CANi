@@ -124,6 +124,7 @@ export default function EOPage() {
   });
 
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [detailEvent, setDetailEvent] = useState(null);
 
   const handleNavClick = (navKey) => {
     setActiveNav(navKey);
@@ -202,7 +203,15 @@ export default function EOPage() {
                 </div>
               </section>
 
-              <EOMetricsGrid metrics={events.metrics} />
+              <EOMetricsGrid
+                metrics={events.metrics}
+                onOpenActiveEventDetail={() => {
+                  const active = events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0];
+                  if (active) {
+                    setDetailEvent(active);
+                  }
+                }}
+              />
             </>
           )}
 
@@ -218,6 +227,8 @@ export default function EOPage() {
               setSortBy={events.setSortBy}
               expandedEventId={shifts.expandedEventId}
               setExpandedEventId={shifts.setExpandedEventId}
+              onOpenEventDetail={setDetailEvent}
+              onDeleteEvent={events.handleDeleteEvent}
               onOpenCreateEvent={() => events.setShowEventModal(true)}
               onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
               onOpenEditEvent={events.setEditingEvent}
@@ -316,6 +327,9 @@ export default function EOPage() {
         setInviteModal={setInviteModal}
         disputeModal={disputeModal}
         setDisputeModal={setDisputeModal}
+        detailEvent={detailEvent}
+        setDetailEvent={setDetailEvent}
+        onNavigateToRecruitment={() => handleNavClick('recruitment')}
       />
 
       {/* Modal Xuất Phiếu Chi Thù Lao & Quyết Toán Kế Toán (Mẫu 02-TT / NĐ 52/2024/NĐ-CP) */}

@@ -17,6 +17,8 @@ import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -150,7 +152,7 @@ public class AuthService {
             accessToken = session.getAccessToken();
             refreshToken = session.getRefreshToken();
             expiresIn = session.getExpiresIn();
-        } else if (environment.acceptsProfiles("h2")) {
+        } else if (environment.acceptsProfiles(Profiles.of("h2"))) {
             // Chỉ profile h2 (dev offline, H2DataSeeder) được phép fallback dev-token.
             User localUser = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không chính xác"));
@@ -239,6 +241,19 @@ public class AuthService {
 
             if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
                 throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
+            }
+
+            // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
+            if (user.getRole() == UserRole.EVENT_ORGANIZER) {
+                eventOrganizerRepository.findByUser_UserId(user.getUserId())
+                        .orElseGet(() -> eventOrganizerRepository.save(
+                                EventOrganizer.builder()
+                                        .user(user)
+                                        .companyName(user.getFullName() != null && !user.getFullName().isBlank()
+                                                ? user.getFullName()
+                                                : "Ban Tổ Chức")
+                                        .build()
+                        ));
             }
 
             user.setLastLoginAt(Instant.now());

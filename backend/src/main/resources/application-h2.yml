@@ -35,8 +35,8 @@ cani:
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-3.5-flash}
+      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
   ekyc:
-    provider: mock
+    provider: ${EKYC_PROVIDER:vnpt}
   sla-scan:
     enabled: false

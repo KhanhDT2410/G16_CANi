@@ -17,6 +17,8 @@ import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -150,7 +152,7 @@ public class AuthService {
             accessToken = session.getAccessToken();
             refreshToken = session.getRefreshToken();
             expiresIn = session.getExpiresIn();
-        } else if (environment.acceptsProfiles("h2")) {
+        } else if (environment.acceptsProfiles(Profiles.of("h2"))) {
             // Chỉ profile h2 (dev offline, H2DataSeeder) được phép fallback dev-token.
             User localUser = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không chính xác"));
@@ -189,10 +191,20 @@ public class AuthService {
         try {
             // 1. Xác thực chữ ký token từ Supabase bằng JWKS ES256
             Jwt jwt = jwtDecoder.decode(request.getSupabaseAccessToken());
-            UUID userId = UUID.fromString(jwt.getSubject());
             String email = jwt.getClaimAsString("email");
+            if (email == null || email.isBlank()) {
+                throw new BadRequestException("Không tìm thấy thông tin email từ phiên xác thực Google");
+            }
 
-            User user = userRepository.findById(userId)
+            UUID parsedUserId;
+            try {
+                parsedUserId = UUID.fromString(jwt.getSubject());
+            } catch (Exception e) {
+                parsedUserId = UUID.nameUUIDFromBytes(email.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            final UUID finalUserId = parsedUserId;
+
+            User user = userRepository.findById(finalUserId)
                     .or(() -> userRepository.findByEmail(email))
                     .orElseGet(() -> {
                 String fullName = email;
@@ -208,7 +220,7 @@ public class AuthService {
                 }
 
                 User newUser = User.builder()
-                        .userId(userId)
+                        .userId(finalUserId)
                         .email(email)
                         .fullName(fullName)
                         .role(initialRole)
@@ -237,12 +249,36 @@ public class AuthService {
                 return saved;
             });
 
+            // Nếu user đã tồn tại nhưng có role là WORKER (và không phải tài khoản seed worker@cani.vn)
+            // khi đăng nhập/đăng ký từ Web Portal với targetRole là EVENT_ORGANIZER, tự động nâng cấp sang EVENT_ORGANIZER
+            if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())
+                    && user.getRole() == UserRole.WORKER
+                    && !"worker@cani.vn".equalsIgnoreCase(user.getEmail())) {
+                log.info("Cập nhật vai trò người dùng {} sang EVENT_ORGANIZER theo yêu cầu từ Web Portal", user.getEmail());
+                user.setRole(UserRole.EVENT_ORGANIZER);
+                user = userRepository.save(user);
+            }
+
             if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
                 throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
             }
 
-            user.setLastLoginAt(Instant.now());
-            userRepository.save(user);
+            // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
+            final User currentUser = user;
+            if (currentUser.getRole() == UserRole.EVENT_ORGANIZER) {
+                eventOrganizerRepository.findByUser_UserId(currentUser.getUserId())
+                        .orElseGet(() -> eventOrganizerRepository.save(
+                                EventOrganizer.builder()
+                                        .user(currentUser)
+                                        .companyName(currentUser.getFullName() != null && !currentUser.getFullName().isBlank()
+                                                ? currentUser.getFullName()
+                                                : "Ban Tổ Chức")
+                                        .build()
+                        ));
+            }
+
+            currentUser.setLastLoginAt(Instant.now());
+            user = userRepository.save(currentUser);
 
             return LoginResponse.builder()
                     .token(request.getSupabaseAccessToken())

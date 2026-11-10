@@ -52,7 +52,7 @@ export const LoginForm = () => {
               name="email"
               type="email"
               className="form-input with-icon"
-              placeholder="customer@petshop.vn"
+              placeholder="name@company.com"
               value={formData.email}
               onChange={handleChange}
               autoComplete="username"

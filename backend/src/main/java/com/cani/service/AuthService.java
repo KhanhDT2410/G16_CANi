@@ -187,7 +187,7 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginResponse googleLogin(GoogleLoginRequest request) {
+    public synchronized LoginResponse googleLogin(GoogleLoginRequest request) {
         try {
             // 1. Xác thực chữ ký token từ Supabase bằng JWKS ES256
             Jwt jwt = jwtDecoder.decode(request.getSupabaseAccessToken());

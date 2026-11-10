@@ -140,7 +140,7 @@ export default function EoProfileTab() {
           ratingAvg: profileRes.value.ratingAvg || prev.ratingAvg,
           totalEventsCompleted: profileRes.value.totalEventsCompleted ?? prev.totalEventsCompleted,
           businessLicenseUrl: profileRes.value.businessLicenseUrl || '',
-          businessVerificationStatus: profileRes.value.businessVerificationStatus || (hasTax ? 'AWAITING_LICENSE_UPLOAD' : 'NOT_REGISTERED'),
+          businessVerificationStatus: profileRes.value.businessVerificationStatus || (hasTax ? 'PENDING_REVIEW' : 'NOT_REGISTERED'),
         }));
       }
 
@@ -254,8 +254,15 @@ export default function EoProfileTab() {
       }
 
       const result = await eoService.submitEkyc(formData);
-      showToast('Đã nộp hồ sơ eKYC thành công! Hệ thống đang xử lý thẩm định.', 'success');
       setEkycData(result);
+      if (result?.status === 'REJECTED') {
+        showToast(result.routingReason || 'Hồ sơ định danh eKYC không hợp lệ hoặc bị trùng CCCD!', 'error');
+      } else if (result?.status === 'PENDING_REVIEW') {
+        showToast(result.routingReason || 'Đã nộp hồ sơ eKYC! Đang chờ Admin thẩm định.', 'info');
+      } else {
+        showToast('Xác thực định danh eKYC thành công!', 'success');
+      }
+      await loadData();
       try {
         window.dispatchEvent(new CustomEvent('cani_ekyc_updated'));
       } catch (e) {
@@ -608,11 +615,11 @@ export default function EoProfileTab() {
                     </span>
                   ) : profile.businessVerificationStatus === 'PENDING_REVIEW' ? (
                     <span className="status-pill pending" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      ⏳ ĐÃ NỘP GPKD - ĐANG CHỜ ADMIN XÁC NHẬN
+                      ⏳ ĐÃ ĐĂNG KÝ MST - ĐANG CHỜ ADMIN XÁC NHẬN
                     </span>
                   ) : (
                     <span className="status-pill none" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#b45309' }}>
-                      ⚠️ CẦN ADMIN XÁC NHẬN (NỘP GPKD TẠI EKYC)
+                      ⚠️ CHỜ ADMIN XÁC NHẬN TƯ CÁCH PHÁP NHÂN
                     </span>
                   )
                 ) : (
@@ -630,36 +637,9 @@ export default function EoProfileTab() {
               </div>
               <p style={{ margin: '0.4rem 0 0', fontSize: '0.825rem', color: '#64748b', lineHeight: 1.45 }}>
                 {isBusinessEntity
-                  ? 'Khi đăng ký Hộ kinh doanh / Doanh nghiệp, bạn cần điền Mã số thuế và nộp Giấy phép đăng ký kinh doanh tại mục eKYC để Ban Quản Trị (Admin) thẩm định và phê duyệt tư cách pháp nhân.'
+                  ? 'Khi đăng ký Hộ kinh doanh / Doanh nghiệp, bạn cần điền đầy đủ Tên tổ chức và Mã số thuế để Ban Quản Trị (Admin) thẩm định và phê duyệt tư cách pháp nhân.'
                   : 'Tài khoản cá nhân / ban tổ chức tự do không bắt buộc có Mã số thuế. Nếu bạn là Hộ kinh doanh hoặc Doanh nghiệp có MST, hãy tích vào ô trên để mở khóa ô điền Mã số thuế.'}
               </p>
-              {isBusinessEntity && profile.businessVerificationStatus !== 'APPROVED' && profile.businessVerificationStatus !== 'PENDING_REVIEW' && (
-                <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSection('EKYC')}
-                    style={{
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      padding: '0.35rem 0.85rem',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                    }}
-                  >
-                    <span>Nộp Giấy phép ĐKKD để Admin duyệt</span>
-                    <span>→</span>
-                  </button>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    (Tải ảnh Giấy phép ĐKKD tại Tab 2. Xác Thực Định Danh eKYC)
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="profile-form-grid-2">
@@ -863,22 +843,32 @@ export default function EoProfileTab() {
 
               <div className="info-grid">
                 <div className="info-item">
-                  <span className="info-label">Người đại diện pháp luật</span>
-                  <span className="info-val">{ekycData.representativeName || profile.fullName}</span>
+                  <span className="info-label">Họ và tên trên CCCD</span>
+                  <span className="info-val">{ekycData.representativeName || '—'}</span>
                 </div>
                 <div className="info-item">
                   <span className="info-label">Số CCCD (Bảo mật NĐ 13)</span>
-                  <span className="info-val">{ekycData.cccdNumberMasked || '001099******'}</span>
+                  <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Ngày sinh & Giới tính</span>
+                  <span className="info-val">
+                    {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
+                  </span>
                 </div>
                 <div className="info-item">
                   <span className="info-label">Độ khớp khuôn mặt (Face Match)</span>
                   <span className="info-val" style={{ color: '#16a34a' }}>
-                    {ekycData.faceMatchScore ? `${ekycData.faceMatchScore}%` : '98.5% (VNPT eKYC)'}
+                    {ekycData.faceMatchScore != null ? `${Number(ekycData.faceMatchScore).toFixed(1)}%` : '—'}
                   </span>
                 </div>
                 <div className="info-item">
-                  <span className="info-label">Địa chỉ đăng ký</span>
-                  <span className="info-val">{ekycData.residenceAddress || profile.address}</span>
+                  <span className="info-label">Quê quán</span>
+                  <span className="info-val">{ekycData.originAddress || '—'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Nơi thường trú (Trên CCCD)</span>
+                  <span className="info-val">{ekycData.residenceAddress || '—'}</span>
                 </div>
               </div>
             </div>
@@ -887,11 +877,33 @@ export default function EoProfileTab() {
               {ekycStatus === 'PENDING_REVIEW' && (
                 <div style={{ backgroundColor: '#fefce8', border: '1px solid #fef08a', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
                   <div style={{ fontWeight: 700, color: '#854d0e', marginBottom: '0.25rem' }}>
-                    Hồ sơ eKYC đang được đội ngũ CSKH thẩm định
+                    Hồ sơ eKYC đang chờ Admin / CSKH thẩm định
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#a16207' }}>
-                    Hệ thống đã tiếp nhận dữ liệu CCCD của bạn. Thời gian xét duyệt tự động trong vòng 15-30 phút làm việc.
+                  <div style={{ fontSize: '0.875rem', color: '#a16207', marginBottom: '0.75rem' }}>
+                    {ekycData?.routingReason || 'Hệ thống đã bóc tách thông tin CCCD của bạn và đang chờ Admin phê duyệt.'}
                   </div>
+                  {ekycData && (
+                    <div className="info-grid" style={{ marginTop: '0.75rem' }}>
+                      <div className="info-item">
+                        <span className="info-label">Họ và tên trên CCCD</span>
+                        <span className="info-val">{ekycData.representativeName || '—'}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Số CCCD (Bảo mật NĐ 13)</span>
+                        <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Ngày sinh & Giới tính</span>
+                        <span className="info-val">
+                          {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
+                        </span>
+                      </div>
+                      <div className="info-item">
+                        <span className="info-label">Nơi thường trú (Trên CCCD)</span>
+                        <span className="info-val">{ekycData.residenceAddress || '—'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -908,7 +920,7 @@ export default function EoProfileTab() {
 
               <form onSubmit={handleSubmitEkyc}>
                 <p style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', margin: '0 0 0.75rem' }}>
-                  Tải lên hồ sơ xác thực định danh (CCCD & Giấy phép ĐKKD):
+                  Tải lên hồ sơ xác thực định danh (CCCD & Ảnh chân dung đại diện):
                 </p>
 
                 <div className="ekyc-upload-grid">
@@ -970,29 +982,6 @@ export default function EoProfileTab() {
                     )}
                     <div className="upload-label">Ảnh chân dung đại diện *</div>
                     <div className="upload-hint">Nhìn thẳng, đủ ánh sáng</div>
-                  </label>
-
-                  <label className={`upload-box ${previews.businessLicenseImage ? 'has-file' : ''}`}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => handleEkycFileChange('businessLicenseImage', e)}
-                      disabled={submittingEkyc}
-                    />
-                    {previews.businessLicenseImage ? (
-                      <img src={previews.businessLicenseImage} alt="Giấy phép kinh doanh" className="upload-preview-img" />
-                    ) : (
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.75">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                      </svg>
-                    )}
-                    <div className="upload-label">Giấy Phép ĐKKD (Dành cho Hộ kinh doanh)</div>
-                    <div className="upload-hint">Bản chụp ĐKKD — Admin CANi sẽ trực tiếp thẩm định & phê duyệt</div>
                   </label>
                 </div>
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
-import { getAddressFromCoordinates } from '../utils/geoUtils';
+import { getAddressFromCoordinates, getCoordinatesFromAddress } from '../utils/geoUtils';
 import {
   DEFAULT_NEW_EVENT,
   DEMO_EVENTS,
@@ -75,7 +75,22 @@ export function useEvents() {
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     try {
-      await eoService.createEvent(newEvent);
+      let eventPayload = { ...newEvent };
+      if (eventPayload.venueAddress?.trim()) {
+        try {
+          const coords = await getCoordinatesFromAddress(eventPayload.venueAddress);
+          if (coords && coords.lat && coords.lng) {
+            eventPayload.venueLat = coords.lat;
+            eventPayload.venueLng = coords.lng;
+          }
+        } catch {
+          // Bỏ qua lỗi mạng
+        }
+      }
+      eventPayload.venueLat = eventPayload.venueLat || 10.7328;
+      eventPayload.venueLng = eventPayload.venueLng || 106.7214;
+
+      await eoService.createEvent(eventPayload);
       setShowEventModal(false);
       loadEvents();
       showToast('Tạo sự kiện thành công! Hãy thêm các ca làm việc cho sự kiện này.', 'success');

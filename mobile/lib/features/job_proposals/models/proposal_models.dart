@@ -13,6 +13,7 @@ class JobProposalItem {
   final double totalEstimatedPay;
   final double matchScore;
   final String status;
+  final String? imageUrl;
 
   JobProposalItem({
     required this.proposalId,
@@ -29,6 +30,7 @@ class JobProposalItem {
     required this.totalEstimatedPay,
     required this.matchScore,
     required this.status,
+    this.imageUrl,
   });
 
   factory JobProposalItem.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class JobProposalItem {
       totalEstimatedPay: (json['totalEstimatedPay'] is num) ? (json['totalEstimatedPay'] as num).toDouble() : 0.0,
       matchScore: (json['matchScore'] is num) ? (json['matchScore'] as num).toDouble() : 0.0,
       status: json['status'] ?? 'PENDING',
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 }
@@ -72,6 +75,7 @@ class ShiftAssignmentItem {
   final DateTime? checkinTime;
   final DateTime? checkoutTime;
   final double? hoursWorked;
+  final String? imageUrl;
 
   ShiftAssignmentItem({
     required this.assignmentId,
@@ -94,6 +98,7 @@ class ShiftAssignmentItem {
     this.checkinTime,
     this.checkoutTime,
     this.hoursWorked,
+    this.imageUrl,
   });
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
@@ -118,6 +123,7 @@ class ShiftAssignmentItem {
       checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime']) : null,
       checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime']) : null,
       hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 }

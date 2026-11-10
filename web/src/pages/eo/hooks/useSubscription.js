@@ -105,6 +105,11 @@ export function useSubscription() {
     try {
       const result = await eoService.purchaseSubscriptionPayOS({ planType });
       if (result) {
+        if (!result.checkoutUrl || result.amount === 0) {
+          showToast('Kích hoạt Gói Trải Nghiệm Khởi Nghiệp thành công!', 'success');
+          await loadSubscriptionData();
+          return;
+        }
         setPayOSModalData(result);
         showToast('Khởi tạo mã VietQR PayOS thành công!', 'success');
       }

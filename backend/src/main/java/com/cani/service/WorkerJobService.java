@@ -387,6 +387,7 @@ public class WorkerJobService {
                         .requiredWorkers(s.getRequiredWorkers())
                         .confirmedWorkers(s.getConfirmedWorkers())
                         .remainingWorkers(s.getRemainingWorkers())
+                        .imageUrl(s.getImageUrl())
                         .build());
             }
         }
@@ -902,6 +903,7 @@ public class WorkerJobService {
                 .expiresAt(p.getExpiresAt())
                 .source(p.getSource())
                 .createdAt(p.getCreatedAt())
+                .imageUrl(s != null ? s.getImageUrl() : null)
                 .build();
     }
 
@@ -939,6 +941,7 @@ public class WorkerJobService {
                 .checkoutTime(attendanceOpt.map(AttendanceLog::getCheckoutTime).orElse(null))
                 .hoursWorked(attendanceOpt.map(AttendanceLog::getHoursWorked).orElse(BigDecimal.ZERO))
                 .createdAt(a.getCreatedAt())
+                .imageUrl(s != null ? s.getImageUrl() : null)
                 .build();
     }
 }

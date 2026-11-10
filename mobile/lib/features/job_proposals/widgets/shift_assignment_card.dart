@@ -152,6 +152,19 @@ class ShiftAssignmentCard extends StatelessWidget {
                     letterSpacing: -0.1,
                   ),
                 ),
+                if (a.imageUrl != null && a.imageUrl!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      a.imageUrl!.trim(),
+                      height: 100,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
 
                 // Thời gian & Địa điểm

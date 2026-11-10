@@ -156,7 +156,7 @@ class RevenueServiceTest {
             assertThat(response.getGrowth().getPackageRevenueGrowthRate()).isEqualTo(50.0);
 
             // Phân bổ loại gói
-            assertThat(response.getPackageTypeBreakdown()).hasSize(2);
+            assertThat(response.getPackageTypeBreakdown()).hasSize(PlanType.values().length);
             assertThat(response.getPackageTypeBreakdown().stream().filter(p -> p.getPlanType() == PlanType.INVITE_ONLY).findFirst().get().getTotalRevenue())
                     .isEqualByComparingTo(BigDecimal.valueOf(500000));
             assertThat(response.getPackageTypeBreakdown().stream().filter(p -> p.getPlanType() == PlanType.MATCHING_PLUS).findFirst().get().getTotalRevenue())

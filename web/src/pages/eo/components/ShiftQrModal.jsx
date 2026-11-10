@@ -66,8 +66,23 @@ const ShiftQrModal = ({
     <div className="eo-modal-overlay">
       <div className="eo-modal-box" style={{ maxWidth: 480, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, textAlign: 'left' }}>Mã QR Điểm Danh Ca Làm</h3>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}>Đóng</button>
+          <h3 style={{ margin: 0, textAlign: 'left', fontSize: '1.2rem', fontWeight: 700, color: '#1e293b' }}>
+            Mã QR Điểm Danh Ca Làm
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              color: '#64748b',
+              fontWeight: 600,
+            }}
+          >
+            Đóng
+          </button>
         </div>
 
         {/* Tab Switcher: Check-in vs Check-out */}
@@ -153,26 +168,26 @@ const ShiftQrModal = ({
               <em>Hướng dẫn:</em> Hiển thị màn hình này tại bàn tiếp tân sự kiện hoặc in ra giấy để Worker quét mã trực tiếp trên ứng dụng CANi.
             </p>
 
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.25rem' }}>
               <button
                 type="button"
-                className="eo-btn-submit"
+                className="eo-btn-primary"
                 onClick={handlePrint}
                 style={{
-                  background: accentColor,
-                  padding: '8px 16px',
-                  fontSize: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.65rem 1.75rem',
+                  fontSize: '0.9rem',
+                  background: isCheckin ? '#2563eb' : '#0d9488',
                 }}
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
                 In Mã QR Ra Giấy
-              </button>
-              <button
-                type="button"
-                className="eo-btn-cancel"
-                onClick={onClose}
-                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-              >
-                Đóng
               </button>
             </div>
           </div>

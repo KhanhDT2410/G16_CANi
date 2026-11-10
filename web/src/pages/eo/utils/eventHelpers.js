@@ -1,7 +1,7 @@
 export const DEFAULT_NEW_EVENT = {
   name: '',
   description: '',
-  venueAddress: '799 Nguyễn Văn Linh, Quận 7, TP.HCM',
+  venueAddress: '',
   venueLat: 10.7328,
   venueLng: 106.7214,
   eventDate: '2026-11-20T08:00:00Z',

@@ -25,11 +25,11 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
   });
 
   const [invoiceSettings, setInvoiceSettings] = useState({
-    companyName: 'Công ty Cổ phần Sự kiện Quốc tế CANi',
-    taxId: '0109887766',
-    invoiceEmail: 'finance@cani.vn',
-    legalAddress: 'Tầng 8, Tòa nhà Innovation, Cầu Giấy, Hà Nội',
-    representativeName: 'Phạm Duy Hưng',
+    companyName: '',
+    taxId: '',
+    invoiceEmail: '',
+    legalAddress: '',
+    representativeName: '',
   });
 
   const [notificationSettings, setNotificationSettings] = useState({
@@ -112,7 +112,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
             cursor: 'pointer',
           }}
         >
-          Cài Đặt Gói Cước & Quota
+          Cài Đặt Gói Cước & Hạn Mức
         </button>
 
         <button
@@ -169,7 +169,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
 
       {/* 3. NỘI DUNG TỪNG SECTION */}
 
-      {/* SECTION 1: CÀI ĐẶT GÓI CƯỚC & QUOTA */}
+      {/* SECTION 1: CÀI ĐẶT GÓI CƯỚC & HẠN MỨC */}
       {activeSection === 'PACKAGE' && (
         <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
@@ -182,7 +182,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
               onClick={onNavigateToSubscription}
               style={{ fontSize: '0.85rem' }}
             >
-              Xem danh mục gói & mua thêm Quota &rarr;
+              Xem danh mục gói & mua thêm lượt &rarr;
             </button>
           </div>
 
@@ -219,7 +219,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
             </div>
 
             <div className="eo-form-group">
-              <label>Cảnh Báo Khi Hạn Mức Quota Sự Kiện Còn Lại</label>
+              <label>Cảnh Báo Khi Lượt Sự Kiện Còn Lại</label>
               <select
                 className="eo-form-select"
                 value={packageSettings.alertThreshold}
@@ -235,7 +235,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
             </div>
 
             <div className="eo-form-group">
-              <label>Tự Động Mở PayOS VietQR Khi Hết Quota</label>
+              <label>Tự Động Mở Thanh Toán Khi Hết Lượt Sự Kiện</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem' }}>
                 <input
                   type="checkbox"

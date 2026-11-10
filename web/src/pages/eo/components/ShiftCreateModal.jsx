@@ -309,7 +309,7 @@ const ShiftCreateModal = ({
               = ({shiftDurationHours}h x {Number(newShift.requiredWorkers || 1)} người x {Number(newShift.hourlyWage || 0).toLocaleString()}đ/h) + {Number(newShift.allowance || 0).toLocaleString()}đ phụ cấp
             </div>
             <div className="shift-cost-note">
-              Thù lao này EO thanh toán trực tiếp cho Worker sau ca làm (Mô hình Non-Escrow - CANi không thu cọc lương).
+              Thù lao này Ban tổ chức thanh toán trực tiếp cho nhân sự sau ca làm việc.
             </div>
           </div>
 

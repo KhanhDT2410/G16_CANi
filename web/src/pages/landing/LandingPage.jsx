@@ -123,7 +123,7 @@ export default function LandingPage() {
               <span>Điểm danh QR Code động kết hợp bán kính định vị Geofence GPS 200m</span>
             </li>
             <li className="hero-feature-item">
-              <span>Quyết toán thù lao Non-Escrow minh bạch, đánh giá 2 chiều chuẩn xác</span>
+              <span>Quyết toán thù lao trực tiếp minh bạch, đánh giá 2 chiều chuẩn xác</span>
             </li>
           </ul>
         </div>
@@ -243,7 +243,7 @@ export default function LandingPage() {
           <div className="feature-card">
             <h3 className="feature-card-title">Quyết toán minh bạch</h3>
             <p className="feature-card-desc">
-              Không giữ cọc lương Non-Escrow, xuất phiếu chi đối soát tự động và hệ thống đánh giá 2 chiều xây dựng uy tín lâu dài.
+              Không giữ cọc lương, xuất phiếu chi đối soát tự động và hệ thống đánh giá 2 chiều xây dựng uy tín lâu dài.
             </p>
           </div>
         </div>
@@ -317,13 +317,13 @@ export default function LandingPage() {
           <div>
             <CaniLogo height={32} />
             <p style={{ margin: '0.75rem 0 0', fontSize: '0.85rem', color: '#94a3b8', maxWidth: '380px', lineHeight: 1.5 }}>
-              Nền tảng điều phối nhân lực sự kiện ngắn hạn theo ca thế hệ mới. Áp dụng chuẩn kiểm thử IEEE & giải ngân Non-Escrow an toàn.
+              Nền tảng điều phối nhân lực sự kiện ngắn hạn theo ca thế hệ mới, kết nối nhanh chóng, minh bạch và an toàn.
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: '2.5rem', fontSize: '0.85rem' }}>
             <div>
-              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Ban Tổ Chức (EO)</h5>
+              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Ban Tổ Chức</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <Link to="/login" style={{ color: '#94a3b8', textDecoration: 'none' }}>Đăng nhập Cổng Quản lý</Link>
                 <Link to="/register" style={{ color: '#94a3b8', textDecoration: 'none' }}>Đăng ký Ban Tổ Chức</Link>
@@ -334,7 +334,7 @@ export default function LandingPage() {
             <div>
               <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Hỗ trợ & Quy chế</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <span style={{ color: '#94a3b8' }}>Quy chế giải ngân Non-Escrow</span>
+                <span style={{ color: '#94a3b8' }}>Quy chế thanh toán thù lao</span>
                 <span style={{ color: '#94a3b8' }}>Chính sách bảo mật thông tin</span>
                 <span style={{ color: '#94a3b8' }}>Hỗ trợ kỹ thuật 24/7</span>
               </div>
@@ -343,7 +343,7 @@ export default function LandingPage() {
         </div>
 
         <div className="footer-copy">
-          © 2026 CANi Platform — Đồ án Tốt nghiệp Kỹ nghệ Phần mềm SEP490_G16 (FPT University). Mọi quyền được bảo lưu.
+          © 2026 CANi Platform. Mọi quyền được bảo lưu.
         </div>
       </footer>
     </div>

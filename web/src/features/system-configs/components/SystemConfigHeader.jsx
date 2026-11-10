@@ -32,7 +32,7 @@ export const SystemConfigHeader = ({
     },
     FINANCIAL: {
       title: 'Tài Chính & Hoa Hồng',
-      subtitle: 'Quản trị tỷ lệ hoa hồng nền tảng và thời hạn đối soát xác nhận thù lao trực tiếp Non-Escrow.',
+      subtitle: 'Quản trị tỷ lệ hoa hồng nền tảng và thời hạn đối soát xác nhận thù lao trực tiếp.',
     },
     GENERAL: {
       title: 'Hệ Thống & Tài Khoản',

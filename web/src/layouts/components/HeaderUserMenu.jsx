@@ -54,15 +54,15 @@ export const HeaderUserMenu = ({
               style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
             />
           ) : (
-            (user.fullName || user.username || (isAdmin ? 'Q' : 'D')).charAt(0).toUpperCase()
+            (user.fullName || user.username || (isAdmin ? 'Q' : 'N')).charAt(0).toUpperCase()
           )}
         </div>
         <div className="user-meta-info">
           <span className="user-meta-name">
-            {user.fullName || user.username || (isAdmin ? 'Quản Trị Viên Hệ Thống' : 'Duy Hưng Phạm')}
+            {user.fullName || user.username || (isAdmin ? 'Quản Trị Viên' : 'Người Dùng')}
           </span>
           <span className="user-meta-email">
-            {user.email || (isAdmin ? 'admin@cani.vn' : 'hung.company@gmail.com')}
+            {user.email || 'Chưa cập nhật email'}
           </span>
         </div>
         {!isAdmin && <span className="user-meta-arrow">▾</span>}

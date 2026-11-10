@@ -48,7 +48,7 @@ export const RsAppealDetailModal = ({ appeal, isOpen, onClose, onReview }) => {
           </div>
 
           <div className="detail-box">
-            <h4 className="detail-box-title">Giải Trình Của Worker:</h4>
+            <h4 className="detail-box-title">Giải Trình Của Nhân Sự:</h4>
             <p className="detail-box-reason">
               <strong>Lý do bất khả kháng:</strong> {REASON_CODE_LABELS[appeal.reasonCode] || appeal.reasonCode}
             </p>

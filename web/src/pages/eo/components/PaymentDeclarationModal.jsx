@@ -19,8 +19,7 @@ const PaymentDeclarationModal = ({
       <div className="eo-modal-box">
         <h3>Khai Báo Đã Trả Lương Trực Tiếp</h3>
         <p style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1.25rem' }}>
-          Theo Mục 11 & 12 SRS, CANi không giữ cọc hay giữ lương. Sau khi chi trả ngoài cho
-          Worker, vui lòng khai báo để hệ thống đối soát và Worker bấm xác nhận.
+          Sau khi chuyển khoản hoặc chi trả thù lao cho nhân sự, vui lòng khai báo để hệ thống ghi nhận đối soát và gửi thông báo xác nhận đến nhân sự.
         </p>
         <form onSubmit={onSubmit}>
           <div className="eo-form-group">

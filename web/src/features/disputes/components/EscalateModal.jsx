@@ -28,9 +28,9 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
           <div>
-            <h3>Kháng Nghị Lên Ban Quản Trị Viên (UC-101)</h3>
+            <h3>Kháng Nghị Lên Ban Quản Trị Viên</h3>
             <span className="dispute-modal-subtitle">
-              Mã đơn: <code>{dispute.id}</code> (BR-54: Trong vòng 7 ngày kể từ quyết định của CSKH)
+              Mã đơn: <code>{dispute.id}</code> (Thời hạn: Trong vòng 7 ngày kể từ quyết định của CSKH)
             </span>
           </div>
           <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
@@ -51,7 +51,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
             </div>
 
             <div className="dispute-escalate-notice">
-              Đơn sẽ được chuyển trực tiếp vào hàng đợi thẩm định của Quản trị viên (Admin). Quyết định của Quản trị viên sau bước này sẽ là <strong>phán quyết cuối cùng (BR-68)</strong>.
+              Đơn sẽ được chuyển trực tiếp vào hàng đợi thẩm định của Quản trị viên (Admin). Quyết định của Quản trị viên sau bước này sẽ là <strong>phán quyết cuối cùng</strong>.
             </div>
           </div>
 

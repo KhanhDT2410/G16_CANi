@@ -73,12 +73,12 @@ const PublishEventModal = ({
               </span>
             </div>
             <div className="publish-grid-item full-width">
-              <span className="lbl">Tổng dự toán thù lao chi trả Worker:</span>
+              <span className="lbl">Tổng dự toán thù lao chi trả nhân sự:</span>
               <span className="val wage" style={{ color: '#059669', fontSize: '1.1rem', fontWeight: 800 }}>
                 {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalCost)}
               </span>
               <div className="sub-note" style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                (Thanh toán trực tiếp giữa Ban Tổ Chức & Worker sau khi kết thúc ca làm việc - CANi không thu cọc lương theo mô hình Non-Escrow)
+                (Ban tổ chức thanh toán trực tiếp cho nhân sự sau khi kết thúc ca làm việc)
               </div>
             </div>
           </div>

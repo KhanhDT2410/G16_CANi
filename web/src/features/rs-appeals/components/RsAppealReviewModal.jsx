@@ -55,13 +55,13 @@ export const RsAppealReviewModal = ({ appeal, isOpen, onClose, onSubmit, submitt
             <div className={`review-hint-box ${approved ? 'approve' : 'reject'}`}>
               {approved ? (
                 <span>
-                  Hệ thống sẽ <strong>khôi phục +{appeal.penaltyAmount} điểm RS</strong> cho Worker,
+                  Hệ thống sẽ <strong>khôi phục +{appeal.penaltyAmount} điểm uy tín</strong> cho nhân sự,
                   ghi nhận vào nhật ký kiểm toán và tự động gửi thông báo kết quả.
                 </span>
               ) : (
                 <span>
-                  Đơn kháng cáo sẽ bị <strong>từ chối</strong>. Điểm RS của Worker giữ nguyên và
-                  lý do từ chối sẽ được gửi trực tiếp đến Worker.
+                  Đơn kháng cáo sẽ bị <strong>từ chối</strong>. Điểm uy tín của nhân sự giữ nguyên và
+                  lý do từ chối sẽ được gửi trực tiếp đến nhân sự.
                 </span>
               )}
             </div>

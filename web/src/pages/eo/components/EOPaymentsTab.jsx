@@ -16,7 +16,7 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
       >
         <div>
           <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-            Khai Báo Lương & Quyết Toán Non-Escrow (Mục 11 SRS)
+            Khai Báo Lương & Quyết Toán Thù Lao Nhân Sự
           </h3>
           <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
             Đối soát chấm công GPS QR, thanh toán trực tiếp sau ca và xuất chứng từ chi chuẩn kế toán.

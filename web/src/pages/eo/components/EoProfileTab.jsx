@@ -429,7 +429,7 @@ export default function EoProfileTab() {
                   className="profile-input"
                   value={profile.fullName}
                   onChange={(e) => handleProfileFieldChange('fullName', e.target.value)}
-                  placeholder="VD: Phạm Duy Hưng"
+                  placeholder="VD: Nguyễn Văn A"
                 />
               </div>
 
@@ -441,7 +441,7 @@ export default function EoProfileTab() {
                   className="profile-input"
                   value={profile.phone}
                   onChange={(e) => handleProfileFieldChange('phone', e.target.value)}
-                  placeholder="VD: 0987654321"
+                  placeholder="VD: 0901234567"
                 />
               </div>
 
@@ -475,7 +475,7 @@ export default function EoProfileTab() {
                   className="profile-input"
                   value={profile.address}
                   onChange={(e) => handleProfileFieldChange('address', e.target.value)}
-                  placeholder="VD: Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội"
+                  placeholder="VD: Tòa nhà văn phòng, Quận Cầu Giấy, Hà Nội"
                 />
               </div>
 

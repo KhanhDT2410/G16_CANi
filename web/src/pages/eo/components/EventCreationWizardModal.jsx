@@ -908,7 +908,7 @@ const EventCreationWizardModal = ({
                   <span>Gói Dịch Vụ Hội Viên / Ưu Đãi Sự Kiện Đầu Tiên</span>
                 </div>
                 <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>
-                  Hệ thống sẽ tự động trừ <strong>1 lượt quota sự kiện</strong> trong gói hội viên của bạn (hoặc tự động kích hoạt <strong>Ưu Đãi Chào Mừng Miễn Phí</strong> nếu đây là sự kiện đầu tiên của bạn). Bao gồm trọn gói toàn bộ {shiftsList.length} ca làm việc và {totalWorkers} vị trí nhân sự.
+                  Hệ thống sẽ tự động trừ <strong>1 lượt đăng sự kiện</strong> trong gói dịch vụ của bạn (hoặc tự động kích hoạt <strong>Ưu Đãi Chào Mừng Miễn Phí</strong> nếu đây là sự kiện đầu tiên của bạn). Bao gồm trọn gói toàn bộ {shiftsList.length} ca làm việc và {totalWorkers} vị trí nhân sự.
                 </p>
                 <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
                   ✓ Miễn phí toàn bộ phí Matching Radar AI và đối soát chấm công theo chính sách gói.

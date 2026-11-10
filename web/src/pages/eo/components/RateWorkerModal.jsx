@@ -171,7 +171,7 @@ const RateWorkerModal = ({
             <textarea
               rows="3"
               className="eo-form-textarea"
-              placeholder="Nhận xét về thái độ, kỹ năng thực tế của Worker trong ca làm..."
+              placeholder="Nhận xét về thái độ, kỹ năng thực tế của nhân sự trong ca làm..."
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />

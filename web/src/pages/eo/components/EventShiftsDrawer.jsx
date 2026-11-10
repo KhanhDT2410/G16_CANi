@@ -168,7 +168,7 @@ const EventShiftsDrawer = ({
                       alignItems: 'center',
                       gap: 4,
                     }}
-                    title="Hiển thị mã QR Check-in / Check-out cho Worker quét"
+                    title="Hiển thị mã QR Check-in / Check-out cho nhân sự quét"
                   >
                     Mã QR
                   </button>

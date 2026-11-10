@@ -157,7 +157,7 @@ export default function EOPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const displayName = user?.fullName || user?.username || 'Duy Hưng';
+  const displayName = user?.fullName || user?.username || 'Ban Tổ Chức';
 
   return (
     <div className="eo-dashboard-container">
@@ -325,10 +325,10 @@ export default function EOPage() {
         events={events.events}
         payments={payments.payments}
         companyInfo={{
-          companyName: user?.companyName || user?.fullName || 'HUNG COMPANY',
-          taxCode: user?.taxCode || '0108923489',
-          address: user?.address || 'Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội',
-          organizerName: user?.fullName || 'Duy Hưng Phạm',
+          companyName: user?.companyName || user?.fullName || 'Đơn vị tổ chức sự kiện',
+          taxCode: user?.taxCode || 'Chưa cập nhật',
+          address: user?.address || 'Chưa cập nhật địa chỉ',
+          organizerName: user?.fullName || user?.username || 'Đại diện Ban Tổ Chức',
         }}
       />
     </div >

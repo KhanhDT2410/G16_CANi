@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { UserManagementView } from '../../features/admin-users';
 import { AdminDashboardView } from '../../features/admin-dashboard';
 import { DisputeCenterView } from '../../features/disputes';
@@ -64,6 +64,15 @@ const AdminPage = () => {
       return false;
     }
   });
+
+  // Xử lý sự kiện click vào User block trên Header để trở về Bảng điều khiển chính
+  useEffect(() => {
+    const handleNavHome = () => {
+      setActiveTab('dashboard');
+    };
+    window.addEventListener('cani_admin_navigate_home', handleNavHome);
+    return () => window.removeEventListener('cani_admin_navigate_home', handleNavHome);
+  }, []);
 
   const handleToggleCollapse = () => {
     setCollapsed((prev) => {

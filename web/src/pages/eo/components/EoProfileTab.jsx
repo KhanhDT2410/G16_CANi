@@ -9,7 +9,7 @@ export default function EoProfileTab() {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
 
-  const [activeSection, setActiveSection] = useState('PROFILE'); // 'PROFILE' | 'EKYC' | 'BANK' | 'SECURITY' | 'REPUTATION'
+  const [activeSection, setActiveSection] = useState('PROFILE'); // 'PROFILE' | 'EKYC' | 'SECURITY'
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [submittingEkyc, setSubmittingEkyc] = useState(false);
@@ -24,18 +24,18 @@ export default function EoProfileTab() {
     }
   });
 
-  // Hồ Sơ Doanh Nghiệp
+  // Hồ Sơ Doanh Nghiệp - Khởi tạo từ thông tin người dùng thực tế, không dùng dữ liệu ảo
   const [profile, setProfile] = useState({
-    companyName: 'Công ty Cổ phần Sự kiện & Truyền thông CANi',
-    taxId: '0109876543',
-    address: 'Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội',
-    fullName: user?.fullName || 'Phạm Duy Hưng',
-    phone: '0987654321',
-    email: user?.email || 'hungpd@cani.vn',
-    industry: 'Tổ chức sự kiện biểu diễn, thể thao & hội nghị cấp cao',
-    bio: 'Đơn vị tổ chức sự kiện chuyên nghiệp với hơn 5 năm kinh nghiệm điều phối nhân sự quy mô lớn tại Hà Nội và TP.HCM.',
-    ratingAvg: 5.0,
-    totalEventsCompleted: 2,
+    companyName: '',
+    taxId: '',
+    address: '',
+    fullName: user?.fullName || user?.username || '',
+    phone: user?.phone || '',
+    email: user?.email || '',
+    industry: '',
+    bio: '',
+    ratingAvg: 0,
+    totalEventsCompleted: 0,
   });
 
   // Trạng thái eKYC
@@ -53,23 +53,6 @@ export default function EoProfileTab() {
     backImage: null,
     selfieImage: null,
     businessLicenseImage: null,
-  });
-
-  // Tài khoản ngân hàng chi trả Non-Escrow (MBBank VietQR)
-  const [bankInfo, setBankInfo] = useState(() => {
-    try {
-      const saved = localStorage.getItem('cani_eo_bank_info');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.warn('Lỗi đọc cani_eo_bank_info:', e);
-    }
-    return {
-      bankName: 'MBBank (Ngân hàng TMCP Quân Đội)',
-      accountNumber: '2622 0147 8909 6',
-      accountHolder: 'PHAM DUY HUNG',
-      branch: 'Hội sở chính Hà Nội',
-      note: 'Dùng cho thanh toán VietQR chuyển khoản thù lao trực tiếp cho nhân sự sau ca làm.',
-    };
   });
 
   // Form Đổi Mật Khẩu
@@ -221,17 +204,6 @@ export default function EoProfileTab() {
     }
   };
 
-  // Cập nhật thông tin tài khoản ngân hàng
-  const handleSaveBankInfo = (e) => {
-    e.preventDefault();
-    try {
-      localStorage.setItem('cani_eo_bank_info', JSON.stringify(bankInfo));
-      showToast('Cập nhật tài khoản chi trả thù lao thành công!', 'success');
-    } catch {
-      showToast('Lỗi lưu thông tin ngân hàng', 'error');
-    }
-  };
-
   // Đổi mật khẩu
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -297,7 +269,7 @@ export default function EoProfileTab() {
 
           <div className="profile-hero-info">
             <div className="profile-name-row">
-              <h2 className="profile-org-name">{profile.companyName}</h2>
+              <h2 className="profile-org-name">{profile.companyName || 'Chưa cập nhật tên tổ chức'}</h2>
               <span className="profile-role-pill">Ban Tổ Chức Sự Kiện</span>
               {ekycStatus === 'APPROVED' ? (
                 <span className="status-pill approved" title="Doanh nghiệp đã được xác thực eKYC">
@@ -319,20 +291,20 @@ export default function EoProfileTab() {
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                   <circle cx="12" cy="7" r="4"></circle>
                 </svg>
-                Người đại diện: <strong>{profile.fullName}</strong>
+                Người đại diện: <strong>{profile.fullName || 'Chưa cập nhật'}</strong>
               </span>
               <span className="profile-meta-item">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                   <polyline points="22,6 12,13 2,6"></polyline>
                 </svg>
-                {profile.email}
+                {profile.email || 'Chưa có email'}
               </span>
               <span className="profile-meta-item">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                 </svg>
-                {profile.phone}
+                {profile.phone || 'Chưa cập nhật SĐT'}
               </span>
             </div>
 
@@ -360,16 +332,14 @@ export default function EoProfileTab() {
 
         <div className="profile-hero-right">
           <div className="profile-stat-box">
-            <div className="profile-stat-value">{profile.totalEventsCompleted || 2}</div>
+            <div className="profile-stat-value">{profile.totalEventsCompleted ?? 0}</div>
             <div className="profile-stat-label">Sự kiện đã chạy</div>
           </div>
           <div className="profile-stat-box">
-            <div className="profile-stat-value" style={{ color: '#16a34a' }}>5.0 / 5.0</div>
+            <div className="profile-stat-value" style={{ color: '#16a34a' }}>
+              {profile.totalEventsCompleted > 0 && profile.ratingAvg ? `${profile.ratingAvg.toFixed(1)} / 5.0` : '—'}
+            </div>
             <div className="profile-stat-label">Độ uy tín tuyển dụng</div>
-          </div>
-          <div className="profile-stat-box">
-            <div className="profile-stat-value" style={{ color: '#2563eb' }}>100%</div>
-            <div className="profile-stat-label">Tuân thủ Non-Escrow</div>
           </div>
         </div>
       </div>
@@ -402,18 +372,6 @@ export default function EoProfileTab() {
 
         <button
           type="button"
-          className={`profile-subnav-btn ${activeSection === 'BANK' ? 'active' : ''}`}
-          onClick={() => setActiveSection('BANK')}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-            <line x1="1" y1="10" x2="23" y2="10"></line>
-          </svg>
-          3. Tài Khoản Ngân Hàng Chi Trả
-        </button>
-
-        <button
-          type="button"
           className={`profile-subnav-btn ${activeSection === 'SECURITY' ? 'active' : ''}`}
           onClick={() => setActiveSection('SECURITY')}
         >
@@ -421,19 +379,7 @@ export default function EoProfileTab() {
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
-          4. Bảo Mật & Mật Khẩu
-        </button>
-
-        <button
-          type="button"
-          className={`profile-subnav-btn ${activeSection === 'REPUTATION' ? 'active' : ''}`}
-          onClick={() => setActiveSection('REPUTATION')}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="8" r="7"></circle>
-            <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-          </svg>
-          5. Huy Hiệu Tín Nhiệm & Pháp Lý
+          3. Bảo Mật & Mật Khẩu
         </button>
       </nav>
 
@@ -756,114 +702,7 @@ export default function EoProfileTab() {
         </div>
       )}
 
-      {/* SECTION 3: TÀI KHOẢN NGÂN HÀNG CHI TRẢ THÙ LAO */}
-      {activeSection === 'BANK' && (
-        <div className="profile-card">
-          <div className="profile-card-header">
-            <div className="profile-card-header-left">
-              <h3>Tài Khoản Ngân Hàng Chi Trả Thù Lao (Non-Escrow)</h3>
-              <p>Hệ thống CANi kết nối VietQR NAPAS 247 để chuyển lương trực tiếp từ tài khoản EO sang tài khoản Worker.</p>
-            </div>
-          </div>
-
-          <div className="bank-preview-card">
-            <div className="bank-card-top">
-              <div className="bank-name-badge">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                </svg>
-                {bankInfo.bankName}
-              </div>
-              <div className="bank-card-chip"></div>
-            </div>
-
-            <div className="bank-account-number">{bankInfo.accountNumber}</div>
-
-            <div className="bank-card-bottom">
-              <div>
-                <div className="bank-holder-label">Chủ Tài Khoản / Người Thụ Hưởng</div>
-                <div className="bank-holder-name">{bankInfo.accountHolder}</div>
-              </div>
-              <span className="bank-method-badge">VietQR NAPAS 247 Direct</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSaveBankInfo}>
-            <div className="profile-form-grid-2">
-              <div className="profile-form-group">
-                <label>Ngân Hàng *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={bankInfo.bankName}
-                  onChange={(e) => setBankInfo({ ...bankInfo, bankName: e.target.value })}
-                  placeholder="VD: MBBank (Ngân hàng Quân Đội)"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Số Tài Khoản Ngân Hàng *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={bankInfo.accountNumber}
-                  onChange={(e) => setBankInfo({ ...bankInfo, accountNumber: e.target.value })}
-                  placeholder="VD: 2622 0147 8909 6"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Tên Chủ Tài Khoản (In hoa không dấu) *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={bankInfo.accountHolder}
-                  onChange={(e) => setBankInfo({ ...bankInfo, accountHolder: e.target.value.toUpperCase() })}
-                  placeholder="VD: PHAM DUY HUNG"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Chi Nhánh Mở Tài Khoản</label>
-                <input
-                  type="text"
-                  className="profile-input"
-                  value={bankInfo.branch}
-                  onChange={(e) => setBankInfo({ ...bankInfo, branch: e.target.value })}
-                  placeholder="VD: Hội sở chính Hà Nội"
-                />
-              </div>
-
-              <div className="profile-form-group span-2">
-                <label>Ghi Chú Thanh Toán Non-Escrow</label>
-                <input
-                  type="text"
-                  className="profile-input"
-                  value={bankInfo.note}
-                  onChange={(e) => setBankInfo({ ...bankInfo, note: e.target.value })}
-                  placeholder="Ghi chú xuất hiện khi quét mã QR thanh toán lương"
-                />
-              </div>
-            </div>
-
-            <div className="profile-actions-bar">
-              <button type="submit" className="profile-btn-primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                </svg>
-                Lưu Tài Khoản Ngân Hàng
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* SECTION 4: BẢO MẬT & MẬT KHẨU */}
+      {/* SECTION 3: BẢO MẬT & MẬT KHẨU */}
       {activeSection === 'SECURITY' && (
         <div className="profile-card">
           <div className="profile-card-header">
@@ -933,71 +772,7 @@ export default function EoProfileTab() {
         </div>
       )}
 
-      {/* SECTION 5: HUY HIỆU TÍN NHIỆM & PHÁP LÝ */}
-      {activeSection === 'REPUTATION' && (
-        <div className="profile-card">
-          <div className="profile-card-header">
-            <div className="profile-card-header-left">
-              <h3>Huy Hiệu Tín Nhiệm & Tuân Thủ Pháp Lý Sàn CANi</h3>
-              <p>Hệ thống chứng nhận chuẩn hóa năng lực tổ chức sự kiện chuyên nghiệp.</p>
-            </div>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '1.25rem', backgroundColor: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Huy Hiệu Doanh Nghiệp Xác Minh</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Cấp bởi Sàn CANi Platform</div>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.825rem', color: '#475569', margin: 0 }}>
-                Chứng nhận pháp nhân có giấy phép hoạt động hợp pháp và người đại diện CCCD được đối soát điện tử.
-              </p>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '1.25rem', backgroundColor: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Cam Kết Non-Escrow Chuẩn Mực</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Chi trả thù lao đúng hạn 100%</div>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.825rem', color: '#475569', margin: 0 }}>
-                EO thực hiện đối soát và chi trả lương trực tiếp ngay sau khi ca kết thúc thông qua mã QR NAPAS 247.
-              </p>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.875rem', padding: '1.25rem', backgroundColor: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                  </svg>
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Chỉ Số Đánh Giá Tuyệt Đối (5.0/5.0)</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Dựa trên phản hồi thực tế từ Worker</div>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.825rem', color: '#475569', margin: 0 }}>
-                Môi trường làm việc văn minh, đối xử tôn trọng và phân công checklist công việc chuyên nghiệp.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 

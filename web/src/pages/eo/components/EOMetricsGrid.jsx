@@ -1,5 +1,11 @@
 export default function EOMetricsGrid({ metrics }) {
-  const { totalEvents, totalRequiredWorkers, totalConfirmedWorkers, totalEstimatedCost, fillRate } = metrics;
+  const { totalEvents, totalRequiredWorkers, totalConfirmedWorkers, totalEstimatedCost, fillRate } = metrics || {};
+
+  const safeEvents = totalEvents ?? 0;
+  const safeRequired = totalRequiredWorkers ?? 0;
+  const safeConfirmed = totalConfirmedWorkers ?? 0;
+  const safeCost = totalEstimatedCost ?? 0;
+  const safeFillRate = fillRate ?? 0;
 
   return (
     <section className="eo-metrics-grid">
@@ -17,12 +23,14 @@ export default function EOMetricsGrid({ metrics }) {
           <div className="metric-meta-group">
             <span className="metric-title-text">Tổng sự kiện</span>
             <div className="metric-data-row">
-              <span className="metric-big-number">{totalEvents || 8}</span>
-              <span className="metric-trend-pill green">↑ +33%</span>
+              <span className="metric-big-number">{safeEvents}</span>
+              {safeEvents > 0 && (
+                <span className="metric-trend-pill green">Đang hoạt động</span>
+              )}
             </div>
           </div>
         </div>
-        <div className="metric-bottom-sub">So với tháng trước</div>
+        <div className="metric-bottom-sub">Sự kiện trên hệ thống</div>
       </div>
 
       {/* 2. Nhân sự cần tuyển */}
@@ -39,12 +47,14 @@ export default function EOMetricsGrid({ metrics }) {
           <div className="metric-meta-group">
             <span className="metric-title-text">Nhân sự cần tuyển</span>
             <div className="metric-data-row">
-              <span className="metric-big-number">{totalRequiredWorkers || 17}</span>
-              <span className="metric-trend-pill green">↑ +70%</span>
+              <span className="metric-big-number">{safeRequired}</span>
+              {safeRequired > 0 && (
+                <span className="metric-trend-pill green">Đang mở tuyển</span>
+              )}
             </div>
           </div>
         </div>
-        <div className="metric-bottom-sub">Đang mở tuyển</div>
+        <div className="metric-bottom-sub">Tổng nhu cầu các ca</div>
       </div>
 
       {/* 3. Nhân sự đã chốt ca */}
@@ -59,12 +69,12 @@ export default function EOMetricsGrid({ metrics }) {
           <div className="metric-meta-group">
             <span className="metric-title-text">Nhân sự đã chốt ca</span>
             <div className="metric-data-row">
-              <span className="metric-big-number">{totalConfirmedWorkers || 0}</span>
-              <span className="metric-trend-pill neutral">—</span>
+              <span className="metric-big-number">{safeConfirmed}</span>
+              <span className="metric-trend-pill neutral">{safeFillRate}%</span>
             </div>
           </div>
         </div>
-        <div className="metric-bottom-sub">Tỷ lệ lấp đầy: {fillRate}%</div>
+        <div className="metric-bottom-sub">Tỷ lệ lấp đầy: {safeFillRate}%</div>
       </div>
 
       {/* 4. Dự toán chi phí */}
@@ -80,7 +90,7 @@ export default function EOMetricsGrid({ metrics }) {
             <span className="metric-title-text">Dự toán chi phí</span>
             <div className="metric-data-row">
               <span className="metric-big-number text-accent-green">
-                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalEstimatedCost || 3460000)}
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(safeCost)}
               </span>
             </div>
           </div>

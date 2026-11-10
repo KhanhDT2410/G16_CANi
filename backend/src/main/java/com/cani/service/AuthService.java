@@ -196,14 +196,15 @@ public class AuthService {
                 throw new BadRequestException("Không tìm thấy thông tin email từ phiên xác thực Google");
             }
 
-            UUID userId;
+            UUID parsedUserId;
             try {
-                userId = UUID.fromString(jwt.getSubject());
+                parsedUserId = UUID.fromString(jwt.getSubject());
             } catch (Exception e) {
-                userId = UUID.nameUUIDFromBytes(email.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                parsedUserId = UUID.nameUUIDFromBytes(email.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             }
+            final UUID finalUserId = parsedUserId;
 
-            User user = userRepository.findById(userId)
+            User user = userRepository.findById(finalUserId)
                     .or(() -> userRepository.findByEmail(email))
                     .orElseGet(() -> {
                 String fullName = email;
@@ -219,7 +220,7 @@ public class AuthService {
                 }
 
                 User newUser = User.builder()
-                        .userId(userId)
+                        .userId(finalUserId)
                         .email(email)
                         .fullName(fullName)
                         .role(initialRole)
@@ -263,20 +264,21 @@ public class AuthService {
             }
 
             // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
-            if (user.getRole() == UserRole.EVENT_ORGANIZER) {
-                eventOrganizerRepository.findByUser_UserId(user.getUserId())
+            final User currentUser = user;
+            if (currentUser.getRole() == UserRole.EVENT_ORGANIZER) {
+                eventOrganizerRepository.findByUser_UserId(currentUser.getUserId())
                         .orElseGet(() -> eventOrganizerRepository.save(
                                 EventOrganizer.builder()
-                                        .user(user)
-                                        .companyName(user.getFullName() != null && !user.getFullName().isBlank()
-                                                ? user.getFullName()
+                                        .user(currentUser)
+                                        .companyName(currentUser.getFullName() != null && !currentUser.getFullName().isBlank()
+                                                ? currentUser.getFullName()
                                                 : "Ban Tổ Chức")
                                         .build()
                         ));
             }
 
-            user.setLastLoginAt(Instant.now());
-            userRepository.save(user);
+            currentUser.setLastLoginAt(Instant.now());
+            user = userRepository.save(currentUser);
 
             return LoginResponse.builder()
                     .token(request.getSupabaseAccessToken())

@@ -52,7 +52,7 @@ export function calculateEventMetrics(events) {
   const totalRequiredWorkers = events.reduce((sum, e) => sum + (e.totalRequiredWorkers || 0), 0);
   const totalConfirmedWorkers = events.reduce((sum, e) => sum + (e.totalConfirmedWorkers || 0), 0);
   const totalEstimatedCost = events.reduce((sum, e) => sum + (e.totalEstimatedCost || 0), 0);
-  const fillRate = totalRequiredWorkers > 0 ? Math.round((totalConfirmedWorkers / totalRequiredWorkers) * 100) : 73;
+  const fillRate = totalRequiredWorkers > 0 ? Math.round((totalConfirmedWorkers / totalRequiredWorkers) * 100) : 0;
 
   return {
     totalEvents,

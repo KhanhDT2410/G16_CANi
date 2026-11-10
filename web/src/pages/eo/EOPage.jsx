@@ -206,41 +206,6 @@ export default function EOPage() {
             </>
           )}
 
-          <div className="eo-pill-tabs">
-            <button type="button" className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`} onClick={() => switchTab('events')}>
-              Quản lý sự kiện
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'recruitment' ? 'active' : ''}`} onClick={() => switchTab('recruitment')}>
-              Tuyển dụng & Điều phối
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => switchTab('payments')}>
-              Thanh toán & Lương
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => switchTab('subscription')}>
-              Gói dịch vụ
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
-              Hồ sơ tổ chức
-            </button>
-            <button
-              type="button"
-              className={`pill-tab ${activeTab === 'support' ? 'active' : ''}`}
-              onClick={() => switchTab('support')}
-            >
-              Hỗ trợ kỹ thuật
-            </button>
-            {activeTab === 'analytics' && (
-              <button type="button" className="pill-tab active" onClick={() => switchTab('analytics')}>
-                Báo cáo & Thống kê
-              </button>
-            )}
-            {activeTab === 'settings' && (
-              <button type="button" className="pill-tab active" onClick={() => switchTab('settings')}>
-                Cài đặt hệ thống
-              </button>
-            )}
-          </div>
-
           {activeTab === 'events' && (
             <EOEventsTab
               loading={events.loading}
@@ -327,6 +292,7 @@ export default function EOPage() {
         {(activeTab === 'events' || activeNav === 'overview') && (
           <EORightSidebar
             metrics={events.metrics}
+            events={events.events}
             onOpenQr={() => {
               if (events.events.length > 0 && events.events[0].totalShifts > 0) {
                 shifts.handleOpenShiftQr(events.events[0].eventId, events.events[0].name);

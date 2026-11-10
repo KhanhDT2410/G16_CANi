@@ -69,9 +69,22 @@ const EditShiftModal = ({
   return (
     <div className="eo-modal-overlay">
       <div className="eo-modal-box">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0 }}>Chỉnh Sửa Ca Làm Việc</h3>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}>Đóng</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Chỉnh Sửa Ca Làm Việc</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              color: '#64748b',
+              fontWeight: 600,
+            }}
+          >
+            Đóng
+          </button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -190,11 +203,11 @@ const EditShiftModal = ({
             </div>
           </div>
 
-          <div className="eo-form-actions">
-            <button type="button" className="eo-btn-cancel" onClick={onClose}>
-              Hủy
+          <div className="eo-modal-footer">
+            <button type="button" className="eo-btn-secondary" onClick={onClose}>
+              Hủy Bỏ
             </button>
-            <button type="submit" className="eo-btn-submit" disabled={submitting}>
+            <button type="submit" className="eo-btn-primary" disabled={submitting}>
               {submitting ? 'Đang lưu...' : 'Lưu Ca Làm Việc'}
             </button>
           </div>

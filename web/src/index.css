@@ -86,6 +86,40 @@
   --transition-fast: 0.18s var(--ease-spring);
   --transition-normal: 0.28s var(--ease-spring);
   --transition-slow: 0.45s var(--ease-spring);
+
+  /* CANi UI Specification Tokens (docs/UI_DESIGN_SPECIFICATION.md) */
+  --cani-primary: #2563eb;
+  --cani-primary-hover: #1d4ed8;
+  --cani-primary-light: #ebf3fe;
+  --cani-brand-gradient: linear-gradient(135deg, #5b86e5 0%, #36d1dc 100%);
+  --cani-hero-gradient: linear-gradient(135deg, #e0efff 0%, #b8dcff 100%);
+
+  --cani-bg-page: #f4f7fc;
+  --cani-surface: #ffffff;
+  --cani-border: #e2e8f0;
+  --cani-border-subtle: #edf2f7;
+
+  --cani-text-title: #0f172a;
+  --cani-text-body: #334155;
+  --cani-text-muted: #64748b;
+  --cani-text-placeholder: #94a3b8;
+
+  --cani-success: #10b981;
+  --cani-success-bg: #ecfdf5;
+  --cani-warning: #f59e0b;
+  --cani-warning-bg: #fffbeb;
+  --cani-danger: #ef4444;
+  --cani-danger-bg: #fef2f2;
+
+  --cani-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+  --cani-shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+  --cani-shadow-float: 0 10px 25px -5px rgba(37, 99, 235, 0.25);
+
+  --cani-radius-sm: 8px;
+  --cani-radius-md: 12px;
+  --cani-radius-lg: 18px;
+  --cani-radius-xl: 24px;
+  --cani-radius-full: 9999px;
 }
 
 * {
@@ -281,5 +315,104 @@ label:has(input[type="radio"]) {
   cursor: pointer;
   user-select: none;
 }
+
+/* ==========================================================================
+   CANi Global Design System Utility Classes (docs/UI_DESIGN_SPECIFICATION.md)
+   ========================================================================== */
+
+/* Thẻ thống kê chuẩn */
+.cani-metric-card {
+  background: var(--cani-surface);
+  border: 1px solid var(--cani-border);
+  border-radius: var(--cani-radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--cani-shadow-sm);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cani-metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -4px rgba(91, 134, 229, 0.12);
+  border-color: #cbd5e1;
+}
+
+/* Banner Chào Mừng Gradient */
+.cani-hero-banner {
+  background: var(--cani-hero-gradient);
+  border-radius: var(--cani-radius-xl);
+  padding: 32px 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(91, 134, 229, 0.08);
+}
+
+.cani-hero-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cani-text-title);
+  margin-bottom: 8px;
+}
+
+.cani-hero-desc {
+  font-size: 14px;
+  color: var(--cani-text-body);
+  line-height: 1.5;
+}
+
+/* Nút CTA Chuẩn dạng Viên Thuốc (Pill Primary Button) */
+.cani-btn-primary-pill {
+  background: var(--cani-primary);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 24px;
+  border-radius: var(--cani-radius-full);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.cani-btn-primary-pill:hover {
+  background: var(--cani-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+}
+
+/* Nút hỗ trợ nổi trực tuyến */
+.cani-floating-support-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 1000;
+  background: var(--cani-primary);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 22px;
+  border-radius: var(--cani-radius-full);
+  border: none;
+  box-shadow: var(--cani-shadow-float);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cani-floating-support-btn:hover {
+  background: var(--cani-primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -4px rgba(37, 99, 235, 0.4);
+}
+
 
 

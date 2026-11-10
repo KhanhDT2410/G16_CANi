@@ -7,7 +7,10 @@ import {
   TicketIcon,
   DisputeIcon,
   FaqIcon,
-  ConfigIcon,
+  MatchingConfigIcon,
+  OperationConfigIcon,
+  FinancialConfigIcon,
+  GeneralConfigIcon,
 } from './AdminSidebarIcons';
 
 // Danh mục phân nhóm menu chức năng Admin thuần tiếng Việt
@@ -40,19 +43,14 @@ export const ADMIN_NAV_GROUPS = [
   },
   {
     groupKey: 'system',
-    groupLabel: 'Cấu hình hệ thống',
+    groupLabel: 'Cấu hình tham số hệ thống',
     items: [
-      { id: 'configs', label: 'Tham Số Hệ Thống', icon: <ConfigIcon />, hasChildren: true },
+      { id: 'config_matching', label: 'Thuật Toán Ghép Nối', icon: <MatchingConfigIcon /> },
+      { id: 'config_operation', label: 'Vận Hành & Điểm Uy Tín', icon: <OperationConfigIcon /> },
+      { id: 'config_financial', label: 'Tài Chính & Hoa Hồng', icon: <FinancialConfigIcon /> },
+      { id: 'config_general', label: 'Hệ Thống & Tài Khoản', icon: <GeneralConfigIcon /> },
     ],
   },
-];
-
-export const CONFIG_SUB_ITEMS = [
-  { key: 'ALL', label: 'Tất cả tham số' },
-  { key: 'MATCHING', label: 'Thuật toán Matching' },
-  { key: 'OPERATION', label: 'Vận hành & Điểm uy tín' },
-  { key: 'FINANCIAL', label: 'Tài chính & Hoa hồng' },
-  { key: 'GENERAL', label: 'Hệ thống & Tài khoản' },
 ];
 
 export const TICKET_SUB_ITEMS = [

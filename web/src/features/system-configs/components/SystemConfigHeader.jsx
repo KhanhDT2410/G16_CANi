@@ -21,15 +21,37 @@ export const SystemConfigHeader = ({
   const currentCategoryInfo = CONFIG_CATEGORIES[selectedCategory] || { label: 'Tất cả tham số' };
   const currentCount = categoryCounts ? categoryCounts[selectedCategory] ?? 0 : totalCount;
 
+  const headerMeta = {
+    MATCHING: {
+      title: 'Thuật Toán Ghép Nối & Matching',
+      subtitle: 'Quản trị các hệ số trọng số khoảng cách, đánh giá sao, kinh nghiệm và công thức phân bổ đề xuất ca.',
+    },
+    OPERATION: {
+      title: 'Vận Hành & Điểm Uy Tín',
+      subtitle: 'Thiết lập ngưỡng phát hiện vắng mặt (No-show), mức trừ điểm uy tín và thời hạn đánh giá sau ca làm.',
+    },
+    FINANCIAL: {
+      title: 'Tài Chính & Hoa Hồng',
+      subtitle: 'Quản trị tỷ lệ hoa hồng nền tảng và thời hạn đối soát xác nhận thù lao trực tiếp Non-Escrow.',
+    },
+    GENERAL: {
+      title: 'Hệ Thống & Tài Khoản',
+      subtitle: 'Quy định độ tuổi lao động tối thiểu, phiên bản ứng dụng di động bắt buộc và hộp thư CSKH sàn.',
+    },
+    ALL: {
+      title: 'Tham Số & Quy Tắc Nghiệp Vụ Toàn Sàn',
+      subtitle: 'Quản trị và điều chỉnh thuật toán ghép ca Matching, tỷ lệ hoa hồng, ngưỡng uy tín và các quy tắc vận hành theo thời gian thực.',
+    },
+  };
+  const currentHeader = headerMeta[selectedCategory] || headerMeta.ALL;
+
   return (
     <div className="sys-config-header">
       {/* Top Banner */}
       <div className="sys-config-topbar">
         <div>
-          <h2 className="sys-config-title">Tham Số & Quy Tắc Nghiệp Vụ Toàn Sàn</h2>
-          <p className="sys-config-subtitle">
-            Quản trị và điều chỉnh thuật toán ghép ca Matching, tỷ lệ hoa hồng, ngưỡng uy tín và các quy tắc vận hành theo thời gian thực.
-          </p>
+          <h2 className="sys-config-title">{currentHeader.title}</h2>
+          <p className="sys-config-subtitle">{currentHeader.subtitle}</p>
         </div>
 
         <div className="sys-config-actions">

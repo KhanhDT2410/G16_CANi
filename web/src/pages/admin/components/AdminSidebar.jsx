@@ -1,24 +1,21 @@
 import { useState } from 'react';
 import { CollapseToggleIcon, ChevronDownIcon } from './AdminSidebarIcons';
-import { ADMIN_NAV_GROUPS, CONFIG_SUB_ITEMS, TICKET_SUB_ITEMS } from './adminSidebar.constants';
+import { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS } from './adminSidebar.constants';
 
-export { ADMIN_NAV_GROUPS, CONFIG_SUB_ITEMS, TICKET_SUB_ITEMS };
+export { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS };
 
 /**
- * Sidebar quản trị đa chức năng với menu con xổ xuống cho Tham số và Phiếu hỗ trợ (ADM-01).
+ * Sidebar quản trị đa chức năng với từng màn hình tham số độc lập và menu phiếu hỗ trợ (ADM-01).
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const AdminSidebar = ({
   activeTab,
   onSelectTab,
-  activeConfigCategory = 'ALL',
-  onSelectConfigCategory,
   activeTicketFilter = 'ALL',
   onSelectTicketFilter,
   collapsed,
   onToggleCollapse,
 }) => {
-  const [configsExpanded, setConfigsExpanded] = useState(true);
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
 
   const renderExpandableItem = (item, isExpanded, onToggleExpand, subItems, activeKey, onSubClick) => {
@@ -107,20 +104,6 @@ export const AdminSidebar = ({
 
             <div className="sidebar-group-items">
               {group.items.map((item) => {
-                if (item.id === 'configs') {
-                  return renderExpandableItem(
-                    item,
-                    configsExpanded,
-                    () => setConfigsExpanded((p) => !p),
-                    CONFIG_SUB_ITEMS,
-                    activeConfigCategory,
-                    (cat) => {
-                      onSelectTab('configs');
-                      if (onSelectConfigCategory) onSelectConfigCategory(cat);
-                    }
-                  );
-                }
-
                 if (item.id === 'tickets') {
                   return renderExpandableItem(
                     item,

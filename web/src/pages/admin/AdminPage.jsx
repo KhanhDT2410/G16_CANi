@@ -47,6 +47,22 @@ const TAB_METADATA = {
     title: 'Câu Hỏi Thường Gặp',
     subtitle: 'Quản lý kho tri thức trợ giúp, kiểm soát trạng thái xuất bản và đo lường giảm tải',
   },
+  config_matching: {
+    title: 'Thuật Toán Ghép Nối & Matching',
+    subtitle: 'Tinh chỉnh trọng số khoảng cách, đánh giá sao, kinh nghiệm và công thức phân phối đề xuất ca',
+  },
+  config_operation: {
+    title: 'Vận Hành & Điểm Uy Tín',
+    subtitle: 'Thiết lập ngưỡng thời gian vắng mặt (No-show), mức trừ điểm uy tín và thời hạn đánh giá',
+  },
+  config_financial: {
+    title: 'Tài Chính & Hoa Hồng',
+    subtitle: 'Quản trị tỷ lệ hoa hồng nền tảng và thời hạn đối soát chuyển khoản thù lao trực tiếp',
+  },
+  config_general: {
+    title: 'Hệ Thống & Tài Khoản',
+    subtitle: 'Quy định độ tuổi lao động tối thiểu, phiên bản ứng dụng di động bắt buộc và hộp thư CSKH',
+  },
   configs: {
     title: 'Tham Số Hệ Thống',
     subtitle: 'Cấu hình linh hoạt các tham số thuật toán ghép ca, ngưỡng vi phạm và quy tắc nền tảng',
@@ -55,7 +71,6 @@ const TAB_METADATA = {
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [configCategory, setConfigCategory] = useState('ALL');
   const [ticketFilter, setTicketFilter] = useState('ALL');
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -99,8 +114,6 @@ const AdminPage = () => {
       <AdminSidebar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
-        activeConfigCategory={configCategory}
-        onSelectConfigCategory={setConfigCategory}
         activeTicketFilter={ticketFilter}
         onSelectTicketFilter={setTicketFilter}
         collapsed={collapsed}
@@ -133,12 +146,11 @@ const AdminPage = () => {
             />
           )}
           {activeTab === 'faqs' && <FaqView />}
-          {activeTab === 'configs' && (
-            <SystemConfigView
-              activeCategory={configCategory}
-              onCategoryChange={setConfigCategory}
-            />
-          )}
+          {activeTab === 'config_matching' && <SystemConfigView activeCategory="MATCHING" />}
+          {activeTab === 'config_operation' && <SystemConfigView activeCategory="OPERATION" />}
+          {activeTab === 'config_financial' && <SystemConfigView activeCategory="FINANCIAL" />}
+          {activeTab === 'config_general' && <SystemConfigView activeCategory="GENERAL" />}
+          {activeTab === 'configs' && <SystemConfigView activeCategory="ALL" />}
         </section>
       </main>
     </div>

@@ -182,7 +182,7 @@
 .venue-map-wrapper {
   position: relative;
   width: 100%;
-  height: 210px;
+  height: 220px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   overflow: hidden;
@@ -192,7 +192,42 @@
 .venue-leaflet-map {
   width: 100%;
   height: 100%;
-  background-color: #f8fafc;
+  background-color: #e5e3df; /* Màu nền tải mặc định của Google Maps */
+}
+
+/* Nút chuyển đổi kiểu bản đồ Google (Bản đồ / Vệ tinh) */
+.venue-map-type-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+}
+
+.venue-map-type-btn {
+  padding: 0.28rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.venue-map-type-btn.active {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.venue-map-type-btn:hover:not(.active) {
+  background-color: #f1f5f9;
+  color: #1e293b;
 }
 
 /* Thanh thông tin dưới bản đồ */
@@ -225,3 +260,4 @@
   border-radius: 4px;
   border: 1px solid #bfdbfe;
 }
+

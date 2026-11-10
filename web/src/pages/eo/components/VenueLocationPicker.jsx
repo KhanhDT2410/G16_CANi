@@ -4,16 +4,16 @@ import 'leaflet/dist/leaflet.css';
 import { searchAddressSuggestions, getAddressFromCoordinates } from '../utils/geoUtils';
 import './VenueLocationPicker.css';
 
-// Custom SVG Pin Icon cho CANi (Xanh dương hiện đại, không phụ thuộc file ảnh tĩnh)
-const createCaniPinIcon = () =>
+// Custom SVG Pin Icon phong cách Google Maps (Màu đỏ đặc trưng #ea4335, vòng tròn trắng ở giữa)
+const createGooglePinIcon = () =>
   L.divIcon({
-    className: 'cani-custom-pin',
+    className: 'google-custom-pin',
     html: `
       <div style="position: relative; width: 34px; height: 34px; transform: translate(-50%, -100%); cursor: grab;">
-        <svg viewBox="0 0 24 24" width="34" height="34" fill="#2563eb" style="filter: drop-shadow(0 3px 5px rgba(0,0,0,0.35));">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="#ea4335" style="filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
-        <div style="position: absolute; top: 7px; left: 12px; width: 10px; height: 10px; background: white; border-radius: 50%;"></div>
+        <div style="position: absolute; top: 7px; left: 12px; width: 10px; height: 10px; background: white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></div>
       </div>
     `,
     iconSize: [0, 0],
@@ -40,19 +40,33 @@ export const VenueLocationPicker = ({
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [mapType, setMapType] = useState('roadmap'); // 'roadmap' | 'satellite'
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
+  const tileLayerRef = useRef(null);
   const dropdownRef = useRef(null);
   const debounceTimerRef = useRef(null);
+
+  // Tạo tile layer tương ứng với chế độ bản đồ Google
+  const createGoogleTileLayer = (type) => {
+    // lyrs=m: Bản đồ đường sá tiêu chuẩn của Google (Tiếng Việt)
+    // lyrs=y: Ảnh vệ tinh kết hợp tên đường và địa danh (Hybrid Satellite)
+    const lyrs = type === 'satellite' ? 'y' : 'm';
+    return L.tileLayer(`https://mt{s}.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}&hl=vi`, {
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20,
+      attribution: '© Google Maps',
+    });
+  };
 
   // Đồng bộ giá trị input khi prop address từ bên ngoài thay đổi (ví dụ: bấm GPS)
   useEffect(() => {
     setInputValue(address);
   }, [address]);
 
-  // Khởi tạo bản đồ Leaflet
+  // Khởi tạo bản đồ Leaflet với Google Maps tile
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -66,14 +80,14 @@ export const VenueLocationPicker = ({
       attributionControl: false,
     });
 
-    // Tile layer OpenStreetMap miễn phí
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-    }).addTo(map);
+    // Tile layer Google Maps chuẩn tiếng Việt
+    const initialTileLayer = createGoogleTileLayer('roadmap');
+    initialTileLayer.addTo(map);
+    tileLayerRef.current = initialTileLayer;
 
-    // Marker có thể kéo thả (draggable)
+    // Marker phong cách Google Maps đỏ có thể kéo thả
     const marker = L.marker([initialLat, initialLng], {
-      icon: createCaniPinIcon(),
+      icon: createGooglePinIcon(),
       draggable: true,
       autoPan: true,
     }).addTo(map);
@@ -133,8 +147,22 @@ export const VenueLocationPicker = ({
       map.remove();
       mapInstanceRef.current = null;
       markerRef.current = null;
+      tileLayerRef.current = null;
     };
   }, []);
+
+  // Chuyển đổi giữa chế độ Bản đồ thường và Vệ tinh
+  const handleSwitchMapType = (type) => {
+    if (type === mapType || !mapInstanceRef.current) return;
+    setMapType(type);
+
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    }
+    const newLayer = createGoogleTileLayer(type);
+    newLayer.addTo(mapInstanceRef.current);
+    tileLayerRef.current = newLayer;
+  };
 
   // Cập nhật vị trí bản đồ khi tọa độ lat/lng từ ngoài thay đổi
   useEffect(() => {
@@ -304,9 +332,29 @@ export const VenueLocationPicker = ({
         )}
       </div>
 
-      {/* Bản Đồ Tương Tác Mini Leaflet */}
+      {/* Bản Đồ Tương Tác Phong Cách Google Maps */}
       <div className="venue-map-wrapper">
         <div ref={mapContainerRef} className="venue-leaflet-map" />
+
+        {/* Nút chuyển đổi kiểu hiển thị: Bản đồ đường sá / Vệ tinh Google */}
+        <div className="venue-map-type-toggle">
+          <button
+            type="button"
+            className={`venue-map-type-btn ${mapType === 'roadmap' ? 'active' : ''}`}
+            onClick={() => handleSwitchMapType('roadmap')}
+            title="Xem bản đồ đường sá Google Maps"
+          >
+            Bản đồ
+          </button>
+          <button
+            type="button"
+            className={`venue-map-type-btn ${mapType === 'satellite' ? 'active' : ''}`}
+            onClick={() => handleSwitchMapType('satellite')}
+            title="Xem hình ảnh vệ tinh thực tế Google Earth"
+          >
+            Vệ tinh
+          </button>
+        </div>
       </div>
 
       <div className="venue-map-statusbar">
@@ -327,3 +375,4 @@ export const VenueLocationPicker = ({
 };
 
 export default VenueLocationPicker;
+

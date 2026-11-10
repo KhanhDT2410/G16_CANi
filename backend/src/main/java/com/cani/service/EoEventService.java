@@ -190,6 +190,7 @@ public class EoEventService {
                 .maxDistanceKm(dto.getMaxDistanceKm())
                 .minExperienceLevel(dto.getMinExperienceLevel())
                 .dressCode(dto.getDressCode())
+                .imageUrl(dto.getImageUrl())
                 .checklist(dto.getChecklist())
                 .build();
 
@@ -727,6 +728,7 @@ public class EoEventService {
                 .minReliabilityScore(s.getMinReliabilityScore())
                 .minExperienceLevel(s.getMinExperienceLevel())
                 .dressCode(s.getDressCode())
+                .imageUrl(s.getImageUrl())
                 .checklist(s.getChecklist())
                 .build();
     }

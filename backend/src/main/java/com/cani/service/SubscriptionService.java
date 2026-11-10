@@ -67,42 +67,60 @@ public class SubscriptionService {
     public List<SubscriptionPlanDto> getAvailablePlans() {
         return List.of(
                 SubscriptionPlanDto.builder()
-                        .planType(PlanType.INVITE_ONLY)
-                        .name("Gói Invite Mode")
-                        .price(BigDecimal.valueOf(50000))
+                        .planType(PlanType.FREE_TRIAL)
+                        .name("Gói Trải Nghiệm (Khởi Nghiệp)")
+                        .price(BigDecimal.ZERO)
                         .durationDays(30)
-                        .maxEvents(1)
-                        .maxShifts(5)
+                        .maxEvents(2)
+                        .maxShifts(6)
                         .maxWorkers(20)
-                        .description("Phù hợp sự kiện quy mô nhỏ, EO tự tuyển dụng bằng Link mời & mã QR thủ công.")
+                        .description("Tặng 2 sự kiện miễn phí cho Nhà tổ chức trải nghiệm toàn diện hệ thống Matching Radar.")
                         .features(List.of(
-                                "Tạo 1 Sự kiện với tối đa 5 Ca làm việc",
-                                "Tuyển dụng bằng Link mời & Mã QR chuyên biệt",
+                                "Miễn phí 2 Sự kiện đầu tiên",
+                                "Tối đa 6 Ca làm việc & 20 Nhân sự",
+                                "Kích hoạt Thuật toán Ghép đôi (Matching Radar)",
                                 "Điểm danh Check-in / Check-out bằng QR code",
-                                "Checklist đầu việc & thu thập bằng chứng",
-                                "Hạ tầng đối soát thanh toán trực tiếp 3 bên"
+                                "Checklist đầu việc & giám sát trực tiếp"
                         ))
                         .isRecommended(false)
                         .build(),
 
                 SubscriptionPlanDto.builder()
                         .planType(PlanType.MATCHING_PLUS)
-                        .name("Gói Matching + Invite Mode")
-                        .price(BigDecimal.valueOf(80000))
+                        .name("Gói Tiêu Chuẩn (Standard)")
+                        .price(BigDecimal.valueOf(99000))
                         .durationDays(30)
-                        .maxEvents(3)
-                        .maxShifts(15)
-                        .maxWorkers(50)
-                        .description("Mở khóa toàn bộ: Vừa tuyển bằng Link mời, vừa kích hoạt Thuật toán Matching Radar tự động.")
+                        .maxEvents(5)
+                        .maxShifts(25)
+                        .maxWorkers(80)
+                        .description("Tối ưu cho đơn vị tổ chức định kỳ: Tuyển dụng chủ động kết hợp Matching Radar.")
                         .features(List.of(
-                                "Tạo 3 Sự kiện với tối đa 15 Ca làm việc",
+                                "Tạo 5 Sự kiện với tối đa 25 Ca làm việc",
                                 "Kích hoạt Thuật toán Ghép đôi (Matching Engine)",
-                                "Hiển thị ca làm việc trên Bản đồ Job Radar di động",
+                                "Hiển thị ca làm việc ưu tiên trên Bản đồ Job Radar di động",
                                 "Bắn thông báo đẩy (FCM Push) đến ứng viên phù hợp",
-                                "Tự động kích hoạt Emergency Dispatch khi có hủy ca",
-                                "Ưu tiên xếp hạng trên bảng việc làm gần nhất"
+                                "Tự động kích hoạt hỗ trợ khi có biến động ca làm"
                         ))
                         .isRecommended(true)
+                        .build(),
+
+                SubscriptionPlanDto.builder()
+                        .planType(PlanType.ENTERPRISE)
+                        .name("Gói Chuyên Nghiệp (Pro / Doanh Nghiệp)")
+                        .price(BigDecimal.valueOf(249000))
+                        .durationDays(30)
+                        .maxEvents(20)
+                        .maxShifts(100)
+                        .maxWorkers(300)
+                        .description("Dành cho quy mô lớn: Ưu tiên tuyển dụng tối đa và mở khóa Gọi Thêm Người Khẩn Cấp.")
+                        .features(List.of(
+                                "Tạo 20 Sự kiện với 100 Ca làm việc & 300 Nhân sự",
+                                "Ưu tiên xếp hạng cao nhất trên Radar tuyển dụng",
+                                "Mở khóa tính năng Gọi Nhân Sự Khẩn Cấp (Emergency Dispatch)",
+                                "Báo cáo số liệu chuyên sâu & đối soát đa chiều",
+                                "Kênh chăm sóc & hỗ trợ kỹ thuật riêng 24/7"
+                        ))
+                        .isRecommended(false)
                         .build()
         );
     }
@@ -292,10 +310,15 @@ public class SubscriptionService {
         List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
 
         if (activeSubs.isEmpty()) {
-            if (strictQuotaEnforcement) {
-                throw new BadRequestException("Bạn cần mua Gói dịch vụ (Gói Invite Mode 50.000đ hoặc Matching Mode 80.000đ) để tạo sự kiện.");
+            // Tự động cấp Gói Trải Nghiệm Khởi Nghiệp Miễn Phí (2 sự kiện) nếu đây là EO mới chưa có gói
+            log.info("EO {} chưa có gói: Tự động kích hoạt Gói Trải Nghiệm Miễn Phí (FREE_TRIAL) 2 sự kiện", eo.getEoId());
+            SubscriptionResponseDto freeSubDto = activateSubscription(eo, PlanType.FREE_TRIAL, "FREE_WELCOME", "FREE_" + System.currentTimeMillis(), "WELCOME_BONUS");
+            Subscription freeSub = subscriptionRepository.findById(freeSubDto.getSubscriptionId()).orElse(null);
+            if (freeSub != null) {
+                activeSubs = List.of(freeSub);
+            } else if (strictQuotaEnforcement) {
+                throw new BadRequestException("Bạn cần mua Gói dịch vụ để tạo sự kiện.");
             } else {
-                log.info("Chế độ Demo/Dev: EO {} chưa có gói nhưng strict = false, cho phép tạo sự kiện tự do.", eo.getEoId());
                 return;
             }
         }
@@ -306,7 +329,7 @@ public class SubscriptionService {
 
         if (used >= max) {
             if (strictQuotaEnforcement) {
-                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện (" + used + "/" + max + "). Vui lòng mua thêm gói để tiếp tục.");
+                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện của gói (" + used + "/" + max + "). Vui lòng nâng cấp gói tại mục Gói Dịch Vụ để tiếp tục.");
             } else {
                 log.info("Chế độ Demo/Dev: EO {} đã hết quota ({}/{}) nhưng strict = false, tiếp tục cho phép.", eo.getEoId(), used, max);
             }
@@ -329,10 +352,25 @@ public class SubscriptionService {
         EventOrganizer eo = getEoOrThrow(userId);
         SubscriptionPlanDto plan = getPlanDefinition(dto.getPlanType());
 
+        // Nếu là gói miễn phí trải nghiệm (0đ), kích hoạt trực tiếp không cần qua cổng thanh toán
+        if (plan.getPrice().compareTo(BigDecimal.ZERO) == 0) {
+            activateSubscription(eo, plan.getPlanType(), "FREE_PROMO", "FREE_" + System.currentTimeMillis(), "WELCOME_FREE");
+            return PayOSPaymentResponseDto.builder()
+                    .orderCode(System.currentTimeMillis())
+                    .amount(0)
+                    .description("Kích hoạt Gói Trải Nghiệm thành công")
+                    .status("PAID")
+                    .checkoutUrl("")
+                    .build();
+        }
+
         long orderCode = Math.abs(System.currentTimeMillis() % 900000000L) + 100000000L;
         pendingOrders.put("PAYOS_" + orderCode, new PendingOrder(eo.getEoId(), plan.getPlanType(), plan.getPrice(), Instant.now()));
 
-        String desc = "CANI " + (plan.getPlanType() == PlanType.INVITE_ONLY ? "INVITE 50K" : "MATCH 80K");
+        String desc = "CANI " + plan.getName();
+        if (desc.length() > 25) {
+            desc = desc.substring(0, 25);
+        }
         String buyerName = eo.getUser() != null ? eo.getUser().getFullName() : "Khach hang CANi";
         String buyerEmail = eo.getUser() != null ? eo.getUser().getEmail() : "user@cani.vn";
 

@@ -86,16 +86,20 @@ export default function EOSubscriptionTab() {
           <div className="sub-metric-item">
             <span className="sub-metric-label">Chế độ tuyển dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem' }}>
-              {currentSubscription?.planType === 'MATCHING_PLUS'
-                ? 'Matching Radar AI + Mời'
+              {currentSubscription?.planType === 'ENTERPRISE'
+                ? 'Matching Radar AI Ưu Tiên + Cứu Hộ'
+                : currentSubscription?.planType === 'MATCHING_PLUS'
+                ? 'Matching Radar AI Tiêu Chuẩn'
+                : currentSubscription?.planType === 'FREE_TRIAL'
+                ? 'Matching Radar AI (Khởi Nghiệp)'
                 : currentSubscription?.planType === 'INVITE_ONLY'
                 ? 'Mời Trực Tiếp (Invite Mode)'
                 : 'Chưa kích hoạt'}
             </span>
             <span className="sub-metric-hint">
-              {currentSubscription?.planType === 'MATCHING_PLUS'
-                ? 'Tự động quét nhân sự bán kính 15km'
-                : 'Phân phối qua link / QR bảo mật'}
+              {currentSubscription?.planType
+                ? 'Tự động quét nhân sự bán kính định vị'
+                : 'Cần kích hoạt gói dịch vụ'}
             </span>
           </div>
 
@@ -147,6 +151,7 @@ export default function EOSubscriptionTab() {
             <div className="sub-pricing-grid">
               {plans.map((plan) => {
                 const isMatching = plan.planType === 'MATCHING_PLUS';
+                const isFree = plan.price === 0;
 
                 return (
                   <div
@@ -154,6 +159,7 @@ export default function EOSubscriptionTab() {
                     className={`pricing-card ${isMatching ? 'featured' : ''}`}
                   >
                     {isMatching && <div className="pricing-badge">Khuyên Dùng</div>}
+                    {isFree && <div className="pricing-badge" style={{ background: '#10b981' }}>Miễn Phí</div>}
 
                     <div className="pricing-header">
                       <h3 className="pricing-title">{plan.name}</h3>
@@ -163,7 +169,7 @@ export default function EOSubscriptionTab() {
                     <div className="pricing-cost">
                       <span className="cost-amount">{formatCurrency(plan.price)}</span>
                       <span className="cost-currency">VNĐ</span>
-                      <span className="cost-period">/ Sự kiện</span>
+                      <span className="cost-period">/ {plan.eventQuota ? `${plan.eventQuota} sự kiện` : 'gói'}</span>
                     </div>
 
                     <ul className="pricing-features">
@@ -179,14 +185,14 @@ export default function EOSubscriptionTab() {
                       <button
                         type="button"
                         className="btn-purchase-vnpay"
-                        style={{ background: '#2563eb', width: '100%' }}
+                        style={{ background: isFree ? '#10b981' : '#2563eb', width: '100%' }}
                         disabled={purchasingPlan !== null}
                         onClick={() => handlePurchasePayOS(plan.planType)}
                       >
                         {purchasingPlan === plan.planType ? (
-                          'Đang khởi tạo PayOS...'
+                          isFree ? 'Đang kích hoạt...' : 'Đang khởi tạo PayOS...'
                         ) : (
-                          'Thanh toán qua PayOS VietQR'
+                          isFree ? 'Kích Hoạt Miễn Phí (Trải Nghiệm)' : 'Thanh toán qua PayOS VietQR'
                         )}
                       </button>
 

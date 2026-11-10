@@ -81,22 +81,31 @@ const ShiftCreateModal = ({
                 <option key={role} value={role} />
               ))}
             </datalist>
+          </div>
 
-            {/* Gợi ý Ma trận Lương */}
-            {wageRecommendationsMap[newShift.jobType] && (
-              <div className="wage-recommendation-badge animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
-                <div>
-                  <strong>Gợi ý Ma trận Lương:</strong>{' '}
-                  <span className="wage-range">
-                    {wageRecommendationsMap[newShift.jobType].min.toLocaleString()} đ -{' '}
-                    {wageRecommendationsMap[newShift.jobType].max.toLocaleString()} đ / giờ
-                  </span>
-                  <div className="wage-subnote">
-                    Đặc điểm: {wageRecommendationsMap[newShift.jobType].note}
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* Hình ảnh minh họa ca làm / Đồng phục */}
+          <div className="eo-form-group">
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>Hiển thị trên app ứng viên</span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="url"
+                className="eo-form-input"
+                placeholder="Dán link ảnh đồng phục hoặc ảnh vị trí ca làm (https://...)"
+                value={newShift.imageUrl || ''}
+                onChange={(e) => setNewShift({ ...newShift, imageUrl: e.target.value })}
+              />
+              {newShift.imageUrl && (
+                <img
+                  src={newShift.imageUrl}
+                  alt="Preview"
+                  style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #cbd5e1' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              )}
+            </div>
           </div>
 
           {/* Mô tả công việc */}

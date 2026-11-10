@@ -102,7 +102,6 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                     <span className="faq-acc-question">{faq.question}</span>
                   </div>
                   <div className="faq-acc-meta">
-                    <span className="faq-acc-views">{faq.viewCount || 0} lượt xem</span>
                     <span className="faq-chevron">{isExpanded ? 'Thu gọn' : 'Chi tiết'}</span>
                   </div>
                 </button>

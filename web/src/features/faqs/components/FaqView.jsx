@@ -12,10 +12,8 @@ import './Faq.css';
 export const FaqView = () => {
   const {
     faqs,
-    analytics,
     loading,
     loadFaqs,
-    loadAnalytics,
     createFaq,
     updateFaq,
     publishFaq,
@@ -24,7 +22,7 @@ export const FaqView = () => {
 
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [activeCategory, setActiveCategory] = useState('ALL');
-  const [sortBy, setSortBy] = useState('VIEWS_DESC');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState(null);
@@ -63,7 +61,6 @@ export const FaqView = () => {
     });
 
     return list.sort((a, b) => {
-      if (sortBy === 'VIEWS_DESC') return (b.viewCount || 0) - (a.viewCount || 0);
       if (sortBy === 'NEWEST') return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       if (sortBy === 'OLDEST') return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
       if (sortBy === 'TITLE_AZ') return (a.question || '').localeCompare(b.question || '', 'vi');
@@ -79,17 +76,14 @@ export const FaqView = () => {
         <div>
           <h2>Quản Lý Câu Hỏi Thường Gặp & Trợ Giúp</h2>
           <p className="faq-subtitle">
-            Tạo, xuất bản và theo dõi hiệu quả bài viết giải đáp thắc mắc người dùng
+            Tạo, xuất bản và quản lý bộ câu hỏi giải đáp thắc mắc người dùng
           </p>
         </div>
         <div className="faq-header-actions">
           <button
             type="button"
             className="faq-btn-refresh"
-            onClick={() => {
-              loadFaqs();
-              loadAnalytics();
-            }}
+            onClick={() => loadFaqs()}
             disabled={loading}
           >
             Làm mới
@@ -97,33 +91,6 @@ export const FaqView = () => {
           <button type="button" className="faq-btn-primary" onClick={handleOpenCreate}>
             Thêm Câu Hỏi Mới
           </button>
-        </div>
-      </div>
-
-      {/* Analytics Summary */}
-      <div className="faq-analytics-grid">
-        <div className="faq-stat-card">
-          <span className="faq-stat-label">Tổng lượt xem câu hỏi</span>
-          <span className="faq-stat-value">{analytics?.totalViews ?? 0}</span>
-          <span className="faq-stat-desc">Đọc qua trung tâm trợ giúp</span>
-        </div>
-        <div className="faq-stat-card highlight">
-          <span className="faq-stat-label">Tỷ lệ giải đáp tự động</span>
-          <span className="faq-stat-value">
-            {analytics?.ticketDeflectionRate != null ? `${analytics.ticketDeflectionRate}%` : '0%'}
-          </span>
-          <span className="faq-stat-desc" title={analytics?.calculationFormula}>
-            Yêu cầu thuộc danh mục đã có giải đáp sẵn
-          </span>
-        </div>
-        <div className="faq-stat-card">
-          <span className="faq-stat-label">Lượt xem theo Danh mục</span>
-          <div className="faq-stat-cats">
-            <span>Tài khoản: {analytics?.viewsByCategory?.ACCOUNT || 0}</span>
-            <span>Ca làm: {analytics?.viewsByCategory?.SHIFT || 0}</span>
-            <span>Thù lao: {analytics?.viewsByCategory?.PAYMENT || 0}</span>
-            <span>Khiếu nại: {analytics?.viewsByCategory?.DISPUTE || 0}</span>
-          </div>
         </div>
       </div>
 
@@ -148,7 +115,6 @@ export const FaqView = () => {
 
           <label>Sắp xếp:</label>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="VIEWS_DESC">Lượt xem nhiều nhất</option>
             <option value="NEWEST">Mới nhất</option>
             <option value="OLDEST">Cũ nhất</option>
             <option value="TITLE_AZ">Tiêu đề (A → Z)</option>

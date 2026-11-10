@@ -36,9 +36,6 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
             <span className={`faq-status-badge ${statusConfig.badgeClass}`}>
               {statusConfig.label}
             </span>
-            <span className="faq-views-badge" title="Lượt xem trên Help Center">
-              👁 {faq.viewCount || 0} lượt xem
-            </span>
             {hasAttachment && (
               <span className="faq-has-attachment-badge" title="Có ảnh hoặc tệp đính kèm">
                 📎 Đính kèm

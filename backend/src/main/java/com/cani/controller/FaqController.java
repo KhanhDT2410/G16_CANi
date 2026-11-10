@@ -46,6 +46,8 @@ public class FaqController {
     ) {
         FaqPublicResponseDto result = faqService.getPublicFaqById(id);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy thông tin chi tiết câu hỏi thường gặp thành công"));
+    }
+
     /**
      * Phục vụ hiển thị ảnh FAQ đã tải lên từ thiết bị.
      * GET /api/v1/faqs/images/{filename}

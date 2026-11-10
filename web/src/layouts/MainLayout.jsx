@@ -95,14 +95,6 @@ const MainLayout = () => {
           >
             <CaniLogo variant="horizontal" height={36} />
           </Link>
-
-          {!isAdmin && !isCustomerCare && (
-            <div className="header-role-pill">
-              <span className="role-dot-badge">EO</span>
-              <span className="role-text">Ban Tổ Chức (EO)</span>
-              <span className="role-chevron">▾</span>
-            </div>
-          )}
         </div>
 
         {!isAdmin && (
@@ -117,7 +109,6 @@ const MainLayout = () => {
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
               />
-              <kbd className="header-search-shortcut">Ctrl K</kbd>
               {headerSearch && (
                 <button
                   type="button"

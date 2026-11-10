@@ -7,6 +7,7 @@ import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.UserRole;
+import com.cani.entity.enums.VerificationStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
@@ -69,6 +70,10 @@ public class EoEventService {
     @Transactional
     public EventResponseDto createEvent(UUID userId, CreateEventRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
+
+        if (eo.getVerificationStatus() != VerificationStatus.APPROVED) {
+            throw new BadRequestException("Tài khoản của bạn chưa hoàn tất định danh eKYC. Vui lòng xác thực eKYC trước khi tạo sự kiện và tuyển dụng nhân sự trên CANi.");
+        }
 
         Event event = Event.builder()
                 .eventOrganizer(eo)

@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLogin } from '../hooks/useLogin';
 import CaniLogo from '../../../components/common/CaniLogo';
+import ForgotPasswordModal from './ForgotPasswordModal';
 import '../auth.css';
 
 export const LoginForm = () => {
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const {
     formData,
     isLoading,
@@ -124,9 +126,14 @@ export const LoginForm = () => {
             />
             Ghi nhớ phiên đăng nhập
           </label>
-          <a href="#forgot" className="forgot-link" onClick={(e) => e.preventDefault()}>
+          <button
+            type="button"
+            className="forgot-link"
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+            onClick={() => setShowForgotPassword(true)}
+          >
             Quên mật khẩu?
-          </a>
+          </button>
         </div>
 
         <button type="submit" className="btn-submit btn-pill-primary" disabled={isLoading}>
@@ -178,6 +185,16 @@ export const LoginForm = () => {
       <div className="auth-footer">
         Chưa có tài khoản đại diện Ban Tổ Chức? <a href="/register">Đăng ký ngay</a>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        onResetSuccess={(resetEmail) => {
+          if (resetEmail && handleChange) {
+            handleChange({ target: { name: 'email', value: resetEmail } });
+          }
+        }}
+      />
     </div>
   );
 };

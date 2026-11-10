@@ -14,6 +14,7 @@ export default function EoProfileTab() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [submittingEkyc, setSubmittingEkyc] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [isBusinessEntity, setIsBusinessEntity] = useState(false);
 
   // Avatar State & Sync
   const [avatarUrl, setAvatarUrl] = useState(() => {
@@ -72,6 +73,8 @@ export default function EoProfileTab() {
       ]);
 
       if (profileRes.status === 'fulfilled' && profileRes.value) {
+        const hasTax = Boolean(profileRes.value.taxId && profileRes.value.taxId.trim());
+        setIsBusinessEntity(hasTax);
         setProfile((prev) => ({
           ...prev,
           companyName: profileRes.value.companyName || prev.companyName,
@@ -150,7 +153,7 @@ export default function EoProfileTab() {
     setSavingProfile(true);
     try {
       const res = await eoService.updateEoProfile(profile);
-      showToast('Lưu thông tin hồ sơ doanh nghiệp thành công!', 'success');
+      showToast('Lưu thông tin hồ sơ nhà tổ chức thành công!', 'success');
       if (res) {
         setProfile((prev) => ({
           ...prev,
@@ -197,6 +200,11 @@ export default function EoProfileTab() {
       const result = await eoService.submitEkyc(formData);
       showToast('Đã nộp hồ sơ eKYC thành công! Hệ thống đang xử lý thẩm định.', 'success');
       setEkycData(result);
+      try {
+        window.dispatchEvent(new CustomEvent('cani_ekyc_updated'));
+      } catch (e) {
+        console.warn('Lỗi dispatch cani_ekyc_updated:', e);
+      }
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi nộp hồ sơ eKYC', 'error');
     } finally {
@@ -272,7 +280,7 @@ export default function EoProfileTab() {
               <h2 className="profile-org-name">{profile.companyName || 'Chưa cập nhật tên tổ chức'}</h2>
               <span className="profile-role-pill">Ban Tổ Chức Sự Kiện</span>
               {ekycStatus === 'APPROVED' ? (
-                <span className="status-pill approved" title="Doanh nghiệp đã được xác thực eKYC">
+                <span className="status-pill approved" title="Nhà tổ chức đã được xác thực eKYC">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                   </svg>
@@ -356,7 +364,7 @@ export default function EoProfileTab() {
             <line x1="3" y1="9" x2="21" y2="9"></line>
             <line x1="9" y1="21" x2="9" y2="9"></line>
           </svg>
-          1. Thông Tin Doanh Nghiệp
+          1. Thông Tin Nhà Tổ Chức
         </button>
 
         <button
@@ -367,7 +375,7 @@ export default function EoProfileTab() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
-          2. Định Danh eKYC Doanh Nghiệp
+          2. Xác Thực Định Danh eKYC
         </button>
 
         <button
@@ -385,44 +393,97 @@ export default function EoProfileTab() {
 
       {/* 3. NỘI DUNG TỪNG PHÂN HỆ */}
 
-      {/* SECTION 1: THÔNG TIN DOANH NGHIỆP */}
+      {/* SECTION 1: THÔNG TIN NHÀ TỔ CHỨC */}
       {activeSection === 'PROFILE' && (
         <div className="profile-card">
           <div className="profile-card-header">
             <div className="profile-card-header-left">
-              <h3>Hồ Sơ Doanh Nghiệp & Đơn Vị Tổ Chức Sự Kiện</h3>
+              <h3>Hồ Sơ Nhà Tổ Chức Sự Kiện</h3>
               <p>Thông tin thương hiệu chính thức xuất hiện trên trang tuyển dụng và bảng phân công nhân sự.</p>
             </div>
           </div>
 
           <form onSubmit={handleSaveProfile}>
+            {/* Toggle / Nút bấm Đăng Ký Hộ Kinh Doanh */}
+            <div style={{
+              backgroundColor: isBusinessEntity ? '#eff6ff' : '#f8fafc',
+              border: isBusinessEntity ? '1.5px solid #3b82f6' : '1px dashed #cbd5e1',
+              borderRadius: '0.875rem',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.25rem',
+              transition: 'all 0.2s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={isBusinessEntity}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsBusinessEntity(checked);
+                      if (!checked) {
+                        handleProfileFieldChange('taxId', '');
+                      }
+                    }}
+                    style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 700, fontSize: '0.925rem', color: isBusinessEntity ? '#1d4ed8' : '#334155' }}>
+                    Đăng ký tư cách Hộ kinh doanh / Doanh nghiệp (Có Mã Số Thuế)
+                  </span>
+                </label>
+                <span style={{
+                  fontSize: '0.775rem',
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: '9999px',
+                  fontWeight: 600,
+                  backgroundColor: isBusinessEntity ? '#dbeafe' : '#e2e8f0',
+                  color: isBusinessEntity ? '#1e40af' : '#475569',
+                }}>
+                  {isBusinessEntity ? 'Đang mở ô nhập MST' : 'Mặc định: Cá nhân / Nhà tổ chức'}
+                </span>
+              </div>
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.825rem', color: '#64748b', lineHeight: 1.45 }}>
+                {isBusinessEntity
+                  ? 'Chế độ Hộ kinh doanh / Doanh nghiệp đang bật. Vui lòng nhập chính xác Mã số thuế bên dưới để xuất hóa đơn VAT và ký hợp đồng dịch vụ.'
+                  : 'Tài khoản cá nhân / ban tổ chức tự do không bắt buộc có Mã số thuế. Nếu bạn là Hộ kinh doanh hoặc Doanh nghiệp có MST, hãy tích vào ô trên để mở khóa ô điền Mã số thuế.'}
+              </p>
+            </div>
+
             <div className="profile-form-grid-2">
               <div className="profile-form-group">
-                <label>Tên Doanh Nghiệp / Công Ty / Đơn Vị Tổ Chức *</label>
+                <label>Tên Nhà Tổ Chức / Đơn Vị Sự Kiện *</label>
                 <input
                   type="text"
                   required
                   className="profile-input"
                   value={profile.companyName}
                   onChange={(e) => handleProfileFieldChange('companyName', e.target.value)}
-                  placeholder="VD: Công ty TNHH Truyền Thông CANI"
+                  placeholder="VD: Ban Tổ Chức Festival hoặc Tên Đơn Vị"
                 />
               </div>
 
               <div className="profile-form-group">
-                <label>Mã Số Thuế (MST) / Số ĐKKD *</label>
+                <label>
+                  Mã Số Thuế (MST) / Số ĐKKD {isBusinessEntity ? '*' : '(Chỉ mở cho Hộ kinh doanh)'}
+                </label>
                 <input
                   type="text"
-                  required
+                  required={isBusinessEntity}
+                  disabled={!isBusinessEntity}
                   className="profile-input"
+                  style={{
+                    backgroundColor: !isBusinessEntity ? '#f1f5f9' : '#ffffff',
+                    cursor: !isBusinessEntity ? 'not-allowed' : 'text',
+                    color: !isBusinessEntity ? '#94a3b8' : 'inherit',
+                  }}
                   value={profile.taxId}
                   onChange={(e) => handleProfileFieldChange('taxId', e.target.value)}
-                  placeholder="VD: 0109876543"
+                  placeholder={isBusinessEntity ? "VD: 0109876543 hoặc 0312345678" : "Bấm nút đăng ký hộ kinh doanh phía trên để điền MST"}
                 />
               </div>
 
               <div className="profile-form-group">
-                <label>Người Đại Diện Pháp Luật / Trưởng Ban Tổ Chức *</label>
+                <label>Họ & Tên Trưởng Ban / Người Đại Diện *</label>
                 <input
                   type="text"
                   required
@@ -446,7 +507,7 @@ export default function EoProfileTab() {
               </div>
 
               <div className="profile-form-group">
-                <label>Email Nhận Báo Cáo & Hóa Đơn VAT</label>
+                <label>Email Nhận Báo Cáo & Hóa Đơn VAT (Tùy chọn)</label>
                 <input
                   type="email"
                   className="profile-input"
@@ -468,14 +529,14 @@ export default function EoProfileTab() {
               </div>
 
               <div className="profile-form-group span-2">
-                <label>Địa Chỉ Trụ Sở Công Ty / Văn Phòng Điều Hành *</label>
+                <label>Địa Chỉ Liên Hệ / Văn Phòng *</label>
                 <input
                   type="text"
                   required
                   className="profile-input"
                   value={profile.address}
                   onChange={(e) => handleProfileFieldChange('address', e.target.value)}
-                  placeholder="VD: Tòa nhà văn phòng, Quận Cầu Giấy, Hà Nội"
+                  placeholder="VD: Số 123 Đường Cầu Giấy, Hà Nội"
                 />
               </div>
 
@@ -508,18 +569,18 @@ export default function EoProfileTab() {
         </div>
       )}
 
-      {/* SECTION 2: ĐỊNH DANH eKYC DOANH NGHIỆP */}
+      {/* SECTION 2: ĐỊNH DANH eKYC NHÀ TỔ CHỨC */}
       {activeSection === 'EKYC' && (
         <div className="profile-card">
           <div className="profile-card-header">
             <div className="profile-card-header-left">
-              <h3>Xác Thực Định Danh Doanh Nghiệp (eKYC 4.0)</h3>
-              <p>Tuân thủ Nghị định 13/2023/NĐ-CP và Luật Căn cước công dân. Nâng cao độ uy tín tuyển dụng.</p>
+              <h3>Xác Thực Định Danh Nhà Tổ Chức (eKYC 4.0)</h3>
+              <p>Tuân thủ Nghị định 13/2023/NĐ-CP và Luật Căn cước. Nâng cao độ uy tín tuyển dụng và mở khóa tính năng tạo sự kiện.</p>
             </div>
 
             <div>
               {ekycStatus === 'APPROVED' && (
-                <span className="status-pill approved">ĐÃ CHỨNG THỰC UY TÍN</span>
+                <span className="status-pill approved">ĐÃ XÁC THỰC UY TÍN</span>
               )}
               {ekycStatus === 'PENDING_REVIEW' && (
                 <span className="status-pill pending">ĐANG CHỜ DUYỆT</span>
@@ -541,10 +602,10 @@ export default function EoProfileTab() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
-                Doanh nghiệp đã hoàn tất thẩm định định danh eKYC điện tử.
+                Nhà tổ chức đã hoàn tất thẩm định định danh eKYC điện tử.
               </div>
               <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
-                Tin tuyển dụng của bạn được đóng dấu Huy hiệu Doanh nghiệp Uy tín, tự động kích hoạt Matching Radar AI với độ ưu tiên cao nhất.
+                Hồ sơ của bạn được đóng dấu Huy hiệu Nhà Tổ Chức Uy Tín, mở khóa toàn quyền tạo sự kiện và tuyển dụng nhân sự trên CANi.
               </div>
 
               <div className="info-grid">
@@ -677,8 +738,8 @@ export default function EoProfileTab() {
                         <polyline points="10 9 9 9 8 9"></polyline>
                       </svg>
                     )}
-                    <div className="upload-label">Giấy Phép ĐKKD (Tùy chọn)</div>
-                    <div className="upload-hint">Bản chụp GPKD hoặc giấy ủy quyền</div>
+                    <div className="upload-label">Giấy Phép ĐKKD (Dành cho Hộ kinh doanh)</div>
+                    <div className="upload-hint">Bản chụp ĐKKD hoặc giấy ủy quyền sự kiện</div>
                   </label>
                 </div>
 

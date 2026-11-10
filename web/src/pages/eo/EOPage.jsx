@@ -19,6 +19,8 @@ import EOAnalyticsTab from './components/EOAnalyticsTab';
 import EOSettingsTab from './components/EOSettingsTab';
 import EOModals from './components/EOModals';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
+import EkycRequiredModal from './components/EkycRequiredModal';
+import { eoService } from '../../services/eoService';
 
 import { SupportTicketsCenterView } from '../../features/support-tickets';
 import './EOPage.css';
@@ -125,6 +127,35 @@ export default function EOPage() {
 
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState(null);
+  const [ekycStatus, setEkycStatus] = useState('APPROVED');
+  const [showEkycModal, setShowEkycModal] = useState(false);
+
+  // Lấy trạng thái eKYC của Nhà tổ chức
+  const fetchEkycStatus = async () => {
+    try {
+      const res = await eoService.getEkycStatus();
+      if (res?.status) {
+        setEkycStatus(res.status);
+      }
+    } catch (err) {
+      console.warn('Lỗi kiểm tra eKYC status:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchEkycStatus();
+    const handleEkycUpdated = () => fetchEkycStatus();
+    window.addEventListener('cani_ekyc_updated', handleEkycUpdated);
+    return () => window.removeEventListener('cani_ekyc_updated', handleEkycUpdated);
+  }, []);
+
+  const handleOpenCreateEvent = () => {
+    if (ekycStatus !== 'APPROVED') {
+      setShowEkycModal(true);
+      return;
+    }
+    events.setShowEventModal(true);
+  };
 
   const handleNavClick = (navKey) => {
     setActiveNav(navKey);
@@ -203,6 +234,30 @@ export default function EOPage() {
                 </div>
               </section>
 
+              {/* Banner cảnh báo khi tài khoản chưa hoàn tất eKYC */}
+              {ekycStatus && ekycStatus !== 'APPROVED' && (
+                <div className="eo-ekyc-warning-banner">
+                  <div className="warning-banner-left">
+                    <span className="warning-icon">⚠️</span>
+                    <div>
+                      <strong>Tài khoản chưa hoàn tất định danh eKYC</strong>
+                      <p>
+                        {ekycStatus === 'PENDING_REVIEW'
+                          ? 'Hồ sơ eKYC của bạn đang trong quá trình thẩm định. Bạn cần được phê duyệt để mở khóa tạo sự kiện.'
+                          : 'Bạn cần hoàn tất xác thực định danh (CCCD/ĐKKD) để được phép tạo sự kiện và tuyển dụng nhân sự trên CANi.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-verify-ekyc-now"
+                    onClick={() => switchTab('profile')}
+                  >
+                    {ekycStatus === 'PENDING_REVIEW' ? 'Xem Trạng Thái eKYC →' : 'Xác Thực Định Danh Ngay →'}
+                  </button>
+                </div>
+              )}
+
               <EOMetricsGrid
                 metrics={events.metrics}
                 onOpenActiveEventDetail={() => {
@@ -229,7 +284,7 @@ export default function EOPage() {
               setExpandedEventId={shifts.setExpandedEventId}
               onOpenEventDetail={setDetailEvent}
               onDeleteEvent={events.handleDeleteEvent}
-              onOpenCreateEvent={() => events.setShowEventModal(true)}
+              onOpenCreateEvent={handleOpenCreateEvent}
               onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
               onOpenEditEvent={events.setEditingEvent}
               onCancelEvent={events.handleCancelEvent}
@@ -258,7 +313,7 @@ export default function EOPage() {
               onOpenQr={shifts.handleOpenShiftQr}
               onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
               onOpenAttendance={shifts.handleOpenAttendance}
-              onOpenCreateEvent={() => events.setShowEventModal(true)}
+              onOpenCreateEvent={handleOpenCreateEvent}
               onReloadEvents={events.loadEvents}
             />
           )}
@@ -344,6 +399,13 @@ export default function EOPage() {
           address: user?.address || 'Chưa cập nhật địa chỉ',
           organizerName: user?.fullName || user?.username || 'Đại diện Ban Tổ Chức',
         }}
+      />
+      {/* Modal Cảnh Báo Yêu Cầu eKYC Trước Khi Tạo Sự Kiện */}
+      <EkycRequiredModal
+        isOpen={showEkycModal}
+        onClose={() => setShowEkycModal(false)}
+        onNavigateToEkyc={() => switchTab('profile')}
+        ekycStatus={ekycStatus}
       />
     </div >
   );

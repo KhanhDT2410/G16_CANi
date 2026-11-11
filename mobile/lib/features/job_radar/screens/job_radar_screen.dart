@@ -5,6 +5,7 @@ import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/attendance_qr_scanner_screen.dart';
+import 'package:cani/features/job_proposals/screens/shift_detail_execution_screen.dart';
 import 'package:cani/features/job_proposals/widgets/shift_navigation_sheet.dart';
 import 'package:cani/features/job_radar/data/job_radar_repository.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
@@ -23,6 +24,7 @@ class JobRadarScreen extends ConsumerStatefulWidget {
 }
 
 class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
+  List<ShiftAssignmentItem> _activeShifts = [];
   ShiftAssignmentItem? _urgentShift;
   bool _isLoadingUrgent = false;
 
@@ -40,12 +42,25 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
       final active = assigns.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).toList();
       if (mounted) {
         setState(() {
+          _activeShifts = active;
           _urgentShift = active.isNotEmpty ? active.first : null;
           _isLoadingUrgent = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingUrgent = false);
+    }
+  }
+
+  Future<void> _openExecutionScreen(ShiftAssignmentItem a) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShiftDetailExecutionScreen(assignment: a),
+      ),
+    );
+    if (updated == true) {
+      _loadUrgentShift();
     }
   }
 
@@ -268,6 +283,79 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                 assignment: _urgentShift!,
                 onNavigate: () => _openNavigation(_urgentShift!),
                 onQrScan: () => _openQrScanner(_urgentShift!),
+                onOpenDetail: () => _openExecutionScreen(_urgentShift!),
+              ),
+
+            // Danh sách các ca làm việc khác đang trực / sắp tới
+            if (_activeShifts.length > 1)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Các ca làm khác đang trực / sắp tới (${_activeShifts.length - 1}):',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 58,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _activeShifts.length - 1,
+                        separatorBuilder: (context, index) => const SizedBox(width: 8),
+                        itemBuilder: (ctx, idx) {
+                          final a = _activeShifts[idx + 1];
+                          return InkWell(
+                            onTap: () => _openExecutionScreen(a),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFF0077FF).withValues(alpha: 0.3)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.work_outline, size: 16, color: Color(0xFF0066FF)),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        a.jobType,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                      Text(
+                                        a.eventName,
+                                        style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward_ios, size: 11, color: Color(0xFF94A3B8)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
             // 3. Thanh Bán Kính & Chuyển Đổi Bản Đồ / Danh Sách

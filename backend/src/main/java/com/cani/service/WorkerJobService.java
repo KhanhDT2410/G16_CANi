@@ -24,7 +24,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +48,8 @@ public class WorkerJobService {
     private static final double DEFAULT_MAX_DISTANCE_KM = 20.0;
     private static final int MAX_RELIABILITY_SCORE = 100;
     private static final int MIN_RELIABILITY_SCORE = 0;
+    private static final String PROOF_UPLOAD_DIR = "uploads/proofs";
+    private static final java.util.List<String> ALLOWED_IMAGE_EXTS = java.util.List.of("jpg", "jpeg", "png", "webp", "gif");
 
     private final WorkerRepository workerRepository;
     private final ShiftRepository shiftRepository;
@@ -119,7 +124,17 @@ public class WorkerJobService {
         List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
                 worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
         if (!conflicts.isEmpty()) {
-            throw new BadRequestException("Bạn đã có một ca làm việc khác trùng khung giờ với ca này!");
+            ShiftAssignment conflict = conflicts.get(0);
+            Shift cShift = conflict.getShift();
+            String cJob = cShift != null ? cShift.getJobType() : "Ca làm việc";
+            String cEvent = (cShift != null && cShift.getEvent() != null) ? cShift.getEvent().getName() : "";
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+            String timeRange = (cShift != null && cShift.getStartTime() != null && cShift.getEndTime() != null)
+                    ? fmt.format(cShift.getStartTime()) + " - " + fmt.format(cShift.getEndTime())
+                    : "";
+            throw new BadRequestException(String.format(
+                    "Không thể nhận ca: Bạn đã có ca làm việc khác trùng khung giờ (\"%s\" - %s, %s). Mỗi thời điểm chỉ được làm 1 ca duy nhất!",
+                    cJob, cEvent, timeRange));
         }
 
         // 2. ATOMIC CONCURRENCY CHECK: Tăng confirmed_workers một cách nguyên tử
@@ -219,7 +234,22 @@ public class WorkerJobService {
             throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-in chính thức của sự kiện!");
         }
         String scannedShiftPart = qrContent.substring("CANI_CHECKIN:".length()).trim();
-        if (!scannedShiftPart.equalsIgnoreCase(shift.getShiftId().toString())) {
+        String scannedShiftId = scannedShiftPart;
+        if (scannedShiftPart.contains(":")) {
+            String[] parts = scannedShiftPart.split(":");
+            scannedShiftId = parts[0].trim();
+            if (parts.length >= 2) {
+                try {
+                    long epochSeconds = Long.parseLong(parts[1].trim());
+                    long currentEpochSeconds = Instant.now().getEpochSecond();
+                    // Mã QR động đổi theo thời gian: cho phép lệch tối đa 5 phút (300s) chống in giấy / chụp ảnh cũ
+                    if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
+                        throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (!scannedShiftId.equalsIgnoreCase(shift.getShiftId().toString())) {
             throw new BadRequestException("Mã QR Check-in này không thuộc ca làm việc hiện tại của bạn!");
         }
 
@@ -306,7 +336,21 @@ public class WorkerJobService {
             throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-out chính thức của ca làm việc!");
         }
         String scannedShiftPart = qrContent.substring("CANI_CHECKOUT:".length()).trim();
-        if (!scannedShiftPart.equalsIgnoreCase(shift.getShiftId().toString())) {
+        String scannedShiftId = scannedShiftPart;
+        if (scannedShiftPart.contains(":")) {
+            String[] parts = scannedShiftPart.split(":");
+            scannedShiftId = parts[0].trim();
+            if (parts.length >= 2) {
+                try {
+                    long epochSeconds = Long.parseLong(parts[1].trim());
+                    long currentEpochSeconds = Instant.now().getEpochSecond();
+                    if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
+                        throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (!scannedShiftId.equalsIgnoreCase(shift.getShiftId().toString())) {
             throw new BadRequestException("Mã QR Check-out này không thuộc ca làm việc hiện tại của bạn!");
         }
 
@@ -326,6 +370,11 @@ public class WorkerJobService {
         attendanceLog.setCheckoutQrHash(!qrContent.isEmpty() ? hashString(qrContent) : "MANUAL_CHECKOUT");
         attendanceLog.setHoursWorked(hoursWorked);
         attendanceLog.setAttendanceStatus(AttendanceStatus.CHECKED_OUT);
+
+        if (request != null && request.getProofImageUrl() != null && !request.getProofImageUrl().isBlank()) {
+            attendanceLog.setProofImageUrl(request.getProofImageUrl().trim());
+            attendanceLog.setProofSubmittedAt(now);
+        }
 
         attendanceLogRepository.save(attendanceLog);
 
@@ -347,6 +396,7 @@ public class WorkerJobService {
                 .checkoutTime(now)
                 .hoursWorked(hoursWorked)
                 .isOnTime(attendanceLog.getIsOnTime())
+                .proofImageUrl(attendanceLog.getProofImageUrl())
                 .message("Điểm danh Check-out thành công! Cảm ơn bạn đã hoàn thành ca làm việc.")
                 .build();
     }
@@ -356,10 +406,28 @@ public class WorkerJobService {
      */
     @Transactional(readOnly = true)
     public List<NearbyShiftResponseDto> getNearbyShifts(Double userLat, Double userLng, Double radiusKm) {
+        return getNearbyShifts(null, userLat, userLng, radiusKm);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NearbyShiftResponseDto> getNearbyShifts(UUID userId, Double userLat, Double userLng, Double radiusKm) {
         double searchRadius = (radiusKm != null && radiusKm > 0) ? radiusKm : DEFAULT_SEARCH_RADIUS_KM;
         double centerLat = (userLat != null) ? userLat : DEFAULT_CENTER_LAT;
         double centerLng = (userLng != null) ? userLng : DEFAULT_CENTER_LNG;
 
+        // Lấy danh sách ca đang active của Worker để check trùng ca (1 thời điểm chỉ làm 1 ca)
+        List<ShiftAssignment> workerActiveAssignments = Collections.emptyList();
+        if (userId != null) {
+            Worker worker = workerRepository.findByUser_UserId(userId).orElse(null);
+            if (worker != null) {
+                workerActiveAssignments = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
+                        worker.getWorkerId(),
+                        List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING)
+                );
+            }
+        }
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
         List<Shift> activeShifts = shiftRepository.findByStatus(ShiftStatus.ACTIVE);
         List<NearbyShiftResponseDto> nearbyList = new ArrayList<>();
 
@@ -370,6 +438,25 @@ public class WorkerJobService {
             double distance = MatchingDispatchService.calculateDistance(centerLat, centerLng, sLat, sLng);
             if (distance <= searchRadius) {
                 Event e = s.getEvent();
+
+                // Kiểm tra xung đột trùng ca
+                boolean isConflicting = false;
+                String conflictReason = null;
+                if (!workerActiveAssignments.isEmpty() && s.getStartTime() != null && s.getEndTime() != null) {
+                    for (ShiftAssignment activeAssign : workerActiveAssignments) {
+                        Shift existingShift = activeAssign.getShift();
+                        if (existingShift != null && existingShift.getStartTime() != null && existingShift.getEndTime() != null) {
+                            if (s.getStartTime().isBefore(existingShift.getEndTime()) && s.getEndTime().isAfter(existingShift.getStartTime())) {
+                                isConflicting = true;
+                                String cJob = existingShift.getJobType() != null ? existingShift.getJobType() : "Ca làm việc";
+                                String cRange = fmt.format(existingShift.getStartTime()) + " - " + fmt.format(existingShift.getEndTime());
+                                conflictReason = "Trùng giờ với " + cJob + " (" + cRange + ")";
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 nearbyList.add(NearbyShiftResponseDto.builder()
                         .shiftId(s.getShiftId())
                         .eventId(e != null ? e.getEventId() : null)
@@ -388,6 +475,8 @@ public class WorkerJobService {
                         .confirmedWorkers(s.getConfirmedWorkers())
                         .remainingWorkers(s.getRemainingWorkers())
                         .imageUrl(s.getImageUrl())
+                        .isConflicting(isConflicting)
+                        .conflictReason(conflictReason)
                         .build());
             }
         }
@@ -421,7 +510,17 @@ public class WorkerJobService {
         List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
                 worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
         if (!conflicts.isEmpty()) {
-            throw new BadRequestException("Bạn đã có một ca làm việc khác trùng khung giờ với ca này!");
+            ShiftAssignment conflict = conflicts.get(0);
+            Shift cShift = conflict.getShift();
+            String cJob = cShift != null ? cShift.getJobType() : "Ca làm việc";
+            String cEvent = (cShift != null && cShift.getEvent() != null) ? cShift.getEvent().getName() : "";
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+            String timeRange = (cShift != null && cShift.getStartTime() != null && cShift.getEndTime() != null)
+                    ? fmt.format(cShift.getStartTime()) + " - " + fmt.format(cShift.getEndTime())
+                    : "";
+            throw new BadRequestException(String.format(
+                    "Không thể nhận ca: Bạn đã có ca làm việc khác trùng khung giờ (\"%s\" - %s, %s). Mỗi thời điểm chỉ được làm 1 ca duy nhất!",
+                    cJob, cEvent, timeRange));
         }
 
         int updatedRows = shiftRepository.incrementConfirmedWorkersAtomic(shiftId);
@@ -602,9 +701,13 @@ public class WorkerJobService {
             if (prog != null && Boolean.TRUE.equals(prog.getIsCompleted())) {
                 item.setIsCompleted(true);
                 item.setCompletedAt(prog.getCompletedAt());
+                item.setEvidenceImageUrl(prog.getEvidenceImageUrl());
+                item.setEvidenceSubmittedAt(prog.getEvidenceSubmittedAt());
             } else {
                 item.setIsCompleted(false);
                 item.setCompletedAt(null);
+                item.setEvidenceImageUrl(null);
+                item.setEvidenceSubmittedAt(null);
             }
         }
 
@@ -636,9 +739,18 @@ public class WorkerJobService {
                     Instant completedAt = completed
                             ? (incoming.getCompletedAt() != null ? incoming.getCompletedAt() : now)
                             : null;
+                    String evidenceUrl = (incoming.getEvidenceImageUrl() != null && !incoming.getEvidenceImageUrl().isBlank())
+                            ? incoming.getEvidenceImageUrl().trim()
+                            : null;
+                    Instant evidenceSubmittedAt = evidenceUrl != null
+                            ? (incoming.getEvidenceSubmittedAt() != null ? incoming.getEvidenceSubmittedAt() : now)
+                            : null;
+
                     progressMap.put(itemId, ChecklistProgressDto.builder()
                             .isCompleted(completed)
                             .completedAt(completedAt)
+                            .evidenceImageUrl(evidenceUrl)
+                            .evidenceSubmittedAt(evidenceSubmittedAt)
                             .build());
                 }
             }
@@ -658,9 +770,13 @@ public class WorkerJobService {
             if (prog != null && Boolean.TRUE.equals(prog.getIsCompleted())) {
                 item.setIsCompleted(true);
                 item.setCompletedAt(prog.getCompletedAt());
+                item.setEvidenceImageUrl(prog.getEvidenceImageUrl());
+                item.setEvidenceSubmittedAt(prog.getEvidenceSubmittedAt());
             } else {
                 item.setIsCompleted(false);
                 item.setCompletedAt(null);
+                item.setEvidenceImageUrl(null);
+                item.setEvidenceSubmittedAt(null);
             }
         }
 
@@ -683,15 +799,22 @@ public class WorkerJobService {
                     result.add(ShiftChecklistItemDto.builder()
                             .id("chk_" + index)
                             .title(node.asText())
+                            .instruction("Thực hiện đầy đủ theo hướng dẫn của quản lý ca và chụp ảnh bằng chứng hoàn thành.")
+                            .isRequiredEvidence(true)
                             .isCompleted(false)
                             .build());
                     index++;
                 } else if (node.isObject()) {
                     String id = node.hasNonNull("id") ? node.get("id").asText() : ("chk_" + index);
                     String title = node.hasNonNull("title") ? node.get("title").asText() : "";
+                    String instruction = node.hasNonNull("instruction") ? node.get("instruction").asText()
+                            : "Thực hiện đầy đủ theo hướng dẫn của quản lý ca và chụp ảnh bằng chứng hoàn thành.";
+                    Boolean isRequired = node.hasNonNull("isRequiredEvidence") ? node.get("isRequiredEvidence").asBoolean() : true;
                     result.add(ShiftChecklistItemDto.builder()
                             .id(id)
                             .title(title)
+                            .instruction(instruction)
+                            .isRequiredEvidence(isRequired)
                             .isCompleted(false)
                             .build());
                     index++;
@@ -907,6 +1030,50 @@ public class WorkerJobService {
                 .build();
     }
 
+    public String uploadProofImage(org.springframework.web.multipart.MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Tệp ảnh bằng chứng không được để trống");
+        }
+        String originalFilename = file.getOriginalFilename();
+        String ext = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        }
+        if (!ALLOWED_IMAGE_EXTS.contains(ext)) {
+            throw new BadRequestException("Chỉ chấp nhận các định dạng ảnh: " + String.join(", ", ALLOWED_IMAGE_EXTS));
+        }
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new BadRequestException("Dung lượng ảnh bằng chứng không được vượt quá 10MB");
+        }
+        try {
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(PROOF_UPLOAD_DIR);
+            if (!java.nio.file.Files.exists(uploadPath)) {
+                java.nio.file.Files.createDirectories(uploadPath);
+            }
+            String savedFilename = "proof_" + UUID.randomUUID().toString().replace("-", "") + "." + ext;
+            java.nio.file.Path targetPath = uploadPath.resolve(savedFilename);
+            java.nio.file.Files.copy(file.getInputStream(), targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return "/api/v1/workers/proof/" + savedFilename;
+        } catch (java.io.IOException e) {
+            log.error("Lỗi khi lưu tệp ảnh bằng chứng nghiệm thu ca làm: {}", e.getMessage(), e);
+            throw new BadRequestException("Không thể lưu tệp ảnh: " + e.getMessage());
+        }
+    }
+
+    public org.springframework.core.io.Resource loadProofImage(String filename) {
+        try {
+            java.nio.file.Path filePath = java.nio.file.Paths.get(PROOF_UPLOAD_DIR).resolve(filename).normalize();
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            } else {
+                throw new BadRequestException("Không tìm thấy tệp ảnh bằng chứng: " + filename);
+            }
+        } catch (java.net.MalformedURLException e) {
+            throw new BadRequestException("Đường dẫn tệp ảnh không hợp lệ: " + filename);
+        }
+    }
+
     private ShiftAssignmentResponseDto mapToAssignmentDto(ShiftAssignment a) {
         Shift s = a.getShift();
         Event e = s != null ? s.getEvent() : null;
@@ -942,6 +1109,8 @@ public class WorkerJobService {
                 .hoursWorked(attendanceOpt.map(AttendanceLog::getHoursWorked).orElse(BigDecimal.ZERO))
                 .createdAt(a.getCreatedAt())
                 .imageUrl(s != null ? s.getImageUrl() : null)
+                .proofImageUrl(attendanceOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
+                .proofSubmittedAt(attendanceOpt.map(AttendanceLog::getProofSubmittedAt).orElse(null))
                 .build();
     }
 }

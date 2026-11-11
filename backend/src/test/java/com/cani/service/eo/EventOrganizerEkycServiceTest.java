@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.eo;
+
+import com.cani.service.*;
 
 import com.cani.client.ekyc.EkycProvider;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;

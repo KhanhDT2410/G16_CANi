@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.admin;
+
+import com.cani.service.*;
 
 import com.cani.dto.admin.revenue.RevenueAnalyticsResponseDto;
 import com.cani.dto.admin.revenue.RevenueSummaryResponseDto;

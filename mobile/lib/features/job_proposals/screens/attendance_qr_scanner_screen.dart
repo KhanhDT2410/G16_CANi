@@ -9,11 +9,13 @@ import '../models/proposal_models.dart';
 class AttendanceQrScannerScreen extends ConsumerStatefulWidget {
   final ShiftAssignmentItem assignment;
   final bool isCheckin; // true: Check-in, false: Check-out
+  final String? proofImageUrl;
 
   const AttendanceQrScannerScreen({
     super.key,
     required this.assignment,
     required this.isCheckin,
+    this.proofImageUrl,
   });
 
   @override
@@ -28,6 +30,37 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
 
   bool _isProcessing = false;
   bool _isFlashOn = false;
+  double? _distanceMeters;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkDistance();
+  }
+
+  Future<void> _checkDistance() async {
+    final vLat = widget.assignment.venueLat;
+    final vLng = widget.assignment.venueLng;
+    if (vLat == null || vLng == null) {
+      return;
+    }
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 5),
+        ),
+      );
+      final dist = Geolocator.distanceBetween(pos.latitude, pos.longitude, vLat, vLng);
+      if (mounted) {
+        setState(() {
+          _distanceMeters = dist;
+        });
+      }
+    } catch (_) {
+      // Ignored
+    }
+  }
 
   @override
   void dispose() {
@@ -105,6 +138,7 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
           qrContent: rawValue.trim(),
           lat: lat,
           lng: lng,
+          proofImageUrl: widget.proofImageUrl,
         );
       }
 
@@ -297,6 +331,69 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
           MobileScanner(
             controller: _controller,
             onDetect: _handleBarcodeDetected,
+          ),
+
+          // Banner Cảnh báo khoảng cách GPS Geofence
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Column(
+              children: [
+                if (_distanceMeters != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _distanceMeters! > 200
+                          ? const Color(0xFFDC2626).withValues(alpha: 0.92)
+                          : const Color(0xFF16A34A).withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 3)),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _distanceMeters! > 200 ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _distanceMeters! > 200
+                                ? 'Cảnh báo: Bạn đang cách địa điểm ${_distanceMeters! >= 1000 ? "${(_distanceMeters! / 1000).toStringAsFixed(1)}km" : "${_distanceMeters!.toInt()}m"} (vượt quá 200m). Hãy đến gần sự kiện để điểm danh!'
+                                : 'Vị trí hợp lệ: Đang ở trong bán kính sự kiện (${_distanceMeters!.toInt()}m)',
+                            style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (widget.proofImageUrl != null) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.image, color: Colors.white, size: 14),
+                        SizedBox(width: 6),
+                        Text(
+                          'Đã đính kèm ảnh bằng chứng nghiệm thu',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
 
           // 2. Scanner Overlay & Bounding Box

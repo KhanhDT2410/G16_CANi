@@ -135,9 +135,10 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
         SupabaseSession session = null;
         try {
-            session = supabaseAuthClient.signInWithPassword(request.getEmail(), request.getPassword());
+            session = supabaseAuthClient.signInWithPassword(email, request.getPassword());
         } catch (Exception e) {
             log.warn("Supabase GoTrue auth failed or unreachable: {}. Falling back to local check...", e.getMessage());
         }
@@ -154,7 +155,7 @@ public class AuthService {
             expiresIn = session.getExpiresIn();
         } else if (environment.acceptsProfiles(Profiles.of("h2"))) {
             // Chỉ profile h2 (dev offline, H2DataSeeder) được phép fallback dev-token.
-            User localUser = userRepository.findByEmail(request.getEmail())
+            User localUser = userRepository.findByEmail(email)
                     .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không chính xác"));
             userId = localUser.getUserId();
             accessToken = "dev-token-" + userId;
@@ -162,13 +163,13 @@ public class AuthService {
             expiresIn = 86400L;
         } else {
             // ponytail: Supabase không thể đạt ở prod/dev-thẳng-Supabase → 503 thay vì dev-token (auth bypass).
-            log.error("Supabase GoTrue không khả dụng, không thể cấp token cho {}", request.getEmail());
+            log.error("Supabase GoTrue không khả dụng, không thể cấp token cho {}", email);
             throw new AppException("Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại sau.",
                     org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         User user = userRepository.findById(userId)
-                .or(() -> userRepository.findByEmail(request.getEmail()))
+                .or(() -> userRepository.findByEmail(email))
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy thông tin tài khoản trong hệ thống"));
 
         if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
@@ -308,7 +309,8 @@ public class AuthService {
 
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        emailOtpService.sendOtp(request.getEmail(), "RESET_PASSWORD");
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        emailOtpService.sendOtp(email, "RESET_PASSWORD");
     }
 
     @Transactional

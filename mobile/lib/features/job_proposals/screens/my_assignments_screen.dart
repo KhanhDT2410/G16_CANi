@@ -9,9 +9,9 @@ import '../widgets/job_proposal_invite_card.dart';
 import '../widgets/payment_confirm_dialog.dart';
 import '../widgets/rate_eo_dialog.dart';
 import '../widgets/shift_assignment_card.dart';
-import '../widgets/shift_checklist_sheet.dart';
 import '../widgets/shift_navigation_sheet.dart';
 import 'attendance_qr_scanner_screen.dart';
+import 'shift_detail_execution_screen.dart';
 
 class MyAssignmentsScreen extends ConsumerStatefulWidget {
   const MyAssignmentsScreen({super.key});
@@ -250,13 +250,16 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
-  void _openChecklistSheet(ShiftAssignmentItem a) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ShiftChecklistSheet(assignment: a),
+  Future<void> _openExecutionScreen(ShiftAssignmentItem a) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShiftDetailExecutionScreen(assignment: a),
+      ),
     );
+    if (updated == true) {
+      _loadAllData();
+    }
   }
 
   Future<void> _openCancelDialog(ShiftAssignmentItem a) async {
@@ -639,10 +642,11 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
 
         return ShiftAssignmentCard(
           assignment: item,
+          onTap: () => _openExecutionScreen(item),
           onNavigate: () => _openNavigationSheet(item),
           onQrScan: () => _openQrScanner(item, !isCheckedIn),
           onConfirmPayment: () => _openPaymentDialog(item),
-          onOpenChecklist: () => _openChecklistSheet(item),
+          onOpenChecklist: () => _openExecutionScreen(item),
           onCancelAssignment: () => _openCancelDialog(item),
           onRateOrganizer: () => _openRateDialog(item),
         );

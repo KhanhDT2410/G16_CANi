@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.auth;
+
+import com.cani.service.*;
 
 import com.cani.entity.EmailOtpVerification;
 import com.cani.exception.BadRequestException;

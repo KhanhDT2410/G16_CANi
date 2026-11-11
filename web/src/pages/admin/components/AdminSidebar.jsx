@@ -78,7 +78,6 @@ export const AdminSidebar = ({
       <div className="admin-sidebar-header">
         {!collapsed && (
           <div className="admin-sidebar-brand">
-            <span className="sidebar-brand-badge">QUẢN TRỊ</span>
             <span className="sidebar-brand-title">Cổng Quản Trị</span>
           </div>
         )}

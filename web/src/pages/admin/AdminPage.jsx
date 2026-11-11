@@ -124,10 +124,7 @@ const AdminPage = () => {
       <main className="admin-main-wrapper">
         <header className="admin-topbar">
           <div className="admin-topbar-left">
-            <h1 className="admin-topbar-title">
-              {currentMeta.title}
-              <span className="admin-badge">QUẢN TRỊ VIÊN</span>
-            </h1>
+            <h1 className="admin-topbar-title">{currentMeta.title}</h1>
             <p className="admin-topbar-subtitle">{currentMeta.subtitle}</p>
           </div>
         </header>

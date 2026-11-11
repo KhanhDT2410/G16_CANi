@@ -76,10 +76,7 @@ export const CustomerCarePage = () => {
       <main className="cc-main-wrapper">
         <header className="cc-topbar">
           <div className="cc-topbar-left">
-            <h1 className="cc-topbar-title">
-              {currentMeta.title}
-              <span className="cc-role-badge">CHĂM SÓC KHÁCH HÀNG</span>
-            </h1>
+            <h1 className="cc-topbar-title">{currentMeta.title}</h1>
             <p className="cc-topbar-subtitle">{currentMeta.subtitle}</p>
           </div>
         </header>

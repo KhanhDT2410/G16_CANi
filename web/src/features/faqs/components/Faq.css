@@ -1095,3 +1095,332 @@
   background: #fee2e2;
 }
 
+
+
+/* ==========================================================================
+   Giao diện Soạn Thảo FAQ Dạng Card Toàn Màn Hình (SRS UC-110 / ADM-08)
+   ========================================================================== */
+
+.faq-editor-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0.5rem 0 3rem 0;
+}
+
+.faq-editor-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.faq-editor-heading {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.faq-top-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Nút Lưu bản nháp (theo ảnh mẫu) */
+.faq-btn-draft {
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.faq-btn-draft:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+/* Nút Gửi duyệt / Xuất bản (nút xanh nổi bật theo ảnh mẫu) */
+.faq-btn-submit {
+  background: #1d4ed8;
+  color: #ffffff;
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  padding: 0.55rem 1.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.25);
+  transition: all 0.2s ease;
+}
+
+.faq-btn-submit:hover:not(:disabled) {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+/* Nút Quay lại bài viết của tôi (theo ảnh mẫu) */
+.faq-btn-back {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.faq-btn-back:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+/* Card form bài viết trắng */
+.faq-editor-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.faq-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.faq-field-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.faq-field-label .req {
+  color: #dc2626;
+  margin-left: 0.2rem;
+}
+
+.faq-field-counter {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.faq-form-input,
+.faq-form-textarea {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.92rem;
+  color: #1e293b;
+  background: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.faq-form-input:focus,
+.faq-form-textarea:focus {
+  border-color: #3b82f6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.faq-form-textarea {
+  resize: vertical;
+  min-height: 70px;
+  line-height: 1.5;
+}
+
+/* Thumbnail Picker */
+.faq-thumbnail-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.faq-thumbnail-box {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 1.15rem;
+  background: #fbfcfe;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.faq-thumbnail-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.faq-native-file-input {
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.faq-uploading-text {
+  font-size: 0.82rem;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.faq-thumbnail-hint {
+  font-size: 0.825rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.faq-thumbnail-error {
+  font-size: 0.825rem;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.faq-thumbnail-preview-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.faq-thumbnail-preview {
+  max-width: 180px;
+  max-height: 120px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  object-fit: cover;
+}
+
+.faq-thumbnail-remove-btn {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.faq-thumbnail-remove-btn:hover {
+  background: #fca5a5;
+}
+
+/* Rich Text Editor */
+.faq-rich-editor {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.faq-rich-editor:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.faq-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.45rem 0.65rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.faq-toolbar-select {
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.82rem;
+  color: #334155;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.faq-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: #cbd5e1;
+  margin: 0 0.25rem;
+}
+
+.faq-editor-toolbar button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  width: 30px;
+  height: 30px;
+  font-size: 0.9rem;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.faq-editor-toolbar button:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.faq-editor-content {
+  padding: 0.85rem 1rem;
+  min-height: 220px;
+  max-height: 600px;
+  overflow-y: auto;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: #1e293b;
+  outline: none;
+}
+
+.faq-editor-content[data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+/* Tệp đính kèm */
+.faq-form-field-attachment {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Hộp hiển thị tóm tắt trong thẻ Accordion */
+.faq-summary-box {
+  background: #f8fafc;
+  border-left: 3px solid #2563eb;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.9rem;
+  color: #334155;
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}

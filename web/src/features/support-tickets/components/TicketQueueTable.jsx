@@ -1,16 +1,27 @@
 import {
   TICKET_STATUS_CONFIG,
   TICKET_CATEGORY_CONFIG,
-  TICKET_PRIORITY_CONFIG,
 } from '../types/ticket.constants';
+import { DEMO_PREVIEW_TICKETS } from '../types/demoTickets.constants';
 
+/**
+ * Bảng hàng đợi Phiếu Hỗ Trợ Khách Hàng cho CSKH / Quản trị viên.
+ * - Mã phiếu xuống dòng gọn gàng, ưu tiên chiều dọc để không bị cuộn ngang màn hình.
+ * - Cột Thao Tác căn sát lề trái.
+ * - Thứ tự nút: Xem Phiếu -> Chat Trực Tiếp -> Tiếp Nhận.
+ * Tiêu chuẩn < 200 dòng theo AGENTS.md.
+ */
 export const TicketQueueTable = ({
   tickets,
   onOpenDetail,
+  onOpenChat,
   onAssign,
   onOpenTransferModal,
   loading,
 }) => {
+  const isPreviewMode = !loading && (!tickets || tickets.length === 0);
+  const displayTickets = isPreviewMode ? DEMO_PREVIEW_TICKETS : tickets;
+
   const formatDateTime = (isoStr) => {
     if (!isoStr) return '—';
     return new Date(isoStr).toLocaleString('vi-VN', {
@@ -22,68 +33,124 @@ export const TicketQueueTable = ({
     return <div className="ticket-empty-state">Đang tải danh sách hàng đợi phiếu hỗ trợ...</div>;
   }
 
-  if (!tickets || tickets.length === 0) {
-    return <div className="ticket-empty-state">Không có phiếu hỗ trợ nào trong hàng đợi.</div>;
-  }
-
   return (
     <div className="tickets-table-wrapper">
+      {isPreviewMode && (
+        <div className="ticket-preview-notice">
+          <strong>Chế độ mô phỏng layout:</strong> Đang hiển thị 3 phiếu hỗ trợ mẫu kèm kênh chat Messenger trực tiếp (Khi CSDL có dữ liệu thực tế, hệ thống sẽ tự động hiển thị dữ liệu thật).
+        </div>
+      )}
+
       <table className="tickets-table">
         <thead>
           <tr>
-            <th>Mã Phiếu</th>
-            <th>Danh Mục</th>
-            <th>Độ Ưu Tiên</th>
-            <th>Tiêu Đề</th>
-            <th>Trạng Thái</th>
-            <th>Hạn SLA</th>
-            <th>Chuyên Viên</th>
-            <th style={{ textAlign: 'right' }}>Thao Tác</th>
+            <th style={{ width: '85px' }}>Mã Phiếu</th>
+            <th style={{ minWidth: '150px' }}>Khách Hàng (SĐT / Email)</th>
+            <th style={{ minWidth: '110px' }}>Danh Mục</th>
+            <th style={{ minWidth: '180px' }}>Tiêu Đề Yêu Cầu</th>
+            <th style={{ width: '90px' }}>Trạng Thái</th>
+            <th style={{ width: '105px' }}>Hạn SLA</th>
+            <th style={{ minWidth: '120px' }}>Chuyên Viên</th>
+            <th style={{ textAlign: 'left', minWidth: '190px' }}>Thao Tác</th>
           </tr>
         </thead>
         <tbody>
-          {tickets.map((t) => {
+          {displayTickets.map((t) => {
             const statusConfig = TICKET_STATUS_CONFIG[t.status] || { label: t.status, badgeClass: '' };
-            const priorityConfig = TICKET_PRIORITY_CONFIG[t.priority] || { label: t.priority, badgeClass: '' };
             const categoryConfig = TICKET_CATEGORY_CONFIG[t.category] || { label: t.category };
 
             return (
               <tr key={t.id}>
-                <td>
-                  <span className="ticket-reference">{t.referenceNo}</span>
+                {/* Mã phiếu xuống dòng gọn gàng theo chiều dọc */}
+                <td style={{ width: '85px' }}>
+                  <div className="ticket-ref-cell">
+                    {t.referenceNo ? (
+                      t.referenceNo.split('-').map((part, idx, arr) => (
+                        <span key={idx} className="ticket-ref-line">
+                          {part}{idx < arr.length - 1 ? '-' : ''}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="ticket-reference">—</span>
+                    )}
+                  </div>
                 </td>
+
+                {/* Cột thông tin khách hàng: Tên, SĐT, Email */}
+                <td>
+                  <div className="ticket-customer-cell">
+                    <div className="ticket-customer-name">{t.userName || 'Khách hàng'}</div>
+                    <div className="ticket-customer-contact">
+                      <span>SĐT: {t.userPhone || '—'}</span>
+                      <span className="ticket-customer-sep">·</span>
+                      <span>{t.userEmail || '—'}</span>
+                    </div>
+                  </div>
+                </td>
+
                 <td>{categoryConfig.label}</td>
-                <td>
-                  <span className={`ticket-badge ${priorityConfig.badgeClass}`}>
-                    {priorityConfig.label}
-                  </span>
-                </td>
-                <td style={{ maxWidth: '260px', fontWeight: 500 }}>
-                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+
+                {/* Tiêu đề yêu cầu: Tự động xuống dòng tự nhiên */}
+                <td style={{ minWidth: '180px', maxWidth: '320px' }}>
+                  <div className="ticket-subject-cell">
                     {t.subject}
                   </div>
                 </td>
+
                 <td>
                   <span className={`ticket-badge ${statusConfig.badgeClass}`}>
                     {statusConfig.label}
                   </span>
                 </td>
+
+                {/* Hạn SLA kèm cảnh báo nhỏ nhắn "Sắp hết hạn" */}
                 <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    <span>{formatDateTime(t.slaDeadline)}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.84rem', color: '#1e293b' }}>
+                      {formatDateTime(t.slaDeadline)}
+                    </span>
                     {t.slaAtRisk && (
-                      <span className="ticket-badge-risk" style={{ alignSelf: 'flex-start' }}>
-                        SLA Nguy Cơ
+                      <span className="ticket-badge-sla-warning">
+                        Sắp hết hạn
                       </span>
                     )}
                   </div>
                 </td>
-                <td style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                  {t.assignedTo ? t.assignedTo.substring(0, 8) + '...' : 'Chưa nhận'}
+
+                {/* Chuyên viên tiếp nhận: Tên to đậm, phân quyền ( CSKH ) ở dòng dưới */}
+                <td style={{ minWidth: '120px' }}>
+                  {t.assignedName || (t.assignedTo && t.assignedTo !== 'Chưa nhận') ? (
+                    <div className="ticket-staff-cell">
+                      <div className="ticket-staff-name">
+                        {t.assignedName || t.assignedTo}
+                      </div>
+                      <div className="ticket-staff-role">
+                        {t.assignedRole ? `( ${t.assignedRole} )` : '( CSKH )'}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="ticket-staff-unassigned">Chưa nhận</span>
+                  )}
                 </td>
-                <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
-                    {t.status === 'OPEN' && (
+
+                {/* Nút thao tác: Sát về lề trái; Thứ tự: Xem Phiếu -> Chat Trực Tiếp -> Tiếp Nhận */}
+                <td style={{ textAlign: 'left' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="ticket-btn ticket-btn-secondary ticket-btn-sm"
+                      onClick={() => onOpenDetail(t.id, t)}
+                    >
+                      Xem Phiếu
+                    </button>
+                    <button
+                      type="button"
+                      className="ticket-btn ticket-btn-chat ticket-btn-sm"
+                      onClick={() => onOpenChat(t)}
+                    >
+                      Chat Trực Tiếp
+                    </button>
+                    {t.status === 'OPEN' && !t.assignedTo && onAssign && (
                       <button
                         type="button"
                         className="ticket-btn ticket-btn-secondary ticket-btn-sm"
@@ -92,22 +159,6 @@ export const TicketQueueTable = ({
                         Tiếp Nhận
                       </button>
                     )}
-                    {t.status !== 'CLOSED' && onOpenTransferModal && (
-                      <button
-                        type="button"
-                        className="ticket-btn ticket-btn-secondary ticket-btn-sm"
-                        onClick={() => onOpenTransferModal(t)}
-                      >
-                        Chuyển
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="ticket-btn ticket-btn-primary ticket-btn-sm"
-                      onClick={() => onOpenDetail(t.id)}
-                    >
-                      Chi Tiết
-                    </button>
                   </div>
                 </td>
               </tr>

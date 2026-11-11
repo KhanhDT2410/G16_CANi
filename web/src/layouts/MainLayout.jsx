@@ -161,8 +161,8 @@ const MainLayout = () => {
         </div>
       </footer>
 
-      {/* Bong bóng chat hỗ trợ trực tuyến toàn sàn (ADM-04) */}
-      <SupportChatWidget />
+      {/* Bong bóng chat hỗ trợ trực tuyến toàn sàn - chỉ hiển thị cho Người dùng / EO, ẩn trên Admin và CSKH */}
+      {!isStaff && <SupportChatWidget />}
     </div>
   );
 };

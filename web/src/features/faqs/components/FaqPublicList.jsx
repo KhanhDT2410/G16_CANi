@@ -107,7 +107,16 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                 </button>
                 {isExpanded && (
                   <div className="faq-accordion-body">
-                    <div className="faq-acc-answer">{faq.answer}</div>
+                    {faq.summary && (
+                      <div className="faq-summary-box">
+                        <strong>Tóm tắt:</strong> {faq.summary}
+                      </div>
+                    )}
+                    {/<[a-z][\s\S]*>/i.test(faq.answer || '') ? (
+                      <div className="faq-acc-answer" dangerouslySetInnerHTML={{ __html: faq.answer }} />
+                    ) : (
+                      <div className="faq-acc-answer">{faq.answer}</div>
+                    )}
                     {(faq.imageUrl || faq.attachmentUrl) && (
                       <div className="faq-attachments-container">
                         {faq.imageUrl && (

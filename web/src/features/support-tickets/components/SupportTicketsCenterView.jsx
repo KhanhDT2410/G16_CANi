@@ -6,11 +6,12 @@ import TicketToolbar from './TicketToolbar';
 import TicketQueueTable from './TicketQueueTable';
 import MyTicketsTable from './MyTicketsTable';
 import TicketModalsGroup from './TicketModalsGroup';
+import StaffMessengerDock from './StaffMessengerDock';
 import './SupportTickets.css';
 
 /**
  * Màn hình Trung tâm Phiếu Hỗ Trợ Khách Hàng (ADM-02).
- * Hỗ trợ đồng bộ bộ lọc trạng thái từ thanh Sidebar chính.
+ * Tích hợp kênh Live Chat Messenger 2 chiều ngay góc dưới màn hình.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterChange: propOnFilterChange }) => {
@@ -37,6 +38,7 @@ export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterCha
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [activeTicket, setActiveTicket] = useState(null);
+  const [activeChatTicket, setActiveChatTicket] = useState(null);
 
   const stats = useMemo(() => {
     const total = queue.length;
@@ -63,7 +65,12 @@ export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterCha
     });
   }, [queue, myQueue, isStaff, activeFilter, searchTerm]);
 
-  const handleOpenDetail = async (id) => {
+  const handleOpenDetail = async (id, fallbackTicket = null) => {
+    if (String(id).startsWith('demo-') && fallbackTicket) {
+      setSelectedTicket(fallbackTicket);
+      setIsDetailModalOpen(true);
+      return;
+    }
     const detail = await loadTicketDetail(id);
     if (detail) setIsDetailModalOpen(true);
   };
@@ -95,7 +102,7 @@ export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterCha
           <div className="tickets-title">Trung Tâm Phiếu Hỗ Trợ Khách Hàng</div>
           <div className="tickets-subtitle">
             {isStaff
-              ? 'Hàng đợi tiếp nhận và giải quyết yêu cầu kỹ thuật, thanh toán và tài khoản'
+              ? 'Hàng đợi tiếp nhận phiếu, phản hồi trực tiếp và kết nối kênh chat Messenger thời gian thực'
               : 'Gửi yêu cầu hỗ trợ đến ban quản trị và theo dõi tiến độ xử lý'}
           </div>
         </div>
@@ -127,6 +134,7 @@ export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterCha
         <TicketQueueTable
           tickets={filteredQueue}
           onOpenDetail={handleOpenDetail}
+          onOpenChat={(t) => setActiveChatTicket(t)}
           onAssign={(id) => assignTicket(id)}
           onOpenTransferModal={handleOpenTransferModal}
           loading={loading}
@@ -167,6 +175,15 @@ export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterCha
         }}
         loading={loading}
       />
+
+      {/* Khung chat Messenger ở góc dưới màn hình */}
+      {isStaff && (
+        <StaffMessengerDock
+          activeChat={activeChatTicket}
+          onClose={() => setActiveChatTicket(null)}
+          onOpenTicket={(t) => handleOpenDetail(t.id, t)}
+        />
+      )}
     </div>
   );
 };

@@ -231,6 +231,7 @@ class ProposalRepository {
     required String qrContent,
     double? lat,
     double? lng,
+    String? proofImageUrl,
     String? token,
   }) async {
     try {
@@ -243,6 +244,7 @@ class ProposalRepository {
           'qrContent': qrContent,
           'lat': lat,
           'lng': lng,
+          if (proofImageUrl != null && proofImageUrl.isNotEmpty) 'proofImageUrl': proofImageUrl,
         },
         options: options,
       );
@@ -255,6 +257,30 @@ class ProposalRepository {
       );
     } catch (e) {
       throw RepositoryException(_extractErrorMessage(e, 'Điểm danh Check-out thất bại. Vui lòng quét lại mã QR.'), e);
+    }
+  }
+
+  // Tải ảnh bằng chứng nghiệm thu hoàn thành ca làm
+  Future<String> uploadProofImage(String filePath, {String? token}) async {
+    try {
+      final fileName = filePath.split(RegExp(r'[\\/]')).last;
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      });
+      final options = Options(
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+      );
+      final response = await _dio.post(
+        '/v1/workers/upload-proof',
+        data: formData,
+        options: options,
+      );
+      if (response.data != null && response.data['data'] != null && response.data['data']['url'] != null) {
+        return response.data['data']['url'] as String;
+      }
+      throw RepositoryException('Không nhận được đường dẫn ảnh sau khi tải lên.');
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Tải ảnh bằng chứng thất bại. Vui lòng thử lại.'), e);
     }
   }
 

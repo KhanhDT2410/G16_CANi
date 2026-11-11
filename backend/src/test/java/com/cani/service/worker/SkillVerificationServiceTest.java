@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.worker;
+
+import com.cani.service.*;
 
 import com.cani.client.skill.SkillVisionAiClient;
 import com.cani.dto.skill.*;

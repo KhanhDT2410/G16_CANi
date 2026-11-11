@@ -5,6 +5,9 @@ export const DEFAULT_NEW_EVENT = {
   venueLat: 10.7328,
   venueLng: 106.7214,
   eventDate: '2026-11-20T08:00:00Z',
+  startTime: '2026-11-20T08:00',
+  endTime: '2026-11-20T22:00',
+  imageUrl: '',
   mode: 'MATCHING',
 };
 

@@ -6,6 +6,7 @@ import '../auth.css';
 export const RegisterForm = () => {
   const {
     formData,
+    fieldErrors,
     isLoading,
     isSendingOtp,
     otpSent,
@@ -13,11 +14,13 @@ export const RegisterForm = () => {
     errorMessage,
     successMessage,
     showPassword,
+    showConfirmPassword,
     handleChange,
     handleSendOtp,
     handleGoogleLogin,
     handleSubmit,
     toggleShowPassword,
+    toggleShowConfirmPassword,
   } = useRegister();
 
   return (
@@ -26,7 +29,7 @@ export const RegisterForm = () => {
         <CaniLogo variant="full" height={52} className="auth-logo-center" />
         <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng Ký Nhà Tổ Chức</h2>
         <p className="auth-subtitle">
-          Tạo tài khoản dành riêng cho Nhà Tổ Chức Sự Kiện trên CANi
+          Tạo tài khoản dành riêng cho Nhà Tổ Chức Sự Kiện trên CANi Web Portal
         </p>
       </div>
 
@@ -84,7 +87,7 @@ export const RegisterForm = () => {
       </button>
 
       <div className="auth-divider" style={{ margin: '1rem 0' }}>
-        <span>Hoặc đăng ký bằng Email & Xác thực OTP</span>
+        <span>Hoặc đăng ký bằng Email & Xác thực OTP 1 màn hình</span>
       </div>
 
       {errorMessage && (
@@ -162,6 +165,7 @@ export const RegisterForm = () => {
           </div>
         </div>
 
+        {/* Họ và tên đại diện */}
         <div className="form-group">
           <label className="form-label" htmlFor="fullName">
             {formData.organizerType === 'ENTERPRISE' ? 'Họ và tên người đại diện pháp luật *' : 'Họ và tên người tổ chức sự kiện *'}
@@ -170,7 +174,7 @@ export const RegisterForm = () => {
             id="fullName"
             name="fullName"
             type="text"
-            className="form-input"
+            className={`form-input ${fieldErrors.fullName ? 'input-error' : ''}`}
             placeholder="Nguyễn Văn Đại Diện"
             value={formData.fullName}
             onChange={handleChange}
@@ -178,8 +182,12 @@ export const RegisterForm = () => {
             disabled={isLoading}
             required
           />
+          {fieldErrors.fullName && (
+            <div className="field-error-text">⚠️ {fieldErrors.fullName}</div>
+          )}
         </div>
 
+        {/* Thông tin Doanh nghiệp / Hộ kinh doanh */}
         {formData.organizerType === 'ENTERPRISE' ? (
           <div className="form-row">
             <div className="form-group" style={{ flex: 1 }}>
@@ -190,13 +198,16 @@ export const RegisterForm = () => {
                 id="companyName"
                 name="companyName"
                 type="text"
-                className="form-input"
-                placeholder="VD: Hộ kinh doanh Sự Kiện CANi"
+                className={`form-input ${fieldErrors.companyName ? 'input-error' : ''}`}
+                placeholder="VD: Công ty TNHH Sự Kiện CANi"
                 value={formData.companyName}
                 onChange={handleChange}
                 disabled={isLoading}
                 required
               />
+              {fieldErrors.companyName && (
+                <div className="field-error-text">⚠️ {fieldErrors.companyName}</div>
+              )}
             </div>
 
             <div className="form-group" style={{ flex: 1 }}>
@@ -207,13 +218,16 @@ export const RegisterForm = () => {
                 id="taxId"
                 name="taxId"
                 type="text"
-                className="form-input"
+                className={`form-input ${fieldErrors.taxId ? 'input-error' : ''}`}
                 placeholder="VD: 0109876543"
                 value={formData.taxId}
                 onChange={handleChange}
                 disabled={isLoading}
                 required
               />
+              {fieldErrors.taxId && (
+                <div className="field-error-text">⚠️ {fieldErrors.taxId}</div>
+              )}
             </div>
           </div>
         ) : (
@@ -234,6 +248,7 @@ export const RegisterForm = () => {
           </div>
         )}
 
+        {/* Flow 1 màn hình: Email & Ô nhập mã xác thực OTP từ Email */}
         <div className="form-row">
           <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label" htmlFor="email">
@@ -244,7 +259,7 @@ export const RegisterForm = () => {
                 id="email"
                 name="email"
                 type="email"
-                className="form-input"
+                className={`form-input ${fieldErrors.email ? 'input-error' : ''}`}
                 placeholder="contact@company.com"
                 value={formData.email}
                 onChange={handleChange}
@@ -272,34 +287,50 @@ export const RegisterForm = () => {
                 {isSendingOtp ? 'Đang gửi...' : countdown > 0 ? `Gửi lại (${countdown}s)` : 'Gửi mã OTP'}
               </button>
             </div>
+            {fieldErrors.email && (
+              <div className="field-error-text">⚠️ {fieldErrors.email}</div>
+            )}
           </div>
 
           <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label" htmlFor="otpCode">
-              Mã xác thực OTP (6 chữ số)
+              Mã xác thực OTP (6 chữ số) *
             </label>
             <input
               id="otpCode"
               name="otpCode"
               type="text"
               maxLength={6}
-              className="form-input"
+              className={`form-input ${fieldErrors.otpCode ? 'input-error' : ''}`}
               placeholder="123456"
               value={formData.otpCode}
               onChange={handleChange}
               disabled={isLoading}
               style={{
-                letterSpacing: '0.2em',
+                letterSpacing: '0.25em',
                 fontWeight: 700,
                 textAlign: 'center',
                 backgroundColor: otpSent ? '#f0fdf4' : '#ffffff',
-                borderColor: otpSent ? '#22c55e' : '#d1d5db',
+                borderColor: fieldErrors.otpCode ? '#ef4444' : (otpSent ? '#22c55e' : '#d1d5db'),
               }}
               required
             />
+            {fieldErrors.otpCode && (
+              <div className="field-error-text">⚠️ {fieldErrors.otpCode}</div>
+            )}
           </div>
         </div>
 
+        {otpSent && (
+          <div className="otp-feedback-box">
+            <span>✉️</span>
+            <span>
+              Mã xác thực 6 số đã được gửi tới <strong>{formData.email}</strong>. Vui lòng kiểm tra hộp thư đến (hoặc thư rác/Spam) và nhập 6 chữ số vào ô trên.
+            </span>
+          </div>
+        )}
+
+        {/* Số điện thoại liên hệ */}
         <div className="form-group">
           <label className="form-label" htmlFor="phone">
             Số điện thoại liên hệ *
@@ -308,7 +339,7 @@ export const RegisterForm = () => {
             id="phone"
             name="phone"
             type="tel"
-            className="form-input"
+            className={`form-input ${fieldErrors.phone ? 'input-error' : ''}`}
             placeholder="0912345678"
             value={formData.phone}
             onChange={handleChange}
@@ -316,56 +347,85 @@ export const RegisterForm = () => {
             disabled={isLoading}
             required
           />
+          {fieldErrors.phone && (
+            <div className="field-error-text">⚠️ {fieldErrors.phone}</div>
+          )}
         </div>
 
-        <div className="form-row">
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label" htmlFor="password">
-              Mật khẩu (tối thiểu 6 ký tự)
-            </label>
-            <div className="input-wrapper">
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                className="form-input"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                autoComplete="new-password"
-                disabled={isLoading}
-                required
-              />
-            </div>
+        {/* DÒNG RIÊNG BIỆT 1: MẬT KHẨU */}
+        <div className="form-group">
+          <label className="form-label" htmlFor="password">
+            Mật khẩu đăng nhập *
+          </label>
+          <div className="input-wrapper">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              className={`form-input ${fieldErrors.password ? 'input-error' : ''}`}
+              placeholder="Tối thiểu 8 ký tự, có 1 chữ in hoa (A-Z)"
+              value={formData.password}
+              onChange={handleChange}
+              autoComplete="new-password"
+              disabled={isLoading}
+              required
+            />
+            <button
+              type="button"
+              className="toggle-password-btn"
+              onClick={toggleShowPassword}
+              tabIndex={-1}
+            >
+              {showPassword ? 'Ẩn' : 'Hiện'}
+            </button>
           </div>
+          {fieldErrors.password ? (
+            <div className="field-error-text">
+              <span>⚠️</span> {fieldErrors.password}
+            </div>
+          ) : (
+            <div className="field-hint-text">
+              Mật khẩu bắt buộc có tối thiểu 8 ký tự và chứa ít nhất 1 chữ cái in hoa (A-Z).
+            </div>
+          )}
+        </div>
 
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label" htmlFor="confirmPassword">
-              Xác nhận lại mật khẩu
-            </label>
-            <div className="input-wrapper">
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type={showPassword ? 'text' : 'password'}
-                className="form-input"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                autoComplete="new-password"
-                disabled={isLoading}
-                required
-              />
-              <button
-                type="button"
-                className="toggle-password-btn"
-                onClick={toggleShowPassword}
-                tabIndex={-1}
-              >
-                {showPassword ? 'Ẩn' : 'Hiện'}
-              </button>
-            </div>
+        {/* DÒNG RIÊNG BIỆT 2: NHẬP LẠI MẬT KHẨU */}
+        <div className="form-group">
+          <label className="form-label" htmlFor="confirmPassword">
+            Xác nhận lại mật khẩu *
+          </label>
+          <div className="input-wrapper">
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type={showConfirmPassword ? 'text' : 'password'}
+              className={`form-input ${fieldErrors.confirmPassword ? 'input-error' : ''}`}
+              placeholder="Nhập lại chính xác mật khẩu đã tạo ở trên"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              autoComplete="new-password"
+              disabled={isLoading}
+              required
+            />
+            <button
+              type="button"
+              className="toggle-password-btn"
+              onClick={toggleShowConfirmPassword}
+              tabIndex={-1}
+            >
+              {showConfirmPassword ? 'Ẩn' : 'Hiện'}
+            </button>
           </div>
+          {fieldErrors.confirmPassword ? (
+            <div className="field-error-text">
+              <span>⚠️</span> {fieldErrors.confirmPassword}
+            </div>
+          ) : (
+            <div className="field-hint-text">
+              Nhập lại mật khẩu để đảm bảo bạn không gõ nhầm ký tự.
+            </div>
+          )}
         </div>
 
         <button type="submit" className="btn-submit" disabled={isLoading}>
@@ -382,7 +442,7 @@ export const RegisterForm = () => {
 
       <div className="auth-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #f3f4f6' }}>
         <div>
-          Bạn là <strong>Nhân sự sự kiện (Worker)</strong>? Hãy tải ứng dụng <strong>CANi Mobile</strong> trên điện thoại để nhận ca làm linh hoạt.
+          Bạn là <strong>Nhân sự sự kiện (Worker)</strong>? Hãy tải ứng dụng <strong>CANi Mobile (Android APK)</strong> trên điện thoại để nhận ca làm linh hoạt.
         </div>
         <div style={{ marginTop: '0.5rem' }}>
           Đã có tài khoản? <a href="/login">Đăng nhập tại đây</a>

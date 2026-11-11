@@ -134,9 +134,11 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<List<NearbyShiftResponseDto>>> getNearbyShifts(
             @RequestParam(value = "lat", required = false) Double lat,
             @RequestParam(value = "lng", required = false) Double lng,
-            @RequestParam(value = "radiusKm", required = false, defaultValue = "15.0") Double radiusKm
+            @RequestParam(value = "radiusKm", required = false, defaultValue = "15.0") Double radiusKm,
+            Authentication authentication
     ) {
-        List<NearbyShiftResponseDto> shifts = workerJobService.getNearbyShifts(lat, lng, radiusKm);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<NearbyShiftResponseDto> shifts = workerJobService.getNearbyShifts(userId, lat, lng, radiusKm);
         return ResponseEntity.ok(ApiResponse.ok(shifts, "Quét tìm ca làm việc xung quanh thành công (Tìm thấy " + shifts.size() + " ca)"));
     }
 
@@ -293,5 +295,36 @@ public class WorkerJobController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         WorkerIncomeSummaryDto summary = workerJobService.getIncomeSummary(userId);
         return ResponseEntity.ok(ApiResponse.ok(summary, "Lấy thống kê thu nhập thành công"));
+    }
+
+    /**
+     * Tải ảnh bằng chứng nghiệm thu hoàn thành ca làm việc lên máy chủ
+     * POST /api/v1/workers/upload-proof
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping(value = "/upload-proof", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> uploadProofImage(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        String url = workerJobService.uploadProofImage(file);
+        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of("url", url), "Tải ảnh bằng chứng nghiệm thu lên thành công!"));
+    }
+
+    /**
+     * Xem / phục vụ ảnh bằng chứng nghiệm thu
+     * GET /api/v1/workers/proof/{filename}
+     */
+    @GetMapping("/proof/{filename:.+}")
+    public ResponseEntity<org.springframework.core.io.Resource> getProofImage(@PathVariable("filename") String filename) {
+        org.springframework.core.io.Resource resource = workerJobService.loadProofImage(filename);
+        String contentType = "image/jpeg";
+        if (filename.toLowerCase().endsWith(".png")) contentType = "image/png";
+        else if (filename.toLowerCase().endsWith(".webp")) contentType = "image/webp";
+        else if (filename.toLowerCase().endsWith(".gif")) contentType = "image/gif";
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
     }
 }

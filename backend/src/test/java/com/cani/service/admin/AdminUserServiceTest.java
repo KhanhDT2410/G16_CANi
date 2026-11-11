@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.admin;
+
+import com.cani.service.*;
 
 import com.cani.dto.admin.user.UpdateUserStatusRequestDto;
 import com.cani.dto.admin.user.UserDetailResponseDto;

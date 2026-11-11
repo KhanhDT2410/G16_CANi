@@ -1,10 +1,8 @@
 package com.cani.service;
 
 import com.cani.config.PayOSConfig;
-import com.cani.config.VNPayConfig;
 import com.cani.dto.subscription.PayOSPaymentResponseDto;
 import com.cani.dto.subscription.PurchaseSubscriptionRequestDto;
-import com.cani.dto.subscription.PurchaseSubscriptionResponseDto;
 import com.cani.dto.subscription.SubscriptionPlanDto;
 import com.cani.dto.subscription.SubscriptionResponseDto;
 import com.cani.entity.EventOrganizer;
@@ -17,7 +15,6 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
 import com.cani.repository.SubscriptionRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,9 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -37,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Service quản lý Gói dịch vụ & Cổng thanh toán VNPay Sandbox (UC-10, UC-11, UC-12, BR-08)
+ * Service quản lý Gói dịch vụ & Cổng thanh toán VietQR PayOS (UC-10, UC-11, UC-12, BR-08)
  */
 @Service
 @RequiredArgsConstructor
@@ -46,7 +40,6 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
-    private final VNPayConfig vnPayConfig;
     private final PayOSConfig payOSConfig;
     private final PayOSService payOSService;
 
@@ -56,7 +49,7 @@ public class SubscriptionService {
     @Value("${cani.subscription.strict:false}")
     private boolean strictQuotaEnforcement;
 
-    // Bộ nhớ đệm lưu thông tin giao dịch chờ đối soát VNPay (TxnRef -> OrderData)
+    // Bộ nhớ đệm lưu thông tin giao dịch chờ đối soát PayOS (TxnRef -> OrderData)
     private final Map<String, PendingOrder> pendingOrders = new ConcurrentHashMap<>();
 
     private record PendingOrder(UUID eoId, PlanType planType, BigDecimal price, Instant createdAt) {}
@@ -123,133 +116,6 @@ public class SubscriptionService {
                         .isRecommended(false)
                         .build()
         );
-    }
-
-    // =========================================================================
-    // UC-11: KHỞI TẠO PHIÊN THANH TOÁN VNPAY (PURCHASE PACKAGE VIA VNPAY)
-    // =========================================================================
-    @Transactional
-    public PurchaseSubscriptionResponseDto createVNPayPaymentSession(
-            UUID userId, PurchaseSubscriptionRequestDto dto, HttpServletRequest request) {
-
-        EventOrganizer eo = getEoOrThrow(userId);
-        SubscriptionPlanDto plan = getPlanDefinition(dto.getPlanType());
-
-        // Sinh mã giao dịch duy nhất
-        String vnpTxnRef = "CANI_" + System.currentTimeMillis();
-        pendingOrders.put(vnpTxnRef, new PendingOrder(eo.getEoId(), plan.getPlanType(), plan.getPrice(), Instant.now()));
-
-        // Chuẩn bị tham số theo đúng tài liệu VNPay Sandbox
-        long amountInVnd = plan.getPrice().longValue();
-        long amountForVnPay = amountInVnd * 100L; // VNPay tính theo đơn vị hào (x100)
-
-        String returnUrl = (dto.getReturnUrl() != null && !dto.getReturnUrl().isBlank())
-                ? dto.getReturnUrl()
-                : vnPayConfig.getReturnUrl();
-
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-        formatter.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        String vnpCreateDate = formatter.format(cld.getTime());
-        cld.add(Calendar.MINUTE, 15);
-        String vnpExpireDate = formatter.format(cld.getTime());
-
-        String clientIp = VNPayConfig.getIpAddress(request);
-
-        Map<String, String> vnpParams = new HashMap<>();
-        vnpParams.put("vnp_Version", "2.1.0");
-        vnpParams.put("vnp_Command", "pay");
-        vnpParams.put("vnp_TmnCode", vnPayConfig.getTmnCode());
-        vnpParams.put("vnp_Amount", String.valueOf(amountForVnPay));
-        vnpParams.put("vnp_CurrCode", "VND");
-        vnpParams.put("vnp_TxnRef", vnpTxnRef);
-        vnpParams.put("vnp_OrderInfo", "Mua " + plan.getName() + " tren san CANi");
-        vnpParams.put("vnp_OrderType", "other");
-        vnpParams.put("vnp_Locale", "vn");
-        vnpParams.put("vnp_ReturnUrl", returnUrl);
-        vnpParams.put("vnp_IpAddr", clientIp);
-        vnpParams.put("vnp_CreateDate", vnpCreateDate);
-        vnpParams.put("vnp_ExpireDate", vnpExpireDate);
-
-        // Tạo query string và mã băm SHA-512
-        List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
-        Collections.sort(fieldNames);
-        StringBuilder hashData = new StringBuilder();
-        StringBuilder query = new StringBuilder();
-
-        Iterator<String> itr = fieldNames.iterator();
-        while (itr.hasNext()) {
-            String fieldName = itr.next();
-            String fieldValue = vnpParams.get(fieldName);
-            if (fieldValue != null && !fieldValue.isEmpty()) {
-                hashData.append(fieldName).append('=').append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII))
-                        .append('=')
-                        .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
-                if (itr.hasNext()) {
-                    query.append('&');
-                    hashData.append('&');
-                }
-            }
-        }
-
-        String vnpSecureHash = vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), hashData.toString());
-        query.append("&vnp_SecureHash=").append(vnpSecureHash);
-        String paymentUrl = vnPayConfig.getPayUrl() + "?" + query;
-
-        log.info("EO {} khởi tạo phiên thanh toán VNPay: TxnRef={}, Plan={}, Amount={}",
-                eo.getEoId(), vnpTxnRef, plan.getPlanType(), plan.getPrice());
-
-        return PurchaseSubscriptionResponseDto.builder()
-                .paymentUrl(paymentUrl)
-                .txnRef(vnpTxnRef)
-                .planType(plan.getPlanType())
-                .planName(plan.getName())
-                .amount(plan.getPrice())
-                .orderInfo(vnpParams.get("vnp_OrderInfo"))
-                .isDemo(false)
-                .build();
-    }
-
-    // =========================================================================
-    // UC-11: XỬ LÝ KẾT QUẢ THANH TOÁN VNPAY (CALLBACK / IPN)
-    // =========================================================================
-    @Transactional
-    public SubscriptionResponseDto processVNPayCallback(Map<String, String> queryParams) {
-        String vnpSecureHash = queryParams.get("vnp_SecureHash");
-        if (vnpSecureHash == null || vnpSecureHash.isBlank()) {
-            throw new BadRequestException("Thiếu mã băm bảo mật vnp_SecureHash");
-        }
-
-        Map<String, String> fields = new HashMap<>(queryParams);
-        fields.remove("vnp_SecureHash");
-        fields.remove("vnp_SecureHashType");
-
-        String calculatedHash = vnPayConfig.hashAllFields(fields);
-        if (!calculatedHash.equalsIgnoreCase(vnpSecureHash)) {
-            log.error("Sai chữ ký bảo mật VNPay! Calculated: {}, Received: {}", calculatedHash, vnpSecureHash);
-            throw new BadRequestException("Chữ ký bảo mật VNPay không hợp lệ (Checksum mismatch)");
-        }
-
-        String responseCode = queryParams.get("vnp_ResponseCode");
-        String txnRef = queryParams.get("vnp_TxnRef");
-        String transactionNo = queryParams.get("vnp_TransactionNo");
-
-        PendingOrder order = pendingOrders.remove(txnRef);
-        if (order == null) {
-            log.warn("Không tìm thấy đơn hàng chờ cho TxnRef: {}", txnRef);
-            throw new ResourceNotFoundException("Giao dịch không tồn tại hoặc đã xử lý trước đó: " + txnRef);
-        }
-
-        if (!"00".equals(responseCode)) {
-            log.warn("Giao dịch VNPay thất bại hoặc bị hủy: TxnRef={}, ResponseCode={}", txnRef, responseCode);
-            throw new BadRequestException("Thanh toán không thành công qua VNPay (Mã lỗi: " + responseCode + ")");
-        }
-
-        EventOrganizer eo = eventOrganizerRepository.findById(order.eoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhà tổ chức: " + order.eoId()));
-
-        return activateSubscription(eo, order.planType(), "VNPAY", txnRef, transactionNo);
     }
 
     // =========================================================================

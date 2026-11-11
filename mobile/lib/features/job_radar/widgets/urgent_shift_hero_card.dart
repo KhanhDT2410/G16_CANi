@@ -7,12 +7,14 @@ class UrgentShiftHeroCard extends StatefulWidget {
   final ShiftAssignmentItem assignment;
   final VoidCallback onNavigate;
   final VoidCallback onQrScan;
+  final VoidCallback? onOpenDetail;
 
   const UrgentShiftHeroCard({
     super.key,
     required this.assignment,
     required this.onNavigate,
     required this.onQrScan,
+    this.onOpenDetail,
   });
 
   @override
@@ -61,7 +63,6 @@ class _UrgentShiftHeroCardState extends State<UrgentShiftHeroCard> {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF00D2FF), Color(0xFF0066FF)],
@@ -77,8 +78,15 @@ class _UrgentShiftHeroCardState extends State<UrgentShiftHeroCard> {
           ),
         ],
       ),
-      child: Stack(
-        children: [
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onOpenDetail ?? widget.onQrScan,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Stack(
+              children: [
           // Hiệu ứng bong bóng trang trí góc phải
           Positioned(
             right: -25,
@@ -200,32 +208,33 @@ class _UrgentShiftHeroCardState extends State<UrgentShiftHeroCard> {
               ),
               const SizedBox(height: 12),
 
-              // 2 Nút hành động
+              // Hàng nút hành động
               Row(
                 children: [
                   Expanded(
                     child: SizedBox(
                       height: 40,
                       child: ElevatedButton.icon(
-                        onPressed: widget.onNavigate,
-                        icon: const Icon(Icons.directions, size: 16, color: Color(0xFF0066FF)),
+                        onPressed: widget.onOpenDetail ?? widget.onQrScan,
+                        icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF0066FF)),
                         label: const Text(
-                          'Chỉ đường',
+                          'Vận hành ca',
                           style: TextStyle(
                             color: Color(0xFF0066FF),
                             fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
+                            fontSize: 12,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           elevation: 2,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: SizedBox(
                       height: 40,
@@ -233,19 +242,35 @@ class _UrgentShiftHeroCardState extends State<UrgentShiftHeroCard> {
                         onPressed: widget.onQrScan,
                         icon: const Icon(Icons.qr_code_scanner, size: 16, color: Colors.white),
                         label: Text(
-                          isCheckedIn ? 'Quét QR Check-out' : 'Quét QR Check-in',
+                          isCheckedIn ? 'Check-out' : 'Check-in',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
-                            fontSize: 12.5,
+                            fontSize: 12,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0D9488),
                           elevation: 2,
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: widget.onNavigate,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                      ),
+                      child: const Icon(Icons.directions, color: Colors.white, size: 20),
                     ),
                   ),
                 ],
@@ -253,6 +278,9 @@ class _UrgentShiftHeroCardState extends State<UrgentShiftHeroCard> {
             ],
           ),
         ],
+      ),
+      ),
+      ),
       ),
     );
   }

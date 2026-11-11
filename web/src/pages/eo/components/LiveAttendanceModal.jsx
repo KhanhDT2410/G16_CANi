@@ -284,18 +284,18 @@ const LiveAttendanceModal = ({
                               </span>
                             )}
 
-                            {/* Nút đánh giá Worker */}
+                            {/* Nút đánh giá Worker: Chỉ mở khi Worker đã Check-out hoặc ca đã hoàn thành */}
                             {item.hasReviewedWorker ? (
                               <span style={{ color: '#eab308', fontSize: '0.75rem', fontWeight: 600, padding: '4px 0' }}>
                                 ⭐ Đã đánh giá
                               </span>
-                            ) : (
+                            ) : isCompleted ? (
                               <button
                                 type="button"
                                 onClick={() => setSelectedForReview(item)}
                                 style={{
-                                  background: '#f8fafc',
-                                  color: '#d97706',
+                                  background: '#fef3c7',
+                                  color: '#b45309',
                                   border: '1px solid #fde68a',
                                   borderRadius: 4,
                                   padding: '4px 10px',
@@ -303,9 +303,22 @@ const LiveAttendanceModal = ({
                                   cursor: 'pointer',
                                   fontWeight: 600,
                                 }}
+                                title="Đánh giá năng lực và thái độ của Worker sau ca làm việc"
                               >
-                                ⭐ Chấm sao
+                                ⭐ Đánh giá
                               </button>
+                            ) : (
+                              <span
+                                style={{
+                                  color: '#94a3b8',
+                                  fontSize: '0.75rem',
+                                  fontStyle: 'italic',
+                                  padding: '4px 6px',
+                                }}
+                                title="Chỉ mở đánh giá sau khi Worker đã Check-out hoàn thành ca làm việc"
+                              >
+                                Chờ Check-out
+                              </span>
                             )}
                           </div>
                         </td>

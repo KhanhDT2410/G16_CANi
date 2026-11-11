@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { eoService } from '../../../services/eoService';
 import './EventDetailModal.css';
 
 export default function EventDetailModal({
@@ -11,6 +12,26 @@ export default function EventDetailModal({
   onOpenAttendance,
   onNavigateToRecruitment,
 }) {
+  const [activeTab, setActiveTab] = useState('SHIFTS'); // 'SHIFTS' | 'WORKERS'
+  const [eventWorkers, setEventWorkers] = useState([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [searchWorker, setSearchWorker] = useState('');
+
+  useEffect(() => {
+    if (isOpen && event?.eventId) {
+      setLoadingWorkers(true);
+      eoService.getEventWorkers(event.eventId)
+        .then((data) => {
+          setEventWorkers(Array.isArray(data) ? data : []);
+        })
+        .catch((err) => {
+          console.warn('Lỗi khi tải danh sách nhân sự sự kiện:', err);
+          setEventWorkers([]);
+        })
+        .finally(() => setLoadingWorkers(false));
+    }
+  }, [isOpen, event?.eventId]);
+
   if (!isOpen || !event) return null;
 
   const shifts = event.shifts || [];
@@ -45,6 +66,20 @@ export default function EventDetailModal({
     }
   };
 
+  const formatDateTimeRange = (start, end) => {
+    if (!start && !end) return formatDate(event.eventDate);
+    try {
+      const s = start ? new Date(start) : null;
+      const e = end ? new Date(end) : null;
+      if (s && e) {
+        return `${s.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${s.toLocaleDateString('vi-VN')} - ${e.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${e.toLocaleDateString('vi-VN')}`;
+      }
+      return formatDate(start || end);
+    } catch {
+      return formatDate(event.eventDate);
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'ACTIVE':
@@ -64,20 +99,45 @@ export default function EventDetailModal({
     }
   };
 
+  const filteredWorkers = eventWorkers.filter((w) => {
+    if (!searchWorker.trim()) return true;
+    const q = searchWorker.toLowerCase();
+    return (
+      (w.workerName && w.workerName.toLowerCase().includes(q)) ||
+      (w.jobType && w.jobType.toLowerCase().includes(q)) ||
+      (w.workerPhone && w.workerPhone.includes(q))
+    );
+  });
+
   return (
     <div className="event-detail-modal-overlay" onClick={onClose}>
       <div className="event-detail-modal-box" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="event-detail-modal-header">
           <div className="event-detail-header-left">
-            <div className="event-detail-icon-stage">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-            </div>
+            {event.imageUrl ? (
+              <img
+                src={event.imageUrl}
+                alt={event.name}
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  objectFit: 'cover',
+                  border: '1.5px solid #bfdbfe',
+                }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <div className="event-detail-icon-stage">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </div>
+            )}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 <h3 className="event-detail-title">{event.name}</h3>
@@ -98,13 +158,13 @@ export default function EventDetailModal({
           {/* Thông tin cốt lõi */}
           <div className="event-detail-info-grid">
             <div className="info-item">
-              <span className="info-label">Thời gian tổ chức</span>
+              <span className="info-label">Thời gian sự kiện</span>
               <span className="info-value">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"></circle>
                   <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                {formatDate(event.eventDate)}
+                {formatDateTimeRange(event.startTime, event.endTime)}
               </span>
             </div>
 
@@ -162,143 +222,307 @@ export default function EventDetailModal({
             </div>
           </div>
 
-          {/* Danh sách các ca làm việc & Nhân sự */}
-          <div className="event-detail-shifts-section">
-            <div className="shifts-section-header">
-              <h4 className="shifts-title">
-                Chi Tiết Ca Làm Việc & Điều Phối Nhân Sự ({shifts.length})
-              </h4>
-              <button
-                type="button"
-                className="btn-add-shift-pill"
-                onClick={() => {
-                  onClose();
-                  onOpenAddShift(event.eventId);
-                }}
-              >
-                + Thêm ca làm việc
-              </button>
-            </div>
+          {/* Tab Switcher: Ca làm việc vs Danh sách nhân sự */}
+          <div className="event-detail-tabs-header">
+            <button
+              type="button"
+              className={`event-detail-tab-btn ${activeTab === 'SHIFTS' ? 'active' : ''}`}
+              onClick={() => setActiveTab('SHIFTS')}
+            >
+              📋 Chi Tiết Ca Làm Việc ({shifts.length})
+            </button>
+            <button
+              type="button"
+              className={`event-detail-tab-btn ${activeTab === 'WORKERS' ? 'active' : ''}`}
+              onClick={() => setActiveTab('WORKERS')}
+            >
+              👥 Danh Sách Nhân Sự Sự Kiện ({eventWorkers.length || totalConfirmed})
+            </button>
+          </div>
 
-            {shifts.length === 0 ? (
-              <div className="detail-empty-shifts">
-                <p>Sự kiện này hiện chưa có ca làm việc nào.</p>
+          {/* TAB 1: DANH SÁCH CA LÀM VIỆC */}
+          {activeTab === 'SHIFTS' && (
+            <div className="event-detail-shifts-section">
+              <div className="shifts-section-header">
+                <h4 className="shifts-title">
+                  Phân Chia Ca & Lịch Trình Chi Tiết
+                </h4>
                 <button
                   type="button"
-                  className="btn-add-shift-primary"
+                  className="btn-add-shift-pill"
                   onClick={() => {
                     onClose();
                     onOpenAddShift(event.eventId);
                   }}
                 >
-                  + Thiết lập ca làm việc đầu tiên
+                  + Thêm ca làm việc
                 </button>
               </div>
-            ) : (
-              <div className="detail-shifts-list">
-                {shifts.map((shift, sIdx) => {
-                  const shiftConfirmed = shift.confirmedWorkers || 0;
-                  const shiftRequired = shift.requiredWorkers || 1;
-                  const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
 
-                  return (
-                    <div key={shift.shiftId || sIdx} className="detail-shift-card">
-                      <div className="shift-card-header">
-                        <div className="shift-card-title-group">
-                          <span className="shift-job-badge">{shift.jobType}</span>
-                          <span className="shift-time-badge">
-                            {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
-                          </span>
-                          {shift.dressCode && (
-                            <span className="shift-dresscode-tag">Đồng phục: {shift.dressCode}</span>
+              {shifts.length === 0 ? (
+                <div className="detail-empty-shifts">
+                  <p>Sự kiện này hiện chưa có ca làm việc nào.</p>
+                  <button
+                    type="button"
+                    className="btn-add-shift-primary"
+                    onClick={() => {
+                      onClose();
+                      onOpenAddShift(event.eventId);
+                    }}
+                  >
+                    + Thiết lập ca làm việc đầu tiên
+                  </button>
+                </div>
+              ) : (
+                <div className="detail-shifts-list">
+                  {shifts.map((shift, sIdx) => {
+                    const shiftConfirmed = shift.confirmedWorkers || 0;
+                    const shiftRequired = shift.requiredWorkers || 1;
+                    const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
+
+                    return (
+                      <div key={shift.shiftId || sIdx} className="detail-shift-card">
+                        <div className="shift-card-header">
+                          <div className="shift-card-title-group">
+                            {shift.imageUrl && (
+                              <img
+                                src={shift.imageUrl}
+                                alt={shift.jobType}
+                                style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            )}
+                            <span className="shift-job-badge">{shift.jobType}</span>
+                            <span className="shift-time-badge">
+                              {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
+                            </span>
+                            {shift.dressCode && (
+                              <span className="shift-dresscode-tag">Đồng phục: {shift.dressCode}</span>
+                            )}
+                          </div>
+                          <div className="shift-wage-tag">
+                            {new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/h
+                            {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)}đ phụ cấp)`}
+                          </div>
+                        </div>
+
+                        <div className="shift-card-body">
+                          {/* Tiến độ nhân sự của ca */}
+                          <div className="shift-worker-progress">
+                            <div className="progress-labels">
+                              <span className="progress-title">
+                                Nhân sự nhận ca: <strong>{shiftConfirmed} / {shiftRequired}</strong> người
+                              </span>
+                              <span className="progress-percent">{shiftRate}%</span>
+                            </div>
+                            <div className="progress-track">
+                              <div
+                                className="progress-fill"
+                                style={{
+                                  width: `${Math.min(100, shiftRate)}%`,
+                                  backgroundColor: shiftRate >= 100 ? '#10b981' : '#2563eb',
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Thao tác ca */}
+                          <div className="shift-card-actions">
+                            <button
+                              type="button"
+                              className="btn-shift-action blue"
+                              onClick={() => {
+                                onClose();
+                                onOpenQr(shift, event);
+                              }}
+                              title="Hiển thị mã QR Điểm danh Động"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                              </svg>
+                              Mã QR Điểm Danh Động
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn-shift-action purple"
+                              onClick={() => {
+                                onClose();
+                                onOpenInvite(shift, event);
+                              }}
+                              title="Lấy link & mã mời trực tiếp cho nhân sự"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                              </svg>
+                              Mã Mời Nhân Sự
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn-shift-action emerald"
+                              onClick={() => {
+                                onClose();
+                                onOpenAttendance(shift, event);
+                              }}
+                              title="Theo dõi bảng điểm danh & xác nhận duyệt công"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <polyline points="16 11 18 13 22 9"></polyline>
+                              </svg>
+                              Bảng Điểm Danh Ca
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: DANH SÁCH NHÂN SỰ SỰ KIỆN (WORKFORCE LIST) */}
+          {activeTab === 'WORKERS' && (
+            <div className="event-detail-workers-section">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>
+                  Danh Sách Nhân Sự Tham Gia Sự Kiện ({eventWorkers.length})
+                </h4>
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên, vị trí ca, SĐT..."
+                  className="eo-form-input"
+                  style={{ width: '240px', padding: '0.4rem 0.75rem', fontSize: '0.825rem' }}
+                  value={searchWorker}
+                  onChange={(e) => setSearchWorker(e.target.value)}
+                />
+              </div>
+
+              {loadingWorkers ? (
+                <div style={{ padding: '2.5rem 0', textAlign: 'center', color: '#64748b' }}>
+                  Đang tải danh sách nhân sự sự kiện...
+                </div>
+              ) : filteredWorkers.length === 0 ? (
+                <div style={{
+                  padding: '2.5rem 1.5rem',
+                  textAlign: 'center',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '12px',
+                  border: '1.5px dashed #cbd5e1',
+                  color: '#64748b',
+                }}>
+                  <p style={{ margin: '0 0 0.5rem', fontWeight: 600, color: '#334155' }}>
+                    Chưa có nhân sự nào nhận ca làm việc trong sự kiện này.
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.825rem' }}>
+                    Hãy xuất bản sự kiện hoặc gửi mã mời trực tiếp để thu hút các ứng viên tham gia.
+                  </p>
+                </div>
+              ) : (
+                <div className="event-workers-list">
+                  {filteredWorkers.map((w, idx) => {
+                    const isReliableHigh = (w.workerReliabilityScore || 100) >= 90;
+                    return (
+                      <div key={w.assignmentId || idx} className="event-worker-card">
+                        <div className="worker-card-left">
+                          {w.avatarUrl ? (
+                            <img
+                              src={w.avatarUrl}
+                              alt={w.workerName}
+                              className="worker-avatar-frame"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="worker-avatar-placeholder">
+                              {(w.workerName || 'W').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+
+                          <div className="worker-info-main">
+                            <div className="worker-name-row">
+                              <span className="worker-name-text">{w.workerName}</span>
+                              <span className="worker-age-badge">
+                                🎂 {w.workerAge ? `${w.workerAge} tuổi` : '22 tuổi'} {w.workerDob ? `(${w.workerDob})` : ''}
+                              </span>
+                              <span className={`worker-reliability-pill ${isReliableHigh ? 'high' : ''}`}>
+                                ⭐ {w.workerReliabilityScore || 100}/100 Uy tín
+                              </span>
+                              <span style={{ fontSize: '0.8rem', color: '#eab308', fontWeight: 700 }}>
+                                {w.workerRatingAvg ? `${w.workerRatingAvg} ★` : '5.0 ★'}
+                              </span>
+                            </div>
+
+                            <div className="worker-sub-row">
+                              <span className="worker-job-tag">Ca: {w.jobType || w.shiftName || 'Nhân sự ca'}</span>
+                              <span>📞 SĐT: <strong>{w.workerPhone || '09xx xxx xxx'}</strong></span>
+                              {w.agreedWage && (
+                                <span>Thù lao: <strong>{Number(w.agreedWage).toLocaleString()} đ</strong></span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Trạng thái nhân sự */}
+                        <div>
+                          {w.checkinTime ? (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.35rem 0.75rem',
+                              backgroundColor: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              color: '#065f46',
+                              borderRadius: '999px',
+                              fontSize: '0.775rem',
+                              fontWeight: 700,
+                            }}>
+                              ● Đã vào ca ({formatTime(w.checkinTime)})
+                            </span>
+                          ) : w.assignmentStatus === 'CONFIRMED' || w.assignmentStatus === 'ACCEPTED' ? (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.35rem 0.75rem',
+                              backgroundColor: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              color: '#1d4ed8',
+                              borderRadius: '999px',
+                              fontSize: '0.775rem',
+                              fontWeight: 700,
+                            }}>
+                              ✓ Đã nhận ca (Chờ check-in)
+                            </span>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '0.35rem 0.75rem',
+                              backgroundColor: '#f1f5f9',
+                              color: '#64748b',
+                              borderRadius: '999px',
+                              fontSize: '0.775rem',
+                              fontWeight: 600,
+                            }}>
+                              {w.assignmentStatus || 'Đã phân công'}
+                            </span>
                           )}
                         </div>
-                        <div className="shift-wage-tag">
-                          {new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/h
-                          {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)}đ phụ cấp)`}
-                        </div>
                       </div>
-
-                      <div className="shift-card-body">
-                        {/* Tiến độ nhân sự của ca */}
-                        <div className="shift-worker-progress">
-                          <div className="progress-labels">
-                            <span className="progress-title">
-                              Nhân sự nhận ca: <strong>{shiftConfirmed} / {shiftRequired}</strong> người
-                            </span>
-                            <span className="progress-percent">{shiftRate}%</span>
-                          </div>
-                          <div className="progress-track">
-                            <div
-                              className="progress-fill"
-                              style={{
-                                width: `${Math.min(100, shiftRate)}%`,
-                                backgroundColor: shiftRate >= 100 ? '#10b981' : '#2563eb',
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Thao tác ca */}
-                        <div className="shift-card-actions">
-                          <button
-                            type="button"
-                            className="btn-shift-action blue"
-                            onClick={() => {
-                              onClose();
-                              onOpenQr(shift, event);
-                            }}
-                            title="Hiển thị mã QR Check-in / Check-out"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="3" y="3" width="7" height="7"></rect>
-                              <rect x="14" y="3" width="7" height="7"></rect>
-                              <rect x="14" y="14" width="7" height="7"></rect>
-                              <rect x="3" y="14" width="7" height="7"></rect>
-                            </svg>
-                            Mã QR Điểm Danh
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn-shift-action purple"
-                            onClick={() => {
-                              onClose();
-                              onOpenInvite(shift, event);
-                            }}
-                            title="Lấy link & mã mời trực tiếp cho nhân sự"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                            </svg>
-                            Mã Mời Nhân Sự
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn-shift-action emerald"
-                            onClick={() => {
-                              onClose();
-                              onOpenAttendance(shift, event);
-                            }}
-                            title="Theo dõi bảng điểm danh & xác nhận duyệt công"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                              <circle cx="9" cy="7" r="4"></circle>
-                              <polyline points="16 11 18 13 22 9"></polyline>
-                            </svg>
-                            Danh Sách Điểm Danh
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -323,4 +547,3 @@ export default function EventDetailModal({
     </div>
   );
 }
-

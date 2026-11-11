@@ -313,6 +313,18 @@ export default function EORecruitmentTab({
             const percent = Math.min(100, Math.round((confirmed / required) * 100));
             const isFull = confirmed >= required;
 
+            // Kiểm tra điều kiện Cứu trợ khẩn cấp (Emergency Broadcast):
+            // 1. Phải còn thiếu người (!isFull)
+            // 2. Ca chưa kết thúc
+            // 3. Sát giờ diễn ra ca: trong vòng 4 tiếng trước ca HOẶC ca đang diễn ra mà bị thiếu người (bùng ca/no-show)
+            const now = new Date();
+            const shiftStart = shift.startTime ? new Date(shift.startTime) : null;
+            const shiftEnd = shift.endTime ? new Date(shift.endTime) : null;
+            const isNotEnded = shiftEnd ? now < shiftEnd : true;
+            const hoursUntilStart = shiftStart ? (shiftStart.getTime() - now.getTime()) / (1000 * 60 * 60) : 999;
+            const isNearShift = isNotEnded && (hoursUntilStart <= 4 || (shiftStart && now >= shiftStart));
+            const canTriggerEmergency = !isFull && isNearShift;
+
             return (
               <div
                 key={shift.shiftId}
@@ -401,28 +413,35 @@ export default function EORecruitmentTab({
                   </div>
                 </div>
 
-                {/* Các thao tác tuyển dụng */}
+                {/* Các thao tác tuyển dụng & vận hành ca */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {!isFull && (
                     <>
-                      <button
-                        type="button"
-                        style={{
-                          background: '#dc2626',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '0.45rem 0.85rem',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
-                        }}
-                        onClick={() => setEmergencyModal({ isOpen: true, shift })}
-                        title="Kích hoạt Emergency Broadcast Pool diện rộng (Section 11 CANi_Flow_v8.txt)"
-                      >
-                        Cứu Trợ Khẩn Cấp
-                      </button>
+                      {/* Nút Cứu trợ khẩn cấp: Chỉ mở khi GẦN ĐẾN CA (< 4 giờ) mà THIẾU NGƯỜI */}
+                      {canTriggerEmergency && (
+                        <button
+                          type="button"
+                          style={{
+                            background: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          onClick={() => setEmergencyModal({ isOpen: true, shift })}
+                          title="Ca sắp diễn ra mà chưa đủ người! Kích hoạt Emergency Broadcast Pool diện rộng."
+                        >
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffffff', display: 'inline-block' }} />
+                          Cứu Trợ Khẩn Cấp
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -472,27 +491,9 @@ export default function EORecruitmentTab({
                       cursor: 'pointer',
                     }}
                     onClick={() => onOpenAttendance?.(shift, { eventId: shift.eventId, name: shift.eventName })}
-                    title="Xem danh sách ứng viên, điểm danh và duyệt công"
+                    title="Mở bảng theo dõi điểm danh trực tiếp & hiển thị mã QR cho Worker quét"
                   >
                     Điểm Danh & Duyệt
-                  </button>
-
-                  <button
-                    type="button"
-                    style={{
-                      background: '#f1f5f9',
-                      color: '#334155',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: 6,
-                      padding: '0.45rem 0.75rem',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => onOpenQr?.(shift, { eventId: shift.eventId, name: shift.eventName })}
-                    title="Hiển thị mã QR Check-in/Check-out"
-                  >
-                    Mã QR
                   </button>
                 </div>
               </div>

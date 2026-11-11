@@ -76,6 +76,8 @@ class ShiftAssignmentItem {
   final DateTime? checkoutTime;
   final double? hoursWorked;
   final String? imageUrl;
+  final String? proofImageUrl;
+  final DateTime? proofSubmittedAt;
 
   ShiftAssignmentItem({
     required this.assignmentId,
@@ -99,6 +101,8 @@ class ShiftAssignmentItem {
     this.checkoutTime,
     this.hoursWorked,
     this.imageUrl,
+    this.proofImageUrl,
+    this.proofSubmittedAt,
   });
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
@@ -124,6 +128,8 @@ class ShiftAssignmentItem {
       checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime']) : null,
       hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
       imageUrl: json['imageUrl'] as String?,
+      proofImageUrl: json['proofImageUrl'] as String?,
+      proofSubmittedAt: json['proofSubmittedAt'] != null ? DateTime.tryParse(json['proofSubmittedAt']) : null,
     );
   }
 }
@@ -137,6 +143,7 @@ class AttendanceCheckResult {
   final DateTime? checkoutTime;
   final double? hoursWorked;
   final bool? isOnTime;
+  final String? proofImageUrl;
   final String message;
 
   AttendanceCheckResult({
@@ -148,6 +155,7 @@ class AttendanceCheckResult {
     this.checkoutTime,
     this.hoursWorked,
     this.isOnTime,
+    this.proofImageUrl,
     required this.message,
   });
 
@@ -161,6 +169,7 @@ class AttendanceCheckResult {
       checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime']) : null,
       hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
       isOnTime: json['isOnTime'] ?? true,
+      proofImageUrl: json['proofImageUrl'] as String?,
       message: json['message'] ?? 'Thành công',
     );
   }
@@ -272,43 +281,67 @@ class WorkerPreferencesModel {
 class ShiftChecklistItem {
   final String id;
   final String title;
+  final String? instruction;
   final bool isCompleted;
   final DateTime? completedAt;
+  final String? evidenceImageUrl;
+  final DateTime? evidenceSubmittedAt;
+  final bool isRequiredEvidence;
 
   const ShiftChecklistItem({
     required this.id,
     required this.title,
+    this.instruction,
     this.isCompleted = false,
     this.completedAt,
+    this.evidenceImageUrl,
+    this.evidenceSubmittedAt,
+    this.isRequiredEvidence = true,
   });
 
   factory ShiftChecklistItem.fromJson(Map<String, dynamic> json) {
     return ShiftChecklistItem(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
+      instruction: json['instruction'],
       isCompleted: json['isCompleted'] ?? false,
       completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'].toString()) : null,
+      evidenceImageUrl: json['evidenceImageUrl'],
+      evidenceSubmittedAt: json['evidenceSubmittedAt'] != null ? DateTime.tryParse(json['evidenceSubmittedAt'].toString()) : null,
+      isRequiredEvidence: json['isRequiredEvidence'] ?? true,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
+        if (instruction != null) 'instruction': instruction,
         'isCompleted': isCompleted,
         if (completedAt != null) 'completedAt': completedAt!.toUtc().toIso8601String(),
+        if (evidenceImageUrl != null) 'evidenceImageUrl': evidenceImageUrl,
+        if (evidenceSubmittedAt != null) 'evidenceSubmittedAt': evidenceSubmittedAt!.toUtc().toIso8601String(),
+        'isRequiredEvidence': isRequiredEvidence,
       };
 
   ShiftChecklistItem copyWith({
     String? id,
     String? title,
+    String? instruction,
     bool? isCompleted,
     DateTime? completedAt,
+    String? evidenceImageUrl,
+    DateTime? evidenceSubmittedAt,
+    bool? isRequiredEvidence,
   }) {
     return ShiftChecklistItem(
       id: id ?? this.id,
       title: title ?? this.title,
+      instruction: instruction ?? this.instruction,
       isCompleted: isCompleted ?? this.isCompleted,
       completedAt: completedAt ?? this.completedAt,
+      evidenceImageUrl: evidenceImageUrl ?? this.evidenceImageUrl,
+      evidenceSubmittedAt: evidenceSubmittedAt ?? this.evidenceSubmittedAt,
+      isRequiredEvidence: isRequiredEvidence ?? this.isRequiredEvidence,
     );
   }
 }

@@ -23,12 +23,15 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -58,8 +61,12 @@ public class EoEventService {
     private final ReviewRepository reviewRepository;
     private final PaymentRepository paymentRepository;
     private final WorkerRepository workerRepository;
+    private final WorkerEkycVerificationRepository workerEkycVerificationRepository;
     private final MatchingDispatchService matchingDispatchService;
     private final ObjectMapper objectMapper;
+
+    private static final String EVENT_UPLOAD_DIR = "uploads/events";
+    private static final Set<String> ALLOWED_IMAGE_EXTS = Set.of("jpg", "jpeg", "png", "webp", "gif");
 
     @Autowired(required = false)
     private SubscriptionService subscriptionService;
@@ -83,6 +90,9 @@ public class EoEventService {
                 .venueLat(dto.getVenueLat())
                 .venueLng(dto.getVenueLng())
                 .eventDate(dto.getEventDate())
+                .startTime(dto.getStartTime())
+                .endTime(dto.getEndTime())
+                .imageUrl(dto.getImageUrl() != null && !dto.getImageUrl().isBlank() ? dto.getImageUrl().trim() : null)
                 .mode(dto.getMode())
                 .status(EventStatus.DRAFT)
                 .readinessScore(0)
@@ -117,6 +127,9 @@ public class EoEventService {
         if (dto.getVenueLat() != null) event.setVenueLat(dto.getVenueLat());
         if (dto.getVenueLng() != null) event.setVenueLng(dto.getVenueLng());
         if (dto.getEventDate() != null) event.setEventDate(dto.getEventDate());
+        if (dto.getStartTime() != null) event.setStartTime(dto.getStartTime());
+        if (dto.getEndTime() != null) event.setEndTime(dto.getEndTime());
+        if (dto.getImageUrl() != null) event.setImageUrl(dto.getImageUrl().trim());
         if (dto.getMode() != null) event.setMode(dto.getMode());
 
         event = eventRepository.save(event);
@@ -162,7 +175,7 @@ public class EoEventService {
     public ShiftResponseDto addShiftToEvent(UUID userId, UUID eventId, CreateShiftRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
-        validateShiftTimeRange(dto.getStartTime(), dto.getEndTime());
+        validateShiftWithinEvent(event, dto.getStartTime(), dto.getEndTime());
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -213,7 +226,7 @@ public class EoEventService {
     public ShiftResponseDto updateShift(UUID userId, UUID shiftId, UpdateShiftRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
-        validateShiftTimeRange(dto.getStartTime(), dto.getEndTime());
+        validateShiftWithinEvent(shift.getEvent(), dto.getStartTime(), dto.getEndTime());
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -359,6 +372,13 @@ public class EoEventService {
 
         if (reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, eoUserId).isPresent()) {
             throw new BadRequestException("Bạn đã gửi đánh giá cho Worker này trong ca làm việc rồi.");
+        }
+
+        Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId);
+        boolean hasCheckedOut = (attOpt.isPresent() && attOpt.get().getCheckoutTime() != null)
+                || sa.getStatus() == AssignmentStatus.COMPLETED;
+        if (!hasCheckedOut) {
+            throw new BadRequestException("Chỉ có thể đánh giá nhân sự sau khi nhân sự đã hoàn thành Check-out ca làm việc.");
         }
 
         Worker worker = sa.getWorker();
@@ -520,8 +540,20 @@ public class EoEventService {
     }
 
     private void validateShiftTimeRange(Instant startTime, Instant endTime) {
+        validateShiftWithinEvent(null, startTime, endTime);
+    }
+
+    private void validateShiftWithinEvent(Event event, Instant startTime, Instant endTime) {
         if (endTime.isBefore(startTime)) {
-            throw new BadRequestException("Thời gian kết thúc ca phải sau thời gian bắt đầu");
+            throw new BadRequestException("Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu ca.");
+        }
+        if (event != null) {
+            if (event.getStartTime() != null && startTime.isBefore(event.getStartTime())) {
+                throw new BadRequestException("Thời gian bắt đầu ca làm việc không được sớm hơn thời gian bắt đầu của sự kiện.");
+            }
+            if (event.getEndTime() != null && endTime.isAfter(event.getEndTime())) {
+                throw new BadRequestException("Thời gian kết thúc ca làm việc không được muộn hơn thời gian kết thúc của sự kiện.");
+            }
         }
     }
 
@@ -661,6 +693,34 @@ public class EoEventService {
 
         String defaultName = "Worker #" + (worker != null ? worker.getWorkerId().toString().substring(0, 8) : "");
 
+        Integer workerAge = null;
+        String workerDob = null;
+        if (worker != null) {
+            Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
+            if (ekycOpt.isPresent() && ekycOpt.get().getDob() != null && !ekycOpt.get().getDob().isBlank()) {
+                workerDob = ekycOpt.get().getDob().trim();
+                try {
+                    LocalDate birthDate = null;
+                    if (workerDob.contains("/")) {
+                        String[] parts = workerDob.split("/");
+                        if (parts.length == 3) {
+                            birthDate = LocalDate.of(Integer.parseInt(parts[2]), Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
+                        }
+                    } else if (workerDob.contains("-")) {
+                        birthDate = LocalDate.parse(workerDob);
+                    }
+                    if (birthDate != null) {
+                        workerAge = Period.between(birthDate, LocalDate.now()).getYears();
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (workerAge == null && worker.getYearsExperience() != null && worker.getYearsExperience() > 0) {
+                workerAge = 18 + worker.getYearsExperience();
+            } else if (workerAge == null) {
+                workerAge = 22;
+            }
+        }
+
         return ShiftAttendanceDto.builder()
                 .assignmentId(sa.getAssignmentId())
                 .workerId(worker != null ? worker.getWorkerId() : null)
@@ -670,6 +730,8 @@ public class EoEventService {
                 .avatarUrl(u != null ? u.getAvatarUrl() : null)
                 .workerReliabilityScore(worker != null ? worker.getReliabilityScore() : MAX_RELIABILITY_SCORE)
                 .workerRatingAvg(worker != null ? worker.getRatingAvg() : DEFAULT_RATING)
+                .workerAge(workerAge)
+                .workerDob(workerDob)
                 .assignmentStatus(sa.getStatus() != null ? sa.getStatus().name() : AssignmentStatus.PENDING.name())
                 .checkinTime(attOpt.map(AttendanceLog::getCheckinTime).orElse(null))
                 .checkoutTime(attOpt.map(AttendanceLog::getCheckoutTime).orElse(null))
@@ -679,6 +741,7 @@ public class EoEventService {
                 .eoConfirmedAt(sa.getEoConfirmedAt())
                 .hasReviewedWorker(reviewed)
                 .checklistProgress(checklistSummary)
+                .proofImageUrl(attOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .paymentStatus(payOpt.map(p -> p.getStatus().name()).orElse(PAYMENT_NOT_DECLARED))
                 .agreedWage(agreedWage)
                 .build();
@@ -693,6 +756,9 @@ public class EoEventService {
                 .venueLat(e.getVenueLat())
                 .venueLng(e.getVenueLng())
                 .eventDate(e.getEventDate())
+                .startTime(e.getStartTime())
+                .endTime(e.getEndTime())
+                .imageUrl(e.getImageUrl())
                 .mode(e.getMode())
                 .status(e.getStatus())
                 .readinessScore(e.getReadinessScore())
@@ -704,6 +770,76 @@ public class EoEventService {
                 .createdAt(e.getCreatedAt())
                 .shifts(shifts.stream().map(this::mapToShiftResponseDto).collect(Collectors.toList()))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShiftAttendanceDto> getEventWorkersList(UUID userId, UUID eventId) {
+        EventOrganizer eo = getEoOrThrow(userId);
+        Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
+        List<Shift> shifts = shiftRepository.findByEvent_EventIdAndStatusNot(eventId, ShiftStatus.CANCELLED);
+        List<ShiftAttendanceDto> allWorkers = new ArrayList<>();
+        UUID eoUserId = resolveEoUserId(eo, userId);
+
+        for (Shift s : shifts) {
+            List<ShiftAssignment> assignments = shiftAssignmentRepository.findByShift_ShiftId(s.getShiftId());
+            BigDecimal agreedWage = calculateSingleWorkerAgreedWage(s);
+            for (ShiftAssignment sa : assignments) {
+                String checklistSummary = computeChecklistSummary(s.getChecklist(), sa.getChecklistProgress());
+                ShiftAttendanceDto dto = mapToShiftAttendanceDto(sa, eoUserId, agreedWage, checklistSummary);
+                dto.setShiftId(s.getShiftId());
+                dto.setJobType(s.getJobType());
+                dto.setShiftName(s.getJobType());
+                allWorkers.add(dto);
+            }
+        }
+        return allWorkers;
+    }
+
+    public String uploadEventImage(org.springframework.web.multipart.MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Tệp ảnh tải lên không được để trống");
+        }
+        String originalFilename = file.getOriginalFilename();
+        String ext = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        }
+        if (!ALLOWED_IMAGE_EXTS.contains(ext)) {
+            throw new BadRequestException("Chỉ chấp nhận các định dạng ảnh: " + String.join(", ", ALLOWED_IMAGE_EXTS));
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BadRequestException("Dung lượng tệp ảnh không được vượt quá 5MB");
+        }
+        try {
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(EVENT_UPLOAD_DIR);
+            if (!java.nio.file.Files.exists(uploadPath)) {
+                java.nio.file.Files.createDirectories(uploadPath);
+            }
+            String savedFilename = "event_" + UUID.randomUUID().toString().replace("-", "") + "." + ext;
+            java.nio.file.Path targetPath = uploadPath.resolve(savedFilename);
+            java.nio.file.Files.copy(file.getInputStream(), targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return "/api/v1/eo/events/images/" + savedFilename;
+        } catch (java.io.IOException e) {
+            log.error("Lỗi khi lưu tệp ảnh sự kiện: {}", e.getMessage(), e);
+            throw new BadRequestException("Không thể lưu tệp ảnh: " + e.getMessage());
+        }
+    }
+
+    public org.springframework.core.io.Resource loadEventImage(String filename) {
+        try {
+            if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                throw new BadRequestException("Tên tệp không hợp lệ");
+            }
+            java.nio.file.Path filePath = java.nio.file.Paths.get(EVENT_UPLOAD_DIR).resolve(filename).normalize();
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            } else {
+                throw new ResourceNotFoundException("Không tìm thấy tệp ảnh: " + filename);
+            }
+        } catch (java.net.MalformedURLException e) {
+            throw new ResourceNotFoundException("Đường dẫn tệp không hợp lệ: " + filename);
+        }
     }
 
     private ShiftResponseDto mapToShiftResponseDto(Shift s) {

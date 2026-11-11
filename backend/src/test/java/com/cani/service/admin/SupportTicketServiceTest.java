@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.admin;
+
+import com.cani.service.*;
 
 import com.cani.dto.support.AssignTicketRequestDto;
 import com.cani.dto.support.CloseTicketRequestDto;

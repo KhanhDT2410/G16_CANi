@@ -25,15 +25,41 @@ const EventCreationWizardModal = ({
   const [submitting, setSubmitting] = useState(false);
   const [createdEvent, setCreatedEvent] = useState(null);
   
+  // State upload ảnh từ thiết bị
+  const [uploadingEventImg, setUploadingEventImg] = useState(false);
+  const [uploadingShiftImg, setUploadingShiftImg] = useState(false);
+  const eventFileInputRef = React.useRef(null);
+  const shiftFileInputRef = React.useRef(null);
+
   // Danh sách các ca làm việc (Shifts) đã thêm vào sự kiện này
   const [shiftsList, setShiftsList] = useState([]);
   const [isAddingShift, setIsAddingShift] = useState(true);
+
+  // Helper định dạng date -> string cho input datetime-local (YYYY-MM-DDTHH:mm)
+  const toDateTimeInputVal = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const formatDateTimeDisplay = (date) => {
+    if (!date) return 'Chưa xác định';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Chưa xác định';
+    return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ngày ${d.toLocaleDateString('vi-VN')}`;
+  };
 
   // State cho Form tạo ca hiện tại
   const [currentShift, setCurrentShift] = useState({
     jobType: ROLES[0],
     description: 'Hỗ trợ công tác đón tiếp khách, hướng dẫn vị trí và điều phối sự kiện theo phân công.',
-    startTime: '2026-11-20T08:00',
+    startTime: newEvent.startTime || '2026-11-20T08:00',
     endTime: '2026-11-20T12:00',
     requiredWorkers: 4,
     hourlyWage: 50000,
@@ -49,6 +75,80 @@ const EventCreationWizardModal = ({
   });
 
   const [newChecklistItem, setNewChecklistItem] = useState('');
+
+  // Xử lý upload ảnh sự kiện từ thiết bị local
+  const handleEventImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn định dạng file ảnh (JPG, PNG, WEBP, GIF)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Dung lượng ảnh không được vượt quá 5MB', 'error');
+      return;
+    }
+    setUploadingEventImg(true);
+    try {
+      const res = await eoService.uploadImage(file);
+      const url = res.url || res;
+      setNewEvent((prev) => ({ ...prev, imageUrl: url }));
+      showToast('Tải ảnh poster sự kiện thành công!', 'success');
+    } catch (err) {
+      showToast('Lỗi khi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploadingEventImg(false);
+      if (eventFileInputRef.current) eventFileInputRef.current.value = '';
+    }
+  };
+
+  // Xử lý upload ảnh ca làm việc / đồng phục từ thiết bị local
+  const handleShiftImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn định dạng file ảnh (JPG, PNG, WEBP, GIF)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Dung lượng ảnh không được vượt quá 5MB', 'error');
+      return;
+    }
+    setUploadingShiftImg(true);
+    try {
+      const res = await eoService.uploadImage(file);
+      const url = res.url || res;
+      setCurrentShift((prev) => ({ ...prev, imageUrl: url }));
+      showToast('Tải ảnh minh họa ca làm việc thành công!', 'success');
+    } catch (err) {
+      showToast('Lỗi khi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploadingShiftImg(false);
+      if (shiftFileInputRef.current) shiftFileInputRef.current.value = '';
+    }
+  };
+
+  // Tính năng chia ca nhanh thông minh trong khung giờ sự kiện
+  const handleQuickSplit = (splitCount) => {
+    const evtStart = new Date(createdEvent?.startTime || newEvent.startTime);
+    const evtEnd = new Date(createdEvent?.endTime || newEvent.endTime);
+    if (isNaN(evtStart.getTime()) || isNaN(evtEnd.getTime()) || evtStart >= evtEnd) {
+      showToast('Thời gian sự kiện chưa hợp lệ để thực hiện chia ca nhanh', 'error');
+      return;
+    }
+    const totalMs = evtEnd.getTime() - evtStart.getTime();
+    const slotMs = totalMs / splitCount;
+    const currentSlotIndex = Math.min(shiftsList.length, splitCount - 1);
+    const slotStart = new Date(evtStart.getTime() + currentSlotIndex * slotMs);
+    const slotEnd = new Date(evtStart.getTime() + (currentSlotIndex + 1) * slotMs);
+
+    setCurrentShift((prev) => ({
+      ...prev,
+      startTime: toDateTimeInputVal(slotStart),
+      endTime: toDateTimeInputVal(slotEnd),
+    }));
+    showToast(`Đã áp dụng khung giờ Ca #${currentSlotIndex + 1}/${splitCount} (${slotStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${slotEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`, 'info');
+  };
 
   if (!isOpen) return null;
 
@@ -108,9 +208,30 @@ const EventCreationWizardModal = ({
       return;
     }
 
+    if (!newEvent.startTime || !newEvent.endTime) {
+      showToast('Vui lòng chọn thời gian bắt đầu và kết thúc sự kiện', 'error');
+      return;
+    }
+
+    const evtStart = new Date(newEvent.startTime);
+    const evtEnd = new Date(newEvent.endTime);
+    if (isNaN(evtStart.getTime()) || isNaN(evtEnd.getTime())) {
+      showToast('Thời gian sự kiện không hợp lệ', 'error');
+      return;
+    }
+    if (evtStart >= evtEnd) {
+      showToast('Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện!', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      let eventPayload = { ...newEvent };
+      let eventPayload = {
+        ...newEvent,
+        startTime: evtStart.toISOString(),
+        endTime: evtEnd.toISOString(),
+        eventDate: evtStart.toISOString().substring(0, 10),
+      };
       // Tự động phân giải tọa độ GPS theo địa chỉ nếu có
       if (eventPayload.venueAddress?.trim()) {
         try {
@@ -132,9 +253,20 @@ const EventCreationWizardModal = ({
         evt = await eoService.createEvent(eventPayload);
         setCreatedEvent(evt);
       }
+
+      // Khởi tạo khung giờ cho ca làm đầu tiên khớp theo sự kiện
+      const defaultShiftStart = toDateTimeInputVal(evtStart);
+      const defaultShiftEndMs = Math.min(evtStart.getTime() + 4 * 3600 * 1000, evtEnd.getTime());
+      const defaultShiftEnd = toDateTimeInputVal(new Date(defaultShiftEndMs));
+      setCurrentShift((prev) => ({
+        ...prev,
+        startTime: defaultShiftStart,
+        endTime: defaultShiftEnd,
+      }));
+
       setCurrentStep(2);
       setIsAddingShift(true);
-      showToast('Tạo sự kiện thành công! Hãy tạo các ca làm việc cho sự kiện.', 'success');
+      showToast('Tạo sự kiện thành công! Hãy phân chia các ca làm việc trong sự kiện.', 'success');
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi khi tạo sự kiện', 'error');
     } finally {
@@ -157,6 +289,28 @@ const EventCreationWizardModal = ({
       return;
     }
 
+    // Kiểm tra ràng buộc thời gian ca làm việc trong sự kiện
+    const sStart = new Date(currentShift.startTime);
+    const sEnd = new Date(currentShift.endTime);
+    const eStart = new Date(createdEvent?.startTime || newEvent.startTime);
+    const eEnd = new Date(createdEvent?.endTime || newEvent.endTime);
+
+    if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) {
+      showToast('Vui lòng chọn thời gian bắt đầu và kết thúc ca làm hợp lệ', 'error');
+      return;
+    }
+    if (sStart >= sEnd) {
+      showToast('Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu ca', 'error');
+      return;
+    }
+    if (sStart < eStart || sEnd > eEnd) {
+      showToast(
+        `Ca làm việc (${formatDateTimeDisplay(sStart)} - ${formatDateTimeDisplay(sEnd)}) phải nằm trọn trong thời gian sự kiện (${formatDateTimeDisplay(eStart)} - ${formatDateTimeDisplay(eEnd)})!`,
+        'error'
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const checklistJson = JSON.stringify(
@@ -170,22 +324,30 @@ const EventCreationWizardModal = ({
         ...currentShift,
         imageUrl: currentShift.imageUrl?.trim() || null,
         checklist: checklistJson,
-        startTime: new Date(currentShift.startTime).toISOString(),
-        endTime: new Date(currentShift.endTime).toISOString(),
+        startTime: sStart.toISOString(),
+        endTime: sEnd.toISOString(),
       };
 
       const addedShift = await eoService.addShiftToEvent(createdEvent.eventId, payload);
       setShiftsList((prev) => [...prev, addedShift]);
       
-      // Reset form để sẵn sàng tạo ca tiếp theo
+      // Reset form để sẵn sàng tạo ca tiếp theo với giờ tiếp nối
       const nextRoleIndex = (shiftsList.length + 1) % ROLES.length;
       const nextRole = ROLES[nextRoleIndex];
+
+      // Gợi ý giờ ca tiếp theo: bắt đầu từ khi ca trước kết thúc
+      let nextStart = sEnd;
+      let nextEnd = new Date(Math.min(nextStart.getTime() + 4 * 3600 * 1000, eEnd.getTime()));
+      if (nextStart >= eEnd) {
+        nextStart = eStart;
+        nextEnd = new Date(Math.min(nextStart.getTime() + 4 * 3600 * 1000, eEnd.getTime()));
+      }
 
       setCurrentShift({
         jobType: nextRole,
         description: 'Phối hợp thực hiện nhiệm vụ theo kế hoạch tổ chức sự kiện.',
-        startTime: currentShift.startTime,
-        endTime: currentShift.endTime,
+        startTime: toDateTimeInputVal(nextStart),
+        endTime: toDateTimeInputVal(nextEnd),
         requiredWorkers: 2,
         hourlyWage: 50000,
         allowance: 0,
@@ -368,6 +530,97 @@ const EventCreationWizardModal = ({
               />
             </div>
 
+            {/* THỜI GIAN DIỄN RA TOÀN BỘ SỰ KIỆN */}
+            <div className="eo-form-row">
+              <div className="eo-form-group">
+                <label>Thời Gian Bắt Đầu Sự Kiện *</label>
+                <input
+                  type="datetime-local"
+                  required
+                  className="eo-form-input"
+                  value={newEvent.startTime || ''}
+                  onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })}
+                />
+              </div>
+              <div className="eo-form-group">
+                <label>Thời Gian Kết Thúc Sự Kiện *</label>
+                <input
+                  type="datetime-local"
+                  required
+                  className="eo-form-input"
+                  value={newEvent.endTime || ''}
+                  onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* ẢNH BANNER / POSTER SỰ KIỆN */}
+            <div className="eo-form-group">
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Ảnh Poster / Banner Sự Kiện (Tùy chọn)</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hỗ trợ JPG, PNG, WEBP, GIF (Tối đa 5MB)</span>
+              </label>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <input
+                  type="file"
+                  ref={eventFileInputRef}
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleEventImageUpload}
+                />
+                <button
+                  type="button"
+                  disabled={uploadingEventImg}
+                  onClick={() => eventFileInputRef.current?.click()}
+                  className="eo-btn-secondary"
+                  style={{
+                    fontSize: '0.825rem',
+                    padding: '0.45rem 0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap',
+                    cursor: uploadingEventImg ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <span>📁 {uploadingEventImg ? 'Đang tải ảnh...' : 'Tải ảnh từ máy'}</span>
+                </button>
+
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>hoặc</span>
+
+                <input
+                  type="url"
+                  className="eo-form-input"
+                  placeholder="Dán link ảnh (https://...)"
+                  value={newEvent.imageUrl || ''}
+                  onChange={(e) => setNewEvent({ ...newEvent, imageUrl: e.target.value })}
+                  style={{ flex: 1 }}
+                />
+              </div>
+
+              {newEvent.imageUrl && (
+                <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
+                  <img
+                    src={newEvent.imageUrl}
+                    alt="Event Poster Preview"
+                    style={{ width: '80px', height: '48px', objectFit: 'cover', borderRadius: '0.25rem' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <span style={{ fontSize: '0.8rem', color: '#475569', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {newEvent.imageUrl}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setNewEvent({ ...newEvent, imageUrl: '' })}
+                    style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Gỡ ảnh
+                  </button>
+                </div>
+              )}
+            </div>
+
             <VenueLocationPicker
               address={newEvent.venueAddress}
               lat={newEvent.venueLat}
@@ -411,7 +664,7 @@ const EventCreationWizardModal = ({
                   Bước 2: Thiết Lập Danh Sách Ca Làm Việc
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0.25rem 0 0' }}>
-                  Sự kiện: <strong>{createdEvent?.name || newEvent.name}</strong>. Một sự kiện có thể chia làm nhiều ca khác nhau.
+                  Sự kiện: <strong>{createdEvent?.name || newEvent.name}</strong>. Các ca làm việc phải được phân bổ trong khung giờ sự kiện.
                 </p>
               </div>
 
@@ -425,6 +678,70 @@ const EventCreationWizardModal = ({
                   Thêm Ca Mới
                 </button>
               )}
+            </div>
+
+            {/* BANNER THỜI GIAN SỰ KIỆN CHA & CÔNG CỤ CHIA CA NHANH */}
+            <div style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '0.625rem',
+              padding: '0.85rem 1rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e40af', marginBottom: '0.2rem' }}>
+                  ⏰ Khung giờ sự kiện cha:
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 600 }}>
+                  {formatDateTimeDisplay(createdEvent?.startTime || newEvent.startTime)} → {formatDateTimeDisplay(createdEvent?.endTime || newEvent.endTime)}
+                  <span style={{ color: '#2563eb', marginLeft: '0.4rem', fontWeight: 700 }}>
+                    ({getDurationHours(createdEvent?.startTime || newEvent.startTime, createdEvent?.endTime || newEvent.endTime)} tiếng)
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Chia ca nhanh:</span>
+                <button
+                  type="button"
+                  onClick={() => handleQuickSplit(2)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#2563eb',
+                    border: '1px solid #93c5fd',
+                    borderRadius: '0.375rem',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="Tự động chia thời gian sự kiện làm 2 ca (Sáng & Chiều)"
+                >
+                  ⚡ 2 Ca
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickSplit(3)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#2563eb',
+                    border: '1px solid #93c5fd',
+                    borderRadius: '0.375rem',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="Tự động chia thời gian sự kiện làm 3 ca (Sáng - Chiều - Tối)"
+                >
+                  ⚡ 3 Ca
+                </button>
+              </div>
             </div>
 
             {/* DANH SÁCH CÁC CA ĐÃ TẠO */}
@@ -570,14 +887,49 @@ const EventCreationWizardModal = ({
 
                 {/* Ảnh minh họa ca làm / đồng phục */}
                 <div className="eo-form-group">
-                  <label>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</label>
-                  <input
-                    type="url"
-                    className="eo-form-input"
-                    placeholder="Dán đường dẫn ảnh (URL) minh họa đồng phục hoặc khu vực làm việc..."
-                    value={currentShift.imageUrl}
-                    onChange={(e) => setCurrentShift({ ...currentShift, imageUrl: e.target.value })}
-                  />
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hỗ trợ JPG, PNG, WEBP, GIF (Tối đa 5MB)</span>
+                  </label>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <input
+                      type="file"
+                      ref={shiftFileInputRef}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleShiftImageUpload}
+                    />
+                    <button
+                      type="button"
+                      disabled={uploadingShiftImg}
+                      onClick={() => shiftFileInputRef.current?.click()}
+                      className="eo-btn-secondary"
+                      style={{
+                        fontSize: '0.825rem',
+                        padding: '0.45rem 0.85rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        whiteSpace: 'nowrap',
+                        cursor: uploadingShiftImg ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <span>📁 {uploadingShiftImg ? 'Đang tải ảnh...' : 'Tải ảnh từ máy'}</span>
+                    </button>
+
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>hoặc</span>
+
+                    <input
+                      type="url"
+                      className="eo-form-input"
+                      placeholder="Dán đường dẫn ảnh minh họa đồng phục..."
+                      value={currentShift.imageUrl || ''}
+                      onChange={(e) => setCurrentShift({ ...currentShift, imageUrl: e.target.value })}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+
                   {currentShift.imageUrl && (
                     <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
                       <img
@@ -586,8 +938,8 @@ const EventCreationWizardModal = ({
                         style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '0.25rem' }}
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
-                      <span style={{ fontSize: '0.8rem', color: '#475569', flex: 1 }}>
-                        Ảnh minh họa sẽ hiển thị trên ứng dụng của Worker khi nhận việc.
+                      <span style={{ fontSize: '0.8rem', color: '#475569', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {currentShift.imageUrl}
                       </span>
                       <button
                         type="button"
@@ -622,6 +974,35 @@ const EventCreationWizardModal = ({
                     />
                   </div>
                 </div>
+
+                {/* Cảnh báo trực quan nếu thời gian ca làm việc nằm ngoài thời gian sự kiện */}
+                {(() => {
+                  const sS = new Date(currentShift.startTime);
+                  const sE = new Date(currentShift.endTime);
+                  const evS = new Date(createdEvent?.startTime || newEvent.startTime);
+                  const evE = new Date(createdEvent?.endTime || newEvent.endTime);
+                  const isOutOfRange = !isNaN(sS.getTime()) && !isNaN(sE.getTime()) && !isNaN(evS.getTime()) && !isNaN(evE.getTime()) && (sS < evS || sE > evE);
+                  if (isOutOfRange) {
+                    return (
+                      <div style={{
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '0.375rem',
+                        padding: '0.5rem 0.75rem',
+                        fontSize: '0.8rem',
+                        color: '#dc2626',
+                        marginBottom: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontWeight: 600
+                      }}>
+                        <span>⚠️ Chú ý: Thời gian ca làm phải nằm trọn trong khung giờ sự kiện ({formatDateTimeDisplay(evS)} - {formatDateTimeDisplay(evE)})</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 <div className="eo-form-row">
                   <div className="eo-form-group">

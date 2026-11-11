@@ -15,6 +15,7 @@ const MainLayout = () => {
 
   const isAdmin = location.pathname.startsWith('/admin') || user?.role === 'ADMIN';
   const isCustomerCare = location.pathname.startsWith('/customer-care') || user?.role === 'CUSTOMER_CARE';
+  const isStaff = isAdmin || isCustomerCare;
 
   const [userAvatar, setUserAvatar] = useState(() => {
     try {
@@ -97,7 +98,7 @@ const MainLayout = () => {
           </Link>
         </div>
 
-        {!isAdmin && (
+        {!isStaff && (
           <div className="main-header-center">
             <div className="header-search-box">
               <SearchIcon />
@@ -139,6 +140,7 @@ const MainLayout = () => {
             user={user}
             userAvatar={userAvatar}
             isAdmin={isAdmin}
+            isCustomerCare={isCustomerCare}
             onUserBlockClick={handleUserBlockClick}
             onLogout={handleLogout}
           />

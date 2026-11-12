@@ -8,11 +8,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Provider giả lập eKYC dùng cho môi trường Local / Dev / Unit Test.
- * Giúp phát triển giao diện và kiểm thử tính năng hoàn toàn miễn phí mà không làm hao hụt 100 requests dùng thử của VNPT.
+ * DEPRECATED: Đã loại bỏ hoàn toàn chế độ Mock theo yêu cầu nghiệp vụ thực tế.
+ * Hệ thống chỉ chấp nhận xác thực thật qua VNPT eKYC hoặc Gemini Vision AI OCR.
  */
 @Slf4j
-@Component
 public class MockEkycProvider implements EkycProvider {
 
     @Override

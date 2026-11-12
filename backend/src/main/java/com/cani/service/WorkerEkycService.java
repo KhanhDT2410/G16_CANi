@@ -102,27 +102,6 @@ public class WorkerEkycService {
                     backBytes, backFile.getContentType(),
                     selfieBytes, selfieFile.getContentType());
 
-            // Đồng bộ tên worker nếu là chế độ Mock hoặc Fallback về Mock để phản ánh đúng người dùng đăng nhập
-            boolean isMockResult = "MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())
-                    || (ekycResult.getRawAnalysis() != null && Boolean.TRUE.equals(ekycResult.getRawAnalysis().get("mock")));
-            if (isMockResult) {
-                if (worker.getFullName() != null && !worker.getFullName().isBlank()) {
-                    ekycResult.setFullName(worker.getFullName().toUpperCase());
-                }
-                if (ekycResult.getIdNumber() == null || "001202012345".equals(ekycResult.getIdNumber())) {
-                    int imageSeed = Arrays.hashCode(frontBytes);
-                    String uniqueSuffix = String.format("%06d", Math.abs(imageSeed) % 1_000_000);
-                    ekycResult.setIdNumber("001202" + uniqueSuffix);
-                }
-                if (ekycStrict) {
-                    ekycResult.setRoutingDecision("MANUAL_REVIEW");
-                    ekycResult.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
-                } else {
-                    ekycResult.setRoutingDecision("AUTO_APPROVED");
-                    ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
-                }
-            }
-
             // Ghi đè bằng thông tin người dùng đã xác nhận hoặc quét từ mã QR trên thẻ CCCD gắn chip (nếu có)
             if (confirmedCccd != null && !confirmedCccd.isBlank()) {
                 ekycResult.setIdNumber(confirmedCccd.trim());
@@ -153,12 +132,20 @@ public class WorkerEkycService {
                 ekycResult.setExpiryDate(confirmedExpiryDate.trim());
             }
 
-            // 2. Chuẩn hóa, băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
+            // 1. Chuẩn hóa, băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
             String rawIdNumber = ekycResult.getIdNumber() != null
                     ? ekycResult.getIdNumber().replaceAll("\\D", "")
                     : null;
             if (rawIdNumber != null && !rawIdNumber.isBlank()) {
                 ekycResult.setIdNumber(rawIdNumber);
+            }
+            if (rawIdNumber == null || rawIdNumber.length() < 9) {
+                ekycResult.setRoutingDecision("REJECTED");
+                ekycResult.setRoutingReason("Không thể trích xuất số Căn cước công dân hợp lệ từ ảnh tải lên. Vui lòng chụp rõ nét mặt trước thẻ CCCD thật.");
+            }
+            if (ekycResult.getFullName() == null || ekycResult.getFullName().isBlank()) {
+                ekycResult.setRoutingDecision("REJECTED");
+                ekycResult.setRoutingReason("Không thể trích xuất họ và tên từ thẻ CCCD. Vui lòng chụp ảnh thẻ rõ ràng không bị bóng lóa.");
             }
             String idHash = hashCccd(rawIdNumber);
             String maskedNumber = maskCccd(rawIdNumber);
@@ -197,7 +184,12 @@ public class WorkerEkycService {
 
             String decision = ekycResult.getRoutingDecision();
             String status;
-            if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
+            if (ekycStrict && "AUTO_APPROVED".equalsIgnoreCase(decision)) {
+                status = "PENDING_REVIEW";
+                decision = "MANUAL_REVIEW";
+                ekycResult.setRoutingDecision(decision);
+                ekycResult.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
+            } else if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
                 status = "APPROVED";
             } else if ("REJECTED".equalsIgnoreCase(decision)) {
                 status = "REJECTED";
@@ -316,6 +308,25 @@ public class WorkerEkycService {
 
         log.info("Admin {} đã duyệt hồ sơ eKYC {}: {}", adminUserId, verificationId, decision);
         return mapToDto(verification);
+    }
+
+    /**
+     * Reset toàn bộ hồ sơ eKYC của Worker về trạng thái chưa định danh để nộp lại ảnh thật
+     */
+    @Transactional
+    public void resetMyEkyc(UUID userId) {
+        Worker worker = workerRepository.findByUser_UserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Worker không tồn tại"));
+
+        List<WorkerEkycVerification> oldList = ekycVerificationRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
+        if (oldList != null && !oldList.isEmpty()) {
+            ekycVerificationRepository.deleteAll(oldList);
+        }
+
+        worker.setKycStatus(null);
+        worker.setCccdNumber(null);
+        workerRepository.save(worker);
+        log.info("Reset eKYC thành công cho workerId={}", worker.getWorkerId());
     }
 
     /**

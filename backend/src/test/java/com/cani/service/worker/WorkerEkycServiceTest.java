@@ -158,7 +158,7 @@ class WorkerEkycServiceTest {
         EkycVerificationResultDto result = workerEkycService.submitEkyc(workerUser.getUserId(), frontFile, backFile, selfieFile);
 
         assertThat(result.getStatus()).isEqualTo("REJECTED");
-        assertThat(result.getRoutingReason()).contains("liên kết với một tài khoản Worker khác");
+        assertThat(result.getRoutingReason()).contains("đã được sử dụng để xác thực cho một tài khoản khác");
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.REJECTED);
     }
 
@@ -169,6 +169,7 @@ class WorkerEkycServiceTest {
 
         EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
                 .idNumber("079201012345")
+                .fullName("NGUYỄN VĂN AN")
                 .ocrConfidence(0.95)
                 .faceMatchScore(93.5)
                 .routingDecision("AUTO_APPROVED")
@@ -176,7 +177,6 @@ class WorkerEkycServiceTest {
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
-        when(ekycProvider.getProviderName()).thenReturn("MOCK_EKYC");
         when(ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(any(), any(), any())).thenReturn(false);
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);

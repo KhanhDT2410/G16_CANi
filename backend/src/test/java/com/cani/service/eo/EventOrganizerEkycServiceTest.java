@@ -190,7 +190,6 @@ class EventOrganizerEkycServiceTest {
                 .build();
 
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
-        when(ekycProvider.getProviderName()).thenReturn("MOCK_EKYC");
         when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any())).thenReturn(false);
         when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
                 .thenAnswer(invocation -> {
@@ -206,8 +205,8 @@ class EventOrganizerEkycServiceTest {
         assertNotNull(result);
         assertEquals("PENDING_REVIEW", result.getStatus());
         assertEquals("MANUAL_REVIEW", result.getRoutingDecision());
-        assertEquals("ĐẠI DIỆN DOANH NGHIỆP", result.getRepresentativeName());
-        assertTrue(result.getCccdNumberMasked().startsWith("001******"));
+        assertEquals("MOCK NAME", result.getRepresentativeName());
+        assertTrue(result.getCccdNumberMasked().startsWith("001201******"));
         assertEquals(VerificationStatus.PENDING, eo.getVerificationStatus());
     }
 
@@ -227,7 +226,6 @@ class EventOrganizerEkycServiceTest {
                 .build();
 
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
-        when(ekycProvider.getProviderName()).thenReturn("MOCK_EKYC");
         when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any())).thenReturn(false);
         when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
                 .thenAnswer(invocation -> {
@@ -243,8 +241,8 @@ class EventOrganizerEkycServiceTest {
         assertNotNull(result);
         assertEquals("APPROVED", result.getStatus());
         assertEquals("AUTO_APPROVED", result.getRoutingDecision());
-        assertEquals("ĐẠI DIỆN DOANH NGHIỆP", result.getRepresentativeName());
-        assertTrue(result.getCccdNumberMasked().startsWith("001******"));
+        assertEquals("MOCK NAME", result.getRepresentativeName());
+        assertTrue(result.getCccdNumberMasked().startsWith("001201******"));
         assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
         verify(eventOrganizerRepository, times(1)).save(eo);
     }

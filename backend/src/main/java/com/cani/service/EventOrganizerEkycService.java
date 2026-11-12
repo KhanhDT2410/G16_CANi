@@ -94,39 +94,24 @@ public class EventOrganizerEkycService {
                     backBytes, backFile.getContentType(),
                     selfieBytes, selfieFile.getContentType());
 
-            // Đồng bộ thông tin nếu chạy ở chế độ Mock thuần hoặc Fallback về Mock
-            boolean isMockResult = "MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())
-                    || (result.getRawAnalysis() != null && Boolean.TRUE.equals(result.getRawAnalysis().get("mock")));
-            if (isMockResult) {
-                if (eo.getUser() != null && eo.getUser().getFullName() != null && !eo.getUser().getFullName().isBlank()) {
-                    result.setFullName(eo.getUser().getFullName().toUpperCase());
-                }
-                // Tạo số CCCD dựa trên nội dung file ảnh mặt trước (Arrays.hashCode(frontBytes)) thay vì eoId
-                // để nếu 2 tài khoản cùng tải lên 1 ảnh CCCD giống nhau sẽ sinh ra cùng 1 số CCCD và bị chặn trùng!
-                if (result.getIdNumber() == null || "001202012345".equals(result.getIdNumber())) {
-                    int imageSeed = Arrays.hashCode(frontBytes);
-                    String uniqueSuffix = String.format("%06d", Math.abs(imageSeed) % 1_000_000);
-                    result.setIdNumber("001202" + uniqueSuffix);
-                }
-                if (ekycStrict) {
-                    result.setRoutingDecision("MANUAL_REVIEW");
-                    result.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
-                } else {
-                    result.setRoutingDecision("AUTO_APPROVED");
-                    result.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
-                }
-            }
-
             if (confirmedCccd != null && !confirmedCccd.isBlank()) {
                 result.setIdNumber(confirmedCccd.replaceAll("\\D", ""));
             }
 
-            // 2. Chuẩn hóa, băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
+            // 1. Chuẩn hóa, băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
             String rawIdNumber = result.getIdNumber() != null
                     ? result.getIdNumber().replaceAll("\\D", "")
                     : null;
             if (rawIdNumber != null && !rawIdNumber.isBlank()) {
                 result.setIdNumber(rawIdNumber);
+            }
+            if (rawIdNumber == null || rawIdNumber.length() < 9) {
+                result.setRoutingDecision("REJECTED");
+                result.setRoutingReason("Không thể trích xuất số Căn cước công dân hợp lệ từ ảnh tải lên. Vui lòng chụp rõ nét mặt trước thẻ CCCD thật.");
+            }
+            if (result.getFullName() == null || result.getFullName().isBlank()) {
+                result.setRoutingDecision("REJECTED");
+                result.setRoutingReason("Không thể trích xuất họ và tên từ thẻ CCCD. Vui lòng chụp ảnh thẻ rõ ràng không bị bóng lóa.");
             }
             String idHash = hashCccd(rawIdNumber);
             String maskedNumber = maskCccd(rawIdNumber);
@@ -173,7 +158,12 @@ public class EventOrganizerEkycService {
 
             String decision = result.getRoutingDecision();
             String status;
-            if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
+            if (ekycStrict && "AUTO_APPROVED".equalsIgnoreCase(decision)) {
+                status = "PENDING_REVIEW";
+                decision = "MANUAL_REVIEW";
+                result.setRoutingDecision(decision);
+                result.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
+            } else if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
                 status = "APPROVED";
             } else if ("REJECTED".equalsIgnoreCase(decision)) {
                 status = "REJECTED";
@@ -231,8 +221,7 @@ public class EventOrganizerEkycService {
                         && (eo.getAddress() == null || eo.getAddress().isBlank())) {
                     eo.setAddress(result.getResidenceAddress().trim());
                 }
-                if (!isMockResult
-                        && result.getFullName() != null && !result.getFullName().isBlank()
+                if (result.getFullName() != null && !result.getFullName().isBlank()
                         && eo.getUser() != null) {
                     eo.getUser().setFullName(result.getFullName().trim());
                     userRepository.save(eo.getUser());

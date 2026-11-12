@@ -102,4 +102,14 @@ class EkycRepository {
       return null;
     }
   }
+
+  Future<bool> resetEkyc({String? token}) async {
+    try {
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.post('/v1/workers/ekyc/reset', options: options);
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
 }

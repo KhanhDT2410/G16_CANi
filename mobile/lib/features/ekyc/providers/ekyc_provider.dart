@@ -182,8 +182,11 @@ class EkycNotifier extends StateNotifier<EkycState> {
     }
   }
 
-  void resetForm() {
+  Future<void> resetForm() async {
     state = const EkycState();
+    try {
+      await _repository.resetEkyc();
+    } catch (_) {}
   }
 }
 

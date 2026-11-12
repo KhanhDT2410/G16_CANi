@@ -1,6 +1,7 @@
 package com.cani.repository;
 
 import com.cani.entity.SupportTicket;
+import com.cani.entity.enums.TicketCategory;
 import com.cani.entity.enums.TicketStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -25,5 +26,9 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, UU
     long countByStatusInAndAssignedTo(Collection<TicketStatus> statuses, UUID assignedTo);
 
     long countByStatus(TicketStatus status);
+
+    long countByCategory(TicketCategory category);
+
+    List<SupportTicket> findByStatusInAndSlaDeadlineBefore(Collection<TicketStatus> statuses, java.time.Instant now);
 }
 

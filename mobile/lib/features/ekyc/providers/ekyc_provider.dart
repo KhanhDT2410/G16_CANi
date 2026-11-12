@@ -1,11 +1,13 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import '../data/ekyc_repository.dart';
 import '../models/ekyc_models.dart';
 
 final ekycRepositoryProvider = Provider<EkycRepository>((ref) {
-  return EkycRepository();
+  final dio = ref.watch(dioProvider);
+  return EkycRepository(dio);
 });
 
 class EkycState {
@@ -96,6 +98,14 @@ class EkycNotifier extends StateNotifier<EkycState> {
 
   EkycNotifier(this._repository, this._ref) : super(const EkycState()) {
     checkStatus();
+    _ref.listen<AuthState>(authStateProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id) {
+        resetForm();
+        if (next.isAuthenticated) {
+          checkStatus();
+        }
+      }
+    });
   }
 
   Future<void> checkStatus() async {

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/screens/forgot_password_screen.dart';
 import 'package:cani/features/auth/screens/register_screen.dart';
 import 'package:cani/features/auth/widgets/auth_text_field.dart';
+import 'package:cani/shared/widgets/app_back_button.dart';
 import 'package:cani/shared/widgets/cani_brand_logo.dart';
 import 'package:cani/shared/widgets/worker_illustration_card.dart';
 
@@ -38,17 +40,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đăng nhập thành công! Chào mừng bạn đến với CANi Worker.'),
+          content: Text('Đăng nhập thành công! Chào mừng bạn đến với CANi.'),
           backgroundColor: Color(0xFF10B981),
         ),
       );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -62,14 +66,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (Navigator.of(context).canPop()) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: AppBackButton(
+                        onTap: () {
+                          ref.read(authStateProvider.notifier).clearError();
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   // 1. Logo CANi Worker Chính Thức (Chuẩn Mockup Image 2)
-                  const SizedBox(height: 8),
-                  const CaniBrandLogo(
-                    height: 52,
-                    isWorker: true,
-                    showSlogan: false,
-                  ),
                   const SizedBox(height: 6),
+                  const CaniBrandLogo(),
                   Text(
                     'Đăng nhập để nhận ca làm sự kiện linh hoạt',
                     textAlign: TextAlign.center,
@@ -139,7 +151,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 4),
+
+                  // Quên mật khẩu link
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ForgotPasswordScreen(
+                              initialEmail: _emailController.text.trim(),
+                            ),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text(
+                        'Quên mật khẩu?',
+                        style: TextStyle(
+                          color: Color(0xFF0077FF),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
                   // 5. Nút Đăng Nhập Gradient (Ocean Cyan-Blue) kèm icon Mũi tên ->
                   Container(
@@ -153,7 +194,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0077FF).withOpacity(0.35),
+                          color: const Color(0xFF0077FF).withValues(alpha: 0.35),
                           blurRadius: 14,
                           offset: const Offset(0, 5),
                         ),
@@ -226,6 +267,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   backgroundColor: Color(0xFF10B981),
                                 ),
                               );
+                              if (Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop();
+                              }
                             }
                           },
                     icon: authState.isLoading
@@ -238,7 +282,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             'https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png',
                             height: 20,
                             width: 20,
-                            errorBuilder: (_, __, ___) => const Icon(
+                            errorBuilder: (_, _, _) => const Icon(
                               Icons.g_mobiledata,
                               size: 26,
                               color: Colors.blue,
@@ -265,14 +309,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Chưa có tài khoản Worker? ',
-                        style: TextStyle(fontSize: 13.5, color: Colors.grey.shade700),
+                      const Text(
+                        'Bạn chưa có tài khoản? ',
+                        style: TextStyle(fontSize: 13.5, color: Color(0xFF1E293B)),
                       ),
                       GestureDetector(
                         onTap: () {
                           ref.read(authStateProvider.notifier).clearError();
-                          Navigator.of(context).push(
+                          Navigator.of(context).pushReplacement(
                             MaterialPageRoute<void>(
                               builder: (_) => const RegisterScreen(),
                             ),

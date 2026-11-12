@@ -18,9 +18,17 @@ public interface DisputeRepository extends JpaRepository<Dispute, UUID>, JpaSpec
 
     List<Dispute> findByRespondentIdOrderByCreatedAtDesc(UUID respondentId);
 
+    List<Dispute> findByComplainantIdOrRespondentIdOrderByCreatedAtDesc(UUID complainantId, UUID respondentId);
+
+    List<Dispute> findByAssignmentIdOrderByCreatedAtDesc(UUID assignmentId);
+
     List<Dispute> findByStatusIn(List<DisputeStatus> statuses);
 
-    List<Dispute> findByStatusInAndAssignedTo(java.util.Collection<DisputeStatus> statuses, UUID assignedTo);
+    List<Dispute> findByStatusInAndAssignedTo(List<DisputeStatus> statuses, UUID assignedTo);
+
+    List<Dispute> findByStatusInAndAssignedToIsNull(List<DisputeStatus> statuses);
 
     long countByStatus(DisputeStatus status);
+
+    List<Dispute> findByStatusInAndSlaDeadlineBefore(List<DisputeStatus> statuses, java.time.Instant now);
 }

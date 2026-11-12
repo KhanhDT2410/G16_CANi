@@ -3,8 +3,7 @@ package com.cani.controller;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
 import com.cani.dto.response.ApiResponse;
-import com.cani.entity.User;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.WorkerEkycService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,12 +27,12 @@ public class WorkerEkycController {
     /**
      * Worker nộp hồ sơ eKYC (Mặt trước CCCD, Mặt sau CCCD, Ảnh chân dung Selfie)
      */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @PostMapping(value = "/workers/ekyc/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> submitEkyc(
             @RequestParam("frontImage") MultipartFile frontImage,
             @RequestParam("backImage") MultipartFile backImage,
             @RequestParam("selfieImage") MultipartFile selfieImage,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             @RequestParam(value = "cccdNumber", required = false) String cccdNumber,
             @RequestParam(value = "fullName", required = false) String fullName,
             @RequestParam(value = "dob", required = false) String dob,
@@ -44,7 +43,7 @@ public class WorkerEkycController {
             @RequestParam(value = "expiryDate", required = false) String expiryDate,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.submitEkyc(
                 userId, frontImage, backImage, selfieImage,
                 cccdNumber, fullName, dob, gender,
@@ -65,12 +64,12 @@ public class WorkerEkycController {
     /**
      * Worker kiểm tra trạng thái hồ sơ eKYC
      */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/workers/ekyc/status")
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> getMyEkycStatus(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.getMyEkycStatus(userId);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy thông tin trạng thái eKYC thành công"));
     }
@@ -93,26 +92,10 @@ public class WorkerEkycController {
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> adminReviewEkyc(
             @PathVariable UUID verificationId,
             @Valid @RequestBody EkycAdminReviewRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
 
-        UUID adminUserId = resolveUserId(authentication, explicitUserId);
+        UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.adminReviewEkyc(adminUserId, verificationId, request);
         return ResponseEntity.ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC thành công: " + result.getStatus()));
-    }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        if (explicitUserId != null) {
-            return explicitUserId;
-        }
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            return u.getUserId();
-        }
-        if (authentication != null && authentication.getName() != null) {
-            try {
-                return UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
     }
 }

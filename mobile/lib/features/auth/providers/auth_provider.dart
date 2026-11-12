@@ -1,7 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/notifications/fcm_service.dart';
 import 'package:cani/features/auth/data/auth_repository.dart';
 import 'package:cani/features/auth/models/user_dto.dart';
+import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 
 class AuthState {
   const AuthState({
@@ -31,21 +35,26 @@ class AuthState {
 
 final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final repository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(repository);
+  final dio = ref.watch(dioProvider);
+  return AuthNotifier(repository, dio);
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._repository) : super(const AuthState()) {
+  AuthNotifier(this._repository, this._dio) : super(const AuthState()) {
     checkAuthStatus();
   }
 
   final AuthRepository _repository;
+  final Dio _dio;
 
   Future<void> checkAuthStatus() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final user = await _repository.getSavedUser();
       state = state.copyWith(isLoading: false, user: user);
+      if (user != null) {
+        FcmService.syncTokenWithBackend(_dio, explicitUserId: user.id);
+      }
     } catch (_) {
       state = state.copyWith(isLoading: false, user: null);
     }
@@ -56,6 +65,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final response = await _repository.login(email, password);
       state = state.copyWith(isLoading: false, user: response.user);
+      FcmService.syncTokenWithBackend(_dio, explicitUserId: response.user.id);
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -86,6 +96,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final response = await _repository.signInWithGoogle();
       state = state.copyWith(isLoading: false, user: response.user);
+      FcmService.syncTokenWithBackend(_dio, explicitUserId: response.user.id);
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -105,13 +116,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await _repository.registerWorker(
+      final user = await _repository.registerWorker(
         email: email,
         password: password,
         fullName: fullName,
         otpCode: otpCode,
         phone: phone,
       );
+      // Người dùng đã đồng ý điều khoản ở bước 1, lưu trạng thái để tránh popup đè lên các bước tiếp theo
+      await TermsOfServiceDialog.markAccepted(user.id);
       state = state.copyWith(isLoading: false);
       return true;
     } catch (e) {
@@ -125,6 +138,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
+    final currentUserId = state.user?.id;
+    try {
+      await FcmService.unregisterToken(_dio, explicitUserId: currentUserId);
+    } catch (_) {}
     await _repository.logout();
     state = const AuthState();
   }

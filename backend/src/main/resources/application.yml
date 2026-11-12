@@ -80,16 +80,45 @@ cani:
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-3.5-flash}
+      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
       url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
       timeout-ms: 20000
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
+    strict: ${EKYC_STRICT:false}
     vnpt:
       enabled: ${VNPT_EKYC_ENABLED:false}
       base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}
-      token-id: ${VNPT_EKYC_TOKEN_ID:5e7a3b1b-db74-1656-e063-63199f0a717f}
-      token-key: ${VNPT_EKYC_TOKEN_KEY:MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAlvv9EToVRDb3ZS58HaSGBNDHN9GLm9lROWE4CxyRMHib2K1XCmSS6suua/4coDMvthnv8zKmUy25BiplQtd6MMCAwEAAQ==}
+      token-id: ${VNPT_EKYC_TOKEN_ID:}
+      token-key: ${VNPT_EKYC_TOKEN_KEY:}
       access-token: ${VNPT_EKYC_ACCESS_TOKEN:}
       mac-address: ${VNPT_EKYC_MAC_ADDRESS:TEST1}
       timeout-ms: 25000
+  firebase:
+    enabled: ${FIREBASE_ENABLED:true}
+    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
+  subscription:
+    strict: ${SUBSCRIPTION_STRICT:false}
+  vnpay:
+    pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+    tmn-code: ${VNPAY_TMN_CODE:}
+    hash-secret: ${VNPAY_HASH_SECRET:}
+    return-url: ${VNPAY_RETURN_URL:http://localhost:5173/eo?tab=subscription}
+  payos:
+    endpoint: ${PAYOS_ENDPOINT:https://api-merchant.payos.vn}
+    client-id: ${PAYOS_CLIENT_ID:}
+    api-key: ${PAYOS_API_KEY:}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:}
+    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?payos=success}
+    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?payos=cancel}
+  sla-scan:
+    enabled: ${SLA_SCAN_ENABLED:true}
+    cron: ${SLA_SCAN_CRON:0 */15 * * * *}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha

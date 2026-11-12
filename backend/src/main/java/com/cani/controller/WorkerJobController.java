@@ -1,12 +1,9 @@
 package com.cani.controller;
 
 import com.cani.dto.response.ApiResponse;
-import com.cani.dto.worker.JobProposalResponseDto;
-import com.cani.dto.worker.ShiftAssignmentResponseDto;
-import com.cani.dto.worker.WorkerOnlineStatusRequestDto;
-import com.cani.entity.User;
+import com.cani.dto.worker.*;
 import com.cani.entity.Worker;
-import com.cani.exception.BadRequestException;
+import com.cani.security.SecurityUtils;
 import com.cani.service.WorkerJobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,12 +31,11 @@ public class WorkerJobController {
     @PostMapping("/status")
     public ResponseEntity<ApiResponse<Boolean>> setOnlineStatus(
             @Valid @RequestBody WorkerOnlineStatusRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         Worker worker = workerJobService.setOnlineStatus(userId, request);
-        String msg = Boolean.TRUE.equals(worker.getIsOnline()) 
+        String msg = Boolean.TRUE.equals(worker.getIsOnline())
                 ? "Đã bật chế độ 'Bắt đầu kiếm việc'. Hệ thống sẽ tự động ghép nối và gửi đề xuất việc làm phù hợp cho bạn."
                 : "Đã tắt chế độ kiếm việc. Bạn sẽ tạm thời không nhận thêm đề xuất mới.";
         return ResponseEntity.ok(ApiResponse.ok(worker.getIsOnline(), msg));
@@ -51,10 +47,9 @@ public class WorkerJobController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/proposals")
     public ResponseEntity<ApiResponse<List<JobProposalResponseDto>>> getMyProposals(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<JobProposalResponseDto> proposals = workerJobService.getMyProposals(userId);
         return ResponseEntity.ok(ApiResponse.ok(proposals, "Lấy danh sách đề xuất việc làm thành công"));
     }
@@ -66,10 +61,9 @@ public class WorkerJobController {
     @PostMapping("/proposals/{proposalId}/accept")
     public ResponseEntity<ApiResponse<ShiftAssignmentResponseDto>> acceptProposal(
             @PathVariable("proposalId") UUID proposalId,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftAssignmentResponseDto assignment = workerJobService.acceptProposal(userId, proposalId);
         return ResponseEntity.ok(ApiResponse.ok(assignment, "Chúc mừng! Bạn đã nhận thành công ca làm việc. Vui lòng có mặt đúng giờ theo yêu cầu của sự kiện."));
     }
@@ -82,10 +76,9 @@ public class WorkerJobController {
     public ResponseEntity<ApiResponse<Void>> rejectProposal(
             @PathVariable("proposalId") UUID proposalId,
             @RequestParam(value = "reason", required = false) String reason,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         workerJobService.rejectProposal(userId, proposalId, reason);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã từ chối đề xuất việc làm thành công."));
     }
@@ -96,10 +89,9 @@ public class WorkerJobController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/assignments")
     public ResponseEntity<ApiResponse<List<ShiftAssignmentResponseDto>>> getMyAssignments(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<ShiftAssignmentResponseDto> assignments = workerJobService.getMyAssignments(userId);
         return ResponseEntity.ok(ApiResponse.ok(assignments, "Lấy lịch làm việc thành công"));
     }
@@ -109,14 +101,13 @@ public class WorkerJobController {
      */
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @PostMapping("/assignments/{assignmentId}/checkin")
-    public ResponseEntity<ApiResponse<com.cani.dto.worker.AttendanceCheckResponseDto>> checkin(
+    public ResponseEntity<ApiResponse<AttendanceCheckResponseDto>> checkin(
             @PathVariable("assignmentId") UUID assignmentId,
-            @RequestBody com.cani.dto.worker.AttendanceCheckRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            @RequestBody AttendanceCheckRequestDto request,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
-        com.cani.dto.worker.AttendanceCheckResponseDto response = workerJobService.checkinAssignment(userId, assignmentId, request);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        AttendanceCheckResponseDto response = workerJobService.checkinAssignment(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
     }
 
@@ -125,14 +116,13 @@ public class WorkerJobController {
      */
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @PostMapping("/assignments/{assignmentId}/checkout")
-    public ResponseEntity<ApiResponse<com.cani.dto.worker.AttendanceCheckResponseDto>> checkout(
+    public ResponseEntity<ApiResponse<AttendanceCheckResponseDto>> checkout(
             @PathVariable("assignmentId") UUID assignmentId,
-            @RequestBody com.cani.dto.worker.AttendanceCheckRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
+            @RequestBody AttendanceCheckRequestDto request,
             Authentication authentication
     ) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
-        com.cani.dto.worker.AttendanceCheckResponseDto response = workerJobService.checkoutAssignment(userId, assignmentId, request);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        AttendanceCheckResponseDto response = workerJobService.checkoutAssignment(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
     }
 
@@ -141,27 +131,167 @@ public class WorkerJobController {
      */
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/shifts/nearby")
-    public ResponseEntity<ApiResponse<List<com.cani.dto.worker.NearbyShiftResponseDto>>> getNearbyShifts(
+    public ResponseEntity<ApiResponse<List<NearbyShiftResponseDto>>> getNearbyShifts(
             @RequestParam(value = "lat", required = false) Double lat,
             @RequestParam(value = "lng", required = false) Double lng,
             @RequestParam(value = "radiusKm", required = false, defaultValue = "15.0") Double radiusKm
     ) {
-        List<com.cani.dto.worker.NearbyShiftResponseDto> shifts = workerJobService.getNearbyShifts(lat, lng, radiusKm);
+        List<NearbyShiftResponseDto> shifts = workerJobService.getNearbyShifts(lat, lng, radiusKm);
         return ResponseEntity.ok(ApiResponse.ok(shifts, "Quét tìm ca làm việc xung quanh thành công (Tìm thấy " + shifts.size() + " ca)"));
     }
 
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        if (explicitUserId != null) {
-            return explicitUserId;
-        }
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            return u.getUserId();
-        }
-        if (authentication != null && authentication.getName() != null) {
-            try {
-                return UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
+    /**
+     * Worker ứng tuyển trực tiếp vào ca làm việc từ Job Radar Map
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/shifts/{shiftId}/apply")
+    public ResponseEntity<ApiResponse<ShiftAssignmentResponseDto>> applyForShift(
+            @PathVariable("shiftId") UUID shiftId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        ShiftAssignmentResponseDto assignment = workerJobService.applyForShift(userId, shiftId);
+        return ResponseEntity.ok(ApiResponse.ok(assignment, "Ứng tuyển thành công! Ca làm đã được thêm vào Lịch làm việc của bạn."));
+    }
+
+    /**
+     * UC-25: Lấy danh sách lịch rảnh tuần của Worker
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/availability")
+    public ResponseEntity<ApiResponse<List<WorkerAvailabilityDto>>> getAvailability(
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<WorkerAvailabilityDto> list = workerJobService.getWorkerAvailability(userId);
+        return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách lịch rảnh thành công"));
+    }
+
+    /**
+     * UC-25: Cập nhật lịch rảnh tuần của Worker (Atomic Replace)
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PutMapping("/availability")
+    public ResponseEntity<ApiResponse<List<WorkerAvailabilityDto>>> updateAvailability(
+            @Valid @RequestBody UpdateAvailabilityRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<WorkerAvailabilityDto> list = workerJobService.updateWorkerAvailability(userId, request);
+        return ResponseEntity.ok(ApiResponse.ok(list, "Cập nhật lịch rảnh tuần thành công"));
+    }
+
+    /**
+     * UC-26 & UC-34: Lấy cài đặt bán kính tìm việc và mức lương mong muốn
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/preferences")
+    public ResponseEntity<ApiResponse<WorkerPreferencesDto>> getPreferences(
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerPreferencesDto prefs = workerJobService.getWorkerPreferences(userId);
+        return ResponseEntity.ok(ApiResponse.ok(prefs, "Lấy thông tin tiêu chí tìm việc thành công"));
+    }
+
+    /**
+     * UC-26 & UC-34: Cập nhật tiêu chí tìm việc (Bán kính, lương, địa chỉ)
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PutMapping("/preferences")
+    public ResponseEntity<ApiResponse<WorkerPreferencesDto>> updatePreferences(
+            @Valid @RequestBody WorkerPreferencesDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerPreferencesDto prefs = workerJobService.updateWorkerPreferences(userId, request);
+        return ResponseEntity.ok(ApiResponse.ok(prefs, "Cập nhật tiêu chí tìm việc thành công"));
+    }
+
+    /**
+     * UC-53: Worker hủy ca làm việc đã nhận (Kèm trừ điểm uy tín theo quy định)
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/assignments/{assignmentId}/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancelAssignment(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @RequestParam(value = "reason", required = false) String reason,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        workerJobService.cancelAssignment(userId, assignmentId, reason);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã hủy nhận ca làm việc thành công. Điểm uy tín của bạn đã được cập nhật."));
+    }
+
+    /**
+     * UC-45: Lấy checklist đầu việc của ca làm
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/assignments/{assignmentId}/checklist")
+    public ResponseEntity<ApiResponse<List<ShiftChecklistItemDto>>> getShiftChecklist(
+            @PathVariable("assignmentId") UUID assignmentId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<ShiftChecklistItemDto> items = workerJobService.getShiftChecklist(userId, assignmentId);
+        return ResponseEntity.ok(ApiResponse.ok(items, "Lấy danh sách checklist công việc thành công"));
+    }
+
+    /**
+     * UC-45: Cập nhật tiến độ checklist đầu việc của ca làm
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PutMapping("/assignments/{assignmentId}/checklist")
+    public ResponseEntity<ApiResponse<List<ShiftChecklistItemDto>>> updateShiftChecklist(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @Valid @RequestBody UpdateChecklistRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<ShiftChecklistItemDto> items = workerJobService.updateShiftChecklist(userId, assignmentId, request);
+        return ResponseEntity.ok(ApiResponse.ok(items, "Cập nhật checklist công việc thành công"));
+    }
+
+    /**
+     * UC-69: Worker đánh giá Ban tổ chức (EO) sau khi hoàn thành ca
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/assignments/{assignmentId}/reviews")
+    public ResponseEntity<ApiResponse<ReviewResponseDto>> createReview(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @Valid @RequestBody CreateReviewRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        ReviewResponseDto review = workerJobService.createReview(userId, assignmentId, request);
+        return ResponseEntity.ok(ApiResponse.ok(review, "Gửi đánh giá thành công! Cảm ơn bạn đã phản hồi."));
+    }
+
+    /**
+     * UC-69: Xem đánh giá đã gửi cho ca làm
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/assignments/{assignmentId}/reviews")
+    public ResponseEntity<ApiResponse<ReviewResponseDto>> getAssignmentReview(
+            @PathVariable("assignmentId") UUID assignmentId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        return workerJobService.getAssignmentReview(userId, assignmentId)
+                .map(r -> ResponseEntity.ok(ApiResponse.ok(r, "Lấy đánh giá thành công")))
+                .orElseGet(() -> ResponseEntity.ok(ApiResponse.ok(null, "Chưa có đánh giá cho ca này")));
+    }
+
+    /**
+     * UC-60 / UC-64: Thống kê thu nhập và ví làm việc cá nhân
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/income-summary")
+    public ResponseEntity<ApiResponse<WorkerIncomeSummaryDto>> getIncomeSummary(
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerIncomeSummaryDto summary = workerJobService.getIncomeSummary(userId);
+        return ResponseEntity.ok(ApiResponse.ok(summary, "Lấy thống kê thu nhập thành công"));
     }
 }

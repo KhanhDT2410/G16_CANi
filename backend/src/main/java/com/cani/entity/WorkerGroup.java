@@ -3,7 +3,9 @@ package com.cani.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,6 +45,7 @@ public class WorkerGroup {
     @Builder.Default
     private Integer maxSize = 20;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "availability", columnDefinition = "jsonb")
     private String availability;
 

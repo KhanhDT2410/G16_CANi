@@ -26,16 +26,17 @@ export const RegisterForm = () => {
         <CaniLogo variant="full" height={52} className="auth-logo-center" />
         <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng Ký Nhà Tổ Chức</h2>
         <p className="auth-subtitle">
-          Tạo tài khoản dành riêng cho Ban Tổ Chức & Doanh Nghiệp Sự Kiện
+          Tạo tài khoản dành riêng cho Nhà Tổ Chức Sự Kiện trên CANi
         </p>
       </div>
 
-      <div className="worker-perks-box" style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534', marginBottom: '1.25rem' }}>
-        <div className="worker-perks-title" style={{ color: '#15803d' }}>
-          <span>Quyền lợi Nhà Tổ Chức (Event Organizer):</span>
+      <div className="worker-perks-box" style={{ backgroundColor: '#fefce8', borderColor: '#fde047', color: '#854d0e', marginBottom: '1.25rem' }}>
+        <div className="worker-perks-title" style={{ color: '#a16207', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <span>⚠️ Quy định tạo sự kiện & tuyển dụng:</span>
         </div>
-        <div>• Đăng tải không giới hạn ca làm, tuyển chọn nhân sự sự kiện chất lượng cao.</div>
-        <div>• Tự động khớp ca, quản lý điểm danh QR thời gian thực và thanh toán tự động, minh bạch.</div>
+        <div style={{ fontSize: '0.825rem', marginTop: '0.25rem' }}>
+          Sau khi đăng ký tài khoản thành công, bạn cần <strong>hoàn tất định danh eKYC</strong> thì mới có thể tạo sự kiện và tuyển chọn nhân sự.
+        </div>
       </div>
 
       {/* Đăng ký nhanh bằng Google */}
@@ -99,9 +100,71 @@ export const RegisterForm = () => {
       )}
 
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        {/* Lựa chọn loại hình tổ chức: Doanh nghiệp hoặc Cá nhân */}
+        <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+          <label className="form-label" style={{ marginBottom: '0.4rem', fontWeight: 700 }}>
+            Hình thức tổ chức sự kiện *
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '0.5rem',
+                border: formData.organizerType === 'ENTERPRISE' ? '2px solid #2563eb' : '1px solid #d1d5db',
+                backgroundColor: formData.organizerType === 'ENTERPRISE' ? '#eff6ff' : '#ffffff',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: formData.organizerType === 'ENTERPRISE' ? '#1d4ed8' : '#374151',
+                transition: 'all 0.2s',
+              }}
+            >
+              <input
+                type="radio"
+                name="organizerType"
+                value="ENTERPRISE"
+                checked={formData.organizerType === 'ENTERPRISE'}
+                onChange={handleChange}
+                disabled={isLoading}
+              />
+              Hộ Kinh Doanh / Doanh Nghiệp
+            </label>
+
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '0.5rem',
+                border: formData.organizerType === 'INDIVIDUAL' ? '2px solid #2563eb' : '1px solid #d1d5db',
+                backgroundColor: formData.organizerType === 'INDIVIDUAL' ? '#eff6ff' : '#ffffff',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: formData.organizerType === 'INDIVIDUAL' ? '#1d4ed8' : '#374151',
+                transition: 'all 0.2s',
+              }}
+            >
+              <input
+                type="radio"
+                name="organizerType"
+                value="INDIVIDUAL"
+                checked={formData.organizerType === 'INDIVIDUAL'}
+                onChange={handleChange}
+                disabled={isLoading}
+              />
+              Cá Nhân / Ban Tổ Chức Tự Do
+            </label>
+          </div>
+        </div>
+
         <div className="form-group">
           <label className="form-label" htmlFor="fullName">
-            Họ và tên người đại diện
+            {formData.organizerType === 'ENTERPRISE' ? 'Họ và tên người đại diện pháp luật *' : 'Họ và tên người tổ chức sự kiện *'}
           </label>
           <input
             id="fullName"
@@ -117,10 +180,64 @@ export const RegisterForm = () => {
           />
         </div>
 
+        {formData.organizerType === 'ENTERPRISE' ? (
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" htmlFor="companyName">
+                Tên Hộ kinh doanh / Doanh nghiệp *
+              </label>
+              <input
+                id="companyName"
+                name="companyName"
+                type="text"
+                className="form-input"
+                placeholder="VD: Hộ kinh doanh Sự Kiện CANi"
+                value={formData.companyName}
+                onChange={handleChange}
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" htmlFor="taxId">
+                Mã số thuế (MST) / Số ĐKKD *
+              </label>
+              <input
+                id="taxId"
+                name="taxId"
+                type="text"
+                className="form-input"
+                placeholder="VD: 0109876543"
+                value={formData.taxId}
+                onChange={handleChange}
+                disabled={isLoading}
+                required
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="form-group">
+            <label className="form-label" htmlFor="companyName">
+              Tên thương hiệu / Đơn vị tổ chức (Tùy chọn)
+            </label>
+            <input
+              id="companyName"
+              name="companyName"
+              type="text"
+              className="form-input"
+              placeholder="CLB Sự Kiện Trẻ / Nhóm điều phối tự do..."
+              value={formData.companyName}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
+          </div>
+        )}
+
         <div className="form-row">
           <div className="form-group" style={{ flex: 1 }}>
             <label className="form-label" htmlFor="email">
-              Địa chỉ Email doanh nghiệp
+              Địa chỉ Email liên hệ *
             </label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input
@@ -183,41 +300,22 @@ export const RegisterForm = () => {
           </div>
         </div>
 
-        <div className="form-row">
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label" htmlFor="phone">
-              Số điện thoại liên hệ
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              className="form-input"
-              placeholder="0912345678"
-              value={formData.phone}
-              onChange={handleChange}
-              autoComplete="tel"
-              disabled={isLoading}
-              required
-            />
-          </div>
-
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label" htmlFor="companyName">
-              Tên công ty / Đơn vị tổ chức sự kiện
-            </label>
-            <input
-              id="companyName"
-              name="companyName"
-              type="text"
-              className="form-input"
-              placeholder="Công ty Sự kiện Á Châu"
-              value={formData.companyName}
-              onChange={handleChange}
-              disabled={isLoading}
-              required
-            />
-          </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="phone">
+            Số điện thoại liên hệ *
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            className="form-input"
+            placeholder="0912345678"
+            value={formData.phone}
+            onChange={handleChange}
+            autoComplete="tel"
+            disabled={isLoading}
+            required
+          />
         </div>
 
         <div className="form-row">

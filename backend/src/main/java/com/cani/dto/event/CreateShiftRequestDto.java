@@ -59,4 +59,8 @@ public class CreateShiftRequestDto {
     private ExperienceLevel minExperienceLevel = ExperienceLevel.BEGINNER;
 
     private String dressCode;
+
+    private String imageUrl;
+
+    private String checklist;
 }

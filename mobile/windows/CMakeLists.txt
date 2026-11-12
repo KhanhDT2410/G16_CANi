@@ -1,3 +1,4 @@
+set(CMAKE_POLICY_VERSION_MINIMUM "3.5" CACHE STRING "Force minimum policy version")
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
 project(cani LANGUAGES CXX)

@@ -9,6 +9,7 @@ import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
+import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
@@ -16,6 +17,8 @@ import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -37,6 +40,7 @@ public class AuthService {
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
     private final EmailOtpService emailOtpService;
+    private final org.springframework.core.env.Environment environment;
 
     @Transactional
     public UserDto register(RegisterRequest request) {
@@ -107,7 +111,12 @@ public class AuthService {
                             .user(finalUser)
                             .build());
             if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
-                eo.setCompanyName(request.getCompanyName());
+                eo.setCompanyName(request.getCompanyName().trim());
+            } else if ("INDIVIDUAL".equalsIgnoreCase(request.getOrganizerType()) || eo.getCompanyName() == null) {
+                eo.setCompanyName(request.getFullName().trim());
+            }
+            if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+                eo.setTaxId(request.getTaxId().trim());
             }
             eventOrganizerRepository.save(eo);
         } else {
@@ -143,13 +152,19 @@ public class AuthService {
             accessToken = session.getAccessToken();
             refreshToken = session.getRefreshToken();
             expiresIn = session.getExpiresIn();
-        } else {
+        } else if (environment.acceptsProfiles(Profiles.of("h2"))) {
+            // Chỉ profile h2 (dev offline, H2DataSeeder) được phép fallback dev-token.
             User localUser = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không chính xác"));
             userId = localUser.getUserId();
             accessToken = "dev-token-" + userId;
             refreshToken = "dev-refresh-" + userId;
             expiresIn = 86400L;
+        } else {
+            // ponytail: Supabase không thể đạt ở prod/dev-thẳng-Supabase → 503 thay vì dev-token (auth bypass).
+            log.error("Supabase GoTrue không khả dụng, không thể cấp token cho {}", request.getEmail());
+            throw new AppException("Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại sau.",
+                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         User user = userRepository.findById(userId)
@@ -172,14 +187,24 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginResponse googleLogin(GoogleLoginRequest request) {
+    public synchronized LoginResponse googleLogin(GoogleLoginRequest request) {
         try {
             // 1. Xác thực chữ ký token từ Supabase bằng JWKS ES256
             Jwt jwt = jwtDecoder.decode(request.getSupabaseAccessToken());
-            UUID userId = UUID.fromString(jwt.getSubject());
             String email = jwt.getClaimAsString("email");
+            if (email == null || email.isBlank()) {
+                throw new BadRequestException("Không tìm thấy thông tin email từ phiên xác thực Google");
+            }
 
-            User user = userRepository.findById(userId)
+            UUID parsedUserId;
+            try {
+                parsedUserId = UUID.fromString(jwt.getSubject());
+            } catch (Exception e) {
+                parsedUserId = UUID.nameUUIDFromBytes(email.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            final UUID finalUserId = parsedUserId;
+
+            User user = userRepository.findById(finalUserId)
                     .or(() -> userRepository.findByEmail(email))
                     .orElseGet(() -> {
                 String fullName = email;
@@ -195,7 +220,7 @@ public class AuthService {
                 }
 
                 User newUser = User.builder()
-                        .userId(userId)
+                        .userId(finalUserId)
                         .email(email)
                         .fullName(fullName)
                         .role(initialRole)
@@ -224,12 +249,36 @@ public class AuthService {
                 return saved;
             });
 
+            // Nếu user đã tồn tại nhưng có role là WORKER (và không phải tài khoản seed worker@cani.vn)
+            // khi đăng nhập/đăng ký từ Web Portal với targetRole là EVENT_ORGANIZER, tự động nâng cấp sang EVENT_ORGANIZER
+            if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())
+                    && user.getRole() == UserRole.WORKER
+                    && !"worker@cani.vn".equalsIgnoreCase(user.getEmail())) {
+                log.info("Cập nhật vai trò người dùng {} sang EVENT_ORGANIZER theo yêu cầu từ Web Portal", user.getEmail());
+                user.setRole(UserRole.EVENT_ORGANIZER);
+                user = userRepository.save(user);
+            }
+
             if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
                 throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
             }
 
-            user.setLastLoginAt(Instant.now());
-            userRepository.save(user);
+            // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
+            final User currentUser = user;
+            if (currentUser.getRole() == UserRole.EVENT_ORGANIZER) {
+                eventOrganizerRepository.findByUser_UserId(currentUser.getUserId())
+                        .orElseGet(() -> eventOrganizerRepository.save(
+                                EventOrganizer.builder()
+                                        .user(currentUser)
+                                        .companyName(currentUser.getFullName() != null && !currentUser.getFullName().isBlank()
+                                                ? currentUser.getFullName()
+                                                : "Ban Tổ Chức")
+                                        .build()
+                        ));
+            }
+
+            currentUser.setLastLoginAt(Instant.now());
+            user = userRepository.save(currentUser);
 
             return LoginResponse.builder()
                     .token(request.getSupabaseAccessToken())
@@ -250,15 +299,32 @@ public class AuthService {
 
     @Transactional
     public void verifyOtp(VerifyOtpRequest request) {
-        supabaseAuthClient.verifyOtp(request.getEmail(), request.getToken());
+        emailOtpService.verifyOtp(request.getEmail(), request.getToken(), "REGISTER");
         userRepository.findByEmail(request.getEmail()).ifPresent(u -> {
             u.setEmailVerified(true);
             userRepository.save(u);
         });
     }
 
+    @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        supabaseAuthClient.resetPassword(request.getEmail());
+        emailOtpService.sendOtp(request.getEmail(), "RESET_PASSWORD");
+    }
+
+    @Transactional
+    public void confirmResetPassword(ConfirmResetPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+
+        // 1. Xác thực OTP loại RESET_PASSWORD
+        emailOtpService.verifyOtp(email, request.getOtp(), "RESET_PASSWORD");
+
+        // 2. Tìm User trong cơ sở dữ liệu
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy tài khoản với email: " + email));
+
+        // 3. Cập nhật mật khẩu trong Supabase qua GoTrue Admin API
+        supabaseAuthClient.updateUserPassword(user.getUserId(), request.getNewPassword());
+        log.info("Khôi phục mật khẩu thành công cho email: {}", email);
     }
 
     @Transactional

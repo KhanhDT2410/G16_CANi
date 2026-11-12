@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:cani/core/constants/api_constants.dart';
+
 /// Interceptor that attaches the Bearer access token to outgoing HTTP requests.
 ///
 /// Priority:
@@ -29,8 +31,8 @@ class AuthInterceptor extends Interceptor {
             inMemoryToken = refreshRes.session!.accessToken;
             await _storage.write(key: 'cani_token', value: inMemoryToken);
           }
-        } else if (inMemoryToken == null) {
-          inMemoryToken = session.accessToken;
+        } else {
+          inMemoryToken ??= session.accessToken;
         }
       }
     } catch (_) {}
@@ -72,7 +74,7 @@ class AuthInterceptor extends Interceptor {
           final refreshToken = await _storage.read(key: 'cani_refresh_token');
           if (refreshToken != null && refreshToken.isNotEmpty) {
             final refreshDio = Dio(BaseOptions(
-              baseUrl: 'http://localhost:8080/api',
+              baseUrl: '${ApiConstants.baseUrl}${ApiConstants.apiPath}',
               connectTimeout: const Duration(seconds: 10),
             ));
             final res = await refreshDio.post('/auth/refresh', data: {

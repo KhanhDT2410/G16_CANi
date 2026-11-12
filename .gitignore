@@ -34,14 +34,10 @@ mobile/.flutter-plugins-cache/
 mobile/.symlinks/
 mobile/android/.gradle/
 mobile/android/app/build/
-mobile/ios/Pods/
-mobile/ios/.symlinks/
-mobile/ios/Flutter/ephemeral/
-mobile/macos/Pods/
-mobile/macos/.symlinks/
-mobile/macos/Flutter/ephemeral/
+mobile/ios/
+mobile/macos/
+mobile/linux/
 mobile/windows/flutter/ephemeral/
-mobile/linux/flutter/ephemeral/
 
 # IDE & AI Tooling
 .idea/
@@ -49,6 +45,7 @@ mobile/linux/flutter/ephemeral/
 .agents/
 .claude/
 .omo/
+graphify-out/
 *.iml
 *.iws
 .project
@@ -76,6 +73,8 @@ Desktop.ini
 *.bak
 *.bak*
 client_secret*.json
+*firebase-adminsdk*.json
+firebase-service-account*.json
 secrets/
 credentials/
 
@@ -102,4 +101,8 @@ CLAUDE.md
 
 # Temporary backup directories
 web_backup_*/
+
+# Local uploads
+uploads/
+backend/uploads/
 

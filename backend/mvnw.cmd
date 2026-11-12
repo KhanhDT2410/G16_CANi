@@ -9,7 +9,7 @@ set APP_BASE_NAME=%~n0
 set APP_HOME=%SCRIPT_DIR%
 
 @REM Add default JVM options
-set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+set DEFAULT_JVM_OPTS=-Xmx2048m -Xms512m
 
 @REM Build the classpath
 set CLASSPATH=%APP_HOME%\.mvn\wrapper\maven-wrapper.jar
@@ -32,4 +32,4 @@ if defined JAVA_HOME (
 )
 
 @REM Execute Maven
-%JAVACMD% %DEFAULT_JVM_OPTS% -Dmaven.multiModuleProjectDirectory="%APP_HOME%" -classpath "%CLASSPATH%" org.apache.maven.wrapper.MavenWrapperMain %*
+%JAVACMD% %DEFAULT_JVM_OPTS% %MAVEN_OPTS% -Dmaven.multiModuleProjectDirectory="%APP_HOME%" -classpath "%CLASSPATH%" org.apache.maven.wrapper.MavenWrapperMain %*

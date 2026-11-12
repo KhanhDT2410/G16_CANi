@@ -64,6 +64,12 @@ public class DisputeService {
     private final ObjectMapper objectMapper;
 
     private static final List<DisputeStatus> OPEN_STATUSES = List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING);
+
+    /**
+     * Hàng đợi CC/Admin xử lý (UC-109).
+     * Bao gồm ESCALATED: đơn đã kháng nghị phải nằm trong hàng đợi để Admin
+     * ra quyết định cuối (UC-102, BR-68) — nếu thiếu, đơn sẽ biến mất khỏi UI.
+     */
     private static final List<DisputeStatus> QUEUE_STATUSES = List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING,
             DisputeStatus.ESCALATED);
     private static final List<DisputeStatus> RESOLVED_STATUSES = List.of(DisputeStatus.RESOLVED,
@@ -277,23 +283,28 @@ public class DisputeService {
     // =========================================================================
 
     public List<DisputeQueueItemDto> getDisputeQueue() {
-        Instant slaRiskCutoff = Instant.now().plus(Duration.ofHours(24));
-        return disputeRepository.findByStatusIn(QUEUE_STATUSES).stream()
-                .sorted(Comparator
-                        .<Dispute>comparingInt(d -> d.getStatus() == DisputeStatus.ESCALATED ? 0
-                                : (slaAtRisk(d, slaRiskCutoff) ? 1 : 2))
-                        .thenComparing(Dispute::getCreatedAt,
-                                Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(d -> toQueueItemDto(d, slaRiskCutoff))
-                .toList();
+        return toQueueItems(disputeRepository.findByStatusIn(QUEUE_STATUSES));
     }
 
     /**
-     * UC-109 (phân tầng CC): Hàng đợi chỉ gồm đơn đang được giao cho CC này.
+     * UC-109 (phân tầng CC): hàng đợi tranh chấp được gán cho đúng CC này.
+     * Khi đội CC có nhiều người, mỗi CC chỉ thấy đơn "của tôi đang xử lý".
      */
     public List<DisputeQueueItemDto> getDisputeQueueForCc(UUID ccUserId) {
+        return toQueueItems(disputeRepository.findByStatusInAndAssignedTo(QUEUE_STATUSES, ccUserId));
+    }
+
+    /**
+     * Đơn mở chưa ai nhận (assignedTo = null) — dùng để CC chọn "đơn chưa gán" khi
+     * tự nhận.
+     */
+    public List<DisputeQueueItemDto> getUnassignedQueue() {
+        return toQueueItems(disputeRepository.findByStatusInAndAssignedToIsNull(QUEUE_STATUSES));
+    }
+
+    private List<DisputeQueueItemDto> toQueueItems(List<Dispute> disputes) {
         Instant slaRiskCutoff = Instant.now().plus(Duration.ofHours(24));
-        return disputeRepository.findByStatusInAndAssignedTo(QUEUE_STATUSES, ccUserId).stream()
+        return disputes.stream()
                 .sorted(Comparator
                         .<Dispute>comparingInt(d -> d.getStatus() == DisputeStatus.ESCALATED ? 0
                                 : (slaAtRisk(d, slaRiskCutoff) ? 1 : 2))
@@ -304,8 +315,8 @@ public class DisputeService {
     }
 
     /**
-     * UC-99: Danh sách nhân sự Customer Care kèm số lượng đơn đang giao để phục vụ
-     * chuyển đơn.
+     * UC-99: Danh sách nhân sự Customer Care để CC chuyển đơn cho nhau.
+     * Kèm số đơn đang giao để CC cân bằng tải.
      */
     public List<CustomerCareStaffDto> getCustomerCareStaff() {
         return userRepository.findByRole(UserRole.CUSTOMER_CARE).stream()
@@ -313,8 +324,8 @@ public class DisputeService {
                         .userId(cc.getUserId())
                         .fullName(cc.getFullName())
                         .email(cc.getEmail())
-                        .assignedCount(disputeRepository.findByStatusInAndAssignedTo(
-                                QUEUE_STATUSES, cc.getUserId()).size())
+                        .assignedCount(
+                                disputeRepository.findByStatusInAndAssignedTo(QUEUE_STATUSES, cc.getUserId()).size())
                         .build())
                 .toList();
     }
@@ -582,18 +593,18 @@ public class DisputeService {
     // ------------------------------------------------------------------
 
     private DisputeDetailResponseDto toDetailDto(Dispute dispute) {
-        List<DisputeDetailResponseDto.EvidenceDto> evidences =
-                evidenceRepository.findByDisputeIdOrderByCreatedAtAsc(dispute.getDisputeId()).stream()
-                        .map(e -> DisputeDetailResponseDto.EvidenceDto.builder()
-                                .id(e.getEvidenceId())
-                                .party(e.getParty())
-                                .fileType(e.getFileType())
-                                .fileUrl(e.getFileUrl())
-                                .label(e.getLabel())
-                                .createdAt(e.getCreatedAt())
-                                .build())
-                        .toList();
-                        
+        List<DisputeDetailResponseDto.EvidenceDto> evidences = evidenceRepository
+                .findByDisputeIdOrderByCreatedAtAsc(dispute.getDisputeId()).stream()
+                .map(e -> DisputeDetailResponseDto.EvidenceDto.builder()
+                        .id(e.getEvidenceId())
+                        .party(e.getParty())
+                        .fileType(e.getFileType())
+                        .fileUrl(e.getFileUrl())
+                        .label(e.getLabel())
+                        .createdAt(e.getCreatedAt())
+                        .build())
+                .toList();
+
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())
                 .assignmentId(dispute.getAssignmentId())

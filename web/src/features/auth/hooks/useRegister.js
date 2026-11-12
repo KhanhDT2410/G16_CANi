@@ -9,7 +9,9 @@ export const useRegister = () => {
     fullName: '',
     email: '',
     phone: '',
+    organizerType: 'ENTERPRISE', // 'ENTERPRISE' | 'INDIVIDUAL'
     companyName: '',
+    taxId: '',
     password: '',
     confirmPassword: '',
     otpCode: '',
@@ -47,7 +49,7 @@ export const useRegister = () => {
 
   const handleSendOtp = async () => {
     if (!formData.email?.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ email doanh nghiệp trước khi lấy mã OTP.');
+      setErrorMessage('Vui lòng nhập địa chỉ email trước khi lấy mã OTP.');
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -91,16 +93,22 @@ export const useRegister = () => {
       return;
     }
     if (!formData.email.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ email doanh nghiệp.');
+      setErrorMessage('Vui lòng nhập địa chỉ email.');
       return;
     }
     if (!formData.phone?.trim()) {
       setErrorMessage('Vui lòng nhập số điện thoại liên hệ.');
       return;
     }
-    if (!formData.companyName?.trim()) {
-      setErrorMessage('Vui lòng nhập tên công ty hoặc đơn vị tổ chức sự kiện.');
-      return;
+    if (formData.organizerType === 'ENTERPRISE') {
+      if (!formData.companyName?.trim()) {
+        setErrorMessage('Hộ kinh doanh / Doanh nghiệp bắt buộc phải nhập Tên đơn vị / thương hiệu.');
+        return;
+      }
+      if (!formData.taxId?.trim()) {
+        setErrorMessage('Hộ kinh doanh / Doanh nghiệp bắt buộc phải nhập Mã số thuế / ĐKKD.');
+        return;
+      }
     }
     if (!formData.otpCode?.trim() || formData.otpCode.trim().length !== 6) {
       setErrorMessage('Vui lòng nhập chính xác mã xác thực OTP 6 số đã gửi về email.');
@@ -124,20 +132,26 @@ export const useRegister = () => {
     setSuccessMessage('');
 
     try {
+      const finalCompanyName = formData.organizerType === 'ENTERPRISE'
+        ? formData.companyName.trim()
+        : (formData.companyName?.trim() || formData.fullName.trim());
+
       await authApi.register({
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
-        companyName: formData.companyName.trim(),
+        organizerType: formData.organizerType,
+        companyName: finalCompanyName,
+        taxId: formData.taxId?.trim() || null,
         password: formData.password,
         otpCode: formData.otpCode.trim(),
         accountType: 'EVENT_ORGANIZER',
       });
 
-      setSuccessMessage('Đăng ký tài khoản thành công! Đang chuyển hướng đến trang đăng nhập...');
+      setSuccessMessage('Đăng ký tài khoản thành công! Lưu ý: Bạn cần hoàn tất định danh eKYC thì mới có thể tạo sự kiện và tuyển dụng nhân sự trên CANi.');
       setTimeout(() => {
         navigate('/login');
-      }, 1500);
+      }, 2500);
     } catch (err) {
       setErrorMessage(err.message || 'Đăng ký tài khoản không thành công. Vui lòng thử lại.');
     } finally {

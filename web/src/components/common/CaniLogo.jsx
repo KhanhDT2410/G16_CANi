@@ -13,8 +13,13 @@ const CaniLogo = ({
   variant = 'full', // 'full' | 'horizontal' | 'worker' | 'mark'
   height = 54,
   className = '',
+  theme = 'light', // 'light' (mặc định cho nền sáng) | 'dark' (cho nền tối/hero)
   onClick,
 }) => {
+  const isDark = theme === 'dark';
+  const brandDarkText = isDark ? '#FFFFFF' : '#0B1B3D';
+  const brandSubText = isDark ? '#CBD5E1' : '#475569';
+
   // Biểu tượng glyph vector độc quyền
   const renderGlyphs = () => (
     <svg
@@ -48,7 +53,7 @@ const CaniLogo = ({
         </linearGradient>
 
         <filter id="caniSoftShadow" x="-10%" y="-10%" width="120%" height="120%">
-          <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#0066FF" floodOpacity="0.18" />
+          <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#0066FF" floodOpacity={isDark ? 0.35 : 0.18} />
         </filter>
       </defs>
 
@@ -68,15 +73,15 @@ const CaniLogo = ({
           fill="url(#caniGradA)"
         />
 
-        {/* Chữ N (Xanh Navy đậm đà hiện đại) */}
+        {/* Chữ N (Xanh Navy đậm đà trên nền sáng, hoặc Trắng sáng trên nền tối) */}
         <path
           d="M165 40 C165 37, 168 35, 172 35 L182 35 C186 35, 189 37, 190 41 L210 75 L210 40 C210 37, 213 35, 217 35 L227 35 C231 35, 234 37, 234 40 L234 92 C234 95, 231 97, 227 97 L217 97 C213 97, 210 95, 209 91 L189 57 L189 92 C189 95, 186 97, 182 97 L172 97 C168 97, 165 95, 165 92 L165 40 Z"
-          fill="#0B1B3D"
+          fill={brandDarkText}
         />
 
         {/* Chữ i: Thân và Dấu chấm */}
-        <circle cx="254" cy="38" r="8" fill="#0B1B3D" />
-        <rect x="246" y="52" width="16" height="45" rx="5" fill="#0B1B3D" />
+        <circle cx="254" cy="38" r="8" fill={brandDarkText} />
+        <rect x="246" y="52" width="16" height="45" rx="5" fill={brandDarkText} />
       </g>
     </svg>
   );
@@ -121,7 +126,7 @@ const CaniLogo = ({
             fontSize: '9.5px',
             fontWeight: 800,
             letterSpacing: '0.24em',
-            color: '#0B1B3D',
+            color: brandDarkText,
             paddingLeft: '14px',
             marginTop: '-6px',
             textTransform: 'uppercase',
@@ -151,7 +156,7 @@ const CaniLogo = ({
           fontSize: '11px',
           fontWeight: 800,
           letterSpacing: '0.28em',
-          color: '#0B1B3D',
+          color: brandDarkText,
           marginTop: '-4px',
           textTransform: 'uppercase',
         }}
@@ -163,7 +168,7 @@ const CaniLogo = ({
           fontFamily: 'var(--font-family, "Plus Jakarta Sans", sans-serif)',
           fontSize: '12px',
           fontWeight: 600,
-          color: '#475569',
+          color: brandSubText,
           letterSpacing: '0.06em',
           marginTop: '4px',
         }}

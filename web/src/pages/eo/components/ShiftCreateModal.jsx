@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
  * ShiftCreateModal
- * Modal thêm ca làm việc kèm gợi ý định mức lương Wage Matrix 4D
+ * Modal thêm ca làm việc kèm gợi ý định mức lương Wage Matrix 4D, mô tả công việc và checklist (No Emoji)
  */
 const ShiftCreateModal = ({
   isOpen,
@@ -11,48 +11,114 @@ const ShiftCreateModal = ({
   newShift,
   setNewShift,
   roles,
-  wageRecommendationsMap,
+  wageRecommendationsMap = {},
   onRoleChange,
-  shiftDurationHours,
-  shiftTotal,
+  shiftDurationHours = 4,
+  calculateShiftTotal,
 }) => {
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+
   if (!isOpen) return null;
+
+  const totalCost = calculateShiftTotal ? calculateShiftTotal() : 0;
+  const checklistList = Array.isArray(newShift.checklistItems) ? newShift.checklistItems : [];
+
+  const handleAddChecklist = (e) => {
+    e?.preventDefault();
+    if (!newChecklistItem.trim()) return;
+    setNewShift((prev) => ({
+      ...prev,
+      checklistItems: [...(prev.checklistItems || []), newChecklistItem.trim()],
+    }));
+    setNewChecklistItem('');
+  };
+
+  const handleRemoveChecklist = (indexToRemove) => {
+    setNewShift((prev) => ({
+      ...prev,
+      checklistItems: (prev.checklistItems || []).filter((_, idx) => idx !== indexToRemove),
+    }));
+  };
+
+  const handleQuickAddChecklist = (item) => {
+    if (checklistList.includes(item)) return;
+    setNewShift((prev) => ({
+      ...prev,
+      checklistItems: [...(prev.checklistItems || []), item],
+    }));
+  };
 
   return (
     <div className="eo-modal-overlay">
-      <div className="eo-modal-box">
-        <h3>Thêm Ca Làm Việc & Định Mức Lương</h3>
+      <div className="eo-modal-box" style={{ maxWidth: '640px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
+            Thêm Ca Làm Việc & Tiêu Chí Tuyển Dụng
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b', fontWeight: 600 }}
+          >
+            Đóng
+          </button>
+        </div>
+
         <form onSubmit={onSubmit}>
           <div className="eo-form-group">
             <label>Vị Trí / Vai Trò Cần Tuyển *</label>
-            <select
-              className="eo-form-select"
+            <input
+              type="text"
+              list="create-shift-roles-list"
+              className="eo-form-input"
+              placeholder="Nhập vị trí hoặc chọn gợi ý (VD: Phục vụ bàn, Lễ tân, MC, Kỹ thuật...)"
               value={newShift.jobType}
-              onChange={(e) => onRoleChange(e.target.value)}
-            >
+              onChange={(e) => onRoleChange ? onRoleChange(e.target.value) : setNewShift({ ...newShift, jobType: e.target.value })}
+              required
+            />
+            <datalist id="create-shift-roles-list">
               {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
+                <option key={role} value={role} />
               ))}
-            </select>
+            </datalist>
+          </div>
 
-            {/* Gợi ý Ma trận Lương Wage Matrix 4D */}
-            {wageRecommendationsMap[newShift.jobType] && (
-              <div className="wage-recommendation-badge animate-fade-in-up">
-                <span className="badge-icon">💡</span>
-                <div>
-                  <strong>Gợi ý Ma trận Lương (Wage Matrix 4D):</strong>{' '}
-                  <span className="wage-range">
-                    {wageRecommendationsMap[newShift.jobType].min.toLocaleString()} đ -{' '}
-                    {wageRecommendationsMap[newShift.jobType].max.toLocaleString()} đ / giờ
-                  </span>
-                  <div className="wage-subnote">
-                    Đặc điểm: {wageRecommendationsMap[newShift.jobType].note}
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* Hình ảnh minh họa ca làm / Đồng phục */}
+          <div className="eo-form-group">
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>Hiển thị trên app ứng viên</span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="url"
+                className="eo-form-input"
+                placeholder="Dán link ảnh đồng phục hoặc ảnh vị trí ca làm (https://...)"
+                value={newShift.imageUrl || ''}
+                onChange={(e) => setNewShift({ ...newShift, imageUrl: e.target.value })}
+              />
+              {newShift.imageUrl && (
+                <img
+                  src={newShift.imageUrl}
+                  alt="Preview"
+                  style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #cbd5e1' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Mô tả công việc */}
+          <div className="eo-form-group">
+            <label>Mô Tả Nhiệm Vụ Công Việc *</label>
+            <textarea
+              rows="2"
+              required
+              className="eo-form-textarea"
+              placeholder="VD: Hỗ trợ đón tiếp khách mời, phát tài liệu chương trình, hướng dẫn chỗ ngồi..."
+              value={newShift.description || ''}
+              onChange={(e) => setNewShift({ ...newShift, description: e.target.value })}
+            />
           </div>
 
           <div className="eo-form-row">
@@ -80,7 +146,7 @@ const ShiftCreateModal = ({
 
           <div className="eo-form-row">
             <div className="eo-form-group">
-              <label>Số Lượng Worker Cần Tuyển *</label>
+              <label>Số Lượng Nhân Sự Cần Tuyển *</label>
               <input
                 type="number"
                 min="1"
@@ -116,7 +182,7 @@ const ShiftCreateModal = ({
               />
             </div>
             <div className="eo-form-group">
-              <label>Cự Ly Bán Kính Tối Đa (km)</label>
+              <label>Bán Kính Quét Ứng Viên (km)</label>
               <input
                 type="number"
                 min="1"
@@ -128,22 +194,131 @@ const ShiftCreateModal = ({
             </div>
           </div>
 
+          {/* Checklist công việc */}
+          <div className="eo-form-group" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+            <label style={{ fontWeight: 600, color: '#334155', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Checklist Đầu Việc Cho Ca Làm (Quy Trình Kiểm Tra)</span>
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{checklistList.length} đầu việc</span>
+            </label>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0.6rem' }}>
+              Worker sẽ phải tích xác nhận các đầu việc này trong app di động CANi khi thực hiện ca.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <input
+                type="text"
+                className="eo-form-input"
+                style={{ flex: 1 }}
+                placeholder="Nhập đầu việc mới (VD: Có mặt trước 20 phút...)"
+                value={newChecklistItem}
+                onChange={(e) => setNewChecklistItem(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddChecklist();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="eo-btn-secondary"
+                style={{ whiteSpace: 'nowrap', padding: '0.5rem 0.85rem' }}
+                onClick={handleAddChecklist}
+              >
+                + Thêm
+              </button>
+            </div>
+
+            {/* Gợi ý checklist nhanh */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', alignSelf: 'center' }}>Gợi ý:</span>
+              {[
+                'Có mặt trước 20 phút nhận thẻ',
+                'Quét mã QR Check-in',
+                'Đồng phục sơ mi trắng quần sẫm màu',
+                'Báo cáo quản lý trước khi ra về',
+              ].map((suggestItem) => (
+                <button
+                  key={suggestItem}
+                  type="button"
+                  onClick={() => handleQuickAddChecklist(suggestItem)}
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: '4px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    color: '#475569',
+                  }}
+                >
+                  + {suggestItem}
+                </button>
+              ))}
+            </div>
+
+            {/* Danh sách items đã thêm */}
+            {checklistList.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                {checklistList.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.375rem',
+                      padding: '0.4rem 0.75rem',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    <span>
+                      <strong style={{ color: '#2563eb', marginRight: '0.4rem' }}>#{idx + 1}</strong>
+                      {item}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveChecklist(idx)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        padding: '0 0.25rem',
+                      }}
+                      title="Xóa đầu việc"
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '0.5rem' }}>
+                Chưa có đầu việc checklist nào. Hãy thêm để Worker nắm rõ nhiệm vụ.
+              </div>
+            )}
+          </div>
+
           {/* Chi phí ước tính hiển thị realtime */}
           <div className="shift-cost-summary-box">
             <div className="shift-cost-header">
               <span>DỰ TOÁN THÙ LAO CA LÀM NÀY:</span>
               <span className="shift-cost-hours">
-                ⏱️ {shiftDurationHours} giờ &times; {newShift.requiredWorkers || 1} nhân sự
+                {shiftDurationHours} giờ x {newShift.requiredWorkers || 1} nhân sự
               </span>
             </div>
             <div className="shift-cost-total">
-              {shiftTotal.toLocaleString()} đ
+              {totalCost.toLocaleString()} đ
             </div>
             <div className="shift-cost-formula">
-              = ({shiftDurationHours}h &times; {Number(newShift.requiredWorkers || 1)} người &times; {Number(newShift.hourlyWage || 0).toLocaleString()}đ/h) + {Number(newShift.allowance || 0).toLocaleString()}đ phụ cấp
+              = ({shiftDurationHours}h x {Number(newShift.requiredWorkers || 1)} người x {Number(newShift.hourlyWage || 0).toLocaleString()}đ/h) + {Number(newShift.allowance || 0).toLocaleString()}đ phụ cấp
             </div>
             <div className="shift-cost-note">
-              💡 Thù lao này EO thanh toán trực tiếp cho Worker sau ca làm (Mô hình Non-Escrow - CANi không thu cọc lương).
+              Thù lao này Ban tổ chức thanh toán trực tiếp cho nhân sự sau ca làm việc.
             </div>
           </div>
 

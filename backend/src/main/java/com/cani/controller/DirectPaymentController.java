@@ -5,11 +5,10 @@ import com.cani.dto.payment.DeclarePaymentRequestDto;
 import com.cani.dto.payment.PaymentResponseDto;
 import com.cani.dto.response.ApiResponse;
 import com.cani.entity.EventOrganizer;
-import com.cani.entity.User;
 import com.cani.entity.Worker;
-import com.cani.exception.BadRequestException;
 import com.cani.repository.EventOrganizerRepository;
 import com.cani.repository.WorkerRepository;
+import com.cani.security.SecurityUtils;
 import com.cani.service.DirectPaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,9 +36,8 @@ public class DirectPaymentController {
     @PostMapping("/eo/declare")
     public ResponseEntity<ApiResponse<PaymentResponseDto>> declarePayment(
             @Valid @RequestBody DeclarePaymentRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new IllegalStateException("Tài khoản chưa đăng ký hồ sơ Nhà tổ chức sự kiện (EO)"));
 
@@ -55,9 +53,8 @@ public class DirectPaymentController {
     public ResponseEntity<ApiResponse<PaymentResponseDto>> confirmPayment(
             @PathVariable UUID assignmentId,
             @Valid @RequestBody ConfirmPaymentRequestDto request,
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         Worker worker = workerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new IllegalStateException("Tài khoản chưa đăng ký hồ sơ Worker"));
 
@@ -68,9 +65,20 @@ public class DirectPaymentController {
     /**
      * Lấy danh sách thanh toán theo Ca làm việc (Dành cho EO)
      */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/shifts/{shiftId}")
-    public ResponseEntity<ApiResponse<List<PaymentResponseDto>>> getShiftPayments(@PathVariable UUID shiftId) {
-        List<PaymentResponseDto> payments = directPaymentService.getPaymentsByShift(shiftId);
+    public ResponseEntity<ApiResponse<List<PaymentResponseDto>>> getShiftPayments(
+            @PathVariable UUID shiftId,
+            Authentication authentication) {
+        boolean isAdmin = SecurityUtils.isAdmin(authentication);
+        UUID callerEoId = null;
+        if (!isAdmin) {
+            UUID userId = SecurityUtils.getCurrentUserId(authentication);
+            EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
+                    .orElseThrow(() -> new IllegalStateException("Tài khoản chưa đăng ký hồ sơ Nhà tổ chức sự kiện (EO)"));
+            callerEoId = eo.getEoId();
+        }
+        List<PaymentResponseDto> payments = directPaymentService.getPaymentsByShift(shiftId, callerEoId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok(payments, "Lấy danh sách thanh toán của ca thành công"));
     }
 
@@ -80,9 +88,8 @@ public class DirectPaymentController {
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @GetMapping("/worker/history")
     public ResponseEntity<ApiResponse<List<PaymentResponseDto>>> getWorkerPaymentHistory(
-            @RequestParam(value = "userId", required = false) UUID explicitUserId,
             Authentication authentication) {
-        UUID userId = resolveUserId(authentication, explicitUserId);
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         Worker worker = workerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new IllegalStateException("Tài khoản chưa đăng ký hồ sơ Worker"));
 
@@ -93,24 +100,14 @@ public class DirectPaymentController {
     /**
      * Xem trạng thái thanh toán của một Assignment
      */
+    @PreAuthorize("hasAnyRole('WORKER', 'EVENT_ORGANIZER', 'ADMIN')")
     @GetMapping("/assignments/{assignmentId}")
-    public ResponseEntity<ApiResponse<PaymentResponseDto>> getAssignmentPayment(@PathVariable UUID assignmentId) {
-        PaymentResponseDto payment = directPaymentService.getPaymentByAssignment(assignmentId);
+    public ResponseEntity<ApiResponse<PaymentResponseDto>> getAssignmentPayment(
+            @PathVariable UUID assignmentId,
+            Authentication authentication) {
+        boolean isAdmin = SecurityUtils.isAdmin(authentication);
+        UUID callerId = isAdmin ? null : SecurityUtils.getCurrentUserId(authentication);
+        PaymentResponseDto payment = directPaymentService.getPaymentByAssignment(assignmentId, callerId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok(payment, "Lấy thông tin thanh toán thành công"));
-    }
-
-    private UUID resolveUserId(Authentication authentication, UUID explicitUserId) {
-        if (explicitUserId != null) {
-            return explicitUserId;
-        }
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
-            return u.getUserId();
-        }
-        if (authentication != null && authentication.getName() != null) {
-            try {
-                return UUID.fromString(authentication.getName());
-            } catch (Exception ignored) {}
-        }
-        throw new BadRequestException("Vui lòng đăng nhập hoặc cung cấp userId hợp lệ");
     }
 }

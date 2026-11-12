@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "498475929919",
+    "project_id": "cani-512714",
+    "storage_bucket": "cani-512714.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:498475929919:android:631249acfb5d937e82438a",
+        "android_client_info": {
+          "package_name": "com.cani.cani"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "498475929919-n3a74frl23n8ftq50nv0j1a9f54juj5s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaVnE5oS9HZK2GZxtPkTwqW0DusY5AH9M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "498475929919-n3a74frl23n8ftq50nv0j1a9f54juj5s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

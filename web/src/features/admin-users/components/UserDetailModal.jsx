@@ -84,7 +84,7 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
                   <div>
                     <span className="detail-label">Đánh giá trung bình:</span>{' '}
                     <span className="detail-value" style={{ color: '#d97706' }}>
-                      ★ {user.workerProfile.ratingAvg} ({user.workerProfile.ratingCount || 0} lượt)
+                      {user.workerProfile.ratingAvg} ({user.workerProfile.ratingCount || 0} lượt)
                     </span>
                   </div>
                   <div>
@@ -125,7 +125,7 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
                   <div>
                     <span className="detail-label">Đánh giá trung bình:</span>{' '}
                     <span className="detail-value" style={{ color: '#d97706' }}>
-                      ★ {user.eoProfile.ratingAvg} ({user.eoProfile.ratingCount || 0} lượt)
+                      {user.eoProfile.ratingAvg} ({user.eoProfile.ratingCount || 0} lượt)
                     </span>
                   </div>
                   <div>

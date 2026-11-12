@@ -37,6 +37,7 @@ public class DispatchProposal {
     @Column(name = "match_score", precision = 5, scale = 2)
     private BigDecimal matchScore;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "score_breakdown", columnDefinition = "jsonb")
     private String scoreBreakdown;
 

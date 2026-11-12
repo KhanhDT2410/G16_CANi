@@ -4,14 +4,21 @@ import 'package:flutter/material.dart';
 /// Card hình minh hoạ nhân sự sự kiện năng động, cầm điện thoại thông minh,
 /// với hậu cảnh sân khấu festival ánh sáng xanh dịu mát chuẩn mockup Image 2.
 class WorkerIllustrationCard extends StatelessWidget {
-  const WorkerIllustrationCard({super.key});
+  final double height;
+  final EdgeInsetsGeometry margin;
+
+  const WorkerIllustrationCard({
+    super.key,
+    this.height = 175,
+    this.margin = const EdgeInsets.only(bottom: 20),
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 175,
+      height: height,
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: margin,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
@@ -21,7 +28,7 @@ class WorkerIllustrationCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0077FF).withOpacity(0.06),
+            color: const Color(0xFF0077FF).withValues(alpha: 0.06),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -42,7 +49,7 @@ class WorkerIllustrationCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF38BDF8).withOpacity(0.35),
+                      const Color(0xFF38BDF8).withValues(alpha: 0.35),
                       Colors.transparent,
                     ],
                   ),
@@ -58,7 +65,7 @@ class WorkerIllustrationCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF0077FF).withOpacity(0.25),
+                      const Color(0xFF0077FF).withValues(alpha: 0.25),
                       Colors.transparent,
                     ],
                   ),
@@ -77,7 +84,7 @@ class WorkerIllustrationCard extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: [
                       Colors.transparent,
-                      const Color(0xFF38BDF8).withOpacity(0.12),
+                      const Color(0xFF38BDF8).withValues(alpha: 0.12),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,

@@ -4,9 +4,11 @@ import com.cani.client.ekyc.EkycProvider;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
+import com.cani.dto.ekyc.EoProfileDto;
 import com.cani.entity.EventOrganizer;
 import com.cani.entity.EoEkycVerification;
 import com.cani.entity.User;
+import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.VerificationStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
@@ -36,6 +38,12 @@ public class EventOrganizerEkycService {
     private final UserRepository userRepository;
     private final EkycProvider ekycProvider;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.WorkerEkycVerificationRepository workerEkycVerificationRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
+    private boolean ekycStrict;
+
     /**
      * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC doanh nghiệp
      */
@@ -51,6 +59,9 @@ public class EventOrganizerEkycService {
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
+                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
+                    }
                     return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
                 });
 
@@ -63,21 +74,61 @@ public class EventOrganizerEkycService {
             byte[] backBytes = backFile.getBytes();
             byte[] selfieBytes = selfieFile.getBytes();
 
-            // 1. Phân tích OCR và so khớp khuôn mặt qua EkycProvider (VNPT / Mock)
+            // 1. Phân tích OCR và so khớp khuôn mặt qua EkycProvider (VNPT / Gemini Vision AI / Mock)
             EkycIdentityResultDto result = ekycProvider.verifyIdentity(
                     frontBytes, frontFile.getContentType(),
                     backBytes, backFile.getContentType(),
                     selfieBytes, selfieFile.getContentType());
+
+            // Đồng bộ thông tin nếu chạy ở chế độ Mock thuần (Unit Test / Offline)
+            if ("MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())) {
+                if (eo.getUser() != null && eo.getUser().getFullName() != null && !eo.getUser().getFullName().isBlank()) {
+                    result.setFullName(eo.getUser().getFullName().toUpperCase());
+                }
+                // Tạo số CCCD dựa trên nội dung file ảnh mặt trước (Arrays.hashCode(frontBytes)) thay vì eoId
+                // để nếu 2 tài khoản cùng tải lên 1 ảnh CCCD giống nhau sẽ sinh ra cùng 1 số CCCD và bị chặn trùng!
+                if (result.getIdNumber() == null || "001202012345".equals(result.getIdNumber())) {
+                    int imageSeed = Arrays.hashCode(frontBytes);
+                    String uniqueSuffix = String.format("%06d", Math.abs(imageSeed) % 1_000_000);
+                    result.setIdNumber("001202" + uniqueSuffix);
+                }
+                if (ekycStrict) {
+                    result.setRoutingDecision("MANUAL_REVIEW");
+                    result.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
+                } else {
+                    result.setRoutingDecision("AUTO_APPROVED");
+                    result.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
+                }
+            }
 
             // 2. Băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
             String rawIdNumber = result.getIdNumber();
             String idHash = hashCccd(rawIdNumber);
             String maskedNumber = maskCccd(rawIdNumber);
 
-            // 3. Kiểm tra chống gian lận
-            if (idHash != null && eoEkycVerificationRepository.existsByCccdNumberHashAndStatus(idHash, "APPROVED")) {
+            // 3. Kiểm tra chống gian lận: 1 CCCD chỉ được phép định danh cho duy nhất 1 tài khoản trên toàn hệ thống
+            boolean isDuplicateCccd = false;
+            if (idHash != null) {
+                if (eo.getEoId() != null) {
+                    isDuplicateCccd = eoEkycVerificationRepository
+                            .existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
+                                    idHash, List.of("APPROVED", "PENDING_REVIEW"), eo.getEoId());
+                }
+                if (!isDuplicateCccd && eoEkycVerificationRepository.existsByCccdNumberHashAndStatus(idHash, "APPROVED")
+                        && eo.getVerificationStatus() != VerificationStatus.APPROVED) {
+                    isDuplicateCccd = true;
+                }
+                if (!isDuplicateCccd && workerEkycVerificationRepository != null && userId != null) {
+                    isDuplicateCccd = workerEkycVerificationRepository
+                            .existsByCccdNumberHashAndStatusInAndWorker_User_UserIdNot(
+                                    idHash, List.of("APPROVED", "PENDING_REVIEW"), userId);
+                }
+            }
+
+            if (isDuplicateCccd) {
                 result.setRoutingDecision("REJECTED");
-                result.setRoutingReason("Số CCCD người đại diện này đã được xác thực cho một tổ chức khác trong hệ thống.");
+                result.setRoutingReason("Số Căn cước công dân (" + (maskedNumber != null ? maskedNumber : "này")
+                        + ") đã được sử dụng để xác thực cho một tài khoản khác trong hệ thống. Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
             }
 
             Map<String, Object> fraudFlags = new HashMap<>();
@@ -96,6 +147,16 @@ public class EventOrganizerEkycService {
                 status = "PENDING_REVIEW";
             }
 
+            // Nếu đăng ký tư cách Hộ kinh doanh / Doanh nghiệp (có MST) hoặc có nộp GPKD, bắt buộc chuyển PENDING_REVIEW để Admin thẩm định
+            boolean isBusiness = (eo.getTaxId() != null && !eo.getTaxId().isBlank())
+                    || (businessLicenseFile != null && !businessLicenseFile.isEmpty());
+            if (isBusiness && !"REJECTED".equals(status)) {
+                decision = "MANUAL_REVIEW";
+                status = "PENDING_REVIEW";
+                result.setRoutingDecision("MANUAL_REVIEW");
+                result.setRoutingReason("Hồ sơ đăng ký Hộ kinh doanh đang chờ Admin kiểm tra và xác nhận tư cách pháp nhân.");
+            }
+
             // Mock link storage (Trong thực tế sẽ upload lên S3/Firebase/Supabase Storage)
             String frontUrl = "https://storage.cani.vn/ekyc/eo_front_" + UUID.randomUUID() + ".jpg";
             String backUrl = "https://storage.cani.vn/ekyc/eo_back_" + UUID.randomUUID() + ".jpg";
@@ -106,7 +167,7 @@ public class EventOrganizerEkycService {
 
             EoEkycVerification record = EoEkycVerification.builder()
                     .eventOrganizer(eo)
-                    .representativeName(result.getFullName() != null ? result.getFullName() : eo.getUser().getFullName())
+                    .representativeName(result.getFullName() != null ? result.getFullName() : (eo.getUser() != null ? eo.getUser().getFullName() : null))
                     .cccdNumberMasked(maskedNumber)
                     .cccdNumberHash(idHash)
                     .dob(result.getDob())
@@ -130,9 +191,28 @@ public class EventOrganizerEkycService {
 
             record = eoEkycVerificationRepository.save(record);
 
+            // Đồng bộ thông tin thực tế bóc tách từ thẻ CCCD vào hồ sơ EO/User khi hợp lệ
+            if (!"REJECTED".equals(status)) {
+                if (result.getResidenceAddress() != null && !result.getResidenceAddress().isBlank()
+                        && (eo.getAddress() == null || eo.getAddress().isBlank())) {
+                    eo.setAddress(result.getResidenceAddress().trim());
+                }
+                if (!"MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())
+                        && result.getFullName() != null && !result.getFullName().isBlank()
+                        && eo.getUser() != null) {
+                    eo.getUser().setFullName(result.getFullName().trim());
+                    userRepository.save(eo.getUser());
+                }
+            }
+
             if ("APPROVED".equals(status)) {
                 eo.setVerificationStatus(VerificationStatus.APPROVED);
                 eo.setVerifiedAt(Instant.now());
+                eventOrganizerRepository.save(eo);
+            } else if ("REJECTED".equals(status) && eo.getVerificationStatus() != VerificationStatus.APPROVED) {
+                eo.setVerificationStatus(VerificationStatus.REJECTED);
+                eventOrganizerRepository.save(eo);
+            } else if ("PENDING_REVIEW".equals(status) && eo.getVerificationStatus() != VerificationStatus.APPROVED) {
                 eventOrganizerRepository.save(eo);
             }
 
@@ -148,10 +228,9 @@ public class EventOrganizerEkycService {
     /**
      * Lấy trạng thái hồ sơ eKYC hiện tại của Nhà tổ chức sự kiện
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public EoEkycVerificationResultDto getMyEkycStatus(UUID userId) {
-        EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin Nhà tổ chức sự kiện"));
+        EventOrganizer eo = getOrCreateEo(userId);
 
         return eoEkycVerificationRepository.findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId())
                 .map(this::mapToDto)
@@ -161,6 +240,92 @@ public class EventOrganizerEkycService {
                         .status("NOT_SUBMITTED")
                         .routingReason("Doanh nghiệp chưa nộp hồ sơ xác thực định danh eKYC")
                         .build());
+    }
+
+    /**
+     * Lấy thông tin hồ sơ doanh nghiệp (Profile) của EO
+     */
+    @Transactional
+    public EoProfileDto getEoProfile(UUID userId) {
+        EventOrganizer eo = getOrCreateEo(userId);
+        User u = eo.getUser();
+
+        EoEkycVerification latestVerification = eoEkycVerificationRepository
+                .findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId())
+                .orElse(null);
+
+        String businessLicenseUrl = latestVerification != null ? latestVerification.getBusinessLicenseUrl() : null;
+        String businessVerificationStatus = "NOT_REGISTERED";
+        if (eo.getTaxId() != null && !eo.getTaxId().isBlank()) {
+            if (eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED) {
+                businessVerificationStatus = "APPROVED";
+            } else if (eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.REJECTED) {
+                businessVerificationStatus = "REJECTED";
+            } else {
+                businessVerificationStatus = "PENDING_REVIEW";
+            }
+        }
+
+        return EoProfileDto.builder()
+                .eoId(eo.getEoId())
+                .userId(u != null ? u.getUserId() : userId)
+                .companyName(eo.getCompanyName())
+                .taxId(eo.getTaxId())
+                .address(eo.getAddress())
+                .fullName(u != null ? u.getFullName() : null)
+                .phone(u != null ? u.getPhone() : null)
+                .email(u != null ? u.getEmail() : null)
+                .verificationStatus(eo.getVerificationStatus() != null ? eo.getVerificationStatus().name() : "PENDING")
+                .verifiedAt(eo.getVerifiedAt())
+                .ratingAvg(eo.getRatingAvg())
+                .ratingCount(eo.getRatingCount())
+                .totalEventsCompleted(eo.getTotalEventsCompleted())
+                .businessLicenseUrl(businessLicenseUrl)
+                .businessVerificationStatus(businessVerificationStatus)
+                .build();
+    }
+
+    /**
+     * Cập nhật thông tin hồ sơ doanh nghiệp của EO
+     */
+    @Transactional
+    public EoProfileDto updateEoProfile(UUID userId, EoProfileDto dto) {
+        EventOrganizer eo = getOrCreateEo(userId);
+        if (dto.getCompanyName() != null) eo.setCompanyName(dto.getCompanyName().trim());
+        if (dto.getTaxId() != null) eo.setTaxId(dto.getTaxId().trim());
+        if (dto.getAddress() != null) eo.setAddress(dto.getAddress().trim());
+        eventOrganizerRepository.save(eo);
+
+        User u = eo.getUser();
+        if (u != null) {
+            boolean userChanged = false;
+            if (dto.getFullName() != null && !dto.getFullName().isBlank()) {
+                u.setFullName(dto.getFullName().trim());
+                userChanged = true;
+            }
+            if (dto.getPhone() != null && !dto.getPhone().isBlank()) {
+                u.setPhone(dto.getPhone().trim());
+                userChanged = true;
+            }
+            if (userChanged) {
+                userRepository.save(u);
+            }
+        }
+
+        log.info("EO {} đã cập nhật thông tin doanh nghiệp (Profile)", eo.getEoId());
+        return getEoProfile(userId);
+    }
+
+    private EventOrganizer getOrCreateEo(UUID userId) {
+        return eventOrganizerRepository.findByUser_UserId(userId)
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
+                        throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
+                    }
+                    return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
+                });
     }
 
     /**
@@ -197,6 +362,11 @@ public class EventOrganizerEkycService {
         EventOrganizer eo = record.getEventOrganizer();
 
         if ("APPROVED".equals(decision)) {
+            if (record.getCccdNumberHash() != null && eo != null && eo.getEoId() != null
+                    && eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
+                            record.getCccdNumberHash(), List.of("APPROVED"), eo.getEoId())) {
+                throw new BadRequestException("Số CCCD này đã được phê duyệt cho một tài khoản Nhà tổ chức khác trong hệ thống!");
+            }
             record.setStatus("APPROVED");
             record.setRoutingDecision("MANUAL_APPROVED");
             eo.setVerificationStatus(VerificationStatus.APPROVED);

@@ -1,7 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../features/auth';
 import { ToastContainer } from '../components/common/Toast';
 import CaniLogo from '../components/common/CaniLogo';
+import { SupportChatWidget } from '../features/support-tickets';
+import { SearchIcon } from './components/HeaderIcons';
+import HeaderUserMenu from './components/HeaderUserMenu';
 import './MainLayout.css';
 
 const MainLayout = () => {
@@ -9,49 +13,70 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
 
-  // Phân quyền thanh điều hướng chuẩn đặc tả SEP490:
-  // - Web Portal: Dành riêng cho Event Organizer (EO), Admin, Customer Care.
-  // - Worker: Hoạt động độc lập 100% trên Mobile App (CANi Partner App).
-  const getNavItems = () => {
-    const commonItems = [
-      { path: '/mobile-preview', label: '📱 App Mobile Worker' },
-    ];
+  const isAdmin = location.pathname.startsWith('/admin') || user?.role === 'ADMIN';
+  const isCustomerCare = location.pathname.startsWith('/customer-care') || user?.role === 'CUSTOMER_CARE';
+  const isStaff = isAdmin || isCustomerCare;
 
-    if (!user) {
-      return [
-        { path: '/eo', label: 'Ban Tổ Chức (EO)' },
-        ...commonItems,
-      ];
+  const [userAvatar, setUserAvatar] = useState(() => {
+    try {
+      return localStorage.getItem('cani_eo_avatar') || user?.avatarUrl || null;
+    } catch {
+      return user?.avatarUrl || null;
     }
-    switch (user.role) {
-      case 'ADMIN':
-        return [
-          { path: '/admin', label: 'Admin Portal' },
-          { path: '/customer-care', label: 'Customer Care' },
-          { path: '/eo', label: 'Xem Cổng EO' },
-          ...commonItems,
-        ];
-      case 'CUSTOMER_CARE':
-        return [
-          { path: '/customer-care', label: 'Customer Care' },
-          { path: '/eo', label: 'Xem Cổng EO' },
-          ...commonItems,
-        ];
-      case 'EVENT_ORGANIZER':
-      default:
-        return [
-          { path: '/eo', label: 'Ban Tổ Chức (EO)' },
-          { path: '/support', label: 'Trung Tâm Hỗ Trợ' },
-          ...commonItems,
-        ];
+  });
+
+  const [headerSearch, setHeaderSearch] = useState(() => {
+    try {
+      return new URLSearchParams(location.search).get('q') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setHeaderSearch(val);
+    window.dispatchEvent(new CustomEvent('cani_global_search', { detail: { query: val } }));
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      window.dispatchEvent(new CustomEvent('cani_global_search', { detail: { query: headerSearch } }));
+      if (!location.pathname.startsWith('/eo')) {
+        navigate(`/eo?q=${encodeURIComponent(headerSearch)}`);
+      }
     }
   };
 
-  const navItems = getNavItems();
+  const handleClearSearch = () => {
+    setHeaderSearch('');
+    window.dispatchEvent(new CustomEvent('cani_global_search', { detail: { query: '' } }));
+  };
+
+  useEffect(() => {
+    const handleAvatarUpdate = (e) => {
+      const newAvatar = e.detail?.avatarUrl || localStorage.getItem('cani_eo_avatar');
+      setUserAvatar(newAvatar);
+    };
+    window.addEventListener('cani_avatar_updated', handleAvatarUpdate);
+    return () => window.removeEventListener('cani_avatar_updated', handleAvatarUpdate);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const handleUserBlockClick = () => {
+    if (isAdmin) {
+      navigate('/admin');
+      window.dispatchEvent(new CustomEvent('cani_admin_navigate_home'));
+    } else if (isCustomerCare) {
+      navigate('/customer-care');
+    } else {
+      navigate('/eo?tab=profile');
+      window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail: { tab: 'profile' } }));
+    }
   };
 
   return (
@@ -59,73 +84,66 @@ const MainLayout = () => {
       <ToastContainer />
       <header className="main-header">
         <div className="main-header-left">
-          <Link to="/eo" className="main-logo-group" title="CANi EVENT PLATFORM - Cần Ai, Có CANi">
+          <Link
+            to={isAdmin ? '/admin' : isCustomerCare ? '/customer-care' : '/eo'}
+            className="main-logo-group"
+            title="CANi EVENT PLATFORM - Cần Ai, Có CANi"
+            onClick={() => {
+              if (isAdmin) {
+                window.dispatchEvent(new CustomEvent('cani_admin_navigate_home'));
+              }
+            }}
+          >
             <CaniLogo variant="horizontal" height={36} />
           </Link>
-          <nav className="main-nav">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`nav-link ${isActive ? 'active' : ''}`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
         </div>
 
-        <div className="main-header-center">
-          <div className="header-search-box">
-            <span className="header-search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Tìm kiếm sự kiện, nhân sự, địa điểm..."
-              className="header-search-input"
-            />
-          </div>
-        </div>
-
-        <div className="main-header-right">
-          {isAuthenticated && user ? (
-            <div className="user-header-group">
-              <button type="button" className="header-notif-btn" title="Thông báo mới">
-                <span className="notif-icon">🔔</span>
-                <span className="notif-badge-dot"></span>
-              </button>
-              <div className="user-session-info">
-                <div className="user-avatar-badge" title={user.fullName || user.username}>
-                  {(user.fullName || user.username || 'D').charAt(0).toUpperCase()}
-                </div>
-                <div className="user-meta">
-                  <span className="user-greeting">
-                    Xin chào, <strong>{user.fullName || user.username}</strong>
-                  </span>
-                  <span className="user-role-pill">{user.role}</span>
-                </div>
+        {!isStaff && (
+          <div className="main-header-center">
+            <div className="header-search-box">
+              <SearchIcon />
+              <input
+                type="text"
+                placeholder="Tìm kiếm sự kiện, nhân sự, địa điểm..."
+                className="header-search-input"
+                value={headerSearch}
+                onChange={handleSearchChange}
+                onKeyDown={handleSearchKeyDown}
+              />
+              {headerSearch && (
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="btn-logout"
-                  title="Đăng xuất"
+                  onClick={handleClearSearch}
+                  className="header-search-clear-btn"
+                  title="Xóa tìm kiếm"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1rem',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
                 >
-                  Đăng xuất
+                  ×
                 </button>
-              </div>
+              )}
             </div>
-          ) : (
-            <div className="auth-nav-actions">
-              <Link to="/login" className="btn-login-link">
-                Đăng nhập
-              </Link>
-              <Link to="/register" className="btn-register-link">
-                Đăng ký EO
-              </Link>
-            </div>
-          )}
+          </div>
+        )}
+
+        <div className="main-header-right">
+          <HeaderUserMenu
+            isAuthenticated={isAuthenticated}
+            user={user}
+            userAvatar={userAvatar}
+            isAdmin={isAdmin}
+            isCustomerCare={isCustomerCare}
+            onUserBlockClick={handleUserBlockClick}
+            onLogout={handleLogout}
+          />
         </div>
       </header>
 
@@ -137,11 +155,14 @@ const MainLayout = () => {
         <div className="main-footer-inner">
           <span>CANi Event Staffing Platform — Portal Dành Cho Ban Tổ Chức & Quản Trị</span>
           <span className="system-status-indicator">
-            <span className="status-dot"></span>
+            <span className="status-dot" />
             Hệ thống ổn định
           </span>
         </div>
       </footer>
+
+      {/* Bong bóng chat hỗ trợ trực tuyến toàn sàn - chỉ hiển thị cho Người dùng / EO, ẩn trên Admin và CSKH */}
+      {!isStaff && <SupportChatWidget />}
     </div>
   );
 };

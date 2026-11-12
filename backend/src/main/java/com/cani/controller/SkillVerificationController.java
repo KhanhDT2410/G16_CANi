@@ -135,6 +135,36 @@ public class SkillVerificationController {
     }
 
     /**
+     * Admin Skill Audit Log: Lấy toàn bộ lịch sử thẩm định của tất cả Worker để thanh tra, hậu kiểm
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
+    @GetMapping("/admin/all")
+    public ResponseEntity<ApiResponse<List<SkillVerificationResponseDto>>> getAllVerifications(
+            @RequestParam(value = "status", required = false) com.cani.entity.enums.SkillVerificationStatus status
+    ) {
+        List<SkillVerificationResponseDto> all = verificationService.getAllVerificationsForAdmin(status);
+        return ResponseEntity.ok(ApiResponse.ok(all, "Lấy danh sách toàn bộ hồ sơ thẩm định kỹ năng thành công"));
+    }
+
+    /**
+     * Admin Post-Audit Revocation: Thu hồi điểm kỹ năng nếu phát hiện chứng chỉ giả mạo
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
+    @PostMapping("/admin/{id}/revoke")
+    public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> revokeVerification(
+            @PathVariable("id") UUID verificationId,
+            @RequestParam(value = "reason", required = false) String reason,
+            Authentication authentication
+    ) {
+        UUID adminUserId = (authentication != null && authentication.getPrincipal() instanceof User u)
+                ? u.getUserId()
+                : null;
+
+        SkillVerificationResponseDto response = verificationService.revokeVerification(verificationId, adminUserId, reason);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Đã thu hồi chứng nhận kỹ năng và khấu trừ điểm SP thành công"));
+    }
+
+    /**
      * Admin / Customer Care manual review for Medium-confidence submissions (UC-47)
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")

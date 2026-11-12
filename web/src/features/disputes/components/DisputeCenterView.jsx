@@ -1,222 +1,191 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../auth';
 import { useDisputes } from '../hooks/useDisputes';
+import DisputeQueueSidebar from './DisputeQueueSidebar';
+import DisputeConversationWorkspace from './DisputeConversationWorkspace';
 import DisputeQueueTable from './DisputeQueueTable';
-import MyDisputesTable from './MyDisputesTable';
-import DisputeDetailModal from './DisputeDetailModal';
 import CreateDisputeModal from './CreateDisputeModal';
-import AddEvidenceModal from './AddEvidenceModal';
 import DisputeDecisionModal from './DisputeDecisionModal';
 import EscalateModal from './EscalateModal';
 import TransferDisputeModal from './TransferDisputeModal';
 import './Disputes.css';
 
+/**
+ * Màn hình Trung tâm Xử lý Tranh chấp & Khiếu nại (ADM-03).
+ * Mặc định hiển thị giao diện đối thoại trực tiếp kết nối cơ sở dữ liệu thật.
+ * Tiêu chuẩn < 200 dòng theo AGENTS.md.
+ */
 export const DisputeCenterView = () => {
   const { user } = useAuth();
   const isArbitrator = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
 
   const {
-    queue,
-    myQueue,
-    ccStaff,
-    myDisputes,
-    selectedDispute,
-    loading,
-    loadQueue,
-    loadMyQueue,
-    loadCcStaff,
-    loadMyDisputes,
-    loadDisputeDetail,
-    createDispute,
-    addEvidence,
-    assignDispute,
-    issueDecision,
-    escalateDispute,
+    queue, myQueue, ccStaff, loading,
+    loadQueue, loadCcStaff, loadDisputeDetail,
+    createDispute, addEvidence, assignDispute,
+    issueDecision, escalateDispute,
   } = useDisputes(isArbitrator ? 'queue' : 'my');
 
+  const [activeDisputeId, setActiveDisputeId] = useState(null);
+  const [selectedDisputeDetail, setSelectedDisputeDetail] = useState(null);
+  const [viewMode, setViewMode] = useState('SPLIT'); // 'SPLIT' | 'TABLE'
   const [modalType, setModalType] = useState(null);
   const [modalDispute, setModalDispute] = useState(null);
-  const [searchId, setSearchId] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [queueFilter, setQueueFilter] = useState('ALL');
   const [queueScope, setQueueScope] = useState('ALL');
 
-  const escalatedCount = useMemo(
-    () => queue.filter((item) => item.status === 'ESCALATED').length,
-    [queue]
-  );
+  const scopedList = queueScope === 'MINE' ? myQueue : queue;
   const riskCount = useMemo(() => queue.filter((item) => item.slaAtRisk).length, [queue]);
 
-  // Hàng đợi hiển thị: phạm vi (tất cả / của tôi) + bộ lọc trạng thái
-  const scopedQueue = queueScope === 'MINE' ? myQueue : queue;
-
   const filteredQueue = useMemo(() => {
-    if (!isArbitrator) return [];
-    let list = scopedQueue;
-    if (queueFilter === 'OPEN') list = list.filter((item) => item.status === 'OPEN');
-    else if (queueFilter === 'INVESTIGATING') list = list.filter((item) => item.status === 'INVESTIGATING');
-    else if (queueFilter === 'ESCALATED') list = list.filter((item) => item.status === 'ESCALATED');
-    else if (queueFilter === 'SLA_RISK') list = list.filter((item) => item.slaAtRisk);
-    return list;
-  }, [scopedQueue, queueFilter, isArbitrator]);
+    let list = scopedList;
+    if (queueFilter === 'OPEN') list = list.filter((i) => i.status === 'OPEN');
+    else if (queueFilter === 'INVESTIGATING') list = list.filter((i) => i.status === 'INVESTIGATING');
+    else if (queueFilter === 'ESCALATED') list = list.filter((i) => i.status === 'ESCALATED');
+    else if (queueFilter === 'SLA_RISK') list = list.filter((i) => i.slaAtRisk);
 
-  const handleOpenDetail = async (id) => {
-    const detail = await loadDisputeDetail(id);
-    if (detail) {
-      setModalDispute(detail);
-      setModalType('detail');
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter((i) => i.title?.toLowerCase().includes(q) || i.id?.toLowerCase().includes(q));
     }
+    return list;
+  }, [scopedList, queueFilter, searchTerm]);
+
+  // Tự động chọn đơn đầu tiên khi có dữ liệu từ CSDL
+  useEffect(() => {
+    if (filteredQueue.length > 0 && (!activeDisputeId || !filteredQueue.some((i) => i.id === activeDisputeId))) {
+      setActiveDisputeId(filteredQueue[0].id);
+    }
+  }, [filteredQueue, activeDisputeId]);
+
+  // Chi tiết đơn đang hiển thị trong khung hội thoại
+  const currentDispute = useMemo(() => {
+    if (!activeDisputeId) return null;
+    if (selectedDisputeDetail && selectedDisputeDetail.id === activeDisputeId) {
+      return selectedDisputeDetail;
+    }
+    return filteredQueue.find((i) => i.id === activeDisputeId) || null;
+  }, [selectedDisputeDetail, activeDisputeId, filteredQueue]);
+
+  const handleSelectDispute = async (id) => {
+    setActiveDisputeId(id);
+    const detail = await loadDisputeDetail(id);
+    if (detail) setSelectedDisputeDetail(detail);
   };
 
-  const openEvidence = (d) => { setModalDispute(d); setModalType('evidence'); };
+  const handleSendMessage = async (disputeId, payload) => {
+    const updated = await addEvidence(disputeId, payload);
+    if (updated) setSelectedDisputeDetail(updated);
+    else handleSelectDispute(disputeId);
+  };
+
   const openDecision = (d) => { setModalDispute(d); setModalType('decision'); };
   const openEscalate = (d) => { setModalDispute(d); setModalType('escalate'); };
   const openTransfer = (d) => { setModalDispute(d); setModalType('transfer'); loadCcStaff(); };
 
   return (
     <div className="disputes-container">
-      {/* Header */}
+      {/* Top Bar Switcher */}
       <div className="disputes-header">
         <div>
           <h1 className="disputes-title">
-            {isArbitrator ? 'Hàng Đợi Xử Lý Tranh Chấp & Khiếu Nại' : 'Tranh Chấp Của Tôi'}
+            Trung Tâm Xử Lý Tranh Chấp & Khiếu Nại
           </h1>
           <p className="disputes-subtitle">
-            {isArbitrator
-              ? 'Tiếp nhận hồ sơ, đối soát bằng chứng, tự động khấu trừ điểm uy tín RS và kiểm soát thời hạn SLA.'
-              : 'Theo dõi tiến trình giải quyết khiếu nại ca làm việc và bổ sung bằng chứng theo quy định.'}
+            Không gian đối thoại trực tiếp giữa Người lao động, Nhà tổ chức sự kiện và Trọng tài viên CSKH.
           </p>
         </div>
         <div className="disputes-actions-group">
-          {!isArbitrator && (
+          <div className="view-mode-toggle">
             <button
               type="button"
-              className="dispute-btn-primary"
-              onClick={() => setModalType('create')}
+              className={`toggle-btn ${viewMode === 'SPLIT' ? 'active' : ''}`}
+              onClick={() => setViewMode('SPLIT')}
             >
-              Nộp đơn khiếu nại
+              Không gian hội thoại
             </button>
-          )}
-          <button
-            type="button"
-            className="dispute-btn-secondary"
-            onClick={() => (isArbitrator ? loadQueue() : loadMyDisputes())}
-          >
+            <button
+              type="button"
+              className={`toggle-btn ${viewMode === 'TABLE' ? 'active' : ''}`}
+              onClick={() => setViewMode('TABLE')}
+            >
+              Bảng hàng đợi
+            </button>
+          </div>
+          <button type="button" className="dispute-btn-secondary" onClick={() => loadQueue()}>
             Làm mới
           </button>
         </div>
       </div>
 
-      {/* Tra cứu nhanh theo ID */}
-      <form onSubmit={(e) => { e.preventDefault(); if (searchId.trim()) handleOpenDetail(searchId.trim()); }} className="dispute-search-form">
-        <input
-          type="text"
-          className="dispute-input"
-          placeholder="Nhập mã tranh chấp (UUID) để tra cứu hồ sơ trực tiếp..."
-          value={searchId}
-          onChange={(e) => setSearchId(e.target.value)}
-        />
-        <button type="submit" className="dispute-btn-secondary">
-          Tra cứu
-        </button>
-      </form>
-
-      {/* Tabs lọc hàng đợi cho Admin/CSKH HOẶC Danh sách cá nhân cho Worker/EO */}
-      {isArbitrator ? (
-        <>
-          {/* Phạm vi: toàn bộ đội CC hay chỉ những đơn được giao cho tôi */}
-          <div className="disputes-tabs">
-            <button
-              type="button"
-              className={`disputes-tab-btn ${queueScope === 'ALL' ? 'active' : ''}`}
-              onClick={() => setQueueScope('ALL')}
-            >
-              <span>Toàn bộ hàng đợi ({queue.length})</span>
-            </button>
-            <button
-              type="button"
-              className={`disputes-tab-btn ${queueScope === 'MINE' ? 'active' : ''}`}
-              onClick={() => {
-                setQueueScope('MINE');
-                loadMyQueue();
-              }}
-            >
-              <span>Được giao tôi ({myQueue.length})</span>
-            </button>
+      {/* CHẾ ĐỘ 1: GIAO DIỆN HỘI THOẠI SPLIT-VIEW (ADM-03) */}
+      {viewMode === 'SPLIT' ? (
+        <div className="dispute-split-layout">
+          <DisputeQueueSidebar
+            queue={filteredQueue}
+            selectedId={currentDispute?.id}
+            onSelect={handleSelectDispute}
+            queueFilter={queueFilter}
+            setQueueFilter={setQueueFilter}
+            queueScope={queueScope}
+            setQueueScope={setQueueScope}
+            totalCount={queue.length}
+            myCount={myQueue.length}
+            riskCount={riskCount}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+          />
+          <div className="dispute-split-workspace">
+            {currentDispute ? (
+              <DisputeConversationWorkspace
+                dispute={currentDispute}
+                onBack={() => setViewMode('TABLE')}
+                onAssign={assignDispute}
+                onDecide={openDecision}
+                onEscalate={openEscalate}
+                onTransfer={openTransfer}
+                onSendMessage={handleSendMessage}
+                isSending={loading}
+                isArbitrator={isArbitrator}
+              />
+            ) : (
+              <div className="empty-workspace-state">
+                <span>
+                  {filteredQueue.length === 0
+                    ? 'Hiện không có đơn khiếu nại nào trong hàng đợi.'
+                    : 'Chọn một đơn khiếu nại từ danh sách bên trái để xem nội dung trao đổi.'}
+                </span>
+              </div>
+            )}
           </div>
-
-          <div className="disputes-tabs">
-          <button type="button" className={`disputes-tab-btn ${queueFilter === 'ALL' ? 'active' : ''}`} onClick={() => setQueueFilter('ALL')}>
-            <span>Tất cả ({scopedQueue.length})</span>
-          </button>
-          <button type="button" className={`disputes-tab-btn ${queueFilter === 'OPEN' ? 'active' : ''}`} onClick={() => setQueueFilter('OPEN')}>
-            <span>Chờ nhận ({scopedQueue.filter((q) => q.status === 'OPEN').length})</span>
-          </button>
-          <button type="button" className={`disputes-tab-btn ${queueFilter === 'INVESTIGATING' ? 'active' : ''}`} onClick={() => setQueueFilter('INVESTIGATING')}>
-            <span>Đang điều tra ({scopedQueue.filter((q) => q.status === 'INVESTIGATING').length})</span>
-          </button>
-          <button type="button" className={`disputes-tab-btn ${queueFilter === 'ESCALATED' ? 'active' : ''}`} onClick={() => setQueueFilter('ESCALATED')}>
-            <span>Kháng nghị Admin ({scopedQueue.filter((q) => q.status === 'ESCALATED').length})</span>
-          </button>
-          {riskCount > 0 && (
-            <button type="button" className={`disputes-tab-btn ${queueFilter === 'SLA_RISK' ? 'active' : ''}`} onClick={() => setQueueFilter('SLA_RISK')}>
-              <span className="tab-danger-text">SLA Khẩn cấp ({riskCount})</span>
-            </button>
-          )}
-          </div>
-        </>
-      ) : (
-        <div className="disputes-tabs">
-          <button type="button" className="disputes-tab-btn active">
-            <span>Danh sách khiếu nại đã gửi ({myDisputes.length})</span>
-          </button>
         </div>
-      )}
-
-      {/* Nội dung bảng */}
-      {isArbitrator ? (
+      ) : (
+        /* CHẾ ĐỘ 2: BẢNG HÀNG ĐỢI */
         <DisputeQueueTable
           queue={filteredQueue}
           loading={loading}
-          onSelect={handleOpenDetail}
-          onAssign={(id) => assignDispute(id)}
+          onSelect={(id) => {
+            handleSelectDispute(id);
+            setViewMode('SPLIT');
+          }}
+          onAssign={assignDispute}
           onDecide={openDecision}
           onTransfer={openTransfer}
         />
-      ) : (
-        <MyDisputesTable
-          disputes={myDisputes}
-          loading={loading}
-          onSelect={handleOpenDetail}
-          onAddEvidence={openEvidence}
-          onEscalate={openEscalate}
-        />
       )}
 
-      {/* Modals */}
-      {modalType === 'detail' && (
-        <DisputeDetailModal
-          dispute={modalDispute || selectedDispute}
-          onClose={() => setModalType(null)}
-          onAddEvidence={openEvidence}
-          onDecide={openDecision}
-          onEscalate={openEscalate}
-          onTransfer={isArbitrator ? openTransfer : undefined}
-        />
-      )}
       {modalType === 'create' && <CreateDisputeModal onClose={() => setModalType(null)} onSubmit={createDispute} />}
-      {modalType === 'evidence' && modalDispute && <AddEvidenceModal dispute={modalDispute} onClose={() => setModalType(null)} onSubmit={addEvidence} />}
-      {modalType === 'decision' && modalDispute && <DisputeDecisionModal dispute={modalDispute} onClose={() => setModalType(null)} onSubmit={issueDecision} />}
-      {modalType === 'escalate' && modalDispute && <EscalateModal dispute={modalDispute} onClose={() => setModalType(null)} onSubmit={escalateDispute} />}
+      {modalType === 'decision' && modalDispute && (
+        <DisputeDecisionModal dispute={modalDispute} onClose={() => setModalType(null)} onSubmit={issueDecision} />
+      )}
+      {modalType === 'escalate' && modalDispute && (
+        <EscalateModal dispute={modalDispute} onClose={() => setModalType(null)} onSubmit={escalateDispute} />
+      )}
       {modalType === 'transfer' && modalDispute && (
-        <TransferDisputeModal
-          dispute={modalDispute}
-          staff={ccStaff}
-          onClose={() => setModalType(null)}
-          onSubmit={assignDispute}
-        />
+        <TransferDisputeModal dispute={modalDispute} staff={ccStaff} onClose={() => setModalType(null)} onSubmit={assignDispute} />
       )}
     </div>
   );
 };
-
 export default DisputeCenterView;

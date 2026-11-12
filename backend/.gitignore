@@ -31,4 +31,6 @@ Thumbs.db
 # Secrets
 .env
 *.pem
-*.key
+*.key
+firebase-service-account*.json
+*firebase-adminsdk*.json

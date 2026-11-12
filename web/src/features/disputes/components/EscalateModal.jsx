@@ -30,7 +30,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
           <div>
             <h3>Kháng Nghị Lên Ban Quản Trị Viên</h3>
             <span className="dispute-modal-subtitle">
-              Mã đơn: <code>{dispute.id}</code> (Trong vòng 7 ngày kể từ quyết định của CSKH)
+              Mã đơn: <code>{dispute.id}</code> (Thời hạn: Trong vòng 7 ngày kể từ quyết định của CSKH)
             </span>
           </div>
           <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>

@@ -8,6 +8,7 @@ import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerEkycVerification;
 import com.cani.entity.enums.KycStatus;
+import com.cani.entity.enums.UserRole;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.UserRepository;
@@ -35,6 +36,12 @@ public class WorkerEkycService {
     private final WorkerEkycVerificationRepository ekycVerificationRepository;
     private final EkycProvider ekycProvider;
     private final UserRepository userRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.EoEkycVerificationRepository eoEkycVerificationRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
+    private boolean ekycStrict;
 
     /**
      * Worker nộp hồ sơ eKYC: Mặt trước CCCD, Mặt sau CCCD và Ảnh Selfie chân dung
@@ -67,6 +74,9 @@ public class WorkerEkycService {
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy User cho User ID: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.WORKER && user.getRole() != UserRole.ADMIN) {
+                        throw new BadRequestException("Tài khoản không phải là Worker");
+                    }
                     return workerRepository.save(Worker.builder().user(user).isOnline(false).build());
                 });
 
@@ -90,10 +100,18 @@ public class WorkerEkycService {
                 if (worker.getFullName() != null && !worker.getFullName().isBlank()) {
                     ekycResult.setFullName(worker.getFullName().toUpperCase());
                 }
-                String uniqueSuffix = String.format("%06d", Math.abs(worker.getWorkerId().hashCode()) % 1_000_000);
-                ekycResult.setIdNumber("001202" + uniqueSuffix);
-                ekycResult.setRoutingDecision("AUTO_APPROVED");
-                ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
+                if (ekycResult.getIdNumber() == null || "001202012345".equals(ekycResult.getIdNumber())) {
+                    int imageSeed = Arrays.hashCode(frontBytes);
+                    String uniqueSuffix = String.format("%06d", Math.abs(imageSeed) % 1_000_000);
+                    ekycResult.setIdNumber("001202" + uniqueSuffix);
+                }
+                if (ekycStrict) {
+                    ekycResult.setRoutingDecision("MANUAL_REVIEW");
+                    ekycResult.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
+                } else {
+                    ekycResult.setRoutingDecision("AUTO_APPROVED");
+                    ekycResult.setRoutingReason("Hồ sơ đã được đối soát hợp lệ qua hệ thống eKYC.");
+                }
             }
 
             // Ghi đè bằng thông tin người dùng đã xác nhận hoặc quét từ mã QR trên thẻ CCCD gắn chip (nếu có)
@@ -132,7 +150,21 @@ public class WorkerEkycService {
             String maskedNumber = maskCccd(rawIdNumber);
 
             // 3. Kiểm tra chống gian lận dùng trùng CCCD cho nhiều tài khoản (trừ khi là chính worker này nộp lại)
-            if (idHash != null && ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(idHash, "APPROVED", worker.getWorkerId())) {
+            boolean isDuplicateWorkerCccd = false;
+            if (idHash != null) {
+                isDuplicateWorkerCccd = ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(
+                        idHash, "APPROVED", worker.getWorkerId());
+                if (!isDuplicateWorkerCccd) {
+                    isDuplicateWorkerCccd = ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(
+                            idHash, List.of("APPROVED", "PENDING_REVIEW"), worker.getWorkerId());
+                }
+                if (!isDuplicateWorkerCccd && eoEkycVerificationRepository != null && userId != null) {
+                    isDuplicateWorkerCccd = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_User_UserIdNot(
+                            idHash, List.of("APPROVED", "PENDING_REVIEW"), userId);
+                }
+            }
+
+            if (isDuplicateWorkerCccd) {
                 ekycResult.setRoutingDecision("REJECTED");
                 ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
             }

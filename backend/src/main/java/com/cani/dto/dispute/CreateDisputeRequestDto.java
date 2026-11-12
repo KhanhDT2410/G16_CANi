@@ -21,7 +21,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateDisputeRequestDto {
 
-    @NotNull(message = "ID ca làm việc (assignment) không được để trống")
+    @NotNull(message = "ID ca làm việc (assignmentId) không được để trống")
     private UUID assignmentId;
 
     @NotNull(message = "Danh mục tranh chấp không được để trống")
@@ -34,4 +34,7 @@ public class CreateDisputeRequestDto {
     @NotBlank(message = "Mô tả tranh chấp không được để trống")
     @Size(min = 50, max = 3000, message = "Mô tả tranh chấp phải từ 50 đến 3000 ký tự (BR-52)")
     private String description;
+
+    private String evidence;
 }
+

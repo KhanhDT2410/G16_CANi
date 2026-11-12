@@ -1,16 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 
 class JobDetailBottomSheet extends StatelessWidget {
   final NearbyShiftItem shift;
   final VoidCallback onApply;
+  final double userLat;
+  final double userLng;
 
   const JobDetailBottomSheet({
     super.key,
     required this.shift,
     required this.onApply,
+    this.userLat = 10.7769,
+    this.userLng = 106.7009,
   });
+
+  Future<void> _launchGoogleMapsNavigation(BuildContext context) async {
+    final destLat = shift.locationLat;
+    final destLng = shift.locationLng;
+    final uri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&origin=$userLat,$userLng&destination=$destLat,$destLng&travelmode=driving',
+    );
+
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể mở Google Maps: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +52,7 @@ class JobDetailBottomSheet extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -45,6 +74,47 @@ class JobDetailBottomSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+
+          // Ảnh minh họa ca làm / đồng phục (nếu EO có cung cấp)
+          if (shift.imageUrl != null && shift.imageUrl!.trim().isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Stack(
+                children: [
+                  Image.network(
+                    shift.imageUrl!.trim(),
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
+                  ),
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.checkroom_rounded, size: 12, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text(
+                            'Ảnh ca làm / Đồng phục yêu cầu',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
 
           // Tên sự kiện & Khoảng cách
           Row(
@@ -88,7 +158,7 @@ class JobDetailBottomSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withOpacity(0.6),
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -136,7 +206,7 @@ class JobDetailBottomSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -185,20 +255,65 @@ class JobDetailBottomSheet extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
 
-          // Nút Ứng tuyển
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: onApply,
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('ỨNG TUYỂN / NHẬN VIỆC NGAY', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Ghi chú thanh toán Non-Escrow (Minh bạch phương thức thanh toán)
+          Row(
+            children: [
+              const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  '* Tiền thù lao do Ban tổ chức thanh toán trực tiếp cho bạn sau ca (không qua CANi ví điện tử).',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                  ),
+                ),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Hàng nút thao tác: Chỉ đường Google Maps + Ứng tuyển ca làm
+          Row(
+            children: [
+              // Nút Chỉ đường Google Maps
+              Expanded(
+                flex: 4,
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _launchGoogleMapsNavigation(context),
+                    icon: const Icon(Icons.navigation_rounded, size: 18),
+                    label: const Text('Chỉ đường', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0066FF),
+                      side: const BorderSide(color: Color(0xFF0066FF), width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Nút Ứng tuyển
+              Expanded(
+                flex: 6,
+                child: SizedBox(
+                  height: 48,
+                  child: FilledButton.icon(
+                    onPressed: onApply,
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text('Ứng tuyển ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0066FF),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

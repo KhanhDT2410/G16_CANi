@@ -127,15 +127,15 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final a = widget.assignment;
     final destLat = a.venueLat ?? 10.7769;
     final destLng = a.venueLng ?? 106.7009;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: SafeArea(
@@ -150,7 +150,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -163,23 +163,31 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.4) : Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.directions, color: Colors.blue.shade700, size: 24),
+                  child: Icon(Icons.directions, color: isDark ? const Color(0xFF38BDF8) : Colors.blue.shade700, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Lộ Trình Chỉ Đường',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                        ),
                       ),
                       Text(
                         a.eventName,
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -188,7 +196,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: Icon(Icons.close, color: isDark ? const Color(0xFF94A3B8) : null),
                 ),
               ],
             ),
@@ -198,9 +206,9 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
               ),
               child: Column(
                 children: [
@@ -211,7 +219,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                       Column(
                         children: [
                           Icon(Icons.my_location, color: Colors.blue.shade600, size: 20),
-                          Container(width: 2, height: 32, color: Colors.blue.shade200),
+                          Container(width: 2, height: 32, color: isDark ? const Color(0xFF1E3A8A) : Colors.blue.shade200),
                         ],
                       ),
                       const SizedBox(width: 12),
@@ -235,7 +243,10 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                             else if (_currentPosition != null)
                               Text(
                                 'Lat: ${_currentPosition!.latitude.toStringAsFixed(4)}, Lng: ${_currentPosition!.longitude.toStringAsFixed(4)}',
-                                style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFFCBD5E1) : Colors.black87,
+                                ),
                               )
                             else
                               Text(
@@ -265,12 +276,19 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                             const SizedBox(height: 2),
                             Text(
                               a.venueAddress,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Tọa độ: $destLat, $destLng',
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                              ),
                             ),
                           ],
                         ),
@@ -288,17 +306,19 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Colors.teal.shade50, Colors.blue.shade50],
+                    colors: isDark
+                        ? [const Color(0xFF064E3B).withValues(alpha: 0.4), const Color(0xFF1E3A8A).withValues(alpha: 0.4)]
+                        : [Colors.teal.shade50, Colors.blue.shade50],
                   ),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.teal.shade200),
+                  border: Border.all(color: isDark ? const Color(0xFF0D9488).withValues(alpha: 0.5) : Colors.teal.shade200),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.route, color: Colors.teal.shade800, size: 20),
+                        Icon(Icons.route, color: isDark ? const Color(0xFF34D399) : Colors.teal.shade800, size: 20),
                         const SizedBox(width: 8),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,16 +326,20 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                             const Text('Khoảng cách', style: TextStyle(fontSize: 11, color: Colors.grey)),
                             Text(
                               '${_distanceKm!.toStringAsFixed(1)} km',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFF34D399) : Colors.teal.shade900,
+                              ),
                             ),
                           ],
                         ),
                       ],
                     ),
-                    Container(width: 1, height: 30, color: Colors.teal.shade200),
+                    Container(width: 1, height: 30, color: isDark ? const Color(0xFF334155) : Colors.teal.shade200),
                     Row(
                       children: [
-                        Icon(Icons.two_wheeler, color: Colors.blue.shade800, size: 20),
+                        Icon(Icons.two_wheeler, color: isDark ? const Color(0xFF38BDF8) : Colors.blue.shade800, size: 20),
                         const SizedBox(width: 8),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +347,11 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                             const Text('Ước tính di chuyển', style: TextStyle(fontSize: 11, color: Colors.grey)),
                             Text(
                               '~$_estimatedMinutes phút',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFF38BDF8) : Colors.blue.shade900,
+                              ),
                             ),
                           ],
                         ),

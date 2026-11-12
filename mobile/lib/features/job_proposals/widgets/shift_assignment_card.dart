@@ -1,0 +1,418 @@
+import 'package:flutter/material.dart';
+
+import '../models/proposal_models.dart';
+
+class ShiftAssignmentCard extends StatelessWidget {
+  final ShiftAssignmentItem assignment;
+  final VoidCallback onNavigate;
+  final VoidCallback onQrScan;
+  final VoidCallback onConfirmPayment;
+  final VoidCallback? onOpenChecklist;
+  final VoidCallback? onCancelAssignment;
+  final VoidCallback? onRateOrganizer;
+
+  const ShiftAssignmentCard({
+    super.key,
+    required this.assignment,
+    required this.onNavigate,
+    required this.onQrScan,
+    required this.onConfirmPayment,
+    this.onOpenChecklist,
+    this.onCancelAssignment,
+    this.onRateOrganizer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final a = assignment;
+    final isCheckedIn = a.status == 'CHECKED_IN' || (a.checkinTime != null && a.checkoutTime == null);
+    final isCompleted = a.status == 'COMPLETED' || a.checkoutTime != null;
+    final isNotStarted = !isCheckedIn && !isCompleted;
+
+    final isDeclared = a.paymentStatus == 'DECLARED_PENDING_WORKER';
+    final isConfirmedFull = a.paymentStatus == 'CONFIRMED_FULL';
+    final isConfirmedPartial = a.paymentStatus == 'CONFIRMED_PARTIAL';
+    final isDisputed = a.paymentStatus == 'DISPUTED';
+
+    final barColor = isCompleted
+        ? const Color(0xFF7E22CE)
+        : (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF0077FF));
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.20)
+                : const Color(0xFF0077FF).withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Vạch màu trang trí mép trái theo OpenDesign
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 4.5,
+            child: Container(color: barColor),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 15, 15, 15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tag trạng thái
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? const Color(0xFFF3E8FF)
+                            : (isCheckedIn
+                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                : const Color(0xFF0077FF).withValues(alpha: 0.10)),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isCompleted
+                                  ? const Color(0xFF7E22CE)
+                                  : (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF0077FF)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isCompleted
+                                ? 'ĐÃ HOÀN THÀNH'
+                                : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: isCompleted
+                                  ? const Color(0xFF7E22CE)
+                                  : (isCheckedIn ? const Color(0xFF059669) : const Color(0xFF0077FF)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    InkWell(
+                      onTap: onNavigate,
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        child: Row(
+                          children: [
+                            Icon(Icons.directions, size: 14, color: Color(0xFF0066FF)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Chỉ đường',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0066FF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 9),
+
+                // Tên ca & Sự kiện
+                Text(
+                  '${a.jobType} · ${a.eventName}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
+                    letterSpacing: -0.1,
+                  ),
+                ),
+                if (a.imageUrl != null && a.imageUrl!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      a.imageUrl!.trim(),
+                      height: 100,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
+
+                // Thời gian & Địa điểm
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF0077FF)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.venueAddress}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Nút Quét QR Lớn cao 52px màu Teal nếu ca đang chạy hoặc chờ
+                if (!isCompleted) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x550D9488),
+                            blurRadius: 16,
+                            offset: Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: onQrScan,
+                        icon: const Icon(Icons.qr_code_scanner, size: 19, color: Colors.white),
+                        label: Text(
+                          isCheckedIn ? 'Quét QR Check-out Thực Địa' : 'Quét QR Check-in Thực Địa',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Hàng nút phụ: Checklist việc / Hủy ca / Đánh giá BTC
+                if (onOpenChecklist != null || onCancelAssignment != null || onRateOrganizer != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (onOpenChecklist != null)
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: onOpenChecklist,
+                            icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF0D9488)),
+                            label: const Text(
+                              'Checklist việc',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: isDark
+                                  ? const Color(0xFF134E4A).withValues(alpha: 0.35)
+                                  : const Color(0xFFF0FDFA),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      if (onOpenChecklist != null && (isNotStarted && onCancelAssignment != null || isCompleted && onRateOrganizer != null))
+                        const SizedBox(width: 8),
+                      if (isNotStarted && onCancelAssignment != null)
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: onCancelAssignment,
+                            icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
+                            label: const Text(
+                              'Hủy nhận ca',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: isDark
+                                  ? const Color(0xFF7F1D1D).withValues(alpha: 0.35)
+                                  : const Color(0xFFFEF2F2),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      if (isCompleted && onRateOrganizer != null)
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: onRateOrganizer,
+                            icon: const Icon(Icons.star_rounded, size: 17, color: Color(0xFFD97706)),
+                            label: const Text(
+                              'Đánh giá BTC',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: isDark
+                                  ? const Color(0xFF78350F).withValues(alpha: 0.35)
+                                  : const Color(0xFFFEF3C7),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 12),
+
+                // Khung Thù Lao & Nút Xác Nhận
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.15 : 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.30)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.monetization_on_outlined, size: 16, color: Color(0xFF059669)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            text: isDeclared
+                                ? (a.declaredAmount > 0 && a.declaredAmount < a.totalPay
+                                    ? 'BTC khai báo: '
+                                    : 'BTC đã thanh toán: ')
+                                : 'Thù lao: ',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
+                            children: [
+                              TextSpan(
+                                text: isDeclared && a.declaredAmount > 0 && a.declaredAmount < a.totalPay
+                                    ? '${a.declaredAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ / ${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ'
+                                    : '${(isDeclared && a.declaredAmount > 0 ? a.declaredAmount : a.totalPay).toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+                              ),
+                              if (isDeclared && a.paymentMethod != null)
+                                TextSpan(
+                                  text: ' (${a.paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Tiền mặt'})',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (isConfirmedFull)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF059669),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Đã nhận đủ ✓',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      else if (isConfirmedPartial)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Nhận một phần ⚠️',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      else if (isDisputed)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Đang khiếu nại ⚖️',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      else if (isDeclared)
+                        InkWell(
+                          onTap: onConfirmPayment,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF10B981), width: 1.2),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.edit_note, size: 14, color: Color(0xFF059669)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Xác nhận thù lao',
+                                  style: TextStyle(color: Color(0xFF059669), fontSize: 10.5, fontWeight: FontWeight.w800),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          'Sẽ trả sau ca',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

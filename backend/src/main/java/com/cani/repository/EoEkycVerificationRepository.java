@@ -21,6 +21,12 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
      */
     boolean existsByCccdNumberHashAndStatus(String cccdNumberHash, String status);
 
+    boolean existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
+            String cccdNumberHash, java.util.Collection<String> statuses, UUID eoId);
+
+    boolean existsByCccdNumberHashAndStatusInAndEventOrganizer_User_UserIdNot(
+            String cccdNumberHash, java.util.Collection<String> statuses, UUID userId);
+
     /**
      * Lấy danh sách hồ sơ eKYC chờ duyệt (PENDING_REVIEW) cho Admin thẩm định
      */

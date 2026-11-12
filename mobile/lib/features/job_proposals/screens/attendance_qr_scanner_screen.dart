@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 
-class AttendanceQrScannerScreen extends StatefulWidget {
+class AttendanceQrScannerScreen extends ConsumerStatefulWidget {
   final ShiftAssignmentItem assignment;
   final bool isCheckin; // true: Check-in, false: Check-out
 
@@ -16,10 +17,10 @@ class AttendanceQrScannerScreen extends StatefulWidget {
   });
 
   @override
-  State<AttendanceQrScannerScreen> createState() => _AttendanceQrScannerScreenState();
+  ConsumerState<AttendanceQrScannerScreen> createState() => _AttendanceQrScannerScreenState();
 }
 
-class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
+class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerScreen> {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: const [BarcodeFormat.qrCode],
@@ -27,7 +28,6 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
 
   bool _isProcessing = false;
   bool _isFlashOn = false;
-  final ProposalRepository _repo = ProposalRepository();
 
   @override
   void dispose() {
@@ -43,6 +43,27 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
 
     final rawValue = barcodes.first.rawValue;
     if (rawValue == null || rawValue.trim().isEmpty) return;
+
+    final qrStr = rawValue.trim();
+
+    // Client-side Validation: Tránh quét nhầm mã Check-in và Check-out
+    if (widget.isCheckin && qrStr.startsWith('CANI_CHECKOUT:')) {
+      setState(() => _isProcessing = true);
+      await _showMismatchDialog(
+        title: 'Mã QR Không Hợp Lệ',
+        message: 'Bạn đang chọn Check-in (vào ca), nhưng mã vừa quét là mã Check-out (tan ca). Vui lòng quét đúng mã QR Check-in do Ban tổ chức cung cấp!',
+      );
+      return;
+    }
+
+    if (!widget.isCheckin && qrStr.startsWith('CANI_CHECKIN:')) {
+      setState(() => _isProcessing = true);
+      await _showMismatchDialog(
+        title: 'Mã QR Không Hợp Lệ',
+        message: 'Bạn đang chọn Check-out (tan ca), nhưng mã vừa quét là mã Check-in (vào ca). Vui lòng quét đúng mã QR Check-out do Ban tổ chức cung cấp!',
+      );
+      return;
+    }
 
     setState(() {
       _isProcessing = true;
@@ -69,16 +90,17 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
       }
 
       // 3. Gửi API đối soát điểm danh
+      final repo = ref.read(proposalRepositoryProvider);
       AttendanceCheckResult result;
       if (widget.isCheckin) {
-        result = await _repo.checkin(
+        result = await repo.checkin(
           assignmentId: widget.assignment.assignmentId,
           qrContent: rawValue.trim(),
           lat: lat,
           lng: lng,
         );
       } else {
-        result = await _repo.checkout(
+        result = await repo.checkout(
           assignmentId: widget.assignment.assignmentId,
           qrContent: rawValue.trim(),
           lat: lat,
@@ -206,6 +228,41 @@ class _AttendanceQrScannerScreenState extends State<AttendanceQrScannerScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showMismatchDialog({required String title, required String message}) async {
+    await _controller.stop();
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17))),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(fontSize: 13.5, height: 1.45)),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _isProcessing = false);
+              _controller.start();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0077FF),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Quét Lại'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

@@ -5,9 +5,25 @@ export const TicketInfoGrid = ({
   slaDeadline,
   assignedTo,
   formatDateTime,
+  customerName,
+  customerPhone,
+  customerEmail,
 }) => {
   return (
     <div className="ticket-info-grid">
+      {customerName && (
+        <div className="ticket-info-item" style={{ gridColumn: '1 / -1' }}>
+          <span className="label">Khách hàng</span>
+          <span className="val" style={{ fontWeight: 700, color: '#0f172a' }}>
+            {customerName}
+            {(customerPhone || customerEmail) && (
+              <span style={{ fontWeight: 400, color: '#64748b', marginLeft: '0.5rem' }}>
+                (SĐT: {customerPhone || '—'} · Email: {customerEmail || '—'})
+              </span>
+            )}
+          </span>
+        </div>
+      )}
       <div className="ticket-info-item">
         <span className="label">Danh mục</span>
         <span className="val">{categoryLabel}</span>
@@ -25,7 +41,7 @@ export const TicketInfoGrid = ({
       <div className="ticket-info-item">
         <span className="label">Chuyên viên phụ trách</span>
         <span className="val">
-          {assignedTo ? assignedTo.substring(0, 8) + '...' : 'Chưa phân công'}
+          {assignedTo ? (assignedTo.length > 10 ? assignedTo.substring(0, 8) + '...' : assignedTo) : 'Chưa phân công'}
         </span>
       </div>
     </div>
@@ -33,4 +49,3 @@ export const TicketInfoGrid = ({
 };
 
 export default TicketInfoGrid;
-

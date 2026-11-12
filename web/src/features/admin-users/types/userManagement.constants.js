@@ -7,9 +7,9 @@ export const USER_ROLES = {
 
 export const USER_ROLE_LABELS = {
   ADMIN: { label: 'Quản trị viên', badgeClass: 'badge-role-admin' },
-  CUSTOMER_CARE: { label: 'Chăm sóc KH', badgeClass: 'badge-role-cc' },
-  EVENT_ORGANIZER: { label: 'Nhà tổ chức (EO)', badgeClass: 'badge-role-eo' },
-  WORKER: { label: 'Nhân sự (Worker)', badgeClass: 'badge-role-worker' },
+  CUSTOMER_CARE: { label: 'Chăm sóc khách hàng', badgeClass: 'badge-role-cc' },
+  EVENT_ORGANIZER: { label: 'Nhà tổ chức sự kiện', badgeClass: 'badge-role-eo' },
+  WORKER: { label: 'Người lao động', badgeClass: 'badge-role-worker' },
 };
 
 export const USER_STATUSES = {

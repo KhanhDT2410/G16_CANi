@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 public class PrimaryEkycProvider implements EkycProvider {
 
     private final VnptEkycClient vnptClient;
+    private final GeminiEkycClient geminiClient;
     private final MockEkycProvider mockClient;
     private final VnptEkycProperties vnptProperties;
 
@@ -41,9 +42,41 @@ public class PrimaryEkycProvider implements EkycProvider {
             byte[] backBytes, String backMime,
             byte[] selfieBytes, String selfieMime) {
 
-        EkycProvider delegate = getDelegate();
-        log.info("eKYC Router: Đang điều phối yêu cầu xác thực sang Provider: [{}]", delegate.getProviderName());
-        return delegate.verifyIdentity(frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
+        if ("mock".equalsIgnoreCase(configuredProvider)) {
+            log.info("eKYC Router: Chế độ cấu hình là [MOCK_EKYC]");
+            return mockClient.verifyIdentity(frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
+        }
+
+        // 1. Ưu tiên gọi VNPT eKYC nếu đã bật và có Access Token
+        if ("vnpt".equalsIgnoreCase(configuredProvider)
+                && vnptProperties.isEnabled()
+                && vnptProperties.getAccessToken() != null
+                && !vnptProperties.getAccessToken().isBlank()) {
+            log.info("eKYC Router: Đang gọi VNPT eKYC API...");
+            EkycIdentityResultDto vnptResult = vnptClient.verifyIdentity(
+                    frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
+            boolean isFallback = vnptResult != null
+                    && vnptResult.getRawAnalysis() != null
+                    && "VNPT_EKYC_FALLBACK".equals(vnptResult.getRawAnalysis().get("provider"));
+            if (vnptResult != null && !isFallback && vnptResult.getIdNumber() != null && !vnptResult.getIdNumber().isBlank()) {
+                return vnptResult;
+            }
+            log.warn("VNPT eKYC trả về Fallback (Token hết hạn hoặc gián đoạn). Chuyển sang Gemini Vision AI OCR để bóc tách thông tin thực tế trên thẻ CCCD...");
+        }
+
+        // 2. Sử dụng Gemini Vision AI OCR & Face Matching để đọc chính xác thông tin thực tế trên thẻ CCCD
+        if (geminiClient != null && geminiClient.isAvailable()) {
+            log.info("eKYC Router: Đang điều phối yêu cầu xác thực sang [GEMINI_VISION_EKYC]");
+            EkycIdentityResultDto geminiResult = geminiClient.verifyIdentity(
+                    frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
+            if (geminiResult != null) {
+                return geminiResult;
+            }
+        }
+
+        // 3. Dự phòng cuối cùng
+        log.info("eKYC Router: Chuyển về Mock Provider dự phòng.");
+        return mockClient.verifyIdentity(frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
     }
 
     /**
@@ -57,13 +90,17 @@ public class PrimaryEkycProvider implements EkycProvider {
         if ("vnpt".equalsIgnoreCase(configuredProvider)) {
             if (vnptProperties.isEnabled() && vnptProperties.getAccessToken() != null && !vnptProperties.getAccessToken().isBlank()) {
                 return vnptClient;
-            } else {
-                log.info("Cấu hình eKYC là VNPT nhưng vnpt.enabled=false hoặc chưa có Access Token. Tự động chuyển tiếp sang Mock Provider để bảo toàn luồng chạy.");
-                return mockClient;
             }
+            if (geminiClient != null && geminiClient.isAvailable()) {
+                return geminiClient;
+            }
+            return mockClient;
         }
 
-        log.info("Mặc định sử dụng Mock Provider cho eKYC kiểm thử.");
+        if (geminiClient != null && geminiClient.isAvailable()) {
+            return geminiClient;
+        }
+
         return mockClient;
     }
 }

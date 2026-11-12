@@ -23,14 +23,14 @@ public class VnptEkycProperties {
     private String baseUrl = "https://api.idg.vnpt.vn";
 
     /**
-     * Token ID do VNPT cấp
+     * Token ID do VNPT cấp (cấu hình qua biến môi trường VNPT_EKYC_TOKEN_ID)
      */
-    private String tokenId = "5e7a3b1b-db74-1656-e063-63199f0a717f";
+    private String tokenId = "";
 
     /**
-     * Token Key (Public Key) do VNPT cấp
+     * Token Key (Public Key) do VNPT cấp (cấu hình qua biến môi trường VNPT_EKYC_TOKEN_KEY)
      */
-    private String tokenKey = "MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAlvv9EToVRDb3ZS58HaSGBNDHN9GLm9lROWE4CxyRMHib2K1XCmSS6suua/4coDMvthnv8zKmUy25BiplQtd6MMCAwEAAQ==";
+    private String tokenKey = "";
 
     /**
      * JWT Access Token (Lưu ý: Hết hạn sau 8 giờ)

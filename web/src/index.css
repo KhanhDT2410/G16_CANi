@@ -261,3 +261,25 @@ button:active {
   }
 }
 
+/* ==========================================================================
+   WCAG 2.1 AA Accessibility: Minimum 44px Touch Target Size
+   Đảm bảo toàn bộ checkbox và radio buttons đạt tiêu chuẩn công thái học
+   ========================================================================== */
+input[type="checkbox"],
+input[type="radio"] {
+  min-width: 18px;
+  min-height: 18px;
+  cursor: pointer;
+}
+
+.cani-checkbox-wrapper,
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+

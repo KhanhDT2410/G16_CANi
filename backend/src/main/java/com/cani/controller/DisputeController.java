@@ -20,7 +20,7 @@ import java.util.UUID;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/disputes")
+@RequestMapping({"/api/v1/disputes", "/v1/disputes"})
 @RequiredArgsConstructor
 public class DisputeController {
 
@@ -100,9 +100,16 @@ public class DisputeController {
     }
 
     private UUID currentUserId(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof User u)) {
+        if (authentication == null) {
             return null;
         }
-        return u.getUserId();
+        if (authentication.getPrincipal() instanceof User u) {
+            return u.getUserId();
+        }
+        try {
+            return com.cani.security.SecurityUtils.getCurrentUserId(authentication);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

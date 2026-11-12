@@ -9,5 +9,6 @@ public enum NotificationType {
     RATING,
     SYSTEM,
     GROUP,
-    SUPPORT_TICKET
+    SUPPORT_TICKET,
+    RS_APPEAL
 }

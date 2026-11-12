@@ -23,7 +23,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
       return;
     }
     if (!isDescValid) {
-      showToast('Mô tả tranh chấp phải từ 50 đến 3000 ký tự theo quy định', 'warning');
+      showToast('Mô tả tranh chấp phải từ 50 đến 3000 ký tự', 'warning');
       return;
     }
 
@@ -54,7 +54,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
             <div className="dispute-modal-notice">
-              Đơn chỉ được nộp trong vòng 14 ngày kể từ khi ca kết thúc, mô tả tối thiểu 50 ký tự.
+              Lưu ý: Đơn chỉ được nộp trong vòng 14 ngày kể từ khi ca kết thúc, mô tả tối thiểu 50 ký tự.
             </div>
 
             <div className="dispute-field-group">

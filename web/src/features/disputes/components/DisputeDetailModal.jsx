@@ -121,7 +121,7 @@ const DisputeDetailModal = ({
               </div>
               {dispute.rsPenaltyApplied && (
                 <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: 'var(--color-danger-text)', fontWeight: 600 }}>
-                  Đã tự động áp dụng khấu trừ -10 điểm RS của Worker
+                  Đã tự động khấu trừ -10 điểm uy tín của nhân sự
                 </div>
               )}
               {dispute.resolution && (

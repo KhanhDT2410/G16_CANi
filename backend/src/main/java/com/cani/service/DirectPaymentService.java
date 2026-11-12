@@ -4,11 +4,15 @@ import com.cani.dto.payment.ConfirmPaymentRequestDto;
 import com.cani.dto.payment.DeclarePaymentRequestDto;
 import com.cani.dto.payment.PaymentResponseDto;
 import com.cani.entity.*;
+import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.PaymentStatus;
+import com.cani.exception.AppException;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +20,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -33,6 +38,9 @@ public class DirectPaymentService {
 
     private final PaymentRepository paymentRepository;
     private final ShiftAssignmentRepository assignmentRepository;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     /**
      * Khởi tạo bản ghi Payment khi Worker được gán vào ca làm việc
@@ -82,6 +90,10 @@ public class DirectPaymentService {
         Payment payment = paymentRepository.findByAssignmentId(dto.getAssignmentId())
                 .orElseGet(() -> createInitialPayment(assignment));
 
+        if (payment == null || payment.getEventOrganizer() == null) {
+            throw new IllegalArgumentException("Không đủ thông tin sự kiện/ca làm hoặc Worker để khởi tạo thanh toán cho phân công: " + dto.getAssignmentId());
+        }
+
         if (!payment.getEventOrganizer().getEoId().equals(eoId)) {
             throw new IllegalStateException("Bạn không có quyền khai báo thanh toán cho phân công này");
         }
@@ -96,6 +108,23 @@ public class DirectPaymentService {
         Payment saved = paymentRepository.save(payment);
         log.info("EO {} đã khai báo thanh toán {} VND cho Worker {} (Assignment {})",
                 eoId, dto.getDeclaredAmount(), payment.getWorker().getWorkerId(), dto.getAssignmentId());
+
+        if (notificationService != null && payment.getWorker() != null
+                && payment.getWorker().getUser() != null && payment.getWorker().getUser().getUserId() != null) {
+            try {
+                notificationService.createAndSend(
+                        payment.getWorker().getUser().getUserId(),
+                        "Thù lao ca làm đã được khai báo",
+                        "Ban tổ chức đã khai báo thanh toán " + dto.getDeclaredAmount() + " VNĐ. Vui lòng kiểm tra và xác nhận!",
+                        NotificationType.PAYMENT,
+                        "ASSIGNMENT",
+                        dto.getAssignmentId(),
+                        Map.of("assignmentId", dto.getAssignmentId().toString(), "type", "PAYMENT_DECLARED")
+                );
+            } catch (Exception ex) {
+                log.warn("Không thể gửi thông báo thanh toán tới Worker: {}", ex.getMessage());
+            }
+        }
 
         return mapToDto(saved);
     }
@@ -112,23 +141,27 @@ public class DirectPaymentService {
             throw new IllegalStateException("Bạn không có quyền xác nhận thanh toán này");
         }
 
-        String confirmStatus = dto.getConfirmStatus().toUpperCase();
-        if ("RECEIVED_FULL".equals(confirmStatus)) {
+        String rawStatus = dto.getConfirmStatus() != null ? dto.getConfirmStatus().trim().toUpperCase() : "";
+        String normalizedConfirmStatus;
+        if ("RECEIVED_FULL".equals(rawStatus) || "CONFIRMED_FULL".equals(rawStatus)) {
             payment.setStatus(PaymentStatus.CONFIRMED_FULL);
-        } else if ("RECEIVED_PARTIAL".equals(confirmStatus)) {
+            normalizedConfirmStatus = "RECEIVED_FULL";
+        } else if ("RECEIVED_PARTIAL".equals(rawStatus) || "CONFIRMED_PARTIAL".equals(rawStatus)) {
             payment.setStatus(PaymentStatus.CONFIRMED_PARTIAL);
-        } else if ("NOT_RECEIVED".equals(confirmStatus)) {
+            normalizedConfirmStatus = "RECEIVED_PARTIAL";
+        } else if ("NOT_RECEIVED".equals(rawStatus) || "DISPUTED".equals(rawStatus)) {
             payment.setStatus(PaymentStatus.DISPUTED);
+            normalizedConfirmStatus = "NOT_RECEIVED";
         } else {
-            throw new IllegalArgumentException("Trạng thái xác nhận không hợp lệ. Chỉ chấp nhận: RECEIVED_FULL, RECEIVED_PARTIAL, NOT_RECEIVED");
+            throw new IllegalArgumentException("Trạng thái xác nhận không hợp lệ. Chỉ chấp nhận: RECEIVED_FULL (hoặc CONFIRMED_FULL), RECEIVED_PARTIAL, NOT_RECEIVED");
         }
 
         payment.setWorkerConfirmedAt(Instant.now());
-        payment.setWorkerConfirmStatus(confirmStatus);
+        payment.setWorkerConfirmStatus(normalizedConfirmStatus);
         payment.setWorkerComment(dto.getComment());
 
         Payment saved = paymentRepository.save(payment);
-        log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, confirmStatus, assignmentId);
+        log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, normalizedConfirmStatus, assignmentId);
 
         return mapToDto(saved);
     }
@@ -136,6 +169,21 @@ public class DirectPaymentService {
     @Transactional(readOnly = true)
     public List<PaymentResponseDto> getPaymentsByShift(UUID shiftId) {
         return paymentRepository.findByShiftId(shiftId).stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentResponseDto> getPaymentsByShift(UUID shiftId, UUID callerEoId, boolean isAdmin) {
+        List<Payment> payments = paymentRepository.findByShiftId(shiftId);
+        if (!isAdmin) {
+            boolean unauthorized = payments.stream().anyMatch(p ->
+                    p.getEventOrganizer() == null || !p.getEventOrganizer().getEoId().equals(callerEoId));
+            if (unauthorized) {
+                throw new AppException("Không tìm thấy thông tin thanh toán của ca làm việc", HttpStatus.NOT_FOUND);
+            }
+        }
+        return payments.stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
@@ -152,6 +200,28 @@ public class DirectPaymentService {
         return paymentRepository.findByAssignmentId(assignmentId)
                 .map(this::mapToDto)
                 .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentResponseDto getPaymentByAssignment(UUID assignmentId, UUID callerId, boolean isAdmin) {
+        Payment payment = paymentRepository.findByAssignmentId(assignmentId)
+                .orElseThrow(() -> new AppException("Không tìm thấy thông tin thanh toán của ca làm việc", HttpStatus.NOT_FOUND));
+
+        if (!isAdmin) {
+            boolean isWorkerOwner = payment.getWorker() != null && (
+                    (payment.getWorker().getUser() != null && callerId != null && callerId.equals(payment.getWorker().getUser().getUserId()))
+                    || (callerId != null && callerId.equals(payment.getWorker().getWorkerId()))
+            );
+            boolean isEoOwner = payment.getEventOrganizer() != null && (
+                    (payment.getEventOrganizer().getUser() != null && callerId != null && callerId.equals(payment.getEventOrganizer().getUser().getUserId()))
+                    || (callerId != null && callerId.equals(payment.getEventOrganizer().getEoId()))
+            );
+            if (!isWorkerOwner && !isEoOwner) {
+                throw new AppException("Không tìm thấy thông tin thanh toán của ca làm việc", HttpStatus.NOT_FOUND);
+            }
+        }
+
+        return mapToDto(payment);
     }
 
     private PaymentResponseDto mapToDto(Payment p) {

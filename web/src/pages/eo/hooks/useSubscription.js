@@ -64,11 +64,25 @@ export function useSubscription() {
         const vnpKeys = Array.from(newParams.keys()).filter((k) => k.startsWith('vnp_'));
         vnpKeys.forEach((k) => newParams.delete(k));
         setSearchParams(newParams, { replace: true });
-      } else if (searchParams.get('payos') === 'success') {
-        showToast('🎉 Thanh toán VietQR PayOS thành công! Gói cước đã được kích hoạt.', 'success');
-        loadSubscriptionData();
+      } else if (searchParams.get('payos') === 'success' || searchParams.get('status') === 'PAID') {
+        const orderCode = searchParams.get('orderCode');
+        try {
+          if (orderCode) {
+            await eoService.confirmPayOSPayment(orderCode);
+          }
+          showToast('🎉 Thanh toán VietQR PayOS thành công! Gói cước đã được kích hoạt.', 'success');
+        } catch (error) {
+          console.warn('Lỗi xác nhận PayOS từ callback:', error);
+        } finally {
+          await loadSubscriptionData();
+          const newParams = new URLSearchParams(searchParams);
+          ['payos', 'orderCode', 'status', 'code', 'id', 'cancel'].forEach((k) => newParams.delete(k));
+          setSearchParams(newParams, { replace: true });
+        }
+      } else if (searchParams.get('payos') === 'cancel' || searchParams.get('cancel') === 'true') {
+        showToast('Giao dịch thanh toán PayOS đã bị hủy.', 'info');
         const newParams = new URLSearchParams(searchParams);
-        newParams.delete('payos');
+        ['payos', 'orderCode', 'status', 'code', 'id', 'cancel'].forEach((k) => newParams.delete(k));
         setSearchParams(newParams, { replace: true });
       }
     };
@@ -99,7 +113,7 @@ export function useSubscription() {
     }
   };
 
-  // Khởi tạo thanh toán VietQR qua PayOS Gateway
+  // Khởi tạo thanh toán VietQR qua PayOS Gateway (Thanh toán thật - Redirect trực tiếp)
   const handlePurchasePayOS = async (planType) => {
     setPurchasingPlan(planType);
     try {
@@ -108,6 +122,12 @@ export function useSubscription() {
         if (!result.checkoutUrl || result.amount === 0) {
           showToast('Kích hoạt Gói Trải Nghiệm Khởi Nghiệp thành công!', 'success');
           await loadSubscriptionData();
+          return;
+        }
+        // Thanh toán thật: Điều hướng trực tiếp sang trang PayOS Checkout
+        if (result.checkoutUrl && result.checkoutUrl.startsWith('http')) {
+          showToast('Đang chuyển hướng sang cổng thanh toán PayOS VietQR...', 'info');
+          window.location.href = result.checkoutUrl;
           return;
         }
         setPayOSModalData(result);

@@ -105,8 +105,8 @@ cani:
     client-id: ${PAYOS_CLIENT_ID:}
     api-key: ${PAYOS_API_KEY:}
     checksum-key: ${PAYOS_CHECKSUM_KEY:}
-    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?payos=success}
-    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?payos=cancel}
+    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?tab=subscription&payos=success}
+    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?tab=subscription&payos=cancel}
   sla-scan:
     enabled: ${SLA_SCAN_ENABLED:true}
     cron: ${SLA_SCAN_CRON:0 */15 * * * *}

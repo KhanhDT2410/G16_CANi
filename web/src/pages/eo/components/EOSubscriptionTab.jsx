@@ -190,23 +190,11 @@ export default function EOSubscriptionTab() {
                         onClick={() => handlePurchasePayOS(plan.planType)}
                       >
                         {purchasingPlan === plan.planType ? (
-                          isFree ? 'Đang kích hoạt...' : 'Đang khởi tạo PayOS...'
+                          isFree ? 'Đang kích hoạt...' : 'Đang chuyển sang PayOS...'
                         ) : (
                           isFree ? 'Kích Hoạt Miễn Phí (Trải Nghiệm)' : 'Thanh toán qua PayOS VietQR'
                         )}
                       </button>
-
-                      {(import.meta.env.DEV || window.location.hostname === 'localhost') && (
-                        <button
-                          type="button"
-                          className="btn-demo-simulate"
-                          disabled={purchasingPlan !== null}
-                          onClick={() => handleSimulateDemo(plan.planType)}
-                          title="Chỉ khả dụng trong môi trường thử nghiệm cục bộ (H2/Sandbox)"
-                        >
-                          🧪 Thử nghiệm kích hoạt (Sandbox)
-                        </button>
-                      )}
                     </div>
                   </div>
                 );

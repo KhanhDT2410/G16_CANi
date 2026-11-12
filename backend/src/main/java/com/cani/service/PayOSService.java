@@ -122,5 +122,29 @@ public class PayOSService {
                 .status("PENDING")
                 .build();
     }
+
+    /**
+     * Tra cứu trạng thái giao dịch thanh toán trực tiếp từ PayOS v2 API
+     */
+    public String getPaymentStatus(long orderCode) {
+        String url = payOSConfig.getEndpoint() + "/v2/payment-requests/" + orderCode;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-client-id", payOSConfig.getClientId());
+        headers.set("x-api-key", payOSConfig.getApiKey());
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                if ("00".equals(root.path("code").asText())) {
+                    return root.path("data").path("status").asText("PENDING");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi kiểm tra trạng thái đơn hàng PayOS {}: {}", orderCode, e.getMessage());
+        }
+        return "UNKNOWN";
+    }
 }
 

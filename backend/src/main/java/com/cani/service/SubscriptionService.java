@@ -276,17 +276,28 @@ public class SubscriptionService {
     @Transactional
     public SubscriptionResponseDto confirmPayOSPaymentForUser(UUID userId, long orderCode) {
         EventOrganizer eo = getEoOrThrow(userId);
-        PendingOrder order = pendingOrders.remove("PAYOS_" + orderCode);
+        PendingOrder order = pendingOrders.get("PAYOS_" + orderCode);
+
+        if (order != null && !order.eoId().equals(eo.getEoId())) {
+            log.warn("Cảnh báo bảo mật: User {} cố kích hoạt đơn hàng PayOS {} thuộc về EO {}", userId, orderCode, order.eoId());
+            throw new BadRequestException("Giao dịch không thuộc về tài khoản Ban tổ chức hiện tại");
+        }
+
+        // 1. Kiểm tra trạng thái thực tế từ PayOS Gateway (Thanh toán thật)
+        String payOsStatus = payOSService.getPaymentStatus(orderCode);
+        log.info("Xác thực PayOS orderCode {} với PayOS Gateway: status={}", orderCode, payOsStatus);
+
+        boolean isRealPaid = "PAID".equalsIgnoreCase(payOsStatus);
+
+        if (isRealPaid || (demoEnabled && order != null)) {
+            pendingOrders.remove("PAYOS_" + orderCode);
+            PlanType planType = order != null ? order.planType() : PlanType.MATCHING_PLUS;
+            String gatewayRef = isRealPaid ? "PAYOS_VIETQR" : "PAYOS_VIETQR_DEMO";
+            return activateSubscription(eo, planType, gatewayRef, "PAYOS_" + orderCode, "POS_" + orderCode);
+        }
 
         if (order != null) {
-            if (!order.eoId().equals(eo.getEoId())) {
-                log.warn("Cảnh báo bảo mật: User {} cố kích hoạt đơn hàng PayOS {} thuộc về EO {}", userId, orderCode, order.eoId());
-                throw new BadRequestException("Giao dịch không thuộc về tài khoản Ban tổ chức hiện tại");
-            }
-            if (demoEnabled) {
-                return activateSubscription(eo, order.planType(), "PAYOS_VIETQR_DEMO", "PAYOS_" + orderCode, "POS_" + orderCode);
-            }
-            throw new BadRequestException("Giao dịch đang chờ xác nhận thanh toán từ cổng PayOS. Vui lòng hoàn tất chuyển khoản và chờ trong giây lát.");
+            throw new BadRequestException("Giao dịch chưa hoàn tất thanh toán trên PayOS (Trạng thái: " + payOsStatus + "). Vui lòng hoàn tất chuyển khoản.");
         }
 
         // Trường hợp reload lại trang hoặc Webhook đã xử lý kích hoạt trước đó cho chính EO này

@@ -90,10 +90,15 @@ export default function EOPage() {
     return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
   }, [setSearchQuery]);
 
-  // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_) hoặc điều hướng tab (?tab=profile)
+  // Kiểm tra nếu có redirect từ VNPay / PayOS (?tab=subscription hoặc chứa param vnp_, payos, orderCode) hoặc điều hướng tab (?tab=profile)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'subscription' || searchParams.has('vnp_ResponseCode')) {
+    if (
+      tabParam === 'subscription' ||
+      searchParams.has('vnp_ResponseCode') ||
+      searchParams.has('payos') ||
+      searchParams.has('orderCode')
+    ) {
       setActiveTab('subscription');
       setActiveNav('subscription');
     } else if (tabParam === 'profile' || tabParam === 'ekyc') {

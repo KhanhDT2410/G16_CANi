@@ -995,6 +995,20 @@
   margin-bottom: 1.25rem;
 }
 
+.eo-empty-state-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px dashed #cbd5e1;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.empty-calendar-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
 /* =========================================================
    CỘT 3: WIDGET TIỆN ÍCH BÊN PHẢI (RIGHT UTILITY COLUMN)
    ========================================================= */

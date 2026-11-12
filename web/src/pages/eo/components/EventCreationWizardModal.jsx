@@ -487,7 +487,7 @@ const EventCreationWizardModal = ({
     try {
       await eoService.publishEvent(createdEvent.eventId);
       const finalEvent = buildFinalEventObject('ACTIVE');
-      showToast('Đã kích hoạt tìm kiếm nhân sự thành công! Chuyển sang trang chi tiết sự kiện.', 'success');
+      showToast('Đã đăng tuyển và tự động tìm kiếm nhân sự thành công! Chuyển sang trang chi tiết sự kiện.', 'success');
       await onSuccess?.();
       handleClose();
       onEventCreated?.(finalEvent);
@@ -1519,7 +1519,7 @@ const EventCreationWizardModal = ({
                     boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
                   }}
                 >
-                  {submitting ? 'Đang kích hoạt...' : 'Kích Hoạt Tìm Kiếm Ngay'}
+                  {submitting ? 'Đang đăng tuyển...' : 'Đăng Tuyển & Tìm Người Ngay'}
                 </button>
               </div>
             </div>

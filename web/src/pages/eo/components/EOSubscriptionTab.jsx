@@ -87,18 +87,18 @@ export default function EOSubscriptionTab() {
             <span className="sub-metric-label">Chế độ tuyển dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem' }}>
               {currentSubscription?.planType === 'ENTERPRISE'
-                ? 'Matching Radar AI Ưu Tiên + Cứu Hộ'
+                ? 'Tự Động Ghép Đôi Ưu Tiên + Cứu Hộ'
                 : currentSubscription?.planType === 'MATCHING_PLUS'
-                ? 'Matching Radar AI Tiêu Chuẩn'
+                ? 'Tự Động Ghép Đôi Tiêu Chuẩn'
                 : currentSubscription?.planType === 'FREE_TRIAL'
-                ? 'Matching Radar AI (Khởi Nghiệp)'
+                ? 'Tự Động Ghép Đôi (Khởi Nghiệp)'
                 : currentSubscription?.planType === 'INVITE_ONLY'
                 ? 'Mời Trực Tiếp (Invite Mode)'
                 : 'Chưa kích hoạt'}
             </span>
             <span className="sub-metric-hint">
               {currentSubscription?.planType
-                ? 'Tự động quét nhân sự bán kính định vị'
+                ? 'Tự động kết nối nhân sự theo bán kính vị trí'
                 : 'Cần kích hoạt gói dịch vụ'}
             </span>
           </div>
@@ -325,7 +325,7 @@ export default function EOSubscriptionTab() {
               <div className="eo-form-group">
                 <label>Gói Cước Mặc Định Khi Tạo Sự Kiện Mới</label>
                 <select className="eo-form-select" defaultValue="MATCHING_PLUS">
-                  <option value="MATCHING_PLUS">Gói Matching Radar AI (80,000 đ / sự kiện) - Tự động quét 15km</option>
+                  <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80,000 đ / sự kiện) - Tự động kết nối 15km</option>
                   <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
                 </select>
                 <span className="eo-field-helper">Gói ưu tiên được chọn sẵn khi bạn tạo sự kiện mới.</span>

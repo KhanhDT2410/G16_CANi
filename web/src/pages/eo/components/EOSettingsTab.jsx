@@ -165,7 +165,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
                 value={packageSettings.defaultPlan}
                 onChange={(e) => setPackageSettings({ ...packageSettings, defaultPlan: e.target.value })}
               >
-                <option value="MATCHING_PLUS">Gói Matching Radar AI (80,000 đ / sự kiện)</option>
+                <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80,000 đ / sự kiện)</option>
                 <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
               </select>
               <span className="eo-field-helper">
@@ -306,7 +306,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
               {
                 id: 'notifWorker',
                 title: 'Thông báo tức thì khi có Worker nhận ca',
-                desc: 'Gửi tin nhắn thông báo khi thuật toán Matching Radar ghép nối thành công ứng viên',
+                desc: 'Gửi tin nhắn thông báo khi hệ thống tự động kết nối thành công ứng viên',
                 checked: notificationSettings.notifyOnWorkerAccept,
                 onChange: (v) => setNotificationSettings({ ...notificationSettings, notifyOnWorkerAccept: v }),
               },

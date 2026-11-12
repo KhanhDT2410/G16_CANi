@@ -649,7 +649,7 @@ export default function EOEventsTab({
                                 whiteSpace: 'nowrap',
                               }}
                             >
-                              Kích Hoạt Tìm Kiếm Ngay
+                              Đăng Tuyển Ngay
                             </button>
                           )}
                         </div>
@@ -736,7 +736,7 @@ export default function EOEventsTab({
                                   closeMenu();
                                 }}
                               >
-                                <span>Kích Hoạt Tìm Kiếm Ngay</span>
+                                <span>Đăng Tuyển Ngay</span>
                               </button>
                             )}
 

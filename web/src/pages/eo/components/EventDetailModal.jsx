@@ -225,7 +225,7 @@ export default function EventDetailModal({
                       cursor: 'pointer',
                     }}
                   >
-                    Kích Hoạt Tìm Kiếm Ngay
+                    Đăng Tuyển Ngay
                   </button>
                 )}
               </>

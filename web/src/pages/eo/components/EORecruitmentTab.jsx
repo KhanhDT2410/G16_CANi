@@ -7,7 +7,7 @@ import { getEventStatusPriority } from '../utils/eventHelpers';
 
 /**
  * EORecruitmentTab
- * Màn hình Quản lý Tuyển dụng Nhân sự & Điều phối Matching Radar (Gộp trong Quản lý sự kiện)
+ * Màn hình Quản lý Tuyển dụng Nhân sự & Điều phối Tự động (Gộp trong Quản lý sự kiện)
  */
 export default function EORecruitmentTab({
   events = [],
@@ -88,20 +88,6 @@ export default function EORecruitmentTab({
   const totalConfirmed = validAllShifts.reduce((acc, s) => acc + (s.confirmedWorkers || 0), 0);
   const totalMissing = Math.max(0, totalPositions - totalConfirmed);
   const overallFillRate = totalPositions > 0 ? Math.round((totalConfirmed / totalPositions) * 100) : 0;
-
-  // Kích hoạt lại Matching Radar cho ca cụ thể
-  const handleTriggerDispatch = async (shift) => {
-    setDispatchingShiftId(shift.shiftId);
-    try {
-      await eoService.dispatchForShift(shift.shiftId);
-      showToast(`Đã kích hoạt quét Matching Radar AI cho ca "${shift.jobType}"!`, 'success');
-      onReloadEvents?.();
-    } catch (err) {
-      showToast('Lỗi khi kích hoạt Matching: ' + (err.response?.data?.message || err.message), 'error');
-    } finally {
-      setDispatchingShiftId(null);
-    }
-  };
 
   const formatCurrency = (val) => new Intl.NumberFormat('vi-VN').format(val || 0);
 
@@ -257,7 +243,7 @@ export default function EORecruitmentTab({
                   Còn thiếu
                 </span>
                 <span className="breakdown-val text-rose">{totalMissing}</span>
-                <span className="breakdown-desc">{totalMissing > 0 ? 'Cần radar matching' : 'Đã đủ ca'}</span>
+                <span className="breakdown-desc">{totalMissing > 0 ? 'Đang tuyển nhân sự' : 'Đã đủ ca'}</span>
               </div>
             </div>
           </div>
@@ -315,12 +301,12 @@ export default function EORecruitmentTab({
         </div>
       </div>
 
-      {/* 3. DANH SÁCH CÁC CA TUYỂN DỤNG & RADAR MATCHING (Đang hoạt động ở trên, Nháp ở dưới) */}
+      {/* 3. DANH SÁCH CÁC CA TUYỂN DỤNG (Đang hoạt động ở trên, Nháp ở dưới) */}
       {activeAndDraftShifts.length === 0 ? (
         <div className="eo-widget-card" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
           <h4 style={{ margin: '0 0 0.5rem', color: '#1e293b', fontSize: '1.1rem' }}>Chưa có ca làm việc nào đang mở tuyển</h4>
           <p style={{ margin: '0 0 1.25rem', fontSize: '0.9rem' }}>
-            Tạo thêm ca làm việc cho sự kiện để kích hoạt hệ thống tuyển dụng tự động qua Matching Radar AI.
+            Tạo thêm ca làm việc cho sự kiện để hệ thống tự động kết nối nhân sự phù hợp.
           </p>
           <button
             type="button"
@@ -452,7 +438,7 @@ export default function EORecruitmentTab({
                     </div>
                   </div>
 
-                  {/* Các thao tác tuyển dụng & vận hành ca (Đã bỏ nút Radar AI theo yêu cầu, thêm Kích Hoạt Tìm Kiếm Ngay cho Bản nháp) */}
+                  {/* Các thao tác tuyển dụng & vận hành ca */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     {!isFull && canTriggerEmergency && (
                       <button
@@ -495,7 +481,7 @@ export default function EORecruitmentTab({
                           }
                         }}
                       >
-                        Kích Hoạt Tìm Kiếm Ngay
+                        Đăng Tuyển Ngay
                       </button>
                     )}
 

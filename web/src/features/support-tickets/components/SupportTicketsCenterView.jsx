@@ -65,12 +65,7 @@ export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterCha
     });
   }, [queue, myQueue, isStaff, activeFilter, searchTerm]);
 
-  const handleOpenDetail = async (id, fallbackTicket = null) => {
-    if (String(id).startsWith('demo-') && fallbackTicket) {
-      setSelectedTicket(fallbackTicket);
-      setIsDetailModalOpen(true);
-      return;
-    }
+  const handleOpenDetail = async (id) => {
     const detail = await loadTicketDetail(id);
     if (detail) setIsDetailModalOpen(true);
   };
@@ -181,7 +176,7 @@ export const SupportTicketsCenterView = ({ activeFilter: propFilter, onFilterCha
         <StaffMessengerDock
           activeChat={activeChatTicket}
           onClose={() => setActiveChatTicket(null)}
-          onOpenTicket={(t) => handleOpenDetail(t.id, t)}
+          onOpenTicket={(t) => handleOpenDetail(t.id)}
         />
       )}
     </div>

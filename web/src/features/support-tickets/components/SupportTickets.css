@@ -599,17 +599,8 @@
 }
 
 /* ==========================================================================
-   Preview Mode Notice & Customer Info Cell
+   Customer Info Cell & Table Elements
    ========================================================================== */
-
-.ticket-preview-notice {
-  background: #eff6ff;
-  border-bottom: 1px solid #bfdbfe;
-  color: #1e40af;
-  padding: 0.75rem 1.25rem;
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
 
 .ticket-customer-cell {
   display: flex;

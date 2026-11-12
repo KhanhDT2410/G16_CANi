@@ -2,13 +2,13 @@ import {
   TICKET_STATUS_CONFIG,
   TICKET_CATEGORY_CONFIG,
 } from '../types/ticket.constants';
-import { DEMO_PREVIEW_TICKETS } from '../types/demoTickets.constants';
 
 /**
  * Bảng hàng đợi Phiếu Hỗ Trợ Khách Hàng cho CSKH / Quản trị viên.
- * - Mã phiếu xuống dòng gọn gàng, ưu tiên chiều dọc để không bị cuộn ngang màn hình.
- * - Cột Thao Tác căn sát lề trái.
- * - Thứ tự nút: Xem Phiếu -> Chat Trực Tiếp -> Tiếp Nhận.
+ * - Hiển thị danh tính khách hàng (Tên, SĐT, Email).
+ * - Mã phiếu xuống dòng gọn gàng theo chiều dọc, tối ưu diện tích.
+ * - Cột Thao Tác căn sát lề trái với thứ tự nút: Xem Phiếu -> Chat Trực Tiếp -> Tiếp Nhận.
+ * - Cảnh báo SLA "Sắp hết hạn" nhỏ gọn, tinh tế.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const TicketQueueTable = ({
@@ -19,9 +19,6 @@ export const TicketQueueTable = ({
   onOpenTransferModal,
   loading,
 }) => {
-  const isPreviewMode = !loading && (!tickets || tickets.length === 0);
-  const displayTickets = isPreviewMode ? DEMO_PREVIEW_TICKETS : tickets;
-
   const formatDateTime = (isoStr) => {
     if (!isoStr) return '—';
     return new Date(isoStr).toLocaleString('vi-VN', {
@@ -33,14 +30,12 @@ export const TicketQueueTable = ({
     return <div className="ticket-empty-state">Đang tải danh sách hàng đợi phiếu hỗ trợ...</div>;
   }
 
+  if (!tickets || tickets.length === 0) {
+    return <div className="ticket-empty-state">Không có phiếu hỗ trợ nào trong hàng đợi.</div>;
+  }
+
   return (
     <div className="tickets-table-wrapper">
-      {isPreviewMode && (
-        <div className="ticket-preview-notice">
-          <strong>Chế độ mô phỏng layout:</strong> Đang hiển thị 3 phiếu hỗ trợ mẫu kèm kênh chat Messenger trực tiếp (Khi CSDL có dữ liệu thực tế, hệ thống sẽ tự động hiển thị dữ liệu thật).
-        </div>
-      )}
-
       <table className="tickets-table">
         <thead>
           <tr>
@@ -55,7 +50,7 @@ export const TicketQueueTable = ({
           </tr>
         </thead>
         <tbody>
-          {displayTickets.map((t) => {
+          {tickets.map((t) => {
             const statusConfig = TICKET_STATUS_CONFIG[t.status] || { label: t.status, badgeClass: '' };
             const categoryConfig = TICKET_CATEGORY_CONFIG[t.category] || { label: t.category };
 
@@ -139,7 +134,7 @@ export const TicketQueueTable = ({
                     <button
                       type="button"
                       className="ticket-btn ticket-btn-secondary ticket-btn-sm"
-                      onClick={() => onOpenDetail(t.id, t)}
+                      onClick={() => onOpenDetail(t.id)}
                     >
                       Xem Phiếu
                     </button>

@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Data
@@ -27,6 +28,10 @@ public class CreateEventRequestDto {
     private Double venueLng;
 
     private LocalDate eventDate;
+
+    private Instant startTime;
+    private Instant endTime;
+    private String imageUrl;
 
     @Builder.Default
     private EventMode mode = EventMode.MATCHING;

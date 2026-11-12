@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.matching;
+
+import com.cani.service.*;
 
 import com.cani.entity.DispatchProposal;
 import com.cani.entity.enums.ProposalStatus;

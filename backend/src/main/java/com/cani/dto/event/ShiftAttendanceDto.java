@@ -23,6 +23,11 @@ public class ShiftAttendanceDto {
     private String avatarUrl;
     private Integer workerReliabilityScore;
     private BigDecimal workerRatingAvg;
+    private Integer workerAge;
+    private String workerDob;
+    private UUID shiftId;
+    private String jobType;
+    private String shiftName;
     private String assignmentStatus;
     private Instant checkinTime;
     private Instant checkoutTime;
@@ -32,7 +37,7 @@ public class ShiftAttendanceDto {
     private Instant eoConfirmedAt;
     private Boolean hasReviewedWorker;
     private String checklistProgress;
+    private String proofImageUrl;
     private String paymentStatus;
     private BigDecimal agreedWage;
 }
-

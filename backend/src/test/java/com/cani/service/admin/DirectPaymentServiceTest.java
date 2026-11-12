@@ -1,4 +1,6 @@
-package com.cani.service;
+package com.cani.service.admin;
+
+import com.cani.service.*;
 
 import com.cani.dto.payment.ConfirmPaymentRequestDto;
 import com.cani.dto.payment.DeclarePaymentRequestDto;

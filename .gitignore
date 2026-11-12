@@ -38,6 +38,9 @@ mobile/ios/
 mobile/macos/
 mobile/linux/
 mobile/windows/flutter/ephemeral/
+*.apk
+*.aab
+web/public/downloads/
 
 # IDE & AI Tooling
 .idea/

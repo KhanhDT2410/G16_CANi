@@ -43,6 +43,11 @@ export default function LandingPage() {
                 </span>
               </li>
               <li>
+                <span className="landing-nav-link" onClick={() => scrollToSection('products')}>
+                  Sản phẩm & Ứng dụng
+                </span>
+              </li>
+              <li>
                 <span className="landing-nav-link" onClick={() => scrollToSection('features')}>
                   Tính năng
                 </span>
@@ -209,6 +214,156 @@ export default function LandingPage() {
       </section>
 
       {/* =========================================================================
+          3.5. ECOSYSTEM PRODUCTS SHOWCASE: WORKER MOBILE APK vs EO WEB PORTAL
+          ========================================================================= */}
+      <section id="products" className="landing-products-section">
+        <div className="section-pill-badge">HỆ SINH THÁI ĐIỀU PHỐI CANI</div>
+        <h2 className="section-title">Hai Phân Hệ Chuyên Biệt — Một Nền Tảng Đồng Bộ</h2>
+        <p className="section-subtitle">
+          Tối ưu hóa trải nghiệm người dùng: Ứng dụng di động chuyên biệt cho lực lượng Worker và Cổng điều phối đa nhiệm trên trình duyệt máy tính dành cho Ban Tổ Chức (EO).
+        </p>
+
+        <div className="products-showcase-grid">
+          {/* Card 1: Worker Mobile App (Android APK) */}
+          <div className="product-card product-card-worker">
+            <div className="product-badge-row">
+              <span className="product-tag-pill tag-worker">DÀNH CHO WORKER / CTV</span>
+              <span className="product-platform-badge">Android App (APK)</span>
+            </div>
+
+            <div className="product-card-header">
+              <div className="product-icon-box worker-gradient">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                  <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                </svg>
+              </div>
+              <div>
+                <h3 className="product-card-title">CANi Partner Mobile App</h3>
+                <p className="product-card-role">Ứng dụng nhận việc & điểm danh linh hoạt</p>
+              </div>
+            </div>
+
+            <p className="product-description">
+              Thiết kế dành riêng cho nhân sự sự kiện và cộng tác viên tự do trên điện thoại thông minh. Nhận việc linh hoạt, điểm danh chuẩn xác và quyết toán thù lao trực tiếp không giữ cọc.
+            </p>
+
+            <ul className="product-specs-list">
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Matching Radar AI 15km:</strong> Quét các ca làm việc gần vị trí nhất theo thời gian thực, chủ động ứng tuyển chỉ trong 15 phút.
+                </div>
+              </li>
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Điểm danh Geofence GPS 200m:</strong> Quét mã QR động vào ca/tan ca chuẩn xác trong bán kính 200m bảo vệ quyền lợi công làm.
+                </div>
+              </li>
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Nhận thù lao trực tiếp (Non-Escrow):</strong> Ban tổ chức chuyển khoản thẳng theo ca, ví công minh bạch, không giam cọc.
+                </div>
+              </li>
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Định danh eKYC điện tử:</strong> Xác thực CCCD gắn chip & Face Match 1 lần duy nhất, xây dựng điểm tín nhiệm nhận ca VIP.
+                </div>
+              </li>
+            </ul>
+
+            <div className="product-action-box">
+              <a
+                href="/downloads/cani-partner.apk"
+                download="cani-partner.apk"
+                className="btn-download-apk"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Tải bản Android APK (CANi Partner)
+              </a>
+              <div className="product-subtext">
+                Phiên bản v1.0.0 • Hỗ trợ Android 8.0+ • Tệp an toàn đã xác thực • Cài đặt trực tiếp không qua CH Play
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Event Organizer Web Portal */}
+          <div className="product-card product-card-eo">
+            <div className="product-badge-row">
+              <span className="product-tag-pill tag-eo">DÀNH CHO BAN TỔ CHỨC / AGENCY</span>
+              <span className="product-platform-badge">Web Portal (Desktop)</span>
+            </div>
+
+            <div className="product-card-header">
+              <div className="product-icon-box eo-gradient">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+              </div>
+              <div>
+                <h3 className="product-card-title">CANi Web Portal</h3>
+                <p className="product-card-role">Cổng điều phối & quản trị sự kiện đám mây</p>
+              </div>
+            </div>
+
+            <p className="product-description">
+              Dành riêng cho doanh nghiệp, agency và nhà tổ chức sự kiện chuyên nghiệp trên màn hình lớn. Quản lý toàn chuỗi từ lên ca, ghép quân đến giám sát thời gian thực.
+            </p>
+
+            <ul className="product-specs-list">
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Khởi tạo sự kiện đa ca (Multi-Shift):</strong> Lập lịch ca làm việc chi tiết, cấu hình thù lao, vai trò và vị trí định vị Geofence.
+                </div>
+              </li>
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Radar AI tuyển dụng tự động:</strong> Ghép nối tức thì với nguồn nhân lực đạt chuẩn eKYC trong 15 phút, loại bỏ nỗi lo thiếu người giờ chót.
+                </div>
+              </li>
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Live Attendance Dashboard:</strong> Giám sát trực tiếp trạng thái check-in, phát hiện ca muộn và tự động kích hoạt điều phối thay thế.
+                </div>
+              </li>
+              <li>
+                <span className="spec-bullet">✓</span>
+                <div>
+                  <strong>Hạn ngạch Quota PayOS VietQR:</strong> Mua gói Quota sự kiện thanh toán tự động qua mã VietQR Napas247, xuất phiếu chi đối soát chuẩn xác.
+                </div>
+              </li>
+            </ul>
+
+            <div className="product-action-box eo-actions-group">
+              <div className="eo-buttons-row">
+                <Link to="/login" className="btn-portal-primary">
+                  Truy cập Cổng Quản Trị Web
+                </Link>
+                <Link to="/register" className="btn-portal-secondary">
+                  Đăng ký Nhà Tổ Chức
+                </Link>
+              </div>
+              <div className="product-subtext">
+                Tương thích Chrome, Edge, Safari, Firefox • Không cần cài đặt phần mềm • Bảo mật dữ liệu doanh nghiệp
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
           4. FEATURES SECTION (4 TRỤ CỘT NỔI BẬT)
           ========================================================================= */}
       <section id="features" className="landing-features-section">
@@ -321,9 +476,20 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '2.5rem', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', gap: '2.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
             <div>
-              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Ban Tổ Chức</h5>
+              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Nhân Sự (Worker)</h5>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <a href="/downloads/cani-partner.apk" download="cani-partner.apk" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600 }}>
+                  ↓ Tải App Worker (Android APK)
+                </a>
+                <span onClick={() => scrollToSection('products')} style={{ color: '#94a3b8', cursor: 'pointer' }}>Tính năng Radar AI 15km</span>
+                <span onClick={() => scrollToSection('products')} style={{ color: '#94a3b8', cursor: 'pointer' }}>Điểm danh Geofence 200m</span>
+              </div>
+            </div>
+
+            <div>
+              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Ban Tổ Chức (EO)</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <Link to="/login" style={{ color: '#94a3b8', textDecoration: 'none' }}>Đăng nhập Cổng Quản lý</Link>
                 <Link to="/register" style={{ color: '#94a3b8', textDecoration: 'none' }}>Đăng ký Ban Tổ Chức</Link>
@@ -334,7 +500,7 @@ export default function LandingPage() {
             <div>
               <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Hỗ trợ & Quy chế</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <span style={{ color: '#94a3b8' }}>Quy chế thanh toán thù lao</span>
+                <span style={{ color: '#94a3b8' }}>Quy chế nhận thù lao Non-Escrow</span>
                 <span style={{ color: '#94a3b8' }}>Chính sách bảo mật thông tin</span>
                 <span style={{ color: '#94a3b8' }}>Hỗ trợ kỹ thuật 24/7</span>
               </div>

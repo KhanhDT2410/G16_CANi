@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Data
@@ -24,10 +25,13 @@ public class UpdateEventRequestDto {
     private String venueAddress;
 
     private Double venueLat;
-
     private Double venueLng;
 
     private LocalDate eventDate;
+
+    private Instant startTime;
+    private Instant endTime;
+    private String imageUrl;
 
     private EventMode mode;
 }

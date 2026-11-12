@@ -96,9 +96,9 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   color: const Color(0xFF10B981).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text(
-                  'Khớp ${p.matchScore.toInt()}% kỹ năng',
-                  style: const TextStyle(
+                child: const Text(
+                  'Phù hợp kỹ năng',
+                  style: TextStyle(
                     color: Color(0xFF059669),
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,

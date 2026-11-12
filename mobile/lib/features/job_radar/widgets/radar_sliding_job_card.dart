@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
@@ -35,7 +34,6 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
   Widget build(BuildContext context) {
     final s = widget.shift;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final matchScore = math.max(72, math.min(99, (98 - (s.distanceKm * 1.6)).round()));
 
     return GestureDetector(
       onVerticalDragEnd: (details) {
@@ -72,7 +70,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
         ),
         child: _isCollapsed
             ? _buildCollapsedView(isDark, s)
-            : _buildExpandedView(isDark, s, matchScore),
+            : _buildExpandedView(isDark, s),
       ),
     );
   }
@@ -162,7 +160,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
     );
   }
 
-  Widget _buildExpandedView(bool isDark, NearbyShiftItem s, int matchScore) {
+  Widget _buildExpandedView(bool isDark, NearbyShiftItem s) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -198,7 +196,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
         // Top Info Row
         Row(
           children: [
-            // Match Score box
+            // Job Icon Box
             Container(
               width: 44,
               height: 44,
@@ -208,29 +206,10 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                     : const Color(0xFF10B981).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '$matchScore%',
-                    style: TextStyle(
-                      fontFamily: 'Be Vietnam Pro',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
-                      color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                      height: 1.1,
-                    ),
-                  ),
-                  Text(
-                    'KHỚP',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
+              child: Icon(
+                Icons.work_outline_rounded,
+                size: 22,
+                color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
               ),
             ),
             const SizedBox(width: 11),

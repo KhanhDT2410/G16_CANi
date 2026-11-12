@@ -857,12 +857,6 @@ export default function EoProfileTab() {
                   </span>
                 </div>
                 <div className="info-item">
-                  <span className="info-label">Độ khớp khuôn mặt (Face Match)</span>
-                  <span className="info-val" style={{ color: '#16a34a' }}>
-                    {ekycData.faceMatchScore != null ? `${Number(ekycData.faceMatchScore).toFixed(1)}%` : '—'}
-                  </span>
-                </div>
-                <div className="info-item">
                   <span className="info-label">Quê quán</span>
                   <span className="info-val">{ekycData.originAddress || '—'}</span>
                 </div>

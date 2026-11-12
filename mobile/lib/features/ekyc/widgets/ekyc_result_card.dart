@@ -62,20 +62,20 @@ class EkycResultCard extends StatelessWidget {
             ),
             const Divider(height: 24, color: Color(0xFFF1F5F9)),
 
-            // Scores
+            // Trạng thái thẩm định
             Row(
               children: [
                 Expanded(
                   child: _buildMetricTile(
-                    'Độ khớp khuôn mặt',
-                    '${item.faceMatchScore.toStringAsFixed(1)}%',
+                    'Khuôn mặt',
+                    item.faceMatchScore >= 80 ? 'Hợp lệ' : 'Cần xem xét',
                     item.faceMatchScore >= 80 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                   ),
                 ),
                 Expanded(
                   child: _buildMetricTile(
-                    'Độ tin cậy OCR',
-                    '${(item.ocrConfidence * 100).toStringAsFixed(1)}%',
+                    'Ảnh CCCD',
+                    item.ocrConfidence >= 0.85 ? 'Rõ nét' : 'Cần xem xét',
                     item.ocrConfidence >= 0.85 ? const Color(0xFF10B981) : const Color(0xFF0077FF),
                   ),
                 ),

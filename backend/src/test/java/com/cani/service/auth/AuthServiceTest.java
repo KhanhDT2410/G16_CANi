@@ -458,12 +458,12 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("UTC013: login - Supabase offline ở profile H2 kích hoạt dev-token fallback (hungpd)")
+        @DisplayName("UTC013: login - Supabase offline ở profile H2 kích hoạt dev-token fallback khi đúng mật khẩu seed (hungpd)")
         void UTC013_login_SupabaseOfflineH2Profile_ReturnsDevTokenFallback() {
             // Arrange
             LoginRequest request = LoginRequest.builder()
                     .email("local@cani.vn")
-                    .password("any")
+                    .password("Password123!")
                     .build();
 
             when(supabaseAuthClient.signInWithPassword(anyString(), anyString()))
@@ -491,6 +491,23 @@ class AuthServiceTest {
             assertEquals("dev-refresh-" + userId, response.getRefreshToken());
             assertEquals(86400L, response.getExpiresIn());
             assertEquals("local@cani.vn", response.getUser().getEmail());
+        }
+
+        @Test
+        @DisplayName("UTC013B: login - Supabase offline ở profile H2 từ chối khi sai mật khẩu (hungpd)")
+        void UTC013B_login_SupabaseOfflineH2Profile_WrongPassword_ThrowsBadRequestException() {
+            // Arrange
+            LoginRequest request = LoginRequest.builder()
+                    .email("local@cani.vn")
+                    .password("wrong-pass")
+                    .build();
+
+            when(supabaseAuthClient.signInWithPassword(anyString(), anyString()))
+                    .thenThrow(new RuntimeException("Supabase unavailable"));
+            when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
+
+            // Act & Assert
+            assertThrows(BadRequestException.class, () -> authService.login(request));
         }
     }
 

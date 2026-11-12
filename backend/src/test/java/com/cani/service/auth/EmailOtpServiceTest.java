@@ -108,7 +108,7 @@ class EmailOtpServiceTest {
         assertDoesNotThrow(() -> emailOtpService.verifyOtp(testEmail, "654321", "REGISTER"));
 
         assertTrue(validOtp.getIsUsed());
-        verify(otpRepository, times(1)).save(validOtp);
+        verify(otpRepository, times(1)).saveAndFlush(validOtp);
     }
 
     @Test
@@ -152,6 +152,6 @@ class EmailOtpServiceTest {
 
         assertTrue(ex.getMessage().contains("không chính xác"));
         assertEquals(2, otp.getAttempts());
-        verify(otpRepository, times(1)).save(otp);
+        verify(otpRepository, times(1)).saveAndFlush(otp);
     }
 }

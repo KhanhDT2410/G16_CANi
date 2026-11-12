@@ -139,6 +139,9 @@ public class AuthService {
         SupabaseSession session = null;
         try {
             session = supabaseAuthClient.signInWithPassword(email, request.getPassword());
+        } catch (BadRequestException e) {
+            // Re-throw lỗi xác thực sai mật khẩu từ GoTrue, không nuốt thành lỗi kết nối
+            throw e;
         } catch (Exception e) {
             log.warn("Supabase GoTrue auth failed or unreachable: {}. Falling back to local check...", e.getMessage());
         }
@@ -154,6 +157,12 @@ public class AuthService {
             refreshToken = session.getRefreshToken();
             expiresIn = session.getExpiresIn();
         } else if (environment.acceptsProfiles(Profiles.of("h2"))) {
+            // Xác thực mật khẩu seed ở profile H2 offline (theo tài liệu run.md: Password123!)
+            String expectedH2Password = "Password123!";
+            if (request.getPassword() == null || !expectedH2Password.equals(request.getPassword().trim())) {
+                throw new BadRequestException("Email hoặc mật khẩu không chính xác");
+            }
+
             // Chỉ profile h2 (dev offline, H2DataSeeder) được phép fallback dev-token.
             User localUser = userRepository.findByEmail(email)
                     .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không chính xác"));
@@ -249,16 +258,6 @@ public class AuthService {
 
                 return saved;
             });
-
-            // Nếu user đã tồn tại nhưng có role là WORKER (và không phải tài khoản seed worker@cani.vn)
-            // khi đăng nhập/đăng ký từ Web Portal với targetRole là EVENT_ORGANIZER, tự động nâng cấp sang EVENT_ORGANIZER
-            if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())
-                    && user.getRole() == UserRole.WORKER
-                    && !"worker@cani.vn".equalsIgnoreCase(user.getEmail())) {
-                log.info("Cập nhật vai trò người dùng {} sang EVENT_ORGANIZER theo yêu cầu từ Web Portal", user.getEmail());
-                user.setRole(UserRole.EVENT_ORGANIZER);
-                user = userRepository.save(user);
-            }
 
             if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
                 throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");

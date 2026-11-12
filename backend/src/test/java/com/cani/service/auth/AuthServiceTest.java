@@ -587,6 +587,100 @@ class AuthServiceTest {
         }
 
         @Test
+        @DisplayName("UTC015B: googleLogin - Tài khoản mới bị trigger gán WORKER nhưng đăng nhập từ Web Portal (targetRole=EO) -> chuyển đổi an toàn sang EVENT_ORGANIZER")
+        void UTC015B_googleLogin_TriggerAssignedWorker_SafelyTransitionsToEo() {
+            // Arrange
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .supabaseAccessToken("valid.google.jwt")
+                    .targetRole("EVENT_ORGANIZER")
+                    .build();
+
+            UUID userId = UUID.randomUUID();
+            Jwt jwt = mock(Jwt.class);
+            when(jwtDecoder.decode("valid.google.jwt")).thenReturn(jwt);
+            when(jwt.getClaimAsString("email")).thenReturn("neweo2@gmail.com");
+            when(jwt.getSubject()).thenReturn(userId.toString());
+
+            User triggerCreatedUser = User.builder()
+                    .userId(userId)
+                    .email("neweo2@gmail.com")
+                    .fullName("New EO User")
+                    .role(UserRole.WORKER)
+                    .status(UserStatus.ACTIVE)
+                    .build();
+
+            Worker dummyWorker = Worker.builder()
+                    .workerId(UUID.randomUUID())
+                    .user(triggerCreatedUser)
+                    .fullName("New EO User")
+                    .cccdNumber(null)
+                    .totalShiftsCompleted(0)
+                    .build();
+
+            when(userRepository.findById(userId)).thenReturn(Optional.of(triggerCreatedUser));
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(dummyWorker));
+            when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.empty());
+            when(eventOrganizerRepository.save(any(EventOrganizer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // Act
+            LoginResponse response = authService.googleLogin(request);
+
+            // Assert
+            assertNotNull(response);
+            assertEquals("neweo2@gmail.com", response.getUser().getEmail());
+            assertEquals(UserRole.EVENT_ORGANIZER, response.getUser().getRole());
+            verify(workerRepository).delete(dummyWorker);
+            verify(eventOrganizerRepository, atLeastOnce()).save(any(EventOrganizer.class));
+        }
+
+        @Test
+        @DisplayName("UTC015C: googleLogin - Worker thực thụ (đã có CCCD/ca làm việc) đăng nhập từ Web Portal -> giữ nguyên vai trò WORKER, không bị leo quyền")
+        void UTC015C_googleLogin_EstablishedWorker_RoleProtectedAgainstEscalation() {
+            // Arrange
+            GoogleLoginRequest request = GoogleLoginRequest.builder()
+                    .supabaseAccessToken("valid.google.jwt")
+                    .targetRole("EVENT_ORGANIZER")
+                    .build();
+
+            UUID userId = UUID.randomUUID();
+            Jwt jwt = mock(Jwt.class);
+            when(jwtDecoder.decode("valid.google.jwt")).thenReturn(jwt);
+            when(jwt.getClaimAsString("email")).thenReturn("realworker@gmail.com");
+            when(jwt.getSubject()).thenReturn(userId.toString());
+
+            User realWorkerUser = User.builder()
+                    .userId(userId)
+                    .email("realworker@gmail.com")
+                    .fullName("Real Worker")
+                    .role(UserRole.WORKER)
+                    .status(UserStatus.ACTIVE)
+                    .build();
+
+            Worker realWorker = Worker.builder()
+                    .workerId(UUID.randomUUID())
+                    .user(realWorkerUser)
+                    .fullName("Real Worker")
+                    .cccdNumber("012345678901")
+                    .totalShiftsCompleted(5)
+                    .build();
+
+            when(userRepository.findById(userId)).thenReturn(Optional.of(realWorkerUser));
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(realWorker));
+
+            // Act
+            LoginResponse response = authService.googleLogin(request);
+
+            // Assert
+            assertNotNull(response);
+            assertEquals("realworker@gmail.com", response.getUser().getEmail());
+            assertEquals(UserRole.WORKER, response.getUser().getRole());
+            verify(workerRepository, never()).delete(any());
+            verify(eventOrganizerRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("UTC016: googleLogin - targetRole null an toàn fallback về vai trò mặc định WORKER (BUG-AUTH-003) (hungpd)")
         void UTC016_googleLogin_NewUserNullTargetRole_DefaultsToWorkerSafely() {
             // Arrange

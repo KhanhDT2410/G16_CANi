@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -259,30 +260,61 @@ public class AuthService {
                 return saved;
             });
 
+            // Nếu người dùng đăng nhập từ Web Portal với targetRole là EVENT_ORGANIZER
+            // và tài khoản hiện tại đang ở vai trò WORKER:
+            // - Kiểm tra tài khoản có phải Worker thực thụ (đã có CCCD / đã hoàn thành ca làm) hay không.
+            // - Nếu là tài khoản mới / chưa có lịch sử làm việc (do trigger Supabase tự động gán WORKER):
+            //   Tiến hành chuyển đổi vai trò sang EVENT_ORGANIZER và xóa profile Worker rác.
+            if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())
+                    && user.getRole() == UserRole.WORKER
+                    && !"worker@cani.vn".equalsIgnoreCase(user.getEmail())) {
+
+                Optional<Worker> workerOpt = workerRepository.findByUser_UserId(user.getUserId());
+                boolean isEstablishedWorker = workerOpt.map(w ->
+                        (w.getCccdNumber() != null && !w.getCccdNumber().isBlank()) ||
+                        (w.getTotalShiftsCompleted() != null && w.getTotalShiftsCompleted() > 0)
+                ).orElse(false);
+
+                if (!isEstablishedWorker) {
+                    log.info("Cập nhật vai trò người dùng Google OAuth {} sang EVENT_ORGANIZER từ Web Portal", user.getEmail());
+                    user.setRole(UserRole.EVENT_ORGANIZER);
+                    user = userRepository.save(user);
+
+                    // Xóa profile worker rác do trigger Supabase tự sinh
+                    workerOpt.ifPresent(w -> {
+                        try {
+                            workerRepository.delete(w);
+                        } catch (Exception e) {
+                            log.warn("Không thể xóa worker dummy của user {}: {}", email, e.getMessage());
+                        }
+                    });
+                }
+            }
+
             if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
                 throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
             }
 
             // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
-            final User currentUser = user;
-            if (currentUser.getRole() == UserRole.EVENT_ORGANIZER) {
-                eventOrganizerRepository.findByUser_UserId(currentUser.getUserId())
+            if (user.getRole() == UserRole.EVENT_ORGANIZER) {
+                final User eoUser = user;
+                eventOrganizerRepository.findByUser_UserId(eoUser.getUserId())
                         .orElseGet(() -> eventOrganizerRepository.save(
                                 EventOrganizer.builder()
-                                        .user(currentUser)
-                                        .companyName(currentUser.getFullName() != null && !currentUser.getFullName().isBlank()
-                                                ? currentUser.getFullName()
+                                        .user(eoUser)
+                                        .companyName(eoUser.getFullName() != null && !eoUser.getFullName().isBlank()
+                                                ? eoUser.getFullName()
                                                 : "Ban Tổ Chức")
                                         .build()
                         ));
             }
 
-            currentUser.setLastLoginAt(Instant.now());
-            user = userRepository.save(currentUser);
+            user.setLastLoginAt(Instant.now());
+            User finalSavedUser = userRepository.save(user);
 
             return LoginResponse.builder()
                     .token(request.getSupabaseAccessToken())
-                    .user(toUserDto(user))
+                    .user(toUserDto(finalSavedUser))
                     .build();
         } catch (JwtException e) {
             log.error("Token Supabase Google không hợp lệ: {}", e.getMessage());

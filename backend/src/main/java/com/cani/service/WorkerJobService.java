@@ -1062,12 +1062,20 @@ public class WorkerJobService {
 
     public org.springframework.core.io.Resource loadProofImage(String filename) {
         try {
-            java.nio.file.Path filePath = java.nio.file.Paths.get(PROOF_UPLOAD_DIR).resolve(filename).normalize();
+            // Ngăn chặn Path Traversal
+            if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                throw new BadRequestException("Tên tệp không hợp lệ");
+            }
+            java.nio.file.Path basePath = java.nio.file.Paths.get(PROOF_UPLOAD_DIR).toAbsolutePath().normalize();
+            java.nio.file.Path filePath = basePath.resolve(filename).normalize();
+            if (!filePath.startsWith(basePath)) {
+                throw new BadRequestException("Đường dẫn tệp không được phép");
+            }
             org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
             } else {
-                throw new BadRequestException("Không tìm thấy tệp ảnh bằng chứng: " + filename);
+                throw new ResourceNotFoundException("Không tìm thấy tệp ảnh bằng chứng: " + filename);
             }
         } catch (java.net.MalformedURLException e) {
             throw new BadRequestException("Đường dẫn tệp ảnh không hợp lệ: " + filename);

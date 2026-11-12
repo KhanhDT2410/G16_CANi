@@ -38,13 +38,13 @@ export const SupportChatWidget = () => {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
 
-  if (isStaff) return null;
-
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
+
+  if (isStaff) return null;
 
   const handleSend = async (customText = null) => {
     const textToSend = customText || inputText.trim();

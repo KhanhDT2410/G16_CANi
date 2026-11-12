@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
+import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import './EventDetailModal.css';
 
 export default function EventDetailModal({
@@ -7,15 +8,17 @@ export default function EventDetailModal({
   onClose,
   event,
   onOpenAddShift,
-  onOpenQr,
   onOpenInvite,
-  onOpenAttendance,
   onNavigateToRecruitment,
+  onReloadEvents,
+  onOpenPaymentDeclaration,
 }) {
   const [activeTab, setActiveTab] = useState('SHIFTS'); // 'SHIFTS' | 'WORKERS'
   const [eventWorkers, setEventWorkers] = useState([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [searchWorker, setSearchWorker] = useState('');
+  const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
+  const [showCancelledShifts, setShowCancelledShifts] = useState(false);
 
   useEffect(() => {
     if (isOpen && event?.eventId) {
@@ -34,7 +37,16 @@ export default function EventDetailModal({
 
   if (!isOpen || !event) return null;
 
-  const shifts = event.shifts || [];
+  const rawShifts = event.shifts || [];
+  const activeAndDraftShifts = rawShifts
+    .filter((sh) => sh.status !== 'CANCELLED')
+    .sort((a, b) => {
+      const pA = a.status === 'ACTIVE' || a.status === 'OPEN' ? 1 : a.status === 'DRAFT' ? 2 : 1;
+      const pB = b.status === 'ACTIVE' || b.status === 'OPEN' ? 1 : b.status === 'DRAFT' ? 2 : 1;
+      return pA - pB;
+    });
+  const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
+  const shifts = activeAndDraftShifts;
   const totalRequired = event.totalRequiredWorkers || shifts.reduce((s, sh) => s + (sh.requiredWorkers || 0), 0);
   const totalConfirmed = event.totalConfirmedWorkers || shifts.reduce((s, sh) => s + (sh.confirmedWorkers || 0), 0);
   const fillRate = totalRequired > 0 ? Math.round((totalConfirmed / totalRequired) * 100) : 0;
@@ -279,110 +291,154 @@ export default function EventDetailModal({
                     const shiftConfirmed = shift.confirmedWorkers || 0;
                     const shiftRequired = shift.requiredWorkers || 1;
                     const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
+                    const isWorkspaceOpen = activeWorkspaceShiftId === shift.shiftId;
 
                     return (
-                      <div key={shift.shiftId || sIdx} className="detail-shift-card">
-                        <div className="shift-card-header">
-                          <div className="shift-card-title-group">
-                            {shift.imageUrl && (
-                              <img
-                                src={shift.imageUrl}
-                                alt={shift.jobType}
-                                style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                            )}
-                            <span className="shift-job-badge">{shift.jobType}</span>
-                            <span className="shift-time-badge">
-                              {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
-                            </span>
-                            {shift.dressCode && (
-                              <span className="shift-dresscode-tag">Đồng phục: {shift.dressCode}</span>
-                            )}
-                          </div>
-                          <div className="shift-wage-tag">
-                            {new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/h
-                            {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)}đ phụ cấp)`}
-                          </div>
-                        </div>
-
-                        <div className="shift-card-body">
-                          {/* Tiến độ nhân sự của ca */}
-                          <div className="shift-worker-progress">
-                            <div className="progress-labels">
-                              <span className="progress-title">
-                                Nhân sự nhận ca: <strong>{shiftConfirmed} / {shiftRequired}</strong> người
+                      <div key={shift.shiftId || sIdx} style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div className="detail-shift-card">
+                          <div className="shift-card-header">
+                            <div className="shift-card-title-group">
+                              {shift.imageUrl && (
+                                <img
+                                  src={shift.imageUrl}
+                                  alt={shift.jobType}
+                                  style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              )}
+                              <span className="shift-job-badge">{shift.jobType}</span>
+                              <span className="shift-time-badge">
+                                {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
                               </span>
-                              <span className="progress-percent">{shiftRate}%</span>
+                              {shift.dressCode && (
+                                <span className="shift-dresscode-tag">Đồng phục: {shift.dressCode}</span>
+                              )}
                             </div>
-                            <div className="progress-track">
-                              <div
-                                className="progress-fill"
-                                style={{
-                                  width: `${Math.min(100, shiftRate)}%`,
-                                  backgroundColor: shiftRate >= 100 ? '#10b981' : '#2563eb',
-                                }}
-                              />
+                            <div className="shift-wage-tag">
+                              {new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/h
+                              {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)}đ phụ cấp)`}
                             </div>
                           </div>
 
-                          {/* Thao tác ca */}
-                          <div className="shift-card-actions">
-                            <button
-                              type="button"
-                              className="btn-shift-action blue"
-                              onClick={() => {
-                                onClose();
-                                onOpenQr(shift, event);
-                              }}
-                              title="Hiển thị mã QR Điểm danh Động"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="3" width="7" height="7"></rect>
-                                <rect x="14" y="3" width="7" height="7"></rect>
-                                <rect x="14" y="14" width="7" height="7"></rect>
-                                <rect x="3" y="14" width="7" height="7"></rect>
-                              </svg>
-                              Mã QR Điểm Danh Động
-                            </button>
+                          <div className="shift-card-body">
+                            {/* Tiến độ nhân sự của ca */}
+                            <div className="shift-worker-progress">
+                              <div className="progress-labels">
+                                <span className="progress-title">
+                                  Nhân sự nhận ca: <strong>{shiftConfirmed} / {shiftRequired}</strong> người
+                                </span>
+                                <span className="progress-percent">{shiftRate}%</span>
+                              </div>
+                              <div className="progress-track">
+                                <div
+                                  className="progress-fill"
+                                  style={{
+                                    width: `${Math.min(100, shiftRate)}%`,
+                                    backgroundColor: shiftRate >= 100 ? '#10b981' : '#2563eb',
+                                  }}
+                                />
+                              </div>
+                            </div>
 
-                            <button
-                              type="button"
-                              className="btn-shift-action purple"
-                              onClick={() => {
-                                onClose();
-                                onOpenInvite(shift, event);
-                              }}
-                              title="Lấy link & mã mời trực tiếp cho nhân sự"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                              </svg>
-                              Mã Mời Nhân Sự
-                            </button>
+                            {/* Thao tác ca */}
+                            <div className="shift-card-actions">
+                              <button
+                                type="button"
+                                className="btn-shift-action purple"
+                                onClick={() => {
+                                  onClose();
+                                  onOpenInvite(shift, event);
+                                }}
+                                title="Lấy link & mã mời trực tiếp cho nhân sự"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                                </svg>
+                                Mã Mời Nhân Sự
+                              </button>
 
-                            <button
-                              type="button"
-                              className="btn-shift-action emerald"
-                              onClick={() => {
-                                onClose();
-                                onOpenAttendance(shift, event);
-                              }}
-                              title="Theo dõi bảng điểm danh & xác nhận duyệt công"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="9" cy="7" r="4"></circle>
-                                <polyline points="16 11 18 13 22 9"></polyline>
-                              </svg>
-                              Bảng Điểm Danh Ca
-                            </button>
+                              <button
+                                type="button"
+                                className="btn-shift-action emerald"
+                                onClick={() =>
+                                  setActiveWorkspaceShiftId((prev) => (prev === shift.shiftId ? null : shift.shiftId))
+                                }
+                                title="Trượt mở bảng Điểm Danh Trực Tiếp & Mã QR Động bên dưới"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="3" width="7" height="7"></rect>
+                                  <rect x="14" y="3" width="7" height="7"></rect>
+                                  <rect x="14" y="14" width="7" height="7"></rect>
+                                  <rect x="3" y="14" width="7" height="7"></rect>
+                                </svg>
+                                {isWorkspaceOpen ? '▾ Đóng Điểm Danh & QR' : '▸ Điểm Danh & Mã QR'}
+                              </button>
+                            </div>
                           </div>
                         </div>
+
+                        {isWorkspaceOpen && (
+                          <ShiftQrAndAttendancePanel
+                            shift={shift}
+                            event={event}
+                            onClose={() => setActiveWorkspaceShiftId(null)}
+                            onReloadEvents={onReloadEvents}
+                            onOpenPaymentDeclaration={onOpenPaymentDeclaration}
+                          />
+                        )}
                       </div>
                     );
                   })}
+
+                  {/* Khu vực tách riêng các ca đã hủy / đã xóa */}
+                  {cancelledShifts.length > 0 && (
+                    <div style={{ marginTop: '0.75rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.75rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelledShifts((prev) => !prev)}
+                        style={{
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          color: '#dc2626',
+                          borderRadius: '8px',
+                          padding: '0.4rem 0.85rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {showCancelledShifts
+                          ? `Ẩn ${cancelledShifts.length} ca đã hủy / đã xóa ▲`
+                          : `Xem ${cancelledShifts.length} ca đã hủy / đã xóa (Tách riêng) ▼`}
+                      </button>
+
+                      {showCancelledShifts && (
+                        <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {cancelledShifts.map((shift, idx) => (
+                            <div
+                              key={shift.shiftId || idx}
+                              style={{
+                                padding: '0.65rem 1rem',
+                                borderRadius: '8px',
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                opacity: 0.75,
+                              }}
+                            >
+                              <span style={{ textDecoration: 'line-through', color: '#64748b', fontWeight: 600 }}>
+                                {shift.jobType} ({formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')})
+                              </span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626' }}>Đã hủy</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

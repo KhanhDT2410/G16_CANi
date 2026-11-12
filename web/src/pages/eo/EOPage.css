@@ -31,6 +31,8 @@
 }
 
 /* Các tab chức năng chuyên sâu mở rộng 100% chiều ngang */
+.eo-dashboard-layout.tab-events,
+.eo-dashboard-layout.tab-support,
 .eo-dashboard-layout.tab-profile,
 .eo-dashboard-layout.tab-ekyc,
 .eo-dashboard-layout.tab-settings,
@@ -41,6 +43,8 @@
   grid-template-columns: 240px minmax(0, 1fr);
 }
 
+.eo-dashboard-layout.sidebar-collapsed.tab-events,
+.eo-dashboard-layout.sidebar-collapsed.tab-support,
 .eo-dashboard-layout.sidebar-collapsed.tab-profile,
 .eo-dashboard-layout.sidebar-collapsed.tab-ekyc,
 .eo-dashboard-layout.sidebar-collapsed.tab-settings,

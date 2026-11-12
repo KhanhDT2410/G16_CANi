@@ -413,6 +413,12 @@ const EventCreationWizardModal = ({
     }
   };
 
+  const handleSaveAsDraft = () => {
+    showToast('Đã lưu sự kiện ở chế độ Bản nháp! Bạn có thể kích hoạt Matching bất cứ lúc nào.', 'success');
+    onSuccess?.();
+    handleClose();
+  };
+
   const handleClose = () => {
     setCurrentStep(1);
     setCreatedEvent(null);
@@ -1219,7 +1225,7 @@ const EventCreationWizardModal = ({
               </div>
             </div>
 
-            <div className="eo-modal-footer">
+            <div className="eo-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="eo-btn-secondary"
@@ -1228,21 +1234,44 @@ const EventCreationWizardModal = ({
               >
                 Quay Lại Sửa Ca
               </button>
-              <button
-                type="button"
-                className="eo-btn-primary"
-                disabled={submitting}
-                onClick={handleActivateMatching}
-                style={{
-                  background: '#2563eb',
-                  padding: '0.75rem 1.75rem',
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-                }}
-              >
-                {submitting ? 'Đang kích hoạt...' : 'Kích Hoạt Tìm Kiếm Ngay'}
-              </button>
+
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleSaveAsDraft}
+                  disabled={submitting}
+                  style={{
+                    background: '#fffbeb',
+                    color: '#b45309',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '0.5rem',
+                    padding: '0.75rem 1.35rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  title="Lưu sự kiện ở trạng thái Bản nháp (chưa trừ gói cước)"
+                >
+                  Lưu Bản Nháp
+                </button>
+
+                <button
+                  type="button"
+                  className="eo-btn-primary"
+                  disabled={submitting}
+                  onClick={handleActivateMatching}
+                  style={{
+                    background: '#2563eb',
+                    padding: '0.75rem 1.75rem',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                  }}
+                >
+                  {submitting ? 'Đang kích hoạt...' : 'Kích Hoạt Tìm Kiếm Ngay'}
+                </button>
+              </div>
             </div>
           </div>
         )}

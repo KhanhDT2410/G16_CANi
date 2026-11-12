@@ -37,6 +37,8 @@ export default function EOModals({
         onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
         onOpenAttendance={shifts.handleOpenAttendance}
         onNavigateToRecruitment={onNavigateToRecruitment}
+        onReloadEvents={events.loadEvents}
+        onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
       />
       <EventCreationWizardModal
         isOpen={events.showEventModal}

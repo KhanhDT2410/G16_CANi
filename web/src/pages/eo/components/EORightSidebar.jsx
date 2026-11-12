@@ -1,7 +1,7 @@
 import React from 'react';
 import { showToast } from '../../../components/common/Toast';
 
-export default function EORightSidebar({ metrics, events = [], onOpenQr, onOpenRecruitment, onOpenSubscription }) {
+export default function EORightSidebar({ metrics, events = [], onOpenQr, onOpenRecruitment, onOpenSubscription, onViewAllEvents }) {
   // Trích xuất các sự kiện thực tế sắp tới (sắp xếp theo ngày tăng dần)
   const upcomingList = (events || [])
     .filter((e) => e && e.status !== 'CANCELLED')
@@ -56,7 +56,10 @@ export default function EORightSidebar({ metrics, events = [], onOpenQr, onOpenR
             <button
               type="button"
               className="widget-link-btn"
-              onClick={() => showToast('Đang xem danh sách sự kiện', 'info')}
+              onClick={() => {
+                if (onViewAllEvents) onViewAllEvents();
+                else showToast('Đang chuyển sang Quản lý sự kiện', 'info');
+              }}
             >
               Xem tất cả &rarr;
             </button>

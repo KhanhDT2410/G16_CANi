@@ -11,7 +11,6 @@ import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
 import EOMetricsGrid from './components/EOMetricsGrid';
 import EOEventsTab from './components/EOEventsTab';
-import EORecruitmentTab from './components/EORecruitmentTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoProfileTab from './components/EoProfileTab';
@@ -35,7 +34,8 @@ export default function EOPage() {
   const payments = usePayments();
 
   const [activeNav, setActiveNav] = useState('overview');
-  const [activeTab, setActiveTab] = useState('events');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [activeEventSubTab, setActiveEventSubTab] = useState('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('cani_eo_sidebar_collapsed') === 'true';
@@ -61,8 +61,17 @@ export default function EOPage() {
     const handleSwitch = (e) => {
       const targetTab = e.detail?.tab;
       if (targetTab) {
-        setActiveTab(targetTab);
-        setActiveNav(targetTab);
+        if (targetTab === 'recruitment') {
+          setActiveTab('events');
+          setActiveNav('events');
+          setActiveEventSubTab('recruitment');
+        } else if (targetTab === 'analytics') {
+          setActiveTab('overview');
+          setActiveNav('overview');
+        } else {
+          setActiveTab(targetTab);
+          setActiveNav(targetTab);
+        }
         try {
           setSearchParams({ tab: targetTab }, { replace: true });
         } catch (err) {
@@ -82,8 +91,9 @@ export default function EOPage() {
       const q = e.detail?.query ?? '';
       setSearchQuery(q);
       if (q.trim()) {
-        setActiveTab((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
-        setActiveNav((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
+        setActiveTab('events');
+        setActiveNav('events');
+        setActiveEventSubTab('list');
       }
     };
     window.addEventListener('cani_global_search', handleGlobalSearch);
@@ -104,7 +114,14 @@ export default function EOPage() {
     } else if (tabParam === 'profile' || tabParam === 'ekyc') {
       setActiveTab('profile');
       setActiveNav('profile');
-    } else if (tabParam && ['events', 'recruitment', 'payments', 'analytics', 'settings'].includes(tabParam)) {
+    } else if (tabParam === 'recruitment') {
+      setActiveTab('events');
+      setActiveNav('events');
+      setActiveEventSubTab('recruitment');
+    } else if (tabParam === 'analytics' || tabParam === 'overview') {
+      setActiveTab('overview');
+      setActiveNav('overview');
+    } else if (tabParam && ['events', 'payments', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
@@ -164,16 +181,27 @@ export default function EOPage() {
 
   const handleNavClick = (navKey) => {
     setActiveNav(navKey);
-    let target = 'events';
-    if (navKey === 'overview' || navKey === 'events') target = 'events';
-    else if (navKey === 'recruitment') target = 'recruitment';
-    else if (navKey === 'payments') target = 'payments';
-    else if (navKey === 'subscription') target = 'subscription';
-    else if (navKey === 'profile' || navKey === 'ekyc') target = 'profile';
-    else if (navKey === 'support') target = 'support';
-    else if (navKey === 'analytics') target = 'analytics';
-    else if (navKey === 'settings') target = 'settings';
-    
+    let target = 'overview';
+    if (navKey === 'overview' || navKey === 'analytics') {
+      target = 'overview';
+    } else if (navKey === 'events') {
+      target = 'events';
+    } else if (navKey === 'recruitment') {
+      target = 'events';
+      setActiveNav('events');
+      setActiveEventSubTab('recruitment');
+    } else if (navKey === 'payments') {
+      target = 'payments';
+    } else if (navKey === 'subscription') {
+      target = 'subscription';
+    } else if (navKey === 'profile' || navKey === 'ekyc') {
+      target = 'profile';
+    } else if (navKey === 'support') {
+      target = 'support';
+    } else if (navKey === 'settings') {
+      target = 'settings';
+    }
+
     setActiveTab(target);
     try {
       setSearchParams({ tab: target }, { replace: true });
@@ -184,6 +212,18 @@ export default function EOPage() {
   };
 
   const switchTab = (tabKey) => {
+    if (tabKey === 'recruitment') {
+      setActiveTab('events');
+      setActiveNav('events');
+      setActiveEventSubTab('recruitment');
+      try {
+        setSearchParams({ tab: 'events' }, { replace: true });
+      } catch (err) {
+        console.warn('Lỗi setSearchParams:', err);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setActiveTab(tabKey);
     setActiveNav(tabKey);
     try {
@@ -194,6 +234,15 @@ export default function EOPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleEventSubTabChange = (subKey) => {
+    setActiveEventSubTab(subKey);
+    if (subKey === 'cancelled') {
+      events.setStatusFilter('CANCELLED');
+    } else if (events.statusFilter === 'CANCELLED') {
+      events.setStatusFilter('ALL');
+    }
+  };
+
   const displayName = user?.fullName || user?.username || 'Ban Tổ Chức';
 
   return (
@@ -202,19 +251,21 @@ export default function EOPage() {
         <EOSidebar
           activeNav={activeNav}
           onNavClick={handleNavClick}
+          activeEventSubTab={activeEventSubTab}
+          onEventSubTabClick={handleEventSubTabChange}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={toggleSidebarCollapse}
         />
 
         <main className="eo-main-stream">
-          {/* Hero Banner & Metrics Grid chỉ hiển thị ở tab Sự kiện / Tổng quan */}
-          {(activeTab === 'events' || activeNav === 'overview') && (
+          {/* TRANG TỔNG QUAN (Gộp Báo Cáo & Thống Kê Tài Chính + Uy Tín vào Tổng Quan) */}
+          {activeTab === 'overview' && (
             <>
               <section className="eo-hero-banner-clean">
                 <div className="hero-clean-left">
                   <h1 className="hero-clean-greeting">Chào mừng trở lại, {displayName}!</h1>
                   <p className="hero-clean-subtitle">
-                    Quản lý sự kiện, tuyển dụng và điều phối nhân sự dễ dàng trên CANi.
+                    Tổng quan chỉ số vận hành, ngân sách và báo cáo quyết toán sự kiện trên CANi.
                   </p>
                 </div>
                 <div className="hero-clean-right">
@@ -272,12 +323,21 @@ export default function EOPage() {
                   }
                 }}
               />
+
+              {/* Báo cáo & Thống kê Tài chính đã gộp vào Tổng quan (đã lược bỏ các chỉ số trùng lặp) */}
+              <EOAnalyticsTab
+                events={events.events}
+                payments={payments.payments}
+                onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
+              />
             </>
           )}
 
+          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN (Gộp Danh sách sự kiện + Tuyển dụng nhân sự + Trạm Điểm danh & QR + Đã hủy) */}
           {activeTab === 'events' && (
             <EOEventsTab
               loading={events.loading}
+              allEvents={events.events}
               filteredEvents={events.filteredEvents}
               searchQuery={events.searchQuery}
               setSearchQuery={events.setSearchQuery}
@@ -287,6 +347,8 @@ export default function EOPage() {
               setSortBy={events.setSortBy}
               expandedEventId={shifts.expandedEventId}
               setExpandedEventId={shifts.setExpandedEventId}
+              activeSubTab={activeEventSubTab}
+              onSubTabChange={handleEventSubTabChange}
               onOpenEventDetail={setDetailEvent}
               onDeleteEvent={events.handleDeleteEvent}
               onOpenCreateEvent={handleOpenCreateEvent}
@@ -308,18 +370,8 @@ export default function EOPage() {
               onOpenAttendance={shifts.handleOpenAttendance}
               onEditShift={shifts.setEditingShift}
               onCancelShift={shifts.handleCancelShift}
-            />
-          )}
-
-          {activeTab === 'recruitment' && (
-            <EORecruitmentTab
-              events={events.events}
-              onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
-              onOpenQr={shifts.handleOpenShiftQr}
-              onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-              onOpenAttendance={shifts.handleOpenAttendance}
-              onOpenCreateEvent={handleOpenCreateEvent}
               onReloadEvents={events.loadEvents}
+              onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
             />
           )}
 
@@ -347,32 +399,28 @@ export default function EOPage() {
             </div>
           )}
 
-          {activeTab === 'analytics' && (
-            <EOAnalyticsTab
-              events={events.events}
-              payments={payments.payments}
-              onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
-            />
-          )}
-
           {activeTab === 'settings' && (
             <EOSettingsTab onNavigateToSubscription={() => switchTab('subscription')} />
           )}
         </main>
 
-        {(activeTab === 'events' || activeNav === 'overview') && (
+        {activeTab === 'overview' && (
           <EORightSidebar
             metrics={events.metrics}
             events={events.events}
             onOpenQr={() => {
-              if (events.events.length > 0 && events.events[0].totalShifts > 0) {
-                shifts.handleOpenShiftQr(events.events[0].eventId, events.events[0].name);
-              } else {
-                showToast('Chưa có ca làm việc nào để tạo mã QR điểm danh.', 'warning');
-              }
+              handleNavClick('events');
+              handleEventSubTabChange('attendance');
             }}
-            onOpenRecruitment={() => switchTab('recruitment')}
+            onOpenRecruitment={() => {
+              handleNavClick('events');
+              handleEventSubTabChange('recruitment');
+            }}
             onOpenSubscription={() => switchTab('subscription')}
+            onViewAllEvents={() => {
+              handleNavClick('events');
+              handleEventSubTabChange('list');
+            }}
           />
         )}
       </div>
@@ -389,7 +437,10 @@ export default function EOPage() {
         setDisputeModal={setDisputeModal}
         detailEvent={detailEvent}
         setDetailEvent={setDetailEvent}
-        onNavigateToRecruitment={() => handleNavClick('recruitment')}
+        onNavigateToRecruitment={() => {
+          handleNavClick('events');
+          handleEventSubTabChange('recruitment');
+        }}
       />
 
       {/* Modal Xuất Phiếu Chi Thù Lao & Quyết Toán Kế Toán (Mẫu 02-TT / NĐ 52/2024/NĐ-CP) */}

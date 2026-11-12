@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import SkeletonCard from '../../../components/common/SkeletonLoader';
 import EventShiftsDrawer from './EventShiftsDrawer';
+import EORecruitmentTab from './EORecruitmentTab';
+import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
+import { getEventStatusPriority } from '../utils/eventHelpers';
 
 export default function EOEventsTab({
   loading,
+  allEvents = [],
   filteredEvents,
   searchQuery,
   setSearchQuery,
@@ -13,6 +17,8 @@ export default function EOEventsTab({
   setSortBy,
   expandedEventId,
   setExpandedEventId,
+  activeSubTab = 'list',
+  onSubTabChange,
   onOpenEventDetail,
   onDeleteEvent,
   onOpenCreateEvent,
@@ -26,8 +32,12 @@ export default function EOEventsTab({
   onOpenAttendance,
   onEditShift,
   onCancelShift,
+  onReloadEvents,
+  onOpenPaymentDeclaration,
 }) {
   const [activeMenuEventId, setActiveMenuEventId] = useState(null);
+  const [selectedStationEventId, setSelectedStationEventId] = useState('');
+  const [selectedStationShiftId, setSelectedStationShiftId] = useState('');
 
   const toggleKebabMenu = (e, eventId) => {
     e.stopPropagation();
@@ -35,6 +45,57 @@ export default function EOEventsTab({
   };
 
   const closeMenu = () => setActiveMenuEventId(null);
+
+  // Danh sách sự kiện chưa hủy (ưu tiên Đang hoạt động lên đầu, Bản nháp ở dưới)
+  const nonCancelledEvents = useMemo(
+    () =>
+      [...allEvents]
+        .filter((e) => e.status !== 'CANCELLED')
+        .sort((a, b) => getEventStatusPriority(a.status) - getEventStatusPriority(b.status)),
+    [allEvents]
+  );
+
+  // Danh sách sự kiện đã hủy và ca làm việc đã hủy (tách riêng hoàn toàn)
+  const cancelledEventsList = useMemo(
+    () => allEvents.filter((e) => e.status === 'CANCELLED'),
+    [allEvents]
+  );
+
+  const cancelledShiftsFromActiveEvents = useMemo(() => {
+    const list = [];
+    allEvents.forEach((evt) => {
+      if (evt.status !== 'CANCELLED' && Array.isArray(evt.shifts)) {
+        evt.shifts.forEach((sh) => {
+          if (sh.status === 'CANCELLED') {
+            list.push({ ...sh, eventName: evt.name, eventId: evt.eventId });
+          }
+        });
+      }
+    });
+    return list;
+  }, [allEvents]);
+
+  // Sự kiện và Ca được chọn trong Trạm Điểm Danh & Mã QR toàn trang
+  const currentStationEvent = useMemo(() => {
+    if (selectedStationEventId) {
+      const found = nonCancelledEvents.find((e) => e.eventId === selectedStationEventId);
+      if (found) return found;
+    }
+    return nonCancelledEvents.find((e) => Array.isArray(e.shifts) && e.shifts.some((s) => s.status !== 'CANCELLED')) || nonCancelledEvents[0] || null;
+  }, [nonCancelledEvents, selectedStationEventId]);
+
+  const currentStationShifts = useMemo(() => {
+    if (!currentStationEvent || !Array.isArray(currentStationEvent.shifts)) return [];
+    return currentStationEvent.shifts.filter((s) => s.status !== 'CANCELLED');
+  }, [currentStationEvent]);
+
+  const currentStationShift = useMemo(() => {
+    if (selectedStationShiftId) {
+      const found = currentStationShifts.find((s) => s.shiftId === selectedStationShiftId);
+      if (found) return found;
+    }
+    return currentStationShifts[0] || null;
+  }, [currentStationShifts, selectedStationShiftId]);
 
   const formatStatusBadge = (status) => {
     switch (status) {
@@ -55,72 +116,394 @@ export default function EOEventsTab({
     }
   };
 
+  const handleSelectSubTab = (subKey) => {
+    onSubTabChange?.(subKey);
+    if (subKey === 'cancelled') {
+      setStatusFilter('CANCELLED');
+    } else if (statusFilter === 'CANCELLED') {
+      setStatusFilter('ALL');
+    }
+  };
+
   return (
-    <section className="eo-events-section-card animate-fade-in-up" onClick={closeMenu}>
-      {/* 1. Header Bar: Tiêu đề + Tìm kiếm + Lọc + Nút Tạo Sự Kiện Mới */}
-      <div className="table-card-header-bar">
-        <div className="table-header-title-group">
-          <h3 className="table-card-heading">Danh sách sự kiện</h3>
-        </div>
-
-        <div className="table-header-actions-group">
-          <div className="table-search-input-wrapper">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#94a3b8"
-              strokeWidth="2.5"
-              className="search-lens-icon"
-            >
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo tên sự kiện..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="table-search-input"
-            />
-          </div>
-
-          <div className="table-select-wrapper">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="table-filter-select"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">Đang diễn ra</option>
-              <option value="DRAFT">Bản nháp</option>
-              <option value="UPCOMING">Sắp diễn ra</option>
-            </select>
-          </div>
-
-          <div className="table-select-wrapper">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="table-filter-select"
-            >
-              <option value="NEWEST">Mới nhất</option>
-              <option value="OLDEST">Cũ nhất</option>
-              <option value="UPCOMING">Sắp diễn ra</option>
-            </select>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }} onClick={closeMenu}>
+      {/* Thanh Điều Hướng Phân Khu Quản Lý Sự Kiện & Tuyển Dụng & Điểm Danh QR */}
+      <div
+        className="eo-widget-card"
+        style={{
+          padding: '0.85rem 1.25rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => handleSelectSubTab('list')}
+            style={{
+              padding: '0.55rem 1rem',
+              borderRadius: '10px',
+              border: activeSubTab === 'list' ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+              background: activeSubTab === 'list' ? '#eff6ff' : '#ffffff',
+              color: activeSubTab === 'list' ? '#1d4ed8' : '#475569',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <span>📅 Danh sách sự kiện ({nonCancelledEvents.length})</span>
+          </button>
 
           <button
             type="button"
-            className="table-btn-create-event"
-            onClick={onOpenCreateEvent}
+            onClick={() => handleSelectSubTab('recruitment')}
+            style={{
+              padding: '0.55rem 1rem',
+              borderRadius: '10px',
+              border: activeSubTab === 'recruitment' ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+              background: activeSubTab === 'recruitment' ? '#eff6ff' : '#ffffff',
+              color: activeSubTab === 'recruitment' ? '#1d4ed8' : '#475569',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
           >
-            <span>+</span>
-            <span>Tạo sự kiện mới</span>
+            <span>👥 Tuyển dụng nhân sự</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectSubTab('attendance')}
+            style={{
+              padding: '0.55rem 1rem',
+              borderRadius: '10px',
+              border: activeSubTab === 'attendance' ? '1.5px solid #0d9488' : '1px solid #e2e8f0',
+              background: activeSubTab === 'attendance' ? '#f0fdfa' : '#ffffff',
+              color: activeSubTab === 'attendance' ? '#0f766e' : '#475569',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <span>📲 Trạm Điểm danh & Mã QR</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSelectSubTab('cancelled')}
+            style={{
+              padding: '0.55rem 1rem',
+              borderRadius: '10px',
+              border: activeSubTab === 'cancelled' ? '1.5px solid #dc2626' : '1px solid #e2e8f0',
+              background: activeSubTab === 'cancelled' ? '#fef2f2' : '#ffffff',
+              color: activeSubTab === 'cancelled' ? '#dc2626' : '#64748b',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <span>🗑️ Đã hủy / Đã xóa ({cancelledEventsList.length + cancelledShiftsFromActiveEvents.length})</span>
           </button>
         </div>
+
+        <button
+          type="button"
+          className="table-btn-create-event"
+          onClick={onOpenCreateEvent}
+        >
+          <span>+</span>
+          <span>Tạo sự kiện mới</span>
+        </button>
       </div>
+
+      {/* PHÂN KHU 2: TUYỂN DỤNG NHÂN SỰ (GỘP VÀO QUẢN LÝ SỰ KIỆN) */}
+      {activeSubTab === 'recruitment' && (
+        <EORecruitmentTab
+          events={allEvents}
+          onOpenAddShift={onOpenAddShift}
+          onOpenInvite={onOpenInvite}
+          onOpenCreateEvent={onOpenCreateEvent}
+          onReloadEvents={onReloadEvents}
+          onOpenPaymentDeclaration={onOpenPaymentDeclaration}
+        />
+      )}
+
+      {/* PHÂN KHU 3: TRẠM ĐIỂM DANH & MÃ QR TOÀN TRANG (KHÔNG DÙNG POPUP NHỎ) */}
+      {activeSubTab === 'attendance' && (
+        <div className="eo-widget-card animate-fade-in-up" style={{ padding: '1.5rem' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              marginBottom: '1rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid #e2e8f0',
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                📲 Trạm Điểm Danh Trực Tiếp & Mã QR Động Toàn Màn Hình
+              </h3>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                Chọn sự kiện và ca làm việc bên dưới để hiển thị Mã QR động (20s) song song với Bảng điểm danh & nghiệm thu nhân sự.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <select
+                className="table-filter-select"
+                value={currentStationEvent?.eventId || ''}
+                onChange={(e) => {
+                  setSelectedStationEventId(e.target.value);
+                  setSelectedStationShiftId('');
+                }}
+                style={{ minWidth: '220px', fontWeight: 600 }}
+              >
+                {nonCancelledEvents.length === 0 ? (
+                  <option value="">Chưa có sự kiện</option>
+                ) : (
+                  nonCancelledEvents.map((evt) => (
+                    <option key={evt.eventId} value={evt.eventId}>
+                      {evt.status === 'DRAFT' ? '[Nháp] ' : '[Đang mở] '}
+                      {evt.name}
+                    </option>
+                  ))
+                )}
+              </select>
+
+              <select
+                className="table-filter-select"
+                value={currentStationShift?.shiftId || ''}
+                onChange={(e) => setSelectedStationShiftId(e.target.value)}
+                style={{ minWidth: '220px', fontWeight: 600 }}
+              >
+                {currentStationShifts.length === 0 ? (
+                  <option value="">Sự kiện chưa có ca làm việc</option>
+                ) : (
+                  currentStationShifts.map((sh) => (
+                    <option key={sh.shiftId} value={sh.shiftId}>
+                      Ca: {sh.jobType} ({sh.confirmedWorkers || 0}/{sh.requiredWorkers || 0} người)
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          </div>
+
+          {currentStationShift ? (
+            <ShiftQrAndAttendancePanel
+              shift={currentStationShift}
+              event={currentStationEvent}
+              onReloadEvents={onReloadEvents}
+              onOpenPaymentDeclaration={onOpenPaymentDeclaration}
+            />
+          ) : (
+            <div style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
+              <p style={{ fontWeight: 600, marginBottom: '0.75rem' }}>
+                Sự kiện hiện tại chưa có ca làm việc nào để hiển thị Mã QR & Điểm danh.
+              </p>
+              {currentStationEvent && (
+                <button
+                  type="button"
+                  className="table-btn-create-event"
+                  onClick={() => onOpenAddShift?.(currentStationEvent.eventId)}
+                >
+                  + Thêm Ca Làm Việc Ngay
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PHÂN KHU 4: DANH SÁCH CA & SỰ KIỆN ĐÃ HỦY / ĐÃ XÓA (TÁCH RIÊNG HOÀN TOÀN) */}
+      {activeSubTab === 'cancelled' && (
+        <div className="eo-widget-card animate-fade-in-up" style={{ padding: '1.5rem' }}>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#991b1b' }}>
+              🗑️ Khu Vực Lưu Trữ Sự Kiện & Ca Làm Việc Đã Hủy / Đã Xóa
+            </h3>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: '#64748b' }}>
+              Các sự kiện và ca làm việc đã hủy được tách riêng tại đây để không làm rối danh sách đang hoạt động.
+            </p>
+          </div>
+
+          {cancelledEventsList.length === 0 && cancelledShiftsFromActiveEvents.length === 0 ? (
+            <div style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+              Hiện không có sự kiện hay ca làm việc nào bị hủy.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {cancelledEventsList.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.92rem', color: '#dc2626', fontWeight: 700 }}>
+                    Sự kiện đã hủy ({cancelledEventsList.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {cancelledEventsList.map((evt) => (
+                      <div
+                        key={evt.eventId}
+                        style={{
+                          padding: '0.9rem 1.15rem',
+                          borderRadius: '10px',
+                          backgroundColor: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#64748b', textDecoration: 'line-through' }}>
+                            {evt.name}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                            📍 {evt.venueAddress} • {evt.totalShifts || 0} ca làm việc
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {formatStatusBadge('CANCELLED')}
+                          <button
+                            type="button"
+                            onClick={() => onDeleteEvent?.(evt)}
+                            style={{
+                              background: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '0.4rem 0.85rem',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Xóa vĩnh viễn
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {cancelledShiftsFromActiveEvents.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.92rem', color: '#dc2626', fontWeight: 700 }}>
+                    Ca làm việc đã hủy trong các sự kiện ({cancelledShiftsFromActiveEvents.length})
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {cancelledShiftsFromActiveEvents.map((sh) => (
+                      <div
+                        key={sh.shiftId}
+                        style={{
+                          padding: '0.8rem 1.15rem',
+                          borderRadius: '10px',
+                          backgroundColor: '#fff1f2',
+                          border: '1px solid #fecdd3',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <div>
+                          <strong style={{ color: '#64748b', textDecoration: 'line-through' }}>
+                            Ca: {sh.jobType}
+                          </strong>
+                          <span style={{ marginLeft: '0.75rem', fontSize: '0.82rem', color: '#94a3b8' }}>
+                            Thuộc sự kiện: <strong>{sh.eventName}</strong>
+                          </span>
+                        </div>
+                        <span className="table-status-pill red">Đã hủy ca</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PHÂN KHU 1: DANH SÁCH SỰ KIỆN (ĐANG HOẠT ĐỘNG LÊN ĐẦU, BẢN NHÁP Ở DƯỚI) */}
+      {activeSubTab === 'list' && (
+        <section className="eo-events-section-card animate-fade-in-up">
+          {/* 1. Header Bar: Tiêu đề + Tìm kiếm + Lọc */}
+          <div className="table-card-header-bar">
+            <div className="table-header-title-group">
+              <h3 className="table-card-heading">Danh sách sự kiện (Đang hoạt động ở trên • Bản nháp ở dưới)</h3>
+            </div>
+
+            <div className="table-header-actions-group">
+              <div className="table-search-input-wrapper">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="2.5"
+                  className="search-lens-icon"
+                >
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo tên sự kiện..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="table-search-input"
+                />
+              </div>
+
+              <div className="table-select-wrapper">
+                <select
+                  value={statusFilter === 'CANCELLED' ? 'ALL' : statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="table-filter-select"
+                >
+                  <option value="ALL">Hoạt động & Bản nháp</option>
+                  <option value="ACTIVE">Đang hoạt động (Lên đầu)</option>
+                  <option value="DRAFT">Bản nháp (Ở dưới)</option>
+                  <option value="UPCOMING">Sắp diễn ra</option>
+                </select>
+              </div>
+
+              <div className="table-select-wrapper">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="table-filter-select"
+                >
+                  <option value="NEWEST">Mới nhất</option>
+                  <option value="OLDEST">Cũ nhất</option>
+                  <option value="UPCOMING">Sắp diễn ra</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
       {/* 2. Bảng Danh Sách Sự Kiện (Table View Chuẩn Mockup Bản 3) */}
       <div className="table-responsive-wrapper">
@@ -419,6 +802,8 @@ export default function EOEventsTab({
                               onOpenAttendance={onOpenAttendance}
                               onEditShift={onEditShift}
                               onCancelShift={onCancelShift}
+                              onReloadEvents={onReloadEvents}
+                              onOpenPaymentDeclaration={onOpenPaymentDeclaration}
                             />
                           </div>
                         </td>
@@ -431,6 +816,8 @@ export default function EOEventsTab({
           </table>
         )}
       </div>
-    </section>
+        </section>
+      )}
+    </div>
   );
 }

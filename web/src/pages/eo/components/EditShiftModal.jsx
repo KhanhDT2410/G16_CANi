@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { showToast } from '../../../components/common/Toast';
+import { WAGE_RECOMMENDATIONS_MAP, calculateShiftRiskAnalysis } from '../hooks/useShifts';
 
 /**
  * EditShiftModal
@@ -55,13 +57,17 @@ const EditShiftModal = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (Number(formData.allowance) < 0) {
+      showToast('Phụ cấp thêm không được là số âm!', 'error');
+      return;
+    }
     onSubmit(shift.shiftId, {
       ...formData,
       startTime: new Date(formData.startTime).toISOString(),
       endTime: new Date(formData.endTime).toISOString(),
-      requiredWorkers: Number(formData.requiredWorkers),
-      hourlyWage: Number(formData.hourlyWage),
-      allowance: Number(formData.allowance),
+      requiredWorkers: Math.max(1, Number(formData.requiredWorkers) || 1),
+      hourlyWage: Math.max(10000, Number(formData.hourlyWage) || 10000),
+      allowance: Math.max(0, Number(formData.allowance) || 0),
       minReliabilityScore: Number(formData.minReliabilityScore),
     });
   };
@@ -167,16 +173,50 @@ const EditShiftModal = ({
             </div>
 
             <div className="eo-form-group">
-              <label>Phụ Cấp (VND)</label>
+              <label>Phụ Cấp (VND - Không âm)</label>
               <input
                 type="number"
+                min="0"
                 step="5000"
                 className="eo-form-input"
                 value={formData.allowance}
-                onChange={(e) => setFormData({ ...formData, allowance: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => {
+                  const raw = parseFloat(e.target.value);
+                  setFormData({ ...formData, allowance: isNaN(raw) || raw < 0 ? 0 : raw });
+                }}
               />
             </div>
           </div>
+
+          {(() => {
+            const wageRec = WAGE_RECOMMENDATIONS_MAP[formData.jobType] || { min: 40000, max: 60000, recommended: 45000 };
+            const riskInfo = calculateShiftRiskAnalysis(formData);
+            return (
+              <div style={{ marginBottom: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#1e3a8a', backgroundColor: '#eff6ff', padding: '0.5rem 0.75rem', borderRadius: '0.4rem', border: '1px solid #bfdbfe' }}>
+                  Gợi ý mức lương: <strong>{wageRec.min.toLocaleString()}đ - {wageRec.max.toLocaleString()}đ/giờ</strong> (Khuyên dùng: <strong>{wageRec.recommended.toLocaleString()}đ/giờ</strong>)
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.4rem',
+                    backgroundColor: riskInfo.level === 'HIGH' ? '#fef2f2' : riskInfo.level === 'MEDIUM' ? '#fffbeb' : '#f0fdf4',
+                    border: riskInfo.level === 'HIGH' ? '1px solid #fecaca' : riskInfo.level === 'MEDIUM' ? '1px solid #fde68a' : '1px solid #bbf7d0',
+                    color: riskInfo.level === 'HIGH' ? '#b91c1c' : riskInfo.level === 'MEDIUM' ? '#b45309' : '#15803d',
+                    fontWeight: 600,
+                  }}
+                >
+                  Cảnh báo Risk Score (Nguy cơ khó tìm người): {riskInfo.riskScore}/100 — {riskInfo.label}
+                </div>
+              </div>
+            );
+          })()}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="eo-form-group">

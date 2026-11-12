@@ -34,11 +34,12 @@ public class EventOrganizerEkycController {
             @RequestParam("backImage") MultipartFile backImage,
             @RequestParam("selfieImage") MultipartFile selfieImage,
             @RequestParam(value = "businessLicenseImage", required = false) MultipartFile businessLicenseImage,
+            @RequestParam(value = "cccdNumber", required = false) String cccdNumber,
             Authentication authentication) {
 
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.submitEkyc(
-                userId, frontImage, backImage, selfieImage, businessLicenseImage
+                userId, frontImage, backImage, selfieImage, businessLicenseImage, cccdNumber
         );
 
         String message;

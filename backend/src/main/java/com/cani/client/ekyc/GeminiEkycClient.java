@@ -52,13 +52,15 @@ public class GeminiEkycClient implements EkycProvider {
 
         List<String> candidateModels = new ArrayList<>();
         if (properties.getModel() != null && !properties.getModel().isBlank()) {
-            candidateModels.add(properties.getModel().trim());
+            String configured = properties.getModel().trim();
+            if (!configured.startsWith("gemini-3.5")) {
+                candidateModels.add(configured);
+            }
         }
-        if (!candidateModels.contains("gemini-3.5-flash-lite")) {
-            candidateModels.add("gemini-3.5-flash-lite");
-        }
-        if (!candidateModels.contains("gemini-3.5-flash")) {
-            candidateModels.add("gemini-3.5-flash");
+        for (String fallbackModel : List.of("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash")) {
+            if (!candidateModels.contains(fallbackModel)) {
+                candidateModels.add(fallbackModel);
+            }
         }
 
         Map<String, Object> payload = buildRequestPayload(frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);

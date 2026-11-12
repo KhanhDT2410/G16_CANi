@@ -34,9 +34,12 @@ export function useEvents() {
       const raw = data && data.length > 0 ? data : (import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : []);
       const visible = raw.filter((e) => !deletedIds.includes(e.eventId) && !e.deletedAt);
       setEvents(visible);
+      return visible;
     } catch (e) {
       console.error(e);
-      setEvents(import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : []);
+      const fallback = import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : [];
+      setEvents(fallback);
+      return fallback;
     } finally {
       setLoading(false);
     }
@@ -58,8 +61,17 @@ export function useEvents() {
         const lng = parseFloat(pos.coords.longitude.toFixed(6));
         try {
           const addr = await getAddressFromCoordinates(lat, lng);
-          setNewEvent((prev) => ({ ...prev, venueAddress: addr, venueLat: lat, venueLng: lng }));
-          showToast('Đã định vị tọa độ GPS & địa chỉ thành công!', 'success');
+          setNewEvent((prev) => ({
+            ...prev,
+            venueAddress: addr || prev.venueAddress,
+            venueLat: lat,
+            venueLng: lng,
+          }));
+          if (addr) {
+            showToast('Đã xác định địa chỉ tổ chức thành công!', 'success');
+          } else {
+            showToast('Đã ghim vị trí trên bản đồ. Vui lòng nhập rõ địa chỉ số nhà, tên đường cụ thể.', 'info');
+          }
         } finally {
           setLocating(false);
         }

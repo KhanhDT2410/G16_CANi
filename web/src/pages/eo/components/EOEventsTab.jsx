@@ -157,7 +157,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>📅 Danh sách sự kiện ({nonCancelledEvents.length})</span>
+            <span>Danh sách sự kiện ({nonCancelledEvents.length})</span>
           </button>
 
           <button
@@ -177,7 +177,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>👥 Tuyển dụng nhân sự</span>
+            <span>Tuyển dụng nhân sự</span>
           </button>
 
           <button
@@ -197,7 +197,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>📲 Trạm Điểm danh & Mã QR</span>
+            <span>Trạm Điểm danh & Mã QR</span>
           </button>
 
           <button
@@ -217,7 +217,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>🗑️ Đã hủy / Đã xóa ({cancelledEventsList.length + cancelledShiftsFromActiveEvents.length})</span>
+            <span>Đã hủy / Đã xóa ({cancelledEventsList.length + cancelledShiftsFromActiveEvents.length})</span>
           </button>
         </div>
 
@@ -238,6 +238,8 @@ export default function EOEventsTab({
           onOpenAddShift={onOpenAddShift}
           onOpenInvite={onOpenInvite}
           onOpenCreateEvent={onOpenCreateEvent}
+          onOpenConfirmPublish={onOpenConfirmPublish}
+          onOpenEventDetail={onOpenEventDetail}
           onReloadEvents={onReloadEvents}
           onOpenPaymentDeclaration={onOpenPaymentDeclaration}
         />
@@ -260,7 +262,7 @@ export default function EOEventsTab({
           >
             <div>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                📲 Trạm Điểm Danh Trực Tiếp & Mã QR Động Toàn Màn Hình
+                Trạm Điểm Danh Trực Tiếp & Mã QR Động Toàn Màn Hình
               </h3>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
                 Chọn sự kiện và ca làm việc bên dưới để hiển thị Mã QR động (20s) song song với Bảng điểm danh & nghiệm thu nhân sự.
@@ -339,7 +341,7 @@ export default function EOEventsTab({
         <div className="eo-widget-card animate-fade-in-up" style={{ padding: '1.5rem' }}>
           <div style={{ marginBottom: '1.25rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#991b1b' }}>
-              🗑️ Khu Vực Lưu Trữ Sự Kiện & Ca Làm Việc Đã Hủy / Đã Xóa
+              Khu Vực Lưu Trữ Sự Kiện & Ca Làm Việc Đã Hủy / Đã Xóa
             </h3>
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: '#64748b' }}>
               Các sự kiện và ca làm việc đã hủy được tách riêng tại đây để không làm rối danh sách đang hoạt động.
@@ -378,7 +380,7 @@ export default function EOEventsTab({
                             {evt.name}
                           </div>
                           <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                            📍 {evt.venueAddress} • {evt.totalShifts || 0} ca làm việc
+                            Địa chỉ: {evt.venueAddress} • {evt.totalShifts || 0} ca làm việc
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -624,9 +626,33 @@ export default function EOEventsTab({
                         </span>
                       </td>
 
-                      {/* Cột 5: Trạng thái Badge */}
-                      <td>
-                        {formatStatusBadge(evt.status)}
+                      {/* Cột 5: Trạng thái Badge + Nút Kích Hoạt Tìm Kiếm Ngay cho Bản nháp */}
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
+                          {formatStatusBadge(evt.status)}
+                          {evt.status === 'DRAFT' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenConfirmPublish(evt);
+                              }}
+                              style={{
+                                background: '#2563eb',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '0.28rem 0.65rem',
+                                fontSize: '0.73rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Kích Hoạt Tìm Kiếm Ngay
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       {/* Cột 6: Thao tác Kebab & Xóa */}
@@ -710,7 +736,7 @@ export default function EOEventsTab({
                                   closeMenu();
                                 }}
                               >
-                                <span>Kích hoạt Matching</span>
+                                <span>Kích Hoạt Tìm Kiếm Ngay</span>
                               </button>
                             )}
 
@@ -723,24 +749,6 @@ export default function EOEventsTab({
                               }}
                             >
                               <span>Thêm ca làm</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              className="dropdown-item"
-                              onClick={() => {
-                                onOpenMap({
-                                  isOpen: true,
-                                  eventName: evt.name,
-                                  venueAddress: evt.venueAddress,
-                                  lat: evt.venueLat || 10.7328,
-                                  lng: evt.venueLng || 106.7214,
-                                  radiusKm: 15,
-                                });
-                                closeMenu();
-                              }}
-                            >
-                              <span>Xem bản đồ Radar</span>
                             </button>
 
                             <button

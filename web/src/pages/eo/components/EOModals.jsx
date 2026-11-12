@@ -22,28 +22,15 @@ export default function EOModals({
   setInviteModal,
   disputeModal,
   setDisputeModal,
-  detailEvent,
-  setDetailEvent,
-  onNavigateToRecruitment,
+  onEventCreated,
 }) {
   return (
     <>
-      <EventDetailModal
-        isOpen={Boolean(detailEvent)}
-        onClose={() => setDetailEvent(null)}
-        event={detailEvent}
-        onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
-        onOpenQr={shifts.handleOpenShiftQr}
-        onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-        onOpenAttendance={shifts.handleOpenAttendance}
-        onNavigateToRecruitment={onNavigateToRecruitment}
-        onReloadEvents={events.loadEvents}
-        onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
-      />
       <EventCreationWizardModal
         isOpen={events.showEventModal}
         onClose={() => events.setShowEventModal(false)}
         onSuccess={events.loadEvents}
+        onEventCreated={onEventCreated}
         newEvent={events.newEvent}
         setNewEvent={events.setNewEvent}
         locating={events.locating}

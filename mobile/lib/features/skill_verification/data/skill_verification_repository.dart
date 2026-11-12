@@ -53,7 +53,11 @@ class SkillVerificationRepository {
   }) async {
     try {
       final formData = FormData.fromMap({
-        'file': MultipartFile.fromBytes(fileBytes, filename: fileName),
+        'file': MultipartFile.fromBytes(
+          fileBytes,
+          filename: fileName,
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
         if (skillId != null && skillId.isNotEmpty) 'skillId': skillId,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
       });

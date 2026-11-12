@@ -179,14 +179,14 @@ const EditEventModal = ({
             </div>
           </div>
 
-          {/* ẢNH POSTER / BANNER SỰ KIỆN */}
+          {/* ẢNH POSTER / BANNER SỰ KIỆN - CHỈ TẢI ẢNH TỪ MÁY TÍNH */}
           <div className="eo-form-group">
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Ảnh Poster / Banner Sự Kiện (Tùy chọn)</span>
-              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hỗ trợ JPG, PNG (Tối đa 5MB)</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Chỉ tải ảnh từ máy tính (JPG, PNG - Tối đa 5MB)</span>
             </label>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -199,21 +199,13 @@ const EditEventModal = ({
                 disabled={uploadingImg}
                 onClick={() => fileInputRef.current?.click()}
                 className="eo-btn-secondary"
-                style={{ fontSize: '0.825rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
+                style={{ fontSize: '0.825rem', padding: '0.45rem 0.95rem', whiteSpace: 'nowrap', fontWeight: 600 }}
               >
-                <span>📁 {uploadingImg ? 'Đang tải...' : 'Tải từ máy'}</span>
+                {uploadingImg ? 'Đang tải ảnh lên...' : 'Tải ảnh từ máy tính'}
               </button>
-
-              <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>hoặc</span>
-
-              <input
-                type="url"
-                className="eo-form-input"
-                placeholder="Dán link ảnh (https://...)"
-                value={formData.imageUrl || ''}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                style={{ flex: 1 }}
-              />
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                {formData.imageUrl ? 'Đã chọn ảnh từ máy tính' : 'Chưa chọn ảnh từ máy tính'}
+              </span>
             </div>
 
             {formData.imageUrl && (
@@ -224,8 +216,8 @@ const EditEventModal = ({
                   style={{ width: '70px', height: '42px', objectFit: 'cover', borderRadius: '0.25rem' }}
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
-                <span style={{ fontSize: '0.8rem', color: '#475569', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {formData.imageUrl}
+                <span style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600, flex: 1 }}>
+                  Đã tải ảnh minh họa từ máy tính
                 </span>
                 <button
                   type="button"

@@ -1,19 +1,31 @@
 /**
  * Reverse geocoding helper using OpenStreetMap Nominatim
+ * Trả về địa chỉ cụ thể (Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố) - KHÔNG trả về chuỗi tọa độ GPS.
  */
 export async function getAddressFromCoordinates(lat, lng) {
+  // Kiểm tra nhanh nếu trùng khớp với các địa điểm sự kiện phổ biến
+  const matchedPopular = POPULAR_VENUES.find(
+    (v) => Math.abs(v.lat - lat) < 0.002 && Math.abs(v.lng - lng) < 0.002
+  );
+  if (matchedPopular) {
+    return `${matchedPopular.name}, ${matchedPopular.displayName}`;
+  }
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
       { headers: { 'Accept-Language': 'vi' }, signal: controller.signal }
     );
     clearTimeout(timeoutId);
     const data = await res.json();
-    return data.display_name || `Vị trí GPS (${lat}, ${lng})`;
+    if (data && data.display_name) {
+      return data.display_name;
+    }
+    return '';
   } catch {
-    return `Tọa độ GPS (${lat}, ${lng})`;
+    return '';
   }
 }
 

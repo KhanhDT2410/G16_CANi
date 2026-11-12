@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,6 +11,7 @@ import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/rate_eo_dialog.dart';
 import 'attendance_qr_scanner_screen.dart';
+import '../../ekyc/screens/card_scanner_screen.dart';
 import '../../../core/constants/api_constants.dart';
 
 class ShiftDetailExecutionScreen extends ConsumerStatefulWidget {
@@ -250,21 +252,66 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     }
   }
 
+  Future<({Uint8List? bytes, String? fileName, String? filePath})?> _chooseOrCaptureImage() async {
+    final source = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFF0066FF)),
+                title: const Text('Chụp ảnh trực tiếp bằng Camera', style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.of(ctx).pop('camera'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF0066FF)),
+                title: const Text('Chọn ảnh từ Thư viện thiết bị', style: TextStyle(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.of(ctx).pop('gallery'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null || !mounted) return null;
+
+    if (source == 'camera') {
+      final scanResult = await Navigator.of(context).push<CardScanResult>(
+        MaterialPageRoute(
+          builder: (_) => const CardScannerScreen(scanType: ScanType.cccdFront),
+        ),
+      );
+      if (scanResult == null) return null;
+      return (bytes: scanResult.bytes, fileName: scanResult.fileName, filePath: null);
+    } else {
+      final files = await FilePicker.pickFiles(type: FileType.image);
+      if (files.isNotEmpty && files.first.path != null) {
+        return (bytes: null, fileName: files.first.name, filePath: files.first.path!);
+      }
+      return null;
+    }
+  }
+
   Future<void> _captureEvidenceForTask(int index) async {
     final item = _checklistItems[index];
     try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.image,
-      );
+      final picked = await _chooseOrCaptureImage();
 
-      if (files.isNotEmpty && files.first.path != null) {
-        final filePath = files.first.path!;
+      if (picked != null && (picked.filePath != null || picked.bytes != null)) {
         setState(() => _uploadingTaskIndex = index);
 
         // Upload ảnh lên backend
-        final uploadedUrl = await ref
-            .read(proposalRepositoryProvider)
-            .uploadProofImage(filePath);
+        final repo = ref.read(proposalRepositoryProvider);
+        final uploadedUrl = picked.bytes != null
+            ? await repo.uploadProofBytes(picked.bytes!, picked.fileName ?? 'task_proof.jpg')
+            : await repo.uploadProofImage(picked.filePath!);
 
         if (!mounted) return;
 
@@ -507,21 +554,21 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
   Future<void> _pickProofImage() async {
     try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.image,
-      );
+      final picked = await _chooseOrCaptureImage();
 
-      if (files.isNotEmpty && files.first.path != null) {
-        final file = File(files.first.path!);
-        setState(() {
-          _proofImageFile = file;
-        });
+      if (picked != null && (picked.filePath != null || picked.bytes != null)) {
+        if (picked.filePath != null) {
+          setState(() {
+            _proofImageFile = File(picked.filePath!);
+          });
+        }
 
         // Tự động upload ảnh lên máy chủ
         setState(() => _isUploadingProof = true);
-        final url = await ref
-            .read(proposalRepositoryProvider)
-            .uploadProofImage(file.path);
+        final repo = ref.read(proposalRepositoryProvider);
+        final url = picked.bytes != null
+            ? await repo.uploadProofBytes(picked.bytes!, picked.fileName ?? 'proof.jpg')
+            : await repo.uploadProofImage(picked.filePath!);
         if (mounted) {
           setState(() {
             _uploadedProofUrl = url;
@@ -1400,7 +1447,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                         fit: BoxFit.cover,
                                       )
                                     : Image.network(
-                                        _uploadedProofUrl!,
+                                        _resolveImageUrl(_uploadedProofUrl!),
                                         height: 170,
                                         width: double.infinity,
                                         fit: BoxFit.cover,

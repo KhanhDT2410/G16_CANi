@@ -14,12 +14,13 @@ export default function EORecruitmentTab({
   onOpenAddShift,
   onOpenInvite,
   onOpenCreateEvent,
+  onOpenConfirmPublish,
+  onOpenEventDetail,
   onReloadEvents,
   onOpenPaymentDeclaration,
 }) {
   const [selectedEventFilter, setSelectedEventFilter] = useState('ALL');
   const [roleFilter, setRoleFilter] = useState('ALL');
-  const [dispatchingShiftId, setDispatchingShiftId] = useState(null);
   const [emergencyModal, setEmergencyModal] = useState({ isOpen: false, shift: null });
   const [activeEmergencies, setActiveEmergencies] = useState({});
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
@@ -451,50 +452,68 @@ export default function EORecruitmentTab({
                     </div>
                   </div>
 
-                  {/* Các thao tác tuyển dụng & vận hành ca */}
+                  {/* Các thao tác tuyển dụng & vận hành ca (Đã bỏ nút Radar AI theo yêu cầu, thêm Kích Hoạt Tìm Kiếm Ngay cho Bản nháp) */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {!isFull && (
-                      <>
-                        {canTriggerEmergency && (
-                          <button
-                            type="button"
-                            style={{
-                              background: '#dc2626',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: 6,
-                              padding: '0.45rem 0.85rem',
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                            onClick={() => setEmergencyModal({ isOpen: true, shift })}
-                            title="Ca sắp diễn ra mà chưa đủ người! Kích hoạt Emergency Broadcast Pool diện rộng."
-                          >
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffffff', display: 'inline-block' }} />
-                            Cứu Trợ Khẩn Cấp
-                          </button>
-                        )}
+                    {!isFull && canTriggerEmergency && (
+                      <button
+                        type="button"
+                        style={{
+                          background: '#dc2626',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '0.45rem 0.85rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                        onClick={() => setEmergencyModal({ isOpen: true, shift })}
+                        title="Ca sắp diễn ra mà chưa đủ người! Kích hoạt Emergency Broadcast Pool diện rộng."
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffffff', display: 'inline-block' }} />
+                        Cứu Trợ Khẩn Cấp
+                      </button>
+                    )}
 
-                        <button
-                          type="button"
-                          disabled={dispatchingShiftId === shift.shiftId}
-                          className="eo-btn-primary"
-                          style={{
-                            fontSize: '0.8rem',
-                            padding: '0.45rem 0.85rem',
-                            backgroundColor: '#2563eb',
-                          }}
-                          onClick={() => handleTriggerDispatch(shift)}
-                          title="Quét lại mạng lưới Worker trong bán kính 15km"
-                        >
-                          {dispatchingShiftId === shift.shiftId ? 'Đang Quét Radar...' : 'Kích Hoạt Radar AI'}
-                        </button>
-                      </>
+                    {isDraftShift && (
+                      <button
+                        type="button"
+                        className="eo-btn-primary"
+                        style={{
+                          fontSize: '0.8rem',
+                          padding: '0.45rem 0.85rem',
+                          backgroundColor: '#2563eb',
+                        }}
+                        onClick={() => {
+                          const parentEvt = events.find((e) => e.eventId === shift.eventId);
+                          if (parentEvt && onOpenConfirmPublish) {
+                            onOpenConfirmPublish(parentEvt);
+                          }
+                        }}
+                      >
+                        Kích Hoạt Tìm Kiếm Ngay
+                      </button>
+                    )}
+
+                    {onOpenEventDetail && (
+                      <button
+                        type="button"
+                        className="eo-btn-secondary"
+                        style={{
+                          fontSize: '0.8rem',
+                          padding: '0.45rem 0.85rem',
+                        }}
+                        onClick={() => {
+                          const parentEvt = events.find((e) => e.eventId === shift.eventId);
+                          if (parentEvt) onOpenEventDetail(parentEvt);
+                        }}
+                      >
+                        Chi Tiết Sự Kiện
+                      </button>
                     )}
 
                     <button
@@ -532,7 +551,7 @@ export default function EORecruitmentTab({
                       }
                       title="Trượt mở bảng Điểm Danh Trực Tiếp & Mã QR Động bên dưới"
                     >
-                      {isWorkspaceOpen ? '▾ Đóng Điểm Danh & QR' : '▸ Điểm Danh & Mã QR'}
+                      {isWorkspaceOpen ? 'Đóng Điểm Danh & QR' : 'Điểm Danh & Mã QR'}
                     </button>
                   </div>
                 </div>
@@ -565,7 +584,7 @@ export default function EORecruitmentTab({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#991b1b' }}>
-              🗑️ Các ca làm việc đã hủy / đã xóa được tách riêng ({cancelledShifts.length} ca)
+              Các ca làm việc đã hủy / đã xóa được tách riêng ({cancelledShifts.length} ca)
             </span>
             <button
               type="button"

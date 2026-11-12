@@ -41,6 +41,9 @@ public class EventOrganizerEkycService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cani.repository.WorkerEkycVerificationRepository workerEkycVerificationRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.WorkerRepository workerRepository;
+
     @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
     private boolean ekycStrict;
 
@@ -54,6 +57,17 @@ public class EventOrganizerEkycService {
             MultipartFile backFile,
             MultipartFile selfieFile,
             MultipartFile businessLicenseFile) {
+        return submitEkyc(userId, frontFile, backFile, selfieFile, businessLicenseFile, null);
+    }
+
+    @Transactional
+    public EoEkycVerificationResultDto submitEkyc(
+            UUID userId,
+            MultipartFile frontFile,
+            MultipartFile backFile,
+            MultipartFile selfieFile,
+            MultipartFile businessLicenseFile,
+            String confirmedCccd) {
 
         EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
                 .orElseGet(() -> {
@@ -80,8 +94,10 @@ public class EventOrganizerEkycService {
                     backBytes, backFile.getContentType(),
                     selfieBytes, selfieFile.getContentType());
 
-            // Đồng bộ thông tin nếu chạy ở chế độ Mock thuần (Unit Test / Offline)
-            if ("MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())) {
+            // Đồng bộ thông tin nếu chạy ở chế độ Mock thuần hoặc Fallback về Mock
+            boolean isMockResult = "MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())
+                    || (result.getRawAnalysis() != null && Boolean.TRUE.equals(result.getRawAnalysis().get("mock")));
+            if (isMockResult) {
                 if (eo.getUser() != null && eo.getUser().getFullName() != null && !eo.getUser().getFullName().isBlank()) {
                     result.setFullName(eo.getUser().getFullName().toUpperCase());
                 }
@@ -101,8 +117,17 @@ public class EventOrganizerEkycService {
                 }
             }
 
-            // 2. Băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
-            String rawIdNumber = result.getIdNumber();
+            if (confirmedCccd != null && !confirmedCccd.isBlank()) {
+                result.setIdNumber(confirmedCccd.replaceAll("\\D", ""));
+            }
+
+            // 2. Chuẩn hóa, băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
+            String rawIdNumber = result.getIdNumber() != null
+                    ? result.getIdNumber().replaceAll("\\D", "")
+                    : null;
+            if (rawIdNumber != null && !rawIdNumber.isBlank()) {
+                result.setIdNumber(rawIdNumber);
+            }
             String idHash = hashCccd(rawIdNumber);
             String maskedNumber = maskCccd(rawIdNumber);
 
@@ -123,6 +148,15 @@ public class EventOrganizerEkycService {
                             .existsByCccdNumberHashAndStatusInAndWorker_User_UserIdNot(
                                     idHash, List.of("APPROVED", "PENDING_REVIEW"), userId);
                 }
+            }
+            if (!isDuplicateCccd && workerRepository != null && rawIdNumber != null && rawIdNumber.length() >= 9) {
+                Set<String> candidateCccds = new HashSet<>();
+                candidateCccds.add(rawIdNumber);
+                if (maskedNumber != null) candidateCccds.add(maskedNumber);
+                if (rawIdNumber.length() >= 9) {
+                    candidateCccds.add(rawIdNumber.substring(0, 6) + "******" + rawIdNumber.substring(rawIdNumber.length() - 3));
+                }
+                isDuplicateCccd = workerRepository.existsByCccdNumberIn(candidateCccds);
             }
 
             if (isDuplicateCccd) {
@@ -197,7 +231,7 @@ public class EventOrganizerEkycService {
                         && (eo.getAddress() == null || eo.getAddress().isBlank())) {
                     eo.setAddress(result.getResidenceAddress().trim());
                 }
-                if (!"MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())
+                if (!isMockResult
                         && result.getFullName() != null && !result.getFullName().isBlank()
                         && eo.getUser() != null) {
                     eo.getUser().setFullName(result.getFullName().trim());
@@ -362,10 +396,16 @@ public class EventOrganizerEkycService {
         EventOrganizer eo = record.getEventOrganizer();
 
         if ("APPROVED".equals(decision)) {
-            if (record.getCccdNumberHash() != null && eo != null && eo.getEoId() != null
-                    && eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
-                            record.getCccdNumberHash(), List.of("APPROVED"), eo.getEoId())) {
-                throw new BadRequestException("Số CCCD này đã được phê duyệt cho một tài khoản Nhà tổ chức khác trong hệ thống!");
+            if (record.getCccdNumberHash() != null && eo != null && eo.getEoId() != null) {
+                boolean isDup = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
+                        record.getCccdNumberHash(), List.of("APPROVED"), eo.getEoId());
+                if (!isDup && workerEkycVerificationRepository != null && eo.getUser() != null) {
+                    isDup = workerEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_User_UserIdNot(
+                            record.getCccdNumberHash(), List.of("APPROVED"), eo.getUser().getUserId());
+                }
+                if (isDup) {
+                    throw new BadRequestException("Số CCCD này đã được phê duyệt cho một tài khoản khác trong hệ thống! Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
+                }
             }
             record.setStatus("APPROVED");
             record.setRoutingDecision("MANUAL_APPROVED");
@@ -425,19 +465,24 @@ public class EventOrganizerEkycService {
             throw new BadRequestException(fieldName + " không được để trống");
         }
         String contentType = file.getContentType();
-        if (contentType == null || (!contentType.equals("image/jpeg") && !contentType.equals("image/png") && !contentType.equals("image/webp"))) {
+        String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+        boolean validMime = contentType != null && contentType.startsWith("image/");
+        boolean validExt = fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png") || fileName.endsWith(".webp") || fileName.endsWith(".heic");
+        if (!validMime && !validExt) {
             throw new BadRequestException(fieldName + " phải là định dạng ảnh hợp lệ (JPEG, PNG, WEBP)");
         }
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new BadRequestException(fieldName + " vượt quá dung lượng tối đa 5MB");
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new BadRequestException(fieldName + " vượt quá dung lượng tối đa 10MB");
         }
     }
 
     private String hashCccd(String idNumber) {
         if (idNumber == null || idNumber.isBlank()) return null;
+        String clean = idNumber.replaceAll("\\D", "");
+        if (clean.isBlank()) clean = idNumber.trim();
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedhash = digest.digest(idNumber.trim().getBytes(StandardCharsets.UTF_8));
+            byte[] encodedhash = digest.digest(clean.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             for (byte b : encodedhash) {
                 String hex = Integer.toHexString(0xff & b);
@@ -451,8 +496,9 @@ public class EventOrganizerEkycService {
     }
 
     private String maskCccd(String idNumber) {
-        if (idNumber == null || idNumber.length() < 6) return idNumber;
-        int len = idNumber.length();
-        return idNumber.substring(0, 3) + "******" + idNumber.substring(len - 3);
+        if (idNumber == null) return null;
+        String clean = idNumber.replaceAll("\\D", "");
+        if (clean.length() < 6) return idNumber.trim();
+        return clean.substring(0, 6) + "******" + (clean.length() > 9 ? clean.substring(clean.length() - 3) : "");
     }
 }

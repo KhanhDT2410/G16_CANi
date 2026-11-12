@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
+import { showToast } from '../../../components/common/Toast';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import './EventDetailModal.css';
 
@@ -7,13 +8,18 @@ export default function EventDetailModal({
   isOpen,
   onClose,
   event,
+  asPage = false,
   onOpenAddShift,
   onOpenInvite,
+  onOpenConfirmPublish,
+  onOpenEditEvent,
+  onEditShift,
+  onCancelShift,
   onNavigateToRecruitment,
   onReloadEvents,
   onOpenPaymentDeclaration,
 }) {
-  const [activeTab, setActiveTab] = useState('SHIFTS'); // 'SHIFTS' | 'WORKERS'
+  const [activeTab, setActiveTab] = useState('SHIFTS'); // 'SHIFTS' | 'WORKERS' | 'QR_ATTENDANCE'
   const [eventWorkers, setEventWorkers] = useState([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [searchWorker, setSearchWorker] = useState('');
@@ -22,6 +28,14 @@ export default function EventDetailModal({
 
   useEffect(() => {
     if (isOpen && event?.eventId) {
+      const validShifts = (event.shifts || []).filter((s) => s.status !== 'CANCELLED');
+      if (validShifts.length > 0) {
+        setActiveWorkspaceShiftId((prev) =>
+          validShifts.some((s) => s.shiftId === prev) ? prev : validShifts[0].shiftId
+        );
+      } else {
+        setActiveWorkspaceShiftId(null);
+      }
       setLoadingWorkers(true);
       eoService.getEventWorkers(event.eventId)
         .then((data) => {
@@ -33,7 +47,7 @@ export default function EventDetailModal({
         })
         .finally(() => setLoadingWorkers(false));
     }
-  }, [isOpen, event?.eventId]);
+  }, [isOpen, event?.eventId, event?.shifts]);
 
   if (!isOpen || !event) return null;
 
@@ -121,9 +135,123 @@ export default function EventDetailModal({
     );
   });
 
-  return (
-    <div className="event-detail-modal-overlay" onClick={onClose}>
-      <div className="event-detail-modal-box" onClick={(e) => e.stopPropagation()}>
+  const selectedQrShift = shifts.find((s) => s.shiftId === activeWorkspaceShiftId) || shifts[0] || null;
+
+  const contentBox = (
+    <div
+      className={asPage ? 'eo-widget-card animate-fade-in-up' : 'event-detail-modal-box'}
+      style={
+        asPage
+          ? {
+              width: '100%',
+              maxWidth: '100%',
+              padding: 0,
+              overflow: 'hidden',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+            }
+          : undefined
+      }
+      onClick={(e) => e.stopPropagation()}
+    >
+      {asPage && (
+        <div
+          style={{
+            padding: '0.85rem 1.5rem',
+            backgroundColor: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '8px',
+              padding: '0.45rem 0.95rem',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            &larr; Quay lại danh sách sự kiện
+          </button>
+
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {event.status === 'DRAFT' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    showToast('Đã lưu sự kiện ở trạng thái Bản nháp!', 'success');
+                    onReloadEvents?.();
+                  }}
+                  style={{
+                    background: '#ffffff',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    padding: '0.45rem 0.95rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Lưu Bản Nháp
+                </button>
+                {onOpenConfirmPublish && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenConfirmPublish(event)}
+                    style={{
+                      background: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.45rem 1rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Kích Hoạt Tìm Kiếm Ngay
+                  </button>
+                )}
+              </>
+            )}
+            {onOpenEditEvent && (
+              <button
+                type="button"
+                onClick={() => onOpenEditEvent(event)}
+                style={{
+                  background: '#ffffff',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.9rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Chỉnh sửa sự kiện
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
         {/* Header */}
         <div className="event-detail-modal-header">
           <div className="event-detail-header-left">
@@ -160,9 +288,11 @@ export default function EventDetailModal({
               </p>
             </div>
           </div>
-          <button type="button" className="event-detail-close-btn" onClick={onClose}>
-            &times;
-          </button>
+          {!asPage && (
+            <button type="button" className="event-detail-close-btn" onClick={onClose}>
+              &times;
+            </button>
+          )}
         </div>
 
         {/* Body */}
@@ -181,13 +311,9 @@ export default function EventDetailModal({
             </div>
 
             <div className="info-item">
-              <span className="info-label">Địa điểm tổ chức</span>
+              <span className="info-label">Địa chỉ tổ chức cụ thể</span>
               <span className="info-value" title={event.venueAddress}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                  <circle cx="12" cy="10" r="3"></circle>
-                </svg>
-                {event.venueAddress || 'Chưa cập nhật địa điểm'}
+                {event.venueAddress || 'Chưa cập nhật địa chỉ cụ thể'}
               </span>
             </div>
 
@@ -195,7 +321,7 @@ export default function EventDetailModal({
               <span className="info-label">Chế độ tuyển dụng</span>
               <span className="info-value">
                 <span className="mode-badge-pill">
-                  {event.mode === 'INVITE' ? 'Mời trực tiếp (Link / QR)' : 'Matching Radar AI (15km)'}
+                  {event.mode === 'INVITE' || event.mode === 'INVITE_ONLY' ? 'Mời trực tiếp (Link / QR)' : 'Điều phối tự động (Matching)'}
                 </span>
               </span>
             </div>
@@ -234,25 +360,25 @@ export default function EventDetailModal({
             </div>
           </div>
 
-          {/* Tab Switcher: Ca làm việc vs Danh sách nhân sự */}
+          {/* Tab Switcher: Ca làm việc + Mã QR & Điểm danh vs Danh sách nhân sự */}
           <div className="event-detail-tabs-header">
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'SHIFTS' ? 'active' : ''}`}
               onClick={() => setActiveTab('SHIFTS')}
             >
-              📋 Chi Tiết Ca Làm Việc ({shifts.length})
+              Chi Tiết Ca Làm Việc & Điểm Danh QR ({shifts.length})
             </button>
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'WORKERS' ? 'active' : ''}`}
               onClick={() => setActiveTab('WORKERS')}
             >
-              👥 Danh Sách Nhân Sự Sự Kiện ({eventWorkers.length || totalConfirmed})
+              Danh Sách Nhân Sự Sự Kiện ({eventWorkers.length || totalConfirmed})
             </button>
           </div>
 
-          {/* TAB 1: DANH SÁCH CA LÀM VIỆC */}
+          {/* TAB 1: DANH SÁCH CA LÀM VIỆC + TRẠM MÃ QR & ĐIỂM DANH CHUNG 1 TRANG */}
           {activeTab === 'SHIFTS' && (
             <div className="event-detail-shifts-section">
               <div className="shifts-section-header">
@@ -263,7 +389,7 @@ export default function EventDetailModal({
                   type="button"
                   className="btn-add-shift-pill"
                   onClick={() => {
-                    onClose();
+                    if (!asPage) onClose();
                     onOpenAddShift(event.eventId);
                   }}
                 >
@@ -278,7 +404,7 @@ export default function EventDetailModal({
                     type="button"
                     className="btn-add-shift-primary"
                     onClick={() => {
-                      onClose();
+                      if (!asPage) onClose();
                       onOpenAddShift(event.eventId);
                     }}
                   >
@@ -291,11 +417,16 @@ export default function EventDetailModal({
                     const shiftConfirmed = shift.confirmedWorkers || 0;
                     const shiftRequired = shift.requiredWorkers || 1;
                     const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
-                    const isWorkspaceOpen = activeWorkspaceShiftId === shift.shiftId;
+                    const isWorkspaceOpen = selectedQrShift?.shiftId === shift.shiftId;
 
                     return (
                       <div key={shift.shiftId || sIdx} style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div className="detail-shift-card">
+                        <div
+                          className="detail-shift-card"
+                          style={{
+                            border: isWorkspaceOpen ? '2px solid #0d9488' : undefined,
+                          }}
+                        >
                           <div className="shift-card-header">
                             <div className="shift-card-title-group">
                               {shift.imageUrl && (
@@ -346,50 +477,106 @@ export default function EventDetailModal({
                                 type="button"
                                 className="btn-shift-action purple"
                                 onClick={() => {
-                                  onClose();
+                                  if (!asPage) onClose();
                                   onOpenInvite(shift, event);
                                 }}
                                 title="Lấy link & mã mời trực tiếp cho nhân sự"
                               >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                                </svg>
                                 Mã Mời Nhân Sự
                               </button>
+
+                              {onEditShift && (
+                                <button
+                                  type="button"
+                                  className="btn-shift-action"
+                                  style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' }}
+                                  onClick={() => onEditShift(shift)}
+                                >
+                                  Sửa Ca
+                                </button>
+                              )}
+
+                              {onCancelShift && shift.status !== 'CANCELLED' && (
+                                <button
+                                  type="button"
+                                  className="btn-shift-action"
+                                  style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}
+                                  onClick={() => onCancelShift(shift)}
+                                >
+                                  Hủy Ca
+                                </button>
+                              )}
 
                               <button
                                 type="button"
                                 className="btn-shift-action emerald"
-                                onClick={() =>
-                                  setActiveWorkspaceShiftId((prev) => (prev === shift.shiftId ? null : shift.shiftId))
-                                }
-                                title="Trượt mở bảng Điểm Danh Trực Tiếp & Mã QR Động bên dưới"
+                                onClick={() => setActiveWorkspaceShiftId(shift.shiftId)}
+                                title="Xem Mã QR Động & Điểm Danh Trực Tiếp của ca này ngay bên dưới"
                               >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <rect x="3" y="3" width="7" height="7"></rect>
-                                  <rect x="14" y="3" width="7" height="7"></rect>
-                                  <rect x="14" y="14" width="7" height="7"></rect>
-                                  <rect x="3" y="14" width="7" height="7"></rect>
-                                </svg>
-                                {isWorkspaceOpen ? '▾ Đóng Điểm Danh & QR' : '▸ Điểm Danh & Mã QR'}
+                                {isWorkspaceOpen ? 'Đang mở Mã QR & Điểm danh bên dưới' : 'Chọn xem Mã QR & Điểm danh'}
                               </button>
                             </div>
                           </div>
                         </div>
-
-                        {isWorkspaceOpen && (
-                          <ShiftQrAndAttendancePanel
-                            shift={shift}
-                            event={event}
-                            onClose={() => setActiveWorkspaceShiftId(null)}
-                            onReloadEvents={onReloadEvents}
-                            onOpenPaymentDeclaration={onOpenPaymentDeclaration}
-                          />
-                        )}
                       </div>
                     );
                   })}
+
+                  {/* TRẠM MÃ QR ĐỘNG & BẢNG ĐIỂM DANH TRỰC TIẾP ĐẶT CHUNG TRÊN CÙNG 1 TRANG CHI TIẾT SỰ KIỆN */}
+                  {selectedQrShift && (
+                    <div
+                      style={{
+                        marginTop: '1.25rem',
+                        paddingTop: '1.25rem',
+                        borderTop: '2px solid #e2e8f0',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem',
+                          marginBottom: '0.75rem',
+                        }}
+                      >
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                            Trạm Mã QR Điểm Danh & Bảng Điểm Danh Trực Tiếp (Chung 1 Trang)
+                          </h4>
+                          <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                            Mã QR động xoay vòng 20s và danh sách điểm danh nhân sự hiển thị trực tiếp ngay trên trang chi tiết sự kiện.
+                          </p>
+                        </div>
+                        {shifts.length > 1 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Đang hiển thị ca:</span>
+                            <select
+                              className="eo-form-input"
+                              style={{ width: 'auto', minWidth: '220px', padding: '0.4rem 0.75rem', fontSize: '0.85rem', fontWeight: 700 }}
+                              value={selectedQrShift.shiftId}
+                              onChange={(e) => setActiveWorkspaceShiftId(e.target.value)}
+                            >
+                              {shifts.map((s) => (
+                                <option key={s.shiftId} value={s.shiftId}>
+                                  {s.jobType} ({formatTime(s.startTime, '08:00')} - {formatTime(s.endTime, '12:00')})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
+                      <ShiftQrAndAttendancePanel
+                        shift={selectedQrShift}
+                        event={event}
+                        onSelectShift={(nextShift) => setActiveWorkspaceShiftId(nextShift.shiftId)}
+                        onReloadEvents={onReloadEvents}
+                        onOpenPaymentDeclaration={onOpenPaymentDeclaration}
+                      />
+                    </div>
+                  )}
 
                   {/* Khu vực tách riêng các ca đã hủy / đã xóa */}
                   {cancelledShifts.length > 0 && (
@@ -505,19 +692,19 @@ export default function EventDetailModal({
                             <div className="worker-name-row">
                               <span className="worker-name-text">{w.workerName}</span>
                               <span className="worker-age-badge">
-                                🎂 {w.workerAge ? `${w.workerAge} tuổi` : '22 tuổi'} {w.workerDob ? `(${w.workerDob})` : ''}
+                                {w.workerAge ? `${w.workerAge} tuổi` : '22 tuổi'} {w.workerDob ? `(${w.workerDob})` : ''}
                               </span>
                               <span className={`worker-reliability-pill ${isReliableHigh ? 'high' : ''}`}>
-                                ⭐ {w.workerReliabilityScore || 100}/100 Uy tín
+                                {w.workerReliabilityScore || 100}/100 Uy tín
                               </span>
                               <span style={{ fontSize: '0.8rem', color: '#eab308', fontWeight: 700 }}>
-                                {w.workerRatingAvg ? `${w.workerRatingAvg} ★` : '5.0 ★'}
+                                {w.workerRatingAvg ? `${w.workerRatingAvg}` : '5.0'}
                               </span>
                             </div>
 
                             <div className="worker-sub-row">
                               <span className="worker-job-tag">Ca: {w.jobType || w.shiftName || 'Nhân sự ca'}</span>
-                              <span>📞 SĐT: <strong>{w.workerPhone || '09xx xxx xxx'}</strong></span>
+                              <span>SĐT: <strong>{w.workerPhone || '09xx xxx xxx'}</strong></span>
                               {w.agreedWage && (
                                 <span>Thù lao: <strong>{Number(w.agreedWage).toLocaleString()} đ</strong></span>
                               )}
@@ -596,10 +783,19 @@ export default function EventDetailModal({
             </button>
           )}
           <button type="button" className="btn-footer-primary" onClick={onClose}>
-            Đóng
+            {asPage ? 'Quay lại danh sách sự kiện' : 'Đóng'}
           </button>
         </div>
-      </div>
+    </div>
+  );
+
+  if (asPage) {
+    return contentBox;
+  }
+
+  return (
+    <div className="event-detail-modal-overlay" onClick={onClose}>
+      {contentBox}
     </div>
   );
 }

@@ -77,7 +77,14 @@ public class WorkerEkycService {
                     if (user.getRole() != null && user.getRole() != UserRole.WORKER && user.getRole() != UserRole.ADMIN) {
                         throw new BadRequestException("Tài khoản không phải là Worker");
                     }
-                    return workerRepository.save(Worker.builder().user(user).isOnline(false).build());
+                    String defaultName = (user.getFullName() != null && !user.getFullName().isBlank())
+                            ? user.getFullName().trim()
+                            : "Worker";
+                    return workerRepository.save(Worker.builder()
+                            .user(user)
+                            .fullName(defaultName)
+                            .isOnline(false)
+                            .build());
                 });
 
         validateFile(frontFile, "Ảnh mặt trước CCCD");
@@ -95,8 +102,10 @@ public class WorkerEkycService {
                     backBytes, backFile.getContentType(),
                     selfieBytes, selfieFile.getContentType());
 
-            // Đồng bộ tên worker nếu là chế độ Mock để phản ánh đúng người dùng đăng nhập
-            if ("MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())) {
+            // Đồng bộ tên worker nếu là chế độ Mock hoặc Fallback về Mock để phản ánh đúng người dùng đăng nhập
+            boolean isMockResult = "MOCK_EKYC".equalsIgnoreCase(ekycProvider.getProviderName())
+                    || (ekycResult.getRawAnalysis() != null && Boolean.TRUE.equals(ekycResult.getRawAnalysis().get("mock")));
+            if (isMockResult) {
                 if (worker.getFullName() != null && !worker.getFullName().isBlank()) {
                     ekycResult.setFullName(worker.getFullName().toUpperCase());
                 }
@@ -144,29 +153,40 @@ public class WorkerEkycService {
                 ekycResult.setExpiryDate(confirmedExpiryDate.trim());
             }
 
-            // 2. Băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
-            String rawIdNumber = ekycResult.getIdNumber();
+            // 2. Chuẩn hóa, băm bảo mật và che số CCCD (Nghị định 13/2023/NĐ-CP)
+            String rawIdNumber = ekycResult.getIdNumber() != null
+                    ? ekycResult.getIdNumber().replaceAll("\\D", "")
+                    : null;
+            if (rawIdNumber != null && !rawIdNumber.isBlank()) {
+                ekycResult.setIdNumber(rawIdNumber);
+            }
             String idHash = hashCccd(rawIdNumber);
             String maskedNumber = maskCccd(rawIdNumber);
 
             // 3. Kiểm tra chống gian lận dùng trùng CCCD cho nhiều tài khoản (trừ khi là chính worker này nộp lại)
             boolean isDuplicateWorkerCccd = false;
             if (idHash != null) {
-                isDuplicateWorkerCccd = ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(
-                        idHash, "APPROVED", worker.getWorkerId());
-                if (!isDuplicateWorkerCccd) {
-                    isDuplicateWorkerCccd = ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(
-                            idHash, List.of("APPROVED", "PENDING_REVIEW"), worker.getWorkerId());
-                }
+                isDuplicateWorkerCccd = ekycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(
+                        idHash, List.of("APPROVED", "PENDING_REVIEW"), worker.getWorkerId());
                 if (!isDuplicateWorkerCccd && eoEkycVerificationRepository != null && userId != null) {
                     isDuplicateWorkerCccd = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_User_UserIdNot(
                             idHash, List.of("APPROVED", "PENDING_REVIEW"), userId);
                 }
             }
+            if (!isDuplicateWorkerCccd && rawIdNumber != null && rawIdNumber.length() >= 9) {
+                Set<String> candidateCccds = new HashSet<>();
+                candidateCccds.add(rawIdNumber);
+                if (maskedNumber != null) candidateCccds.add(maskedNumber);
+                if (rawIdNumber.length() >= 6) {
+                    candidateCccds.add(rawIdNumber.substring(0, 3) + "******" + rawIdNumber.substring(rawIdNumber.length() - 3));
+                }
+                isDuplicateWorkerCccd = workerRepository.existsByCccdNumberInAndWorkerIdNot(candidateCccds, worker.getWorkerId());
+            }
 
             if (isDuplicateWorkerCccd) {
                 ekycResult.setRoutingDecision("REJECTED");
-                ekycResult.setRoutingReason("Số Căn cước công dân này đã được liên kết với một tài khoản Worker khác trong hệ thống.");
+                ekycResult.setRoutingReason("Số Căn cước công dân (" + (maskedNumber != null ? maskedNumber : "này")
+                        + ") đã được sử dụng để xác thực cho một tài khoản khác trong hệ thống. Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
             }
 
             Map<String, Object> fraudFlags = new HashMap<>();
@@ -217,13 +237,13 @@ public class WorkerEkycService {
 
             verification = ekycVerificationRepository.save(verification);
 
-            // 5. Đồng bộ trạng thái vào bảng Worker
+            // 5. Đồng bộ trạng thái vào bảng Worker (Không hạ cấp nếu tài khoản đã APPROVED trước đó)
             if ("APPROVED".equals(status)) {
                 worker.setKycStatus(KycStatus.APPROVED);
                 worker.setCccdNumber(maskedNumber);
-            } else if ("PENDING_REVIEW".equals(status)) {
+            } else if ("PENDING_REVIEW".equals(status) && worker.getKycStatus() != KycStatus.APPROVED) {
                 worker.setKycStatus(KycStatus.PENDING);
-            } else {
+            } else if (worker.getKycStatus() != KycStatus.APPROVED) {
                 worker.setKycStatus(KycStatus.REJECTED);
             }
             workerRepository.save(worker);
@@ -259,9 +279,22 @@ public class WorkerEkycService {
         WorkerEkycVerification verification = ekycVerificationRepository.findById(verificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ eKYC: " + verificationId));
 
-        String decision = dto.getDecision().toUpperCase();
+        String decision = dto.getDecision().toUpperCase().trim();
         if (!"APPROVED".equals(decision) && !"REJECTED".equals(decision)) {
             throw new BadRequestException("Quyết định duyệt chỉ chấp nhận APPROVED hoặc REJECTED");
+        }
+
+        Worker worker = verification.getWorker();
+        if ("APPROVED".equals(decision) && verification.getCccdNumberHash() != null && worker != null) {
+            boolean isDup = ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(
+                    verification.getCccdNumberHash(), "APPROVED", worker.getWorkerId());
+            if (!isDup && eoEkycVerificationRepository != null && worker.getUser() != null) {
+                isDup = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_User_UserIdNot(
+                        verification.getCccdNumberHash(), List.of("APPROVED"), worker.getUser().getUserId());
+            }
+            if (isDup) {
+                throw new BadRequestException("Số CCCD này đã được phê duyệt cho một tài khoản khác trong hệ thống! Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
+            }
         }
 
         verification.setStatus(decision);
@@ -270,14 +303,15 @@ public class WorkerEkycService {
         verification = ekycVerificationRepository.save(verification);
 
         // Cập nhật trạng thái Worker
-        Worker worker = verification.getWorker();
-        if ("APPROVED".equals(decision)) {
-            worker.setKycStatus(KycStatus.APPROVED);
-            worker.setCccdNumber(verification.getCccdNumberMasked());
-        } else {
-            worker.setKycStatus(KycStatus.REJECTED);
+        if (worker != null) {
+            if ("APPROVED".equals(decision)) {
+                worker.setKycStatus(KycStatus.APPROVED);
+                worker.setCccdNumber(verification.getCccdNumberMasked());
+            } else if (worker.getKycStatus() != KycStatus.APPROVED) {
+                worker.setKycStatus(KycStatus.REJECTED);
+            }
+            workerRepository.save(worker);
         }
-        workerRepository.save(worker);
 
 
         log.info("Admin {} đã duyệt hồ sơ eKYC {}: {}", adminUserId, verificationId, decision);
@@ -302,16 +336,21 @@ public class WorkerEkycService {
             throw new BadRequestException(fieldName + " không được vượt quá 10MB");
         }
         String contentType = file.getContentType();
-        if (contentType == null || (!contentType.startsWith("image/") && !contentType.contains("pdf"))) {
-            throw new BadRequestException(fieldName + " phải là tệp hình ảnh hợp lệ (JPG, PNG)");
+        String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+        boolean validMime = contentType != null && (contentType.startsWith("image/") || contentType.contains("pdf"));
+        boolean validExt = fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png") || fileName.endsWith(".webp") || fileName.endsWith(".heic");
+        if (!validMime && !validExt) {
+            throw new BadRequestException(fieldName + " phải là tệp hình ảnh hợp lệ (JPG, PNG, WEBP)");
         }
     }
 
     private String hashCccd(String cccd) {
         if (cccd == null || cccd.isBlank()) return null;
+        String clean = cccd.replaceAll("\\D", "");
+        if (clean.isBlank()) clean = cccd.trim();
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(cccd.trim().getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(clean.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
@@ -325,8 +364,9 @@ public class WorkerEkycService {
     }
 
     private String maskCccd(String cccd) {
-        if (cccd == null || cccd.length() < 6) return cccd;
-        String clean = cccd.trim();
+        if (cccd == null) return null;
+        String clean = cccd.replaceAll("\\D", "");
+        if (clean.length() < 6) return cccd.trim();
         return clean.substring(0, 6) + "******" + (clean.length() > 9 ? clean.substring(clean.length() - 3) : "");
     }
 

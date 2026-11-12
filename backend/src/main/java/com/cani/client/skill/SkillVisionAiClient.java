@@ -39,7 +39,11 @@ public class SkillVisionAiClient {
             return buildSmartFallbackResult(filename, expectedWorkerName, taxonomySkills);
         }
 
-        String fullUrl = String.format("%s/%s:generateContent", properties.getUrl(), properties.getModel());
+        String modelName = properties.getModel();
+        if (modelName == null || modelName.isBlank() || modelName.trim().startsWith("gemini-3.5")) {
+            modelName = "gemini-2.5-flash";
+        }
+        String fullUrl = String.format("%s/%s:generateContent", properties.getUrl(), modelName.trim());
         String prompt = buildPrompt(taxonomySkills, expectedWorkerName);
         Map<String, Object> requestPayload = buildRequestPayload(prompt, fileBytes, mimeType);
 

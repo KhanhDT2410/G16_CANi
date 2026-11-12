@@ -179,6 +179,12 @@ public class EoEventService {
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
+        if (allowance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Phụ cấp thêm không được là số âm!");
+        }
+        if (dto.getHourlyWage() == null || dto.getHourlyWage().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
+        }
         BigDecimal shiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(), workers, allowance);
 
         Shift shift = Shift.builder()
@@ -230,6 +236,12 @@ public class EoEventService {
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
+        if (allowance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Phụ cấp thêm không được là số âm!");
+        }
+        if (dto.getHourlyWage() == null || dto.getHourlyWage().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
+        }
         BigDecimal newShiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(), workers, allowance);
 
         BigDecimal costDiff = newShiftCost.subtract(shift.getTotalCost() != null ? shift.getTotalCost() : BigDecimal.ZERO);

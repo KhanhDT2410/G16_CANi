@@ -433,6 +433,7 @@
 /* Event Detail Tab Switcher */
 .event-detail-tabs-header {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   border-bottom: 2px solid #e2e8f0;
   padding-bottom: 0.25rem;

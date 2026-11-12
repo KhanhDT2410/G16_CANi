@@ -13,7 +13,7 @@ export default function EOSidebar({
   const navItems = [
     {
       key: 'overview',
-      label: 'Tổng quan & Báo cáo',
+      label: 'Tổng quan',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="7" height="7" rx="1"></rect>
@@ -38,7 +38,6 @@ export default function EOSidebar({
       subItems: [
         { key: 'list', label: 'Danh sách sự kiện' },
         { key: 'detail', label: 'Chi tiết sự kiện' },
-        { key: 'attendance', label: 'Điểm danh & Mã QR' },
         { key: 'cancelled', label: 'Sự kiện đã xóa' },
       ],
     },

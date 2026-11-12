@@ -11,6 +11,7 @@ export default function EventDetailModal({
   allEvents = [],
   onSelectEvent,
   asPage = false,
+  initialTab = 'SHIFTS',
   onOpenAddShift,
   onOpenInvite,
   onOpenConfirmPublish,
@@ -21,12 +22,18 @@ export default function EventDetailModal({
   onReloadEvents,
   onOpenPaymentDeclaration,
 }) {
-  const [activeTab, setActiveTab] = useState('SHIFTS'); // 'SHIFTS' | 'WORKERS' | 'QR_ATTENDANCE'
+  const [activeTab, setActiveTab] = useState(initialTab || 'SHIFTS'); // 'SHIFTS' | 'QR_ATTENDANCE' | 'WORKERS'
   const [eventWorkers, setEventWorkers] = useState([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [searchWorker, setSearchWorker] = useState('');
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, event?.eventId]);
 
   useEffect(() => {
     if (isOpen && event?.eventId) {
@@ -412,14 +419,21 @@ export default function EventDetailModal({
             </div>
           </div>
 
-          {/* Tab Switcher: Ca làm việc + Mã QR & Điểm danh vs Danh sách nhân sự */}
+          {/* Tab Switcher: Ca làm việc | Điểm danh & Mã QR | Danh sách nhân sự */}
           <div className="event-detail-tabs-header">
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'SHIFTS' ? 'active' : ''}`}
               onClick={() => setActiveTab('SHIFTS')}
             >
-              Chi Tiết Ca Làm Việc & Điểm Danh QR ({shifts.length})
+              Chi Tiết Ca Làm Việc ({shifts.length})
+            </button>
+            <button
+              type="button"
+              className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
+              onClick={() => setActiveTab('QR_ATTENDANCE')}
+            >
+              Trạm Điểm Danh & Mã QR Ca
             </button>
             <button
               type="button"
@@ -430,7 +444,7 @@ export default function EventDetailModal({
             </button>
           </div>
 
-          {/* TAB 1: DANH SÁCH CA LÀM VIỆC + TRẠM MÃ QR & ĐIỂM DANH CHUNG 1 TRANG */}
+          {/* TAB 1: DANH SÁCH CA LÀM VIỆC */}
           {activeTab === 'SHIFTS' && (
             <div className="event-detail-shifts-section">
               <div className="shifts-section-header">
@@ -469,16 +483,10 @@ export default function EventDetailModal({
                     const shiftConfirmed = shift.confirmedWorkers || 0;
                     const shiftRequired = shift.requiredWorkers || 1;
                     const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
-                    const isWorkspaceOpen = selectedQrShift?.shiftId === shift.shiftId;
 
                     return (
                       <div key={shift.shiftId || sIdx} style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div
-                          className="detail-shift-card"
-                          style={{
-                            border: isWorkspaceOpen ? '2px solid #0d9488' : undefined,
-                          }}
-                        >
+                        <div className="detail-shift-card">
                           <div className="shift-card-header">
                             <div className="shift-card-title-group">
                               {shift.imageUrl && (
@@ -562,10 +570,13 @@ export default function EventDetailModal({
                               <button
                                 type="button"
                                 className="btn-shift-action emerald"
-                                onClick={() => setActiveWorkspaceShiftId(shift.shiftId)}
-                                title="Xem Mã QR Động & Điểm Danh Trực Tiếp của ca này ngay bên dưới"
+                                onClick={() => {
+                                  setActiveWorkspaceShiftId(shift.shiftId);
+                                  setActiveTab('QR_ATTENDANCE');
+                                }}
+                                title="Mở Trạm Điểm Danh & Mã QR của ca này"
                               >
-                                {isWorkspaceOpen ? 'Đang mở Mã QR & Điểm danh bên dưới' : 'Chọn xem Mã QR & Điểm danh'}
+                                Điểm Danh & Mã QR Ca Này →
                               </button>
                             </div>
                           </div>
@@ -573,62 +584,6 @@ export default function EventDetailModal({
                       </div>
                     );
                   })}
-
-                  {/* TRẠM MÃ QR ĐỘNG & BẢNG ĐIỂM DANH TRỰC TIẾP ĐẶT CHUNG TRÊN CÙNG 1 TRANG CHI TIẾT SỰ KIỆN */}
-                  {selectedQrShift && (
-                    <div
-                      style={{
-                        marginTop: '1.25rem',
-                        paddingTop: '1.25rem',
-                        borderTop: '2px solid #e2e8f0',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                          gap: '0.75rem',
-                          marginBottom: '0.75rem',
-                        }}
-                      >
-                        <div>
-                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                            Trạm Mã QR Điểm Danh & Bảng Điểm Danh Trực Tiếp (Chung 1 Trang)
-                          </h4>
-                          <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                            Mã QR động xoay vòng 20s và danh sách điểm danh nhân sự hiển thị trực tiếp ngay trên trang chi tiết sự kiện.
-                          </p>
-                        </div>
-                        {shifts.length > 1 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Đang hiển thị ca:</span>
-                            <select
-                              className="eo-form-input"
-                              style={{ width: 'auto', minWidth: '220px', padding: '0.4rem 0.75rem', fontSize: '0.85rem', fontWeight: 700 }}
-                              value={selectedQrShift.shiftId}
-                              onChange={(e) => setActiveWorkspaceShiftId(e.target.value)}
-                            >
-                              {shifts.map((s) => (
-                                <option key={s.shiftId} value={s.shiftId}>
-                                  {s.jobType} ({formatTime(s.startTime, '08:00')} - {formatTime(s.endTime, '12:00')})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
-                      <ShiftQrAndAttendancePanel
-                        shift={selectedQrShift}
-                        event={event}
-                        onSelectShift={(nextShift) => setActiveWorkspaceShiftId(nextShift.shiftId)}
-                        onReloadEvents={onReloadEvents}
-                        onOpenPaymentDeclaration={onOpenPaymentDeclaration}
-                      />
-                    </div>
-                  )}
 
                   {/* Khu vực tách riêng các ca đã hủy / đã xóa */}
                   {cancelledShifts.length > 0 && (
@@ -663,7 +618,7 @@ export default function EventDetailModal({
                                 backgroundColor: '#fef2f2',
                                 border: '1px solid #fecaca',
                                 display: 'flex',
-                                justifyContent: 'space-between',
+                                justifyContents: 'space-between',
                                 alignItems: 'center',
                                 opacity: 0.75,
                               }}
@@ -683,7 +638,110 @@ export default function EventDetailModal({
             </div>
           )}
 
-          {/* TAB 2: DANH SÁCH NHÂN SỰ SỰ KIỆN (WORKFORCE LIST) */}
+          {/* TAB 2: TRẠM ĐIỂM DANH & MÃ QR ĐỘNG GỘP TRỰC TIẾP VÀO SỰ KIỆN */}
+          {activeTab === 'QR_ATTENDANCE' && (
+            <div className="event-detail-attendance-section animate-fade-in-up">
+              {shifts.length === 0 ? (
+                <div
+                  style={{
+                    padding: '3rem 1.5rem',
+                    textAlign: 'center',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '12px',
+                    border: '1.5px dashed #cbd5e1',
+                    color: '#64748b',
+                  }}
+                >
+                  <p style={{ margin: '0 0 0.5rem', fontWeight: 700, color: '#334155', fontSize: '1rem' }}>
+                    Sự kiện này chưa có ca làm việc nào để tạo Mã QR & Điểm danh.
+                  </p>
+                  <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem' }}>
+                    Vui lòng thiết lập ít nhất một ca làm việc trước khi mở trạm điểm danh.
+                  </p>
+                  <button
+                    type="button"
+                    className="eo-btn-primary"
+                    onClick={() => {
+                      if (!asPage) onClose();
+                      onOpenAddShift(event.eventId);
+                    }}
+                  >
+                    + Thêm Ca Làm Việc Ngay
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  {/* Thanh chọn ca nếu sự kiện có nhiều ca */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem',
+                      marginBottom: '1rem',
+                      padding: '0.85rem 1.25rem',
+                      backgroundColor: '#f0fdfa',
+                      borderRadius: '12px',
+                      border: '1px solid #ccfbf1',
+                    }}
+                  >
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f766e' }}>
+                        Trạm Điểm Danh & Mã QR Động
+                      </h4>
+                      <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#115e59' }}>
+                        Mã QR xoay vòng 20 giây và danh sách điểm danh, duyệt thù lao nhân sự cho từng ca của sự kiện này.
+                      </p>
+                    </div>
+
+                    {shifts.length > 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f766e' }}>Chọn ca trực:</span>
+                        <select
+                          className="eo-form-input"
+                          style={{
+                            width: 'auto',
+                            minWidth: '220px',
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            borderRadius: '8px',
+                            borderColor: '#99f6e4',
+                            backgroundColor: '#ffffff',
+                          }}
+                          value={selectedQrShift?.shiftId || ''}
+                          onChange={(e) => setActiveWorkspaceShiftId(e.target.value)}
+                        >
+                          {shifts.map((s) => (
+                            <option key={s.shiftId} value={s.shiftId}>
+                              {s.jobType} ({formatTime(s.startTime, '08:00')} - {formatTime(s.endTime, '12:00')}) - {s.confirmedWorkers || 0}/{s.requiredWorkers || 0} người
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedQrShift ? (
+                    <ShiftQrAndAttendancePanel
+                      shift={selectedQrShift}
+                      event={event}
+                      onSelectShift={(nextShift) => setActiveWorkspaceShiftId(nextShift.shiftId)}
+                      onReloadEvents={onReloadEvents}
+                      onOpenPaymentDeclaration={onOpenPaymentDeclaration}
+                    />
+                  ) : (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                      Vui lòng chọn một ca làm việc để hiển thị trạm điểm danh.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: DANH SÁCH NHÂN SỰ SỰ KIỆN (WORKFORCE LIST) */}
           {activeTab === 'WORKERS' && (
             <div className="event-detail-workers-section">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>

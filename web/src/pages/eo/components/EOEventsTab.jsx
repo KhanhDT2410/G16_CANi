@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import SkeletonCard from '../../../components/common/SkeletonLoader';
 import EventShiftsDrawer from './EventShiftsDrawer';
 import EORecruitmentTab from './EORecruitmentTab';
-import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import { getEventStatusPriority } from '../utils/eventHelpers';
 
 export default function EOEventsTab({
@@ -36,8 +35,6 @@ export default function EOEventsTab({
   onOpenPaymentDeclaration,
 }) {
   const [activeMenuEventId, setActiveMenuEventId] = useState(null);
-  const [selectedStationEventId, setSelectedStationEventId] = useState('');
-  const [selectedStationShiftId, setSelectedStationShiftId] = useState('');
 
   const toggleKebabMenu = (e, eventId) => {
     e.stopPropagation();
@@ -74,28 +71,6 @@ export default function EOEventsTab({
     });
     return list;
   }, [allEvents]);
-
-  // Sự kiện và Ca được chọn trong Trạm Điểm Danh & Mã QR toàn trang
-  const currentStationEvent = useMemo(() => {
-    if (selectedStationEventId) {
-      const found = nonCancelledEvents.find((e) => e.eventId === selectedStationEventId);
-      if (found) return found;
-    }
-    return nonCancelledEvents.find((e) => Array.isArray(e.shifts) && e.shifts.some((s) => s.status !== 'CANCELLED')) || nonCancelledEvents[0] || null;
-  }, [nonCancelledEvents, selectedStationEventId]);
-
-  const currentStationShifts = useMemo(() => {
-    if (!currentStationEvent || !Array.isArray(currentStationEvent.shifts)) return [];
-    return currentStationEvent.shifts.filter((s) => s.status !== 'CANCELLED');
-  }, [currentStationEvent]);
-
-  const currentStationShift = useMemo(() => {
-    if (selectedStationShiftId) {
-      const found = currentStationShifts.find((s) => s.shiftId === selectedStationShiftId);
-      if (found) return found;
-    }
-    return currentStationShifts[0] || null;
-  }, [currentStationShifts, selectedStationShiftId]);
 
   const formatStatusBadge = (status) => {
     switch (status) {
@@ -184,27 +159,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>Chi tiết sự kiện</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSelectSubTab('attendance')}
-            style={{
-              padding: '0.55rem 1rem',
-              borderRadius: '10px',
-              border: activeSubTab === 'attendance' ? '1.5px solid #0d9488' : '1px solid #e2e8f0',
-              background: activeSubTab === 'attendance' ? '#f0fdfa' : '#ffffff',
-              color: activeSubTab === 'attendance' ? '#0f766e' : '#475569',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            <span>Trạm Điểm danh & Mã QR</span>
+            <span>Chi tiết sự kiện & Điểm danh</span>
           </button>
 
           <button
@@ -237,99 +192,6 @@ export default function EOEventsTab({
           <span>Tạo sự kiện mới</span>
         </button>
       </div>
-
-
-
-      {/* PHÂN KHU 3: TRẠM ĐIỂM DANH & MÃ QR TOÀN TRANG (KHÔNG DÙNG POPUP NHỎ) */}
-      {activeSubTab === 'attendance' && (
-        <div className="eo-widget-card animate-fade-in-up" style={{ padding: '1.5rem' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '1rem',
-              marginBottom: '1rem',
-              paddingBottom: '1rem',
-              borderBottom: '1px solid #e2e8f0',
-            }}
-          >
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                Trạm Điểm Danh Trực Tiếp & Mã QR Động Toàn Màn Hình
-              </h3>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-                Chọn sự kiện và ca làm việc bên dưới để hiển thị Mã QR động (20s) song song với Bảng điểm danh & nghiệm thu nhân sự.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <select
-                className="table-filter-select"
-                value={currentStationEvent?.eventId || ''}
-                onChange={(e) => {
-                  setSelectedStationEventId(e.target.value);
-                  setSelectedStationShiftId('');
-                }}
-                style={{ minWidth: '220px', fontWeight: 600 }}
-              >
-                {nonCancelledEvents.length === 0 ? (
-                  <option value="">Chưa có sự kiện</option>
-                ) : (
-                  nonCancelledEvents.map((evt) => (
-                    <option key={evt.eventId} value={evt.eventId}>
-                      {evt.status === 'DRAFT' ? '[Nháp] ' : '[Đang mở] '}
-                      {evt.name}
-                    </option>
-                  ))
-                )}
-              </select>
-
-              <select
-                className="table-filter-select"
-                value={currentStationShift?.shiftId || ''}
-                onChange={(e) => setSelectedStationShiftId(e.target.value)}
-                style={{ minWidth: '220px', fontWeight: 600 }}
-              >
-                {currentStationShifts.length === 0 ? (
-                  <option value="">Sự kiện chưa có ca làm việc</option>
-                ) : (
-                  currentStationShifts.map((sh) => (
-                    <option key={sh.shiftId} value={sh.shiftId}>
-                      Ca: {sh.jobType} ({sh.confirmedWorkers || 0}/{sh.requiredWorkers || 0} người)
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          </div>
-
-          {currentStationShift ? (
-            <ShiftQrAndAttendancePanel
-              shift={currentStationShift}
-              event={currentStationEvent}
-              onReloadEvents={onReloadEvents}
-              onOpenPaymentDeclaration={onOpenPaymentDeclaration}
-            />
-          ) : (
-            <div style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
-              <p style={{ fontWeight: 600, marginBottom: '0.75rem' }}>
-                Sự kiện hiện tại chưa có ca làm việc nào để hiển thị Mã QR & Điểm danh.
-              </p>
-              {currentStationEvent && (
-                <button
-                  type="button"
-                  className="table-btn-create-event"
-                  onClick={() => onOpenAddShift?.(currentStationEvent.eventId)}
-                >
-                  + Thêm Ca Làm Việc Ngay
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* PHÂN KHU 4: DANH SÁCH CA & SỰ KIỆN ĐÃ HỦY / ĐÃ XÓA (TÁCH RIÊNG HOÀN TOÀN) */}
       {activeSubTab === 'cancelled' && (
@@ -700,7 +562,7 @@ export default function EOEventsTab({
                               className="dropdown-item"
                               style={{ color: '#2563eb', fontWeight: 700 }}
                               onClick={() => {
-                                onOpenEventDetail?.(evt);
+                                onOpenEventDetail?.(evt, 'SHIFTS');
                                 closeMenu();
                               }}
                             >
@@ -709,6 +571,24 @@ export default function EOEventsTab({
                                 <circle cx="12" cy="12" r="3"></circle>
                               </svg>
                               <span>Chi tiết sự kiện & nhân sự</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className="dropdown-item"
+                              style={{ color: '#0d9488', fontWeight: 700 }}
+                              onClick={() => {
+                                onOpenEventDetail?.(evt, 'QR_ATTENDANCE');
+                                closeMenu();
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                              </svg>
+                              <span>Điểm danh & Mã QR ca</span>
                             </button>
 
                             <button

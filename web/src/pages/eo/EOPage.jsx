@@ -14,7 +14,6 @@ import EOEventsTab from './components/EOEventsTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoProfileTab from './components/EoProfileTab';
-import EOAnalyticsTab from './components/EOAnalyticsTab';
 import EOSettingsTab from './components/EOSettingsTab';
 import EOModals from './components/EOModals';
 import EventDetailModal from './components/EventDetailModal';
@@ -150,6 +149,7 @@ export default function EOPage() {
 
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState(null);
+  const [detailInitialTab, setDetailInitialTab] = useState('SHIFTS');
   const [ekycStatus, setEkycStatus] = useState('APPROVED');
   const [showEkycModal, setShowEkycModal] = useState(false);
 
@@ -163,9 +163,10 @@ export default function EOPage() {
     }
   }, [events.events, detailEvent?.eventId]);
 
-  const handleOpenEventDetailPage = (evt) => {
+  const handleOpenEventDetailPage = (evt, initialTab = 'SHIFTS') => {
     if (!evt) return;
     setDetailEvent(evt);
+    setDetailInitialTab(initialTab);
     setActiveTab('events');
     setActiveNav('events');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -258,10 +259,12 @@ export default function EOPage() {
     if (subKey === 'detail') {
       const target = detailEvent || (Array.isArray(events.events) ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0] : null);
       setDetailEvent(target);
+      setDetailInitialTab('SHIFTS');
       setActiveEventSubTab('detail');
       return;
     }
     setDetailEvent(null);
+    setDetailInitialTab('SHIFTS');
     setActiveEventSubTab(subKey);
     if (subKey === 'cancelled') {
       events.setStatusFilter('CANCELLED');
@@ -350,13 +353,6 @@ export default function EOPage() {
                   }
                 }}
               />
-
-              {/* Báo cáo & Thống kê Tài chính đã gộp vào Tổng quan (đã lược bỏ các chỉ số trùng lặp) */}
-              <EOAnalyticsTab
-                events={events.events}
-                payments={payments.payments}
-                onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
-              />
             </>
           )}
 
@@ -366,10 +362,12 @@ export default function EOPage() {
               <EventDetailModal
                 isOpen={true}
                 asPage={true}
+                initialTab={detailInitialTab}
                 allEvents={events.events}
                 onSelectEvent={(nextEvt) => setDetailEvent(nextEvt)}
                 onClose={() => {
                   setDetailEvent(null);
+                  setDetailInitialTab('SHIFTS');
                   handleEventSubTabChange('list');
                 }}
                 event={
@@ -473,8 +471,13 @@ export default function EOPage() {
             metrics={events.metrics}
             events={events.events}
             onOpenQr={() => {
-              handleNavClick('events');
-              handleEventSubTabChange('attendance');
+              const active = events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0];
+              if (active) {
+                handleOpenEventDetailPage(active, 'QR_ATTENDANCE');
+              } else {
+                handleNavClick('events');
+                handleEventSubTabChange('list');
+              }
             }}
             onOpenRecruitment={() => {
               handleNavClick('events');

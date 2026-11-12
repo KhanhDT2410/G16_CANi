@@ -196,14 +196,17 @@ export default function EOSubscriptionTab() {
                         )}
                       </button>
 
-                      <button
-                        type="button"
-                        className="btn-demo-simulate"
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handleSimulateDemo(plan.planType)}
-                      >
-                        Thử nghiệm kích hoạt
-                      </button>
+                      {(import.meta.env.DEV || window.location.hostname === 'localhost') && (
+                        <button
+                          type="button"
+                          className="btn-demo-simulate"
+                          disabled={purchasingPlan !== null}
+                          onClick={() => handleSimulateDemo(plan.planType)}
+                          title="Chỉ khả dụng trong môi trường thử nghiệm cục bộ (H2/Sandbox)"
+                        >
+                          🧪 Thử nghiệm kích hoạt (Sandbox)
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

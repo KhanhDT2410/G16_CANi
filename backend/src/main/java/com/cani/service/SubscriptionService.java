@@ -49,6 +49,9 @@ public class SubscriptionService {
     @Value("${cani.subscription.strict:false}")
     private boolean strictQuotaEnforcement;
 
+    @Value("${cani.subscription.demo-enabled:false}")
+    private boolean demoEnabled;
+
     // Bộ nhớ đệm lưu thông tin giao dịch chờ đối soát PayOS (TxnRef -> OrderData)
     private final Map<String, PendingOrder> pendingOrders = new ConcurrentHashMap<>();
 
@@ -123,6 +126,9 @@ public class SubscriptionService {
     // =========================================================================
     @Transactional
     public SubscriptionResponseDto simulatePurchaseDemo(UUID userId, PlanType planType) {
+        if (!demoEnabled) {
+            throw new AppException("Chức năng mô phỏng thanh toán bị vô hiệu hóa trên môi trường này.", HttpStatus.FORBIDDEN);
+        }
         EventOrganizer eo = getEoOrThrow(userId);
         String mockTxnRef = "DEMO_" + System.currentTimeMillis();
         log.info("Kích hoạt chế độ Sandbox Demo mua gói {} cho EO {}", planType, eo.getEoId());
@@ -218,8 +224,23 @@ public class SubscriptionService {
         EventOrganizer eo = getEoOrThrow(userId);
         SubscriptionPlanDto plan = getPlanDefinition(dto.getPlanType());
 
-        // Nếu là gói miễn phí trải nghiệm (0đ), kích hoạt trực tiếp không cần qua cổng thanh toán
-        if (plan.getPrice().compareTo(BigDecimal.ZERO) == 0) {
+        // Nếu là gói miễn phí trải nghiệm (0đ), kiểm tra điều kiện chống farm và chống ghi đè gói trả phí
+        if (plan.getPrice().compareTo(BigDecimal.ZERO) == 0 || plan.getPlanType() == PlanType.FREE_TRIAL) {
+            Instant now = Instant.now();
+            List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
+            boolean hasActivePaidPlan = activeSubs.stream()
+                    .anyMatch(s -> s.getPlanType() != PlanType.FREE_TRIAL && s.getPlanType() != PlanType.INVITE_ONLY);
+            if (hasActivePaidPlan) {
+                throw new BadRequestException("Tài khoản đang có gói dịch vụ trả phí hoạt động, không thể chuyển sang gói dùng thử.");
+            }
+
+            boolean hasUsedTrial = subscriptionRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId())
+                    .stream()
+                    .anyMatch(s -> s.getPlanType() == PlanType.FREE_TRIAL);
+            if (hasUsedTrial) {
+                throw new BadRequestException("Mỗi Nhà tổ chức sự kiện chỉ được sử dụng Gói Trải Nghiệm (Free Trial) 1 lần duy nhất.");
+            }
+
             activateSubscription(eo, plan.getPlanType(), "FREE_PROMO", "FREE_" + System.currentTimeMillis(), "WELCOME_FREE");
             return PayOSPaymentResponseDto.builder()
                     .orderCode(System.currentTimeMillis())
@@ -262,7 +283,10 @@ public class SubscriptionService {
                 log.warn("Cảnh báo bảo mật: User {} cố kích hoạt đơn hàng PayOS {} thuộc về EO {}", userId, orderCode, order.eoId());
                 throw new BadRequestException("Giao dịch không thuộc về tài khoản Ban tổ chức hiện tại");
             }
-            return activateSubscription(eo, order.planType(), "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode);
+            if (demoEnabled) {
+                return activateSubscription(eo, order.planType(), "PAYOS_VIETQR_DEMO", "PAYOS_" + orderCode, "POS_" + orderCode);
+            }
+            throw new BadRequestException("Giao dịch đang chờ xác nhận thanh toán từ cổng PayOS. Vui lòng hoàn tất chuyển khoản và chờ trong giây lát.");
         }
 
         // Trường hợp reload lại trang hoặc Webhook đã xử lý kích hoạt trước đó cho chính EO này

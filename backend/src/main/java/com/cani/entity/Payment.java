@@ -13,7 +13,12 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "payments")
+@Table(
+    name = "payments",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_payments_assignment_id", columnNames = {"assignment_id"})
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

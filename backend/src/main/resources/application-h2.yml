@@ -38,5 +38,7 @@ cani:
       model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
+  subscription:
+    demo-enabled: true
   sla-scan:
     enabled: false

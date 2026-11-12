@@ -99,6 +99,7 @@ cani:
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
   subscription:
     strict: ${SUBSCRIPTION_STRICT:false}
+    demo-enabled: ${SUBSCRIPTION_DEMO_ENABLED:false}
   payos:
     endpoint: ${PAYOS_ENDPOINT:https://api-merchant.payos.vn}
     client-id: ${PAYOS_CLIENT_ID:}

@@ -670,7 +670,7 @@ export default function EoProfileTab() {
 
               <div className="profile-form-group">
                 <label>
-                  Mã Số Thuế (MST) / Số ĐKKD {isBusinessEntity ? '*' : '(Chỉ mở cho Hộ kinh doanh)'}
+                  Mã Số Thuế (MST) / Số ĐKKD {isBusinessEntity ? '*' : ''}
                 </label>
                 <input
                   type="text"

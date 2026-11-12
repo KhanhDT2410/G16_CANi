@@ -117,6 +117,13 @@ export default function EOEventsTab({
   };
 
   const handleSelectSubTab = (subKey) => {
+    if (subKey === 'detail') {
+      const target = nonCancelledEvents[0] || allEvents[0];
+      if (target && onOpenEventDetail) {
+        onOpenEventDetail(target);
+        return;
+      }
+    }
     onSubTabChange?.(subKey);
     if (subKey === 'cancelled') {
       setStatusFilter('CANCELLED');
@@ -157,18 +164,18 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>Danh sách sự kiện ({nonCancelledEvents.length})</span>
+            <span>Danh sách sự kiện</span>
           </button>
 
           <button
             type="button"
-            onClick={() => handleSelectSubTab('recruitment')}
+            onClick={() => handleSelectSubTab('detail')}
             style={{
               padding: '0.55rem 1rem',
               borderRadius: '10px',
-              border: activeSubTab === 'recruitment' ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
-              background: activeSubTab === 'recruitment' ? '#eff6ff' : '#ffffff',
-              color: activeSubTab === 'recruitment' ? '#1d4ed8' : '#475569',
+              border: activeSubTab === 'detail' ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+              background: activeSubTab === 'detail' ? '#eff6ff' : '#ffffff',
+              color: activeSubTab === 'detail' ? '#1d4ed8' : '#475569',
               fontWeight: 700,
               fontSize: '0.85rem',
               cursor: 'pointer',
@@ -177,7 +184,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>Tuyển dụng nhân sự</span>
+            <span>Chi tiết sự kiện</span>
           </button>
 
           <button
@@ -217,7 +224,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>Đã hủy / Đã xóa ({cancelledEventsList.length + cancelledShiftsFromActiveEvents.length})</span>
+            <span>Sự kiện đã xóa</span>
           </button>
         </div>
 
@@ -231,19 +238,7 @@ export default function EOEventsTab({
         </button>
       </div>
 
-      {/* PHÂN KHU 2: TUYỂN DỤNG NHÂN SỰ (GỘP VÀO QUẢN LÝ SỰ KIỆN) */}
-      {activeSubTab === 'recruitment' && (
-        <EORecruitmentTab
-          events={allEvents}
-          onOpenAddShift={onOpenAddShift}
-          onOpenInvite={onOpenInvite}
-          onOpenCreateEvent={onOpenCreateEvent}
-          onOpenConfirmPublish={onOpenConfirmPublish}
-          onOpenEventDetail={onOpenEventDetail}
-          onReloadEvents={onReloadEvents}
-          onOpenPaymentDeclaration={onOpenPaymentDeclaration}
-        />
-      )}
+
 
       {/* PHÂN KHU 3: TRẠM ĐIỂM DANH & MÃ QR TOÀN TRANG (KHÔNG DÙNG POPUP NHỎ) */}
       {activeSubTab === 'attendance' && (
@@ -448,13 +443,13 @@ export default function EOEventsTab({
         </div>
       )}
 
-      {/* PHÂN KHU 1: DANH SÁCH SỰ KIỆN (ĐANG HOẠT ĐỘNG LÊN ĐẦU, BẢN NHÁP Ở DƯỚI) */}
+      {/* PHÂN KHU 1: DANH SÁCH SỰ KIỆN */}
       {activeSubTab === 'list' && (
         <section className="eo-events-section-card animate-fade-in-up">
           {/* 1. Header Bar: Tiêu đề + Tìm kiếm + Lọc */}
           <div className="table-card-header-bar">
             <div className="table-header-title-group">
-              <h3 className="table-card-heading">Danh sách sự kiện (Đang hoạt động ở trên • Bản nháp ở dưới)</h3>
+              <h3 className="table-card-heading">Danh sách sự kiện</h3>
             </div>
 
             <div className="table-header-actions-group">
@@ -487,8 +482,8 @@ export default function EOEventsTab({
                   className="table-filter-select"
                 >
                   <option value="ALL">Hoạt động & Bản nháp</option>
-                  <option value="ACTIVE">Đang hoạt động (Lên đầu)</option>
-                  <option value="DRAFT">Bản nháp (Ở dưới)</option>
+                  <option value="ACTIVE">Đang hoạt động</option>
+                  <option value="DRAFT">Bản nháp</option>
                   <option value="UPCOMING">Sắp diễn ra</option>
                 </select>
               </div>

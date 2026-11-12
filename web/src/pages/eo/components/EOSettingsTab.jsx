@@ -165,8 +165,8 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
                 value={packageSettings.defaultPlan}
                 onChange={(e) => setPackageSettings({ ...packageSettings, defaultPlan: e.target.value })}
               >
-                <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80,000 đ / sự kiện)</option>
-                <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
+                <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80.000 đ / sự kiện)</option>
+                <option value="INVITE_ONLY">Gói Mời Trực Tiếp (50.000 đ / sự kiện)</option>
               </select>
               <span className="eo-field-helper">
                 Gói được chọn sẵn khi bạn bước vào quy trình tạo sự kiện.

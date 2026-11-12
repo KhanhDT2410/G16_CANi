@@ -91,9 +91,9 @@ export default function EOSubscriptionTab() {
                 : currentSubscription?.planType === 'MATCHING_PLUS'
                 ? 'Tự Động Ghép Đôi Tiêu Chuẩn'
                 : currentSubscription?.planType === 'FREE_TRIAL'
-                ? 'Tự Động Ghép Đôi (Khởi Nghiệp)'
+                ? 'Tự Động Ghép Đôi'
                 : currentSubscription?.planType === 'INVITE_ONLY'
-                ? 'Mời Trực Tiếp (Invite Mode)'
+                ? 'Mời Trực Tiếp'
                 : 'Chưa kích hoạt'}
             </span>
             <span className="sub-metric-hint">
@@ -325,8 +325,8 @@ export default function EOSubscriptionTab() {
               <div className="eo-form-group">
                 <label>Gói Cước Mặc Định Khi Tạo Sự Kiện Mới</label>
                 <select className="eo-form-select" defaultValue="MATCHING_PLUS">
-                  <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80,000 đ / sự kiện) - Tự động kết nối 15km</option>
-                  <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
+                  <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80.000 đ / sự kiện)</option>
+                  <option value="INVITE_ONLY">Gói Mời Trực Tiếp (50.000 đ / sự kiện)</option>
                 </select>
                 <span className="eo-field-helper">Gói ưu tiên được chọn sẵn khi bạn tạo sự kiện mới.</span>
               </div>

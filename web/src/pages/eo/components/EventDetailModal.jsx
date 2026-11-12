@@ -8,6 +8,8 @@ export default function EventDetailModal({
   isOpen,
   onClose,
   event,
+  allEvents = [],
+  onSelectEvent,
   asPage = false,
   onOpenAddShift,
   onOpenInvite,
@@ -49,7 +51,23 @@ export default function EventDetailModal({
     }
   }, [isOpen, event?.eventId, event?.shifts]);
 
-  if (!isOpen || !event) return null;
+  if (!isOpen) return null;
+  if (!event) {
+    if (asPage) {
+      return (
+        <div className="eo-widget-card animate-fade-in-up" style={{ padding: '3.5rem 2rem', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '16px' }}>
+          <h3 style={{ margin: '0 0 0.5rem', color: '#0f172a', fontSize: '1.2rem' }}>Chưa chọn sự kiện để xem chi tiết</h3>
+          <p style={{ margin: '0 0 1.5rem', color: '#64748b', fontSize: '0.9rem' }}>
+            Vui lòng chọn một sự kiện từ danh sách để xem đầy đủ thông tin, ca làm việc và bảng điểm danh.
+          </p>
+          <button type="button" className="eo-btn-primary" onClick={onClose}>
+            Quay lại Danh sách sự kiện
+          </button>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const rawShifts = event.shifts || [];
   const activeAndDraftShifts = rawShifts
@@ -168,25 +186,59 @@ export default function EventDetailModal({
             gap: '0.75rem',
           }}
         >
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              padding: '0.45rem 0.95rem',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              color: '#1e293b',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            &larr; Quay lại danh sách sự kiện
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                padding: '0.45rem 0.95rem',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: '#1e293b',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              &larr; Quay lại danh sách sự kiện
+            </button>
+
+            {allEvents && allEvents.filter((e) => e && e.status !== 'CANCELLED').length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Xem sự kiện:</span>
+                <select
+                  value={event.eventId}
+                  onChange={(e) => {
+                    const next = allEvents.find((ev) => ev.eventId === e.target.value);
+                    if (next && onSelectEvent) onSelectEvent(next);
+                  }}
+                  style={{
+                    padding: '0.4rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                    cursor: 'pointer',
+                    maxWidth: '260px',
+                  }}
+                >
+                  {allEvents
+                    .filter((e) => e && e.status !== 'CANCELLED')
+                    .map((ev) => (
+                      <option key={ev.eventId} value={ev.eventId}>
+                        {ev.name} {ev.status === 'DRAFT' ? '• [Bản nháp]' : ''}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+          </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             {event.status === 'DRAFT' && (
@@ -770,18 +822,6 @@ export default function EventDetailModal({
 
         {/* Footer */}
         <div className="event-detail-modal-footer">
-          {onNavigateToRecruitment && (
-            <button
-              type="button"
-              className="btn-footer-secondary"
-              onClick={() => {
-                onClose();
-                onNavigateToRecruitment();
-              }}
-            >
-              Chuyển sang Quản Lý Tuyển Dụng &rarr;
-            </button>
-          )}
           <button type="button" className="btn-footer-primary" onClick={onClose}>
             {asPage ? 'Quay lại danh sách sự kiện' : 'Đóng'}
           </button>

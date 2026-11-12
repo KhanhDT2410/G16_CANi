@@ -37,9 +37,9 @@ export default function EOSidebar({
       ),
       subItems: [
         { key: 'list', label: 'Danh sách sự kiện' },
-        { key: 'recruitment', label: 'Tuyển dụng nhân sự' },
+        { key: 'detail', label: 'Chi tiết sự kiện' },
         { key: 'attendance', label: 'Điểm danh & Mã QR' },
-        { key: 'cancelled', label: 'Đã hủy / Đã xóa' },
+        { key: 'cancelled', label: 'Sự kiện đã xóa' },
       ],
     },
     {
@@ -107,7 +107,7 @@ export default function EOSidebar({
         </div>
 
         {navItems.map((item) => {
-          const isActive = activeNav === item.key || (item.key === 'events' && activeNav === 'recruitment');
+          const isActive = activeNav === item.key;
           return (
             <React.Fragment key={item.key}>
               <button

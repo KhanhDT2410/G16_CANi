@@ -65,7 +65,7 @@ export default function EOPage() {
         if (targetTab === 'recruitment') {
           setActiveTab('events');
           setActiveNav('events');
-          setActiveEventSubTab('recruitment');
+          setActiveEventSubTab('list');
         } else if (targetTab === 'analytics') {
           setActiveTab('overview');
           setActiveNav('overview');
@@ -118,7 +118,7 @@ export default function EOPage() {
     } else if (tabParam === 'recruitment') {
       setActiveTab('events');
       setActiveNav('events');
-      setActiveEventSubTab('recruitment');
+      setActiveEventSubTab('list');
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
@@ -235,7 +235,7 @@ export default function EOPage() {
     if (tabKey === 'recruitment') {
       setActiveTab('events');
       setActiveNav('events');
-      setActiveEventSubTab('recruitment');
+      setActiveEventSubTab('list');
       try {
         setSearchParams({ tab: 'events' }, { replace: true });
       } catch (err) {
@@ -255,6 +255,12 @@ export default function EOPage() {
   };
 
   const handleEventSubTabChange = (subKey) => {
+    if (subKey === 'detail') {
+      const target = detailEvent || (Array.isArray(events.events) ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0] : null);
+      setDetailEvent(target);
+      setActiveEventSubTab('detail');
+      return;
+    }
     setDetailEvent(null);
     setActiveEventSubTab(subKey);
     if (subKey === 'cancelled') {
@@ -354,20 +360,30 @@ export default function EOPage() {
             </>
           )}
 
-          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN HOẶC TRANG CHI TIẾT SỰ KIỆN (TẠO SỰ KIỆN XONG RA TRANG DETAIL SỰ KIỆN ĐÓ, MÃ QR CHUNG 1 TRANG VỚI ĐIỂM DANH) */}
+          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN HOẶC TRANG CHI TIẾT SỰ KIỆN */}
           {activeTab === 'events' && (
-            detailEvent ? (
+            (detailEvent || activeEventSubTab === 'detail') ? (
               <EventDetailModal
                 isOpen={true}
                 asPage={true}
-                onClose={() => setDetailEvent(null)}
-                event={detailEvent}
+                allEvents={events.events}
+                onSelectEvent={(nextEvt) => setDetailEvent(nextEvt)}
+                onClose={() => {
+                  setDetailEvent(null);
+                  handleEventSubTabChange('list');
+                }}
+                event={
+                  detailEvent ||
+                  (Array.isArray(events.events)
+                    ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0]
+                    : null)
+                }
                 onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
                 onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
                 onOpenConfirmPublish={(evt) => {
                   const shiftCount = evt.totalShifts || (Array.isArray(evt.shifts) ? evt.shifts.length : 0);
                   if (!shiftCount) {
-                    showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi kích hoạt tìm kiếm!', 'warning');
+                    showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi đăng tuyển!', 'warning');
                     shifts.setSelectedEventId(evt.eventId);
                     shifts.setShowShiftModal(true);
                     return;
@@ -377,10 +393,6 @@ export default function EOPage() {
                 onOpenEditEvent={events.setEditingEvent}
                 onEditShift={shifts.setEditingShift}
                 onCancelShift={shifts.handleCancelShift}
-                onNavigateToRecruitment={() => {
-                  setDetailEvent(null);
-                  handleEventSubTabChange('recruitment');
-                }}
                 onReloadEvents={events.loadEvents}
                 onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
               />

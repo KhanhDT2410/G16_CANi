@@ -371,7 +371,7 @@ const ShiftCreateModal = ({
 
           <div className="eo-form-row">
             <div className="eo-form-group">
-              <label>Phụ Cấp Thêm (VNĐ - Không âm)</label>
+              <label>Phụ Cấp Thêm (VNĐ)</label>
               <input
                 type="number"
                 min="0"

@@ -173,7 +173,7 @@ const EditShiftModal = ({
             </div>
 
             <div className="eo-form-group">
-              <label>Phụ Cấp (VND - Không âm)</label>
+              <label>Phụ Cấp (VNĐ)</label>
               <input
                 type="number"
                 min="0"

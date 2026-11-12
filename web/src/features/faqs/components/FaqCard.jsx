@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { FAQ_CATEGORY_CONFIG, FAQ_STATUS_CONFIG } from '../types/faq.constants';
 
 /**
@@ -95,7 +96,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
             </div>
           )}
           {/<[a-z][\s\S]*>/i.test(faq.answer || '') ? (
-            <div className="faq-answer-content" dangerouslySetInnerHTML={{ __html: faq.answer }} />
+            <div className="faq-answer-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
           ) : (
             <div className="faq-answer-content">{faq.answer}</div>
           )}

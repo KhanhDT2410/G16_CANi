@@ -10,10 +10,18 @@ import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: ApiConstants.supabaseUrl,
-    publishableKey: ApiConstants.supabaseAnonKey,
-  );
+  if (ApiConstants.supabaseUrl.isNotEmpty && ApiConstants.supabaseAnonKey.isNotEmpty) {
+    try {
+      await Supabase.initialize(
+        url: ApiConstants.supabaseUrl,
+        publishableKey: ApiConstants.supabaseAnonKey,
+      );
+    } catch (e) {
+      debugPrint('[Supabase Init Warning] Failed to initialize Supabase: $e');
+    }
+  } else {
+    debugPrint('[Supabase Init Info] Supabase credentials not provided. Skipping initialization.');
+  }
 
   // Khởi tạo Firebase Cloud Messaging (FCM) & Kênh thông báo nổi (Heads-up banner)
   await FcmService.initialize(

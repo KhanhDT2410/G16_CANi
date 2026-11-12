@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG } from '../types/faq.constants';
 
 /**
@@ -113,7 +114,7 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                       </div>
                     )}
                     {/<[a-z][\s\S]*>/i.test(faq.answer || '') ? (
-                      <div className="faq-acc-answer" dangerouslySetInnerHTML={{ __html: faq.answer }} />
+                      <div className="faq-acc-answer" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
                     ) : (
                       <div className="faq-acc-answer">{faq.answer}</div>
                     )}

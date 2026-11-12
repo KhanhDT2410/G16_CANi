@@ -241,4 +241,49 @@ public class EoEventController {
         ShiftResponseDto shift = eoEventService.publishShift(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Kích hoạt điều phối tìm Worker cho ca làm việc thành công!"));
     }
+
+    /**
+     * Lấy danh sách toàn bộ nhân sự tham gia trong sự kiện kèm điểm uy tín, tuổi, trạng thái
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/{eventId}/workers")
+    public ResponseEntity<ApiResponse<List<ShiftAttendanceDto>>> getEventWorkers(
+            @PathVariable("eventId") UUID eventId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<ShiftAttendanceDto> workers = eoEventService.getEventWorkersList(userId, eventId);
+        return ResponseEntity.ok(ApiResponse.ok(workers, "Lấy danh sách nhân sự sự kiện thành công!"));
+    }
+
+    /**
+     * Tải ảnh minh họa sự kiện hoặc ca làm việc từ thiết bị local lên máy chủ
+     * POST /api/v1/eo/events/upload-image
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping(value = "/upload-image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadEventImage(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        String url = eoEventService.uploadEventImage(file);
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("url", url), "Tải ảnh từ thiết bị lên thành công!"));
+    }
+
+    /**
+     * Xem / phục vụ ảnh sự kiện & ca làm việc
+     * GET /api/v1/eo/events/images/{filename}
+     */
+    @GetMapping("/images/{filename:.+}")
+    public ResponseEntity<org.springframework.core.io.Resource> getEventImage(@PathVariable("filename") String filename) {
+        org.springframework.core.io.Resource resource = eoEventService.loadEventImage(filename);
+        String contentType = "image/jpeg";
+        if (filename.toLowerCase().endsWith(".png")) contentType = "image/png";
+        else if (filename.toLowerCase().endsWith(".webp")) contentType = "image/webp";
+        else if (filename.toLowerCase().endsWith(".gif")) contentType = "image/gif";
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
 }

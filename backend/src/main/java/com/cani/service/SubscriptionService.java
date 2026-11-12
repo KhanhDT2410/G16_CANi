@@ -1,10 +1,8 @@
 package com.cani.service;
 
 import com.cani.config.PayOSConfig;
-import com.cani.config.VNPayConfig;
 import com.cani.dto.subscription.PayOSPaymentResponseDto;
 import com.cani.dto.subscription.PurchaseSubscriptionRequestDto;
-import com.cani.dto.subscription.PurchaseSubscriptionResponseDto;
 import com.cani.dto.subscription.SubscriptionPlanDto;
 import com.cani.dto.subscription.SubscriptionResponseDto;
 import com.cani.entity.EventOrganizer;
@@ -17,7 +15,6 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
 import com.cani.repository.SubscriptionRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,9 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -37,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Service quản lý Gói dịch vụ & Cổng thanh toán VNPay Sandbox (UC-10, UC-11, UC-12, BR-08)
+ * Service quản lý Gói dịch vụ & Cổng thanh toán VietQR PayOS (UC-10, UC-11, UC-12, BR-08)
  */
 @Service
 @RequiredArgsConstructor
@@ -46,7 +40,6 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
-    private final VNPayConfig vnPayConfig;
     private final PayOSConfig payOSConfig;
     private final PayOSService payOSService;
 
@@ -56,7 +49,7 @@ public class SubscriptionService {
     @Value("${cani.subscription.strict:false}")
     private boolean strictQuotaEnforcement;
 
-    // Bộ nhớ đệm lưu thông tin giao dịch chờ đối soát VNPay (TxnRef -> OrderData)
+    // Bộ nhớ đệm lưu thông tin giao dịch chờ đối soát PayOS (TxnRef -> OrderData)
     private final Map<String, PendingOrder> pendingOrders = new ConcurrentHashMap<>();
 
     private record PendingOrder(UUID eoId, PlanType planType, BigDecimal price, Instant createdAt) {}
@@ -67,171 +60,62 @@ public class SubscriptionService {
     public List<SubscriptionPlanDto> getAvailablePlans() {
         return List.of(
                 SubscriptionPlanDto.builder()
-                        .planType(PlanType.INVITE_ONLY)
-                        .name("Gói Invite Mode")
-                        .price(BigDecimal.valueOf(50000))
+                        .planType(PlanType.FREE_TRIAL)
+                        .name("Gói Trải Nghiệm (Khởi Nghiệp)")
+                        .price(BigDecimal.ZERO)
                         .durationDays(30)
-                        .maxEvents(1)
-                        .maxShifts(5)
+                        .maxEvents(2)
+                        .maxShifts(6)
                         .maxWorkers(20)
-                        .description("Phù hợp sự kiện quy mô nhỏ, EO tự tuyển dụng bằng Link mời & mã QR thủ công.")
+                        .description("Tặng 2 sự kiện miễn phí cho Nhà tổ chức trải nghiệm toàn diện hệ thống Matching Radar.")
                         .features(List.of(
-                                "Tạo 1 Sự kiện với tối đa 5 Ca làm việc",
-                                "Tuyển dụng bằng Link mời & Mã QR chuyên biệt",
+                                "Miễn phí 2 Sự kiện đầu tiên",
+                                "Tối đa 6 Ca làm việc & 20 Nhân sự",
+                                "Kích hoạt Thuật toán Ghép đôi (Matching Radar)",
                                 "Điểm danh Check-in / Check-out bằng QR code",
-                                "Checklist đầu việc & thu thập bằng chứng",
-                                "Hạ tầng đối soát thanh toán trực tiếp 3 bên"
+                                "Checklist đầu việc & giám sát trực tiếp"
                         ))
                         .isRecommended(false)
                         .build(),
 
                 SubscriptionPlanDto.builder()
                         .planType(PlanType.MATCHING_PLUS)
-                        .name("Gói Matching + Invite Mode")
-                        .price(BigDecimal.valueOf(80000))
+                        .name("Gói Tiêu Chuẩn (Standard)")
+                        .price(BigDecimal.valueOf(99000))
                         .durationDays(30)
-                        .maxEvents(3)
-                        .maxShifts(15)
-                        .maxWorkers(50)
-                        .description("Mở khóa toàn bộ: Vừa tuyển bằng Link mời, vừa kích hoạt Thuật toán Matching Radar tự động.")
+                        .maxEvents(5)
+                        .maxShifts(25)
+                        .maxWorkers(80)
+                        .description("Tối ưu cho đơn vị tổ chức định kỳ: Tuyển dụng chủ động kết hợp Matching Radar.")
                         .features(List.of(
-                                "Tạo 3 Sự kiện với tối đa 15 Ca làm việc",
+                                "Tạo 5 Sự kiện với tối đa 25 Ca làm việc",
                                 "Kích hoạt Thuật toán Ghép đôi (Matching Engine)",
-                                "Hiển thị ca làm việc trên Bản đồ Job Radar di động",
+                                "Hiển thị ca làm việc ưu tiên trên Bản đồ Job Radar di động",
                                 "Bắn thông báo đẩy (FCM Push) đến ứng viên phù hợp",
-                                "Tự động kích hoạt Emergency Dispatch khi có hủy ca",
-                                "Ưu tiên xếp hạng trên bảng việc làm gần nhất"
+                                "Tự động kích hoạt hỗ trợ khi có biến động ca làm"
                         ))
                         .isRecommended(true)
+                        .build(),
+
+                SubscriptionPlanDto.builder()
+                        .planType(PlanType.ENTERPRISE)
+                        .name("Gói Chuyên Nghiệp (Pro / Doanh Nghiệp)")
+                        .price(BigDecimal.valueOf(249000))
+                        .durationDays(30)
+                        .maxEvents(20)
+                        .maxShifts(100)
+                        .maxWorkers(300)
+                        .description("Dành cho quy mô lớn: Ưu tiên tuyển dụng tối đa và mở khóa Gọi Thêm Người Khẩn Cấp.")
+                        .features(List.of(
+                                "Tạo 20 Sự kiện với 100 Ca làm việc & 300 Nhân sự",
+                                "Ưu tiên xếp hạng cao nhất trên Radar tuyển dụng",
+                                "Mở khóa tính năng Gọi Nhân Sự Khẩn Cấp (Emergency Dispatch)",
+                                "Báo cáo số liệu chuyên sâu & đối soát đa chiều",
+                                "Kênh chăm sóc & hỗ trợ kỹ thuật riêng 24/7"
+                        ))
+                        .isRecommended(false)
                         .build()
         );
-    }
-
-    // =========================================================================
-    // UC-11: KHỞI TẠO PHIÊN THANH TOÁN VNPAY (PURCHASE PACKAGE VIA VNPAY)
-    // =========================================================================
-    @Transactional
-    public PurchaseSubscriptionResponseDto createVNPayPaymentSession(
-            UUID userId, PurchaseSubscriptionRequestDto dto, HttpServletRequest request) {
-
-        EventOrganizer eo = getEoOrThrow(userId);
-        SubscriptionPlanDto plan = getPlanDefinition(dto.getPlanType());
-
-        // Sinh mã giao dịch duy nhất
-        String vnpTxnRef = "CANI_" + System.currentTimeMillis();
-        pendingOrders.put(vnpTxnRef, new PendingOrder(eo.getEoId(), plan.getPlanType(), plan.getPrice(), Instant.now()));
-
-        // Chuẩn bị tham số theo đúng tài liệu VNPay Sandbox
-        long amountInVnd = plan.getPrice().longValue();
-        long amountForVnPay = amountInVnd * 100L; // VNPay tính theo đơn vị hào (x100)
-
-        String returnUrl = (dto.getReturnUrl() != null && !dto.getReturnUrl().isBlank())
-                ? dto.getReturnUrl()
-                : vnPayConfig.getReturnUrl();
-
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-        formatter.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        String vnpCreateDate = formatter.format(cld.getTime());
-        cld.add(Calendar.MINUTE, 15);
-        String vnpExpireDate = formatter.format(cld.getTime());
-
-        String clientIp = VNPayConfig.getIpAddress(request);
-
-        Map<String, String> vnpParams = new HashMap<>();
-        vnpParams.put("vnp_Version", "2.1.0");
-        vnpParams.put("vnp_Command", "pay");
-        vnpParams.put("vnp_TmnCode", vnPayConfig.getTmnCode());
-        vnpParams.put("vnp_Amount", String.valueOf(amountForVnPay));
-        vnpParams.put("vnp_CurrCode", "VND");
-        vnpParams.put("vnp_TxnRef", vnpTxnRef);
-        vnpParams.put("vnp_OrderInfo", "Mua " + plan.getName() + " tren san CANi");
-        vnpParams.put("vnp_OrderType", "other");
-        vnpParams.put("vnp_Locale", "vn");
-        vnpParams.put("vnp_ReturnUrl", returnUrl);
-        vnpParams.put("vnp_IpAddr", clientIp);
-        vnpParams.put("vnp_CreateDate", vnpCreateDate);
-        vnpParams.put("vnp_ExpireDate", vnpExpireDate);
-
-        // Tạo query string và mã băm SHA-512
-        List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
-        Collections.sort(fieldNames);
-        StringBuilder hashData = new StringBuilder();
-        StringBuilder query = new StringBuilder();
-
-        Iterator<String> itr = fieldNames.iterator();
-        while (itr.hasNext()) {
-            String fieldName = itr.next();
-            String fieldValue = vnpParams.get(fieldName);
-            if (fieldValue != null && !fieldValue.isEmpty()) {
-                hashData.append(fieldName).append('=').append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII))
-                        .append('=')
-                        .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
-                if (itr.hasNext()) {
-                    query.append('&');
-                    hashData.append('&');
-                }
-            }
-        }
-
-        String vnpSecureHash = vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), hashData.toString());
-        query.append("&vnp_SecureHash=").append(vnpSecureHash);
-        String paymentUrl = vnPayConfig.getPayUrl() + "?" + query;
-
-        log.info("EO {} khởi tạo phiên thanh toán VNPay: TxnRef={}, Plan={}, Amount={}",
-                eo.getEoId(), vnpTxnRef, plan.getPlanType(), plan.getPrice());
-
-        return PurchaseSubscriptionResponseDto.builder()
-                .paymentUrl(paymentUrl)
-                .txnRef(vnpTxnRef)
-                .planType(plan.getPlanType())
-                .planName(plan.getName())
-                .amount(plan.getPrice())
-                .orderInfo(vnpParams.get("vnp_OrderInfo"))
-                .isDemo(false)
-                .build();
-    }
-
-    // =========================================================================
-    // UC-11: XỬ LÝ KẾT QUẢ THANH TOÁN VNPAY (CALLBACK / IPN)
-    // =========================================================================
-    @Transactional
-    public SubscriptionResponseDto processVNPayCallback(Map<String, String> queryParams) {
-        String vnpSecureHash = queryParams.get("vnp_SecureHash");
-        if (vnpSecureHash == null || vnpSecureHash.isBlank()) {
-            throw new BadRequestException("Thiếu mã băm bảo mật vnp_SecureHash");
-        }
-
-        Map<String, String> fields = new HashMap<>(queryParams);
-        fields.remove("vnp_SecureHash");
-        fields.remove("vnp_SecureHashType");
-
-        String calculatedHash = vnPayConfig.hashAllFields(fields);
-        if (!calculatedHash.equalsIgnoreCase(vnpSecureHash)) {
-            log.error("Sai chữ ký bảo mật VNPay! Calculated: {}, Received: {}", calculatedHash, vnpSecureHash);
-            throw new BadRequestException("Chữ ký bảo mật VNPay không hợp lệ (Checksum mismatch)");
-        }
-
-        String responseCode = queryParams.get("vnp_ResponseCode");
-        String txnRef = queryParams.get("vnp_TxnRef");
-        String transactionNo = queryParams.get("vnp_TransactionNo");
-
-        PendingOrder order = pendingOrders.remove(txnRef);
-        if (order == null) {
-            log.warn("Không tìm thấy đơn hàng chờ cho TxnRef: {}", txnRef);
-            throw new ResourceNotFoundException("Giao dịch không tồn tại hoặc đã xử lý trước đó: " + txnRef);
-        }
-
-        if (!"00".equals(responseCode)) {
-            log.warn("Giao dịch VNPay thất bại hoặc bị hủy: TxnRef={}, ResponseCode={}", txnRef, responseCode);
-            throw new BadRequestException("Thanh toán không thành công qua VNPay (Mã lỗi: " + responseCode + ")");
-        }
-
-        EventOrganizer eo = eventOrganizerRepository.findById(order.eoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhà tổ chức: " + order.eoId()));
-
-        return activateSubscription(eo, order.planType(), "VNPAY", txnRef, transactionNo);
     }
 
     // =========================================================================
@@ -292,10 +176,15 @@ public class SubscriptionService {
         List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
 
         if (activeSubs.isEmpty()) {
-            if (strictQuotaEnforcement) {
-                throw new BadRequestException("Bạn cần mua Gói dịch vụ (Gói Invite Mode 50.000đ hoặc Matching Mode 80.000đ) để tạo sự kiện.");
+            // Tự động cấp Gói Trải Nghiệm Khởi Nghiệp Miễn Phí (2 sự kiện) nếu đây là EO mới chưa có gói
+            log.info("EO {} chưa có gói: Tự động kích hoạt Gói Trải Nghiệm Miễn Phí (FREE_TRIAL) 2 sự kiện", eo.getEoId());
+            SubscriptionResponseDto freeSubDto = activateSubscription(eo, PlanType.FREE_TRIAL, "FREE_WELCOME", "FREE_" + System.currentTimeMillis(), "WELCOME_BONUS");
+            Subscription freeSub = subscriptionRepository.findById(freeSubDto.getSubscriptionId()).orElse(null);
+            if (freeSub != null) {
+                activeSubs = List.of(freeSub);
+            } else if (strictQuotaEnforcement) {
+                throw new BadRequestException("Bạn cần mua Gói dịch vụ để tạo sự kiện.");
             } else {
-                log.info("Chế độ Demo/Dev: EO {} chưa có gói nhưng strict = false, cho phép tạo sự kiện tự do.", eo.getEoId());
                 return;
             }
         }
@@ -306,7 +195,7 @@ public class SubscriptionService {
 
         if (used >= max) {
             if (strictQuotaEnforcement) {
-                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện (" + used + "/" + max + "). Vui lòng mua thêm gói để tiếp tục.");
+                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện của gói (" + used + "/" + max + "). Vui lòng nâng cấp gói tại mục Gói Dịch Vụ để tiếp tục.");
             } else {
                 log.info("Chế độ Demo/Dev: EO {} đã hết quota ({}/{}) nhưng strict = false, tiếp tục cho phép.", eo.getEoId(), used, max);
             }
@@ -329,10 +218,25 @@ public class SubscriptionService {
         EventOrganizer eo = getEoOrThrow(userId);
         SubscriptionPlanDto plan = getPlanDefinition(dto.getPlanType());
 
+        // Nếu là gói miễn phí trải nghiệm (0đ), kích hoạt trực tiếp không cần qua cổng thanh toán
+        if (plan.getPrice().compareTo(BigDecimal.ZERO) == 0) {
+            activateSubscription(eo, plan.getPlanType(), "FREE_PROMO", "FREE_" + System.currentTimeMillis(), "WELCOME_FREE");
+            return PayOSPaymentResponseDto.builder()
+                    .orderCode(System.currentTimeMillis())
+                    .amount(0)
+                    .description("Kích hoạt Gói Trải Nghiệm thành công")
+                    .status("PAID")
+                    .checkoutUrl("")
+                    .build();
+        }
+
         long orderCode = Math.abs(System.currentTimeMillis() % 900000000L) + 100000000L;
         pendingOrders.put("PAYOS_" + orderCode, new PendingOrder(eo.getEoId(), plan.getPlanType(), plan.getPrice(), Instant.now()));
 
-        String desc = "CANI " + (plan.getPlanType() == PlanType.INVITE_ONLY ? "INVITE 50K" : "MATCH 80K");
+        String desc = "CANI " + plan.getName();
+        if (desc.length() > 25) {
+            desc = desc.substring(0, 25);
+        }
         String buyerName = eo.getUser() != null ? eo.getUser().getFullName() : "Khach hang CANi";
         String buyerEmail = eo.getUser() != null ? eo.getUser().getEmail() : "user@cani.vn";
 

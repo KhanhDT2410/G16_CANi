@@ -2,11 +2,12 @@ import { useState, useMemo } from 'react';
 import { useFaqs } from '../hooks/useFaqs';
 import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG, FAQ_STATUS, FAQ_STATUS_CONFIG } from '../types/faq.constants';
 import FaqCard from './FaqCard';
-import FaqEditorModal from './FaqEditorModal';
+import FaqEditorView from './FaqEditorView';
 import './Faq.css';
 
 /**
  * Màn hình Quản trị Câu hỏi thường gặp (Admin & Customer Care - ADM-08).
+ * Hỗ trợ chuyển đổi giữa danh sách và màn hình soạn thảo dạng card/view trực quan.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const FaqView = () => {
@@ -20,24 +21,24 @@ export const FaqView = () => {
     archiveFaq,
   } = useFaqs('admin');
 
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'editor'
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState(null);
 
   const handleOpenCreate = () => {
     setEditingFaq(null);
-    setIsModalOpen(true);
+    setViewMode('editor');
   };
 
   const handleOpenEdit = (faq) => {
     setEditingFaq(faq);
-    setIsModalOpen(true);
+    setViewMode('editor');
   };
 
-  const handleModalSubmit = async (payload, shouldPublish = false) => {
+  const handleEditorSubmit = async (payload, shouldPublish = false) => {
     try {
       if (editingFaq?.id) {
         await updateFaq(editingFaq.id, payload);
@@ -50,10 +51,10 @@ export const FaqView = () => {
           await publishFaq(created.id);
         }
       }
-      setIsModalOpen(false);
+      setViewMode('list');
       setEditingFaq(null);
     } catch {
-      // Lỗi đã được hiển thị toast qua useFaqs
+      // Thông báo lỗi đã được useFaqs xử lý qua showToast
     }
   };
 
@@ -64,8 +65,9 @@ export const FaqView = () => {
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const qMatch = f.question?.toLowerCase().includes(term);
+        const sMatch = f.summary?.toLowerCase().includes(term);
         const aMatch = f.answer?.toLowerCase().includes(term);
-        if (!qMatch && !aMatch) return false;
+        if (!qMatch && !sMatch && !aMatch) return false;
       }
       return true;
     });
@@ -78,6 +80,20 @@ export const FaqView = () => {
       return 0;
     });
   }, [faqs, activeStatus, activeCategory, searchTerm, sortBy]);
+
+  if (viewMode === 'editor') {
+    return (
+      <FaqEditorView
+        faq={editingFaq}
+        onBack={() => {
+          setViewMode('list');
+          setEditingFaq(null);
+        }}
+        onSubmit={handleEditorSubmit}
+        loading={loading}
+      />
+    );
+  }
 
   return (
     <div className="faq-view-container">
@@ -135,7 +151,7 @@ export const FaqView = () => {
         <div className="faq-search-inline">
           <input
             type="text"
-            placeholder="Tìm kiếm theo tiêu đề câu hỏi hoặc đáp án..."
+            placeholder="Tìm kiếm theo tiêu đề câu hỏi, tóm tắt hoặc đáp án..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -166,18 +182,6 @@ export const FaqView = () => {
           ))
         )}
       </div>
-
-      {/* Modal Editor */}
-      <FaqEditorModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingFaq(null);
-        }}
-        onSubmit={handleModalSubmit}
-        initialFaq={editingFaq}
-        loading={loading}
-      />
     </div>
   );
 };

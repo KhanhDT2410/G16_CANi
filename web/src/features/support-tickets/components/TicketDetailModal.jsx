@@ -88,6 +88,9 @@ export const TicketDetailModal = ({
             slaDeadline={ticket.slaDeadline}
             assignedTo={ticket.assignedTo}
             formatDateTime={formatDateTime}
+            customerName={ticket.userName}
+            customerPhone={ticket.userPhone}
+            customerEmail={ticket.userEmail}
           />
 
           <div>

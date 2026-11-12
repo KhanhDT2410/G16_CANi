@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { FAQ_CATEGORY_CONFIG, FAQ_STATUS_CONFIG } from '../types/faq.constants';
 
 /**
@@ -89,7 +90,16 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
       {/* Chi tiết nội dung bung ra khi click vào tiêu đề */}
       {isExpanded && (
         <div className="faq-accordion-body">
-          <div className="faq-answer-content">{faq.answer}</div>
+          {faq.summary && (
+            <div className="faq-summary-box">
+              <strong>Tóm tắt:</strong> {faq.summary}
+            </div>
+          )}
+          {/<[a-z][\s\S]*>/i.test(faq.answer || '') ? (
+            <div className="faq-answer-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(faq.answer) }} />
+          ) : (
+            <div className="faq-answer-content">{faq.answer}</div>
+          )}
 
           {/* Phần ảnh / tệp đính kèm (ADM-08) */}
           {hasAttachment && (

@@ -36,4 +36,7 @@ public class ShiftAssignmentResponseDto {
     private Instant checkoutTime;
     private BigDecimal hoursWorked;
     private Instant createdAt;
+    private String imageUrl;
+    private String proofImageUrl;
+    private Instant proofSubmittedAt;
 }

@@ -34,4 +34,5 @@ public class JobProposalResponseDto {
     private Instant expiresAt;
     private AssignmentSource source;
     private Instant createdAt;
+    private String imageUrl;
 }

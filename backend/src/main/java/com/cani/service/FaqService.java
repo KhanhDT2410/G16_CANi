@@ -97,6 +97,7 @@ public class FaqService {
         Faq faq = Faq.builder()
                 .category(req.getCategory())
                 .question(req.getQuestion().trim())
+                .summary(req.getSummary() != null && !req.getSummary().isBlank() ? req.getSummary().trim() : null)
                 .answer(req.getAnswer().trim())
                 .imageUrl(req.getImageUrl() != null && !req.getImageUrl().isBlank() ? req.getImageUrl().trim() : null)
                 .attachmentUrl(req.getAttachmentUrl() != null && !req.getAttachmentUrl().isBlank() ? req.getAttachmentUrl().trim() : null)
@@ -129,6 +130,7 @@ public class FaqService {
 
         faq.setCategory(req.getCategory());
         faq.setQuestion(req.getQuestion().trim());
+        faq.setSummary(req.getSummary() != null && !req.getSummary().isBlank() ? req.getSummary().trim() : null);
         faq.setAnswer(req.getAnswer().trim());
         faq.setImageUrl(req.getImageUrl() != null && !req.getImageUrl().isBlank() ? req.getImageUrl().trim() : null);
         faq.setAttachmentUrl(req.getAttachmentUrl() != null && !req.getAttachmentUrl().isBlank() ? req.getAttachmentUrl().trim() : null);
@@ -283,6 +285,7 @@ public class FaqService {
                 .id(faq.getId())
                 .category(faq.getCategory())
                 .question(faq.getQuestion())
+                .summary(faq.getSummary())
                 .answer(faq.getAnswer())
                 .imageUrl(faq.getImageUrl())
                 .attachmentUrl(faq.getAttachmentUrl())
@@ -303,6 +306,7 @@ public class FaqService {
                 .id(faq.getId())
                 .category(faq.getCategory())
                 .question(faq.getQuestion())
+                .summary(faq.getSummary())
                 .answer(faq.getAnswer())
                 .imageUrl(faq.getImageUrl())
                 .attachmentUrl(faq.getAttachmentUrl())

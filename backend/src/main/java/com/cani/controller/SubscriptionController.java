@@ -3,13 +3,11 @@ package com.cani.controller;
 import com.cani.dto.response.ApiResponse;
 import com.cani.dto.subscription.PayOSPaymentResponseDto;
 import com.cani.dto.subscription.PurchaseSubscriptionRequestDto;
-import com.cani.dto.subscription.PurchaseSubscriptionResponseDto;
 import com.cani.dto.subscription.SubscriptionPlanDto;
 import com.cani.dto.subscription.SubscriptionResponseDto;
 import com.cani.entity.enums.PlanType;
 import com.cani.security.SecurityUtils;
 import com.cani.service.SubscriptionService;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,31 +58,6 @@ public class SubscriptionController {
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         return ResponseEntity.ok(ApiResponse.ok(subscriptionService.getSubscriptionHistory(userId), "Lấy lịch sử mua gói cước thành công"));
-    }
-
-    /**
-     * UC-11: Khởi tạo phiên thanh toán VNPay
-     */
-    @PostMapping("/purchase")
-    public ResponseEntity<ApiResponse<PurchaseSubscriptionResponseDto>> purchaseSubscription(
-            @Valid @RequestBody PurchaseSubscriptionRequestDto request,
-            Authentication authentication,
-            HttpServletRequest servletRequest
-    ) {
-        UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        PurchaseSubscriptionResponseDto response = subscriptionService.createVNPayPaymentSession(userId, request, servletRequest);
-        return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo giao dịch VNPay thành công. Chuyển hướng để thanh toán."));
-    }
-
-    /**
-     * UC-11: Nhận kết quả callback từ VNPay
-     */
-    @GetMapping("/vnpay-callback")
-    public ResponseEntity<ApiResponse<SubscriptionResponseDto>> vnpayCallback(
-            @RequestParam Map<String, String> queryParams
-    ) {
-        SubscriptionResponseDto result = subscriptionService.processVNPayCallback(queryParams);
-        return ResponseEntity.ok(ApiResponse.ok(result, "Xác thực thanh toán VNPay thành công! Gói dịch vụ đã được kích hoạt."));
     }
 
     /**

@@ -37,6 +37,9 @@ public class Faq {
     @Column(name = "question", nullable = false, length = 500)
     private String question;
 
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String summary;
+
     @Column(name = "answer", nullable = false, columnDefinition = "TEXT")
     private String answer;
 

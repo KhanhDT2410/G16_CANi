@@ -51,9 +51,22 @@ const RateWorkerModal = ({
   return (
     <div className="eo-modal-overlay">
       <div className="eo-modal-box" style={{ maxWidth: 520 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0 }}>Đánh Giá Nhân Sự Sau Ca Làm</h3>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}>Đóng</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Đánh Giá Nhân Sự Sau Ca Làm</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              color: '#64748b',
+              fontWeight: 600,
+            }}
+          >
+            Đóng
+          </button>
         </div>
 
         <div style={{ background: '#f8fafc', padding: '0.8rem 1rem', borderRadius: 8, marginBottom: '1.2rem', border: '1px solid #e2e8f0' }}>
@@ -177,12 +190,12 @@ const RateWorkerModal = ({
             />
           </div>
 
-          <div className="eo-form-actions">
-            <button type="button" className="eo-btn-cancel" onClick={onClose}>
-              Đóng
+          <div className="eo-modal-footer">
+            <button type="button" className="eo-btn-secondary" onClick={onClose}>
+              Hủy Bỏ
             </button>
-            <button type="submit" className="eo-btn-submit" disabled={submitting}>
-              {submitting ? 'Đang lưu đánh giá...' : '⭐ Gửi Đánh Giá'}
+            <button type="submit" className="eo-btn-primary" disabled={submitting}>
+              {submitting ? 'Đang lưu đánh giá...' : 'Gửi Đánh Giá'}
             </button>
           </div>
         </form>

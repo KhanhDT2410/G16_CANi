@@ -147,13 +147,14 @@ public class EventOrganizerEkycService {
                 status = "PENDING_REVIEW";
             }
 
-            // Nếu nộp giấy phép ĐKKD (Hộ kinh doanh / Doanh nghiệp), bắt buộc chuyển PENDING_REVIEW để Admin thẩm định và xác nhận
-            boolean hasBusinessLicense = (businessLicenseFile != null && !businessLicenseFile.isEmpty());
-            if (hasBusinessLicense && !"REJECTED".equals(status)) {
+            // Nếu đăng ký tư cách Hộ kinh doanh / Doanh nghiệp (có MST) hoặc có nộp GPKD, bắt buộc chuyển PENDING_REVIEW để Admin thẩm định
+            boolean isBusiness = (eo.getTaxId() != null && !eo.getTaxId().isBlank())
+                    || (businessLicenseFile != null && !businessLicenseFile.isEmpty());
+            if (isBusiness && !"REJECTED".equals(status)) {
                 decision = "MANUAL_REVIEW";
                 status = "PENDING_REVIEW";
                 result.setRoutingDecision("MANUAL_REVIEW");
-                result.setRoutingReason("Hồ sơ đăng ký Hộ kinh doanh kèm Giấy phép ĐKKD đang chờ Admin kiểm tra và xác nhận.");
+                result.setRoutingReason("Hồ sơ đăng ký Hộ kinh doanh đang chờ Admin kiểm tra và xác nhận tư cách pháp nhân.");
             }
 
             // Mock link storage (Trong thực tế sẽ upload lên S3/Firebase/Supabase Storage)
@@ -256,10 +257,12 @@ public class EventOrganizerEkycService {
         String businessLicenseUrl = latestVerification != null ? latestVerification.getBusinessLicenseUrl() : null;
         String businessVerificationStatus = "NOT_REGISTERED";
         if (eo.getTaxId() != null && !eo.getTaxId().isBlank()) {
-            if (latestVerification != null && latestVerification.getBusinessLicenseUrl() != null) {
-                businessVerificationStatus = latestVerification.getStatus(); // "PENDING_REVIEW", "APPROVED", "REJECTED"
+            if (eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED) {
+                businessVerificationStatus = "APPROVED";
+            } else if (eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.REJECTED) {
+                businessVerificationStatus = "REJECTED";
             } else {
-                businessVerificationStatus = "AWAITING_LICENSE_UPLOAD";
+                businessVerificationStatus = "PENDING_REVIEW";
             }
         }
 

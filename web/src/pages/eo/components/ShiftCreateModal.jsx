@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { eoService } from '../../../services/eoService';
+import { showToast } from '../../../components/common/Toast';
 
 /**
  * ShiftCreateModal
@@ -17,6 +19,33 @@ const ShiftCreateModal = ({
   calculateShiftTotal,
 }) => {
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn tệp hình ảnh (JPG, PNG, WEBP, GIF)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Dung lượng ảnh tối đa là 5MB', 'error');
+      return;
+    }
+    setUploadingImg(true);
+    try {
+      const res = await eoService.uploadImage(file);
+      const url = res.url || res;
+      setNewShift((prev) => ({ ...prev, imageUrl: url }));
+      showToast('Tải ảnh ca làm việc thành công!', 'success');
+    } catch (err) {
+      showToast('Lỗi khi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploadingImg(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -81,22 +110,60 @@ const ShiftCreateModal = ({
                 <option key={role} value={role} />
               ))}
             </datalist>
+          </div>
 
-            {/* Gợi ý Ma trận Lương */}
-            {wageRecommendationsMap[newShift.jobType] && (
-              <div className="wage-recommendation-badge animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
-                <div>
-                  <strong>Gợi ý Ma trận Lương:</strong>{' '}
-                  <span className="wage-range">
-                    {wageRecommendationsMap[newShift.jobType].min.toLocaleString()} đ -{' '}
-                    {wageRecommendationsMap[newShift.jobType].max.toLocaleString()} đ / giờ
-                  </span>
-                  <div className="wage-subnote">
-                    Đặc điểm: {wageRecommendationsMap[newShift.jobType].note}
-                  </div>
+          {/* Hình ảnh minh họa ca làm / Đồng phục */}
+          <div className="eo-form-group">
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>Hỗ trợ JPG, PNG (Tối đa 5MB)</span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImageUpload}
+              />
+              <button
+                type="button"
+                disabled={uploadingImg}
+                onClick={() => fileInputRef.current?.click()}
+                className="eo-btn-secondary"
+                style={{ fontSize: '0.825rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
+              >
+                <span>📁 {uploadingImg ? 'Đang tải...' : 'Tải từ máy'}</span>
+              </button>
+
+              <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>hoặc</span>
+
+              <input
+                type="url"
+                className="eo-form-input"
+                placeholder="Dán link ảnh đồng phục (https://...)"
+                value={newShift.imageUrl || ''}
+                onChange={(e) => setNewShift({ ...newShift, imageUrl: e.target.value })}
+                style={{ flex: 1 }}
+              />
+              {newShift.imageUrl && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <img
+                    src={newShift.imageUrl}
+                    alt="Preview"
+                    style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #cbd5e1' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNewShift({ ...newShift, imageUrl: '' })}
+                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    Gỡ
+                  </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Mô tả công việc */}

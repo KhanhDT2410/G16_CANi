@@ -15,6 +15,9 @@ class NearbyShiftItem {
   final int requiredWorkers;
   final int confirmedWorkers;
   final int remainingWorkers;
+  final String? imageUrl;
+  final bool isConflicting;
+  final String? conflictReason;
 
   const NearbyShiftItem({
     required this.shiftId,
@@ -33,6 +36,9 @@ class NearbyShiftItem {
     required this.requiredWorkers,
     required this.confirmedWorkers,
     required this.remainingWorkers,
+    this.imageUrl,
+    this.isConflicting = false,
+    this.conflictReason,
   });
 
   factory NearbyShiftItem.fromJson(Map<String, dynamic> json) {
@@ -47,12 +53,15 @@ class NearbyShiftItem {
       locationLng: (json['locationLng'] as num?)?.toDouble() ?? 106.7009,
       hourlyWage: (json['hourlyWage'] as num?)?.toDouble() ?? 0.0,
       allowance: (json['allowance'] as num?)?.toDouble() ?? 0.0,
-      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'] as String) : null,
-      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'] as String) : null,
+      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'] as String)?.toLocal() : null,
+      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'] as String)?.toLocal() : null,
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       requiredWorkers: (json['requiredWorkers'] as num?)?.toInt() ?? 1,
       confirmedWorkers: (json['confirmedWorkers'] as num?)?.toInt() ?? 0,
       remainingWorkers: (json['remainingWorkers'] as num?)?.toInt() ?? 1,
+      imageUrl: json['imageUrl'] as String?,
+      isConflicting: json['isConflicting'] as bool? ?? false,
+      conflictReason: json['conflictReason'] as String?,
     );
   }
 }

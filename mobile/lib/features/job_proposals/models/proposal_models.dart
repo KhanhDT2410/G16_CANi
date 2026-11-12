@@ -13,6 +13,7 @@ class JobProposalItem {
   final double totalEstimatedPay;
   final double matchScore;
   final String status;
+  final String? imageUrl;
 
   JobProposalItem({
     required this.proposalId,
@@ -29,6 +30,7 @@ class JobProposalItem {
     required this.totalEstimatedPay,
     required this.matchScore,
     required this.status,
+    this.imageUrl,
   });
 
   factory JobProposalItem.fromJson(Map<String, dynamic> json) {
@@ -40,13 +42,14 @@ class JobProposalItem {
       venueAddress: json['venueAddress'] ?? '',
       jobType: json['jobType'] ?? '',
       description: json['description'] ?? '',
-      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime']) ?? DateTime.now() : DateTime.now(),
-      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime']) ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
+      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'])?.toLocal() ?? DateTime.now() : DateTime.now(),
+      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'])?.toLocal() ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
       hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
       allowance: (json['allowance'] is num) ? (json['allowance'] as num).toDouble() : 0.0,
       totalEstimatedPay: (json['totalEstimatedPay'] is num) ? (json['totalEstimatedPay'] as num).toDouble() : 0.0,
       matchScore: (json['matchScore'] is num) ? (json['matchScore'] as num).toDouble() : 0.0,
       status: json['status'] ?? 'PENDING',
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 }
@@ -72,6 +75,9 @@ class ShiftAssignmentItem {
   final DateTime? checkinTime;
   final DateTime? checkoutTime;
   final double? hoursWorked;
+  final String? imageUrl;
+  final String? proofImageUrl;
+  final DateTime? proofSubmittedAt;
 
   ShiftAssignmentItem({
     required this.assignmentId,
@@ -94,6 +100,9 @@ class ShiftAssignmentItem {
     this.checkinTime,
     this.checkoutTime,
     this.hoursWorked,
+    this.imageUrl,
+    this.proofImageUrl,
+    this.proofSubmittedAt,
   });
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
@@ -104,8 +113,8 @@ class ShiftAssignmentItem {
       eventName: json['eventName'] ?? 'Sự kiện',
       venueAddress: json['venueAddress'] ?? '',
       jobType: json['jobType'] ?? '',
-      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime']) ?? DateTime.now() : DateTime.now(),
-      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime']) ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
+      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'])?.toLocal() ?? DateTime.now() : DateTime.now(),
+      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'])?.toLocal() ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
       hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
       totalPay: (json['totalPay'] is num) ? (json['totalPay'] as num).toDouble() : 0.0,
       status: json['status'] ?? 'CONFIRMED',
@@ -115,9 +124,12 @@ class ShiftAssignmentItem {
       venueLat: (json['venueLat'] is num) ? (json['venueLat'] as num).toDouble() : null,
       venueLng: (json['venueLng'] is num) ? (json['venueLng'] as num).toDouble() : null,
       attendanceStatus: json['attendanceStatus'],
-      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime']) : null,
-      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime']) : null,
+      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime'])?.toLocal() : null,
+      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime'])?.toLocal() : null,
       hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
+      imageUrl: json['imageUrl'] as String?,
+      proofImageUrl: json['proofImageUrl'] as String?,
+      proofSubmittedAt: json['proofSubmittedAt'] != null ? DateTime.tryParse(json['proofSubmittedAt'])?.toLocal() : null,
     );
   }
 }
@@ -131,6 +143,7 @@ class AttendanceCheckResult {
   final DateTime? checkoutTime;
   final double? hoursWorked;
   final bool? isOnTime;
+  final String? proofImageUrl;
   final String message;
 
   AttendanceCheckResult({
@@ -142,6 +155,7 @@ class AttendanceCheckResult {
     this.checkoutTime,
     this.hoursWorked,
     this.isOnTime,
+    this.proofImageUrl,
     required this.message,
   });
 
@@ -151,10 +165,11 @@ class AttendanceCheckResult {
       attendanceId: json['attendanceId'],
       attendanceStatus: json['attendanceStatus'],
       assignmentStatus: json['assignmentStatus'],
-      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime']) : null,
-      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime']) : null,
+      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime'])?.toLocal() : null,
+      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime'])?.toLocal() : null,
       hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
       isOnTime: json['isOnTime'] ?? true,
+      proofImageUrl: json['proofImageUrl'] as String?,
       message: json['message'] ?? 'Thành công',
     );
   }
@@ -266,43 +281,67 @@ class WorkerPreferencesModel {
 class ShiftChecklistItem {
   final String id;
   final String title;
+  final String? instruction;
   final bool isCompleted;
   final DateTime? completedAt;
+  final String? evidenceImageUrl;
+  final DateTime? evidenceSubmittedAt;
+  final bool isRequiredEvidence;
 
   const ShiftChecklistItem({
     required this.id,
     required this.title,
+    this.instruction,
     this.isCompleted = false,
     this.completedAt,
+    this.evidenceImageUrl,
+    this.evidenceSubmittedAt,
+    this.isRequiredEvidence = true,
   });
 
   factory ShiftChecklistItem.fromJson(Map<String, dynamic> json) {
     return ShiftChecklistItem(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
+      instruction: json['instruction'],
       isCompleted: json['isCompleted'] ?? false,
-      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'].toString()) : null,
+      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'].toString())?.toLocal() : null,
+      evidenceImageUrl: json['evidenceImageUrl'],
+      evidenceSubmittedAt: json['evidenceSubmittedAt'] != null ? DateTime.tryParse(json['evidenceSubmittedAt'].toString())?.toLocal() : null,
+      isRequiredEvidence: json['isRequiredEvidence'] ?? true,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
+        if (instruction != null) 'instruction': instruction,
         'isCompleted': isCompleted,
         if (completedAt != null) 'completedAt': completedAt!.toUtc().toIso8601String(),
+        if (evidenceImageUrl != null) 'evidenceImageUrl': evidenceImageUrl,
+        if (evidenceSubmittedAt != null) 'evidenceSubmittedAt': evidenceSubmittedAt!.toUtc().toIso8601String(),
+        'isRequiredEvidence': isRequiredEvidence,
       };
 
   ShiftChecklistItem copyWith({
     String? id,
     String? title,
+    String? instruction,
     bool? isCompleted,
     DateTime? completedAt,
+    String? evidenceImageUrl,
+    DateTime? evidenceSubmittedAt,
+    bool? isRequiredEvidence,
   }) {
     return ShiftChecklistItem(
       id: id ?? this.id,
       title: title ?? this.title,
+      instruction: instruction ?? this.instruction,
       isCompleted: isCompleted ?? this.isCompleted,
       completedAt: completedAt ?? this.completedAt,
+      evidenceImageUrl: evidenceImageUrl ?? this.evidenceImageUrl,
+      evidenceSubmittedAt: evidenceSubmittedAt ?? this.evidenceSubmittedAt,
+      isRequiredEvidence: isRequiredEvidence ?? this.isRequiredEvidence,
     );
   }
 }

@@ -50,7 +50,6 @@ export const CustomerCareSidebar = ({
       <div className="cc-sidebar-header">
         {!collapsed && (
           <div className="cc-sidebar-brand">
-            <span className="cc-brand-badge">CSKH</span>
             <span className="cc-brand-title">Cổng Chăm Sóc Khách Hàng</span>
           </div>
         )}

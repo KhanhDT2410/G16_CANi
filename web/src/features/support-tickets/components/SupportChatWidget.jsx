@@ -24,6 +24,7 @@ const QUICK_FAQS = [
 
 export const SupportChatWidget = () => {
   const { user } = useAuth();
+  const isStaff = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -42,6 +43,8 @@ export const SupportChatWidget = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
+
+  if (isStaff) return null;
 
   const handleSend = async (customText = null) => {
     const textToSend = customText || inputText.trim();

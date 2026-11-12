@@ -17,8 +17,17 @@ public class ShiftChecklistItemDto {
 
     private String title;
 
+    private String instruction;
+
     @Builder.Default
     private Boolean isCompleted = false;
 
     private Instant completedAt;
+
+    private String evidenceImageUrl;
+
+    private Instant evidenceSubmittedAt;
+
+    @Builder.Default
+    private Boolean isRequiredEvidence = true;
 }

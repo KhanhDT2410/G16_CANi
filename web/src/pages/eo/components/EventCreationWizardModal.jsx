@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
-import { ROLES, WAGE_RECOMMENDATIONS_MAP } from '../hooks/useShifts';
+import { ROLES } from '../hooks/useShifts';
 import { getCoordinatesFromAddress } from '../utils/geoUtils';
+import VenueLocationPicker from './VenueLocationPicker';
 
 /**
  * EventCreationWizardModal
- * Quy trình liên hoàn 4 bước (Clean Enterprise UI - No Emoji): 
- * 1. Tạo Event
- * 2. Tạo nhiều Ca làm việc (Shifts) kèm Giá tiền, Thời gian, Số người, Mô tả, Checklist, nút Thêm ca & Xóa ca
- * 3. Thanh toán gói cước (PayOS VietQR MBBank hoặc Trừ Quota)
- * 4. Bắt đầu Matching Radar
+ * Quy trình liên hoàn 3 bước (Clean Enterprise UI):
+ * 1. Khởi tạo Sự kiện & Địa điểm (Google Maps Picker)
+ * 2. Thiết lập Danh sách Ca làm việc (Shifts) kèm Ảnh đồng phục/khu vực
+ * 3. Xác nhận & Kích hoạt Matching Radar AI (Áp dụng gói cước / Ưu đãi trải nghiệm)
  */
 const EventCreationWizardModal = ({
   isOpen,
@@ -25,20 +25,47 @@ const EventCreationWizardModal = ({
   const [submitting, setSubmitting] = useState(false);
   const [createdEvent, setCreatedEvent] = useState(null);
   
+  // State upload ảnh từ thiết bị
+  const [uploadingEventImg, setUploadingEventImg] = useState(false);
+  const [uploadingShiftImg, setUploadingShiftImg] = useState(false);
+  const eventFileInputRef = React.useRef(null);
+  const shiftFileInputRef = React.useRef(null);
+
   // Danh sách các ca làm việc (Shifts) đã thêm vào sự kiện này
   const [shiftsList, setShiftsList] = useState([]);
   const [isAddingShift, setIsAddingShift] = useState(true);
+
+  // Helper định dạng date -> string cho input datetime-local (YYYY-MM-DDTHH:mm)
+  const toDateTimeInputVal = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const formatDateTimeDisplay = (date) => {
+    if (!date) return 'Chưa xác định';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Chưa xác định';
+    return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ngày ${d.toLocaleDateString('vi-VN')}`;
+  };
 
   // State cho Form tạo ca hiện tại
   const [currentShift, setCurrentShift] = useState({
     jobType: ROLES[0],
     description: 'Hỗ trợ công tác đón tiếp khách, hướng dẫn vị trí và điều phối sự kiện theo phân công.',
-    startTime: '2026-11-20T08:00',
+    startTime: newEvent.startTime || '2026-11-20T08:00',
     endTime: '2026-11-20T12:00',
     requiredWorkers: 4,
     hourlyWage: 50000,
     allowance: 20000,
     maxDistanceKm: 15,
+    imageUrl: '',
     checklistItems: [
       'Có mặt trước 20 phút nhận thẻ và vị trí',
       'Đồng phục chỉn chu theo quy định',
@@ -49,10 +76,79 @@ const EventCreationWizardModal = ({
 
   const [newChecklistItem, setNewChecklistItem] = useState('');
 
-  // State cho Bước 3: Thanh toán
-  const [payMethod, setPayMethod] = useState('SUBSCRIPTION'); // 'SUBSCRIPTION' | 'VIETQR'
-  const [payOSData, setPayOSData] = useState(null);
-  const [loadingPayOS, setLoadingPayOS] = useState(false);
+  // Xử lý upload ảnh sự kiện từ thiết bị local
+  const handleEventImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn định dạng file ảnh (JPG, PNG, WEBP, GIF)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Dung lượng ảnh không được vượt quá 5MB', 'error');
+      return;
+    }
+    setUploadingEventImg(true);
+    try {
+      const res = await eoService.uploadImage(file);
+      const url = res.url || res;
+      setNewEvent((prev) => ({ ...prev, imageUrl: url }));
+      showToast('Tải ảnh poster sự kiện thành công!', 'success');
+    } catch (err) {
+      showToast('Lỗi khi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploadingEventImg(false);
+      if (eventFileInputRef.current) eventFileInputRef.current.value = '';
+    }
+  };
+
+  // Xử lý upload ảnh ca làm việc / đồng phục từ thiết bị local
+  const handleShiftImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn định dạng file ảnh (JPG, PNG, WEBP, GIF)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Dung lượng ảnh không được vượt quá 5MB', 'error');
+      return;
+    }
+    setUploadingShiftImg(true);
+    try {
+      const res = await eoService.uploadImage(file);
+      const url = res.url || res;
+      setCurrentShift((prev) => ({ ...prev, imageUrl: url }));
+      showToast('Tải ảnh minh họa ca làm việc thành công!', 'success');
+    } catch (err) {
+      showToast('Lỗi khi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploadingShiftImg(false);
+      if (shiftFileInputRef.current) shiftFileInputRef.current.value = '';
+    }
+  };
+
+  // Tính năng chia ca nhanh thông minh trong khung giờ sự kiện
+  const handleQuickSplit = (splitCount) => {
+    const evtStart = new Date(createdEvent?.startTime || newEvent.startTime);
+    const evtEnd = new Date(createdEvent?.endTime || newEvent.endTime);
+    if (isNaN(evtStart.getTime()) || isNaN(evtEnd.getTime()) || evtStart >= evtEnd) {
+      showToast('Thời gian sự kiện chưa hợp lệ để thực hiện chia ca nhanh', 'error');
+      return;
+    }
+    const totalMs = evtEnd.getTime() - evtStart.getTime();
+    const slotMs = totalMs / splitCount;
+    const currentSlotIndex = Math.min(shiftsList.length, splitCount - 1);
+    const slotStart = new Date(evtStart.getTime() + currentSlotIndex * slotMs);
+    const slotEnd = new Date(evtStart.getTime() + (currentSlotIndex + 1) * slotMs);
+
+    setCurrentShift((prev) => ({
+      ...prev,
+      startTime: toDateTimeInputVal(slotStart),
+      endTime: toDateTimeInputVal(slotEnd),
+    }));
+    showToast(`Đã áp dụng khung giờ Ca #${currentSlotIndex + 1}/${splitCount} (${slotStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${slotEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`, 'info');
+  };
 
   if (!isOpen) return null;
 
@@ -77,11 +173,9 @@ const EventCreationWizardModal = ({
 
   // Đổi vai trò cho ca hiện tại
   const handleRoleChange = (role) => {
-    const rec = WAGE_RECOMMENDATIONS_MAP[role];
     setCurrentShift((prev) => ({
       ...prev,
       jobType: role,
-      hourlyWage: rec ? rec.defaultWage : prev.hourlyWage,
     }));
   };
 
@@ -114,9 +208,30 @@ const EventCreationWizardModal = ({
       return;
     }
 
+    if (!newEvent.startTime || !newEvent.endTime) {
+      showToast('Vui lòng chọn thời gian bắt đầu và kết thúc sự kiện', 'error');
+      return;
+    }
+
+    const evtStart = new Date(newEvent.startTime);
+    const evtEnd = new Date(newEvent.endTime);
+    if (isNaN(evtStart.getTime()) || isNaN(evtEnd.getTime())) {
+      showToast('Thời gian sự kiện không hợp lệ', 'error');
+      return;
+    }
+    if (evtStart >= evtEnd) {
+      showToast('Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện!', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      let eventPayload = { ...newEvent };
+      let eventPayload = {
+        ...newEvent,
+        startTime: evtStart.toISOString(),
+        endTime: evtEnd.toISOString(),
+        eventDate: evtStart.toISOString().substring(0, 10),
+      };
       // Tự động phân giải tọa độ GPS theo địa chỉ nếu có
       if (eventPayload.venueAddress?.trim()) {
         try {
@@ -138,9 +253,20 @@ const EventCreationWizardModal = ({
         evt = await eoService.createEvent(eventPayload);
         setCreatedEvent(evt);
       }
+
+      // Khởi tạo khung giờ cho ca làm đầu tiên khớp theo sự kiện
+      const defaultShiftStart = toDateTimeInputVal(evtStart);
+      const defaultShiftEndMs = Math.min(evtStart.getTime() + 4 * 3600 * 1000, evtEnd.getTime());
+      const defaultShiftEnd = toDateTimeInputVal(new Date(defaultShiftEndMs));
+      setCurrentShift((prev) => ({
+        ...prev,
+        startTime: defaultShiftStart,
+        endTime: defaultShiftEnd,
+      }));
+
       setCurrentStep(2);
       setIsAddingShift(true);
-      showToast('Tạo sự kiện thành công! Hãy tạo các ca làm việc cho sự kiện.', 'success');
+      showToast('Tạo sự kiện thành công! Hãy phân chia các ca làm việc trong sự kiện.', 'success');
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi khi tạo sự kiện', 'error');
     } finally {
@@ -163,6 +289,28 @@ const EventCreationWizardModal = ({
       return;
     }
 
+    // Kiểm tra ràng buộc thời gian ca làm việc trong sự kiện
+    const sStart = new Date(currentShift.startTime);
+    const sEnd = new Date(currentShift.endTime);
+    const eStart = new Date(createdEvent?.startTime || newEvent.startTime);
+    const eEnd = new Date(createdEvent?.endTime || newEvent.endTime);
+
+    if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) {
+      showToast('Vui lòng chọn thời gian bắt đầu và kết thúc ca làm hợp lệ', 'error');
+      return;
+    }
+    if (sStart >= sEnd) {
+      showToast('Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu ca', 'error');
+      return;
+    }
+    if (sStart < eStart || sEnd > eEnd) {
+      showToast(
+        `Ca làm việc (${formatDateTimeDisplay(sStart)} - ${formatDateTimeDisplay(sEnd)}) phải nằm trọn trong thời gian sự kiện (${formatDateTimeDisplay(eStart)} - ${formatDateTimeDisplay(eEnd)})!`,
+        'error'
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const checklistJson = JSON.stringify(
@@ -174,28 +322,37 @@ const EventCreationWizardModal = ({
       );
       const payload = {
         ...currentShift,
+        imageUrl: currentShift.imageUrl?.trim() || null,
         checklist: checklistJson,
-        startTime: new Date(currentShift.startTime).toISOString(),
-        endTime: new Date(currentShift.endTime).toISOString(),
+        startTime: sStart.toISOString(),
+        endTime: sEnd.toISOString(),
       };
 
       const addedShift = await eoService.addShiftToEvent(createdEvent.eventId, payload);
       setShiftsList((prev) => [...prev, addedShift]);
       
-      // Reset form để sẵn sàng tạo ca tiếp theo
+      // Reset form để sẵn sàng tạo ca tiếp theo với giờ tiếp nối
       const nextRoleIndex = (shiftsList.length + 1) % ROLES.length;
       const nextRole = ROLES[nextRoleIndex];
-      const rec = WAGE_RECOMMENDATIONS_MAP[nextRole];
+
+      // Gợi ý giờ ca tiếp theo: bắt đầu từ khi ca trước kết thúc
+      let nextStart = sEnd;
+      let nextEnd = new Date(Math.min(nextStart.getTime() + 4 * 3600 * 1000, eEnd.getTime()));
+      if (nextStart >= eEnd) {
+        nextStart = eStart;
+        nextEnd = new Date(Math.min(nextStart.getTime() + 4 * 3600 * 1000, eEnd.getTime()));
+      }
 
       setCurrentShift({
         jobType: nextRole,
         description: 'Phối hợp thực hiện nhiệm vụ theo kế hoạch tổ chức sự kiện.',
-        startTime: currentShift.startTime,
-        endTime: currentShift.endTime,
+        startTime: toDateTimeInputVal(nextStart),
+        endTime: toDateTimeInputVal(nextEnd),
         requiredWorkers: 2,
-        hourlyWage: rec ? rec.defaultWage : 50000,
+        hourlyWage: 50000,
         allowance: 0,
         maxDistanceKm: 15,
+        imageUrl: '',
         checklistItems: [
           'Có mặt đúng giờ quy định',
           'Quét mã QR Check-in',
@@ -226,46 +383,22 @@ const EventCreationWizardModal = ({
     }
   };
 
-  // CHUYỂN SANG BƯỚC 3 (THANH TOÁN GÓI)
-  const handleProceedToStep3 = async () => {
+  // CHUYỂN SANG BƯỚC 3
+  const handleProceedToStep3 = () => {
     if (shiftsList.length === 0) {
       showToast('Vui lòng thêm ít nhất một ca làm việc trước khi tiếp tục!', 'warning');
       return;
     }
     setCurrentStep(3);
-    initPayOSSession();
   };
 
   // ==========================================
-  // BƯỚC 3: KHỞI TẠO VÀ XỬ LÝ PAYOS VIETQR
+  // BƯỚC 3: KÍCH HOẠT MATCHING RADAR AI
   // ==========================================
   const totalWorkers = shiftsList.reduce((sum, s) => sum + (s.requiredWorkers || 0), 0);
   const totalEstimatedCost = shiftsList.reduce((sum, s) => sum + (Number(s.totalCost) || 0), 0);
-  const platformFee = 50000; // 50k phí đăng tin theo gói
 
-  const initPayOSSession = async () => {
-    setLoadingPayOS(true);
-    try {
-      const res = await eoService.purchaseSubscriptionPayOS({ planType: 'INVITE_ONLY' });
-      if (res) {
-        setPayOSData(res);
-      }
-    } catch (e) {
-      console.warn('Lỗi kết nối PayOS, sử dụng fallback VietQR:', e);
-    } finally {
-      setLoadingPayOS(false);
-    }
-  };
-
-  const handleStep3ConfirmPayment = () => {
-    setCurrentStep(4);
-    showToast('Xác nhận thanh toán thành công! Sẵn sàng kích hoạt Matching.', 'success');
-  };
-
-  // ==========================================
-  // BƯỚC 4: KÍCH HOẠT MATCHING RADAR AI
-  // ==========================================
-  const handleStep4ActivateMatching = async () => {
+  const handleActivateMatching = async () => {
     if (!createdEvent?.eventId) return;
     setSubmitting(true);
     try {
@@ -285,21 +418,13 @@ const EventCreationWizardModal = ({
     setCreatedEvent(null);
     setShiftsList([]);
     setIsAddingShift(true);
-    setPayOSData(null);
     onClose();
   };
-
-  // QR VietQR MBBank chính chủ
-  const eventCode = (createdEvent?.eventId || 'EVT').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase();
-  const transferMemo = `CANI PHI ${eventCode}`;
-  const vietQrUrl = payOSData?.checkoutUrl?.startsWith('http') && payOSData?.checkoutUrl?.includes('vietqr.io')
-    ? payOSData.checkoutUrl
-    : `https://img.vietqr.io/image/MB-2622014789096-compact2.png?amount=${platformFee}&addInfo=${encodeURIComponent(transferMemo)}&accountName=PHAM%20DUY%20HUNG`;
 
   return (
     <div className="eo-modal-overlay">
       <div className="eo-modal-box" style={{ maxWidth: '780px', maxHeight: '92vh', overflowY: 'auto' }}>
-        {/* THANH ĐIỀU HƯỚNG BƯỚC (STEPPER) */}
+        {/* THANH ĐIỀU HƯỚNG BƯỚC (STEPPER 3 BƯỚC GỌN GÀNG) */}
         <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -315,13 +440,12 @@ const EventCreationWizardModal = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
-            <div style={{ position: 'absolute', top: '50%', left: '8%', right: '8%', height: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }} />
+            <div style={{ position: 'absolute', top: '50%', left: '12%', right: '12%', height: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }} />
             
             {[
-              { num: 1, label: '1. Sự Kiện' },
-              { num: 2, label: '2. Các Ca Làm' },
-              { num: 3, label: '3. Thanh Toán' },
-              { num: 4, label: '4. Bắt Đầu Tìm Kiếm' },
+              { num: 1, label: '1. Sự Kiện & Địa Điểm' },
+              { num: 2, label: '2. Các Ca Làm Việc' },
+              { num: 3, label: '3. Kích Hoạt Tìm Kiếm' },
             ].map((st) => {
               const isActive = currentStep === st.num;
               const isPassed = currentStep > st.num;
@@ -335,7 +459,7 @@ const EventCreationWizardModal = ({
                     gap: '0.35rem',
                     zIndex: 1,
                     background: '#ffffff',
-                    padding: '0 0.5rem',
+                    padding: '0 0.75rem',
                   }}
                 >
                   <div
@@ -406,30 +530,113 @@ const EventCreationWizardModal = ({
               />
             </div>
 
+            {/* THỜI GIAN DIỄN RA TOÀN BỘ SỰ KIỆN */}
+            <div className="eo-form-row">
+              <div className="eo-form-group">
+                <label>Thời Gian Bắt Đầu Sự Kiện *</label>
+                <input
+                  type="datetime-local"
+                  required
+                  className="eo-form-input"
+                  value={newEvent.startTime || ''}
+                  onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })}
+                />
+              </div>
+              <div className="eo-form-group">
+                <label>Thời Gian Kết Thúc Sự Kiện *</label>
+                <input
+                  type="datetime-local"
+                  required
+                  className="eo-form-input"
+                  value={newEvent.endTime || ''}
+                  onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* ẢNH BANNER / POSTER SỰ KIỆN */}
             <div className="eo-form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <label style={{ margin: 0 }}>Địa Điểm Tổ Chức *</label>
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Ảnh Poster / Banner Sự Kiện (Tùy chọn)</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hỗ trợ JPG, PNG, WEBP, GIF (Tối đa 5MB)</span>
+              </label>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <input
+                  type="file"
+                  ref={eventFileInputRef}
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleEventImageUpload}
+                />
                 <button
                   type="button"
-                  className="eo-btn-gps"
-                  onClick={onGetCurrentLocation}
-                  disabled={locating}
+                  disabled={uploadingEventImg}
+                  onClick={() => eventFileInputRef.current?.click()}
+                  className="eo-btn-secondary"
+                  style={{
+                    fontSize: '0.825rem',
+                    padding: '0.45rem 0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap',
+                    cursor: uploadingEventImg ? 'not-allowed' : 'pointer'
+                  }}
                 >
-                  {locating ? 'Đang định vị...' : 'Lấy vị trí hiện tại'}
+                  <span>📁 {uploadingEventImg ? 'Đang tải ảnh...' : 'Tải ảnh từ máy'}</span>
                 </button>
+
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>hoặc</span>
+
+                <input
+                  type="url"
+                  className="eo-form-input"
+                  placeholder="Dán link ảnh (https://...)"
+                  value={newEvent.imageUrl || ''}
+                  onChange={(e) => setNewEvent({ ...newEvent, imageUrl: e.target.value })}
+                  style={{ flex: 1 }}
+                />
               </div>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                placeholder="Nhập địa chỉ hoặc bấm nút lấy vị trí hiện tại..."
-                value={newEvent.venueAddress}
-                onChange={(e) => setNewEvent({ ...newEvent, venueAddress: e.target.value })}
-              />
-              <span className="eo-field-helper" style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.35rem', display: 'block' }}>
-                Hệ thống tự động định vị tọa độ GPS để quét và ghép nối nhân sự trong bán kính phù hợp.
-              </span>
+
+              {newEvent.imageUrl && (
+                <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
+                  <img
+                    src={newEvent.imageUrl}
+                    alt="Event Poster Preview"
+                    style={{ width: '80px', height: '48px', objectFit: 'cover', borderRadius: '0.25rem' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <span style={{ fontSize: '0.8rem', color: '#475569', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {newEvent.imageUrl}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setNewEvent({ ...newEvent, imageUrl: '' })}
+                    style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Gỡ ảnh
+                  </button>
+                </div>
+              )}
             </div>
+
+            <VenueLocationPicker
+              address={newEvent.venueAddress}
+              lat={newEvent.venueLat}
+              lng={newEvent.venueLng}
+              onLocationChange={({ address, lat, lng }) => {
+                setNewEvent((prev) => ({
+                  ...prev,
+                  venueAddress: address,
+                  venueLat: lat,
+                  venueLng: lng,
+                }));
+              }}
+              onGetCurrentLocation={onGetCurrentLocation}
+              locating={locating}
+              required
+            />
 
             <div className="eo-modal-footer">
               <button type="button" className="eo-btn-secondary" onClick={handleClose}>
@@ -457,7 +664,7 @@ const EventCreationWizardModal = ({
                   Bước 2: Thiết Lập Danh Sách Ca Làm Việc
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0.25rem 0 0' }}>
-                  Sự kiện: <strong>{createdEvent?.name || newEvent.name}</strong>. Một sự kiện có thể chia làm nhiều ca khác nhau.
+                  Sự kiện: <strong>{createdEvent?.name || newEvent.name}</strong>. Các ca làm việc phải được phân bổ trong khung giờ sự kiện.
                 </p>
               </div>
 
@@ -471,6 +678,70 @@ const EventCreationWizardModal = ({
                   Thêm Ca Mới
                 </button>
               )}
+            </div>
+
+            {/* BANNER THỜI GIAN SỰ KIỆN CHA & CÔNG CỤ CHIA CA NHANH */}
+            <div style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '0.625rem',
+              padding: '0.85rem 1rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e40af', marginBottom: '0.2rem' }}>
+                  ⏰ Khung giờ sự kiện cha:
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 600 }}>
+                  {formatDateTimeDisplay(createdEvent?.startTime || newEvent.startTime)} → {formatDateTimeDisplay(createdEvent?.endTime || newEvent.endTime)}
+                  <span style={{ color: '#2563eb', marginLeft: '0.4rem', fontWeight: 700 }}>
+                    ({getDurationHours(createdEvent?.startTime || newEvent.startTime, createdEvent?.endTime || newEvent.endTime)} tiếng)
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Chia ca nhanh:</span>
+                <button
+                  type="button"
+                  onClick={() => handleQuickSplit(2)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#2563eb',
+                    border: '1px solid #93c5fd',
+                    borderRadius: '0.375rem',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="Tự động chia thời gian sự kiện làm 2 ca (Sáng & Chiều)"
+                >
+                  ⚡ 2 Ca
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickSplit(3)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#2563eb',
+                    border: '1px solid #93c5fd',
+                    borderRadius: '0.375rem',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="Tự động chia thời gian sự kiện làm 3 ca (Sáng - Chiều - Tối)"
+                >
+                  ⚡ 3 Ca
+                </button>
+              </div>
             </div>
 
             {/* DANH SÁCH CÁC CA ĐÃ TẠO */}
@@ -500,28 +771,46 @@ const EventCreationWizardModal = ({
                         boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
                       }}
                     >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                          <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: '0.85rem', padding: '0.2rem 0.5rem', borderRadius: '0.35rem' }}>
-                            Ca #{idx + 1}
-                          </span>
-                          <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{shift.jobType}</strong>
-                          <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 600 }}>
-                            {shift.requiredWorkers} người x {Number(shift.hourlyWage || 0).toLocaleString()} đ/h
-                          </span>
-                        </div>
-
-                        <div style={{ fontSize: '0.825rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
-                          <span>Thời gian: {sHours}h ({new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
-                          <span>Dự toán ca: <strong>{(Number(shift.totalCost) || 0).toLocaleString()} đ</strong></span>
-                          {shift.allowance > 0 && <span>Phụ cấp: {Number(shift.allowance).toLocaleString()} đ</span>}
-                        </div>
-
-                        {shift.description && (
-                          <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.35rem', fontStyle: 'italic' }}>
-                            &ldquo;{shift.description}&rdquo;
-                          </div>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1 }}>
+                        {shift.imageUrl && (
+                          <img
+                            src={shift.imageUrl}
+                            alt={shift.jobType}
+                            style={{
+                              width: '54px',
+                              height: '54px',
+                              objectFit: 'cover',
+                              borderRadius: '0.5rem',
+                              border: '1px solid #cbd5e1',
+                              flexShrink: 0,
+                            }}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
                         )}
+
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                            <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: '0.85rem', padding: '0.2rem 0.5rem', borderRadius: '0.35rem' }}>
+                              Ca #{idx + 1}
+                            </span>
+                            <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{shift.jobType}</strong>
+                            <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 600 }}>
+                              {shift.requiredWorkers} người x {Number(shift.hourlyWage || 0).toLocaleString()} đ/h
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.825rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
+                            <span>Thời gian: {sHours}h ({new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
+                            <span>Dự toán ca: <strong>{(Number(shift.totalCost) || 0).toLocaleString()} đ</strong></span>
+                            {shift.allowance > 0 && <span>Phụ cấp: {Number(shift.allowance).toLocaleString()} đ</span>}
+                          </div>
+
+                          {shift.description && (
+                            <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.35rem', fontStyle: 'italic' }}>
+                              &ldquo;{shift.description}&rdquo;
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <button
@@ -581,21 +870,6 @@ const EventCreationWizardModal = ({
                       <option key={role} value={role} />
                     ))}
                   </datalist>
-
-                  {WAGE_RECOMMENDATIONS_MAP[currentShift.jobType] && (
-                    <div className="wage-recommendation-badge animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
-                      <div>
-                        <strong>Gợi ý Ma trận Lương:</strong>{' '}
-                        <span className="wage-range">
-                          {WAGE_RECOMMENDATIONS_MAP[currentShift.jobType].min.toLocaleString()} đ -{' '}
-                          {WAGE_RECOMMENDATIONS_MAP[currentShift.jobType].max.toLocaleString()} đ / giờ
-                        </span>
-                        <div className="wage-subnote">
-                          Đặc điểm: {WAGE_RECOMMENDATIONS_MAP[currentShift.jobType].note}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Mô tả công việc */}
@@ -609,6 +883,73 @@ const EventCreationWizardModal = ({
                     value={currentShift.description}
                     onChange={(e) => setCurrentShift({ ...currentShift, description: e.target.value })}
                   />
+                </div>
+
+                {/* Ảnh minh họa ca làm / đồng phục */}
+                <div className="eo-form-group">
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hỗ trợ JPG, PNG, WEBP, GIF (Tối đa 5MB)</span>
+                  </label>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <input
+                      type="file"
+                      ref={shiftFileInputRef}
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleShiftImageUpload}
+                    />
+                    <button
+                      type="button"
+                      disabled={uploadingShiftImg}
+                      onClick={() => shiftFileInputRef.current?.click()}
+                      className="eo-btn-secondary"
+                      style={{
+                        fontSize: '0.825rem',
+                        padding: '0.45rem 0.85rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        whiteSpace: 'nowrap',
+                        cursor: uploadingShiftImg ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <span>📁 {uploadingShiftImg ? 'Đang tải ảnh...' : 'Tải ảnh từ máy'}</span>
+                    </button>
+
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>hoặc</span>
+
+                    <input
+                      type="url"
+                      className="eo-form-input"
+                      placeholder="Dán đường dẫn ảnh minh họa đồng phục..."
+                      value={currentShift.imageUrl || ''}
+                      onChange={(e) => setCurrentShift({ ...currentShift, imageUrl: e.target.value })}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+
+                  {currentShift.imageUrl && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
+                      <img
+                        src={currentShift.imageUrl}
+                        alt="Preview"
+                        style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '0.25rem' }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <span style={{ fontSize: '0.8rem', color: '#475569', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {currentShift.imageUrl}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentShift({ ...currentShift, imageUrl: '' })}
+                        style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Gỡ ảnh
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="eo-form-row">
@@ -633,6 +974,35 @@ const EventCreationWizardModal = ({
                     />
                   </div>
                 </div>
+
+                {/* Cảnh báo trực quan nếu thời gian ca làm việc nằm ngoài thời gian sự kiện */}
+                {(() => {
+                  const sS = new Date(currentShift.startTime);
+                  const sE = new Date(currentShift.endTime);
+                  const evS = new Date(createdEvent?.startTime || newEvent.startTime);
+                  const evE = new Date(createdEvent?.endTime || newEvent.endTime);
+                  const isOutOfRange = !isNaN(sS.getTime()) && !isNaN(sE.getTime()) && !isNaN(evS.getTime()) && !isNaN(evE.getTime()) && (sS < evS || sE > evE);
+                  if (isOutOfRange) {
+                    return (
+                      <div style={{
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '0.375rem',
+                        padding: '0.5rem 0.75rem',
+                        fontSize: '0.8rem',
+                        color: '#dc2626',
+                        marginBottom: '0.75rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontWeight: 600
+                      }}>
+                        <span>⚠️ Chú ý: Thời gian ca làm phải nằm trọn trong khung giờ sự kiện ({formatDateTimeDisplay(evS)} - {formatDateTimeDisplay(evE)})</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 <div className="eo-form-row">
                   <div className="eo-form-group">
@@ -748,13 +1118,18 @@ const EventCreationWizardModal = ({
                 </div>
 
                 {/* Hộp dự toán cho ca này */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: '#eff6ff', borderRadius: '0.5rem', marginBottom: '1rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#1e40af' }}>
-                    Dự toán ca này: <strong>{currentDurationHours}h x {currentShift.requiredWorkers} người</strong>
-                  </span>
-                  <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1d4ed8' }}>
-                    {currentShiftTotal.toLocaleString()} đ
-                  </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.85rem 1rem', backgroundColor: '#eff6ff', borderRadius: '0.5rem', marginBottom: '1rem', border: '1px solid #bfdbfe' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#1e40af' }}>
+                      Dự toán thù lao ca này: <strong>{currentDurationHours}h x {currentShift.requiredWorkers} người</strong>
+                    </span>
+                    <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1d4ed8' }}>
+                      {currentShiftTotal.toLocaleString()} đ
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    * Tiền thù lao ca do Nhà tổ chức thanh toán trực tiếp cho nhân sự sau khi hoàn thành ca làm việc (không qua CANi).
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -792,205 +1167,81 @@ const EventCreationWizardModal = ({
         )}
 
         {/* ======================================================== */}
-        {/* BƯỚC 3: XÁC NHẬN GÓI CƯỚC & ƯU ĐÃI (SUBSCRIPTION QUOTA) */}
+        {/* BƯỚC 3: XÁC NHẬN & KÍCH HOẠT TÌM KIẾM (MATCHING RADAR)   */}
         {/* ======================================================== */}
         {currentStep === 3 && (
           <div className="animate-fade-in-up">
             <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>
-              Bước 3: Xác Nhận Hạn Mức Gói Cước & Chính Sách Điều Phối
+              Bước 3: Xác Nhận & Kích Hoạt Tìm Kiếm Nhân Sự
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.25rem' }}>
-              Sự kiện <strong>{createdEvent?.name}</strong> gồm <strong>{shiftsList.length} ca làm việc</strong> và <strong>{totalWorkers} nhân sự cần tuyển</strong>. Áp dụng theo mô hình Gói Cước dịch vụ CANi.
+              Kiểm tra lại thông tin sự kiện và các ca làm việc trước khi Matching Radar AI bắt đầu quét và gửi lời mời đến các ứng viên phù hợp nhất.
             </p>
 
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
-              <button
-                type="button"
-                onClick={() => setPayMethod('SUBSCRIPTION')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: payMethod === 'SUBSCRIPTION' ? '2px solid #10b981' : '1px solid #e2e8f0',
-                  backgroundColor: payMethod === 'SUBSCRIPTION' ? '#f0fdf4' : '#ffffff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  color: payMethod === 'SUBSCRIPTION' ? '#15803d' : '#475569',
-                }}
-              >
-                Gói Hội Viên & Ưu Đãi (Khuyên Dùng)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPayMethod('VIETQR')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  borderRadius: '0.5rem',
-                  border: payMethod === 'VIETQR' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                  backgroundColor: payMethod === 'VIETQR' ? '#eff6ff' : '#ffffff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  color: payMethod === 'VIETQR' ? '#1d4ed8' : '#475569',
-                }}
-              >
-                Nạp Thêm Gói Mới (PayOS VietQR)
-              </button>
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Tên sự kiện:</span>
+                <strong style={{ color: '#0f172a' }}>{createdEvent?.name || newEvent.name}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Địa điểm tổ chức:</span>
+                <span style={{ fontWeight: 600, color: '#1e293b', textAlign: 'right', maxWidth: '65%' }}>
+                  {createdEvent?.venueAddress || newEvent.venueAddress}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Tổng số ca làm việc:</span>
+                <strong>{shiftsList.length} ca</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Tổng nhân sự cần tuyển:</span>
+                <strong style={{ color: '#2563eb' }}>{totalWorkers} nhân sự</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px dashed #cbd5e1' }}>
+                <span style={{ color: '#64748b', fontSize: '0.875rem' }}>Tổng dự toán thù lao ca:</span>
+                <strong style={{ color: '#16a34a', fontSize: '1.05rem' }}>{totalEstimatedCost.toLocaleString()} đ</strong>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.35rem', textAlign: 'right' }}>
+                (Thanh toán trực tiếp cho nhân sự sau khi xong ca)
+              </div>
             </div>
 
-            {payMethod === 'VIETQR' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <img
-                    src={vietQrUrl}
-                    alt="PayOS VietQR MBBank"
-                    style={{ width: '100%', maxWidth: '230px', borderRadius: '0.5rem', border: '1px solid #cbd5e1' }}
-                  />
-                  <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '0.5rem' }}>
-                    {loadingPayOS ? 'Đang kết nối cổng PayOS...' : 'Tự động điền số tiền & nội dung khi quét'}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.875rem' }}>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Ngân hàng thụ hưởng:</span>
-                    <div style={{ fontWeight: 700, color: '#1e293b' }}>MBBank (Quân Đội)</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Số tài khoản:</span>
-                    <div style={{ fontWeight: 700, color: '#2563eb', fontSize: '1.05rem' }}>2622 0147 8909 6</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Chủ tài khoản:</span>
-                    <div style={{ fontWeight: 700, color: '#1e293b' }}>PHAM DUY HUNG</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Số tiền thanh toán:</span>
-                    <div style={{ fontWeight: 700, color: '#dc2626', fontSize: '1.1rem' }}>{platformFee.toLocaleString()} VNĐ</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Nội dung chuyển khoản:</span>
-                    <code style={{ background: '#e2e8f0', padding: '0.2rem 0.4rem', borderRadius: '0.25rem', fontWeight: 700 }}>{transferMemo}</code>
-                  </div>
-
-                  {payOSData?.checkoutUrl && payOSData.checkoutUrl.startsWith('http') && !payOSData.checkoutUrl.includes('vietqr.io') && (
-                    <a
-                      href={payOSData.checkoutUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        marginTop: '0.5rem',
-                        display: 'inline-block',
-                        backgroundColor: '#0284c7',
-                        color: '#ffffff',
-                        padding: '0.5rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        textDecoration: 'none',
-                        fontWeight: 600,
-                        fontSize: '0.8rem',
-                        textAlign: 'center',
-                      }}
-                    >
-                      Mở Cổng Thanh Toán PayOS Checkout
-                    </a>
-                  )}
-                </div>
+            {/* Thông báo chính sách hạn mức gói dịch vụ */}
+            <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.75rem', padding: '1.1rem', marginBottom: '1.5rem' }}>
+              <div style={{ fontWeight: 700, color: '#15803d', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>Chính Sách Gói Dịch Vụ & Ưu Đãi Hội Viên</span>
               </div>
-            )}
-
-            {payMethod === 'SUBSCRIPTION' && (
-              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.75rem', padding: '1.25rem' }}>
-                <div style={{ fontWeight: 700, color: '#15803d', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>🎁</span>
-                  <span>Gói Dịch Vụ Hội Viên / Ưu Đãi Sự Kiện Đầu Tiên</span>
-                </div>
-                <p style={{ fontSize: '0.875rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>
-                  Hệ thống sẽ tự động trừ <strong>1 lượt đăng sự kiện</strong> trong gói dịch vụ của bạn (hoặc tự động kích hoạt <strong>Ưu Đãi Chào Mừng Miễn Phí</strong> nếu đây là sự kiện đầu tiên của bạn). Bao gồm trọn gói toàn bộ {shiftsList.length} ca làm việc và {totalWorkers} vị trí nhân sự.
-                </p>
-                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
-                  ✓ Miễn phí toàn bộ phí Matching Radar AI và đối soát chấm công theo chính sách gói.
-                </div>
+              <p style={{ fontSize: '0.825rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>
+                Khi kích hoạt, hệ thống sẽ tự động trừ <strong>1 sự kiện</strong> trong gói dịch vụ của bạn (hoặc tự động cấp <strong>Ưu Đãi Trải Nghiệm Miễn Phí</strong> nếu đây là sự kiện đầu tiên của bạn).
+              </p>
+              <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
+                ✓ Đã bao gồm tính năng Matching Radar AI quét ứng viên tự động trong bán kính ca làm.
               </div>
-            )}
+            </div>
 
-            <div className="eo-modal-footer" style={{ marginTop: '1.5rem' }}>
-              <button type="button" className="eo-btn-secondary" onClick={() => setCurrentStep(2)}>
-                Quay Lại
+            <div className="eo-modal-footer">
+              <button
+                type="button"
+                className="eo-btn-secondary"
+                onClick={() => setCurrentStep(2)}
+                disabled={submitting}
+              >
+                Quay Lại Sửa Ca
               </button>
               <button
                 type="button"
                 className="eo-btn-primary"
-                onClick={handleStep3ConfirmPayment}
-                style={{ background: '#10b981', border: 'none' }}
-              >
-                Xác Nhận & Tiếp Tục
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* BƯỚC 4: BẮT ĐẦU TÌM KIẾM NHÂN SỰ                       */}
-        {/* ======================================================== */}
-        {currentStep === 4 && (
-          <div className="animate-fade-in-up" style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', margin: '0 0 0.5rem' }}>
-              Tất Cả Đã Sẵn Sàng Để Tìm Kiếm Nhân Sự
-            </h3>
-            <p style={{ color: '#64748b', fontSize: '0.95rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
-              Sự kiện <strong>{createdEvent?.name || newEvent.name}</strong> đã hoàn tất thiết lập <strong>{shiftsList.length} ca làm việc</strong> và thanh toán gói dịch vụ.
-            </p>
-
-            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '1.25rem', textAlign: 'left', maxWidth: '540px', margin: '0 auto 2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#64748b' }}>Sự kiện:</span>
-                <strong>{createdEvent?.name || newEvent.name}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#64748b' }}>Tổng số ca làm việc:</span>
-                <strong>{shiftsList.length} ca làm việc</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#64748b' }}>Tổng nhân sự cần tuyển:</span>
-                <strong style={{ color: '#2563eb' }}>{totalWorkers} nhân sự</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: '#64748b' }}>Tổng dự toán thù lao ca:</span>
-                <strong style={{ color: '#16a34a' }}>{totalEstimatedCost.toLocaleString()} đ</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Trạng thái thanh toán:</span>
-                <span style={{ color: '#16a34a', fontWeight: 700 }}>Đã xác nhận gói cước</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-              <button
-                type="button"
-                className="eo-btn-secondary"
-                onClick={handleClose}
                 disabled={submitting}
-              >
-                Để Sau
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={handleStep4ActivateMatching}
+                onClick={handleActivateMatching}
                 style={{
-                  padding: '0.85rem 2.25rem',
-                  fontSize: '1.05rem',
-                  fontWeight: 700,
-                  borderRadius: '0.625rem',
                   background: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+                  padding: '0.75rem 1.75rem',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
                 }}
               >
-                {submitting ? 'Đang tìm kiếm...' : 'Bắt Đầu Tìm Kiếm'}
+                {submitting ? 'Đang kích hoạt...' : 'Kích Hoạt Tìm Kiếm Ngay'}
               </button>
             </div>
           </div>

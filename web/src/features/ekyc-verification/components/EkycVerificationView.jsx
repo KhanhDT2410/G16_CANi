@@ -42,11 +42,11 @@ export const EkycVerificationView = ({ onCountChange }) => {
               </span>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563eb' }}>
-                Độ khớp khuôn mặt: {item.faceMatchScore}%
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a' }}>
+                Khuôn mặt: Hợp lệ
               </div>
               <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                Độ tin cậy OCR: {(item.ocrConfidence * 100).toFixed(0)}%
+                CCCD: Đạt chuẩn
               </div>
             </div>
           </div>

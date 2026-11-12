@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../features/auth/api/supabaseClient';
 import { authApi } from '../../features/auth/api/authApi';
+import { useAuth } from '../../features/auth';
 
 /**
  * Trang Đón Tiếp Callback OAuth Google (/auth/callback)
@@ -9,6 +10,7 @@ import { authApi } from '../../features/auth/api/authApi';
  */
 const AuthCallbackPage = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [status, setStatus] = useState('Đang hoàn tất xác thực với Google...');
   const [errorMessage, setErrorMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(true);
@@ -35,16 +37,8 @@ const AuthCallbackPage = () => {
           return;
         }
 
-        // Lưu thông tin phiên đăng nhập
-        if (loginData.token) {
-          localStorage.setItem('cani_token', loginData.token);
-        }
-        if (loginData.refreshToken) {
-          localStorage.setItem('cani_refresh_token', loginData.refreshToken);
-        }
-        if (loginData.user) {
-          localStorage.setItem('cani_user', JSON.stringify(loginData.user));
-        }
+        // Lưu thông tin phiên đăng nhập vào AuthContext & localStorage
+        login(loginData.user, loginData.token, loginData.refreshToken);
 
         setStatus('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {

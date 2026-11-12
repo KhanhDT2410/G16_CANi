@@ -72,9 +72,9 @@ class JobProposalDispatchCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFBFDBFE)),
                 ),
-                child: Text(
-                  'Khớp ${p.matchScore.toInt()}%',
-                  style: const TextStyle(
+                child: const Text(
+                  'Phù hợp kỹ năng',
+                  style: TextStyle(
                     color: Color(0xFF1D4ED8),
                     fontWeight: FontWeight.w800,
                     fontSize: 11.5,

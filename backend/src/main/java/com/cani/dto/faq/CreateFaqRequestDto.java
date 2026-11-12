@@ -20,6 +20,9 @@ public class CreateFaqRequestDto {
     @Size(min = 10, max = 500, message = "Câu hỏi phải có từ 10 đến 500 ký tự")
     private String question;
 
+    @Size(max = 2000, message = "Tóm tắt không được vượt quá 2000 ký tự")
+    private String summary;
+
     @NotBlank(message = "Câu trả lời không được để trống")
     @Size(min = 20, message = "Câu trả lời phải có ít nhất 20 ký tự")
     private String answer;

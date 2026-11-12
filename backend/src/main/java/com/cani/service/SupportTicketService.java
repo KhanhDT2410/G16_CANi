@@ -363,6 +363,13 @@ public class SupportTicketService {
         Instant now = Instant.now();
         Instant riskThreshold = now.plus(24, ChronoUnit.HOURS);
 
+        Set<UUID> allUserIds = activeTickets.stream()
+                .flatMap(t -> java.util.stream.Stream.of(t.getUserId(), t.getAssignedTo()))
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<UUID, User> userMap = userRepository.findAllById(allUserIds).stream()
+                .collect(java.util.stream.Collectors.toMap(User::getUserId, u -> u, (a, b) -> a));
+
         return activeTickets.stream()
                 .map(ticket -> {
                     // TODO (Optimization): N+1 query chấp nhận được ở quy mô MVP (queue limit 50). Khi scale lớn,
@@ -373,6 +380,10 @@ public class SupportTicketService {
                             .orElse(ticket.getCreatedAt());
 
                     boolean slaAtRisk = ticket.getSlaDeadline().isBefore(riskThreshold);
+                    User customer = ticket.getUserId() != null ? userMap.get(ticket.getUserId()) : null;
+                    User staff = ticket.getAssignedTo() != null ? userMap.get(ticket.getAssignedTo()) : null;
+                    String assignedName = staff != null ? staff.getFullName() : null;
+                    String assignedRole = staff != null ? (staff.getRole() != null && staff.getRole().name().equals("CUSTOMER_CARE") ? "CSKH" : (staff.getRole() != null ? staff.getRole().name() : "CSKH")) : null;
 
                     return SupportTicketQueueItemDto.builder()
                             .id(ticket.getId())
@@ -382,7 +393,13 @@ public class SupportTicketService {
                             .subject(ticket.getSubject())
                             .status(ticket.getStatus())
                             .userId(ticket.getUserId())
+                            .userName(customer != null ? customer.getFullName() : null)
+                            .userPhone(customer != null ? customer.getPhone() : null)
+                            .userEmail(customer != null ? customer.getEmail() : null)
+                            .userAvatar(customer != null ? customer.getAvatarUrl() : null)
                             .assignedTo(ticket.getAssignedTo())
+                            .assignedName(assignedName)
+                            .assignedRole(assignedRole)
                             .slaDeadline(ticket.getSlaDeadline())
                             .lastMessageAt(lastMessageAt)
                             .slaAtRisk(slaAtRisk)
@@ -526,11 +543,19 @@ public class SupportTicketService {
                 && ticket.getSlaDeadline().isBefore(Instant.now().plus(24, ChronoUnit.HOURS));
 
         boolean canReply = ticket.getStatus() != TicketStatus.CLOSED;
+        User customer = ticket.getUserId() != null ? userRepository.findById(ticket.getUserId()).orElse(null) : null;
+        User staff = ticket.getAssignedTo() != null ? userRepository.findById(ticket.getAssignedTo()).orElse(null) : null;
+        String assignedName = staff != null ? staff.getFullName() : null;
+        String assignedRole = staff != null ? (staff.getRole() != null && staff.getRole().name().equals("CUSTOMER_CARE") ? "CSKH" : (staff.getRole() != null ? staff.getRole().name() : "CSKH")) : null;
 
         return SupportTicketResponseDto.builder()
                 .id(ticket.getId())
                 .referenceNo(ticket.getReferenceNo())
                 .userId(ticket.getUserId())
+                .userName(customer != null ? customer.getFullName() : null)
+                .userPhone(customer != null ? customer.getPhone() : null)
+                .userEmail(customer != null ? customer.getEmail() : null)
+                .userAvatar(customer != null ? customer.getAvatarUrl() : null)
                 .category(ticket.getCategory())
                 .priority(ticket.getPriority())
                 .subject(ticket.getSubject())
@@ -538,6 +563,8 @@ public class SupportTicketService {
                 .attachments(attachmentsList)
                 .status(ticket.getStatus())
                 .assignedTo(ticket.getAssignedTo())
+                .assignedName(assignedName)
+                .assignedRole(assignedRole)
                 .slaDeadline(ticket.getSlaDeadline())
                 .resolvedBy(ticket.getResolvedBy())
                 .closedAt(ticket.getClosedAt())

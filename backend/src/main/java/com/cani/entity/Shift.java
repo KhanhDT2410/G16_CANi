@@ -107,6 +107,9 @@ public class Shift {
     @Column(name = "dress_code", columnDefinition = "TEXT")
     private String dressCode;
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "checklist", columnDefinition = "jsonb")
     private String checklist;

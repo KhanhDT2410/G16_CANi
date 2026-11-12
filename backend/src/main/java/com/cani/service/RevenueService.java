@@ -323,9 +323,16 @@ public class RevenueService {
                     ? typeRev.divide(totalPackageRevenue, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).doubleValue()
                     : 0.0;
 
-            String name = (planType == PlanType.INVITE_ONLY)
-                    ? "Gói Giới Hạn Mời (Invite Only)"
-                    : "Gói Đối Soát & Ghép Nâng Cao (Matching + Invite)";
+            String name;
+            if (planType == PlanType.FREE_TRIAL) {
+                name = "Gói Trải Nghiệm (Miễn Phí)";
+            } else if (planType == PlanType.INVITE_ONLY) {
+                name = "Gói Cơ Bản (Invite Mode)";
+            } else if (planType == PlanType.MATCHING_PLUS) {
+                name = "Gói Tiêu Chuẩn (Standard Matching)";
+            } else {
+                name = "Gói Chuyên Nghiệp (Enterprise)";
+            }
 
             result.add(PackageTypeRevenueDto.builder()
                     .planType(planType)

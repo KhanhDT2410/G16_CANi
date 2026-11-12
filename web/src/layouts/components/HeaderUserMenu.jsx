@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom';
-import { BellIcon, HelpIcon, LogoutIcon } from './HeaderIcons';
+import { HelpIcon, LogoutIcon } from './HeaderIcons';
+import { NotificationBell } from '../../features/notifications';
 
 export const HeaderUserMenu = ({
   isAuthenticated,
   user,
   userAvatar,
   isAdmin,
+  isCustomerCare,
   onUserBlockClick,
   onLogout,
 }) => {
+  const isStaff = isAdmin || isCustomerCare;
   if (!isAuthenticated || !user) {
     return (
       <div className="auth-nav-actions">
@@ -24,12 +27,9 @@ export const HeaderUserMenu = ({
 
   return (
     <div className="user-header-group">
-      <button type="button" className="header-notif-btn" title="Thông báo mới">
-        <BellIcon />
-        <span className="notif-badge-dot" />
-      </button>
+      <NotificationBell />
 
-      {!isAdmin && (
+      {!isStaff && (
         <button
           type="button"
           className="header-help-btn"
@@ -43,7 +43,13 @@ export const HeaderUserMenu = ({
       <div
         className="user-header-compact"
         onClick={onUserBlockClick}
-        title={isAdmin ? 'Trở về Bảng Điều Khiển Quản Trị' : `Hồ sơ: ${user.fullName || user.username || 'EO'}`}
+        title={
+          isAdmin
+            ? 'Trở về Bảng Điều Khiển Quản Trị'
+            : isCustomerCare
+              ? 'Cổng Chăm Sóc Khách Hàng'
+              : `Hồ sơ: ${user.fullName || user.username || 'EO'}`
+        }
         style={{ cursor: 'pointer' }}
       >
         <div className="user-avatar-badge">
@@ -54,18 +60,18 @@ export const HeaderUserMenu = ({
               style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
             />
           ) : (
-            (user.fullName || user.username || (isAdmin ? 'Q' : 'N')).charAt(0).toUpperCase()
+            (user.fullName || user.username || (isAdmin ? 'Q' : isCustomerCare ? 'C' : 'N')).charAt(0).toUpperCase()
           )}
         </div>
         <div className="user-meta-info">
           <span className="user-meta-name">
-            {user.fullName || user.username || (isAdmin ? 'Quản Trị Viên' : 'Người Dùng')}
+            {user.fullName || user.username || (isAdmin ? 'Quản Trị Viên' : isCustomerCare ? 'Chuyên Viên CSKH' : 'Người Dùng')}
           </span>
           <span className="user-meta-email">
             {user.email || 'Chưa cập nhật email'}
           </span>
         </div>
-        {!isAdmin && <span className="user-meta-arrow">▾</span>}
+        {!isStaff && <span className="user-meta-arrow">▾</span>}
       </div>
 
       <button

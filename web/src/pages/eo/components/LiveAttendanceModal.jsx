@@ -98,46 +98,54 @@ const LiveAttendanceModal = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
                 type="button"
                 onClick={() => onOpenQr(shift)}
+                className="eo-btn-primary"
                 style={{
-                  background: '#2563eb',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '6px 12px',
+                  padding: '0.45rem 0.95rem',
                   fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  fontWeight: 500,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 4,
+                  gap: 6,
                 }}
               >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
                 Mã QR Ca
               </button>
               <button
                 type="button"
                 onClick={loadAttendance}
+                className="eo-btn-secondary"
                 style={{
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 6,
-                  padding: '6px 10px',
+                  padding: '0.45rem 0.85rem',
                   fontSize: '0.85rem',
-                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
                 }}
                 title="Làm mới dữ liệu"
               >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
                 Làm mới
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                style={{ background: 'none', border: 'none', fontSize: '0.9rem', cursor: 'pointer', color: '#64748b' }}
+                className="eo-btn-secondary"
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.85rem',
+                  color: '#64748b',
+                }}
               >
                 Đóng
               </button>
@@ -276,18 +284,18 @@ const LiveAttendanceModal = ({
                               </span>
                             )}
 
-                            {/* Nút đánh giá Worker */}
+                            {/* Nút đánh giá Worker: Chỉ mở khi Worker đã Check-out hoặc ca đã hoàn thành */}
                             {item.hasReviewedWorker ? (
                               <span style={{ color: '#eab308', fontSize: '0.75rem', fontWeight: 600, padding: '4px 0' }}>
                                 ⭐ Đã đánh giá
                               </span>
-                            ) : (
+                            ) : isCompleted ? (
                               <button
                                 type="button"
                                 onClick={() => setSelectedForReview(item)}
                                 style={{
-                                  background: '#f8fafc',
-                                  color: '#d97706',
+                                  background: '#fef3c7',
+                                  color: '#b45309',
                                   border: '1px solid #fde68a',
                                   borderRadius: 4,
                                   padding: '4px 10px',
@@ -295,9 +303,22 @@ const LiveAttendanceModal = ({
                                   cursor: 'pointer',
                                   fontWeight: 600,
                                 }}
+                                title="Đánh giá năng lực và thái độ của Worker sau ca làm việc"
                               >
-                                ⭐ Chấm sao
+                                ⭐ Đánh giá
                               </button>
+                            ) : (
+                              <span
+                                style={{
+                                  color: '#94a3b8',
+                                  fontSize: '0.75rem',
+                                  fontStyle: 'italic',
+                                  padding: '4px 6px',
+                                }}
+                                title="Chỉ mở đánh giá sau khi Worker đã Check-out hoàn thành ca làm việc"
+                              >
+                                Chờ Check-out
+                              </span>
                             )}
                           </div>
                         </td>
@@ -315,13 +336,6 @@ const LiveAttendanceModal = ({
               </table>
             </div>
           )}
-
-          {/* Footer */}
-          <div style={{ marginTop: '1.2rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="button" className="eo-btn-cancel" onClick={onClose}>
-              Đóng
-            </button>
-          </div>
         </div>
       </div>
 

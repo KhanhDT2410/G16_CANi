@@ -361,4 +361,27 @@ export const eoService = {
       return response.data?.data;
     }
   },
+
+  // Tải ảnh sự kiện hoặc ca làm việc trực tiếp từ máy tính lên
+  uploadImage: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/v1/eo/events/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data?.data?.url;
+  },
+
+  // Lấy danh sách toàn bộ nhân sự tham gia trong sự kiện kèm điểm uy tín, tuổi, trạng thái
+  getEventWorkers: async (eventId) => {
+    try {
+      const response = await apiClient.get(`/v1/eo/events/${eventId}/workers`);
+      return response.data?.data || [];
+    } catch (error) {
+      console.warn('Lỗi getEventWorkers:', error);
+      return [];
+    }
+  },
 };

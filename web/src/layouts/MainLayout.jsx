@@ -154,10 +154,6 @@ const MainLayout = () => {
       <footer className="main-footer">
         <div className="main-footer-inner">
           <span>CANi Event Staffing Platform — Portal Dành Cho Ban Tổ Chức & Quản Trị</span>
-          <span className="system-status-indicator">
-            <span className="status-dot" />
-            Hệ thống ổn định
-          </span>
         </div>
       </footer>
 

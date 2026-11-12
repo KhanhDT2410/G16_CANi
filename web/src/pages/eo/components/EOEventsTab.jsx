@@ -143,7 +143,6 @@ export default function EOEventsTab({
               type="button"
               className="table-btn-create-event"
               onClick={onOpenCreateEvent}
-              style={{ margin: '0 auto' }}
             >
               + Tạo Sự Kiện Đầu Tiên
             </button>

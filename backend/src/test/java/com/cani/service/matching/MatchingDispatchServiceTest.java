@@ -169,10 +169,10 @@ class MatchingDispatchServiceTest {
         }
 
         @Test
-        @DisplayName("MATCH003: Tọa độ null kích hoạt fallback mặc định 3.0 km an toàn")
+        @DisplayName("MATCH003: Tọa độ null trả về khoảng cách vô cực (Double.MAX_VALUE) để tránh matching sai lệch")
         void calculateDistance_NullCoordinates_ReturnsFallbackDefault() {
             double distance = MatchingDispatchService.calculateDistance(null, 106.7009, 10.7769, null);
-            assertEquals(3.0, distance, 0.0001);
+            assertEquals(Double.MAX_VALUE, distance);
         }
 
         @Test

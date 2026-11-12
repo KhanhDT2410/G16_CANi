@@ -270,7 +270,7 @@ public class MatchingDispatchService {
      */
     public static double calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
         if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
-            return 3.0; // Khoảng cách giả định nếu thiếu tọa độ
+            return Double.MAX_VALUE; // Không xác định được tọa độ -> ngoài tầm phủ sóng để tránh matching nhầm
         }
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);

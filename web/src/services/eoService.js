@@ -348,6 +348,12 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // Kích hoạt quét Matching Radar AI cho một ca làm việc (Publish shift)
+  dispatchForShift: async (shiftId) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`);
+    return response.data?.data;
+  },
+
   // ==========================================
   // BONUS 1: EMERGENCY BROADCAST POOL (SECTION 11 CANi_Flow_v8.txt)
   // ==========================================

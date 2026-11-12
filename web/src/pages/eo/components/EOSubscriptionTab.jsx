@@ -182,19 +182,37 @@ export default function EOSubscriptionTab() {
                     </ul>
 
                     <div className="pricing-actions">
-                      <button
-                        type="button"
-                        className="btn-purchase-vnpay"
-                        style={{ background: isFree ? '#10b981' : '#2563eb', width: '100%' }}
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handlePurchasePayOS(plan.planType)}
-                      >
-                        {purchasingPlan === plan.planType ? (
-                          isFree ? 'Đang kích hoạt...' : 'Đang chuyển sang PayOS...'
-                        ) : (
-                          isFree ? 'Kích Hoạt Miễn Phí (Trải Nghiệm)' : 'Thanh toán qua PayOS VietQR'
-                        )}
-                      </button>
+                      {isFree ? (
+                        <div
+                          style={{
+                            textAlign: 'center',
+                            padding: '0.75rem 1rem',
+                            background: '#f8fafc',
+                            borderRadius: '10px',
+                            border: '1px dashed #cbd5e1',
+                            color: '#64748b',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {currentSubscription?.planType === 'FREE_TRIAL' && currentSubscription.remainingEvents === 0
+                            ? '✓ Đã sử dụng hết lượt trải nghiệm'
+                            : '✓ Tự động kích hoạt khi tạo tài khoản'}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-purchase-vnpay"
+                          style={{ background: '#2563eb', width: '100%' }}
+                          disabled={purchasingPlan !== null}
+                          onClick={() => handlePurchasePayOS(plan.planType)}
+                        >
+                          {purchasingPlan === plan.planType
+                            ? 'Đang chuyển sang PayOS...'
+                            : 'Thanh toán qua PayOS VietQR'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

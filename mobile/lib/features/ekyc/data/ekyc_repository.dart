@@ -27,9 +27,21 @@ class EkycRepository {
   }) async {
     try {
       final formDataMap = <String, dynamic>{
-        'frontImage': MultipartFile.fromBytes(frontBytes, filename: frontFileName),
-        'backImage': MultipartFile.fromBytes(backBytes, filename: backFileName),
-        'selfieImage': MultipartFile.fromBytes(selfieBytes, filename: selfieFileName),
+        'frontImage': MultipartFile.fromBytes(
+          frontBytes,
+          filename: frontFileName,
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
+        'backImage': MultipartFile.fromBytes(
+          backBytes,
+          filename: backFileName,
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
+        'selfieImage': MultipartFile.fromBytes(
+          selfieBytes,
+          filename: selfieFileName,
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
       };
       if (userId != null && userId.isNotEmpty) formDataMap['userId'] = userId;
       if (cccdNumber != null && cccdNumber.isNotEmpty) formDataMap['cccdNumber'] = cccdNumber;
@@ -88,6 +100,16 @@ class EkycRepository {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  Future<bool> resetEkyc({String? token}) async {
+    try {
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.post('/v1/workers/ekyc/reset', options: options);
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
   }
 }

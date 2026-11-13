@@ -75,6 +75,17 @@ public class WorkerEkycController {
     }
 
     /**
+     * Worker yêu cầu reset lại hồ sơ eKYC để định danh lại từ đầu
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/workers/ekyc/reset")
+    public ResponseEntity<ApiResponse<Void>> resetMyEkyc(Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        ekycService.resetMyEkyc(userId);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Reset trạng thái eKYC thành công. Bạn có thể tiến hành định danh lại."));
+    }
+
+    /**
      * Admin / Customer Care xem danh sách hồ sơ eKYC chờ thẩm định
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")

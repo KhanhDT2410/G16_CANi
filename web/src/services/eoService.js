@@ -214,14 +214,14 @@ export const eoService = {
         },
         {
           planType: 'MATCHING_PLUS',
-          name: 'Gói Radar Matching + Mời (Matching Plus)',
-          description: 'Toàn bộ tính năng Invite Mode + Thuật toán AI Radar tự động quét và ghép nối Worker phù hợp nhất trong bán kính.',
+          name: 'Gói Tự Động Ghép Đôi + Mời (Matching Plus)',
+          description: 'Toàn bộ tính năng Invite Mode + Thuật toán tự động kết nối Worker phù hợp nhất trong bán kính.',
           price: 80000,
           currency: 'VND',
           eventsQuota: 1,
           features: [
             'Bao gồm toàn bộ tính năng Gói Mời Trực Tiếp',
-            'Kích hoạt Matching Radar AI đề xuất Worker tự động',
+            'Tự động đề xuất và kết nối Worker phù hợp nhất',
             'Quét ứng viên theo bán kính GPS (15km), độ tin cậy >= 80%',
             'Worker chủ động nhận việc qua Mobile App tức thì',
             'Tối ưu hóa tốc độ lấp đầy ca làm việc trong 15 phút',
@@ -345,6 +345,12 @@ export const eoService = {
   // Xác nhận đã thanh toán PayOS thành công
   confirmPayOSPayment: async (orderCode) => {
     const response = await apiClient.post(`/v1/eo/subscriptions/payos-confirm/${orderCode}`);
+    return response.data?.data;
+  },
+
+  // Kích hoạt tự động tìm kiếm Worker cho một ca làm việc (Publish shift)
+  dispatchForShift: async (shiftId) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`);
     return response.data?.data;
   },
 

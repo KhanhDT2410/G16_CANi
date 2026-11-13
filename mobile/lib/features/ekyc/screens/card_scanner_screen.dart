@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -101,6 +100,9 @@ class _CardScannerScreenState extends State<CardScannerScreen>
 
     try {
       await _controller!.initialize();
+      try {
+        await _controller!.setFlashMode(FlashMode.off);
+      } catch (_) {}
       if (mounted) {
         setState(() {
           _isCameraInitialized = true;
@@ -144,8 +146,13 @@ class _CardScannerScreenState extends State<CardScannerScreen>
     });
 
     try {
+      try {
+        if (!_isFlashOn) {
+          await _controller!.setFlashMode(FlashMode.off);
+        }
+      } catch (_) {}
       final file = await _controller!.takePicture();
-      final bytes = await File(file.path).readAsBytes();
+      final bytes = await file.readAsBytes();
 
       setState(() {
         _capturedBytes = bytes;
@@ -225,8 +232,7 @@ class _CardScannerScreenState extends State<CardScannerScreen>
               )
             else if (_isCameraInitialized && _controller != null)
               Positioned.fill(
-                child: AspectRatio(
-                  aspectRatio: _controller!.value.aspectRatio,
+                child: Center(
                   child: CameraPreview(_controller!),
                 ),
               )
@@ -364,13 +370,15 @@ class _CardScannerScreenState extends State<CardScannerScreen>
                     ),
                   ),
                   if (_capturedBytes == null) ...[
-                    IconButton(
-                      icon: Icon(
-                        _isFlashOn ? Icons.flash_on : Icons.flash_off,
-                        color: _isFlashOn ? Colors.amber : Colors.white,
+                    if (_cameras.isNotEmpty &&
+                        _cameras[_selectedCameraIndex].lensDirection != CameraLensDirection.front)
+                      IconButton(
+                        icon: Icon(
+                          _isFlashOn ? Icons.flash_on : Icons.flash_off,
+                          color: _isFlashOn ? Colors.amber : Colors.white,
+                        ),
+                        onPressed: _toggleFlash,
                       ),
-                      onPressed: _toggleFlash,
-                    ),
                     IconButton(
                       icon: const Icon(Icons.flip_camera_ios, color: Colors.white),
                       onPressed: _switchCamera,

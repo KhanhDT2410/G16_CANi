@@ -52,13 +52,15 @@ public class GeminiEkycClient implements EkycProvider {
 
         List<String> candidateModels = new ArrayList<>();
         if (properties.getModel() != null && !properties.getModel().isBlank()) {
-            candidateModels.add(properties.getModel().trim());
+            String configured = properties.getModel().trim();
+            if (!configured.contains("1.5") && !configured.contains("2.5-flash")) {
+                candidateModels.add(configured);
+            }
         }
-        if (!candidateModels.contains("gemini-3.5-flash-lite")) {
-            candidateModels.add("gemini-3.5-flash-lite");
-        }
-        if (!candidateModels.contains("gemini-3.5-flash")) {
-            candidateModels.add("gemini-3.5-flash");
+        for (String fallbackModel : List.of("gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash-lite")) {
+            if (!candidateModels.contains(fallbackModel)) {
+                candidateModels.add(fallbackModel);
+            }
         }
 
         Map<String, Object> payload = buildRequestPayload(frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
@@ -182,7 +184,35 @@ public class GeminiEkycClient implements EkycProvider {
             return null;
         }
 
-        String jsonText = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
+        JsonNode parts = candidates.get(0).path("content").path("parts");
+        if (parts.isEmpty()) {
+            return null;
+        }
+
+        String jsonText = null;
+        for (JsonNode part : parts) {
+            if (part.has("text") && !part.path("thought").asBoolean(false)) {
+                jsonText = part.path("text").asText();
+                break;
+            }
+        }
+        if (jsonText == null) {
+            jsonText = parts.get(0).path("text").asText();
+        }
+
+        if (jsonText == null || jsonText.isBlank()) {
+            return null;
+        }
+
+        jsonText = jsonText.trim();
+        if (jsonText.startsWith("```")) {
+            int firstNewline = jsonText.indexOf('\n');
+            int lastBackticks = jsonText.lastIndexOf("```");
+            if (firstNewline != -1 && lastBackticks > firstNewline) {
+                jsonText = jsonText.substring(firstNewline + 1, lastBackticks).trim();
+            }
+        }
+
         JsonNode data = objectMapper.readTree(jsonText);
 
         boolean isValidIdCard = data.path("isValidIdCard").asBoolean(false);

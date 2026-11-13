@@ -40,7 +40,7 @@ const PublishEventModal = ({
 
   const hasActiveQuota = currentSub && currentSub.status === 'ACTIVE' && (currentSub.remainingEvents > 0);
   const remainingQuota = currentSub?.remainingEvents ?? 0;
-  const planName = currentSub?.planName || (currentSub?.planType === 'MATCHING_PLUS' ? 'Gói Matching Radar AI' : 'Gói Hội Viên CANi');
+  const planName = currentSub?.planName || (currentSub?.planType === 'MATCHING_PLUS' ? 'Gói Tự Động Ghép Đôi' : 'Gói Hội Viên CANi');
 
   return (
     <div className="eo-modal-overlay">
@@ -51,7 +51,7 @@ const PublishEventModal = ({
               Xác Nhận Xuất Bản Sự Kiện
             </h3>
             <p style={{ margin: 0, fontSize: '0.875rem', color: '#64748b' }}>
-              Hệ thống CANi sẽ kích hoạt Matching Engine để quét và ghép nối nhân sự theo bán kính
+              Hệ thống CANi sẽ tự động kết nối và đề xuất nhân sự phù hợp theo bán kính
             </p>
           </div>
         </div>
@@ -119,7 +119,7 @@ const PublishEventModal = ({
                 </span>
               </div>
               <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#374151', lineHeight: 1.5 }}>
-                Khi xác nhận, hệ thống sẽ <strong>trừ 1 lượt sự kiện</strong> trong gói cước của bạn và tự động kích hoạt Matching Radar AI để đề xuất các Worker phù hợp nhất trong bán kính 15km.
+                Khi xác nhận, hệ thống sẽ <strong>trừ 1 lượt sự kiện</strong> trong gói cước của bạn và tự động kết nối các Worker phù hợp nhất trong bán kính 15km.
               </p>
               <div style={{ marginTop: '0.5rem', fontSize: '0.775rem', color: '#16a34a', fontWeight: 600 }}>
                 ✓ Miễn phí toàn bộ phí điều phối & tìm kiếm theo chính sách gói.
@@ -142,7 +142,7 @@ const PublishEventModal = ({
                 </span>
               </div>
               <p style={{ margin: '0.25rem 0 0.5rem', fontSize: '0.85rem', color: '#334155', lineHeight: 1.5 }}>
-                Chào mừng bạn đến với CANi! Bạn được <strong>tặng miễn phí 100%</strong> lượt xuất bản và kích hoạt Matching Radar AI cho sự kiện này để trải nghiệm tốc độ kết nối nhân sự tự động.
+                Chào mừng bạn đến với CANi! Bạn được <strong>tặng miễn phí 100%</strong> lượt xuất bản và tự động kết nối nhân sự cho sự kiện này để trải nghiệm tốc độ tìm người.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
                 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>

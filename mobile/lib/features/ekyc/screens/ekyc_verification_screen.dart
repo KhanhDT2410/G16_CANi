@@ -810,18 +810,23 @@ class _EkycVerificationScreenState
             ? () async {
                 final success = await notifier.submitVerification();
                 if (!mounted) return;
-                if (success) {
+                final currentState = ref.read(ekycProvider);
+                final res = currentState.result;
+                if (success && res != null && !res.isRejected) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Đã gửi hồ sơ eKYC thẩm định thành công!'),
-                      backgroundColor: Color(0xFF10B981),
+                    SnackBar(
+                      content: Text(
+                        res.isApproved
+                            ? 'Xác thực định danh eKYC thành công!'
+                            : 'Đã gửi hồ sơ eKYC! Đang chờ Admin thẩm định.',
+                      ),
+                      backgroundColor: const Color(0xFF10B981),
                     ),
                   );
-                  // Không gọi _navigateToHome() tại đây để người dùng nhìn thấy kết quả chi tiết
                 } else {
-                  final err =
-                      ref.read(ekycProvider).errorMessage ??
-                      'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.';
+                  final err = (res != null && res.isRejected)
+                      ? (res.routingReason ?? 'Hồ sơ eKYC bị từ chối hoặc số CCCD đã được sử dụng.')
+                      : (currentState.errorMessage ?? 'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.');
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(err),

@@ -105,14 +105,17 @@ export const VenueLocationPicker = ({
       const newLng = parseFloat(position.lng.toFixed(6));
       
       const resolvedAddress = await getAddressFromCoordinates(newLat, newLng);
-      setInputValue(resolvedAddress);
-      if (onLocationChange) {
-        onLocationChange({
-          address: resolvedAddress,
-          lat: newLat,
-          lng: newLng,
-        });
-      }
+      setInputValue((prev) => {
+        const nextAddress = resolvedAddress || prev;
+        if (onLocationChange) {
+          onLocationChange({
+            address: nextAddress,
+            lat: newLat,
+            lng: newLng,
+          });
+        }
+        return nextAddress;
+      });
     });
 
     // Khi người dùng click bất kỳ đâu trên bản đồ
@@ -124,14 +127,17 @@ export const VenueLocationPicker = ({
       map.panTo([clickedLat, clickedLng]);
 
       const resolvedAddress = await getAddressFromCoordinates(clickedLat, clickedLng);
-      setInputValue(resolvedAddress);
-      if (onLocationChange) {
-        onLocationChange({
-          address: resolvedAddress,
-          lat: clickedLat,
-          lng: clickedLng,
-        });
-      }
+      setInputValue((prev) => {
+        const nextAddress = resolvedAddress || prev;
+        if (onLocationChange) {
+          onLocationChange({
+            address: nextAddress,
+            lat: clickedLat,
+            lng: clickedLng,
+          });
+        }
+        return nextAddress;
+      });
     });
 
     mapInstanceRef.current = map;
@@ -359,15 +365,10 @@ export const VenueLocationPicker = ({
 
       <div className="venue-map-statusbar">
         <span className="venue-map-hint">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="16" x2="12" y2="12" />
-            <line x1="12" y1="8" x2="12.01" y2="8" />
-          </svg>
-          Click hoặc kéo thả ghim trên bản đồ để chọn đúng sảnh đón tiếp
+          Click hoặc kéo thả ghim trên bản đồ để chọn đúng địa điểm tổ chức
         </span>
-        <span className="venue-gps-badge" title="Tọa độ GPS hệ thống dùng quét tìm kiếm nhân sự">
-          GPS: {lat?.toFixed(4)}, {lng?.toFixed(4)}
+        <span className="venue-gps-badge" title={inputValue || 'Địa chỉ tổ chức cụ thể'}>
+          {inputValue ? `Địa chỉ: ${inputValue.slice(0, 42)}${inputValue.length > 42 ? '...' : ''}` : 'Chưa nhập địa chỉ cụ thể'}
         </span>
       </div>
     </div>

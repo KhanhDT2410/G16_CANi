@@ -32,12 +32,19 @@ final dioProvider = Provider<Dio>((ref) {
             error.requestOptions.baseUrl.contains('localhost')) {
           error.requestOptions.extra['retried_lan'] = true;
           final lanBaseUrl = error.requestOptions.baseUrl.replaceFirst('localhost', '192.168.100.31');
+          final rawData = error.requestOptions.data;
+          final retryData = rawData is FormData ? rawData.clone() : rawData;
+          final retryHeaders = Map<String, dynamic>.from(error.requestOptions.headers);
+          if (rawData is FormData) {
+            retryHeaders.remove('content-type');
+            retryHeaders.remove('Content-Type');
+          }
           final retryOptions = Options(
             method: error.requestOptions.method,
-            headers: error.requestOptions.headers,
+            headers: retryHeaders,
             extra: error.requestOptions.extra,
             responseType: error.requestOptions.responseType,
-            contentType: error.requestOptions.contentType,
+            contentType: rawData is FormData ? null : error.requestOptions.contentType,
             validateStatus: error.requestOptions.validateStatus,
             receiveTimeout: error.requestOptions.receiveTimeout,
             sendTimeout: error.requestOptions.sendTimeout,
@@ -46,10 +53,11 @@ final dioProvider = Provider<Dio>((ref) {
             final fallbackDio = Dio(BaseOptions(baseUrl: lanBaseUrl));
             final response = await fallbackDio.request(
               error.requestOptions.path,
-              data: error.requestOptions.data,
+              data: retryData,
               queryParameters: error.requestOptions.queryParameters,
               options: retryOptions,
             );
+            dio.options.baseUrl = lanBaseUrl;
             return handler.resolve(response);
           } catch (_) {
             // Nếu fallback LAN cũng không thành công thì chuyển tiếp lỗi ban đầu

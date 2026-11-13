@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -57,12 +59,12 @@ public class DirectPaymentService {
             return null;
         }
 
-        // Tính thù lao dự kiến
+        // Tính thù lao dự kiến chuẩn xác qua BigDecimal (chống làm tròn sai số qua double)
         BigDecimal agreedAmount = BigDecimal.ZERO;
         if (shift.getHourlyWage() != null && shift.getStartTime() != null && shift.getEndTime() != null) {
-            long minutes = Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes();
-            double hours = Math.max(1.0, minutes / 60.0);
-            agreedAmount = shift.getHourlyWage().multiply(BigDecimal.valueOf(hours))
+            long minutes = Math.max(60, Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes());
+            BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+            agreedAmount = shift.getHourlyWage().multiply(hours)
                     .add(shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO);
         }
 
@@ -88,7 +90,14 @@ public class DirectPaymentService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phân công công việc: " + dto.getAssignmentId()));
 
         Payment payment = paymentRepository.findByAssignmentId(dto.getAssignmentId())
-                .orElseGet(() -> createInitialPayment(assignment));
+                .orElseGet(() -> {
+                    try {
+                        return createInitialPayment(assignment);
+                    } catch (DataIntegrityViolationException ex) {
+                        return paymentRepository.findByAssignmentId(dto.getAssignmentId())
+                                .orElseThrow(() -> ex);
+                    }
+                });
 
         if (payment == null || payment.getEventOrganizer() == null) {
             throw new IllegalArgumentException("Không đủ thông tin sự kiện/ca làm hoặc Worker để khởi tạo thanh toán cho phân công: " + dto.getAssignmentId());

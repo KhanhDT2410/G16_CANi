@@ -78,8 +78,9 @@ public class EmailOtpService {
 
     /**
      * Xác thực mã OTP 6 số từ người dùng.
+     * Lưu ý: Không dùng @Transactional ở tầng method để tránh việc ném BadRequestException
+     * làm rollback giao dịch ghi nhận số lần thử sai (attempts counter).
      */
-    @Transactional
     public void verifyOtp(String rawEmail, String otpCode, String rawType) {
         if (rawEmail == null || rawEmail.isBlank()) {
             throw new BadRequestException("Email không được để trống");
@@ -106,14 +107,14 @@ public class EmailOtpService {
 
         if (!verification.getOtpCode().equals(otpCode.trim())) {
             verification.setAttempts(currentAttempts + 1);
-            otpRepository.save(verification);
+            otpRepository.saveAndFlush(verification);
             int remaining = Math.max(0, MAX_ATTEMPTS - (currentAttempts + 1));
             throw new BadRequestException("Mã xác thực OTP không chính xác. Bạn còn " + remaining + " lần thử.");
         }
 
         // Đánh dấu mã OTP đã được sử dụng thành công
         verification.setIsUsed(true);
-        otpRepository.save(verification);
+        otpRepository.saveAndFlush(verification);
         log.info("Xác thực OTP thành công cho email: {}, loại: {}", email, otpType);
     }
 }

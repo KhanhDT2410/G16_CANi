@@ -653,6 +653,25 @@ class WorkerJobServiceTest {
         assertThat(list).hasSize(1);
     }
 
+    @Test
+    @DisplayName("UTC026b - getNearbyShifts() - Boundary: Ca đã đủ người (remainingWorkers <= 0) bị loại khỏi Radar")
+    void getNearbyShifts_Boundary_FullyStaffedShiftFilteredOut() {
+        Shift fullShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .status(ShiftStatus.ACTIVE)
+                .requiredWorkers(4)
+                .confirmedWorkers(4)
+                .remainingWorkers(0)
+                .build();
+        when(shiftRepository.findByStatus(ShiftStatus.ACTIVE)).thenReturn(List.of(fullShift));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(10.7769, 106.7009, 10.0);
+
+        assertThat(list).isEmpty();
+    }
+
     // =========================================================================
     // 9. applyForShift() - UTC027 to UTC030
     // =========================================================================

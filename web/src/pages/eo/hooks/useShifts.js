@@ -26,6 +26,76 @@ export const WAGE_RECOMMENDATIONS_MAP = {
   'PG / PB': { min: 70000, max: 110000, defaultWage: 85000, note: 'Ngoại hình, giới thiệu sản phẩm' },
 };
 
+/**
+ * Phân tích gợi ý mức lương (Wage Recommendation) & Cảnh báo Risk Score (Nguy cơ khó tìm nhân sự)
+ */
+export function calculateShiftRiskAnalysis(shift = {}) {
+  const role = shift.jobType || ROLES[0];
+  const rec = WAGE_RECOMMENDATIONS_MAP[role] || {
+    min: 40000,
+    max: 65000,
+    defaultWage: 50000,
+    note: 'Mức thù lao tiêu chuẩn thị trường sự kiện',
+  };
+
+  const wage = Math.max(0, Number(shift.hourlyWage || 0));
+  const allowance = Math.max(0, Number(shift.allowance || 0));
+  const workers = Math.max(1, Number(shift.requiredWorkers || 1));
+  const radius = Math.max(1, Number(shift.maxDistanceKm || 15));
+  const minScore = Number(shift.minReliabilityScore || 60);
+
+  let riskScore = 20;
+  const reasons = [];
+
+  if (wage < rec.min * 0.8) {
+    riskScore += 55;
+    reasons.push(
+      `Thù lao (${wage.toLocaleString()}đ/giờ) thấp hơn hơn 20% so với mức sàn khuyến nghị (${rec.min.toLocaleString()}đ/giờ) cho vị trí "${role}".`
+    );
+  } else if (wage < rec.min) {
+    riskScore += 35;
+    reasons.push(
+      `Thù lao (${wage.toLocaleString()}đ/giờ) đang thấp hơn mức tối thiểu đề xuất (${rec.min.toLocaleString()}đ/giờ) của vị trí "${role}".`
+    );
+  } else if (wage >= rec.max) {
+    riskScore -= 10;
+  }
+
+  if (radius < 5) {
+    riskScore += 25;
+    reasons.push(`Bán kính tìm kiếm quá hẹp (${radius}km < 5km) làm giảm mạnh số lượng ứng viên quanh khu vực.`);
+  } else if (radius < 8) {
+    riskScore += 10;
+    reasons.push(`Bán kính tìm kiếm dưới 8km (${radius}km) có thể hạn chế ứng viên ở các quận lân cận.`);
+  }
+
+  if (workers >= 15) {
+    riskScore += 20;
+    reasons.push(`Cần tuyển số lượng lớn (${workers} nhân sự) trong cùng một ca làm việc.`);
+  } else if (workers >= 8) {
+    riskScore += 10;
+  }
+
+  if (minScore > 85) {
+    riskScore += 20;
+    reasons.push(`Yêu cầu điểm uy tín tối thiểu quá cao (${minScore}/100) lọc bỏ nhiều ứng viên tiềm năng.`);
+  }
+
+  if (allowance >= 30000) {
+    riskScore -= 10;
+  }
+
+  const clampedScore = Math.max(5, Math.min(95, riskScore));
+  const level = clampedScore >= 55 ? 'HIGH' : clampedScore >= 35 ? 'MEDIUM' : 'LOW';
+
+  return {
+    recommendation: rec,
+    riskScore: clampedScore,
+    level,
+    reasons,
+  };
+}
+
 export function useShifts({ onReloadEvents }) {
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -69,12 +139,10 @@ export function useShifts({ onReloadEvents }) {
   const calculateShiftTotal = () => {
     try {
       const hours = getShiftDurationHours() || 0.5;
-      return (
-        hours *
-          Number(newShift.requiredWorkers || 1) *
-          Number(newShift.hourlyWage || 0) +
-        Number(newShift.allowance || 0)
-      );
+      const safeWorkers = Math.max(1, Number(newShift.requiredWorkers || 1));
+      const safeWage = Math.max(0, Number(newShift.hourlyWage || 0));
+      const safeAllowance = Math.max(0, Number(newShift.allowance || 0));
+      return hours * safeWorkers * safeWage + safeAllowance;
     } catch {
       return 0;
     }
@@ -92,6 +160,18 @@ export function useShifts({ onReloadEvents }) {
   const handleAddShift = async (e) => {
     e.preventDefault();
     if (!selectedEventId) return;
+    if (Number(newShift.allowance || 0) < 0) {
+      showToast('Phụ cấp thêm không được là số âm!', 'error');
+      return;
+    }
+    if (Number(newShift.hourlyWage || 0) < 10000) {
+      showToast('Mức thù lao giờ không hợp lệ!', 'error');
+      return;
+    }
+    if (Number(newShift.requiredWorkers || 0) < 1) {
+      showToast('Số lượng nhân sự cần tuyển tối thiểu là 1 người!', 'error');
+      return;
+    }
     try {
       const checklistStr = Array.isArray(newShift.checklistItems)
         ? JSON.stringify(
@@ -105,22 +185,34 @@ export function useShifts({ onReloadEvents }) {
 
       await eoService.addShiftToEvent(selectedEventId, {
         ...newShift,
+        requiredWorkers: Math.max(1, Number(newShift.requiredWorkers || 1)),
+        hourlyWage: Math.max(0, Number(newShift.hourlyWage || 0)),
+        allowance: Math.max(0, Number(newShift.allowance || 0)),
         checklist: checklistStr,
         startTime: new Date(newShift.startTime).toISOString(),
         endTime: new Date(newShift.endTime).toISOString(),
       });
       setShowShiftModal(false);
       onReloadEvents?.();
-      showToast('Thêm ca làm việc thành công! Bạn có thể kích hoạt Matching ngay.', 'success');
+      showToast('Thêm ca làm việc thành công!', 'success');
     } catch (err) {
       showToast('Không thể thêm ca làm việc: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 
   const handleUpdateShift = async (shiftId, shiftData) => {
+    if (Number(shiftData.allowance || 0) < 0) {
+      showToast('Phụ cấp thêm không được là số âm!', 'error');
+      return;
+    }
     setSubmittingEditShift(true);
     try {
-      await eoService.updateShift(shiftId, shiftData);
+      await eoService.updateShift(shiftId, {
+        ...shiftData,
+        requiredWorkers: Math.max(1, Number(shiftData.requiredWorkers || 1)),
+        hourlyWage: Math.max(0, Number(shiftData.hourlyWage || 0)),
+        allowance: Math.max(0, Number(shiftData.allowance || 0)),
+      });
       showToast('Cập nhật ca làm việc thành công!', 'success');
       setEditingShift(null);
       onReloadEvents?.();

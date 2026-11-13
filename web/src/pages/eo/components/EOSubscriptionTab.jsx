@@ -87,18 +87,18 @@ export default function EOSubscriptionTab() {
             <span className="sub-metric-label">Chế độ tuyển dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem' }}>
               {currentSubscription?.planType === 'ENTERPRISE'
-                ? 'Matching Radar AI Ưu Tiên + Cứu Hộ'
+                ? 'Tự Động Ghép Đôi Ưu Tiên + Cứu Hộ'
                 : currentSubscription?.planType === 'MATCHING_PLUS'
-                ? 'Matching Radar AI Tiêu Chuẩn'
+                ? 'Tự Động Ghép Đôi Tiêu Chuẩn'
                 : currentSubscription?.planType === 'FREE_TRIAL'
-                ? 'Matching Radar AI (Khởi Nghiệp)'
+                ? 'Tự Động Ghép Đôi'
                 : currentSubscription?.planType === 'INVITE_ONLY'
-                ? 'Mời Trực Tiếp (Invite Mode)'
+                ? 'Mời Trực Tiếp'
                 : 'Chưa kích hoạt'}
             </span>
             <span className="sub-metric-hint">
               {currentSubscription?.planType
-                ? 'Tự động quét nhân sự bán kính định vị'
+                ? 'Tự động kết nối nhân sự theo bán kính vị trí'
                 : 'Cần kích hoạt gói dịch vụ'}
             </span>
           </div>
@@ -182,28 +182,37 @@ export default function EOSubscriptionTab() {
                     </ul>
 
                     <div className="pricing-actions">
-                      <button
-                        type="button"
-                        className="btn-purchase-vnpay"
-                        style={{ background: isFree ? '#10b981' : '#2563eb', width: '100%' }}
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handlePurchasePayOS(plan.planType)}
-                      >
-                        {purchasingPlan === plan.planType ? (
-                          isFree ? 'Đang kích hoạt...' : 'Đang khởi tạo PayOS...'
-                        ) : (
-                          isFree ? 'Kích Hoạt Miễn Phí (Trải Nghiệm)' : 'Thanh toán qua PayOS VietQR'
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn-demo-simulate"
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handleSimulateDemo(plan.planType)}
-                      >
-                        Thử nghiệm kích hoạt
-                      </button>
+                      {isFree ? (
+                        <div
+                          style={{
+                            textAlign: 'center',
+                            padding: '0.75rem 1rem',
+                            background: '#f8fafc',
+                            borderRadius: '10px',
+                            border: '1px dashed #cbd5e1',
+                            color: '#64748b',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {currentSubscription?.planType === 'FREE_TRIAL' && currentSubscription.remainingEvents === 0
+                            ? '✓ Đã sử dụng hết lượt trải nghiệm'
+                            : '✓ Tự động kích hoạt khi tạo tài khoản'}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-purchase-vnpay"
+                          style={{ background: '#2563eb', width: '100%' }}
+                          disabled={purchasingPlan !== null}
+                          onClick={() => handlePurchasePayOS(plan.planType)}
+                        >
+                          {purchasingPlan === plan.planType
+                            ? 'Đang chuyển sang PayOS...'
+                            : 'Thanh toán qua PayOS VietQR'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -316,8 +325,8 @@ export default function EOSubscriptionTab() {
               <div className="eo-form-group">
                 <label>Gói Cước Mặc Định Khi Tạo Sự Kiện Mới</label>
                 <select className="eo-form-select" defaultValue="MATCHING_PLUS">
-                  <option value="MATCHING_PLUS">Gói Matching Radar AI (80,000 đ / sự kiện) - Tự động quét 15km</option>
-                  <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
+                  <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80.000 đ / sự kiện)</option>
+                  <option value="INVITE_ONLY">Gói Mời Trực Tiếp (50.000 đ / sự kiện)</option>
                 </select>
                 <span className="eo-field-helper">Gói ưu tiên được chọn sẵn khi bạn tạo sự kiện mới.</span>
               </div>

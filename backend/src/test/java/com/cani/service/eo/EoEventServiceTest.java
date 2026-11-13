@@ -63,6 +63,9 @@ class EoEventServiceTest {
     private WorkerRepository workerRepository;
 
     @Mock
+    private WorkerEkycVerificationRepository workerEkycVerificationRepository;
+
+    @Mock
     private MatchingDispatchService matchingDispatchService;
 
     @Mock
@@ -526,7 +529,7 @@ class EoEventServiceTest {
                 .requiredWorkers(2).hourlyWage(BigDecimal.valueOf(50000)).build();
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.addShiftToEvent(userId, eventId, shiftDto));
-        assertTrue(ex.getMessage().contains("Thời gian kết thúc ca phải sau thời gian bắt đầu"));
+        assertTrue(ex.getMessage().contains("Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu"));
     }
 
     @Test
@@ -727,7 +730,7 @@ class EoEventServiceTest {
                 .requiredWorkers(2).hourlyWage(BigDecimal.valueOf(50000)).build();
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.updateShift(userId, shiftId, dto));
-        assertTrue(ex.getMessage().contains("Thời gian kết thúc ca phải sau thời gian bắt đầu"));
+        assertTrue(ex.getMessage().contains("Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu"));
     }
 
     @Test
@@ -989,7 +992,7 @@ class EoEventServiceTest {
         Event mockEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).build();
         Shift mockShift = Shift.builder().shiftId(shiftId).event(mockEvent).checklist(null).build();
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).status(AssignmentStatus.COMPLETED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(mockShift));
@@ -1114,7 +1117,7 @@ class EoEventServiceTest {
         Worker mockWorker = Worker.builder()
                 .workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).build())
                 .ratingAvg(BigDecimal.valueOf(4.0)).ratingCount(1).reliabilityScore(90).build();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).status(AssignmentStatus.COMPLETED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1140,7 +1143,7 @@ class EoEventServiceTest {
         UUID assignmentId = UUID.randomUUID();
         Event mockEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).build();
         Shift mockShift = Shift.builder().shiftId(UUID.randomUUID()).event(mockEvent).build();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).status(AssignmentStatus.COMPLETED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1162,7 +1165,7 @@ class EoEventServiceTest {
         Worker mockWorker = Worker.builder()
                 .workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).build())
                 .ratingAvg(BigDecimal.valueOf(3.0)).ratingCount(1).reliabilityScore(1).build();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).status(AssignmentStatus.COMPLETED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1187,7 +1190,7 @@ class EoEventServiceTest {
         Worker mockWorker = Worker.builder()
                 .workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).build())
                 .ratingAvg(BigDecimal.valueOf(4.5)).ratingCount(2).reliabilityScore(100).build();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).status(AssignmentStatus.COMPLETED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1211,7 +1214,7 @@ class EoEventServiceTest {
         Worker mockWorker = Worker.builder()
                 .workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).build())
                 .ratingAvg(BigDecimal.valueOf(4.0)).ratingCount(1).reliabilityScore(80).build();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(mockWorker).status(AssignmentStatus.COMPLETED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1232,7 +1235,7 @@ class EoEventServiceTest {
         UUID assignmentId = UUID.randomUUID();
         Event mockEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).build();
         Shift mockShift = Shift.builder().shiftId(UUID.randomUUID()).event(mockEvent).build();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(null).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(mockShift).worker(null).status(AssignmentStatus.COMPLETED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));

@@ -432,6 +432,11 @@ public class WorkerJobService {
         List<NearbyShiftResponseDto> nearbyList = new ArrayList<>();
 
         for (Shift s : activeShifts) {
+            // Chỉ hiển thị các ca còn cần tuyển người (remainingWorkers > 0)
+            if (s.getRemainingWorkers() == null || s.getRemainingWorkers() <= 0) {
+                continue;
+            }
+
             Double sLat = s.getLocationLat() != null ? s.getLocationLat() : (s.getEvent() != null ? s.getEvent().getVenueLat() : null);
             Double sLng = s.getLocationLng() != null ? s.getLocationLng() : (s.getEvent() != null ? s.getEvent().getVenueLng() : null);
 
@@ -464,8 +469,8 @@ public class WorkerJobService {
                         .jobType(s.getJobType())
                         .description(s.getDescription())
                         .locationAddress(s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
-                        .locationLat(sLat != null ? sLat : centerLat)
-                        .locationLng(sLng != null ? sLng : centerLng)
+                        .locationLat(sLat)
+                        .locationLng(sLng)
                         .hourlyWage(s.getHourlyWage())
                         .allowance(s.getAllowance())
                         .startTime(s.getStartTime())

@@ -89,6 +89,7 @@ class SubscriptionServiceTest {
 
         ReflectionTestUtils.setField(subscriptionService, "notificationService", notificationService);
         ReflectionTestUtils.setField(subscriptionService, "strictQuotaEnforcement", false);
+        ReflectionTestUtils.setField(subscriptionService, "demoEnabled", true);
     }
 
     private void seedPendingOrder(long orderCode, UUID eoId, PlanType planType) {

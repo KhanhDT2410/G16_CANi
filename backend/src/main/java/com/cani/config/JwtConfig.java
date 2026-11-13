@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -48,7 +49,7 @@ public class JwtConfig {
     public JwtDecoder h2JwtDecoder() {
         return token -> {
             Instant now = Instant.now();
-            String safeToken = token != null ? token : "dev-token";
+            String safeToken = token != null ? token : "";
 
             // 1. Trường hợp token thật (JWT chứa header.payload.signature từ Supabase Google OAuth)
             if (token != null && token.contains(".")) {
@@ -58,9 +59,10 @@ public class JwtConfig {
                         byte[] decodedBytes = Base64.getUrlDecoder().decode(parts[1]);
                         JsonNode payload = objectMapper.readTree(decodedBytes);
 
-                        String subject = payload.hasNonNull("sub")
-                                ? payload.get("sub").asText()
-                                : "08d4cbd3-9d94-4307-99c5-b66484d5de84";
+                        if (!payload.hasNonNull("sub")) {
+                            throw new BadJwtException("Token JWT thiếu trường 'sub'");
+                        }
+                        String subject = payload.get("sub").asText();
 
                         String email = null;
                         if (payload.hasNonNull("email")) {
@@ -68,7 +70,7 @@ public class JwtConfig {
                         } else if (payload.path("user_metadata").hasNonNull("email")) {
                             email = payload.path("user_metadata").get("email").asText();
                         } else {
-                            email = "worker@cani.vn";
+                            email = "user@cani.vn";
                         }
 
                         Jwt.Builder builder = Jwt.withTokenValue(safeToken)
@@ -88,38 +90,41 @@ public class JwtConfig {
 
                         log.info("[H2 Profile] Giải mã JWT OAuth: subject={}, email={}", subject, email);
                         return builder.build();
+                    } catch (BadJwtException e) {
+                        throw e;
                     } catch (Exception e) {
-                        log.warn("[H2 Profile] Lỗi parse payload của token: {}. Fallback dev token.", e.getMessage());
+                        log.warn("[H2 Profile] Lỗi parse payload của token: {}", e.getMessage());
+                        throw new BadJwtException("Token JWT không hợp lệ: " + e.getMessage(), e);
                     }
                 }
             }
 
-            // 2. Trường hợp dev-token-<userId> (đăng nhập cục bộ offline)
-            String subject = "08d4cbd3-9d94-4307-99c5-b66484d5de84";
-            String email = "worker@cani.vn";
-
+            // 2. Trường hợp dev-token-<userId> (đăng nhập cục bộ offline H2)
             if (token != null && token.startsWith("dev-token-")) {
-                subject = token.substring("dev-token-".length());
+                String subject = token.substring("dev-token-".length());
                 try {
                     UUID uid = UUID.fromString(subject);
                     UserRepository repo = userRepositoryProvider.getIfAvailable();
                     if (repo != null) {
                         var userOpt = repo.findById(uid);
                         if (userOpt.isPresent()) {
-                            email = userOpt.get().getEmail();
+                            String email = userOpt.get().getEmail();
+                            return Jwt.withTokenValue(safeToken)
+                                    .header("alg", "none")
+                                    .subject(subject)
+                                    .claim("email", email)
+                                    .issuedAt(now)
+                                    .expiresAt(now.plusSeconds(86400 * 30))
+                                    .build();
                         }
                     }
-                } catch (Exception ignored) {
+                } catch (IllegalArgumentException e) {
+                    throw new BadJwtException("Định dạng dev-token không hợp lệ");
                 }
             }
 
-            return Jwt.withTokenValue(safeToken)
-                    .header("alg", "none")
-                    .subject(subject)
-                    .claim("email", email)
-                    .issuedAt(now)
-                    .expiresAt(now.plusSeconds(86400 * 30))
-                    .build();
+            // Chặn tuyệt đối token rác, không fallback tự động về worker@cani.vn
+            throw new BadJwtException("Mã truy cập không hợp lệ hoặc người dùng không tồn tại");
         };
     }
 }

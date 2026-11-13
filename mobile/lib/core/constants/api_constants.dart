@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// API configuration constants.
 ///
 /// In release mode, secrets must be passed via `--dart-define`.
@@ -6,7 +8,13 @@ class ApiConstants {
   ApiConstants._();
 
   static String get defaultBaseUrl {
-    return 'http://localhost:8080';
+    // Trên Web: localhost trỏ tới máy chủ đang chạy web
+    if (kIsWeb) {
+      return 'http://localhost:8080';
+    }
+    // Trên thiết bị thật hoặc máy ảo di động (Android / iOS):
+    // Trỏ thẳng tới địa chỉ IP LAN của máy chủ backend để tránh lỗi "Connection refused"
+    return 'http://192.168.100.31:8080';
   }
 
   static final String baseUrl = const String.fromEnvironment(

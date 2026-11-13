@@ -96,6 +96,12 @@ class AuthInterceptor extends Interceptor {
 
           // Cập nhật token mới và gửi lại request ban đầu
           err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+          if (err.requestOptions.data is FormData) {
+            err.requestOptions.data = (err.requestOptions.data as FormData).clone();
+            err.requestOptions.headers.remove('content-type');
+            err.requestOptions.headers.remove('Content-Type');
+            err.requestOptions.contentType = null;
+          }
           final retryDio = Dio();
           final response = await retryDio.fetch(err.requestOptions);
           return handler.resolve(response);

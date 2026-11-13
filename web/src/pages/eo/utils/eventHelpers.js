@@ -29,6 +29,23 @@ export const DEMO_EVENTS = [
   },
 ];
 
+export function getEventStatusPriority(status) {
+  switch (status) {
+    case 'ACTIVE':
+    case 'APPROVED':
+    case 'UPCOMING':
+      return 1; // Sự kiện đang hoạt động luôn ở trên đầu
+    case 'DRAFT':
+      return 2; // Bản nháp nằm phía dưới sự kiện đang hoạt động
+    case 'COMPLETED':
+      return 3;
+    case 'CANCELLED':
+      return 4; // Đã hủy tách riêng
+    default:
+      return 2;
+  }
+}
+
 export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
   return events
     .filter((evt) => {
@@ -37,12 +54,30 @@ export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
         evt.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         evt.venueAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         evt.eventId?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Tách riêng sự kiện đã hủy (CANCELLED) sang bộ lọc riêng biệt
+      if (statusFilter === 'CANCELLED') {
+        return matchSearch && evt.status === 'CANCELLED';
+      }
+
+      // Ở chế độ mặc định (ALL), không hiển thị sự kiện đã hủy chung với sự kiện đang chạy/nháp
+      if (evt.status === 'CANCELLED') {
+        return false;
+      }
+
       const matchStatus =
         statusFilter === 'ALL' ||
+        (statusFilter === 'ACTIVE' && (evt.status === 'ACTIVE' || evt.status === 'APPROVED')) ||
         evt.status === statusFilter;
+
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
+      // Ưu tiên 1: Sự kiện đang hoạt động lên đầu, Bản nháp xuống dưới
+      const priorityDiff = getEventStatusPriority(a.status) - getEventStatusPriority(b.status);
+      if (priorityDiff !== 0) return priorityDiff;
+
+      // Ưu tiên 2: Sắp xếp theo tiêu chí người dùng chọn trong cùng nhóm trạng thái
       if (sortBy === 'NAME') return (a.name || '').localeCompare(b.name || '');
       if (sortBy === 'WORKERS') return (b.totalRequiredWorkers || 0) - (a.totalRequiredWorkers || 0);
       if (sortBy === 'OLDEST') return new Date(a.createdAt || a.eventDate || 0) - new Date(b.createdAt || b.eventDate || 0);

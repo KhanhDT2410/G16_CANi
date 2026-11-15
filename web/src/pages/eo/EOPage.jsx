@@ -477,6 +477,7 @@ export default function EOPage() {
           <EORightSidebar
             metrics={events.metrics}
             events={events.events}
+            onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
             onOpenQr={(targetEvt) => {
               const active = targetEvt?.eventId
                 ? targetEvt

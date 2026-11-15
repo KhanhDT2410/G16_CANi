@@ -52,6 +52,7 @@ public class WorkerJobService {
     private static final java.util.List<String> ALLOWED_IMAGE_EXTS = java.util.List.of("jpg", "jpeg", "png", "webp", "gif");
 
     private final WorkerRepository workerRepository;
+    private final UserRepository userRepository;
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final DispatchProposalRepository dispatchProposalRepository;
@@ -246,6 +247,14 @@ public class WorkerJobService {
                     if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
                         throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
                     }
+                    // Xác thực chữ ký số HMAC-SHA256 (Anti-spoofing) nếu mã có kèm chữ ký từ server
+                    if (parts.length >= 3) {
+                        String signature = parts[2].trim();
+                        String dataToVerify = "CANI_CHECKIN:" + scannedShiftId + ":" + epochSeconds;
+                        if (signature.length() == 16 && !com.cani.util.QrCryptoUtil.verifySignature(dataToVerify, signature)) {
+                            throw new BadRequestException("Chữ ký bảo mật mã QR không hợp lệ hoặc đã bị can thiệp. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
+                        }
+                    }
                 } catch (NumberFormatException ignored) {}
             }
         }
@@ -346,6 +355,14 @@ public class WorkerJobService {
                     long currentEpochSeconds = Instant.now().getEpochSecond();
                     if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
                         throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
+                    }
+                    // Xác thực chữ ký số HMAC-SHA256 (Anti-spoofing) nếu mã có kèm chữ ký từ server
+                    if (parts.length >= 3) {
+                        String signature = parts[2].trim();
+                        String dataToVerify = "CANI_CHECKOUT:" + scannedShiftId + ":" + epochSeconds;
+                        if (signature.length() == 16 && !com.cani.util.QrCryptoUtil.verifySignature(dataToVerify, signature)) {
+                            throw new BadRequestException("Chữ ký bảo mật mã QR không hợp lệ hoặc đã bị can thiệp. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
+                        }
                     }
                 } catch (NumberFormatException ignored) {}
             }
@@ -632,6 +649,36 @@ public class WorkerJobService {
     }
 
     // =========================================================================
+    // UC-37 (WBS 100.0): QUẢN LÝ KINH NGHIỆM LÀM VIỆC CỦA WORKER (MANAGE EXPERIENCE)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public WorkerExperienceDto getWorkerExperience(UUID userId) {
+        Worker worker = getWorkerOrThrow(userId);
+        return WorkerExperienceDto.builder()
+                .yearsExperience(worker.getYearsExperience() != null ? worker.getYearsExperience() : 0)
+                .bio(worker.getBio())
+                .totalShiftsCompleted(worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0)
+                .skillTier(worker.getSkillTier())
+                .ratingAvg(worker.getRatingAvg() != null ? worker.getRatingAvg() : BigDecimal.ZERO)
+                .reliabilityScore(worker.getReliabilityScore() != null ? worker.getReliabilityScore() : 100)
+                .build();
+    }
+
+    @Transactional
+    public WorkerExperienceDto updateWorkerExperience(UUID userId, WorkerExperienceDto dto) {
+        Worker worker = getWorkerOrThrow(userId);
+        if (dto.getYearsExperience() != null) {
+            worker.setYearsExperience(dto.getYearsExperience());
+        }
+        if (dto.getBio() != null) {
+            worker.setBio(dto.getBio().trim());
+        }
+        workerRepository.save(worker);
+        log.info("Worker {} đã cập nhật hồ sơ kinh nghiệm: {} năm kinh nghiệm", userId, worker.getYearsExperience());
+        return getWorkerExperience(userId);
+    }
+
+    // =========================================================================
     // UC-53: HỦY CA LÀM VIỆC ĐÃ NHẬN & PHẠT ĐIỂM UY TÍN (CANCEL ASSIGNMENT)
     // =========================================================================
     @Transactional
@@ -653,9 +700,20 @@ public class WorkerJobService {
 
         int penaltyPoints = calculateCancellationPenalty(now, startTime);
         int currentScore = worker.getReliabilityScore() != null ? worker.getReliabilityScore() : MAX_RELIABILITY_SCORE;
-        worker.setReliabilityScore(Math.max(MIN_RELIABILITY_SCORE, currentScore - penaltyPoints));
+        int newScore = Math.max(MIN_RELIABILITY_SCORE, currentScore - penaltyPoints);
+        worker.setReliabilityScore(newScore);
         worker.setTotalCancellations((worker.getTotalCancellations() != null ? worker.getTotalCancellations() : 0) + 1);
         workerRepository.save(worker);
+
+        // WBS 273.0 (UC-95): Tự động khóa tài khoản khi Reliability Score < 20
+        if (newScore < 20) {
+            User workerUser = worker.getUser();
+            if (workerUser != null && workerUser.getStatus() != com.cani.entity.enums.UserStatus.LOCKED) {
+                workerUser.setStatus(com.cani.entity.enums.UserStatus.LOCKED);
+                userRepository.save(workerUser);
+                log.warn("Tài khoản Worker {} tự động khóa do Reliability Score < 20 (Hiện tại: {})", worker.getWorkerId(), newScore);
+            }
+        }
 
         assignment.setStatus(AssignmentStatus.CANCELLED);
         assignment.setCancellationReason(reason != null && !reason.isBlank() ? reason : "Worker tự hủy ca");

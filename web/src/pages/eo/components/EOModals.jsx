@@ -9,7 +9,6 @@ import DisputeModal from './DisputeModal';
 import LiveAttendanceModal from './LiveAttendanceModal';
 import EditEventModal from './EditEventModal';
 import EditShiftModal from './EditShiftModal';
-import EventDetailModal from './EventDetailModal';
 import { ROLES } from '../hooks/useShifts';
 
 export default function EOModals({

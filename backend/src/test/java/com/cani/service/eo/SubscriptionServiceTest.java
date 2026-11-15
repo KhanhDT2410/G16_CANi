@@ -59,6 +59,9 @@ class SubscriptionServiceTest {
     private PayOSService payOSService;
 
     @Mock
+    private com.cani.repository.PayOSOrderRepository payOSOrderRepository;
+
+    @Mock
     private NotificationService notificationService;
 
     @InjectMocks

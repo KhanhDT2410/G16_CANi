@@ -15,6 +15,7 @@ import java.util.UUID;
 @Repository
 public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment, UUID> {
     List<ShiftAssignment> findByShift_ShiftId(UUID shiftId);
+    List<ShiftAssignment> findByGroupId(UUID groupId);
     List<ShiftAssignment> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
     List<ShiftAssignment> findByWorker_WorkerIdAndStatusIn(UUID workerId, List<AssignmentStatus> statuses);
     Optional<ShiftAssignment> findByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);

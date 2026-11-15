@@ -27,6 +27,7 @@ export default function EORightSidebar({ metrics, events = [], onOpenQr, onOpenR
         title: evt.name || 'Sự kiện không tên',
         venue: evt.venueAddress || 'Chưa cập nhật địa điểm',
         dotColor: evt.status === 'ACTIVE' ? '#10b981' : '#f59e0b',
+        raw: evt,
       };
     });
 
@@ -79,7 +80,16 @@ export default function EORightSidebar({ metrics, events = [], onOpenQr, onOpenR
         ) : (
           <div className="upcoming-events-list">
             {upcomingList.map((evt) => (
-              <div key={evt.id} className="upcoming-event-item">
+              <div
+                key={evt.id}
+                className="upcoming-event-item"
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  if (onOpenQr) onOpenQr(evt.raw);
+                  else if (onViewAllEvents) onViewAllEvents();
+                }}
+                title="Bấm để mở trạm QR & chi tiết sự kiện này"
+              >
                 <div className="event-date-box">
                   <span className="event-date-day">{evt.day}</span>
                   <span className="event-date-month">{evt.month}</span>
@@ -103,7 +113,98 @@ export default function EORightSidebar({ metrics, events = [], onOpenQr, onOpenR
         )}
       </div>
 
-      {/* 2. Widget Tỷ Lệ Lấp Đầy Nhân Sự (Biểu Đồ Tròn Donut Chuẩn Enterprise) */}
+      {/* 2. Widget Thao Tác Nhanh (Quick Actions) */}
+      <div className="eo-widget-card quick-actions-widget">
+        <div className="widget-header">
+          <div className="widget-title-with-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" style={{ flexShrink: 0 }}>
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <h4 className="widget-title">Thao tác nhanh</h4>
+          </div>
+        </div>
+
+        <div className="quick-actions-grid">
+          <button
+            type="button"
+            className="quick-action-btn"
+            onClick={() => {
+              if (onOpenQr) onOpenQr();
+              else showToast('Mở trạm quét mã QR điểm danh', 'info');
+            }}
+            title="Mở trạm quét mã QR điểm danh ca đang chạy"
+          >
+            <div className="quick-btn-icon cyan">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </div>
+            <span className="quick-btn-label">Trạm QR</span>
+          </button>
+
+          <button
+            type="button"
+            className="quick-action-btn"
+            onClick={() => {
+              if (onOpenRecruitment) onOpenRecruitment();
+              else showToast('Mở màn hình tuyển dụng nhân sự', 'info');
+            }}
+            title="Đăng tuyển & Tìm kiếm nhân sự mới"
+          >
+            <div className="quick-btn-icon blue">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7" r="4"></circle>
+                <line x1="20" y1="8" x2="20" y2="14"></line>
+                <line x1="23" y1="11" x2="17" y2="11"></line>
+              </svg>
+            </div>
+            <span className="quick-btn-label">Đăng tuyển</span>
+          </button>
+
+          <button
+            type="button"
+            className="quick-action-btn"
+            onClick={() => {
+              if (onOpenSubscription) onOpenSubscription();
+              else showToast('Chuyển sang gói dịch vụ', 'info');
+            }}
+            title="Nâng cấp gói tài khoản & dịch vụ"
+          >
+            <div className="quick-btn-icon amber">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+            <span className="quick-btn-label">Gói dịch vụ</span>
+          </button>
+
+          <button
+            type="button"
+            className="quick-action-btn"
+            onClick={() => {
+              if (onViewAllEvents) onViewAllEvents();
+              else showToast('Xem toàn bộ sự kiện', 'info');
+            }}
+            title="Xem danh sách quản lý tất cả sự kiện"
+          >
+            <div className="quick-btn-icon emerald">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <span className="quick-btn-label">Sự kiện</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Widget Tỷ Lệ Lấp Đầy Nhân Sự (Biểu Đồ Tròn Donut Chuẩn Enterprise) */}
       <div className="eo-widget-card fill-rate-donut-widget">
         <div className="widget-header">
           <div className="widget-title-with-icon">

@@ -6,6 +6,7 @@ import com.cani.dto.subscription.PurchaseSubscriptionRequestDto;
 import com.cani.dto.subscription.SubscriptionPlanDto;
 import com.cani.dto.subscription.SubscriptionResponseDto;
 import com.cani.entity.EventOrganizer;
+import com.cani.entity.PayOSOrder;
 import com.cani.entity.Subscription;
 import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.PlanType;
@@ -14,6 +15,7 @@ import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.PayOSOrderRepository;
 import com.cani.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +47,9 @@ public class SubscriptionService {
 
     @Autowired(required = false)
     private NotificationService notificationService;
+
+    @Autowired(required = false)
+    private PayOSOrderRepository payOSOrderRepository;
 
     @Value("${cani.subscription.strict:false}")
     private boolean strictQuotaEnforcement;
@@ -252,6 +257,19 @@ public class SubscriptionService {
         }
 
         long orderCode = Math.abs(System.currentTimeMillis() % 900000000L) + 100000000L;
+
+        // Lưu đơn hàng bền vững vào DB trước khi gọi PayOS Gateway (Chặn mất mát order khi restart/multi-instance)
+        if (payOSOrderRepository != null) {
+            PayOSOrder payOSOrder = PayOSOrder.builder()
+                    .orderCode(orderCode)
+                    .eoId(eo.getEoId())
+                    .planType(plan.getPlanType())
+                    .amount(plan.getPrice())
+                    .status("PENDING")
+                    .build();
+            payOSOrderRepository.save(payOSOrder);
+        }
+
         pendingOrders.put("PAYOS_" + orderCode, new PendingOrder(eo.getEoId(), plan.getPlanType(), plan.getPrice(), Instant.now()));
 
         String desc = "CANI " + plan.getName();
@@ -276,37 +294,59 @@ public class SubscriptionService {
     @Transactional
     public SubscriptionResponseDto confirmPayOSPaymentForUser(UUID userId, long orderCode) {
         EventOrganizer eo = getEoOrThrow(userId);
-        PendingOrder order = pendingOrders.get("PAYOS_" + orderCode);
 
-        if (order != null && !order.eoId().equals(eo.getEoId())) {
-            log.warn("Cảnh báo bảo mật: User {} cố kích hoạt đơn hàng PayOS {} thuộc về EO {}", userId, orderCode, order.eoId());
+        // 1. Phục hồi thông tin đơn hàng từ cache in-memory hoặc từ repository bền vững payos_orders
+        PendingOrder order = pendingOrders.get("PAYOS_" + orderCode);
+        UUID orderEoId = order != null ? order.eoId() : null;
+        PlanType orderPlanType = order != null ? order.planType() : null;
+
+        if (order == null && payOSOrderRepository != null) {
+            Optional<PayOSOrder> dbOrderOpt = payOSOrderRepository.findByOrderCode(orderCode);
+            if (dbOrderOpt.isPresent()) {
+                PayOSOrder dbOrder = dbOrderOpt.get();
+                orderEoId = dbOrder.getEoId();
+                orderPlanType = dbOrder.getPlanType();
+            }
+        }
+
+        // 2. Chống IDOR / Cross-Tenant: kiểm tra quyền sở hữu đơn hàng
+        if (orderEoId != null && !orderEoId.equals(eo.getEoId())) {
+            log.warn("Cảnh báo bảo mật: User {} cố kích hoạt đơn hàng PayOS {} thuộc về EO {}", userId, orderCode, orderEoId);
             throw new BadRequestException("Giao dịch không thuộc về tài khoản Ban tổ chức hiện tại");
         }
 
-        // 1. Kiểm tra trạng thái thực tế từ PayOS Gateway (Thanh toán thật)
+        // 3. Kiểm tra trạng thái thực tế từ PayOS Gateway
         String payOsStatus = payOSService.getPaymentStatus(orderCode);
         log.info("Xác thực PayOS orderCode {} với PayOS Gateway: status={}", orderCode, payOsStatus);
 
         boolean isRealPaid = "PAID".equalsIgnoreCase(payOsStatus);
 
-        if (isRealPaid || (demoEnabled && order != null)) {
+        // 4. Khi Gateway báo PAID (hoặc demoEnabled) và order hợp lệ của chính EO này -> Kích hoạt đúng gói cước trong order
+        if (orderPlanType != null && (isRealPaid || demoEnabled)) {
             pendingOrders.remove("PAYOS_" + orderCode);
-            PlanType planType = order != null ? order.planType() : PlanType.MATCHING_PLUS;
+            if (payOSOrderRepository != null) {
+                payOSOrderRepository.findByOrderCode(orderCode).ifPresent(po -> {
+                    po.setStatus("PAID");
+                    payOSOrderRepository.save(po);
+                });
+            }
             String gatewayRef = isRealPaid ? "PAYOS_VIETQR" : "PAYOS_VIETQR_DEMO";
-            return activateSubscription(eo, planType, gatewayRef, "PAYOS_" + orderCode, "POS_" + orderCode);
+            return activateSubscription(eo, orderPlanType, gatewayRef, "PAYOS_" + orderCode, "POS_" + orderCode);
         }
 
-        if (order != null) {
+        // 5. Nếu có order nhưng chưa thanh toán trên Gateway -> Báo lỗi
+        if (orderPlanType != null) {
             throw new BadRequestException("Giao dịch chưa hoàn tất thanh toán trên PayOS (Trạng thái: " + payOsStatus + "). Vui lòng hoàn tất chuyển khoản.");
         }
 
-        // Trường hợp reload lại trang hoặc Webhook đã xử lý kích hoạt trước đó cho chính EO này
+        // 6. Trường hợp reload lại trang hoặc Webhook đã xử lý kích hoạt trước đó cho chính EO này
         Instant now = Instant.now();
         List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
         if (!activeSubs.isEmpty()) {
             return mapToDto(activeSubs.get(0));
         }
 
+        // 7. Order lạ hoàn toàn không có trong hệ thống và không có gói active nào -> Từ chối
         throw new BadRequestException("Giao dịch không tồn tại hoặc đã được xử lý trước đó: " + orderCode);
     }
 
@@ -316,7 +356,21 @@ public class SubscriptionService {
     @Transactional
     public SubscriptionResponseDto confirmPayOSPayment(long orderCode) {
         PendingOrder order = pendingOrders.remove("PAYOS_" + orderCode);
-        if (order == null) {
+        UUID eoId = order != null ? order.eoId() : null;
+        PlanType planType = order != null ? order.planType() : null;
+
+        if (order == null && payOSOrderRepository != null) {
+            Optional<PayOSOrder> dbOrderOpt = payOSOrderRepository.findByOrderCode(orderCode);
+            if (dbOrderOpt.isPresent()) {
+                PayOSOrder dbOrder = dbOrderOpt.get();
+                eoId = dbOrder.getEoId();
+                planType = dbOrder.getPlanType();
+                dbOrder.setStatus("PAID");
+                payOSOrderRepository.save(dbOrder);
+            }
+        }
+
+        if (eoId == null || planType == null) {
             log.info("PayOS Webhook/Internal: Giao dịch PAYOS_{} đã được xử lý trước đó hoặc không còn trong hàng đợi.", orderCode);
             return SubscriptionResponseDto.builder()
                     .planName("PayOS Webhook Accepted")
@@ -324,10 +378,11 @@ public class SubscriptionService {
                     .build();
         }
 
-        EventOrganizer eo = eventOrganizerRepository.findById(order.eoId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện: " + order.eoId()));
+        final UUID finalEoId = eoId;
+        EventOrganizer eo = eventOrganizerRepository.findById(finalEoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện: " + finalEoId));
 
-        return activateSubscription(eo, order.planType(), "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode);
+        return activateSubscription(eo, planType, "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode);
     }
 
     /**

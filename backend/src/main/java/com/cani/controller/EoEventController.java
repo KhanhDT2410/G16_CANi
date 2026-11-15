@@ -86,6 +86,21 @@ public class EoEventController {
     }
 
     /**
+     * UC-20 (WBS 74.0): EO tạo hàng loạt Ca làm việc (Bulk Create Shifts)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/{eventId}/shifts/bulk")
+    public ResponseEntity<ApiResponse<List<ShiftResponseDto>>> addBulkShifts(
+            @PathVariable("eventId") UUID eventId,
+            @Valid @RequestBody CreateBulkShiftsRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<ShiftResponseDto> shifts = eoEventService.addBulkShifts(userId, eventId, request);
+        return ResponseEntity.ok(ApiResponse.ok(shifts, "Tạo hàng loạt " + shifts.size() + " ca làm việc thành công!"));
+    }
+
+    /**
      * UC-18: Chỉnh sửa Ca làm việc (Edit Shift)
      */
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
@@ -156,6 +171,21 @@ public class EoEventController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftAttendanceDto verified = eoEventService.verifyAttendance(userId, assignmentId);
         return ResponseEntity.ok(ApiResponse.ok(verified, "Xác nhận hoàn thành ca và duyệt công cho Worker thành công!"));
+    }
+
+    /**
+     * UC-83: EO báo cáo công việc không đạt yêu cầu / chưa hoàn thành (Report Incomplete Work)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/assignments/{assignmentId}/report-incomplete")
+    public ResponseEntity<ApiResponse<com.cani.dto.dispute.DisputeDetailResponseDto>> reportIncompleteWork(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @Valid @RequestBody ReportIncompleteWorkRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        com.cani.dto.dispute.DisputeDetailResponseDto dispute = eoEventService.reportIncompleteWork(userId, assignmentId, request);
+        return ResponseEntity.ok(ApiResponse.ok(dispute, "Đã gửi báo cáo công việc không đạt yêu cầu tới Bộ phận CSKH xử lý!"));
     }
 
     /**
@@ -240,6 +270,24 @@ public class EoEventController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftResponseDto shift = eoEventService.publishShift(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Kích hoạt điều phối tìm Worker cho ca làm việc thành công!"));
+    }
+
+    /**
+     * UC-59: EO kích hoạt điều phối khẩn cấp (Emergency Dispatch) khi ca làm việc thiếu nhân sự
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/shifts/{shiftId}/emergency-dispatch")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> triggerEmergencyDispatch(
+            @PathVariable("shiftId") UUID shiftId,
+            @RequestParam(required = false) Double radiusKm,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        int dispatched = eoEventService.triggerEmergencyDispatch(userId, shiftId, radiusKm);
+        return ResponseEntity.ok(ApiResponse.ok(
+                Map.of("shiftId", shiftId, "dispatchedCount", dispatched),
+                "Kích hoạt điều phối khẩn cấp thành công! Đã gửi " + dispatched + " đề xuất khẩn cấp đến Worker xung quanh."
+        ));
     }
 
     /**

@@ -618,7 +618,7 @@ export default function EventDetailModal({
                                 backgroundColor: '#fef2f2',
                                 border: '1px solid #fecaca',
                                 display: 'flex',
-                                justifyContents: 'space-between',
+                                justifyContent: 'space-between',
                                 alignItems: 'center',
                                 opacity: 0.75,
                               }}

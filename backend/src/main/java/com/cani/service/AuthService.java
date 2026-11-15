@@ -13,6 +13,7 @@ import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.PaymentRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final WorkerRepository workerRepository;
+    private final PaymentRepository paymentRepository;
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
     private final EmailOtpService emailOtpService;
@@ -280,12 +282,13 @@ public class AuthService {
                     user.setRole(UserRole.EVENT_ORGANIZER);
                     user = userRepository.save(user);
 
-                    // Xóa profile worker rác do trigger Supabase tự sinh
+                    // Xóa profile worker rác do trigger Supabase tự sinh (chỉ xóa khi chưa có dữ liệu thanh toán)
                     workerOpt.ifPresent(w -> {
-                        try {
+                        boolean hasFinancialRecords = paymentRepository != null && paymentRepository.existsByWorker_WorkerId(w.getWorkerId());
+                        if (!hasFinancialRecords) {
                             workerRepository.delete(w);
-                        } catch (Exception e) {
-                            log.warn("Không thể xóa worker dummy của user {}: {}", email, e.getMessage());
+                        } else {
+                            log.info("Worker {} đã có dữ liệu thanh toán (Payment), bảo toàn dữ liệu và không xóa khi nâng cấp lên EO", w.getWorkerId());
                         }
                     });
                 }

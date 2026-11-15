@@ -470,8 +470,10 @@ export default function EOPage() {
           <EORightSidebar
             metrics={events.metrics}
             events={events.events}
-            onOpenQr={() => {
-              const active = events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0];
+            onOpenQr={(targetEvt) => {
+              const active = targetEvt?.eventId
+                ? targetEvt
+                : (events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0]);
               if (active) {
                 handleOpenEventDetailPage(active, 'QR_ATTENDANCE');
               } else {

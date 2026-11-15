@@ -1,19 +1,141 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+
+// Chuyển đổi Date thành chuỗi 'YYYY-MM-DD' đồng nhất
+const toDateKey = (dateInput) => {
+  if (!dateInput) return '';
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  } catch {
+    return '';
+  }
+};
 
 /**
  * EOOverviewAnalytics
- * Khối Phân Tích & Số Liệu Vận Hành Tổng Quát dành cho Nhà Tổ Chức Sự Kiện (EO)
- * Cung cấp góc nhìn toàn cảnh về: Hiệu suất điều phối, cơ cấu vị trí, nhịp độ tuyển dụng và dự toán sự kiện.
+ * Khối Thống Kê Tổng Quát & Lịch Sự Kiện Theo Tháng cho Ban Tổ Chức Sự Kiện (EO)
+ * - Lịch tháng tương tác: Đánh dấu chấm (dot) các ngày có sự kiện, chuyển tháng, xem nhanh sự kiện.
+ * - Cơ cấu vị trí tuyển dụng: Phân bổ số lượng nhân sự theo từng vai trò ca làm.
+ * - Bảng quy mô sự kiện: Đã bỏ toàn bộ emoji/icon, thiết kế chuẩn doanh nghiệp.
  */
 export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
-  // 1. Lọc các sự kiện chưa hủy
+  // 1. Lọc danh sách sự kiện chưa hủy
   const activeEvents = useMemo(() => {
     return (events || [])
       .filter((e) => e && e.status !== 'CANCELLED')
       .sort((a, b) => new Date(b.createdAt || b.eventDate || 0) - new Date(a.createdAt || a.eventDate || 0));
   }, [events]);
 
-  // 2. Tổng hợp cơ cấu vị trí tuyển dụng (Job Roles Breakdown) từ tất cả các ca
+  // 2. Gom nhóm sự kiện theo ngày 'YYYY-MM-DD' để hiển thị dấu chấm trên lịch
+  const eventsByDate = useMemo(() => {
+    const map = {};
+    activeEvents.forEach((evt) => {
+      const dateKeys = new Set();
+      if (evt.eventDate) {
+        const k = toDateKey(evt.eventDate);
+        if (k) dateKeys.add(k);
+      }
+      (evt.shifts || []).forEach((sh) => {
+        if (sh.startTime) {
+          const k = toDateKey(sh.startTime);
+          if (k) dateKeys.add(k);
+        }
+      });
+      dateKeys.forEach((k) => {
+        if (!map[k]) map[k] = [];
+        if (!map[k].some((item) => item.eventId === evt.eventId)) {
+          map[k].push(evt);
+        }
+      });
+    });
+    return map;
+  }, [activeEvents]);
+
+  // 3. Quản lý trạng thái Lịch theo tháng
+  const [calendarViewDate, setCalendarViewDate] = useState(() => {
+    // Mặc định chọn tháng của sự kiện gần nhất hoặc ngày hôm nay
+    if (activeEvents.length > 0 && activeEvents[0].eventDate) {
+      const d = new Date(activeEvents[0].eventDate);
+      if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+
+  const [selectedDateKey, setSelectedDateKey] = useState(() => {
+    const todayKey = toDateKey(new Date());
+    if (eventsByDate[todayKey]) return todayKey;
+    const firstEventDateKey = Object.keys(eventsByDate)[0];
+    return firstEventDateKey || todayKey;
+  });
+
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth(); // 0 - 11
+
+  const handlePrevMonth = () => {
+    setCalendarViewDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarViewDate(new Date(year, month + 1, 1));
+  };
+
+  const handleCurrentMonth = () => {
+    const today = new Date();
+    setCalendarViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    setSelectedDateKey(toDateKey(today));
+  };
+
+  // Tính toán ma trận các ngày trong tháng (Thứ Hai đến Chủ Nhật)
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(year, month, 1);
+    // JS getDay(): 0 là CN, 1 là T2... Chuyển sang chuẩn T2 = 0, CN = 6
+    const startDayIndex = (firstDay.getDay() + 6) % 7;
+    const daysInCurrentMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const cells = [];
+
+    // Các ngày cuối tháng trước (mờ)
+    for (let i = startDayIndex - 1; i >= 0; i--) {
+      cells.push({
+        dayNumber: daysInPrevMonth - i,
+        isCurrentMonth: false,
+        dateKey: toDateKey(new Date(year, month - 1, daysInPrevMonth - i)),
+      });
+    }
+
+    // Các ngày trong tháng hiện tại
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      cells.push({
+        dayNumber: d,
+        isCurrentMonth: true,
+        dateKey: toDateKey(new Date(year, month, d)),
+      });
+    }
+
+    // Các ngày đầu tháng sau để đủ khung
+    const totalCells = cells.length > 35 ? 42 : 35;
+    const remaining = totalCells - cells.length;
+    for (let d = 1; d <= remaining; d++) {
+      cells.push({
+        dayNumber: d,
+        isCurrentMonth: false,
+        dateKey: toDateKey(new Date(year, month + 1, d)),
+      });
+    }
+
+    return cells;
+  }, [year, month]);
+
+  // Danh sách sự kiện của ngày được chọn
+  const selectedDayEvents = eventsByDate[selectedDateKey] || [];
+
+  // 4. Cơ cấu vị trí tuyển dụng (Job Roles Breakdown)
   const roleBreakdown = useMemo(() => {
     const map = {};
     activeEvents.forEach((evt) => {
@@ -30,7 +152,6 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
 
     const list = Object.values(map);
     if (list.length === 0) {
-      // Dữ liệu mặc định mô phỏng trực quan nếu EO mới tạo sự kiện chưa có ca
       return [
         { role: 'Phục vụ bàn tiệc (F&B)', required: 12, confirmed: 10, color: '#2563eb' },
         { role: 'Lễ tân / PG / PB sự kiện', required: 8, confirmed: 8, color: '#059669' },
@@ -47,94 +168,21 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
     }));
   }, [activeEvents]);
 
-  // 3. Dữ liệu nhịp độ điều phối 7 ngày gần nhất (Weekly Dispatch Velocity)
-  const weeklyTrends = useMemo(() => {
-    const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    // Mô phỏng phân bổ theo tuần thực tế của sự kiện
-    const values = [6, 10, 14, 18, 26, 32, 22];
-    const maxVal = Math.max(...values, 35);
-    return days.map((day, idx) => ({
-      day,
-      count: values[idx],
-      heightPercent: Math.round((values[idx] / maxVal) * 100),
-    }));
-  }, []);
-
   // Format tiền tệ VNĐ
   const formatCurrency = (val) => new Intl.NumberFormat('vi-VN').format(val || 0);
 
+  const todayKey = toDateKey(new Date());
+
   return (
-    <div className="eo-overview-analytics-container animate-fade-in-up" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="eo-overview-analytics-container animate-fade-in-up" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
       {/* =========================================================================
-          KHỐI 1: 4 CHỈ SỐ VẬN HÀNH & CHẤT LƯỢNG THỰC TẾ (KPI METRICS)
+          KHỐI 1: GRID 2 CỘT: CƠ CẤU VỊ TRÍ (TRÁI) & LỊCH SỰ KIỆN THEO THÁNG (PHẢI)
           ========================================================================= */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
-        
-        {/* KPI 1: Tỷ lệ đúng giờ */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem 1.25rem', borderLeft: '4px solid #10b981' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Tỷ Lệ Đến Đúng Giờ</span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 12, backgroundColor: '#dcfce7', color: '#15803d' }}>
-              +2.4% tuần này
-            </span>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0.4rem 0 0.2rem' }}>
-            97.8%
-          </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Xác thực qua Check-in QR & GPS 200m</span>
-        </div>
-
-        {/* KPI 2: Tỷ lệ hoàn thành ca */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem 1.25rem', borderLeft: '4px solid #2563eb' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Tỷ Lệ Hoàn Thành Ca</span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 12, backgroundColor: '#eff6ff', color: '#2563eb' }}>
-              Xuất sắc
-            </span>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0.4rem 0 0.2rem' }}>
-            99.2%
-          </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Được EO xác nhận & duyệt công</span>
-        </div>
-
-        {/* KPI 3: Tỷ lệ vắng mặt (No-show) */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem 1.25rem', borderLeft: '4px solid #f59e0b' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Tỷ Lệ Vắng Mặt (No-Show)</span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 12, backgroundColor: '#fef3c7', color: '#b45309' }}>
-              Rất thấp
-            </span>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0.4rem 0 0.2rem' }}>
-            1.5%
-          </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Kiểm soát bằng thuật toán phạt RS</span>
-        </div>
-
-        {/* KPI 4: Điểm uy tín & Đánh giá */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem 1.25rem', borderLeft: '4px solid #8b5cf6' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>Đánh Giá Hài Lòng</span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 12, backgroundColor: '#f3e8ff', color: '#7c3aed' }}>
-              5 Sao
-            </span>
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: '0.4rem 0 0.2rem' }}>
-            4.9 <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>/ 5.0</span>
-          </div>
-          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Điểm tín nhiệm từ nhân sự sự kiện</span>
-        </div>
-      </div>
-
-      {/* =========================================================================
-          KHỐI 2: GRID 2 CỘT: CƠ CẤU VỊ TRÍ (TRÁI) & BIỂU ĐỒ NHỊP ĐỘ (PHẢI)
-          ========================================================================= */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
         
         {/* CỘT TRÁI: Cơ cấu vị trí tuyển dụng */}
-        <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
+        <div className="eo-widget-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem' }}>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
@@ -149,7 +197,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, justifyContent: 'center' }}>
             {roleBreakdown.map((item, idx) => {
               const percent = item.required > 0 ? Math.round((item.confirmed / item.required) * 100) : 0;
               return (
@@ -177,56 +225,218 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
           </div>
         </div>
 
-        {/* CỘT PHẢI: Biểu đồ cột SVG nhịp độ điều phối theo ngày */}
-        <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem' }}>
+        {/* CỘT PHẢI: Lịch Sự Kiện Theo Tháng (Monthly Event Calendar) */}
+        <div className="eo-widget-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          
+          {/* Header Lịch: Tháng/Năm & Nút Điều Hướng */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
-                Nhịp Độ Điều Phối Nhân Sự Trong Tuần
+                Lịch Sự Kiện Tháng {month + 1}/{year}
               </h4>
               <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
-                Tổng lượt Worker tham gia các ca theo 7 ngày gần nhất
+                Ngày có dấu chấm xanh biểu thị có lịch sự kiện diễn ra
               </p>
             </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', backgroundColor: '#ecfdf5', padding: '3px 10px', borderRadius: 8 }}>
-              Cao điểm cuối tuần
-            </span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <button
+                type="button"
+                onClick={handleCurrentMonth}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  padding: '3px 8px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  color: '#475569',
+                }}
+              >
+                Hôm nay
+              </button>
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  width: 26,
+                  height: 26,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  color: '#475569',
+                }}
+                title="Tháng trước"
+              >
+                &lsaquo;
+              </button>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  width: 26,
+                  height: 26,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  color: '#475569',
+                }}
+                title="Tháng sau"
+              >
+                &rsaquo;
+              </button>
+            </div>
           </div>
 
-          {/* SVG Bar Chart gọn gàng */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '140px', padding: '0 0.5rem 0.5rem', borderBottom: '1px solid #e2e8f0', marginTop: '0.5rem' }}>
-            {weeklyTrends.map((bar, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', flex: 1 }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>{bar.count}</span>
-                <div
-                  style={{
-                    width: '26px',
-                    height: `${bar.heightPercent}%`,
-                    maxHeight: '100px',
-                    minHeight: '12px',
-                    borderRadius: '6px 6px 0 0',
-                    backgroundColor: idx >= 4 ? '#2563eb' : '#93c5fd',
-                    transition: 'all 0.3s ease',
-                  }}
-                  title={`${bar.day}: ${bar.count} lượt nhân sự`}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Nhãn các ngày trong tuần */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.5rem 0' }}>
-            {weeklyTrends.map((bar, idx) => (
-              <span key={idx} style={{ flex: 1, textAlign: 'center', fontSize: '0.75rem', fontWeight: 600, color: idx >= 4 ? '#2563eb' : '#64748b' }}>
-                {bar.day}
+          {/* Hàng Tiêu Đề Thứ Trong Tuần (T2 - CN) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', marginBottom: '0.35rem' }}>
+            {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((w, idx) => (
+              <span key={idx} style={{ fontSize: '0.72rem', fontWeight: 700, color: idx >= 5 ? '#2563eb' : '#64748b' }}>
+                {w}
               </span>
             ))}
+          </div>
+
+          {/* Lưới Ngày Trong Tháng */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center' }}>
+            {calendarDays.map((cell, idx) => {
+              const hasEvents = (eventsByDate[cell.dateKey] || []).length > 0;
+              const isSelected = cell.dateKey === selectedDateKey;
+              const isToday = cell.dateKey === todayKey;
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => cell.dateKey && setSelectedDateKey(cell.dateKey)}
+                  style={{
+                    padding: '6px 0',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isSelected
+                      ? '#2563eb'
+                      : isToday
+                      ? '#eff6ff'
+                      : hasEvents
+                      ? '#f0fdf4'
+                      : 'transparent',
+                    border: isToday && !isSelected
+                      ? '1px solid #93c5fd'
+                      : isSelected
+                      ? '1px solid #2563eb'
+                      : '1px solid transparent',
+                    color: isSelected
+                      ? '#ffffff'
+                      : !cell.isCurrentMonth
+                      ? '#cbd5e1'
+                      : '#1e293b',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={hasEvents ? `${cell.dateKey}: Có sự kiện` : cell.dateKey}
+                >
+                  <span style={{ fontSize: '0.8rem', fontWeight: isToday || hasEvents || isSelected ? 700 : 500, lineHeight: 1 }}>
+                    {cell.dayNumber}
+                  </span>
+                  
+                  {/* Dấu chấm tròn (Dot) nếu ngày có sự kiện */}
+                  <div style={{ height: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 3 }}>
+                    {hasEvents && (
+                      <span
+                        style={{
+                          width: '5px',
+                          height: '5px',
+                          borderRadius: '50%',
+                          backgroundColor: isSelected ? '#ffffff' : '#10b981',
+                          display: 'inline-block',
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Khung Xem Nhanh Sự Kiện của Ngày Được Chọn */}
+          <div
+            style={{
+              marginTop: '0.85rem',
+              padding: '0.75rem 0.85rem',
+              backgroundColor: '#f8fafc',
+              borderRadius: 8,
+              border: '1px solid #e2e8f0',
+              fontSize: '0.8rem',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: selectedDayEvents.length > 0 ? 6 : 0 }}>
+              <span style={{ fontWeight: 700, color: '#334155' }}>
+                Ngày {selectedDateKey ? new Date(selectedDateKey).toLocaleDateString('vi-VN') : '—'}
+              </span>
+              <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                {selectedDayEvents.length} sự kiện
+              </span>
+            </div>
+
+            {selectedDayEvents.length === 0 ? (
+              <div style={{ color: '#94a3b8', fontSize: '0.75rem', textAlign: 'center', padding: '0.35rem 0' }}>
+                Không có lịch sự kiện diễn ra vào ngày này
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.35rem' }}>
+                {selectedDayEvents.map((evt) => (
+                  <div
+                    key={evt.eventId}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      backgroundColor: '#ffffff',
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div style={{ minWidth: 0, paddingRight: 8 }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {evt.name}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {evt.venueAddress || 'Chưa cập nhật địa điểm'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="eo-btn-primary"
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+                      onClick={() => onSelectEvent?.(evt)}
+                    >
+                      Mở &rarr;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* =========================================================================
-          KHỐI 3: BẢNG SO SÁNH QUY MÔ & TIẾN ĐỘ CÁC SỰ KIỆN ĐANG HOẠT ĐỘNG
+          KHỐI 2: BẢNG SO SÁNH QUY MÔ & TIẾN ĐỘ CÁC SỰ KIỆN ĐANG HOẠT ĐỘNG
+          (ĐÃ BỎ HOÀN TOÀN TẤT CẢ ICON & EMOJI THEO YÊU CẦU)
           ========================================================================= */}
       <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -281,8 +491,8 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                         {evt.name || 'Sự kiện không tên'}
                       </td>
                       <td style={{ padding: '12px', color: '#64748b', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        <div>📅 {evt.eventDate ? new Date(evt.eventDate).toLocaleDateString('vi-VN') : 'Chưa định ngày'}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>📍 {evt.venueAddress || 'Chưa cập nhật địa chỉ'}</div>
+                        <div>{evt.eventDate ? new Date(evt.eventDate).toLocaleDateString('vi-VN') : 'Chưa định ngày'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{evt.venueAddress || 'Chưa cập nhật địa chỉ'}</div>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center', fontWeight: 600 }}>
                         <span style={{ backgroundColor: '#f1f5f9', padding: '3px 8px', borderRadius: 6, fontSize: '0.78rem' }}>

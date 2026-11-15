@@ -197,30 +197,6 @@ export default function EOSidebar({
           );
         })}
       </nav>
-
-      {/* Promo Card ở đáy sidebar */}
-      {!isCollapsed && (
-        <div className="eo-sidebar-promo-card animate-fade-in-up">
-          <div className="promo-calendar-3d-box">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            <div className="promo-calendar-dot" />
-          </div>
-          <h4 className="promo-card-title">Trợ lý Điều phối AI</h4>
-          <p className="promo-card-desc">Tự động quét ứng viên phù hợp bán kính 15km</p>
-          <button
-            type="button"
-            className="promo-card-btn"
-            onClick={() => onNavClick('subscription')}
-          >
-            Xem gói dịch vụ
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

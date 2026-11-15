@@ -197,6 +197,80 @@ export default function EOSidebar({
           );
         })}
       </nav>
+
+      {/* Promo Card: Nâng Cấp Gói Dịch Vụ Chuẩn Mockup Ảnh 2 */}
+      {!isCollapsed && (
+        <div
+          className="eo-sidebar-promo-card animate-fade-in-up"
+          style={{
+            margin: '1rem 0.85rem 0.75rem',
+            padding: '1.25rem 1rem 1rem',
+            background: '#ffffff',
+            borderRadius: '18px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.05)',
+            textAlign: 'center',
+            position: 'relative',
+          }}
+        >
+          {/* Icon Crown & Lotus Badge */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.65rem' }}>
+            <img
+              src="/assets/eo-crown-badge.png"
+              alt="VIP Subscription"
+              style={{ width: 56, height: 'auto', display: 'block' }}
+            />
+          </div>
+
+          <h4
+            style={{
+              margin: '0 0 0.35rem',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              color: '#0f172a',
+            }}
+          >
+            Nâng cấp gói dịch vụ
+          </h4>
+
+          <p
+            style={{
+              margin: '0 0 0.85rem',
+              fontSize: '0.78rem',
+              color: '#64748b',
+              lineHeight: 1.45,
+            }}
+          >
+            Mở khóa nhiều tính năng nâng cao và tối ưu vận hành sự kiện.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => onNavClick('subscription')}
+            style={{
+              width: '100%',
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '0.6rem 0.85rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+          >
+            Xem các gói dịch vụ &rarr;
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

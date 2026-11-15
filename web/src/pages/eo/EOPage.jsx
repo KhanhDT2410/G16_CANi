@@ -10,6 +10,7 @@ import { usePayments } from './hooks/usePayments';
 import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
 import EOMetricsGrid from './components/EOMetricsGrid';
+import EOOverviewAnalytics from './components/EOOverviewAnalytics';
 import EOEventsTab from './components/EOEventsTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
@@ -352,6 +353,12 @@ export default function EOPage() {
                     handleOpenEventDetailPage(active);
                   }
                 }}
+              />
+
+              {/* Bảng Số Liệu Vận Hành & Thống Kê Tổng Quát (Pure Analytics & Operational Metrics) */}
+              <EOOverviewAnalytics
+                events={events.events}
+                onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
               />
             </>
           )}

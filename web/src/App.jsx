@@ -78,6 +78,8 @@ function App() {
               {/* Fallback route cho duong dan cu /cskh */}
               <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
             </Route>
+            {/* Catch-all fallback về Landing Page */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
         </AuthProvider>

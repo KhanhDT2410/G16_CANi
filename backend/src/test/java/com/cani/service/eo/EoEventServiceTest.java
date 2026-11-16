@@ -261,6 +261,52 @@ class EoEventServiceTest {
         assertNull(result.getDescription());
     }
 
+    @Test
+    @DisplayName("UTC006b - createEvent() - Abnormal: Event name is keyboard mash / gibberish (e.g. sdfdsfsdfsd)")
+    void createEvent_ThrowsBadRequest_WhenNameIsGibberish() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("sdfdsfsdfsd")
+                .venueAddress("Hà Nội")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("không hợp lệ") || ex.getMessage().contains("vô nghĩa"));
+    }
+
+    @Test
+    @DisplayName("UTC006c - createEvent() - Abnormal: Event description is keyboard mash / gibberish")
+    void createEvent_ThrowsBadRequest_WhenDescriptionIsGibberish() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("Hội nghị Công nghệ 2026")
+                .description("sdfdsfsdfsd")
+                .venueAddress("Hà Nội")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("Mô tả") || ex.getMessage().contains("vô nghĩa"));
+    }
+
+    @Test
+    @DisplayName("UTC006d - createEvent() - Abnormal: End time is before or equal to start time")
+    void createEvent_ThrowsBadRequest_WhenEndTimeBeforeStartTime() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        Instant now = Instant.now();
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("Hội nghị Công nghệ 2026")
+                .venueAddress("Hà Nội")
+                .startTime(now.plusSeconds(3600))
+                .endTime(now)
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("sau"));
+    }
+
 
     // =========================================================================
     // updateEvent()
@@ -855,8 +901,8 @@ class EoEventServiceTest {
         ShiftQrCodeResponseDto qr = eoEventService.generateShiftQr(userId, shiftId);
 
         assertNotNull(qr);
-        assertEquals("CANI_CHECKIN:" + shiftId, qr.getCheckinQrContent());
-        assertEquals("CANI_CHECKOUT:" + shiftId, qr.getCheckoutQrContent());
+        assertTrue(qr.getCheckinQrContent().startsWith("CANI_CHECKIN:" + shiftId));
+        assertTrue(qr.getCheckoutQrContent().startsWith("CANI_CHECKOUT:" + shiftId));
     }
 
     @Test

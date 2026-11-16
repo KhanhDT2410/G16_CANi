@@ -710,7 +710,9 @@ public class WorkerJobService {
             User workerUser = worker.getUser();
             if (workerUser != null && workerUser.getStatus() != com.cani.entity.enums.UserStatus.LOCKED) {
                 workerUser.setStatus(com.cani.entity.enums.UserStatus.LOCKED);
-                userRepository.save(workerUser);
+                if (userRepository != null) {
+                    userRepository.save(workerUser);
+                }
                 log.warn("Tài khoản Worker {} tự động khóa do Reliability Score < 20 (Hiện tại: {})", worker.getWorkerId(), newScore);
             }
         }

@@ -72,11 +72,11 @@ export default function EOMyTeamTab() {
   };
 
   const handleRemoveMember = async (worker) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa "${worker.fullName}" khỏi Đội của tôi?`)) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa "${worker.fullName}" khỏi danh sách nhân sự quen thuộc?`)) return;
     try {
       await myTeamService.removeWorkerFromMyTeam(worker.workerId);
       setTeam((prev) => prev.filter((w) => w.workerId !== worker.workerId));
-      showToast(`Đã xóa ${worker.fullName} khỏi Đội của tôi.`, 'success');
+      showToast(`Đã xóa ${worker.fullName} khỏi danh sách nhân sự quen thuộc.`, 'success');
     } catch (err) {
       showToast(err.response?.data?.message || 'Lỗi khi xóa nhân sự', 'error');
     }
@@ -84,7 +84,7 @@ export default function EOMyTeamTab() {
 
   const handleBlockWorker = async (worker) => {
     const reason = window.prompt(
-      `Bạn có chắc muốn CHẶN "${worker.fullName}" không?\n\nNgười này sẽ bị xóa khỏi Đội của tôi và không thể nhận bất kỳ ca làm nào của bạn nữa.\nNhập lý do:`,
+      `Bạn có chắc muốn CHẶN "${worker.fullName}" không?\n\nNgười này sẽ bị xóa khỏi danh sách nhân sự quen thuộc và không thể nhận bất kỳ ca làm nào của bạn nữa.\nNhập lý do:`,
       'Không đạt chất lượng công việc'
     );
     if (reason === null) return;
@@ -108,7 +108,7 @@ export default function EOMyTeamTab() {
     setSubmittingAdd(true);
     try {
       await myTeamService.addWorkerToMyTeam(addForm);
-      showToast('Đã thêm nhân sự vào Đội của tôi thành công!', 'success');
+      showToast('Đã thêm nhân sự vào danh sách quen thuộc thành công!', 'success');
       setShowAddModal(false);
       setAddForm({ phone: '', internalNote: '', isFavorited: true });
       fetchTeam();
@@ -127,7 +127,7 @@ export default function EOMyTeamTab() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                Đội Của Tôi
+                Nhân Sự Quen Thuộc
               </h3>
               <span style={{
                 background: '#eff6ff',
@@ -151,7 +151,7 @@ export default function EOMyTeamTab() {
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.55rem 1.25rem' }}
             onClick={() => setShowAddModal(true)}
           >
-            <span>+</span> Thêm Nhân Sự Vào Đội
+            <span>+</span> Thêm Nhân Sự Quen Thuộc
           </button>
         </div>
       </div>
@@ -186,7 +186,7 @@ export default function EOMyTeamTab() {
       {/* 3. WORKER GRID LIST */}
       {loading ? (
         <div style={{ padding: '3rem 0', textAlign: 'center', color: '#64748b' }}>
-          Đang tải danh sách Đội của tôi...
+          Đang tải danh sách nhân sự quen thuộc...
         </div>
       ) : team.length === 0 ? (
         <div style={{
@@ -198,10 +198,10 @@ export default function EOMyTeamTab() {
           color: '#64748b',
         }}>
           <p style={{ margin: '0 0 0.5rem', fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>
-            Chưa có nhân sự nào trong Đội của tôi.
+            Chưa có nhân sự nào trong danh sách quen thuộc.
           </p>
           <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem' }}>
-            Sau mỗi ca làm việc hoàn thành hoặc bằng cách nhập số điện thoại, bạn có thể thêm nhân sự vào Đội của tôi để ưu tiên gọi cho các sự kiện tiếp theo.
+            Sau mỗi ca làm việc hoàn thành hoặc bằng cách nhập số điện thoại, bạn có thể thêm nhân sự vào danh sách quen thuộc để ưu tiên điều động cho các sự kiện tiếp theo.
           </p>
           <button
             type="button"
@@ -409,7 +409,7 @@ export default function EOMyTeamTab() {
                       fontWeight: 600,
                       cursor: 'pointer',
                     }}
-                    title="Xóa khỏi Đội của tôi"
+                    title="Xóa khỏi danh sách quen thuộc"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                       <polyline points="3 6 5 6 21 6" />
@@ -445,7 +445,7 @@ export default function EOMyTeamTab() {
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
           }}>
             <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-              Thêm Nhân Sự Vào Đội Của Tôi
+              Thêm Nhân Sự Quen Thuộc
             </h3>
             <p style={{ margin: '0 0 1.25rem', fontSize: '0.825rem', color: '#64748b' }}>
               Nhập số điện thoại của nhân sự đã đăng ký trên CANi để lưu vào danh sách ưu tiên của bạn.
@@ -505,7 +505,7 @@ export default function EOMyTeamTab() {
                   className="eo-btn-primary"
                   disabled={submittingAdd}
                 >
-                  {submittingAdd ? 'Đang thêm...' : 'Thêm Vào Đội Của Tôi'}
+                  {submittingAdd ? 'Đang thêm...' : 'Thêm Vào Danh Sách'}
                 </button>
               </div>
             </form>

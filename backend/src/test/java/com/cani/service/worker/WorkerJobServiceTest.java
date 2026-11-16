@@ -38,6 +38,9 @@ class WorkerJobServiceTest {
     private WorkerRepository workerRepository;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private ShiftRepository shiftRepository;
 
     @Mock

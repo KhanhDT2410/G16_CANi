@@ -86,6 +86,8 @@ public class EoEventService {
             throw new BadRequestException("Tài khoản của bạn chưa hoàn tất định danh eKYC. Vui lòng xác thực eKYC trước khi tạo sự kiện và tuyển dụng nhân sự trên CANi.");
         }
 
+        validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(), dto.getEndTime());
+
         Event event = Event.builder()
                 .eventOrganizer(eo)
                 .name(dto.getName())
@@ -124,6 +126,8 @@ public class EoEventService {
         if (event.getStatus() == EventStatus.CANCELLED || event.getStatus() == EventStatus.COMPLETED) {
             throw new BadRequestException("Không thể chỉnh sửa sự kiện đã hoàn thành hoặc đã bị hủy.");
         }
+
+        validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(), dto.getEndTime());
 
         event.setName(dto.getName());
         event.setDescription(dto.getDescription());
@@ -1043,5 +1047,86 @@ public class EoEventService {
                 .imageUrl(s.getImageUrl())
                 .checklist(s.getChecklist())
                 .build();
+    }
+
+    public static boolean isGibberishOrSpam(String input) {
+        if (input == null) return false;
+        String str = input.trim().toLowerCase();
+        if (str.length() < 3) return false;
+
+        // 1. Ký tự đơn lặp lại liên tiếp >= 4 lần (ví dụ: aaaaa, 11111)
+        if (str.matches("^(.)\\1{3,}$")) return true;
+
+        // 2. Cặp ký tự lặp lại >= 3 lần (ví dụ: ababab, cdcdcd)
+        if (str.matches("^(.{2})\\1{2,}$")) return true;
+
+        // 3. Regex nhận diện nguyên âm tiếng Việt và tiếng Anh
+        String vowelsPattern = ".*[aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ].*";
+
+        // Tách các từ theo khoảng trắng
+        String[] words = str.split("\\s+");
+        for (String w : words) {
+            if (w.matches("\\d+")) continue; // Bỏ qua nếu từ chỉ toàn chữ số
+            String cleanWord = w.replaceAll("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$", "");
+            // Nếu một từ có độ dài >= 4 ký tự nhưng hoàn toàn KHÔNG chứa nguyên âm
+            if (cleanWord.length() >= 4 && !cleanWord.matches(vowelsPattern)) {
+                return true;
+            }
+        }
+
+        // 4. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd, asdfgh)
+        java.util.regex.Pattern consonantRun = java.util.regex.Pattern.compile(
+                "[^aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ\\s\\d,\\.\\-_/()]{5,}",
+                java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        if (consonantRun.matcher(str).find()) {
+            return true;
+        }
+
+        // 5. Chuỗi tổng thể >= 6 ký tự nhưng không có nguyên âm nào
+        String nonSpace = str.replaceAll("\\s+", "");
+        if (nonSpace.length() >= 6 && !nonSpace.matches(vowelsPattern) && !nonSpace.matches("\\d+")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private void validateEventDetails(String name, String description, String venueAddress, Instant startTime, Instant endTime) {
+        if (name != null) {
+            String trimmedName = name.trim();
+            if (trimmedName.length() < 6) {
+                throw new BadRequestException("Tên sự kiện quá ngắn, tối thiểu phải từ 6 ký tự.");
+            }
+            if (isGibberishOrSpam(trimmedName)) {
+                throw new BadRequestException("Tên sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
+            }
+        }
+        if (description != null && !description.isBlank()) {
+            String trimmedDesc = description.trim();
+            if (trimmedDesc.length() < 5) {
+                throw new BadRequestException("Mô tả quy mô sự kiện quá ngắn (tối thiểu 5 ký tự nếu nhập).");
+            }
+            if (isGibberishOrSpam(trimmedDesc)) {
+                throw new BadRequestException("Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
+            }
+        }
+        if (venueAddress != null && !venueAddress.isBlank()) {
+            String trimmedVenue = venueAddress.trim();
+            if (trimmedVenue.length() < 6) {
+                throw new BadRequestException("Địa chỉ tổ chức sự kiện quá ngắn (tối thiểu 6 ký tự).");
+            }
+            if (isGibberishOrSpam(trimmedVenue)) {
+                throw new BadRequestException("Địa chỉ tổ chức sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
+            }
+        }
+        if (startTime != null && endTime != null) {
+            if (!endTime.isAfter(startTime)) {
+                throw new BadRequestException("Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện.");
+            }
+            if (java.time.Duration.between(startTime, endTime).toMinutes() < 30) {
+                throw new BadRequestException("Thời lượng sự kiện tối thiểu phải từ 30 phút trở lên.");
+            }
+        }
     }
 }

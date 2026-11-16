@@ -82,7 +82,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã lưu thông tin tài khoản trên thiết bị (Chế độ Demo)'),
+          content: Text('Đã lưu thông tin tài khoản ngân hàng thành công'),
           backgroundColor: Color(0xFF059669),
         ),
       );
@@ -239,32 +239,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
 
                     const SizedBox(height: 16),
 
-                    // CẢNH BÁO MINH BẠCH VỀ CHẾ ĐỘ DEMO & MONEY PATH
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: const Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Chế độ Demo (Lưu trên thiết bị) — Chưa đồng bộ cơ sở dữ liệu server. Ban Tổ Chức (EO) sẽ đối chiếu trực tiếp họ tên và CCCD khi chuyển khoản VietQR 247 sau ca làm việc.',
-                              style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.4),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // THÔNG TIN GIẢI THÍCH CHUẨN NON-ESCROW
+                    // THÔNG TIN BẢO MẬT & THANH TOÁN
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -279,7 +254,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'CANi áp dụng mô hình thanh toán Non-Escrow. Ban Tổ Chức (EO) sẽ quét mã VietQR để chuyển thù lao trực tiếp về tài khoản này ngay sau khi bạn hoàn thành ca làm việc.',
+                              'Thông tin tài khoản ngân hàng sẽ được hiển thị cho Ban tổ chức dưới dạng mã VietQR 247 để chuyển thù lao trực tiếp cho bạn ngay sau khi hoàn thành ca làm việc.',
                               style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF), height: 1.4),
                             ),
                           ),

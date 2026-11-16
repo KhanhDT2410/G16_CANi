@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/auth/screens/forgot_password_screen.dart';
+import 'package:cani/features/profile/screens/blocked_users_screen.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
 
 class ProfileSecurityBlock extends ConsumerWidget {
@@ -197,6 +198,56 @@ class ProfileSecurityBlock extends ConsumerWidget {
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
                 ),
               ],
+            ),
+          ),
+
+          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+
+          // 4. DANH SÁCH CHẶN (BLOCK LIST)
+          InkWell(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const BlockedUsersScreen(),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.block_outlined, size: 18, color: Color(0xFFDC2626)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Danh sách chặn',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: t.text,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Quản lý danh sách Ban tổ chức và tài khoản bạn đã chặn',
+                          style: TextStyle(fontSize: 11, color: t.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 20, color: t.muted),
+                ],
+              ),
             ),
           ),
         ],

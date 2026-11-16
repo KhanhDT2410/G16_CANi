@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
+import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import './EventDetailModal.css';
@@ -57,6 +58,31 @@ export default function EventDetailModal({
         .finally(() => setLoadingWorkers(false));
     }
   }, [isOpen, event?.eventId, event?.shifts]);
+
+  const handleBlockWorker = async (worker) => {
+    if (!worker?.userId) {
+      showToast('Không tìm thấy thông tin tài khoản để chặn.', 'error');
+      return;
+    }
+    const reason = window.prompt(
+      `Bạn có chắc chắn muốn chặn nhân sự "${worker.workerName}" không?\n\nNgười này sẽ không thể nhận ca làm việc của bạn trong tương lai.\nNhập lý do chặn (tùy chọn):`,
+      'Không tuân thủ quy định ca làm'
+    );
+    if (reason === null) return;
+
+    try {
+      await blockListService.blockUser(worker.userId, reason);
+      showToast(`Đã đưa nhân sự "${worker.workerName}" vào danh sách chặn thành công.`, 'success');
+      if (event?.eventId) {
+        eoService.getEventWorkers(event.eventId).then((data) => {
+          setEventWorkers(Array.isArray(data) ? data : []);
+        });
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Lỗi khi chặn nhân sự';
+      showToast(msg, 'error');
+    }
+  };
 
   if (!isOpen) return null;
   if (!event) {
@@ -804,6 +830,11 @@ export default function EventDetailModal({
                               <span className="worker-age-badge">
                                 {w.workerAge ? `${w.workerAge} tuổi` : '22 tuổi'} {w.workerDob ? `(${w.workerDob})` : ''}
                               </span>
+                              {w.yearsExperience > 0 && (
+                                <span className="worker-age-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+                                  {w.yearsExperience} năm kinh nghiệm
+                                </span>
+                              )}
                               <span className={`worker-reliability-pill ${isReliableHigh ? 'high' : ''}`}>
                                 {w.workerReliabilityScore || 100}/100 Uy tín
                               </span>
@@ -819,11 +850,27 @@ export default function EventDetailModal({
                                 <span>Thù lao: <strong>{Number(w.agreedWage).toLocaleString()} đ</strong></span>
                               )}
                             </div>
+
+                            {w.workerBio && (
+                              <div style={{
+                                marginTop: '0.35rem',
+                                fontSize: '0.78rem',
+                                color: '#334155',
+                                fontStyle: 'italic',
+                                background: '#f8fafc',
+                                padding: '0.3rem 0.6rem',
+                                borderRadius: '6px',
+                                borderLeft: '3px solid #0066FF',
+                                lineHeight: 1.35
+                              }}>
+                                "{w.workerBio}"
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* Trạng thái nhân sự */}
-                        <div>
+                        {/* Trạng thái nhân sự & Nút hành động */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           {w.checkinTime ? (
                             <span style={{
                               display: 'inline-flex',
@@ -867,6 +914,34 @@ export default function EventDetailModal({
                             }}>
                               {w.assignmentStatus || 'Đã phân công'}
                             </span>
+                          )}
+
+                          {w.userId && (
+                            <button
+                              type="button"
+                              onClick={() => handleBlockWorker(w)}
+                              style={{
+                                padding: '0.35rem 0.65rem',
+                                backgroundColor: '#fff1f2',
+                                color: '#e11d48',
+                                border: '1px solid #fecdd3',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                transition: 'all 0.15s ease',
+                              }}
+                              title="Chặn nhân sự này không cho nhận ca trong tương lai"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                              </svg>
+                              Chặn
+                            </button>
                           )}
                         </div>
                       </div>

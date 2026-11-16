@@ -918,6 +918,8 @@ public class EoEventService {
                 .proofImageUrl(attOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .paymentStatus(payOpt.map(p -> p.getStatus().name()).orElse(PAYMENT_NOT_DECLARED))
                 .agreedWage(agreedWage)
+                .workerBio(worker != null ? worker.getBio() : null)
+                .yearsExperience(worker != null ? worker.getYearsExperience() : 0)
                 .build();
     }
 

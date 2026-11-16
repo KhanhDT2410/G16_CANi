@@ -16,6 +16,7 @@ import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoProfileTab from './components/EoProfileTab';
 import EOSettingsTab from './components/EOSettingsTab';
+import EOMyTeamTab from './components/EOMyTeamTab';
 import EOModals from './components/EOModals';
 import EventDetailModal from './components/EventDetailModal';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
@@ -122,7 +123,7 @@ export default function EOPage() {
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
-    } else if (tabParam && ['events', 'payments', 'settings', 'support'].includes(tabParam)) {
+    } else if (tabParam && ['events', 'payments', 'subscription', 'profile', 'my-team', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
@@ -218,6 +219,8 @@ export default function EOPage() {
       target = 'subscription';
     } else if (navKey === 'profile' || navKey === 'ekyc') {
       target = 'profile';
+    } else if (navKey === 'my-team') {
+      target = 'my-team';
     } else if (navKey === 'support') {
       target = 'support';
     } else if (navKey === 'settings') {
@@ -498,6 +501,8 @@ export default function EOPage() {
           )}
 
           {activeTab === 'subscription' && <EOSubscriptionTab />}
+
+          {activeTab === 'my-team' && <EOMyTeamTab />}
 
           {(activeTab === 'profile' || activeTab === 'ekyc') && <EoProfileTab />}
 

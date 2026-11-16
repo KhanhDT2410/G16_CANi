@@ -7,6 +7,7 @@ import 'package:cani/features/profile/screens/worker_bank_settings_screen.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
 import 'package:cani/features/skill_verification/screens/weekly_availability_screen.dart';
 import 'package:cani/features/skill_verification/screens/worker_settings_screen.dart';
+import 'package:cani/features/worker_groups/screens/worker_groups_screen.dart';
 
 class ProfileSettingsBlock extends StatefulWidget {
   const ProfileSettingsBlock({super.key});
@@ -81,7 +82,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
           _ClickableRow(
             icon: Icons.account_balance_rounded,
             label: 'Tài khoản ngân hàng nhận thù lao',
-            subtitle: 'VietQR 247 nhận thanh toán trực tiếp sau ca (Non-Escrow)',
+            subtitle: 'Nhận thanh toán thù lao trực tiếp qua VietQR 247',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const WorkerBankSettingsScreen()),
@@ -95,7 +96,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
           _ClickableRow(
             icon: Icons.calendar_month_rounded,
             label: 'Lịch rảnh cố định hàng tuần',
-            subtitle: 'Thiết lập khung giờ sẵn sàng nhận ca trong tuần (UC-26)',
+            subtitle: 'Thiết lập khung giờ sẵn sàng nhận ca trong tuần',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const WeeklyAvailabilityScreen()),
@@ -105,7 +106,21 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
 
           const Divider(height: 16, color: Color(0xFFF1F5F9)),
 
-          // 4. THÔNG BÁO VIỆC LÀM MỚI (Switch)
+          // 4. ĐỘI CỦA TÔI (WorkerGroupsScreen)
+          _ClickableRow(
+            icon: Icons.groups_rounded,
+            label: 'Đội của tôi',
+            subtitle: 'Lập đội, mời thành viên cùng nhận ca làm việc',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WorkerGroupsScreen()),
+              );
+            },
+          ),
+
+          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+
+          // 5. THÔNG BÁO VIỆC LÀM MỚI (Switch)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(

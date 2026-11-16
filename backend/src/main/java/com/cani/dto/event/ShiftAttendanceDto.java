@@ -40,4 +40,6 @@ public class ShiftAttendanceDto {
     private String proofImageUrl;
     private String paymentStatus;
     private BigDecimal agreedWage;
+    private String workerBio;
+    private Integer yearsExperience;
 }

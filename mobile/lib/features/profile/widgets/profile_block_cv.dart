@@ -1,20 +1,37 @@
 // CANi · tab "Tài khoản" — Block 4 · Hồ Sơ Năng Lực & Kinh Nghiệm
-// Kết nối trực tiếp với profileDataProvider (Skill Points, Tier, eKYC status)
+// Kết nối trực tiếp với profileDataProvider (Skill Points, Tier, eKYC status) & workerExperienceProvider (Bio, Years of Experience)
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/profile/providers/profile_providers.dart';
+import 'package:cani/features/profile/providers/worker_experience_provider.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
+import 'package:cani/features/profile/widgets/worker_experience_edit_sheet.dart';
 import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
 
 class ProfileCvBlock extends ConsumerWidget {
   const ProfileCvBlock({super.key});
 
+  void _openEditSheet(BuildContext context, WidgetRef ref) {
+    final exp = ref.read(workerExperienceProvider).experience;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => WorkerExperienceEditSheet(initialExperience: exp),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Theme.of(context).profileX;
     final data = ref.watch(profileDataProvider);
+    final expState = ref.watch(workerExperienceProvider);
+    final exp = expState.experience;
     final user = data.user;
 
     // Phân định chính xác 4 trạng thái eKYC
@@ -29,6 +46,12 @@ class ProfileCvBlock extends ConsumerWidget {
         : (data.isEkycPending
             ? const Color(0xFFD97706)
             : (data.isEkycRejected ? const Color(0xFFDC2626) : const Color(0xFF64748B)));
+
+    final bioText = (exp?.bio != null && exp!.bio!.trim().isNotEmpty)
+        ? exp.bio!.trim()
+        : 'Chưa cập nhật giới thiệu bản thân';
+
+    final yearsExpText = '${exp?.yearsExperience ?? 0} năm kinh nghiệm';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -52,13 +75,32 @@ class ProfileCvBlock extends ConsumerWidget {
               ),
               const Spacer(),
               InkWell(
+                onTap: () => _openEditSheet(context, ref),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_outlined, size: 14, color: t.accentDeep),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Chỉnh sửa',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: t.accentDeep,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              InkWell(
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const SkillHubScreen()),
                   );
                 },
                 child: Text(
-                  'Xem Skill Hub →',
+                  'Skill Hub →',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -80,15 +122,23 @@ class ProfileCvBlock extends ConsumerWidget {
           const Divider(height: 14, color: Color(0xFFF1F5F9)),
 
           _InfoRow(
+            icon: Icons.history_edu_outlined,
+            label: 'Kinh nghiệm sự kiện',
+            value: yearsExpText,
+            isHighlight: (exp?.yearsExperience ?? 0) > 0,
+          ),
+          const Divider(height: 14, color: Color(0xFFF1F5F9)),
+
+          _InfoRow(
             icon: Icons.star_border_rounded,
-            label: 'Đánh giá trung bình từ EO',
+            label: 'Đánh giá từ nhà tổ chức',
             value: data.avgRating > 0 ? '${data.avgRating.toStringAsFixed(1)} / 5.0' : 'Chưa có lượt đánh giá',
           ),
           const Divider(height: 14, color: Color(0xFFF1F5F9)),
 
           _InfoRow(
             icon: Icons.badge_outlined,
-            label: 'Định danh CCCD (eKYC)',
+            label: 'Xác thực căn cước công dân',
             value: ekycStatusText,
             valueColor: ekycStatusColor,
           ),
@@ -105,6 +155,46 @@ class ProfileCvBlock extends ConsumerWidget {
             icon: Icons.email_outlined,
             label: 'Email tài khoản',
             value: user?.email ?? 'Chưa cập nhật',
+          ),
+          const Divider(height: 14, color: Color(0xFFF1F5F9)),
+
+          // Giới thiệu bản thân (Bio)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.notes_rounded, size: 18, color: t.accentDeep),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Giới thiệu bản thân',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: t.text,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: t.surface.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: t.border.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  bioText,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontStyle: (exp?.bio == null || exp!.bio!.trim().isEmpty) ? FontStyle.italic : FontStyle.normal,
+                    color: (exp?.bio == null || exp!.bio!.trim().isEmpty) ? t.muted : t.text,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

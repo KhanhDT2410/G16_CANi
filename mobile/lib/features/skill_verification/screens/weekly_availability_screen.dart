@@ -237,7 +237,7 @@ class _WeeklyAvailabilityScreenState extends ConsumerState<WeeklyAvailabilityScr
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Lịch Rảnh Cố Định Hàng Tuần (UC-25)',
+                                    'Lịch rảnh cố định hàng tuần',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w800,

@@ -15,27 +15,88 @@ export const ROLES = [
 ];
 
 export const WAGE_RECOMMENDATIONS_MAP = {
-  'Lễ tân / Check-in': { min: 45000, max: 60000, defaultWage: 50000, note: 'Giao tiếp tốt, ngoại hình sáng' },
-  'Phục vụ bàn': { min: 35000, max: 50000, defaultWage: 40000, note: 'Nhanh nhẹn, cẩn thận' },
-  'Pha chế (Bartender/Barista)': { min: 60000, max: 85000, defaultWage: 70000, note: 'Có tay nghề pha chế' },
-  'Thu ngân': { min: 40000, max: 55000, defaultWage: 45000, note: 'Trung thực, tính toán chuẩn xác' },
-  'Điều phối sự kiện': { min: 70000, max: 100000, defaultWage: 80000, note: 'Kinh nghiệm quản lý nhóm' },
-  'Kỹ thuật âm thanh - ánh sáng': { min: 80000, max: 120000, defaultWage: 95000, note: 'Chuyên môn thiết bị sự kiện' },
-  'Bảo vệ / An ninh': { min: 40000, max: 55000, defaultWage: 45000, note: 'Thể lực tốt, giữ trật tự' },
-  'Hậu cần / Setup sự kiện': { min: 50000, max: 70000, defaultWage: 55000, note: 'Sức khỏe tốt, khuân vác, setup' },
-  'PG / PB': { min: 70000, max: 110000, defaultWage: 85000, note: 'Ngoại hình, giới thiệu sản phẩm' },
+  'Lễ tân / Check-in': { min: 45000, max: 60000, defaultWage: 50000, recommended: 50000, note: 'Giao tiếp tốt, ngoại hình sáng' },
+  'Phục vụ bàn': { min: 35000, max: 50000, defaultWage: 40000, recommended: 40000, note: 'Nhanh nhẹn, cẩn thận' },
+  'Pha chế (Bartender/Barista)': { min: 60000, max: 85000, defaultWage: 70000, recommended: 70000, note: 'Có tay nghề pha chế' },
+  'Thu ngân': { min: 40000, max: 55000, defaultWage: 45000, recommended: 45000, note: 'Trung thực, tính toán chuẩn xác' },
+  'Điều phối sự kiện': { min: 70000, max: 100000, defaultWage: 80000, recommended: 80000, note: 'Kinh nghiệm quản lý nhóm' },
+  'Kỹ thuật âm thanh - ánh sáng': { min: 80000, max: 120000, defaultWage: 95000, recommended: 95000, note: 'Chuyên môn thiết bị sự kiện' },
+  'Bảo vệ / An ninh': { min: 40000, max: 55000, defaultWage: 45000, recommended: 45000, note: 'Thể lực tốt, giữ trật tự' },
+  'Hậu cần / Setup sự kiện': { min: 50000, max: 70000, defaultWage: 55000, recommended: 55000, note: 'Sức khỏe tốt, khuân vác, setup' },
+  'PG / PB': { min: 70000, max: 110000, defaultWage: 85000, recommended: 85000, note: 'Ngoại hình, giới thiệu sản phẩm' },
 };
 
 /**
- * Phân tích gợi ý mức lương (Wage Recommendation) & Cảnh báo Risk Score (Nguy cơ khó tìm nhân sự)
+ * Chuẩn hóa danh sách checklist về dạng mảng object { id, title, isRequiredEvidence }
+ */
+export function normalizeChecklistItems(rawChecklist) {
+  if (!rawChecklist) return [];
+  let list = rawChecklist;
+  if (typeof rawChecklist === 'string') {
+    try {
+      const parsed = JSON.parse(rawChecklist);
+      list = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      list = [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item, idx) => {
+      if (typeof item === 'object' && item !== null) {
+        const title = String(item.title || item.name || item.text || '').trim();
+        if (!title) return null;
+        return {
+          id: item.id || `chk_${idx + 1}`,
+          title,
+          isRequiredEvidence:
+            item.isRequiredEvidence !== undefined
+              ? Boolean(item.isRequiredEvidence)
+              : item.requiresEvidence !== undefined
+              ? Boolean(item.requiresEvidence)
+              : false,
+        };
+      }
+      const title = String(item).trim();
+      if (!title) return null;
+      return {
+        id: `chk_${idx + 1}`,
+        title,
+        isRequiredEvidence: false,
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Chuyển mảng checklist sang chuỗi JSON lưu xuống Backend
+ */
+export function serializeChecklistItems(items = []) {
+  return JSON.stringify(
+    normalizeChecklistItems(items).map((item, idx) => ({
+      id: `chk_${idx + 1}`,
+      title: item.title,
+      isRequiredEvidence: Boolean(item.isRequiredEvidence),
+    }))
+  );
+}
+
+/**
+ * Phân tích gợi ý mức lương & Đánh giá khả năng tìm nhân sự
  */
 export function calculateShiftRiskAnalysis(shift = {}) {
   const role = shift.jobType || ROLES[0];
-  const rec = WAGE_RECOMMENDATIONS_MAP[role] || {
+  const baseRec = WAGE_RECOMMENDATIONS_MAP[role] || {
     min: 40000,
     max: 65000,
     defaultWage: 50000,
+    recommended: 50000,
     note: 'Mức thù lao tiêu chuẩn thị trường sự kiện',
+  };
+  const rec = {
+    ...baseRec,
+    recommended: baseRec.recommended || baseRec.defaultWage || 50000,
+    defaultWage: baseRec.defaultWage || baseRec.recommended || 50000,
   };
 
   const wage = Math.max(0, Number(shift.hourlyWage || 0));
@@ -50,7 +111,7 @@ export function calculateShiftRiskAnalysis(shift = {}) {
   if (wage < rec.min * 0.8) {
     riskScore += 55;
     reasons.push(
-      `Thù lao (${wage.toLocaleString()}đ/giờ) thấp hơn hơn 20% so với mức sàn khuyến nghị (${rec.min.toLocaleString()}đ/giờ) cho vị trí "${role}".`
+      `Thù lao (${wage.toLocaleString()}đ/giờ) thấp hơn trên 20% so với mức sàn khuyến nghị (${rec.min.toLocaleString()}đ/giờ) cho vị trí "${role}".`
     );
   } else if (wage < rec.min) {
     riskScore += 35;
@@ -87,11 +148,18 @@ export function calculateShiftRiskAnalysis(shift = {}) {
 
   const clampedScore = Math.max(5, Math.min(95, riskScore));
   const level = clampedScore >= 55 ? 'HIGH' : clampedScore >= 35 ? 'MEDIUM' : 'LOW';
+  const label =
+    level === 'HIGH'
+      ? 'Khó tìm nhân sự'
+      : level === 'MEDIUM'
+      ? 'Khá khó tìm nhân sự'
+      : 'Dễ tìm nhân sự';
 
   return {
     recommendation: rec,
     riskScore: clampedScore,
     level,
+    label,
     reasons,
   };
 }
@@ -119,9 +187,9 @@ export function useShifts({ onReloadEvents }) {
     minReliabilityScore: 60,
     maxDistanceKm: 15,
     checklistItems: [
-      'Có mặt trước 15-30 phút nhận vị trí',
-      'Đồng phục chỉn chu theo hướng dẫn',
-      'Thực hiện điểm danh check-in bằng mã QR',
+      { id: 'chk_1', title: 'Có mặt trước 15-30 phút nhận vị trí', isRequiredEvidence: false },
+      { id: 'chk_2', title: 'Đồng phục chỉn chu theo hướng dẫn', isRequiredEvidence: true },
+      { id: 'chk_3', title: 'Thực hiện điểm danh check-in bằng mã QR', isRequiredEvidence: false },
     ],
   });
 
@@ -174,19 +242,13 @@ export function useShifts({ onReloadEvents }) {
     }
     try {
       const checklistStr = Array.isArray(newShift.checklistItems)
-        ? JSON.stringify(
-            newShift.checklistItems.map((item, idx) =>
-              typeof item === 'object' && item.title
-                ? item
-                : { id: `chk_${idx + 1}`, title: String(item).trim() }
-            )
-          )
+        ? serializeChecklistItems(newShift.checklistItems)
         : (newShift.checklist || '[]');
 
       await eoService.addShiftToEvent(selectedEventId, {
         ...newShift,
         requiredWorkers: Math.max(1, Number(newShift.requiredWorkers || 1)),
-        hourlyWage: Math.max(0, Number(newShift.hourlyWage || 0)),
+        hourlyWage: Math.max(20000, Number(newShift.hourlyWage || 20000)),
         allowance: Math.max(0, Number(newShift.allowance || 0)),
         checklist: checklistStr,
         startTime: new Date(newShift.startTime).toISOString(),
@@ -207,11 +269,16 @@ export function useShifts({ onReloadEvents }) {
     }
     setSubmittingEditShift(true);
     try {
+      const checklistStr = Array.isArray(shiftData.checklistItems)
+        ? serializeChecklistItems(shiftData.checklistItems)
+        : shiftData.checklist;
+
       await eoService.updateShift(shiftId, {
         ...shiftData,
         requiredWorkers: Math.max(1, Number(shiftData.requiredWorkers || 1)),
-        hourlyWage: Math.max(0, Number(shiftData.hourlyWage || 0)),
+        hourlyWage: Math.max(20000, Number(shiftData.hourlyWage || 20000)),
         allowance: Math.max(0, Number(shiftData.allowance || 0)),
+        ...(checklistStr !== undefined ? { checklist: checklistStr } : {}),
       });
       showToast('Cập nhật ca làm việc thành công!', 'success');
       setEditingShift(null);
@@ -299,4 +366,3 @@ export function useShifts({ onReloadEvents }) {
     handleOpenAttendance,
   };
 }
-

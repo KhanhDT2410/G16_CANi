@@ -29,20 +29,217 @@ export const DEMO_EVENTS = [
   },
 ];
 
-export function getEventStatusPriority(status) {
-  switch (status) {
+/**
+ * Xác định trạng thái chi tiết của từng Ca làm việc (Shift) theo thời gian thực và tiến độ nhân sự
+ */
+export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
+  const rawStatus = (shift.status || '').toUpperCase();
+  const evtStatus = (eventStatus || '').toUpperCase();
+
+  if (rawStatus === 'CANCELLED' || evtStatus === 'CANCELLED') {
+    return {
+      code: 'CANCELLED',
+      label: 'Đã hủy ca',
+      colorClass: 'red',
+      bg: '#fef2f2',
+      color: '#dc2626',
+      border: '#fecaca',
+    };
+  }
+
+  if (evtStatus === 'DRAFT') {
+    return {
+      code: 'NOT_STARTED',
+      label: 'Chưa bắt đầu (Nháp)',
+      colorClass: 'yellow',
+      bg: '#fffbeb',
+      color: '#b45309',
+      border: '#fde68a',
+    };
+  }
+
+  const now = new Date();
+  const start = shift.startTime ? new Date(shift.startTime) : null;
+  const end = shift.endTime ? new Date(shift.endTime) : null;
+  const confirmed = Number(shift.confirmedWorkers || 0);
+  const required = Math.max(1, Number(shift.requiredWorkers || 1));
+
+  if (rawStatus === 'COMPLETED' || (end && !isNaN(end.getTime()) && now > end)) {
+    return {
+      code: 'COMPLETED',
+      label: 'Đã kết thúc',
+      colorClass: 'gray',
+      bg: '#f1f5f9',
+      color: '#475569',
+      border: '#cbd5e1',
+    };
+  }
+
+  if (
+    rawStatus === 'IN_PROGRESS' ||
+    rawStatus === 'ONGOING' ||
+    (start && !isNaN(start.getTime()) && now >= start && (!end || isNaN(end.getTime()) || now <= end))
+  ) {
+    return {
+      code: 'IN_PROGRESS',
+      label: 'Đang diễn ra',
+      colorClass: 'green',
+      bg: '#ecfdf5',
+      color: '#059669',
+      border: '#a7f3d0',
+    };
+  }
+
+  // Trước giờ bắt đầu ca (now < start)
+  if (confirmed >= required) {
+    return {
+      code: 'FULL_WAITING',
+      label: 'Đủ nhân sự • Chờ diễn ra',
+      colorClass: 'purple',
+      bg: '#f0fdf4',
+      color: '#15803d',
+      border: '#bbf7d0',
+    };
+  }
+
+  return {
+    code: 'RECRUITING',
+    label: 'Đang tìm kiếm nhân sự',
+    colorClass: 'blue',
+    bg: '#eff6ff',
+    color: '#1d4ed8',
+    border: '#bfdbfe',
+  };
+}
+
+/**
+ * Xác định trạng thái chi tiết của Sự kiện (Event) dựa trên trạng thái gốc, khung thời gian và tiến độ tuyển dụng
+ */
+export function getDynamicEventStatus(evt = {}) {
+  const rawStatus = (evt.status || 'DRAFT').toUpperCase();
+
+  if (rawStatus === 'CANCELLED') {
+    return {
+      code: 'CANCELLED',
+      label: 'Đã hủy',
+      colorClass: 'red',
+      subText: 'Sự kiện đã hủy',
+    };
+  }
+
+  if (rawStatus === 'COMPLETED') {
+    return {
+      code: 'COMPLETED',
+      label: 'Đã hoàn thành',
+      colorClass: 'gray',
+      subText: 'Sự kiện đã kết thúc',
+    };
+  }
+
+  if (rawStatus === 'DRAFT') {
+    return {
+      code: 'DRAFT',
+      label: 'Chưa bắt đầu (Bản nháp)',
+      colorClass: 'yellow',
+      subText: 'Chưa mở tìm kiếm nhân sự',
+    };
+  }
+
+  const now = new Date();
+  const start = evt.startTime ? new Date(evt.startTime) : evt.eventDate ? new Date(evt.eventDate) : null;
+  const end = evt.endTime ? new Date(evt.endTime) : null;
+
+  // Kiểm tra nếu có danh sách ca làm việc để lấy khoảng thời gian thực tế
+  let earliestShiftStart = start;
+  let latestShiftEnd = end;
+  if (Array.isArray(evt.shifts) && evt.shifts.length > 0) {
+    const activeShifts = evt.shifts.filter((s) => s.status !== 'CANCELLED');
+    activeShifts.forEach((s) => {
+      if (s.startTime) {
+        const st = new Date(s.startTime);
+        if (!isNaN(st.getTime()) && (!earliestShiftStart || isNaN(earliestShiftStart.getTime()) || st < earliestShiftStart)) {
+          earliestShiftStart = st;
+        }
+      }
+      if (s.endTime) {
+        const et = new Date(s.endTime);
+        if (!isNaN(et.getTime()) && (!latestShiftEnd || isNaN(latestShiftEnd.getTime()) || et > latestShiftEnd)) {
+          latestShiftEnd = et;
+        }
+      }
+    });
+  }
+
+  // Đã qua thời gian kết thúc sự kiện
+  if (latestShiftEnd && !isNaN(latestShiftEnd.getTime()) && now > latestShiftEnd) {
+    return {
+      code: 'COMPLETED',
+      label: 'Đã kết thúc',
+      colorClass: 'gray',
+      subText: 'Đã qua khung giờ sự kiện',
+    };
+  }
+
+  // Đang nằm trong khung thời gian diễn ra sự kiện
+  if (
+    rawStatus === 'ONGOING' ||
+    (earliestShiftStart &&
+      !isNaN(earliestShiftStart.getTime()) &&
+      now >= earliestShiftStart &&
+      (!latestShiftEnd || isNaN(latestShiftEnd.getTime()) || now <= latestShiftEnd))
+  ) {
+    return {
+      code: 'IN_PROGRESS',
+      label: 'Đang diễn ra',
+      colorClass: 'green',
+      subText: 'Đang trong khung giờ sự kiện',
+    };
+  }
+
+  // Sự kiện chưa tới giờ bắt đầu (now < startTime) nhưng đã xuất bản (ACTIVE / UPCOMING / APPROVED)
+  const confirmed = Number(evt.totalConfirmedWorkers || 0);
+  const required = Number(evt.totalRequiredWorkers || 0);
+
+  if (required > 0 && confirmed >= required) {
+    return {
+      code: 'READY',
+      label: 'Đủ nhân sự • Chờ diễn ra',
+      colorClass: 'purple',
+      subText: `Đã chốt đủ ${confirmed}/${required} nhân sự`,
+    };
+  }
+
+  return {
+    code: 'RECRUITING',
+    label: 'Đang tìm kiếm nhân sự',
+    colorClass: 'blue',
+    subText: required > 0 ? `Đã tuyển ${confirmed}/${required} nhân sự` : 'Đang mở tìm kiếm',
+  };
+}
+
+export function getEventStatusPriority(evtOrStatus) {
+  const statusObj = typeof evtOrStatus === 'object' && evtOrStatus !== null
+    ? getDynamicEventStatus(evtOrStatus)
+    : { code: evtOrStatus };
+
+  switch (statusObj.code) {
+    case 'IN_PROGRESS':
+      return 1; // Đang diễn ra ưu tiên số 1
+    case 'RECRUITING':
     case 'ACTIVE':
-    case 'APPROVED':
     case 'UPCOMING':
-      return 1; // Sự kiện đang hoạt động luôn ở trên đầu
+      return 2; // Đang tìm kiếm nhân sự ưu tiên số 2
+    case 'READY':
+    case 'APPROVED':
+      return 3; // Đã đủ nhân sự chờ diễn ra
     case 'DRAFT':
-      return 2; // Bản nháp nằm phía dưới sự kiện đang hoạt động
+      return 4; // Chưa bắt đầu (Bản nháp)
     case 'COMPLETED':
-      return 3;
+      return 5; // Đã kết thúc
     case 'CANCELLED':
-      return 4; // Đã hủy tách riêng
+      return 6; // Đã hủy
     default:
-      return 2;
+      return 4;
   }
 }
 
@@ -55,29 +252,28 @@ export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
         evt.venueAddress?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         evt.eventId?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Tách riêng sự kiện đã hủy (CANCELLED) sang bộ lọc riêng biệt
       if (statusFilter === 'CANCELLED') {
         return matchSearch && evt.status === 'CANCELLED';
       }
 
-      // Ở chế độ mặc định (ALL), không hiển thị sự kiện đã hủy chung với sự kiện đang chạy/nháp
       if (evt.status === 'CANCELLED') {
         return false;
       }
 
+      const dynStatus = getDynamicEventStatus(evt);
+
       const matchStatus =
         statusFilter === 'ALL' ||
         (statusFilter === 'ACTIVE' && (evt.status === 'ACTIVE' || evt.status === 'APPROVED')) ||
+        statusFilter === dynStatus.code ||
         evt.status === statusFilter;
 
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
-      // Ưu tiên 1: Sự kiện đang hoạt động lên đầu, Bản nháp xuống dưới
-      const priorityDiff = getEventStatusPriority(a.status) - getEventStatusPriority(b.status);
+      const priorityDiff = getEventStatusPriority(a) - getEventStatusPriority(b);
       if (priorityDiff !== 0) return priorityDiff;
 
-      // Ưu tiên 2: Sắp xếp theo tiêu chí người dùng chọn trong cùng nhóm trạng thái
       if (sortBy === 'NAME') return (a.name || '').localeCompare(b.name || '');
       if (sortBy === 'WORKERS') return (b.totalRequiredWorkers || 0) - (a.totalRequiredWorkers || 0);
       if (sortBy === 'OLDEST') return new Date(a.createdAt || a.eventDate || 0) - new Date(b.createdAt || b.eventDate || 0);
@@ -86,7 +282,6 @@ export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
 }
 
 export function calculateEventMetrics(events) {
-  // Loại trừ các sự kiện đã hủy khỏi số liệu vận hành và tuyển dụng
   const nonCancelled = events.filter((e) => e.status !== 'CANCELLED');
   const activeEvents = events.filter((e) => e.status === 'ACTIVE' || e.status === 'APPROVED');
 
@@ -106,4 +301,3 @@ export function calculateEventMetrics(events) {
     fillRate,
   };
 }
-

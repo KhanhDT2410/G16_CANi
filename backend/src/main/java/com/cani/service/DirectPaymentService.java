@@ -43,6 +43,9 @@ public class DirectPaymentService {
     private final ShiftAssignmentRepository assignmentRepository;
 
     @Autowired(required = false)
+    private com.cani.repository.EventRepository eventRepository;
+
+    @Autowired(required = false)
     private NotificationService notificationService;
 
     /**
@@ -116,6 +119,7 @@ public class DirectPaymentService {
         payment.setStatus(PaymentStatus.DECLARED_PENDING_WORKER);
 
         Payment saved = paymentRepository.save(payment);
+        updateEventTotalPaid(saved.getEventId());
         log.info("EO {} đã khai báo thanh toán {} VND cho Worker {} (Assignment {})",
                 eoId, dto.getDeclaredAmount(), payment.getWorker().getWorkerId(), dto.getAssignmentId());
 
@@ -171,9 +175,28 @@ public class DirectPaymentService {
         payment.setWorkerComment(dto.getComment());
 
         Payment saved = paymentRepository.save(payment);
+        updateEventTotalPaid(saved.getEventId());
         log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, normalizedConfirmStatus, assignmentId);
 
         return mapToDto(saved);
+    }
+
+    private void updateEventTotalPaid(UUID eventId) {
+        if (eventId == null || eventRepository == null) return;
+        eventRepository.findById(eventId).ifPresent(event -> {
+            List<Payment> payments = paymentRepository.findByEventId(eventId);
+            if (payments != null) {
+                BigDecimal sum = payments.stream()
+                        .filter(p -> p.getStatus() == PaymentStatus.CONFIRMED_FULL
+                                || p.getStatus() == PaymentStatus.CONFIRMED_PARTIAL
+                                || p.getStatus() == PaymentStatus.DECLARED_PENDING_WORKER)
+                        .map(p -> p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount())
+                        .filter(java.util.Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                event.setTotalPaid(sum);
+                eventRepository.save(event);
+            }
+        });
     }
 
     @Transactional(readOnly = true)

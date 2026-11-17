@@ -340,8 +340,8 @@ const EventCreationWizardModal = ({
     // 2. Mô tả sự kiện (tùy chọn nhưng nếu nhập thì phải chuẩn)
     const desc = data.description?.trim() || '';
     if (desc) {
-      if (desc.length < 5) {
-        errs.description = 'Mô tả sự kiện quá ngắn (tối thiểu 5 ký tự nếu nhập).';
+      if (desc.length < 3) {
+        errs.description = 'Mô tả sự kiện quá ngắn (tối thiểu 3 ký tự nếu nhập).';
       } else if (isGibberishOrSpam(desc)) {
         errs.description = 'Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.';
       }
@@ -774,7 +774,7 @@ const EventCreationWizardModal = ({
                   borderColor: step1Errors.description ? '#ef4444' : undefined,
                   boxShadow: step1Errors.description ? '0 0 0 1px #ef4444' : undefined,
                 }}
-                placeholder="Mô tả quy mô, đối tượng khách mời, yêu cầu chung..."
+                placeholder="Mô tả quy mô (ví dụ: nhỏ, vừa, lớn, 50 khách...)"
                 value={newEvent.description}
                 onChange={(e) => {
                   setNewEvent({ ...newEvent, description: e.target.value });
@@ -783,8 +783,8 @@ const EventCreationWizardModal = ({
                 onBlur={() => {
                   const val = newEvent.description?.trim() || '';
                   if (val) {
-                    if (val.length < 5) {
-                      setStep1Errors((prev) => ({ ...prev, description: 'Mô tả sự kiện quá ngắn (tối thiểu 5 ký tự nếu nhập).' }));
+                    if (val.length < 3) {
+                      setStep1Errors((prev) => ({ ...prev, description: 'Mô tả sự kiện quá ngắn (tối thiểu 3 ký tự nếu nhập).' }));
                     } else if (isGibberishOrSpam(val)) {
                       setStep1Errors((prev) => ({ ...prev, description: 'Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.' }));
                     }

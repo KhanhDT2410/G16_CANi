@@ -37,6 +37,9 @@ public class InviteService {
     private final WorkerRepository workerRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WorkerGroupMembershipRepository workerGroupMembershipRepository;
+
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -186,6 +189,7 @@ public class InviteService {
                 .source(AssignmentSource.DIRECT)
                 .status(AssignmentStatus.CONFIRMED)
                 .build();
+        attachGroupInfoIfPresent(assignment, worker);
 
         ShiftAssignment savedAssignment = shiftAssignmentRepository.save(assignment);
 
@@ -266,6 +270,23 @@ public class InviteService {
                 .isActive(inv.getIsActive())
                 .createdAt(inv.getCreatedAt())
                 .build();
+    }
+
+    private void attachGroupInfoIfPresent(ShiftAssignment assignment, Worker worker) {
+        if (workerGroupMembershipRepository == null || worker == null || assignment == null) return;
+        try {
+            java.util.List<WorkerGroupMembership> activeMemberships = workerGroupMembershipRepository
+                    .findByWorker_WorkerIdAndStatus(worker.getWorkerId(), com.cani.entity.enums.MembershipStatus.ACTIVE);
+            if (!activeMemberships.isEmpty()) {
+                WorkerGroupMembership m = activeMemberships.get(0);
+                if (m.getWorkerGroup() != null) {
+                    assignment.setGroupId(m.getWorkerGroup().getGroupId());
+                    assignment.setIsGroupLeader(worker.getWorkerId().equals(m.getWorkerGroup().getLeaderWorkerId()));
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Không thể gán group info cho assignment: {}", ex.getMessage());
+        }
     }
 }
 

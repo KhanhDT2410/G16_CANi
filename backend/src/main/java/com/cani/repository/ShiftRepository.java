@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -21,10 +20,18 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     long countByStatus(ShiftStatus status);
 
     @Modifying
-    @Query("UPDATE Shift s SET s.confirmedWorkers = s.confirmedWorkers + 1, s.remainingWorkers = CASE WHEN (s.remainingWorkers > 0) THEN s.remainingWorkers - 1 ELSE 0 END, s.status = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN com.cani.entity.enums.ShiftStatus.FULLY_STAFFED ELSE s.status END WHERE s.shiftId = :shiftId AND s.confirmedWorkers < s.requiredWorkers")
-    int incrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId);
+    @Query("UPDATE Shift s SET s.confirmedWorkers = s.confirmedWorkers + 1, s.remainingWorkers = CASE WHEN (s.remainingWorkers > 0) THEN s.remainingWorkers - 1 ELSE 0 END, s.status = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN :fullStatus ELSE s.status END WHERE s.shiftId = :shiftId AND s.confirmedWorkers < s.requiredWorkers")
+    int incrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId, @Param("fullStatus") ShiftStatus fullStatus);
+
+    default int incrementConfirmedWorkersAtomic(UUID shiftId) {
+        return incrementConfirmedWorkersAtomic(shiftId, ShiftStatus.FULLY_STAFFED);
+    }
 
     @Modifying
-    @Query("UPDATE Shift s SET s.confirmedWorkers = CASE WHEN (s.confirmedWorkers > 0) THEN s.confirmedWorkers - 1 ELSE 0 END, s.remainingWorkers = s.remainingWorkers + 1, s.status = com.cani.entity.enums.ShiftStatus.ACTIVE WHERE s.shiftId = :shiftId")
-    int decrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId);
+    @Query("UPDATE Shift s SET s.confirmedWorkers = CASE WHEN (s.confirmedWorkers > 0) THEN s.confirmedWorkers - 1 ELSE 0 END, s.remainingWorkers = s.remainingWorkers + 1, s.status = :activeStatus WHERE s.shiftId = :shiftId")
+    int decrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId, @Param("activeStatus") ShiftStatus activeStatus);
+
+    default int decrementConfirmedWorkersAtomic(UUID shiftId) {
+        return decrementConfirmedWorkersAtomic(shiftId, ShiftStatus.ACTIVE);
+    }
 }

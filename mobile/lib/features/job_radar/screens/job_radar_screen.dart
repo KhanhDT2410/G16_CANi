@@ -13,6 +13,7 @@ import 'package:cani/features/job_radar/data/job_radar_repository.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
+import 'package:cani/features/job_radar/widgets/job_proposal_dispatch_card.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_map_painter.dart';
 import 'package:cani/features/job_radar/widgets/radar_sliding_job_card.dart';
 import 'package:cani/features/job_radar/widgets/urgent_shift_hero_card.dart';
@@ -27,8 +28,10 @@ class JobRadarScreen extends ConsumerStatefulWidget {
 
 class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   List<ShiftAssignmentItem> _activeShifts = [];
+  List<JobProposalItem> _pendingProposals = [];
   ShiftAssignmentItem? _urgentShift;
   bool _isLoadingUrgent = false;
+  int _homeTopTabIndex = 0; // 0: Việc của tôi, 1: Lời mời làm việc
 
   @override
   void initState() {
@@ -43,17 +46,144 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     setState(() => _isLoadingUrgent = true);
     try {
       final repo = ref.read(proposalRepositoryProvider);
-      final assigns = await repo.fetchAssignments();
+      final results = await Future.wait([
+        repo.fetchAssignments(),
+        repo.fetchProposals().catchError((_) => <JobProposalItem>[]),
+      ]);
+      final assigns = results[0] as List<ShiftAssignmentItem>;
+      final proposals = results[1] as List<JobProposalItem>;
       final active = assigns.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).toList();
       if (mounted) {
         setState(() {
           _activeShifts = active;
+          _pendingProposals = proposals;
           _urgentShift = active.isNotEmpty ? active.first : null;
+          // Nếu có lời mời làm việc mới mà chưa có ca đang nhận thì đẩy sang tab Lời mời làm việc ngay
+          if (proposals.isNotEmpty && active.isEmpty) {
+            _homeTopTabIndex = 1;
+          }
           _isLoadingUrgent = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingUrgent = false);
+    }
+  }
+
+  Future<void> _acceptProposalOnHome(JobProposalItem item) async {
+    try {
+      await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
+      ref.invalidate(proposalsCountProvider);
+      ref.read(jobRadarProvider.notifier).scanNearbyShifts();
+      await _loadUrgentShift();
+      if (mounted) {
+        setState(() => _homeTopTabIndex = 0);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Nhận ca "${item.jobType}" thành công! Đã chuyển vào mục Việc của tôi.'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể nhận ca: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectProposalOnHome(JobProposalItem item) async {
+    try {
+      await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
+      ref.invalidate(proposalsCountProvider);
+      if (mounted) {
+        setState(() {
+          _pendingProposals.removeWhere((p) => p.proposalId == item.proposalId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã bỏ qua lời mời làm việc này.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi từ chối lời mời: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openInviteCodeDialogOnHome() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tham gia ca bằng Mã Mời', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'CANI-XXXXXX',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.confirmation_number_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () {
+              final code = controller.text.trim();
+              if (code.isNotEmpty) Navigator.pop(ctx, code);
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0066FF)),
+            child: const Text('Tham Gia'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      try {
+        await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
+        ref.invalidate(proposalsCountProvider);
+        await _loadUrgentShift();
+        if (mounted) {
+          setState(() => _homeTopTabIndex = 0);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tham gia ca làm việc thành công! Đã thêm vào Việc của tôi.'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+        }
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: ${err.toString().replaceAll("Exception: ", "")}'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -305,86 +435,246 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
             if (!isEkycApproved)
               _buildEkycWarningBanner(context, isDark, ekycState),
 
-            // 2. Thẻ Ca Làm Khẩn Cấp Kế Tiếp Hôm Nay (Hero Card nếu có)
-            if (_urgentShift != null && !_isLoadingUrgent)
-              UrgentShiftHeroCard(
-                assignment: _urgentShift!,
-                onNavigate: () => _openNavigation(_urgentShift!),
-                onQrScan: () => _openQrScanner(_urgentShift!),
-                onOpenDetail: () => _openExecutionScreen(_urgentShift!),
-              ),
-
-            // Danh sách các ca làm việc khác đang trực / sắp tới
-            if (_activeShifts.length > 1)
+            // 2. Thanh 2 Tab Trên Trang Chủ: "Việc của tôi" & "Lời mời làm việc"
+            if (isEkycApproved && !_isLoadingUrgent)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Các ca làm khác đang trực / sắp tới (${_activeShifts.length - 1}):',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      height: 58,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _activeShifts.length - 1,
-                        separatorBuilder: (context, index) => const SizedBox(width: 8),
-                        itemBuilder: (ctx, idx) {
-                          final a = _activeShifts[idx + 1];
-                          return InkWell(
-                            onTap: () => _openExecutionScreen(a),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFF0077FF).withValues(alpha: 0.3)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.work_outline, size: 16, color: Color(0xFF0066FF)),
-                                  const SizedBox(width: 8),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        a.jobType,
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                      ),
-                                      Text(
-                                        a.eventName,
-                                        style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.arrow_forward_ios, size: 11, color: Color(0xFF94A3B8)),
-                                ],
-                              ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE8EEF7),
+                              borderRadius: BorderRadius.circular(11),
+                              border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
                             ),
-                          );
-                        },
-                      ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => setState(() => _homeTopTabIndex = 0),
+                                    borderRadius: BorderRadius.circular(9),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: _homeTopTabIndex == 0
+                                            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        'Việc của tôi (${_activeShifts.length})',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: _homeTopTabIndex == 0 ? FontWeight.w800 : FontWeight.w600,
+                                          color: _homeTopTabIndex == 0
+                                              ? const Color(0xFF0066FF)
+                                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => setState(() => _homeTopTabIndex = 1),
+                                    borderRadius: BorderRadius.circular(9),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: _homeTopTabIndex == 1
+                                            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Lời mời làm việc (${_pendingProposals.length})',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: _homeTopTabIndex == 1 ? FontWeight.w800 : FontWeight.w600,
+                                              color: _homeTopTabIndex == 1
+                                                  ? const Color(0xFF0066FF)
+                                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                            ),
+                                          ),
+                                          if (_pendingProposals.isNotEmpty) ...[
+                                            const SizedBox(width: 5),
+                                            Container(
+                                              width: 7,
+                                              height: 7,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFFEF4444),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: _openInviteCodeDialogOnHome,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F7FF),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.confirmation_number_outlined, size: 15, color: Color(0xFF0066FF)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Mã mời',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0066FF),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
+
+            // Nội dung của Tab đang chọn trên Trang chủ
+            if (isEkycApproved && !_isLoadingUrgent && _homeTopTabIndex == 0) ...[
+              if (_urgentShift != null)
+                UrgentShiftHeroCard(
+                  assignment: _urgentShift!,
+                  onNavigate: () => _openNavigation(_urgentShift!),
+                  onQrScan: () => _openQrScanner(_urgentShift!),
+                  onOpenDetail: () => _openExecutionScreen(_urgentShift!),
+                ),
+              if (_activeShifts.length > 1)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Các ca làm khác đang trực / sắp tới (${_activeShifts.length - 1}):',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        height: 58,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _activeShifts.length - 1,
+                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                          itemBuilder: (ctx, idx) {
+                            final a = _activeShifts[idx + 1];
+                            return InkWell(
+                              onTap: () => _openExecutionScreen(a),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFF0077FF).withValues(alpha: 0.3)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.work_outline, size: 16, color: Color(0xFF0066FF)),
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          a.jobType,
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                        ),
+                                        Text(
+                                          a.eventName,
+                                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.arrow_forward_ios, size: 11, color: Color(0xFF94A3B8)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+
+            if (isEkycApproved && !_isLoadingUrgent && _homeTopTabIndex == 1) ...[
+              if (_pendingProposals.isNotEmpty)
+                JobProposalDispatchCard(
+                  proposal: _pendingProposals.first,
+                  onAccept: () => _acceptProposalOnHome(_pendingProposals.first),
+                  onReject: () => _rejectProposalOnHome(_pendingProposals.first),
+                )
+              else
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mail_outline_rounded, size: 18, color: Color(0xFF0066FF)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Chưa có lời mời làm việc mới. Bạn có thể nhập mã mời hoặc chọn ca trên bản đồ bên dưới.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
 
             // 3. Thanh Bán Kính & Chuyển Đổi Bản Đồ / Danh Sách (Chỉ hiển thị khi đã hoàn tất eKYC)
             if (isEkycApproved)
@@ -708,8 +998,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     try {
       await ref.read(jobRadarRepositoryProvider).applyForShift(shift.shiftId);
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();
-      _loadUrgentShift();
+      await _loadUrgentShift();
       if (mounted) {
+        setState(() => _homeTopTabIndex = 0);
         ScaffoldMessenger.of(this.context).showSnackBar(
           SnackBar(
             content: Text('Ứng tuyển thành công ca: ${shift.jobType} tại ${shift.eventName}!'),

@@ -21,7 +21,7 @@ class MyAssignmentsScreen extends ConsumerStatefulWidget {
 }
 
 class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
-  int _selectedTabIndex = 0; // 0: Lời mời việc, 1: Ca đã nhận
+  int _selectedTabIndex = 0; // 0: Việc của tôi, 1: Lời mời làm việc
   List<JobProposalItem> _proposals = [];
   List<ShiftAssignmentItem> _assignments = [];
   bool _isLoading = true;
@@ -100,13 +100,13 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
               declaredAmount: 0,
             ),
           );
-          _selectedTabIndex = 1; // Tự động chuyển sang Tab Ca đã nhận
+          _selectedTabIndex = 0; // Tự động chuyển sang Tab Việc của tôi
         });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Nhận ca thành công! Ca làm đã được thêm vào mục Ca Đã Nhận.'),
+              content: Text('Nhận ca thành công! Ca làm đã được thêm vào mục Việc Của Tôi.'),
               backgroundColor: Color(0xFF16A34A),
             ),
           );
@@ -441,15 +441,15 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                       children: [
                         _buildSegmentButton(
                           index: 0,
-                          label: 'Lời Mời Việc',
-                          count: _proposals.length,
+                          label: 'Việc Của Tôi',
+                          count: _assignments.length,
                           isDark: isDark,
                         ),
                         const SizedBox(width: 4),
                         _buildSegmentButton(
                           index: 1,
-                          label: 'Ca Đã Nhận',
-                          count: _assignments.length,
+                          label: 'Lời Mời Làm Việc',
+                          count: _proposals.length,
                           isDark: isDark,
                         ),
                       ],
@@ -466,8 +466,8 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                   : RefreshIndicator(
                       onRefresh: _loadAllData,
                       child: _selectedTabIndex == 0
-                          ? _buildProposalsFeed(isDark)
-                          : _buildAssignmentsFeed(isDark),
+                          ? _buildAssignmentsFeed(isDark)
+                          : _buildProposalsFeed(isDark),
                     ),
             ),
           ],

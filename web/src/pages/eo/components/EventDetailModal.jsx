@@ -3,6 +3,7 @@ import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
+import { getDynamicEventStatus, getDynamicShiftStatus } from '../utils/eventHelpers';
 import './EventDetailModal.css';
 
 export default function EventDetailModal({
@@ -157,23 +158,9 @@ export default function EventDetailModal({
     }
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <span className="detail-status-pill green">● Đang diễn ra</span>;
-      case 'DRAFT':
-        return <span className="detail-status-pill yellow">● Bản nháp</span>;
-      case 'UPCOMING':
-        return <span className="detail-status-pill blue">● Sắp diễn ra</span>;
-      case 'APPROVED':
-        return <span className="detail-status-pill purple">● Đã duyệt</span>;
-      case 'COMPLETED':
-        return <span className="detail-status-pill gray">● Đã hoàn thành</span>;
-      case 'CANCELLED':
-        return <span className="detail-status-pill red">● Đã hủy</span>;
-      default:
-        return <span className="detail-status-pill blue">● {status}</span>;
-    }
+  const getStatusBadge = () => {
+    const dyn = getDynamicEventStatus(event);
+    return <span className={`detail-status-pill ${dyn.colorClass || 'blue'}`}>● {dyn.label}</span>;
   };
 
   const filteredWorkers = eventWorkers.filter((w) => {
@@ -382,6 +369,33 @@ export default function EventDetailModal({
 
         {/* Body */}
         <div className="event-detail-modal-body">
+          {/* Ảnh Poster / Banner sự kiện xuống 1 div riêng cho ảnh to rõ */}
+          {event.imageUrl && (
+            <div
+              style={{
+                marginBottom: '1.25rem',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#f8fafc',
+              }}
+            >
+              <img
+                src={event.imageUrl}
+                alt={event.name}
+                style={{
+                  width: '100%',
+                  maxHeight: '280px',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+
           {/* Thông tin cốt lõi */}
           <div className="event-detail-info-grid">
             <div className="info-item">
@@ -509,23 +523,29 @@ export default function EventDetailModal({
                     const shiftConfirmed = shift.confirmedWorkers || 0;
                     const shiftRequired = shift.requiredWorkers || 1;
                     const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
+                    const shDynStatus = getDynamicShiftStatus(shift, event.status);
 
                     return (
                       <div key={shift.shiftId || sIdx} style={{ display: 'flex', flexDirection: 'column' }}>
                         <div className="detail-shift-card">
                           <div className="shift-card-header">
                             <div className="shift-card-title-group">
-                              {shift.imageUrl && (
-                                <img
-                                  src={shift.imageUrl}
-                                  alt={shift.jobType}
-                                  style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }}
-                                  onError={(e) => { e.target.style.display = 'none'; }}
-                                />
-                              )}
                               <span className="shift-job-badge">{shift.jobType}</span>
                               <span className="shift-time-badge">
                                 {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: '999px',
+                                  backgroundColor: shDynStatus.bg,
+                                  color: shDynStatus.color,
+                                  border: `1px solid ${shDynStatus.border}`,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                ● {shDynStatus.label}
                               </span>
                               {shift.dressCode && (
                                 <span className="shift-dresscode-tag">Đồng phục: {shift.dressCode}</span>
@@ -536,6 +556,33 @@ export default function EventDetailModal({
                               {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)}đ phụ cấp)`}
                             </div>
                           </div>
+
+                          {/* Ảnh minh họa ca làm việc xuống 1 div riêng cho to rõ */}
+                          {shift.imageUrl && (
+                            <div
+                              style={{
+                                margin: '0.65rem 0',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                border: '1px solid #e2e8f0',
+                                backgroundColor: '#f8fafc',
+                              }}
+                            >
+                              <img
+                                src={shift.imageUrl}
+                                alt={shift.jobType}
+                                style={{
+                                  width: '100%',
+                                  maxHeight: '200px',
+                                  objectFit: 'cover',
+                                  display: 'block',
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
 
                           <div className="shift-card-body">
                             {/* Tiến độ nhân sự của ca */}

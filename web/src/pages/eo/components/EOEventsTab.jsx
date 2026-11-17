@@ -2,7 +2,11 @@ import React, { useState, useMemo } from 'react';
 import SkeletonCard from '../../../components/common/SkeletonLoader';
 import EventShiftsDrawer from './EventShiftsDrawer';
 import EORecruitmentTab from './EORecruitmentTab';
-import { getEventStatusPriority } from '../utils/eventHelpers';
+import {
+  getEventStatusPriority,
+  getDynamicEventStatus,
+  getDynamicShiftStatus,
+} from '../utils/eventHelpers';
 
 export default function EOEventsTab({
   loading,
@@ -72,23 +76,25 @@ export default function EOEventsTab({
     return list;
   }, [allEvents]);
 
-  const formatStatusBadge = (status) => {
-    switch (status) {
-      case 'DRAFT':
-        return <span className="table-status-pill yellow"><span className="status-dot-solid" />Bản nháp</span>;
-      case 'ACTIVE':
-        return <span className="table-status-pill green"><span className="status-dot-solid" />Đang diễn ra</span>;
-      case 'UPCOMING':
-        return <span className="table-status-pill blue"><span className="status-dot-solid" />Sắp diễn ra</span>;
-      case 'APPROVED':
-        return <span className="table-status-pill purple"><span className="status-dot-solid" />Đã duyệt</span>;
-      case 'COMPLETED':
-        return <span className="table-status-pill gray"><span className="status-dot-solid" />Đã hoàn thành</span>;
-      case 'CANCELLED':
-        return <span className="table-status-pill red"><span className="status-dot-solid" />Đã hủy</span>;
-      default:
-        return <span className="table-status-pill blue"><span className="status-dot-solid" />{status}</span>;
-    }
+  const formatStatusBadge = (evtOrStatus) => {
+    const dyn =
+      typeof evtOrStatus === 'object' && evtOrStatus !== null
+        ? getDynamicEventStatus(evtOrStatus)
+        : getDynamicEventStatus({ status: evtOrStatus });
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
+        <span className={`table-status-pill ${dyn.colorClass || 'blue'}`}>
+          <span className="status-dot-solid" />
+          {dyn.label}
+        </span>
+        {dyn.subText && typeof evtOrStatus === 'object' && (
+          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+            {dyn.subText}
+          </span>
+        )}
+      </div>
+    );
   };
 
   const handleSelectSubTab = (subKey) => {
@@ -339,10 +345,12 @@ export default function EOEventsTab({
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="table-filter-select"
                 >
-                  <option value="ALL">Hoạt động & Bản nháp</option>
-                  <option value="ACTIVE">Đang hoạt động</option>
-                  <option value="DRAFT">Bản nháp</option>
-                  <option value="UPCOMING">Sắp diễn ra</option>
+                  <option value="ALL">Tất cả (Hoạt động & Bản nháp)</option>
+                  <option value="RECRUITING">Đang tìm kiếm nhân sự</option>
+                  <option value="IN_PROGRESS">Đang diễn ra</option>
+                  <option value="READY">Đủ nhân sự • Chờ diễn ra</option>
+                  <option value="DRAFT">Chưa bắt đầu (Bản nháp)</option>
+                  <option value="COMPLETED">Đã kết thúc</option>
                 </select>
               </div>
 
@@ -389,11 +397,11 @@ export default function EOEventsTab({
           <table className="cani-modern-table">
             <thead>
               <tr>
-                <th style={{ width: '32%' }}>Sự kiện ⇅</th>
-                <th style={{ width: '22%' }}>Địa điểm</th>
-                <th style={{ width: '12%' }}>Nhân sự</th>
-                <th style={{ width: '15%' }}>Dự toán chi phí</th>
-                <th style={{ width: '12%' }}>Trạng thái</th>
+                <th style={{ width: '27%' }}>Sự kiện ⇅</th>
+                <th style={{ width: '19%' }}>Địa điểm</th>
+                <th style={{ width: '20%' }}>Nhân sự theo ca</th>
+                <th style={{ width: '13%' }}>Dự toán chi phí</th>
+                <th style={{ width: '14%' }}>Trạng thái</th>
                 <th style={{ width: '7%', textAlign: 'center' }}>Thao tác</th>
               </tr>
             </thead>
@@ -402,14 +410,16 @@ export default function EOEventsTab({
                 const isExpanded = expandedEventId === evt.eventId;
                 const isMenuOpen = activeMenuEventId === evt.eventId;
 
-                // Ảnh minh họa ngẫu nhiên nhưng cố định theo index
                 const demoImages = [
                   'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=150&q=80',
                   'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=150&q=80',
                   'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=150&q=80',
                   'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=150&q=80',
                 ];
-                const thumbImg = demoImages[idx % demoImages.length];
+                const thumbImg = evt.imageUrl || demoImages[idx % demoImages.length];
+                const activeShifts = Array.isArray(evt.shifts)
+                  ? evt.shifts.filter((s) => s.status !== 'CANCELLED')
+                  : [];
 
                 return (
                   <React.Fragment key={evt.eventId}>
@@ -417,22 +427,16 @@ export default function EOEventsTab({
                       className={`event-table-row ${isExpanded ? 'row-expanded' : ''}`}
                       onClick={() => setExpandedEventId(isExpanded ? null : evt.eventId)}
                     >
-                      {/* Cột 1: Thumbnail + Tên sự kiện */}
+                      {/* Cột 1: Tên sự kiện + Ảnh nằm xuống 1 div riêng cho to rõ */}
                       <td>
                         <div
-                          className="table-event-cell"
                           onClick={(e) => {
                             e.stopPropagation();
                             onOpenEventDetail?.(evt);
                           }}
-                          style={{ cursor: 'pointer' }}
+                          style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}
                           title="Nhấn để xem chi tiết sự kiện & nhân sự"
                         >
-                          <img
-                            src={thumbImg}
-                            alt={evt.name}
-                            className="event-row-thumb"
-                          />
                           <div className="event-row-meta">
                             <span className="event-row-title" title={evt.name}>
                               {evt.name}
@@ -440,6 +444,31 @@ export default function EOEventsTab({
                             <span className="event-row-hint" style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>
                               Chi tiết sự kiện & nhân sự &rarr;
                             </span>
+                          </div>
+                          <div
+                            style={{
+                              width: '100%',
+                              maxWidth: '210px',
+                              height: '105px',
+                              borderRadius: '10px',
+                              overflow: 'hidden',
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#f8fafc',
+                            }}
+                          >
+                            <img
+                              src={thumbImg}
+                              alt={evt.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block',
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
                           </div>
                         </div>
                       </td>
@@ -457,16 +486,55 @@ export default function EOEventsTab({
                         </div>
                       </td>
 
-                      {/* Cột 3: Nhân sự (0/5, 12/20) */}
+                      {/* Cột 3: Nhân sự theo ca (Hiển thị tổng & chi tiết từng ca kèm trạng thái) */}
                       <td>
-                        <div className="table-workers-cell">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" style={{ flexShrink: 0 }}>
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                          </svg>
-                          <span className="workers-count">
-                            {evt.totalConfirmedWorkers || 0}/{evt.totalRequiredWorkers || 0}
-                          </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <div className="table-workers-cell">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" style={{ flexShrink: 0 }}>
+                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="9" cy="7" r="4"></circle>
+                            </svg>
+                            <span className="workers-count" style={{ fontWeight: 700, color: '#0f172a' }}>
+                              Tổng: {evt.totalConfirmedWorkers || 0}/{evt.totalRequiredWorkers || 0} người
+                            </span>
+                          </div>
+
+                          {activeShifts.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                              {activeShifts.map((sh, sIdx) => {
+                                const shStatus = getDynamicShiftStatus(sh, evt.status);
+                                return (
+                                  <div
+                                    key={sh.shiftId || sIdx}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: '0.4rem',
+                                      fontSize: '0.73rem',
+                                      padding: '0.2rem 0.45rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: shStatus.bg,
+                                      border: `1px solid ${shStatus.border}`,
+                                      color: shStatus.color,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      Ca {sIdx + 1} ({sh.jobType}): <strong>{sh.confirmedWorkers || 0}/{sh.requiredWorkers || 0}</strong>
+                                    </span>
+                                    <span style={{ fontSize: '0.68rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
+                                      • {shStatus.label}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.73rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                              {evt.totalShifts ? `${evt.totalShifts} ca làm việc` : 'Chưa có ca'}
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -479,10 +547,10 @@ export default function EOEventsTab({
                         </span>
                       </td>
 
-                      {/* Cột 5: Trạng thái Badge + Nút Kích Hoạt Tìm Kiếm Ngay cho Bản nháp */}
+                      {/* Cột 5: Trạng thái Badge động theo thời gian + Nút Kích Hoạt Tìm Kiếm Ngay cho Bản nháp */}
                       <td onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
-                          {formatStatusBadge(evt.status)}
+                          {formatStatusBadge(evt)}
                           {evt.status === 'DRAFT' && (
                             <button
                               type="button"

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { showToast } from '../../../components/common/Toast';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
+import { getDynamicShiftStatus } from '../utils/eventHelpers';
 
 /**
  * EventShiftsDrawer
@@ -60,14 +61,13 @@ const EventShiftsDrawer = ({
     }
   };
 
-  const getShiftStatusMeta = (status) => {
-    if (status === 'ACTIVE') {
-      return { label: 'Đang tuyển', bg: '#dcfce7', color: '#15803d' };
-    }
-    if (status === 'CANCELLED') {
-      return { label: 'Đã hủy', bg: '#fee2e2', color: '#b91c1c' };
-    }
-    return { label: 'Bản nháp', bg: '#fef3c7', color: '#b45309' };
+  const getShiftStatusMeta = (shiftObj) => {
+    const dyn = getDynamicShiftStatus(shiftObj, event?.status);
+    return {
+      label: dyn.label,
+      bg: dyn.bg,
+      color: dyn.color,
+    };
   };
 
   const handleToggleQrAttendance = (shift) => {
@@ -75,7 +75,7 @@ const EventShiftsDrawer = ({
   };
 
   const renderShiftRow = (shift) => {
-    const statusMeta = getShiftStatusMeta(shift.status);
+    const statusMeta = getShiftStatusMeta(shift);
     const isPanelOpen = selectedShiftForPanel?.shiftId === shift.shiftId;
 
     return (

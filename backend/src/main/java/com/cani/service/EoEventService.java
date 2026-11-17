@@ -1080,35 +1080,86 @@ public class EoEventService {
         if (str.length() < 3) return false;
 
         // 1. Ký tự đơn lặp lại liên tiếp >= 4 lần (ví dụ: aaaaa, 11111)
-        if (str.matches("^(.)\\1{3,}$")) return true;
+        java.util.regex.Pattern singleCharRep = java.util.regex.Pattern.compile("(.)\\1{3,}");
+        if (singleCharRep.matcher(str).find()) return true;
 
         // 2. Cặp ký tự lặp lại >= 3 lần (ví dụ: ababab, cdcdcd)
-        if (str.matches("^(.{2})\\1{2,}$")) return true;
-
-        // 3. Regex nhận diện nguyên âm tiếng Việt và tiếng Anh
-        String vowelsPattern = ".*[aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ].*";
+        java.util.regex.Pattern pairCharRep = java.util.regex.Pattern.compile("(.{2})\\1{2,}");
+        if (pairCharRep.matcher(str).find()) return true;
 
         // Tách các từ theo khoảng trắng
         String[] words = str.split("\\s+");
+
+        // 3. Lặp từ liên tiếp >= 3 lần (ví dụ: "ád ád ád", "test test test")
+        String consecutiveWord = null;
+        int consecutiveCount = 0;
+        for (String w : words) {
+            if (!w.isBlank() && w.equals(consecutiveWord)) {
+                consecutiveCount++;
+                if (consecutiveCount >= 3) return true;
+            } else {
+                consecutiveWord = w;
+                consecutiveCount = 1;
+            }
+        }
+
+        // 4. Các mẫu cào phím (Keyboard mash) phổ biến (Telex / Qwerty home-row)
+        java.util.regex.Pattern mashPattern = java.util.regex.Pattern.compile(
+                "(asdasd|sdasd|ádasd|sdada|adasd|sdfsdf|dfghj|fghjk|ghjkl|qwerty|zxcvb)",
+                java.util.regex.Pattern.CASE_INSENSITIVE
+        );
+        if (mashPattern.matcher(str).find()) {
+            return true;
+        }
+
+        // 5. Kiểm tra tần suất từ chiếm ưu thế bất thường (ví dụ: "ádas ád ád ád ádasd ád")
+        if (words.length >= 4) {
+            java.util.Map<String, Integer> wordCounts = new java.util.HashMap<>();
+            int maxCount = 0;
+            for (String w : words) {
+                if (!w.isBlank()) {
+                    int c = wordCounts.getOrDefault(w, 0) + 1;
+                    wordCounts.put(w, c);
+                    if (c > maxCount) maxCount = c;
+                }
+            }
+            if ((double) maxCount / words.length >= 0.45) {
+                return true;
+            }
+        }
+
+        // 6. Độ đa dạng ký tự (Character Diversity / Entropy) trên văn bản chữ cái
+        String cleanLetters = str.replaceAll("[^a-zàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]", "");
+        if (cleanLetters.length() >= 10) {
+            long uniqueChars = cleanLetters.chars().distinct().count();
+            double ratio = (double) uniqueChars / cleanLetters.length();
+            if (uniqueChars <= 4 || ratio < 0.30) {
+                return true;
+            }
+        }
+
+        // 7. Regex nhận diện nguyên âm tiếng Việt và tiếng Anh
+        String vowelsPattern = ".*[aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơờớởỡợúùúủũụưứừửữựýỳỷỹỵ].*";
+
+        // Nếu một từ có độ dài >= 4 ký tự nhưng hoàn toàn KHÔNG chứa nguyên âm
         for (String w : words) {
             if (w.matches("\\d+")) continue; // Bỏ qua nếu từ chỉ toàn chữ số
             String cleanWord = w.replaceAll("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$", "");
-            // Nếu một từ có độ dài >= 4 ký tự nhưng hoàn toàn KHÔNG chứa nguyên âm
             if (cleanWord.length() >= 4 && !cleanWord.matches(vowelsPattern)) {
                 return true;
             }
         }
 
-        // 4. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd, asdfgh)
+        // 8. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd, asdfgh)
         java.util.regex.Pattern consonantRun = java.util.regex.Pattern.compile(
-                "[^aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ\\s\\d,\\.\\-_/()]{5,}",
+                "[^aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùúủũụưứừửữựýỳýỷỹỵ\\s\\d,\\.\\-_/()]{5,}",
                 java.util.regex.Pattern.CASE_INSENSITIVE
         );
         if (consonantRun.matcher(str).find()) {
             return true;
         }
 
-        // 5. Chuỗi tổng thể >= 6 ký tự nhưng không có nguyên âm nào
+        // 9. Chuỗi tổng thể >= 6 ký tự nhưng không có nguyên âm nào
         String nonSpace = str.replaceAll("\\s+", "");
         if (nonSpace.length() >= 6 && !nonSpace.matches(vowelsPattern) && !nonSpace.matches("\\d+")) {
             return true;
@@ -1140,9 +1191,6 @@ public class EoEventService {
             String trimmedVenue = venueAddress.trim();
             if (trimmedVenue.length() < 6) {
                 throw new BadRequestException("Địa chỉ tổ chức sự kiện quá ngắn (tối thiểu 6 ký tự).");
-            }
-            if (isGibberishOrSpam(trimmedVenue)) {
-                throw new BadRequestException("Địa chỉ tổ chức sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
             }
         }
         if (startTime != null && endTime != null) {

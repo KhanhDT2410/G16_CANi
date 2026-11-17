@@ -38,6 +38,9 @@ class WorkerJobServiceTest {
     private WorkerRepository workerRepository;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private ShiftRepository shiftRepository;
 
     @Mock
@@ -99,6 +102,7 @@ class WorkerJobServiceTest {
                 .workerId(UUID.randomUUID())
                 .user(workerUser)
                 .fullName("Lê Văn Worker")
+                .kycStatus(KycStatus.APPROVED)
                 .isOnline(true)
                 .reliabilityScore(90)
                 .totalShiftsCompleted(5)
@@ -194,6 +198,19 @@ class WorkerJobServiceTest {
         assertThat(result.getBaseLng()).isEqualTo(106.5);
     }
 
+    @Test
+    @DisplayName("UTC003b - setOnlineStatus() - Abnormal: Worker chưa eKYC (kycStatus=PENDING) không được bật tìm việc")
+    void setOnlineStatus_Abnormal_UnverifiedEkycThrowsBadRequestException() {
+        worker.setKycStatus(KycStatus.PENDING);
+        WorkerOnlineStatusRequestDto dto = WorkerOnlineStatusRequestDto.builder()
+                .isOnline(true).currentLat(10.7769).currentLng(106.7009).build();
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        assertThatThrownBy(() -> workerJobService.setOnlineStatus(userId, dto))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chưa hoàn tất định danh eKYC");
+    }
+
     // =========================================================================
     // 2. getMyProposals() - UTC004 to UTC006
     // =========================================================================
@@ -267,6 +284,17 @@ class WorkerJobServiceTest {
         assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("không còn khả dụng");
+    }
+
+    @Test
+    @DisplayName("UTC008b - acceptProposal() - Abnormal: Worker chưa eKYC (kycStatus=PENDING) không được nhận việc")
+    void acceptProposal_Abnormal_UnverifiedEkycThrowsBadRequestException() {
+        worker.setKycStatus(KycStatus.PENDING);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chưa hoàn tất định danh eKYC");
     }
 
     @Test
@@ -394,13 +422,20 @@ class WorkerJobServiceTest {
     // =========================================================================
     // 6. checkinAssignment() - UTC016 to UTC019
     // =========================================================================
+    private String makeValidQr(String prefix, UUID shiftId) {
+        long epoch = Instant.now().getEpochSecond();
+        String data = prefix + shiftId + ":" + epoch;
+        String sig = com.cani.util.QrCryptoUtil.generateSignature(data);
+        return data + ":" + sig;
+    }
+
     @Test
     @DisplayName("UTC016 - checkinAssignment() - Normal: Quét mã QR hợp lệ, điểm danh đúng giờ thành công")
     void checkinAssignment_Success_OnTimeCheckin() {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).lat(10.7769).lng(106.7009).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).lat(10.7769).lng(106.7009).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -439,7 +474,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + UUID.randomUUID()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", UUID.randomUUID())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -450,13 +485,45 @@ class WorkerJobServiceTest {
     }
 
     @Test
+    @DisplayName("UTC018b - checkinAssignment() - Security: Quét mã QR thiếu chữ ký HMAC ném BadRequestException")
+    void checkinAssignment_Security_MissingHmacSignatureThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        String legacyNoHmacQr = "CANI_CHECKIN:" + activeShift.getShiftId() + ":" + Instant.now().getEpochSecond();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder().qrContent(legacyNoHmacQr).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkinAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chữ ký số HMAC");
+    }
+
+    @Test
+    @DisplayName("UTC018c - checkinAssignment() - Security: Quét mã QR bị giả mạo chữ ký HMAC ném BadRequestException")
+    void checkinAssignment_Security_ForgedHmacSignatureThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        String forgedQr = "CANI_CHECKIN:" + activeShift.getShiftId() + ":" + Instant.now().getEpochSecond() + ":fake1234fake1234";
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder().qrContent(forgedQr).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkinAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chữ ký bảo mật mã QR không hợp lệ");
+    }
+
+    @Test
     @DisplayName("UTC019 - checkinAssignment() - Boundary: Điểm danh muộn quá 15 phút ghi nhận LATE")
     void checkinAssignment_Boundary_LateCheckinSetsStatusLate() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setStartTime(Instant.now().minus(20, ChronoUnit.MINUTES));
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -476,7 +543,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CANCELLED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -492,7 +559,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId())
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId()))
                 .lat(11.5).lng(107.5) // ~100km away
                 .build();
 
@@ -511,7 +578,7 @@ class WorkerJobServiceTest {
         activeShift.setStartTime(Instant.now().minus(14, ChronoUnit.MINUTES).minus(50, ChronoUnit.SECONDS));
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -536,7 +603,7 @@ class WorkerJobServiceTest {
                 .attendanceId(UUID.randomUUID()).shiftAssignment(sa).worker(worker)
                 .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS)).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -571,7 +638,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -590,7 +657,7 @@ class WorkerJobServiceTest {
         AttendanceLog log = AttendanceLog.builder()
                 .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS)).checkoutTime(Instant.now().minus(1, ChronoUnit.HOURS)).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -608,7 +675,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -672,6 +739,17 @@ class WorkerJobServiceTest {
         assertThat(list).isEmpty();
     }
 
+    @Test
+    @DisplayName("UTC026c - getNearbyShifts() - Boundary: Worker chưa hoàn tất eKYC (KycStatus != APPROVED) bị ẩn danh sách việc làm gần đó")
+    void getNearbyShifts_ReturnsEmptyList_WhenWorkerNotApprovedEkyc() {
+        worker.setKycStatus(KycStatus.PENDING);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 10.0);
+
+        assertThat(list).isEmpty();
+    }
+
     // =========================================================================
     // 9. applyForShift() - UTC027 to UTC030
     // =========================================================================
@@ -695,6 +773,17 @@ class WorkerJobServiceTest {
         assertThat(res.getStatus()).isEqualTo(AssignmentStatus.CONFIRMED);
         verify(directPaymentService).createInitialPayment(any());
         verify(eventRepository).save(mockEvent);
+    }
+
+    @Test
+    @DisplayName("UTC027b - applyForShift() - Abnormal: Worker chưa eKYC (kycStatus=PENDING) không được ứng tuyển ca")
+    void applyForShift_Abnormal_UnverifiedEkycThrowsBadRequestException() {
+        worker.setKycStatus(KycStatus.PENDING);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        assertThatThrownBy(() -> workerJobService.applyForShift(userId, activeShift.getShiftId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chưa hoàn tất định danh eKYC");
     }
 
     @Test
@@ -1234,6 +1323,81 @@ class WorkerJobServiceTest {
         WorkerIncomeSummaryDto summary = workerJobService.getIncomeSummary(userId);
 
         assertThat(summary.getTotalEarnings()).isEqualTo(BigDecimal.ZERO);
+    }
+
+    // =========================================================================
+    // UC-BANK: TESTS FOR GET & UPDATE WORKER BANK ACCOUNT (VIETQR INTEGRATION)
+    // =========================================================================
+
+    @Test
+    @DisplayName("UTC095 - getBankAccount() - Success: Worker đã có tài khoản ngân hàng sinh mã VietQR chuẩn xác")
+    void getBankAccount_Success_WithExistingBankInfo() {
+        worker.setBankCode("MB");
+        worker.setBankAccountNumber("0912345678");
+        worker.setBankAccountName("NGUYEN VAN A");
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        WorkerBankAccountDto dto = workerJobService.getBankAccount(userId);
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.getBankCode()).isEqualTo("MB");
+        assertThat(dto.getBankAccountNumber()).isEqualTo("0912345678");
+        assertThat(dto.getBankAccountName()).isEqualTo("NGUYEN VAN A");
+        assertThat(dto.getVietQrUrl()).contains("https://img.vietqr.io/image/MB-0912345678-compact2.png");
+        assertThat(dto.getVietQrUrl()).contains("accountName=NGUYEN+VAN+A");
+    }
+
+    @Test
+    @DisplayName("UTC096 - getBankAccount() - Success: Worker chưa cài đặt ngân hàng trả về null và không có mã VietQR")
+    void getBankAccount_Success_WithoutBankInfo() {
+        worker.setBankCode(null);
+        worker.setBankAccountNumber(null);
+        worker.setBankAccountName(null);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        WorkerBankAccountDto dto = workerJobService.getBankAccount(userId);
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.getBankCode()).isNull();
+        assertThat(dto.getBankAccountNumber()).isNull();
+        assertThat(dto.getVietQrUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("UTC097 - updateBankAccount() - Success: Chuẩn hóa chữ hoa bankCode, trim số tài khoản và lưu thành công")
+    void updateBankAccount_Success() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerRepository.save(any(Worker.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkerBankAccountDto request = WorkerBankAccountDto.builder()
+                .bankCode("vcb")
+                .bankAccountNumber("  1029384756  ")
+                .bankAccountName("nguyen van b")
+                .build();
+
+        WorkerBankAccountDto result = workerJobService.updateBankAccount(userId, request);
+
+        assertThat(result.getBankCode()).isEqualTo("VCB");
+        assertThat(result.getBankAccountNumber()).isEqualTo("1029384756");
+        assertThat(result.getBankAccountName()).isEqualTo("NGUYEN VAN B");
+        assertThat(result.getVietQrUrl()).contains("https://img.vietqr.io/image/VCB-1029384756-compact2.png");
+        verify(workerRepository).save(worker);
+    }
+
+    @Test
+    @DisplayName("UTC098 - updateBankAccount() - Failure: Không tìm thấy hồ sơ Worker ném ResourceNotFoundException")
+    void updateBankAccount_Failure_WorkerNotFound() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.empty());
+
+        WorkerBankAccountDto request = WorkerBankAccountDto.builder()
+                .bankCode("TCB")
+                .bankAccountNumber("1900123456")
+                .bankAccountName("PHAM DUY HUNG")
+                .build();
+
+        assertThatThrownBy(() -> workerJobService.updateBankAccount(userId, request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy thông tin Worker");
     }
 
 }

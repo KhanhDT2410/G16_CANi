@@ -10,12 +10,13 @@ import { usePayments } from './hooks/usePayments';
 import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
 import EOMetricsGrid from './components/EOMetricsGrid';
+import EOOverviewAnalytics from './components/EOOverviewAnalytics';
 import EOEventsTab from './components/EOEventsTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoProfileTab from './components/EoProfileTab';
-import EOAnalyticsTab from './components/EOAnalyticsTab';
 import EOSettingsTab from './components/EOSettingsTab';
+import EOMyTeamTab from './components/EOMyTeamTab';
 import EOModals from './components/EOModals';
 import EventDetailModal from './components/EventDetailModal';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
@@ -122,7 +123,7 @@ export default function EOPage() {
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
-    } else if (tabParam && ['events', 'payments', 'settings', 'support'].includes(tabParam)) {
+    } else if (tabParam && ['events', 'payments', 'subscription', 'profile', 'my-team', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
@@ -150,6 +151,7 @@ export default function EOPage() {
 
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState(null);
+  const [detailInitialTab, setDetailInitialTab] = useState('SHIFTS');
   const [ekycStatus, setEkycStatus] = useState('APPROVED');
   const [showEkycModal, setShowEkycModal] = useState(false);
 
@@ -163,9 +165,10 @@ export default function EOPage() {
     }
   }, [events.events, detailEvent?.eventId]);
 
-  const handleOpenEventDetailPage = (evt) => {
+  const handleOpenEventDetailPage = (evt, initialTab = 'SHIFTS') => {
     if (!evt) return;
     setDetailEvent(evt);
+    setDetailInitialTab(initialTab);
     setActiveTab('events');
     setActiveNav('events');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -216,6 +219,8 @@ export default function EOPage() {
       target = 'subscription';
     } else if (navKey === 'profile' || navKey === 'ekyc') {
       target = 'profile';
+    } else if (navKey === 'my-team') {
+      target = 'my-team';
     } else if (navKey === 'support') {
       target = 'support';
     } else if (navKey === 'settings') {
@@ -258,10 +263,12 @@ export default function EOPage() {
     if (subKey === 'detail') {
       const target = detailEvent || (Array.isArray(events.events) ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0] : null);
       setDetailEvent(target);
+      setDetailInitialTab('SHIFTS');
       setActiveEventSubTab('detail');
       return;
     }
     setDetailEvent(null);
+    setDetailInitialTab('SHIFTS');
     setActiveEventSubTab(subKey);
     if (subKey === 'cancelled') {
       events.setStatusFilter('CANCELLED');
@@ -288,32 +295,72 @@ export default function EOPage() {
           {/* TRANG TỔNG QUAN (Gộp Báo Cáo & Thống Kê Tài Chính + Uy Tín vào Tổng Quan) */}
           {activeTab === 'overview' && (
             <>
-              <section className="eo-hero-banner-clean">
-                <div className="hero-clean-left">
-                  <h1 className="hero-clean-greeting">Chào mừng trở lại, {displayName}!</h1>
-                  <p className="hero-clean-subtitle">
-                    Tổng quan chỉ số vận hành, ngân sách và báo cáo quyết toán sự kiện trên CANi.
+              <section
+                className="eo-hero-banner-clean"
+                style={{
+                  background: 'linear-gradient(90deg, #dbeafe 0%, #edf5ff 35%, #daebfe 70%, #dbeafe 100%)',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '20px',
+                  padding: '1.4rem 2rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  minHeight: '110px',
+                  boxShadow: '0 4px 18px rgba(37, 99, 235, 0.06)',
+                }}
+              >
+                {/* 1. Phần chữ bên trái */}
+                <div style={{ maxWidth: '60%', zIndex: 2 }}>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', marginBottom: '2px' }}>
+                    Chào mừng trở lại,
+                  </div>
+                  <h1
+                    style={{
+                      fontSize: '1.75rem',
+                      fontWeight: 900,
+                      color: '#0f172a',
+                      margin: '0 0 0.35rem',
+                      letterSpacing: '-0.025em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {displayName}
+                  </h1>
+                  <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, fontWeight: 500 }}>
+                    Quản lý sự kiện, tuyển dụng nhân sự và theo dõi vận hành trên CANi.
                   </p>
                 </div>
-                <div className="hero-clean-right">
-                  <div className="hero-3d-calendar-stage">
-                    <div className="hero-3d-calendar-card">
-                      <div className="hero-calendar-spiral-top">
-                        <span className="spiral-ring" />
-                        <span className="spiral-ring" />
-                        <span className="spiral-ring" />
-                      </div>
-                      <div className="hero-calendar-body">
-                        <div className="hero-calendar-check-circle">✓</div>
-                      </div>
-                    </div>
-                    <div className="hero-coordinator-badge">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
-                    </div>
-                  </div>
+
+                {/* 2. Ảnh minh họa sân khấu sự kiện & lịch 3D bên phải (Chuẩn 100% Mockup Ảnh 1) */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}
+                >
+                  <img
+                    src="/assets/eo-banner-stage.png"
+                    alt="CANi Event Stage & Calendar"
+                    style={{
+                      height: '100%',
+                      width: 'auto',
+                      objectFit: 'cover',
+                      objectPosition: 'right center',
+                      display: 'block',
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
                 </div>
               </section>
 
@@ -351,11 +398,10 @@ export default function EOPage() {
                 }}
               />
 
-              {/* Báo cáo & Thống kê Tài chính đã gộp vào Tổng quan (đã lược bỏ các chỉ số trùng lặp) */}
-              <EOAnalyticsTab
+              {/* Bảng Số Liệu Vận Hành & Thống Kê Tổng Quát (Pure Analytics & Operational Metrics) */}
+              <EOOverviewAnalytics
                 events={events.events}
-                payments={payments.payments}
-                onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
+                onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
               />
             </>
           )}
@@ -366,10 +412,12 @@ export default function EOPage() {
               <EventDetailModal
                 isOpen={true}
                 asPage={true}
+                initialTab={detailInitialTab}
                 allEvents={events.events}
                 onSelectEvent={(nextEvt) => setDetailEvent(nextEvt)}
                 onClose={() => {
                   setDetailEvent(null);
+                  setDetailInitialTab('SHIFTS');
                   handleEventSubTabChange('list');
                 }}
                 event={
@@ -454,6 +502,8 @@ export default function EOPage() {
 
           {activeTab === 'subscription' && <EOSubscriptionTab />}
 
+          {activeTab === 'my-team' && <EOMyTeamTab />}
+
           {(activeTab === 'profile' || activeTab === 'ekyc') && <EoProfileTab />}
 
           {/* Hỗ trợ kỹ thuật & Phiếu yêu cầu (UC-105 / UC-106) */}
@@ -472,9 +522,17 @@ export default function EOPage() {
           <EORightSidebar
             metrics={events.metrics}
             events={events.events}
-            onOpenQr={() => {
-              handleNavClick('events');
-              handleEventSubTabChange('attendance');
+            onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
+            onOpenQr={(targetEvt) => {
+              const active = targetEvt?.eventId
+                ? targetEvt
+                : (events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0]);
+              if (active) {
+                handleOpenEventDetailPage(active, 'QR_ATTENDANCE');
+              } else {
+                handleNavClick('events');
+                handleEventSubTabChange('list');
+              }
             }}
             onOpenRecruitment={() => {
               handleNavClick('events');

@@ -20,6 +20,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByAssignmentId(UUID assignmentId);
     List<Payment> findByEventOrganizer_EoIdOrderByCreatedAtDesc(UUID eoId);
     List<Payment> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
+    boolean existsByWorker_WorkerId(UUID workerId);
 
     List<Payment> findByCreatedAtBetween(Instant from, Instant to);
     Page<Payment> findByCreatedAtBetween(Instant from, Instant to, Pageable pageable);

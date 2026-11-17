@@ -11,6 +11,7 @@ import com.cani.entity.enums.ShiftStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
+import com.cani.util.VietQrUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +53,7 @@ public class WorkerJobService {
     private static final java.util.List<String> ALLOWED_IMAGE_EXTS = java.util.List.of("jpg", "jpeg", "png", "webp", "gif");
 
     private final WorkerRepository workerRepository;
+    private final UserRepository userRepository;
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final DispatchProposalRepository dispatchProposalRepository;
@@ -71,6 +73,10 @@ public class WorkerJobService {
     @Transactional
     public Worker setOnlineStatus(UUID userId, WorkerOnlineStatusRequestDto dto) {
         Worker worker = getWorkerOrThrow(userId);
+
+        if (Boolean.TRUE.equals(dto.getIsOnline()) && worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            throw new BadRequestException("Tài khoản chưa hoàn tất định danh eKYC. Vui lòng xác thực CCCD để kích hoạt chế độ tìm việc.");
+        }
 
         worker.setIsOnline(dto.getIsOnline());
         if (dto.getCurrentLat() != null && dto.getCurrentLng() != null) {
@@ -106,6 +112,11 @@ public class WorkerJobService {
     @Transactional
     public ShiftAssignmentResponseDto acceptProposal(UUID userId, UUID proposalId) {
         Worker worker = getWorkerOrThrow(userId);
+
+        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            throw new BadRequestException("Tài khoản chưa hoàn tất định danh eKYC. Vui lòng xác thực CCCD trước khi nhận việc.");
+        }
+
         DispatchProposal proposal = getWorkerProposalOrThrow(proposalId, worker);
 
         if (proposal.getStatus() != ProposalStatus.PENDING) {
@@ -225,33 +236,15 @@ public class WorkerJobService {
         Shift shift = assignment.getShift();
         Instant now = Instant.now();
 
-        // 1. Xác thực mã QR Check-in
+        // 1. Xác thực mã QR Check-in bảo mật động (HMAC-SHA256 Anti-spoofing)
         String qrContent = request != null && request.getQrContent() != null ? request.getQrContent().trim() : "";
         if (qrContent.startsWith("CANI_CHECKOUT:")) {
             throw new BadRequestException("Đây là mã QR Check-out (Kết ca). Vui lòng quét mã QR Check-in để vào ca làm việc!");
         }
-        if (!qrContent.startsWith("CANI_CHECKIN:") || shift == null || shift.getShiftId() == null) {
-            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-in chính thức của sự kiện!");
+        if (shift == null || shift.getShiftId() == null) {
+            throw new BadRequestException("Thông tin ca làm việc không hợp lệ.");
         }
-        String scannedShiftPart = qrContent.substring("CANI_CHECKIN:".length()).trim();
-        String scannedShiftId = scannedShiftPart;
-        if (scannedShiftPart.contains(":")) {
-            String[] parts = scannedShiftPart.split(":");
-            scannedShiftId = parts[0].trim();
-            if (parts.length >= 2) {
-                try {
-                    long epochSeconds = Long.parseLong(parts[1].trim());
-                    long currentEpochSeconds = Instant.now().getEpochSecond();
-                    // Mã QR động đổi theo thời gian: cho phép lệch tối đa 5 phút (300s) chống in giấy / chụp ảnh cũ
-                    if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
-                        throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
-                    }
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        if (!scannedShiftId.equalsIgnoreCase(shift.getShiftId().toString())) {
-            throw new BadRequestException("Mã QR Check-in này không thuộc ca làm việc hiện tại của bạn!");
-        }
+        validateAndExtractShiftId(qrContent, "CANI_CHECKIN:", shift.getShiftId());
 
         // 2. Kiểm tra khoảng cách Geofence nếu có tọa độ
         if (request != null && request.getLat() != null && request.getLng() != null && shift != null) {
@@ -328,31 +321,15 @@ public class WorkerJobService {
         }
         Shift shift = assignment.getShift();
 
+        // 1. Xác thực mã QR Check-out bảo mật động (HMAC-SHA256 Anti-spoofing)
         String qrContent = request != null && request.getQrContent() != null ? request.getQrContent().trim() : "";
         if (qrContent.startsWith("CANI_CHECKIN:")) {
             throw new BadRequestException("Đây là mã QR Check-in (Vào ca). Vui lòng quét mã QR Check-out để kết thúc ca làm việc!");
         }
-        if (!qrContent.startsWith("CANI_CHECKOUT:") || shift == null || shift.getShiftId() == null) {
-            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-out chính thức của ca làm việc!");
+        if (shift == null || shift.getShiftId() == null) {
+            throw new BadRequestException("Thông tin ca làm việc không hợp lệ.");
         }
-        String scannedShiftPart = qrContent.substring("CANI_CHECKOUT:".length()).trim();
-        String scannedShiftId = scannedShiftPart;
-        if (scannedShiftPart.contains(":")) {
-            String[] parts = scannedShiftPart.split(":");
-            scannedShiftId = parts[0].trim();
-            if (parts.length >= 2) {
-                try {
-                    long epochSeconds = Long.parseLong(parts[1].trim());
-                    long currentEpochSeconds = Instant.now().getEpochSecond();
-                    if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
-                        throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
-                    }
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        if (!scannedShiftId.equalsIgnoreCase(shift.getShiftId().toString())) {
-            throw new BadRequestException("Mã QR Check-out này không thuộc ca làm việc hiện tại của bạn!");
-        }
+        validateAndExtractShiftId(qrContent, "CANI_CHECKOUT:", shift.getShiftId());
 
         AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
                 .orElseThrow(() -> new BadRequestException("Bạn chưa check-in vào ca làm việc này nên không thể check-out."));
@@ -420,6 +397,11 @@ public class WorkerJobService {
         if (userId != null) {
             Worker worker = workerRepository.findByUser_UserId(userId).orElse(null);
             if (worker != null) {
+                // Yêu cầu eKYC: Tài khoản chưa hoàn tất định danh -> không hiển thị danh sách việc làm gần đó
+                if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+                    log.info("Worker {} chưa hoàn tất eKYC (KycStatus={}), ẩn danh sách công việc gần đó", userId, worker.getKycStatus());
+                    return Collections.emptyList();
+                }
                 workerActiveAssignments = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
                         worker.getWorkerId(),
                         List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING)
@@ -496,6 +478,11 @@ public class WorkerJobService {
     @Transactional
     public ShiftAssignmentResponseDto applyForShift(UUID userId, UUID shiftId) {
         Worker worker = getWorkerOrThrow(userId);
+
+        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            throw new BadRequestException("Tài khoản chưa hoàn tất định danh eKYC. Vui lòng xác thực CCCD trước khi ứng tuyển ca làm việc.");
+        }
+
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy ca làm việc ID: " + shiftId));
 
@@ -632,6 +619,83 @@ public class WorkerJobService {
     }
 
     // =========================================================================
+    // UC-37 (WBS 100.0): QUẢN LÝ KINH NGHIỆM LÀM VIỆC CỦA WORKER (MANAGE EXPERIENCE)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public WorkerExperienceDto getWorkerExperience(UUID userId) {
+        Worker worker = getWorkerOrThrow(userId);
+        return WorkerExperienceDto.builder()
+                .yearsExperience(worker.getYearsExperience() != null ? worker.getYearsExperience() : 0)
+                .bio(worker.getBio())
+                .totalShiftsCompleted(worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0)
+                .skillTier(worker.getSkillTier())
+                .ratingAvg(worker.getRatingAvg() != null ? worker.getRatingAvg() : BigDecimal.ZERO)
+                .reliabilityScore(worker.getReliabilityScore() != null ? worker.getReliabilityScore() : 100)
+                .build();
+    }
+
+    @Transactional
+    public WorkerExperienceDto updateWorkerExperience(UUID userId, WorkerExperienceDto dto) {
+        Worker worker = getWorkerOrThrow(userId);
+        if (dto.getYearsExperience() != null) {
+            worker.setYearsExperience(dto.getYearsExperience());
+        }
+        if (dto.getBio() != null) {
+            worker.setBio(dto.getBio().trim());
+        }
+        workerRepository.save(worker);
+        log.info("Worker {} đã cập nhật hồ sơ kinh nghiệm: {} năm kinh nghiệm", userId, worker.getYearsExperience());
+        return getWorkerExperience(userId);
+    }
+
+    // =========================================================================
+    // UC-BANK: QUẢN LÝ TÀI KHOẢN NGÂN HÀNG THỤ HƯỞNG (VIETQR NHẬN THÙ LAO)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public WorkerBankAccountDto getBankAccount(UUID userId) {
+        Worker worker = getWorkerOrThrow(userId);
+        String name = worker.getBankAccountName();
+        if ((name == null || name.isBlank()) && worker.getUser() != null) {
+            name = worker.getUser().getFullName();
+        }
+
+        String vietQr = VietQrUtil.buildVietQrUrl(
+                worker.getBankCode(),
+                worker.getBankAccountNumber(),
+                name,
+                null
+        );
+
+        return WorkerBankAccountDto.builder()
+                .bankCode(worker.getBankCode())
+                .bankAccountNumber(worker.getBankAccountNumber())
+                .bankAccountName(name)
+                .vietQrUrl(vietQr)
+                .build();
+    }
+
+    @Transactional
+    public WorkerBankAccountDto updateBankAccount(UUID userId, WorkerBankAccountDto dto) {
+        Worker worker = getWorkerOrThrow(userId);
+
+        if (dto.getBankCode() != null) {
+            worker.setBankCode(dto.getBankCode().trim().toUpperCase());
+        }
+        if (dto.getBankAccountNumber() != null) {
+            worker.setBankAccountNumber(dto.getBankAccountNumber().trim().replaceAll("\\s+", ""));
+        }
+        if (dto.getBankAccountName() != null) {
+            worker.setBankAccountName(dto.getBankAccountName().trim().toUpperCase());
+        }
+
+        workerRepository.save(worker);
+        log.info("Worker {} đã cập nhật tài khoản ngân hàng thụ hưởng: Bank={}, AccNum={}",
+                userId, worker.getBankCode(), worker.getBankAccountNumber());
+
+        return getBankAccount(userId);
+    }
+
+    // =========================================================================
     // UC-53: HỦY CA LÀM VIỆC ĐÃ NHẬN & PHẠT ĐIỂM UY TÍN (CANCEL ASSIGNMENT)
     // =========================================================================
     @Transactional
@@ -653,9 +717,22 @@ public class WorkerJobService {
 
         int penaltyPoints = calculateCancellationPenalty(now, startTime);
         int currentScore = worker.getReliabilityScore() != null ? worker.getReliabilityScore() : MAX_RELIABILITY_SCORE;
-        worker.setReliabilityScore(Math.max(MIN_RELIABILITY_SCORE, currentScore - penaltyPoints));
+        int newScore = Math.max(MIN_RELIABILITY_SCORE, currentScore - penaltyPoints);
+        worker.setReliabilityScore(newScore);
         worker.setTotalCancellations((worker.getTotalCancellations() != null ? worker.getTotalCancellations() : 0) + 1);
         workerRepository.save(worker);
+
+        // WBS 273.0 (UC-95): Tự động khóa tài khoản khi Reliability Score < 20
+        if (newScore < 20) {
+            User workerUser = worker.getUser();
+            if (workerUser != null && workerUser.getStatus() != com.cani.entity.enums.UserStatus.LOCKED) {
+                workerUser.setStatus(com.cani.entity.enums.UserStatus.LOCKED);
+                if (userRepository != null) {
+                    userRepository.save(workerUser);
+                }
+                log.warn("Tài khoản Worker {} tự động khóa do Reliability Score < 20 (Hiện tại: {})", worker.getWorkerId(), newScore);
+            }
+        }
 
         assignment.setStatus(AssignmentStatus.CANCELLED);
         assignment.setCancellationReason(reason != null && !reason.isBlank() ? reason : "Worker tự hủy ca");
@@ -1125,5 +1202,45 @@ public class WorkerJobService {
                 .proofImageUrl(attendanceOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .proofSubmittedAt(attendanceOpt.map(AttendanceLog::getProofSubmittedAt).orElse(null))
                 .build();
+    }
+
+    /**
+     * Xác thực và bóc tách shiftId từ mã QR động bảo mật (HMAC-SHA256 Anti-spoofing).
+     * Bắt buộc mã QR phải có định dạng: PREFIX:<shiftId>:<epochSeconds>:<signature>.
+     */
+    private String validateAndExtractShiftId(String qrContent, String expectedPrefix, UUID expectedShiftId) {
+        if (qrContent == null || !qrContent.startsWith(expectedPrefix)) {
+            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
+        }
+        String scannedShiftPart = qrContent.substring(expectedPrefix.length()).trim();
+        String[] parts = scannedShiftPart.split(":");
+        if (parts.length < 3) {
+            throw new BadRequestException("Mã QR không đúng định dạng bảo mật động (thiếu chữ ký số HMAC chống gian lận). Vui lòng quét mã QR trực tiếp trên màn hình sự kiện!");
+        }
+
+        String scannedShiftId = parts[0].trim();
+        long epochSeconds;
+        try {
+            epochSeconds = Long.parseLong(parts[1].trim());
+        } catch (NumberFormatException e) {
+            throw new BadRequestException("Mã QR không hợp lệ (thời gian làm mới không đúng định dạng).");
+        }
+
+        long currentEpochSeconds = Instant.now().getEpochSecond();
+        if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
+            throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
+        }
+
+        String signature = parts[2].trim();
+        String dataToVerify = expectedPrefix + scannedShiftId + ":" + epochSeconds;
+        if (!com.cani.util.QrCryptoUtil.verifySignature(dataToVerify, signature)) {
+            throw new BadRequestException("Chữ ký bảo mật mã QR không hợp lệ hoặc đã bị can thiệp. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
+        }
+
+        if (expectedShiftId != null && !scannedShiftId.equalsIgnoreCase(expectedShiftId.toString())) {
+            String actionName = expectedPrefix.contains("CHECKIN") ? "Check-in" : "Check-out";
+            throw new BadRequestException("Mã QR " + actionName + " này không thuộc ca làm việc hiện tại của bạn!");
+        }
+        return scannedShiftId;
     }
 }

@@ -13,7 +13,7 @@ export default function EOSidebar({
   const navItems = [
     {
       key: 'overview',
-      label: 'Tổng quan & Báo cáo',
+      label: 'Tổng quan',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="7" height="7" rx="1"></rect>
@@ -38,7 +38,6 @@ export default function EOSidebar({
       subItems: [
         { key: 'list', label: 'Danh sách sự kiện' },
         { key: 'detail', label: 'Chi tiết sự kiện' },
-        { key: 'attendance', label: 'Điểm danh & Mã QR' },
         { key: 'cancelled', label: 'Sự kiện đã xóa' },
       ],
     },
@@ -58,6 +57,18 @@ export default function EOSidebar({
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+      ),
+    },
+    {
+      key: 'my-team',
+      label: 'Nhân sự quen thuộc',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
       ),
     },
@@ -199,26 +210,76 @@ export default function EOSidebar({
         })}
       </nav>
 
-      {/* Promo Card ở đáy sidebar */}
+      {/* Promo Card: Nâng Cấp Gói Dịch Vụ Chuẩn Mockup Ảnh 2 */}
       {!isCollapsed && (
-        <div className="eo-sidebar-promo-card animate-fade-in-up">
-          <div className="promo-calendar-3d-box">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            <div className="promo-calendar-dot" />
+        <div
+          className="eo-sidebar-promo-card animate-fade-in-up"
+          style={{
+            margin: '1rem 0.85rem 0.75rem',
+            padding: '1.25rem 1rem 1rem',
+            background: '#ffffff',
+            borderRadius: '18px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.05)',
+            textAlign: 'center',
+            position: 'relative',
+          }}
+        >
+          {/* Icon Crown & Lotus Badge */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.65rem' }}>
+            <img
+              src="/assets/eo-crown-badge.png"
+              alt="VIP Subscription"
+              style={{ width: 56, height: 'auto', display: 'block' }}
+            />
           </div>
-          <h4 className="promo-card-title">Trợ lý Điều phối AI</h4>
-          <p className="promo-card-desc">Tự động quét ứng viên phù hợp bán kính 15km</p>
+
+          <h4
+            style={{
+              margin: '0 0 0.35rem',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              color: '#0f172a',
+            }}
+          >
+            Nâng cấp gói dịch vụ
+          </h4>
+
+          <p
+            style={{
+              margin: '0 0 0.85rem',
+              fontSize: '0.78rem',
+              color: '#64748b',
+              lineHeight: 1.45,
+            }}
+          >
+            Mở khóa nhiều tính năng nâng cao và tối ưu vận hành sự kiện.
+          </p>
+
           <button
             type="button"
-            className="promo-card-btn"
             onClick={() => onNavClick('subscription')}
+            style={{
+              width: '100%',
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '0.6rem 0.85rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
           >
-            Xem gói dịch vụ
+            Xem các gói dịch vụ &rarr;
           </button>
         </div>
       )}

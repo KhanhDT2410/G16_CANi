@@ -9,6 +9,7 @@ import com.cani.entity.enums.PaymentStatus;
 import com.cani.exception.AppException;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
+import com.cani.util.VietQrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -234,6 +235,16 @@ public class DirectPaymentService {
     }
 
     private PaymentResponseDto mapToDto(Payment p) {
+        Worker w = p.getWorker();
+        String bankCode = w != null ? w.getBankCode() : null;
+        String bankAccountNumber = w != null ? w.getBankAccountNumber() : null;
+        String bankAccountName = w != null ? w.getBankAccountName() : null;
+        if ((bankAccountName == null || bankAccountName.isBlank()) && w != null && w.getUser() != null) {
+            bankAccountName = w.getUser().getFullName();
+        }
+        BigDecimal amount = p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount();
+        String workerVietQrUrl = VietQrUtil.buildVietQrUrl(bankCode, bankAccountNumber, bankAccountName, amount);
+
         return PaymentResponseDto.builder()
                 .paymentId(p.getPaymentId())
                 .eventId(p.getEventId())
@@ -241,8 +252,8 @@ public class DirectPaymentService {
                 .assignmentId(p.getAssignmentId())
                 .eoId(p.getEventOrganizer() != null ? p.getEventOrganizer().getEoId() : null)
                 .eoCompanyName(p.getEventOrganizer() != null ? p.getEventOrganizer().getCompanyName() : "")
-                .workerId(p.getWorker() != null ? p.getWorker().getWorkerId() : null)
-                .workerName(p.getWorker() != null && p.getWorker().getUser() != null ? p.getWorker().getUser().getFullName() : "")
+                .workerId(w != null ? w.getWorkerId() : null)
+                .workerName(w != null && w.getUser() != null ? w.getUser().getFullName() : "")
                 .agreedAmount(p.getAgreedAmount())
                 .declaredAmount(p.getDeclaredAmount())
                 .status(p.getStatus())
@@ -254,6 +265,10 @@ public class DirectPaymentService {
                 .workerConfirmStatus(p.getWorkerConfirmStatus())
                 .workerComment(p.getWorkerComment())
                 .createdAt(p.getCreatedAt())
+                .bankCode(bankCode)
+                .bankAccountNumber(bankAccountNumber)
+                .bankAccountName(bankAccountName)
+                .workerVietQrUrl(workerVietQrUrl)
                 .build();
     }
 }

@@ -23,6 +23,7 @@ export function useEvents() {
   const [confirmPublish, setConfirmPublish] = useState({ isOpen: false, event: null });
   const [publishPayMethod, setPublishPayMethod] = useState('VIETQR');
   const [locating, setLocating] = useState(false);
+  const [cancelModal, setCancelModal] = useState({ isOpen: false, event: null, loading: false });
 
   const [newEvent, setNewEvent] = useState(DEFAULT_NEW_EVENT);
 
@@ -126,7 +127,11 @@ export function useEvents() {
   };
 
   const handleDeleteEvent = async (event) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn XÓA sự kiện "${event.name}" khỏi danh sách? Thao tác này sẽ dọn dẹp sự kiện khỏi bảng.`)) {
+    if (event.status !== 'DRAFT') {
+      showToast('Chỉ được phép xóa bản nháp sự kiện. Sự kiện đã tạo hoặc đang hoạt động chỉ có thể Hủy kèm lý do.', 'error');
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN bản nháp sự kiện "${event.name}"? Thao tác này không thể hoàn tác.`)) {
       return;
     }
     try {
@@ -150,29 +155,32 @@ export function useEvents() {
 
       // 3. Cập nhật state UI
       setEvents((prev) => prev.filter((e) => e.eventId !== event.eventId));
-      showToast('Đã xóa sự kiện khỏi danh sách thành công!', 'success');
+      showToast('Đã xóa vĩnh viễn bản nháp sự kiện thành công!', 'success');
     } catch (err) {
       showToast('Lỗi xóa sự kiện: ' + (err.response?.data?.message || err.message), 'error');
     }
   };
 
-  const handleCancelEvent = async (event) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn HỦY sự kiện "${event.name}"? Tất cả ca làm việc sẽ bị hủy.`)) {
-      return;
-    }
-    try {
-      await eoService.cancelEvent(event.eventId, 'Ban tổ chức hủy sự kiện');
-      showToast('Đã hủy sự kiện thành công!', 'success');
+  const handleCancelEvent = (event) => {
+    setCancelModal({ isOpen: true, event, loading: false });
+  };
 
-      // Hỏi người dùng có muốn gỡ/xóa khỏi bảng hiển thị luôn không
-      const wantDelete = window.confirm(`Sự kiện "${event.name}" đã được hủy. Bạn có muốn XÓA KHỎI DANH SÁCH hiển thị ngay bây giờ không?`);
-      if (wantDelete) {
-        await handleDeleteEvent(event);
-      } else {
-        loadEvents();
-      }
+  const handleCloseCancelModal = () => {
+    setCancelModal({ isOpen: false, event: null, loading: false });
+  };
+
+  const handleConfirmCancelEvent = async (reason) => {
+    const event = cancelModal.event;
+    if (!event) return;
+    setCancelModal((prev) => ({ ...prev, loading: true }));
+    try {
+      await eoService.cancelEvent(event.eventId, reason);
+      showToast('Đã hủy sự kiện thành công!', 'success');
+      handleCloseCancelModal();
+      loadEvents();
     } catch (err) {
       showToast('Lỗi hủy sự kiện: ' + (err.response?.data?.message || err.message), 'error');
+      setCancelModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -228,6 +236,10 @@ export function useEvents() {
     handleUpdateEvent,
     handleCancelEvent,
     handleDeleteEvent,
+    cancelModal,
+    setCancelModal,
+    handleCloseCancelModal,
+    handleConfirmCancelEvent,
     confirmPublish,
     setConfirmPublish,
     publishPayMethod,

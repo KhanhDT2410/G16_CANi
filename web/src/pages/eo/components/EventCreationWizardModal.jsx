@@ -25,6 +25,7 @@ const EventCreationWizardModal = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [createdEvent, setCreatedEvent] = useState(null);
+  const [step1Errors, setStep1Errors] = useState({});
   
   // State upload ảnh từ thiết bị
   const [uploadingEventImg, setUploadingEventImg] = useState(false);
@@ -247,31 +248,119 @@ const EventCreationWizardModal = ({
     }));
   };
 
+  // Hàm kiểm tra chuỗi có phải gõ linh tinh / spam / keyboard mash không
+  const isGibberishOrSpam = (text) => {
+    if (!text) return false;
+    const str = text.trim().toLowerCase();
+    if (str.length < 3) return false;
+
+    // 1. Ký tự đơn lặp lại liên tiếp >= 4 lần (ví dụ: aaaaa, 11111, .....)
+    if (/^(.)\1{3,}$/.test(str)) return true;
+
+    // 2. Cặp ký tự lặp lại >= 3 lần (ví dụ: ababab, cdcdcd)
+    if (/^(.{2})\1{2,}$/.test(str)) return true;
+
+    // 3. Nguyên âm tiếng Việt & tiếng Anh
+    const VOWELS = /[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/i;
+
+    // Tách từ theo khoảng trắng
+    const words = str.split(/\s+/).filter(Boolean);
+
+    // Kiểm tra từng từ: nếu từ dài >= 4 ký tự nhưng KHÔNG chứa bất kỳ nguyên âm nào (và không phải toàn số)
+    const hasVowellessLongWord = words.some((w) => {
+      if (/^\d+$/.test(w)) return false;
+      const cleanWord = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+      return cleanWord.length >= 4 && !VOWELS.test(cleanWord);
+    });
+    if (hasVowellessLongWord) return true;
+
+    // 4. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd, asdfgh)
+    const CONSONANTS_RUN = /[^aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ\s\d,.\-_/()]{5,}/i;
+    if (CONSONANTS_RUN.test(str)) return true;
+
+    // 5. Chuỗi tổng thể >= 6 ký tự nhưng không có nguyên âm nào
+    const nonSpace = str.replace(/\s+/g, '');
+    if (nonSpace.length >= 6 && !VOWELS.test(nonSpace) && !/^\d+$/.test(nonSpace)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const validateStep1 = (data) => {
+    const errs = {};
+
+    // 1. Tên sự kiện
+    const name = data.name?.trim() || '';
+    if (!name) {
+      errs.name = 'Vui lòng nhập tên sự kiện.';
+    } else if (name.length < 6) {
+      errs.name = 'Tên sự kiện quá ngắn (tối thiểu 6 ký tự).';
+    } else if (name.length > 255) {
+      errs.name = 'Tên sự kiện không được vượt quá 255 ký tự.';
+    } else if (isGibberishOrSpam(name)) {
+      errs.name = 'Tên sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa (vui lòng nhập tên có nghĩa).';
+    }
+
+    // 2. Mô tả sự kiện (tùy chọn nhưng nếu nhập thì phải chuẩn)
+    const desc = data.description?.trim() || '';
+    if (desc) {
+      if (desc.length < 5) {
+        errs.description = 'Mô tả sự kiện quá ngắn (tối thiểu 5 ký tự nếu nhập).';
+      } else if (isGibberishOrSpam(desc)) {
+        errs.description = 'Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.';
+      }
+    }
+
+    // 3. Thời gian bắt đầu và kết thúc
+    if (!data.startTime) {
+      errs.startTime = 'Vui lòng chọn thời gian bắt đầu sự kiện.';
+    }
+    if (!data.endTime) {
+      errs.endTime = 'Vui lòng chọn thời gian kết thúc sự kiện.';
+    }
+
+    if (data.startTime && data.endTime) {
+      const start = new Date(data.startTime);
+      const end = new Date(data.endTime);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        errs.time = 'Thời gian sự kiện không hợp lệ.';
+      } else if (start >= end) {
+        errs.time = 'Thời gian kết thúc phải diễn ra sau thời gian bắt đầu sự kiện.';
+      } else if (end.getTime() - start.getTime() < 30 * 60 * 1000) {
+        errs.time = 'Thời lượng sự kiện tối thiểu phải từ 30 phút trở lên.';
+      }
+    }
+
+    // 4. Địa điểm tổ chức
+    const addr = data.venueAddress?.trim() || '';
+    if (!addr) {
+      errs.venueAddress = 'Vui lòng chọn hoặc nhập địa chỉ tổ chức cụ thể.';
+    } else if (addr.length < 6) {
+      errs.venueAddress = 'Địa chỉ tổ chức quá ngắn (tối thiểu 6 ký tự).';
+    } else if (isGibberishOrSpam(addr)) {
+      errs.venueAddress = 'Địa chỉ tổ chức không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.';
+    }
+
+    return errs;
+  };
+
   // ==========================================
   // BƯỚC 1: TẠO SỰ KIỆN VÀ CHUYỂN SANG BƯỚC 2
   // ==========================================
   const handleStep1Submit = async (e) => {
     e.preventDefault();
-    if (!newEvent.name?.trim() || !newEvent.venueAddress?.trim()) {
-      showToast('Vui lòng nhập tên sự kiện và địa chỉ tổ chức', 'error');
+    const errs = validateStep1(newEvent);
+    if (Object.keys(errs).length > 0) {
+      setStep1Errors(errs);
+      const firstErrMsg = Object.values(errs)[0];
+      showToast(firstErrMsg, 'error');
       return;
     }
-
-    if (!newEvent.startTime || !newEvent.endTime) {
-      showToast('Vui lòng chọn thời gian bắt đầu và kết thúc sự kiện', 'error');
-      return;
-    }
+    setStep1Errors({});
 
     const evtStart = new Date(newEvent.startTime);
     const evtEnd = new Date(newEvent.endTime);
-    if (isNaN(evtStart.getTime()) || isNaN(evtEnd.getTime())) {
-      showToast('Thời gian sự kiện không hợp lệ', 'error');
-      return;
-    }
-    if (evtStart >= evtEnd) {
-      showToast('Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện!', 'error');
-      return;
-    }
 
     setSubmitting(true);
     try {
@@ -335,6 +424,16 @@ const EventCreationWizardModal = ({
 
     if (!currentShift.description?.trim()) {
       showToast('Vui lòng nhập mô tả công việc cho ca làm', 'error');
+      return;
+    }
+
+    if (currentShift.description.trim().length < 6) {
+      showToast('Mô tả công việc quá ngắn (tối thiểu 6 ký tự)', 'error');
+      return;
+    }
+
+    if (isGibberishOrSpam(currentShift.description)) {
+      showToast('Mô tả công việc không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa!', 'error');
       return;
     }
 
@@ -511,6 +610,7 @@ const EventCreationWizardModal = ({
     setCreatedEvent(null);
     setShiftsList([]);
     setIsAddingShift(true);
+    setStep1Errors({});
     onClose();
   };
 
@@ -606,10 +706,32 @@ const EventCreationWizardModal = ({
                 type="text"
                 required
                 className="eo-form-input"
+                style={{
+                  borderColor: step1Errors.name ? '#ef4444' : undefined,
+                  boxShadow: step1Errors.name ? '0 0 0 1px #ef4444' : undefined,
+                }}
                 placeholder="Ví dụ: Triển lãm Công nghệ TechExpo 2026"
                 value={newEvent.name}
-                onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
+                onChange={(e) => {
+                  setNewEvent({ ...newEvent, name: e.target.value });
+                  if (step1Errors.name) setStep1Errors((prev) => ({ ...prev, name: null }));
+                }}
+                onBlur={() => {
+                  const val = newEvent.name?.trim() || '';
+                  if (!val) {
+                    setStep1Errors((prev) => ({ ...prev, name: 'Vui lòng nhập tên sự kiện.' }));
+                  } else if (val.length < 6) {
+                    setStep1Errors((prev) => ({ ...prev, name: 'Tên sự kiện quá ngắn (tối thiểu 6 ký tự).' }));
+                  } else if (isGibberishOrSpam(val)) {
+                    setStep1Errors((prev) => ({ ...prev, name: 'Tên sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa (vui lòng nhập tên có nghĩa).' }));
+                  }
+                }}
               />
+              {step1Errors.name && (
+                <div style={{ color: '#ef4444', fontSize: '0.785rem', marginTop: '0.35rem', fontWeight: 600 }}>
+                  {step1Errors.name}
+                </div>
+              )}
             </div>
 
             <div className="eo-form-group">
@@ -617,10 +739,32 @@ const EventCreationWizardModal = ({
               <textarea
                 rows="2"
                 className="eo-form-textarea"
+                style={{
+                  borderColor: step1Errors.description ? '#ef4444' : undefined,
+                  boxShadow: step1Errors.description ? '0 0 0 1px #ef4444' : undefined,
+                }}
                 placeholder="Mô tả quy mô, đối tượng khách mời, yêu cầu chung..."
                 value={newEvent.description}
-                onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                onChange={(e) => {
+                  setNewEvent({ ...newEvent, description: e.target.value });
+                  if (step1Errors.description) setStep1Errors((prev) => ({ ...prev, description: null }));
+                }}
+                onBlur={() => {
+                  const val = newEvent.description?.trim() || '';
+                  if (val) {
+                    if (val.length < 5) {
+                      setStep1Errors((prev) => ({ ...prev, description: 'Mô tả sự kiện quá ngắn (tối thiểu 5 ký tự nếu nhập).' }));
+                    } else if (isGibberishOrSpam(val)) {
+                      setStep1Errors((prev) => ({ ...prev, description: 'Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.' }));
+                    }
+                  }
+                }}
               />
+              {step1Errors.description && (
+                <div style={{ color: '#ef4444', fontSize: '0.785rem', marginTop: '0.35rem', fontWeight: 600 }}>
+                  {step1Errors.description}
+                </div>
+              )}
             </div>
 
             {/* THỜI GIAN DIỄN RA TOÀN BỘ SỰ KIỆN */}
@@ -631,8 +775,16 @@ const EventCreationWizardModal = ({
                   type="datetime-local"
                   required
                   className="eo-form-input"
+                  style={{
+                    borderColor: step1Errors.startTime || step1Errors.time ? '#ef4444' : undefined,
+                  }}
                   value={newEvent.startTime || ''}
-                  onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })}
+                  onChange={(e) => {
+                    setNewEvent({ ...newEvent, startTime: e.target.value });
+                    if (step1Errors.startTime || step1Errors.time) {
+                      setStep1Errors((prev) => ({ ...prev, startTime: null, time: null }));
+                    }
+                  }}
                 />
               </div>
               <div className="eo-form-group">
@@ -641,11 +793,24 @@ const EventCreationWizardModal = ({
                   type="datetime-local"
                   required
                   className="eo-form-input"
+                  style={{
+                    borderColor: step1Errors.endTime || step1Errors.time ? '#ef4444' : undefined,
+                  }}
                   value={newEvent.endTime || ''}
-                  onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                  onChange={(e) => {
+                    setNewEvent({ ...newEvent, endTime: e.target.value });
+                    if (step1Errors.endTime || step1Errors.time) {
+                      setStep1Errors((prev) => ({ ...prev, endTime: null, time: null }));
+                    }
+                  }}
                 />
               </div>
             </div>
+            {step1Errors.time && (
+              <div style={{ color: '#ef4444', fontSize: '0.785rem', marginTop: '-0.5rem', marginBottom: '0.75rem', fontWeight: 600 }}>
+                {step1Errors.time}
+              </div>
+            )}
 
             {/* ẢNH BANNER / POSTER SỰ KIỆN (CHỈ TẢI TỪ MÁY, ĐÃ XÓA Ô ĐƯỜNG DẪN ẢNH & ICON) */}
             <div className="eo-form-group">
@@ -712,11 +877,19 @@ const EventCreationWizardModal = ({
                   venueLat: lat,
                   venueLng: lng,
                 }));
+                if (step1Errors.venueAddress) {
+                  setStep1Errors((prev) => ({ ...prev, venueAddress: null }));
+                }
               }}
               onGetCurrentLocation={onGetCurrentLocation}
               locating={locating}
               required
             />
+            {step1Errors.venueAddress && (
+              <div style={{ color: '#ef4444', fontSize: '0.785rem', marginTop: '0.35rem', fontWeight: 600 }}>
+                {step1Errors.venueAddress}
+              </div>
+            )}
 
             <div className="eo-modal-footer">
               <button type="button" className="eo-btn-secondary" onClick={handleClose}>

@@ -38,6 +38,12 @@ public class MatchingDispatchService {
     @Autowired(required = false)
     private NotificationService notificationService;
 
+    @Autowired(required = false)
+    private BlockListService blockListService;
+
+    @Autowired(required = false)
+    private com.cani.repository.SystemConfigRepository systemConfigRepository;
+
     private static final double MAX_DISTANCE_KM = 15.0;
     private static final int MIN_RELIABILITY_SCORE = 60;
     private static final int DEFAULT_TIMEOUT_HOURS = 1;
@@ -182,6 +188,11 @@ public class MatchingDispatchService {
             return false;
         }
 
+        // 1b. Bắt buộc tài khoản đã hoàn tất định danh eKYC (KycStatus == APPROVED)
+        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            return false;
+        }
+
         // 2. Tài khoản User phải ACTIVE
         if (worker.getUser() == null || worker.getUser().getStatus() != UserStatus.ACTIVE) {
             return false;
@@ -224,6 +235,17 @@ public class MatchingDispatchService {
             return false;
         }
 
+        // 6. Kiểm tra Danh sách Chặn (UC-38, UC-39): Không match nếu Worker hoặc EO đã chặn nhau
+        if (blockListService != null && shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null) {
+            EventOrganizer eo = shift.getEvent().getEventOrganizer();
+            if (eo.getUser() != null && worker.getUser() != null) {
+                if (blockListService.isEitherBlocked(eo.getUser().getUserId(), worker.getUser().getUserId())) {
+                    log.debug("Loại trừ ứng viên {} do có chặn tương tác với EO {}", worker.getWorkerId(), eo.getEoId());
+                    return false;
+                }
+            }
+        }
+
         return true;
     }
 
@@ -245,9 +267,12 @@ public class MatchingDispatchService {
         // 4. Reliability Score: Trọng số 0.1
         double rsScore = worker.getReliabilityScore() != null ? Math.min(100.0, worker.getReliabilityScore()) : 80.0;
 
-        // Bonus: Người mới (< 3 ca) hoặc nghỉ lâu (> 7 ngày)
-        double newWorkerBonus = (completedShifts < 3) ? 10.0 : 0.0;
-        double idleBonus = 10.0; // Mặc định khuyến khích quay lại làm việc
+        // Bonus: Người mới hoặc nghỉ lâu (UC-60, UC-61: Fairness Boost)
+        double newWorkerBoostConfig = getConfigDouble("fairness.new_worker_boost", 10.0);
+        double idleWorkerBoostConfig = getConfigDouble("fairness.idle_worker_boost", 10.0);
+
+        double newWorkerBonus = (completedShifts < 3) ? newWorkerBoostConfig : 0.0;
+        double idleBonus = idleWorkerBoostConfig;
 
         double finalScore = (0.4 * distanceScore) + (0.3 * ratingScore) + (0.2 * expScore) + (0.1 * rsScore) + newWorkerBonus + idleBonus;
 
@@ -263,6 +288,115 @@ public class MatchingDispatchService {
                 .finalScore(finalScore)
                 .scoreBreakdownJson(breakdownJson)
                 .build();
+    }
+
+    /**
+     * UC-59: Kích hoạt điều phối khẩn cấp (Emergency Dispatch) khi ca làm việc thiếu người
+     */
+    @Transactional
+    public int triggerEmergencyDispatch(UUID shiftId, Double customRadiusKm) {
+        Shift shift = shiftRepository.findById(shiftId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca làm việc ID: " + shiftId));
+
+        if (shift.getStatus() != ShiftStatus.ACTIVE) {
+            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE", shiftId);
+            return 0;
+        }
+
+        double rawRadius = (customRadiusKm != null && customRadiusKm > 0) ? customRadiusKm : 25.0;
+        double emergencyRadius = Math.min(Math.max(rawRadius, 1.0), 50.0);
+        log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km (Capped max 50km)", shiftId, emergencyRadius);
+
+        int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
+        if (needed <= 0) {
+            return 0;
+        }
+
+        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+
+        List<Worker> allWorkers = workerRepository.findByIsOnlineTrue();
+        if (allWorkers == null || allWorkers.isEmpty()) {
+            allWorkers = workerRepository.findAll();
+        }
+
+        List<CandidateMatch> matchedCandidates = new ArrayList<>();
+        for (Worker worker : allWorkers) {
+            if (!passHardFilter(worker, shift)) {
+                continue;
+            }
+            double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
+            if (distanceKm > emergencyRadius) {
+                continue;
+            }
+            CandidateMatch match = calculateSoftScore(worker, distanceKm);
+            matchedCandidates.add(match);
+        }
+
+        matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed());
+
+        int targetDispatchCount = Math.max(needed * 3 + 5, needed);
+        List<CandidateMatch> topCandidates = matchedCandidates.stream()
+                .limit(targetDispatchCount)
+                .toList();
+
+        int createdCount = 0;
+        Instant expiresAt = Instant.now().plus(Duration.ofMinutes(30)); // Khẩn cấp: Hết hạn sau 30 phút
+
+        for (CandidateMatch candidate : topCandidates) {
+            Worker worker = candidate.getWorker();
+            if (dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId()) ||
+                shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
+                continue;
+            }
+
+            DispatchProposal proposal = DispatchProposal.builder()
+                    .shift(shift)
+                    .worker(worker)
+                    .matchScore(BigDecimal.valueOf(candidate.getFinalScore()).setScale(2, RoundingMode.HALF_UP))
+                    .scoreBreakdown(candidate.getScoreBreakdownJson())
+                    .status(ProposalStatus.PENDING)
+                    .expiresAt(expiresAt)
+                    .build();
+
+            DispatchProposal savedProposal = dispatchProposalRepository.save(proposal);
+            createdCount++;
+
+            if (notificationService != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
+                try {
+                    String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
+                    notificationService.createAndSend(
+                            worker.getUser().getUserId(),
+                            "🚨 [GẤP] Lời mời nhận ca làm khẩn cấp: " + shift.getJobType(),
+                            "Ca làm việc khẩn cấp tại \"" + eventName + "\" đang thiếu nhân sự! Thù lao " + shift.getHourlyWage() + " đ/giờ.",
+                            NotificationType.PROPOSAL,
+                            "PROPOSAL",
+                            savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shiftId,
+                            Map.of("shiftId", shiftId.toString(), "type", "EMERGENCY_PROPOSAL")
+                    );
+                } catch (Exception ex) {
+                    log.warn("Lỗi gửi thông báo FCM khẩn cấp: {}", ex.getMessage());
+                }
+            }
+        }
+
+        log.info("Emergency Dispatch hoàn tất: Đã gửi {} đề xuất khẩn cấp cho ca {}", createdCount, shiftId);
+        return createdCount;
+    }
+
+    private double getConfigDouble(String key, double defaultValue) {
+        if (systemConfigRepository != null) {
+            return systemConfigRepository.findByKey(key)
+                    .map(cfg -> {
+                        try {
+                            return Double.parseDouble(cfg.getValue().trim());
+                        } catch (Exception ignored) {
+                            return defaultValue;
+                        }
+                    })
+                    .orElse(defaultValue);
+        }
+        return defaultValue;
     }
 
     /**

@@ -207,7 +207,7 @@ public class SkillVisionAiClient {
 
         } catch (Exception e) {
             log.error("Failed to parse Vision AI JSON output: {}", e.getMessage(), e);
-            return buildFallbackResult("Lỗi xử lý kết quả JSON từ AI. Đã chuyển hồ sơ sang hàng đợi Admin duyệt.");
+            return buildFallbackResult("Không thể nhận diện cấu trúc văn bản chứng chỉ. Vui lòng chụp lại ảnh rõ nét, đủ ánh sáng và không bị nghiêng lệch.");
         }
     }
 

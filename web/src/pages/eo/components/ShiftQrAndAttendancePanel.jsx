@@ -29,6 +29,26 @@ export default function ShiftQrAndAttendancePanel({
   const [verifyingId, setVerifyingId] = useState(null);
   const [selectedForReview, setSelectedForReview] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [serverQrData, setServerQrData] = useState(null);
+
+  // Lấy mã QR động ký chữ ký HMAC-SHA256 chính thức từ backend
+  const fetchLiveQr = useCallback(async () => {
+    if (!shift?.shiftId) return;
+    try {
+      const data = await eoService.getShiftQr(shift.shiftId);
+      if (data) {
+        setServerQrData(data);
+      }
+    } catch (err) {
+      console.warn('Không thể lấy mã QR trực tiếp từ server, sử dụng fallback client:', err);
+    }
+  }, [shift?.shiftId]);
+
+  useEffect(() => {
+    if (shift?.shiftId) {
+      fetchLiveQr();
+    }
+  }, [shift?.shiftId, refreshNonce, fetchLiveQr]);
 
   // Tự động cuộn mượt xuống khu vực Điểm danh & Mã QR khi mở
   useEffect(() => {
@@ -79,8 +99,10 @@ export default function ShiftQrAndAttendancePanel({
     try {
       await eoService.verifyAttendance(assignmentId);
       showToast('Đã xác nhận hoàn thành ca và duyệt công cho nhân sự!', 'success');
-      loadAttendance();
-      onReloadEvents?.();
+      await Promise.allSettled([
+        loadAttendance(),
+        onReloadEvents ? Promise.resolve(onReloadEvents()) : Promise.resolve(),
+      ]);
     } catch (e) {
       showToast('Không thể duyệt công: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
@@ -107,14 +129,18 @@ export default function ShiftQrAndAttendancePanel({
   const isCheckin = qrMode === 'CHECKIN';
   const accentColor = isCheckin ? '#2563eb' : '#0d9488';
   const epochSeconds = Math.floor(refreshNonce / 1000);
-  const currentPayload = isCheckin
+  const fallbackPayload = isCheckin
     ? `CANI_CHECKIN:${shift.shiftId || ''}:${epochSeconds}:${refreshNonce.toString(36)}`
     : `CANI_CHECKOUT:${shift.shiftId || ''}:${epochSeconds}:${refreshNonce.toString(36)}`;
+  const currentPayload = isCheckin
+    ? (serverQrData?.checkinQrContent || fallbackPayload)
+    : (serverQrData?.checkoutQrContent || fallbackPayload);
   const progressPercent = Math.round((countdown / ROTATE_INTERVAL) * 100);
 
   const handleManualRefreshQr = () => {
     setRefreshNonce(Date.now());
     setCountdown(ROTATE_INTERVAL);
+    fetchLiveQr();
   };
 
   // Danh sách các ca của sự kiện hiện tại để chuyển nhanh
@@ -380,18 +406,18 @@ export default function ShiftQrAndAttendancePanel({
 
           <div
             style={{
-              backgroundColor: '#fffbeb',
-              border: '1px solid #fde68a',
+              backgroundColor: '#ecfdf5',
+              border: '1px solid #a7f3d0',
               borderRadius: '0.5rem',
               padding: '0.65rem 0.85rem',
               marginTop: '1rem',
               textAlign: 'left',
               fontSize: '0.78rem',
-              color: '#92400e',
+              color: '#065f46',
               lineHeight: 1.45,
             }}
           >
-            <strong>🚫 Chống gian lận điểm danh hộ:</strong> Mã QR tự làm mới mỗi 20 giây và yêu cầu nhân sự quét trực tiếp tại địa điểm sự kiện (Geofence GPS 200m).
+            <strong>🛡️ Bảo mật chống giả mạo:</strong> Mã QR xoay vòng 20 giây và được ký số bảo mật <strong>HMAC-SHA256</strong> từ máy chủ. Ngăn chặn tuyệt đối việc Worker tự sinh mã QR hoặc gian lận điểm danh từ xa.
           </div>
         </div>
 

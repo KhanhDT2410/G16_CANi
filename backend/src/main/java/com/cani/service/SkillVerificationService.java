@@ -148,6 +148,7 @@ public class SkillVerificationService {
 
         // Collect skills to approve
         List<Skill> approvedSkills = new ArrayList<>();
+        // AI chốt trực tiếp 100%: APPROVED (Đạt chuẩn) hoặc REJECTED (Chưa đạt kèm lý do chi tiết để chụp lại ngay)
         if (aiResult.getRoutingDecision() == RoutingDecision.AUTO_APPROVE && aiResult.getOverallConfidence() >= 0.80) {
             status = SkillVerificationStatus.APPROVED;
 
@@ -172,13 +173,16 @@ public class SkillVerificationService {
 
             // BR-65: +25 SP_verify per approved skill
             spAwarded = Math.max(25, approvedSkills.size() * VerificationTier.AI_DOCUMENT.getSpVerify());
-        } else if (aiResult.getRoutingDecision() == RoutingDecision.ADMIN_REVIEW) {
-            status = SkillVerificationStatus.PENDING_REVIEW;
-            spAwarded = 0;
         } else {
-            // Immediate feedback: REJECTED with actionable guidance so worker can retake immediately
+            // Không đạt chuẩn -> AI REJECT ngay lập tức với lý do chi tiết, không đưa vào hàng đợi Admin
             status = SkillVerificationStatus.REJECTED;
+            aiResult.setRoutingDecision(RoutingDecision.REJECT);
             spAwarded = 0;
+            if (aiResult.getRoutingReason() == null || aiResult.getRoutingReason().isBlank()
+                    || aiResult.getRoutingReason().toLowerCase().contains("admin")
+                    || aiResult.getRoutingReason().toLowerCase().contains("hàng đợi")) {
+                aiResult.setRoutingReason("Tài liệu chưa đạt độ tin cậy nhận diện của AI (ảnh mờ, thiếu con dấu hoặc không khớp chuyên môn). Vui lòng chụp lại tài liệu rõ nét để được duyệt tự động ngay.");
+            }
         }
 
         String extractedSkillsJson = null;

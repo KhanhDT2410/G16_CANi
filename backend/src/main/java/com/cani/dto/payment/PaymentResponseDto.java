@@ -33,4 +33,10 @@ public class PaymentResponseDto {
     private String workerConfirmStatus;
     private String workerComment;
     private Instant createdAt;
+
+    // Thông tin tài khoản ngân hàng thụ hưởng & mã VietQR của Worker
+    private String bankCode;
+    private String bankAccountNumber;
+    private String bankAccountName;
+    private String workerVietQrUrl;
 }

@@ -532,10 +532,8 @@ class _EkycVerificationScreenState
           const SizedBox(height: 12),
           Text(
             item.isApproved
-                ? 'Chúc mừng! Hồ sơ của bạn đã được phê duyệt thành công.'
-                : (item.isPending
-                      ? 'Hồ sơ đã gửi thành công, đang chờ CSKH kiểm duyệt.'
-                      : 'Định danh chưa hoàn tất, vui lòng thử lại.'),
+                ? 'Chúc mừng! Hồ sơ của bạn đã được AI phê duyệt thành công.'
+                : 'Định danh chưa đạt chuẩn nhận diện, vui lòng chụp lại ảnh.',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,
@@ -817,10 +815,10 @@ class _EkycVerificationScreenState
                     SnackBar(
                       content: Text(
                         res.isApproved
-                            ? 'Xác thực định danh eKYC thành công!'
-                            : 'Đã gửi hồ sơ eKYC! Đang chờ Admin thẩm định.',
+                            ? 'Xác thực định danh eKYC thành công! Đã cấp tích xanh.'
+                            : 'Định danh chưa đạt chuẩn: ${res.routingReason ?? "Vui lòng chụp lại ảnh"}',
                       ),
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: res.isApproved ? const Color(0xFF10B981) : const Color(0xFFDC2626),
                     ),
                   );
                 } else {

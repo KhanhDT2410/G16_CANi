@@ -344,7 +344,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🎉 Tham gia ca làm thành công qua mã mời!'),
+              content: Text('Tham gia ca làm việc thành công!'),
               backgroundColor: Color(0xFF16A34A),
             ),
           );
@@ -397,7 +397,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF0077FF), size: 22),
-                            tooltip: 'Nhập mã mời ca làm (Screen 092)',
+                            tooltip: 'Nhập mã mời ca làm',
                             onPressed: _openInviteCodeDialog,
                           ),
                           Container(

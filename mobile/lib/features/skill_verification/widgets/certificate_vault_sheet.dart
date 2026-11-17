@@ -91,11 +91,10 @@ class CertificateVaultSheet extends ConsumerWidget {
 
   Widget _buildVaultCard(SkillVerificationResult item) {
     final isApproved = item.status == 'APPROVED';
-    final isPending = item.status == 'PENDING_REVIEW';
-    final statusColor = isApproved ? Colors.green : (isPending ? Colors.orange : Colors.red);
+    final statusColor = isApproved ? Colors.green : Colors.red;
     final statusText = isApproved
         ? 'Đã duyệt (+${item.spAwarded} SP)'
-        : (isPending ? 'Chờ xét duyệt' : 'Bị từ chối');
+        : 'Không đạt chuẩn';
 
     return Container(
       padding: const EdgeInsets.all(14),

@@ -97,6 +97,7 @@ public class DisputeService {
                 .type(request.getType())
                 .title(request.getTitle())
                 .description(request.getDescription())
+                .evidence(request.getEvidence())
                 .status(DisputeStatus.OPEN)
                 .slaDeadline(Instant.now().plus(Duration.ofDays(CC_DECISION_SLA_DAYS)))
                 .build();

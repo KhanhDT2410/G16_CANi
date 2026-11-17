@@ -3,13 +3,13 @@ import EventCreationWizardModal from './EventCreationWizardModal';
 import ShiftCreateModal from './ShiftCreateModal';
 import PaymentDeclarationModal from './PaymentDeclarationModal';
 import PublishEventModal from './PublishEventModal';
+import CancelEventModal from './CancelEventModal';
 import ShiftQrModal from './ShiftQrModal';
 import ShiftInviteModal from './ShiftInviteModal';
 import DisputeModal from './DisputeModal';
 import LiveAttendanceModal from './LiveAttendanceModal';
 import EditEventModal from './EditEventModal';
 import EditShiftModal from './EditShiftModal';
-import EventDetailModal from './EventDetailModal';
 import { ROLES } from '../hooks/useShifts';
 
 export default function EOModals({
@@ -65,6 +65,14 @@ export default function EOModals({
         payMethod={events.publishPayMethod}
         setPayMethod={events.setPublishPayMethod}
         onExecutePublish={events.handleExecutePublish}
+      />
+
+      <CancelEventModal
+        isOpen={Boolean(events.cancelModal?.isOpen)}
+        event={events.cancelModal?.event}
+        onClose={events.handleCloseCancelModal}
+        onConfirm={events.handleConfirmCancelEvent}
+        loading={events.cancelModal?.loading}
       />
 
       <ShiftQrModal

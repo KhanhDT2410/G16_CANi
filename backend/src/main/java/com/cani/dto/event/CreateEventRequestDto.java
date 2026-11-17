@@ -2,6 +2,7 @@ package com.cani.dto.event;
 
 import com.cani.entity.enums.EventMode;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,6 +18,7 @@ import java.time.LocalDate;
 public class CreateEventRequestDto {
 
     @NotBlank(message = "Tên sự kiện không được để trống")
+    @Size(min = 6, max = 255, message = "Tên sự kiện phải từ 6 đến 255 ký tự")
     private String name;
 
     private String description;

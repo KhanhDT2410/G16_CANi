@@ -211,6 +211,56 @@ public class WorkerJobController {
     }
 
     /**
+     * UC-37 (WBS 100.0): Worker xem thông tin kinh nghiệm làm việc và hồ sơ nghề nghiệp
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/experience")
+    public ResponseEntity<ApiResponse<WorkerExperienceDto>> getExperience(Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerExperienceDto exp = workerJobService.getWorkerExperience(userId);
+        return ResponseEntity.ok(ApiResponse.ok(exp, "Lấy thông tin kinh nghiệm làm việc thành công"));
+    }
+
+    /**
+     * UC-37 (WBS 100.0): Worker cập nhật số năm kinh nghiệm và giới thiệu bản thân
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PutMapping("/experience")
+    public ResponseEntity<ApiResponse<WorkerExperienceDto>> updateExperience(
+            @Valid @RequestBody WorkerExperienceDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerExperienceDto exp = workerJobService.updateWorkerExperience(userId, request);
+        return ResponseEntity.ok(ApiResponse.ok(exp, "Cập nhật hồ sơ kinh nghiệm làm việc thành công"));
+    }
+
+    /**
+     * UC-BANK (Mục 11 & 12 SRS): Worker xem thông tin tài khoản ngân hàng thụ hưởng (VietQR)
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping({"/bank-account", "/me/bank-account"})
+    public ResponseEntity<ApiResponse<WorkerBankAccountDto>> getBankAccount(Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerBankAccountDto dto = workerJobService.getBankAccount(userId);
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Lấy thông tin tài khoản ngân hàng thành công"));
+    }
+
+    /**
+     * UC-BANK (Mục 11 & 12 SRS): Worker cập nhật thông tin tài khoản ngân hàng nhận thù lao
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PutMapping({"/bank-account", "/me/bank-account"})
+    public ResponseEntity<ApiResponse<WorkerBankAccountDto>> updateBankAccount(
+            @Valid @RequestBody WorkerBankAccountDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerBankAccountDto dto = workerJobService.updateBankAccount(userId, request);
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Cập nhật tài khoản ngân hàng nhận thù lao thành công"));
+    }
+
+    /**
      * UC-53: Worker hủy ca làm việc đã nhận (Kèm trừ điểm uy tín theo quy định)
      */
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")

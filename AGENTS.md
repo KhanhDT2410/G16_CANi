@@ -69,3 +69,17 @@ This repository is a monorepo for **CANi - Event Staffing Platform**:
 4. **Never Overwrite Configs:** Do not change build tools, tsconfig, vite plugins, pubspec.yaml, or root configs unless explicitly requested.
 5. **Plan First:** Provide a concise breakdown of files to be modified/created before generating large blocks of code.
 
+---
+
+## 5. Testing & Database Persistence Verification Rule (Quy chuẩn Kiểm thử & Xác thực CSDL)
+
+1. **Bắt buộc đối soát CSDL sau khi test (Post-Test DB Audit):**
+   - Sau khi hoàn thành bất kỳ kịch bản kiểm thử nào (eKYC, tạo sự kiện, matching, điểm danh QR, thanh toán tiền cọc, giải quyết tranh chấp...):
+     * **BẮT BUỘC** phải kiểm tra trực tiếp vào Database (Supabase PostgreSQL / H2 console) để xác nhận dữ liệu đã được ghi nhận (`INSERT`/`UPDATE`) vào các bảng tương ứng (ví dụ: `worker_ekyc_verifications`, `eo_ekyc_verifications`, `shift_assignments`, `attendance_logs`, `dispatch_proposals`, `payments`).
+     * Không được kết luận tính năng hoạt động hoàn chỉnh nếu chỉ dựa trên HTTP status `200 OK` ở frontend mà chưa verify dữ liệu trong database.
+2. **Phân định rõ ràng Profile môi trường:**
+   - **Profile `h2` (In-Memory RAM):** Phù hợp cho Unit Test nội bộ không phụ thuộc mạng. Cảnh báo: Mọi dữ liệu sẽ biến mất khi tắt/restart Backend.
+   - **Profile `local` (Supabase Cloud):** Bắt buộc sử dụng khi cần lưu dữ liệu thực tế để đối soát, demo sản phẩm hoặc nghiệm thu đồ án.
+   - Khi phát hiện bảng trên Cloud DB có `0 bản ghi` sau khi test: Kiểm tra ngay Backend có đang chạy nhầm Profile `h2` hay không.
+
+

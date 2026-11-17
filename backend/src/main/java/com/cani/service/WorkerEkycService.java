@@ -184,17 +184,17 @@ public class WorkerEkycService {
 
             String decision = ekycResult.getRoutingDecision();
             String status;
-            if (ekycStrict && "AUTO_APPROVED".equalsIgnoreCase(decision)) {
-                status = "PENDING_REVIEW";
-                decision = "MANUAL_REVIEW";
-                ekycResult.setRoutingDecision(decision);
-                ekycResult.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
-            } else if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
+            // AI chốt trực tiếp 100%: APPROVED (Đạt chuẩn) hoặc REJECTED (Chưa đạt kèm lý do chi tiết)
+            if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
                 status = "APPROVED";
-            } else if ("REJECTED".equalsIgnoreCase(decision)) {
-                status = "REJECTED";
             } else {
-                status = "PENDING_REVIEW";
+                status = "REJECTED";
+                decision = "REJECTED";
+                if (ekycResult.getRoutingReason() == null || ekycResult.getRoutingReason().isBlank()
+                        || ekycResult.getRoutingReason().toLowerCase().contains("admin")
+                        || ekycResult.getRoutingReason().toLowerCase().contains("thủ công")) {
+                    ekycResult.setRoutingReason("Hình ảnh CCCD hoặc khuôn mặt chưa đạt tiêu chuẩn nhận diện tự động (ảnh mờ, chói sáng hoặc không khớp). Vui lòng chụp lại rõ nét.");
+                }
             }
 
             // Mock link storage (Trong thực tế sẽ upload lên S3/Firebase/Supabase Storage)
@@ -233,8 +233,6 @@ public class WorkerEkycService {
             if ("APPROVED".equals(status)) {
                 worker.setKycStatus(KycStatus.APPROVED);
                 worker.setCccdNumber(maskedNumber);
-            } else if ("PENDING_REVIEW".equals(status) && worker.getKycStatus() != KycStatus.APPROVED) {
-                worker.setKycStatus(KycStatus.PENDING);
             } else if (worker.getKycStatus() != KycStatus.APPROVED) {
                 worker.setKycStatus(KycStatus.REJECTED);
             }

@@ -67,8 +67,8 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(val
-                          ? 'Đã bật chế độ sẵn sàng nhận ca trên Radar (Chế độ Demo)'
-                          : 'Đã ẩn hồ sơ khỏi Radar tìm việc (Chế độ Demo)'),
+                          ? 'Đã bật chế độ sẵn sàng nhận ca'
+                          : 'Đã ẩn hồ sơ khỏi tìm việc'),
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -90,12 +90,11 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
               children: [
                 Expanded(
                   child: Text(
-                    '$profileUrl (Sắp ra mắt)',
+                    profileUrl,
                     style: TextStyle(
                       fontSize: 12,
                       color: t.muted,
                       fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ),
@@ -104,7 +103,7 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
                     Clipboard.setData(ClipboardData(text: profileUrl));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Đã sao chép link hồ sơ cá nhân (Tính năng Web Demo)!'),
+                        content: Text('Đã sao chép liên kết hồ sơ cá nhân'),
                         duration: Duration(seconds: 2),
                       ),
                     );

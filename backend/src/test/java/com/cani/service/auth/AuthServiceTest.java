@@ -15,6 +15,7 @@ import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.PaymentRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -61,6 +62,9 @@ class AuthServiceTest {
     private WorkerRepository workerRepository;
 
     @Mock
+    private PaymentRepository paymentRepository;
+
+    @Mock
     private SupabaseAuthClient supabaseAuthClient;
 
     @Mock
@@ -71,6 +75,9 @@ class AuthServiceTest {
 
     @Mock
     private Environment environment;
+
+    @Mock
+    private com.cani.service.NotificationService notificationService;
 
     @InjectMocks
     private AuthService authService;

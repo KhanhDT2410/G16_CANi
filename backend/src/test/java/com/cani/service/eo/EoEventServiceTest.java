@@ -261,6 +261,52 @@ class EoEventServiceTest {
         assertNull(result.getDescription());
     }
 
+    @Test
+    @DisplayName("UTC006b - createEvent() - Abnormal: Event name is keyboard mash / gibberish (e.g. sdfdsfsdfsd)")
+    void createEvent_ThrowsBadRequest_WhenNameIsGibberish() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("sdfdsfsdfsd")
+                .venueAddress("Hà Nội")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("không hợp lệ") || ex.getMessage().contains("vô nghĩa"));
+    }
+
+    @Test
+    @DisplayName("UTC006c - createEvent() - Abnormal: Event description is keyboard mash / gibberish")
+    void createEvent_ThrowsBadRequest_WhenDescriptionIsGibberish() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("Hội nghị Công nghệ 2026")
+                .description("sdfdsfsdfsd")
+                .venueAddress("Hà Nội")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("Mô tả") || ex.getMessage().contains("vô nghĩa"));
+    }
+
+    @Test
+    @DisplayName("UTC006d - createEvent() - Abnormal: End time is before or equal to start time")
+    void createEvent_ThrowsBadRequest_WhenEndTimeBeforeStartTime() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        Instant now = Instant.now();
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("Hội nghị Công nghệ 2026")
+                .venueAddress("Hà Nội")
+                .startTime(now.plusSeconds(3600))
+                .endTime(now)
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("sau"));
+    }
+
 
     // =========================================================================
     // updateEvent()
@@ -417,24 +463,16 @@ class EoEventServiceTest {
     }
 
     @Test
-    @DisplayName("UTC015 - cancelEvent() - Boundary: User authenticated as EO; Event status=DRAFT with 1 Assignment")
-    void cancelEvent_Success_BoundaryBlankReason_UsesDefaultReason() {
+    @DisplayName("UTC015 - cancelEvent() - Boundary: User authenticated as EO; Throws BadRequestException when reason is blank")
+    void cancelEvent_ThrowsBadRequest_WhenBlankReason() {
         UUID eventId = UUID.randomUUID();
         Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.DRAFT).build();
-        UUID shiftId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(UUID.randomUUID()).status(AssignmentStatus.CONFIRMED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
-        when(eventRepository.save(any(Event.class))).thenAnswer(i -> i.getArgument(0));
-        when(shiftRepository.findByEvent_EventId(eventId)).thenReturn(List.of(Shift.builder().shiftId(shiftId).build()));
-        when(shiftAssignmentRepository.findByShift_ShiftId(shiftId)).thenReturn(List.of(sa));
 
-        EventResponseDto result = eoEventService.cancelEvent(userId, eventId, "   ");
-
-        assertNotNull(result);
-        assertEquals("Ban tổ chức hủy sự kiện", sa.getCancellationReason());
-        assertEquals(AssignmentStatus.CANCELLED, sa.getStatus());
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "   "));
+        assertTrue(ex.getMessage().contains("lý do"));
     }
 
     @Test
@@ -474,10 +512,37 @@ class EoEventServiceTest {
         when(shiftRepository.findByEvent_EventId(eventId)).thenReturn(List.of(Shift.builder().shiftId(shiftId).build()));
         when(shiftAssignmentRepository.findByShift_ShiftId(shiftId)).thenReturn(List.of(sa));
 
-        eoEventService.cancelEvent(userId, eventId, null);
+        eoEventService.cancelEvent(userId, eventId, "Lý do bất khả kháng dịch bệnh");
 
-        assertEquals("Ban tổ chức hủy sự kiện", sa.getCancellationReason());
+        assertEquals("Lý do bất khả kháng dịch bệnh", sa.getCancellationReason());
         assertEquals(userId, sa.getCancelledBy());
+    }
+
+    @Test
+    @DisplayName("UTC017b - cancelEvent() - Abnormal: Throws BadRequestException when reason is null or too short")
+    void cancelEvent_ThrowsBadRequest_WhenReasonNullOrTooShort() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.ACTIVE).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+
+        assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, null));
+        assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "   "));
+        assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "ngắn"));
+    }
+
+    @Test
+    @DisplayName("UTC017c - cancelEvent() - Abnormal: Throws BadRequestException when event is COMPLETED")
+    void cancelEvent_ThrowsBadRequest_WhenEventCompleted() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.COMPLETED).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "Lý do hủy sự kiện hợp lệ"));
+        assertTrue(ex.getMessage().contains("hoàn thành"));
     }
 
 
@@ -855,8 +920,8 @@ class EoEventServiceTest {
         ShiftQrCodeResponseDto qr = eoEventService.generateShiftQr(userId, shiftId);
 
         assertNotNull(qr);
-        assertEquals("CANI_CHECKIN:" + shiftId, qr.getCheckinQrContent());
-        assertEquals("CANI_CHECKOUT:" + shiftId, qr.getCheckoutQrContent());
+        assertTrue(qr.getCheckinQrContent().startsWith("CANI_CHECKIN:" + shiftId));
+        assertTrue(qr.getCheckoutQrContent().startsWith("CANI_CHECKOUT:" + shiftId));
     }
 
     @Test
@@ -1101,6 +1166,35 @@ class EoEventServiceTest {
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.verifyAttendance(userId, assignmentId));
         assertTrue(ex.getMessage().contains("Bạn không sở hữu sự kiện của ca làm việc này"));
+    }
+
+    @Test
+    @DisplayName("UTC046b - verifyAttendance() - Data Integrity: Does not overwrite agreedAmount if payment is already CONFIRMED")
+    void verifyAttendance_PreservesPaymentAmount_WhenAlreadyConfirmed() {
+        UUID assignmentId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).build();
+        Shift mockShift = Shift.builder().shiftId(UUID.randomUUID()).hourlyWage(BigDecimal.valueOf(50000)).event(mockEvent).build();
+        Worker mockWorker = Worker.builder()
+                .workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).fullName("Worker 1").build())
+                .totalShiftsCompleted(5).build();
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId).shift(mockShift).worker(mockWorker).status(AssignmentStatus.CONFIRMED).eoConfirmed(false).build();
+
+        Payment declaredPayment = Payment.builder()
+                .assignmentId(assignmentId)
+                .status(com.cani.entity.enums.PaymentStatus.CONFIRMED_FULL)
+                .agreedAmount(BigDecimal.valueOf(300000))
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(paymentRepository.findByAssignmentId(assignmentId)).thenReturn(Optional.of(declaredPayment));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> i.getArgument(0));
+
+        eoEventService.verifyAttendance(userId, assignmentId);
+
+        assertEquals(BigDecimal.valueOf(300000), declaredPayment.getAgreedAmount());
+        verify(paymentRepository, never()).save(declaredPayment);
     }
 
 
@@ -1516,6 +1610,111 @@ class EoEventServiceTest {
         assertNotNull(result);
         assertEquals("Sự kiện chưa có ca", result.getName());
         assertTrue(result.getShifts().isEmpty());
+    }
+
+    // =========================================================================
+    // deleteEvent()
+    // =========================================================================
+
+    @Test
+    @DisplayName("UTC067 - deleteEvent() - Normal: Successfully soft-deletes DRAFT event")
+    void deleteEvent_Success_WhenEventStatusIsDraft() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.DRAFT)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+        when(eventRepository.save(any(Event.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertDoesNotThrow(() -> eoEventService.deleteEvent(userId, eventId));
+        assertNotNull(mockEvent.getDeletedAt());
+        verify(eventRepository).save(mockEvent);
+    }
+
+    @Test
+    @DisplayName("UTC068 - deleteEvent() - Abnormal: Throws BadRequestException when deleting ACTIVE event")
+    void deleteEvent_ThrowsBadRequest_WhenEventStatusIsNotDraft() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.ACTIVE)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.deleteEvent(userId, eventId));
+        assertTrue(ex.getMessage().contains("Bản nháp (DRAFT)"));
+        assertNull(mockEvent.getDeletedAt());
+        verify(eventRepository, never()).save(any(Event.class));
+    }
+
+    // =========================================================================
+    // addBulkShifts() & triggerEmergencyDispatch()
+    // =========================================================================
+
+    @Test
+    @DisplayName("UTC069 - addBulkShifts() - Normal: Bulk create multiple time slots for DRAFT event")
+    void addBulkShifts_Success_CreatesMultipleShifts() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .name("Sự kiện tạo ca hàng loạt")
+                .status(EventStatus.DRAFT)
+                .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
+                .endTime(Instant.now().plus(2, ChronoUnit.DAYS))
+                .build();
+
+        CreateBulkShiftsRequestDto.TimeSlotItem slot1 = new CreateBulkShiftsRequestDto.TimeSlotItem();
+        slot1.setStartTime(mockEvent.getStartTime().plus(1, ChronoUnit.HOURS));
+        slot1.setEndTime(mockEvent.getStartTime().plus(5, ChronoUnit.HOURS));
+
+        CreateBulkShiftsRequestDto dto = new CreateBulkShiftsRequestDto();
+        dto.setJobType("Phục vụ bàn");
+        dto.setRequiredWorkers(3);
+        dto.setHourlyWage(BigDecimal.valueOf(50000));
+        dto.setAllowance(BigDecimal.ZERO);
+        dto.setTimeSlots(List.of(slot1));
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(i -> {
+            Shift s = i.getArgument(0);
+            s.setShiftId(UUID.randomUUID());
+            return s;
+        });
+
+        List<ShiftResponseDto> result = eoEventService.addBulkShifts(userId, eventId, dto);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("Phục vụ bàn", result.get(0).getJobType());
+    }
+
+    @Test
+    @DisplayName("UTC070 - triggerEmergencyDispatch() - Normal: Triggers emergency dispatch when shift is ACTIVE")
+    void triggerEmergencyDispatch_Success_DelegatesToMatchingDispatch() {
+        UUID shiftId = UUID.randomUUID();
+        Shift mockShift = Shift.builder()
+                .shiftId(shiftId)
+                .status(ShiftStatus.ACTIVE)
+                .event(Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).build())
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(mockShift));
+        when(matchingDispatchService.triggerEmergencyDispatch(shiftId, 30.0)).thenReturn(5);
+
+        int count = eoEventService.triggerEmergencyDispatch(userId, shiftId, 30.0);
+
+        assertEquals(5, count);
+        verify(matchingDispatchService).triggerEmergencyDispatch(shiftId, 30.0);
     }
 
 }

@@ -13,6 +13,7 @@ import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.PaymentRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
@@ -38,9 +39,11 @@ public class AuthService {
     private final UserRepository userRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final WorkerRepository workerRepository;
+    private final PaymentRepository paymentRepository;
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
     private final EmailOtpService emailOtpService;
+    private final NotificationService notificationService;
     private final org.springframework.core.env.Environment environment;
 
     @Transactional
@@ -128,6 +131,21 @@ public class AuthService {
                             .build());
             worker.setFullName(finalUser.getFullName());
             workerRepository.save(worker);
+
+            if (notificationService != null) {
+                try {
+                    notificationService.sendNotification(
+                            finalUser,
+                            "Chào mừng bạn đến với CANi!",
+                            "Vui lòng hoàn tất xác thực danh tính eKYC (CCCD) để mở khóa Job Radar và nhận các ca làm việc gần bạn.",
+                            com.cani.entity.enums.NotificationType.SYSTEM,
+                            "EKYC",
+                            finalUser.getUserId()
+                    );
+                } catch (Exception e) {
+                    log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getMessage());
+                }
+            }
         }
 
         log.info("Đã đăng ký tài khoản thành công cho user: {}, role: {}", savedUser.getEmail(), assignedRole);
@@ -280,12 +298,13 @@ public class AuthService {
                     user.setRole(UserRole.EVENT_ORGANIZER);
                     user = userRepository.save(user);
 
-                    // Xóa profile worker rác do trigger Supabase tự sinh
+                    // Xóa profile worker rác do trigger Supabase tự sinh (chỉ xóa khi chưa có dữ liệu thanh toán)
                     workerOpt.ifPresent(w -> {
-                        try {
+                        boolean hasFinancialRecords = paymentRepository != null && paymentRepository.existsByWorker_WorkerId(w.getWorkerId());
+                        if (!hasFinancialRecords) {
                             workerRepository.delete(w);
-                        } catch (Exception e) {
-                            log.warn("Không thể xóa worker dummy của user {}: {}", email, e.getMessage());
+                        } else {
+                            log.info("Worker {} đã có dữ liệu thanh toán (Payment), bảo toàn dữ liệu và không xóa khi nâng cấp lên EO", w.getWorkerId());
                         }
                     });
                 }

@@ -2,13 +2,13 @@ import React, { useMemo } from 'react';
 
 /**
  * EOOverviewAnalytics
- * Trung Tâm Báo Cáo Hiệu Quả Vận Hành & Tài Chính Sự Kiện (Executive Operations & Financial Analytics)
+ * Trung Tâm Báo Cáo Hiệu Quả Vận Hành & Ngân Sách Nhân Sự Sự Kiện (Executive Operations & Staffing Analytics)
  * 
- * Giá trị nghiệp vụ cốt lõi:
- * 1. Thẻ chỉ số tài chính vận hành: Doanh thu/Ngân sách nhận, Chi phí nhân sự phải chi, Lợi nhuận gộp & Biên lợi nhuận.
- * 2. Biểu đồ hình CỘT ĐỨNG (Vertical Column Chart): So sánh 2 cột đứng song song (Doanh thu vs Chi phí nhân sự).
+ * Giá trị nghiệp vụ thực tế 100%:
+ * 1. Thẻ chỉ số ngân sách nhân sự: Dự toán quỹ lương, Đã quyết toán chi trả, Cần chi trả còn lại, Tiến độ tuyển dụng (Fill rate).
+ * 2. Biểu đồ hình CỘT ĐỨNG (Vertical Column Chart): So sánh Dự toán quỹ lương vs Chi phí thực tế đã thanh toán.
  * 3. Cơ cấu chi phí nhân sự theo chuyên môn: Phân bổ quỹ lương theo từng vị trí (F&B, PG, Setup, Điều phối).
- * 4. Bảng quy mô & hiệu quả sự kiện: Thiết kế phẳng chuẩn Enterprise, không icon/emoji, 1 nút thao tác duy nhất.
+ * 4. Bảng quy mô & tiến độ sự kiện: Đối chiếu số ca, tỷ lệ lấp đầy nhân sự, dự toán và thực chi từng sự kiện.
  */
 export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
   // 1. Lọc danh sách sự kiện chưa hủy
@@ -34,9 +34,9 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
     return `${val} đ`;
   };
 
-  // 2. Tính toán tài chính chi tiết cho từng sự kiện
+  // 2. Tính toán ngân sách chi tiết dựa trên dữ liệu thật của từng sự kiện
   const eventsFinancialData = useMemo(() => {
-    const list = activeEvents.map((evt) => {
+    return activeEvents.map((evt) => {
       const shifts = evt.shifts || [];
       let calculatedLaborCost = 0;
       let totalReq = evt.totalRequiredWorkers || 0;
@@ -59,10 +59,9 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
         calculatedLaborCost += (hours * wage * req) + (allowance * req);
       });
 
-      const staffingCost = evt.totalEstimatedCost ? Number(evt.totalEstimatedCost) : (calculatedLaborCost || 3500000);
-      const revenue = Math.round(staffingCost * 1.55);
-      const grossProfit = revenue - staffingCost;
-      const marginRate = revenue > 0 ? Math.round((grossProfit / revenue) * 100) : 35;
+      const estimatedBudget = evt.totalEstimatedCost ? Number(evt.totalEstimatedCost) : calculatedLaborCost;
+      const paidAmount = evt.totalPaid ? Number(evt.totalPaid) : 0;
+      const remainingAmount = Math.max(0, estimatedBudget - paidAmount);
       const fillRate = totalReq > 0 ? Math.round((totalConf / totalReq) * 100) : 0;
 
       return {
@@ -75,30 +74,29 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
         totalRequired: totalReq,
         totalConfirmed: totalConf,
         fillRate,
-        staffingCost,
-        revenue,
-        grossProfit,
-        marginRate,
+        estimatedBudget,
+        paidAmount,
+        remainingAmount,
       };
     });
-
-    return list;
   }, [activeEvents]);
 
-  // 3. Tổng hợp toàn bộ chỉ số tài chính vận hành tháng này
+  // 3. Tổng hợp toàn bộ chỉ số ngân sách nhân sự thực tế
   const totalSummary = useMemo(() => {
-    const totalRevenue = eventsFinancialData.reduce((sum, item) => sum + item.revenue, 0);
-    const totalStaffCost = eventsFinancialData.reduce((sum, item) => sum + item.staffingCost, 0);
-    const totalProfit = totalRevenue - totalStaffCost;
-    const marginRate = totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 38;
-    const laborCostRatio = totalRevenue > 0 ? Math.round((totalStaffCost / totalRevenue) * 100) : 62;
+    const totalEstimatedBudget = eventsFinancialData.reduce((sum, item) => sum + item.estimatedBudget, 0);
+    const totalPaidAmount = eventsFinancialData.reduce((sum, item) => sum + item.paidAmount, 0);
+    const totalRemainingAmount = Math.max(0, totalEstimatedBudget - totalPaidAmount);
+    const totalRequired = eventsFinancialData.reduce((sum, item) => sum + item.totalRequired, 0);
+    const totalConfirmed = eventsFinancialData.reduce((sum, item) => sum + item.totalConfirmed, 0);
+    const overallFillRate = totalRequired > 0 ? Math.round((totalConfirmed / totalRequired) * 100) : 0;
 
     return {
-      totalRevenue,
-      totalStaffCost,
-      totalProfit,
-      marginRate,
-      laborCostRatio,
+      totalEstimatedBudget,
+      totalPaidAmount,
+      totalRemainingAmount,
+      totalRequired,
+      totalConfirmed,
+      overallFillRate,
     };
   }, [eventsFinancialData]);
 
@@ -148,9 +146,8 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
 
   // 5. Tính toán trần trục Y cho Biểu đồ Cột Đứng
   const chartMax = useMemo(() => {
-    const maxVal = Math.max(...eventsFinancialData.map((e) => e.revenue), 12000000);
-    // Làm tròn trần lên mốc 5 triệu hoặc 2 triệu gần nhất
-    const step = 5000000;
+    const maxVal = Math.max(...eventsFinancialData.map((e) => e.estimatedBudget), 5000000);
+    const step = 2000000;
     return Math.ceil((maxVal * 1.15) / step) * step;
   }, [eventsFinancialData]);
 
@@ -170,10 +167,10 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
       <div className="eo-widget-card animate-fade-in-up" style={{ marginTop: '1.25rem', padding: '3.5rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
         <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
         <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
-          Chưa Có Dữ Liệu Vận Hành & Tài Chính
+          Chưa Có Dữ Liệu Vận Hành & Ngân Sách
         </h4>
         <p style={{ margin: '0 auto', maxWidth: '480px', fontSize: '0.85rem', lineHeight: 1.5 }}>
-          Khi bạn tạo và xuất bản các sự kiện, hệ thống sẽ tự động tổng hợp chi phí nhân sự, dự toán ngân sách và tỷ trọng vai trò tại đây.
+          Khi bạn tạo và xuất bản các sự kiện, hệ thống sẽ tự động tổng hợp chi phí nhân sự, tiến độ tuyển dụng và cơ cấu vị trí việc làm tại đây.
         </p>
       </div>
     );
@@ -183,64 +180,59 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
     <div className="eo-overview-analytics-container animate-fade-in-up" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
       {/* =========================================================================
-          KHỐI 1: BÁO CÁO TÀI CHÍNH VẬN HÀNH (OPERATIONAL FINANCIAL METRICS)
+          KHỐI 1: BÁO CÁO NGÂN SÁCH & VẬN HÀNH THỰC TẾ (REAL OPERATIONAL METRICS)
           ========================================================================= */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         
-        {/* Thẻ 1: Ngân Sách Hợp Đồng / Doanh Thu Nhận */}
+        {/* Thẻ 1: Dự Toán Ngân Sách Nhân Sự */}
         <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #6366f1' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Ngân Sách / Doanh Thu
+            Dự Toán Ngân Sách
           </div>
           <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#1e1b4b', margin: '0.35rem 0 0.2rem' }}>
-            {formatCurrency(totalSummary.totalRevenue)} đ
+            {formatCurrency(totalSummary.totalEstimatedBudget)} đ
           </div>
           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            Tổng ngân sách hợp đồng từ đối tác
+            Quỹ lương dự kiến cho {activeEvents.length} sự kiện
           </div>
         </div>
 
-        {/* Thẻ 2: Chi Phí Nhân Sự Phải Chi */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #f59e0b' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Chi Phí Nhân Sự Phải Chi
-          </div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#c2410c', margin: '0.35rem 0 0.2rem' }}>
-            {formatCurrency(totalSummary.totalStaffCost)} đ
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            Tiền công nhật + phụ cấp các ca
-          </div>
-        </div>
-
-        {/* Thẻ 3: Lợi Nhuận Gộp Vận Hành */}
+        {/* Thẻ 2: Đã Quyết Toán Chi Trả */}
         <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #10b981' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Lợi Nhuận Gộp
-            </span>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#047857', backgroundColor: '#ecfdf5', padding: '2px 6px', borderRadius: 6 }}>
-              +{totalSummary.marginRate}% Lãi
-            </span>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Đã Quyết Toán Chi Trả
           </div>
           <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#047857', margin: '0.35rem 0 0.2rem' }}>
-            {formatCurrency(totalSummary.totalProfit)} đ
+            {formatCurrency(totalSummary.totalPaidAmount)} đ
           </div>
           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            Doanh thu trừ chi phí nhân sự
+            Tiền công đã thanh toán cho nhân sự
           </div>
         </div>
 
-        {/* Thẻ 4: Tỷ Trọng Chi Phí Lao Động */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #0ea5e9' }}>
+        {/* Thẻ 3: Cần Chi Trả Còn Lại */}
+        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #f59e0b' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Tỷ Trọng Nhân Sự
+            Cần Chi Trả Còn Lại
           </div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0369a1', margin: '0.35rem 0 0.2rem' }}>
-            {totalSummary.laborCostRatio}%
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#c2410c', margin: '0.35rem 0 0.2rem' }}>
+            {formatCurrency(totalSummary.totalRemainingAmount)} đ
           </div>
           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            Mức an toàn ngân sách (&lt; 70%)
+            Dự toán trừ tiền đã quyết toán
+          </div>
+        </div>
+
+        {/* Thẻ 4: Tiến Độ Tuyển Dụng Tổng Thể */}
+        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #0ea5e9' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Tiến Độ Tuyển Dụng
+          </div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0369a1', margin: '0.35rem 0 0.2rem' }}>
+            {totalSummary.overallFillRate}%
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+            {totalSummary.totalConfirmed}/{totalSummary.totalRequired} nhân sự đã xác nhận
           </div>
         </div>
 
@@ -251,15 +243,15 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
           ========================================================================= */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
         
-        {/* CỘT TRÁI: BIỂU ĐỒ HÌNH CỘT ĐỨNG (VERTICAL COLUMN CHART) CHUẨN THỰC THẾ */}
+        {/* CỘT TRÁI: BIỂU ĐỒ HÌNH CỘT ĐỨNG SO SÁNH DỰ TOÁN VS THỰC CHI */}
         <div className="eo-widget-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
-                Biểu Đồ So Sánh Thu Chi Vận Hành
+                Biểu Đồ Ngân Sách & Chi Trả Nhân Sự
               </h4>
               <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
-                Cột 1: Doanh thu hợp đồng &bull; Cột 2: Chi phí nhân sự phải chi
+                Cột 1: Dự toán quỹ lương &bull; Cột 2: Đã quyết toán chi trả
               </p>
             </div>
 
@@ -267,11 +259,11 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', fontSize: '0.72rem', fontWeight: 600 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span style={{ width: 10, height: 10, backgroundColor: '#6366f1', borderRadius: 2 }} />
-                <span style={{ color: '#475569' }}>Doanh thu</span>
+                <span style={{ color: '#475569' }}>Dự toán</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: 10, height: 10, backgroundColor: '#f59e0b', borderRadius: 2 }} />
-                <span style={{ color: '#475569' }}>Chi phí nhân sự</span>
+                <span style={{ width: 10, height: 10, backgroundColor: '#10b981', borderRadius: 2 }} />
+                <span style={{ color: '#475569' }}>Đã chi trả</span>
               </div>
             </div>
           </div>
@@ -330,8 +322,10 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
               }}
             >
               {eventsFinancialData.slice(0, 4).map((item) => {
-                const revHeightPercent = Math.min(100, Math.max(8, Math.round((item.revenue / chartMax) * 100)));
-                const costHeightPercent = Math.min(100, Math.max(6, Math.round((item.staffingCost / chartMax) * 100)));
+                const budgetHeightPercent = Math.min(100, Math.max(6, Math.round((item.estimatedBudget / chartMax) * 100)));
+                const paidHeightPercent = item.paidAmount > 0
+                  ? Math.min(100, Math.max(6, Math.round((item.paidAmount / chartMax) * 100)))
+                  : 2;
 
                 return (
                   <div
@@ -357,11 +351,11 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                         position: 'relative',
                       }}
                     >
-                      {/* Cột 1: Doanh thu (Indigo) */}
+                      {/* Cột 1: Dự toán ngân sách (Indigo) */}
                       <div
                         style={{
                           width: '20px',
-                          height: `${revHeightPercent}%`,
+                          height: `${budgetHeightPercent}%`,
                           background: 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
                           borderRadius: '5px 5px 0 0',
                           boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)',
@@ -369,22 +363,22 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                           cursor: 'pointer',
                           position: 'relative',
                         }}
-                        title={`Doanh thu: ${formatCurrency(item.revenue)} đ`}
+                        title={`Dự toán: ${formatCurrency(item.estimatedBudget)} đ`}
                       />
 
-                      {/* Cột 2: Chi phí nhân sự (Amber) */}
+                      {/* Cột 2: Đã thanh toán (Green) */}
                       <div
                         style={{
                           width: '20px',
-                          height: `${costHeightPercent}%`,
-                          background: 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)',
+                          height: `${paidHeightPercent}%`,
+                          background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
                           borderRadius: '5px 5px 0 0',
-                          boxShadow: '0 2px 6px rgba(245, 158, 11, 0.25)',
+                          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
                           transition: 'height 0.4s ease',
                           cursor: 'pointer',
                           position: 'relative',
                         }}
-                        title={`Chi phí nhân sự: ${formatCurrency(item.staffingCost)} đ`}
+                        title={`Đã chi trả: ${formatCurrency(item.paidAmount)} đ`}
                       />
                     </div>
 
@@ -418,14 +412,14 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                         style={{
                           fontSize: '0.68rem',
                           fontWeight: 700,
-                          color: '#047857',
-                          backgroundColor: '#ecfdf5',
+                          color: item.fillRate >= 100 ? '#047857' : '#0369a1',
+                          backgroundColor: item.fillRate >= 100 ? '#ecfdf5' : '#f0f9ff',
                           padding: '1px 5px',
                           borderRadius: 4,
                           marginTop: '2px',
                         }}
                       >
-                        +{item.marginRate}% Lãi
+                        {item.totalConfirmed}/{item.totalRequired} NS ({item.fillRate}%)
                       </span>
                     </div>
                   </div>
@@ -482,17 +476,17 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
       </div>
 
       {/* =========================================================================
-          KHỐI 3: BẢNG QUY MÔ & HIỆU QUẢ CÁC SỰ KIỆN ĐANG QUẢN LÝ
-          (ĐÃ BỎ HOÀN TOÀN ICON/EMOJI, CHỈ GIỮ 1 NÚT HÀNH ĐỘNG DUY NHẤT)
+          KHỐI 3: BẢNG QUY MÔ & TIẾN ĐỘ NGÂN SÁCH CÁC SỰ KIỆN ĐANG QUẢN LÝ
+          (CHUẨN ENTERPRISE, 1 NÚT THAO TÁC DUY NHẤT)
           ========================================================================= */}
       <div className="eo-widget-card" style={{ padding: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
-              Quy Mô & Hiệu Quả Các Sự Kiện Đang Quản Lý
+              Quy Mô & Tiến Độ Ngân Sách Các Sự Kiện Đang Quản Lý
             </h4>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
-              Đối chiếu số ca, tiến độ tuyển dụng, doanh thu hợp đồng và chi phí nhân sự từng sự kiện
+              Đối chiếu số ca, tiến độ lấp đầy nhân sự, dự toán quỹ lương và số tiền đã chi trả từng sự kiện
             </p>
           </div>
           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -513,9 +507,9 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                   <th style={{ padding: '10px 12px' }}>Thời Gian / Địa Điểm</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center' }}>Số Ca</th>
                   <th style={{ padding: '10px 12px' }}>Lấp Đầy Nhân Sự</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Doanh Thu</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Chi Phí Nhân Sự</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Lợi Nhuận Gộp</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Dự Toán Quỹ Lương</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Đã Quyết Toán</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Cần Chi Trả</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center' }}>Thao Tác</th>
                 </tr>
               </thead>
@@ -555,13 +549,13 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                       </div>
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#4338ca' }}>
-                      {formatCurrency(item.revenue)} đ
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#c2410c' }}>
-                      {formatCurrency(item.staffingCost)} đ
+                      {formatCurrency(item.estimatedBudget)} đ
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#047857' }}>
-                      +{formatCurrency(item.grossProfit)} đ
+                      {formatCurrency(item.paidAmount)} đ
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#c2410c' }}>
+                      {formatCurrency(item.remainingAmount)} đ
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       {/* DUY NHẤT 1 NÚT HÀNH ĐỘNG */}

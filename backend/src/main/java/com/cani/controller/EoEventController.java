@@ -65,7 +65,7 @@ public class EoEventController {
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        String reason = body != null ? body.get("reason") : "Ban tổ chức hủy sự kiện";
+        String reason = body != null ? body.get("reason") : null;
         EventResponseDto cancelled = eoEventService.cancelEvent(userId, eventId, reason);
         return ResponseEntity.ok(ApiResponse.ok(cancelled, "Đã hủy sự kiện thành công!"));
     }

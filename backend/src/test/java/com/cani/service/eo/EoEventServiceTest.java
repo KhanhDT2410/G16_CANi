@@ -463,24 +463,16 @@ class EoEventServiceTest {
     }
 
     @Test
-    @DisplayName("UTC015 - cancelEvent() - Boundary: User authenticated as EO; Event status=DRAFT with 1 Assignment")
-    void cancelEvent_Success_BoundaryBlankReason_UsesDefaultReason() {
+    @DisplayName("UTC015 - cancelEvent() - Boundary: User authenticated as EO; Throws BadRequestException when reason is blank")
+    void cancelEvent_ThrowsBadRequest_WhenBlankReason() {
         UUID eventId = UUID.randomUUID();
         Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.DRAFT).build();
-        UUID shiftId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(UUID.randomUUID()).status(AssignmentStatus.CONFIRMED).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
-        when(eventRepository.save(any(Event.class))).thenAnswer(i -> i.getArgument(0));
-        when(shiftRepository.findByEvent_EventId(eventId)).thenReturn(List.of(Shift.builder().shiftId(shiftId).build()));
-        when(shiftAssignmentRepository.findByShift_ShiftId(shiftId)).thenReturn(List.of(sa));
 
-        EventResponseDto result = eoEventService.cancelEvent(userId, eventId, "   ");
-
-        assertNotNull(result);
-        assertEquals("Ban tổ chức hủy sự kiện", sa.getCancellationReason());
-        assertEquals(AssignmentStatus.CANCELLED, sa.getStatus());
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "   "));
+        assertTrue(ex.getMessage().contains("lý do"));
     }
 
     @Test
@@ -520,10 +512,37 @@ class EoEventServiceTest {
         when(shiftRepository.findByEvent_EventId(eventId)).thenReturn(List.of(Shift.builder().shiftId(shiftId).build()));
         when(shiftAssignmentRepository.findByShift_ShiftId(shiftId)).thenReturn(List.of(sa));
 
-        eoEventService.cancelEvent(userId, eventId, null);
+        eoEventService.cancelEvent(userId, eventId, "Lý do bất khả kháng dịch bệnh");
 
-        assertEquals("Ban tổ chức hủy sự kiện", sa.getCancellationReason());
+        assertEquals("Lý do bất khả kháng dịch bệnh", sa.getCancellationReason());
         assertEquals(userId, sa.getCancelledBy());
+    }
+
+    @Test
+    @DisplayName("UTC017b - cancelEvent() - Abnormal: Throws BadRequestException when reason is null or too short")
+    void cancelEvent_ThrowsBadRequest_WhenReasonNullOrTooShort() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.ACTIVE).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+
+        assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, null));
+        assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "   "));
+        assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "ngắn"));
+    }
+
+    @Test
+    @DisplayName("UTC017c - cancelEvent() - Abnormal: Throws BadRequestException when event is COMPLETED")
+    void cancelEvent_ThrowsBadRequest_WhenEventCompleted() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.COMPLETED).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.cancelEvent(userId, eventId, "Lý do hủy sự kiện hợp lệ"));
+        assertTrue(ex.getMessage().contains("hoàn thành"));
     }
 
 
@@ -1562,6 +1581,48 @@ class EoEventServiceTest {
         assertNotNull(result);
         assertEquals("Sự kiện chưa có ca", result.getName());
         assertTrue(result.getShifts().isEmpty());
+    }
+
+    // =========================================================================
+    // deleteEvent()
+    // =========================================================================
+
+    @Test
+    @DisplayName("UTC067 - deleteEvent() - Normal: Successfully soft-deletes DRAFT event")
+    void deleteEvent_Success_WhenEventStatusIsDraft() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.DRAFT)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+        when(eventRepository.save(any(Event.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertDoesNotThrow(() -> eoEventService.deleteEvent(userId, eventId));
+        assertNotNull(mockEvent.getDeletedAt());
+        verify(eventRepository).save(mockEvent);
+    }
+
+    @Test
+    @DisplayName("UTC068 - deleteEvent() - Abnormal: Throws BadRequestException when deleting ACTIVE event")
+    void deleteEvent_ThrowsBadRequest_WhenEventStatusIsNotDraft() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.ACTIVE)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.deleteEvent(userId, eventId));
+        assertTrue(ex.getMessage().contains("Bản nháp (DRAFT)"));
+        assertNull(mockEvent.getDeletedAt());
+        verify(eventRepository, never()).save(any(Event.class));
     }
 
 }

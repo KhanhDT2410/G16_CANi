@@ -158,13 +158,19 @@ public class EoEventService {
         if (event.getStatus() == EventStatus.CANCELLED) {
             throw new BadRequestException("Sự kiện này đã bị hủy trước đó.");
         }
+        if (event.getStatus() == EventStatus.COMPLETED) {
+            throw new BadRequestException("Không thể hủy sự kiện đã hoàn thành.");
+        }
+        if (reason == null || reason.trim().length() < 10) {
+            throw new BadRequestException("Vui lòng nhập lý do hủy sự kiện cụ thể (tối thiểu 10 ký tự).");
+        }
 
         event.setStatus(EventStatus.CANCELLED);
         event = eventRepository.save(event);
 
         List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
         UUID cancelledBy = resolveEoUserId(eo, userId);
-        String finalReason = (reason != null && !reason.isBlank()) ? reason : "Ban tổ chức hủy sự kiện";
+        String finalReason = reason.trim();
 
         for (Shift s : shifts) {
             s.setStatus(ShiftStatus.CANCELLED);
@@ -580,15 +586,18 @@ public class EoEventService {
     }
 
     /**
-     * Xóa mềm Sự kiện khỏi danh sách của EO (Soft Delete)
+     * Xóa mềm Sự kiện khỏi danh sách của EO (Soft Delete - Chỉ áp dụng cho Bản nháp)
      */
     @Transactional
     public void deleteEvent(UUID userId, UUID eventId) {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
+        if (event.getStatus() != EventStatus.DRAFT) {
+            throw new BadRequestException("Chỉ được phép xóa sự kiện ở trạng thái Bản nháp (DRAFT). Sự kiện đã xuất bản hoặc đã tạo không thể xóa mà phải thực hiện Hủy kèm lý do.");
+        }
         event.setDeletedAt(Instant.now());
         eventRepository.save(event);
-        log.info("EO {} đã xóa sự kiện {}", userId, eventId);
+        log.info("EO {} đã xóa vĩnh viễn bản nháp sự kiện {}", userId, eventId);
     }
 
     /**

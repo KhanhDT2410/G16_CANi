@@ -179,7 +179,7 @@ export default function EOEventsTab({
               gap: '0.4rem',
             }}
           >
-            <span>Sự kiện đã xóa</span>
+            <span>Sự kiện đã hủy</span>
           </button>
         </div>
 
@@ -193,15 +193,15 @@ export default function EOEventsTab({
         </button>
       </div>
 
-      {/* PHÂN KHU 4: DANH SÁCH CA & SỰ KIỆN ĐÃ HỦY / ĐÃ XÓA (TÁCH RIÊNG HOÀN TOÀN) */}
+      {/* PHÂN KHU 4: DANH SÁCH CA & SỰ KIỆN ĐÃ HỦY (TÁCH RIÊNG HOÀN TOÀN) */}
       {activeSubTab === 'cancelled' && (
         <div className="eo-widget-card animate-fade-in-up" style={{ padding: '1.5rem' }}>
           <div style={{ marginBottom: '1.25rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#991b1b' }}>
-              Khu Vực Lưu Trữ Sự Kiện & Ca Làm Việc Đã Hủy / Đã Xóa
+              Khu Vực Lưu Trữ Sự Kiện & Ca Làm Việc Đã Hủy
             </h3>
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: '#64748b' }}>
-              Các sự kiện và ca làm việc đã hủy được tách riêng tại đây để không làm rối danh sách đang hoạt động.
+              Các sự kiện và ca làm việc đã hủy được lưu trữ tại đây nhằm phục vụ việc đối soát lịch sử.
             </p>
           </div>
 
@@ -242,22 +242,18 @@ export default function EOEventsTab({
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           {formatStatusBadge('CANCELLED')}
-                          <button
-                            type="button"
-                            onClick={() => onDeleteEvent?.(evt)}
+                          <span
                             style={{
-                              background: '#dc2626',
-                              color: '#ffffff',
-                              border: 'none',
+                              background: '#fee2e2',
+                              color: '#991b1b',
                               borderRadius: '8px',
-                              padding: '0.4rem 0.85rem',
+                              padding: '0.35rem 0.75rem',
                               fontSize: '0.78rem',
                               fontWeight: 700,
-                              cursor: 'pointer',
                             }}
                           >
-                            Xóa vĩnh viễn
-                          </button>
+                            Đã lưu trữ hồ sơ
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -512,38 +508,9 @@ export default function EOEventsTab({
                         </div>
                       </td>
 
-                      {/* Cột 6: Thao tác Kebab & Xóa */}
+                      {/* Cột 6: Thao tác Kebab */}
                       <td style={{ textAlign: 'center', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                          {evt.status === 'CANCELLED' && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteEvent?.(evt);
-                              }}
-                              title="Xóa sự kiện đã hủy khỏi danh sách"
-                              style={{
-                                background: '#fee2e2',
-                                border: '1px solid #fecaca',
-                                color: '#dc2626',
-                                borderRadius: '6px',
-                                width: '28px',
-                                height: '28px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                              }}
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                              </svg>
-                            </button>
-                          )}
-
+                        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                           <button
                             type="button"
                             className="btn-kebab-menu"
@@ -637,7 +604,7 @@ export default function EOEventsTab({
                               <span>Chỉnh sửa sự kiện</span>
                             </button>
 
-                            {evt.status !== 'CANCELLED' && evt.status !== 'COMPLETED' && (
+                            {(evt.status === 'ACTIVE' || evt.status === 'UPCOMING') && (
                               <button
                                 type="button"
                                 className="dropdown-item text-danger"
@@ -650,7 +617,7 @@ export default function EOEventsTab({
                               </button>
                             )}
 
-                            {(evt.status === 'CANCELLED' || evt.status === 'DRAFT') && (
+                            {evt.status === 'DRAFT' && (
                               <button
                                 type="button"
                                 className="dropdown-item text-danger"
@@ -663,7 +630,7 @@ export default function EOEventsTab({
                                   <polyline points="3 6 5 6 21 6"></polyline>
                                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                 </svg>
-                                <span>Xóa khỏi danh sách</span>
+                                <span>Xóa bản nháp</span>
                               </button>
                             )}
                           </div>

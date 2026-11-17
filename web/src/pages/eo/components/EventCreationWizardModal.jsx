@@ -1703,19 +1703,20 @@ const EventCreationWizardModal = ({
                   <div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0369a1' }}>
                       Gợi ý mức lương thị trường ({currentShift.jobType}):{' '}
-                      {riskAnalysis.recommendation.min.toLocaleString()}đ - {riskAnalysis.recommendation.max.toLocaleString()}đ/giờ
+                      {((riskAnalysis?.recommendation?.min) || 40000).toLocaleString()}đ - {((riskAnalysis?.recommendation?.max) || 60000).toLocaleString()}đ/giờ
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.15rem' }}>
-                      Tiêu chí: {riskAnalysis.recommendation.note} • Mức đề xuất tối ưu:{' '}
-                      <strong>{riskAnalysis.recommendation.defaultWage.toLocaleString()}đ/giờ</strong>
+                      Tiêu chí: {riskAnalysis?.recommendation?.note || 'Tiêu chuẩn'} • Mức đề xuất tối ưu:{' '}
+                      <strong>{((riskAnalysis?.recommendation?.defaultWage) || 50000).toLocaleString()}đ/giờ</strong>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       onClick={() => {
-                        setCurrentShift((prev) => ({ ...prev, hourlyWage: riskAnalysis.recommendation.min }));
-                        setShiftPackageWage(Math.round(riskAnalysis.recommendation.min * currentDurationHours));
+                        const minW = riskAnalysis?.recommendation?.min || 40000;
+                        setCurrentShift((prev) => ({ ...prev, hourlyWage: minW }));
+                        setShiftPackageWage(Math.round(minW * currentDurationHours));
                       }}
                       style={{
                         fontSize: '0.72rem',
@@ -1728,13 +1729,14 @@ const EventCreationWizardModal = ({
                         cursor: 'pointer',
                       }}
                     >
-                      Sàn: {riskAnalysis.recommendation.min.toLocaleString()}đ
+                      Sàn: {((riskAnalysis?.recommendation?.min) || 40000).toLocaleString()}đ
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        setCurrentShift((prev) => ({ ...prev, hourlyWage: riskAnalysis.recommendation.defaultWage }));
-                        setShiftPackageWage(Math.round(riskAnalysis.recommendation.defaultWage * currentDurationHours));
+                        const defW = riskAnalysis?.recommendation?.defaultWage || 50000;
+                        setCurrentShift((prev) => ({ ...prev, hourlyWage: defW }));
+                        setShiftPackageWage(Math.round(defW * currentDurationHours));
                       }}
                       style={{
                         fontSize: '0.72rem',
@@ -1747,13 +1749,14 @@ const EventCreationWizardModal = ({
                         cursor: 'pointer',
                       }}
                     >
-                      Khuyên dùng: {riskAnalysis.recommendation.defaultWage.toLocaleString()}đ
+                      Khuyên dùng: {((riskAnalysis?.recommendation?.defaultWage) || 50000).toLocaleString()}đ
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        setCurrentShift((prev) => ({ ...prev, hourlyWage: riskAnalysis.recommendation.max }));
-                        setShiftPackageWage(Math.round(riskAnalysis.recommendation.max * currentDurationHours));
+                        const maxW = riskAnalysis?.recommendation?.max || 60000;
+                        setCurrentShift((prev) => ({ ...prev, hourlyWage: maxW }));
+                        setShiftPackageWage(Math.round(maxW * currentDurationHours));
                       }}
                       style={{
                         fontSize: '0.72rem',
@@ -1766,7 +1769,7 @@ const EventCreationWizardModal = ({
                         cursor: 'pointer',
                       }}
                     >
-                      Thu hút nhanh: {riskAnalysis.recommendation.max.toLocaleString()}đ
+                      Thu hút nhanh: {((riskAnalysis?.recommendation?.max) || 60000).toLocaleString()}đ
                     </button>
                   </div>
                 </div>

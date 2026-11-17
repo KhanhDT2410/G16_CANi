@@ -64,15 +64,21 @@ export function useSubscription() {
         const vnpKeys = Array.from(newParams.keys()).filter((k) => k.startsWith('vnp_'));
         vnpKeys.forEach((k) => newParams.delete(k));
         setSearchParams(newParams, { replace: true });
-      } else if (searchParams.get('payos') === 'success' || searchParams.get('status') === 'PAID') {
+      } else if (
+        searchParams.get('payos') === 'success' ||
+        searchParams.get('status') === 'PAID' ||
+        (searchParams.get('orderCode') && searchParams.get('cancel') !== 'true')
+      ) {
         const orderCode = searchParams.get('orderCode');
         try {
           if (orderCode) {
             await eoService.confirmPayOSPayment(orderCode);
+            showToast('🎉 Thanh toán VietQR PayOS thành công! Gói cước đã được kích hoạt.', 'success');
           }
-          showToast('🎉 Thanh toán VietQR PayOS thành công! Gói cước đã được kích hoạt.', 'success');
         } catch (error) {
           console.warn('Lỗi xác nhận PayOS từ callback:', error);
+          const msg = error.response?.data?.message || error.message || 'Không thể kích hoạt gói dịch vụ';
+          showToast(`Lỗi kích hoạt gói: ${msg}`, 'error');
         } finally {
           await loadSubscriptionData();
           const newParams = new URLSearchParams(searchParams);

@@ -8,6 +8,7 @@ import { FaqView } from '../../features/faqs';
 import { RevenueDashboardView } from '../../features/revenue-dashboard';
 import { RsAppealsView } from '../../features/rs-appeals';
 import { NoShowView } from '../../features/no-shows';
+import { AdminPlansView } from '../../features/admin-plans';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
 
@@ -55,6 +56,10 @@ const TAB_METADATA = {
   config_financial: {
     title: 'Tài Chính & Hoa Hồng',
     subtitle: 'Quản trị tỷ lệ hoa hồng nền tảng và thời hạn đối soát chuyển khoản thù lao trực tiếp',
+  },
+  plans: {
+    title: 'Quản Lý Danh Mục Gói Dịch Vụ',
+    subtitle: 'Quy định hạn mức sự kiện, ca làm việc, nhân sự và đơn giá gói cước cho Ban tổ chức sự kiện',
   },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',
@@ -143,6 +148,7 @@ const AdminPage = () => {
           {activeTab === 'config_matching' && <SystemConfigView activeCategory="MATCHING" />}
           {activeTab === 'config_operation' && <SystemConfigView activeCategory="OPERATION" />}
           {activeTab === 'config_financial' && <SystemConfigView activeCategory="FINANCIAL" />}
+          {activeTab === 'plans' && <AdminPlansView />}
           {activeTab === 'config_general' && <SystemConfigView activeCategory="GENERAL" />}
           {activeTab === 'configs' && <SystemConfigView activeCategory="ALL" />}
         </section>

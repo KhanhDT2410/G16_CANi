@@ -374,8 +374,8 @@ const EditShiftModal = ({
                 border: '1px solid #bfdbfe',
               }}
             >
-              Gợi ý mức lương: <strong>{wageRec.min.toLocaleString()}đ - {wageRec.max.toLocaleString()}đ/giờ</strong> (Khuyên dùng:{' '}
-              <strong>{wageRec.recommended.toLocaleString()}đ/giờ</strong>)
+              Gợi ý mức lương: <strong>{((wageRec && wageRec.min) || 40000).toLocaleString()}đ - {((wageRec && wageRec.max) || 60000).toLocaleString()}đ/giờ</strong> (Khuyên dùng:{' '}
+              <strong>{((wageRec && wageRec.recommended) || 50000).toLocaleString()}đ/giờ</strong>)
             </div>
             <div
               style={{

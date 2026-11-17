@@ -29,6 +29,7 @@ public class H2DataSeeder implements CommandLineRunner {
     private final EventOrganizerRepository eventOrganizerRepository;
     private final EventRepository eventRepository;
     private final ShiftRepository shiftRepository;
+    private final PlanRepository planRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final PaymentRepository paymentRepository;
     private final ReliabilityLogRepository reliabilityLogRepository;
@@ -164,16 +165,55 @@ public class H2DataSeeder implements CommandLineRunner {
             eo = eventOrganizerRepository.findAll().stream().findFirst().orElse(null);
         }
 
-        // Seed Sample Subscriptions (UC-108 Revenue)
+        // Seed Sample Plans & Subscriptions (UC-108 Revenue)
+        if (planRepository.count() == 0) {
+            List<Plan> samplePlans = List.of(
+                    Plan.builder()
+                            .planName("Gói Trải Nghiệm (Khởi Nghiệp)")
+                            .planType(PlanType.FREE_TRIAL)
+                            .price(BigDecimal.ZERO)
+                            .durationDays(30)
+                            .maxEvents(2)
+                            .maxShifts(6)
+                            .maxWorkers(20)
+                            .baseMatchingQuota(2)
+                            .build(),
+                    Plan.builder()
+                            .planName("Gói Tiêu Chuẩn (Standard)")
+                            .planType(PlanType.MATCHING_PLUS)
+                            .price(BigDecimal.valueOf(99000))
+                            .durationDays(30)
+                            .maxEvents(5)
+                            .maxShifts(25)
+                            .maxWorkers(80)
+                            .baseMatchingQuota(5)
+                            .build(),
+                    Plan.builder()
+                            .planName("Gói Chuyên Nghiệp (Pro / Doanh Nghiệp)")
+                            .planType(PlanType.ENTERPRISE)
+                            .price(BigDecimal.valueOf(249000))
+                            .durationDays(30)
+                            .maxEvents(20)
+                            .maxShifts(100)
+                            .maxWorkers(300)
+                            .baseMatchingQuota(20)
+                            .build()
+            );
+            planRepository.saveAll(samplePlans);
+        }
+
         if (eo != null && subscriptionRepository.count() == 0) {
+            Plan matchingPlan = planRepository.findByPlanType(PlanType.MATCHING_PLUS).orElse(null);
+            Plan freeTrialPlan = planRepository.findByPlanType(PlanType.FREE_TRIAL).orElse(null);
             Instant now = Instant.now();
             List<Subscription> sampleSubs = List.of(
                     Subscription.builder()
                             .eventOrganizer(eo)
-                            .planName("Gói Khởi Nghiệp (Mời Đích Danh)")
-                            .planType(PlanType.INVITE_ONLY)
+                            .plan(freeTrialPlan)
+                            .planName("Gói Trải Nghiệm (Khởi Nghiệp)")
+                            .planType(PlanType.FREE_TRIAL)
                             .durationDays(30)
-                            .price(BigDecimal.valueOf(1500000))
+                            .price(BigDecimal.ZERO)
                             .status(SubscriptionStatus.ACTIVE)
                             .startsAt(now.minus(15, ChronoUnit.DAYS))
                             .expiresAt(now.plus(15, ChronoUnit.DAYS))
@@ -181,25 +221,15 @@ public class H2DataSeeder implements CommandLineRunner {
                             .build(),
                     Subscription.builder()
                             .eventOrganizer(eo)
-                            .planName("Gói Ghép Ca Nâng Cao (Matching Plus)")
-                            .planType(PlanType.MATCHING_PLUS)
-                            .durationDays(60)
-                            .price(BigDecimal.valueOf(3500000))
-                            .status(SubscriptionStatus.ACTIVE)
-                            .startsAt(now.minus(5, ChronoUnit.DAYS))
-                            .expiresAt(now.plus(55, ChronoUnit.DAYS))
-                            .createdAt(now.minus(5, ChronoUnit.DAYS))
-                            .build(),
-                    Subscription.builder()
-                            .eventOrganizer(eo)
-                            .planName("Gói Sự Kiện Mùa Thu")
+                            .plan(matchingPlan)
+                            .planName("Gói Tiêu Chuẩn (Standard)")
                             .planType(PlanType.MATCHING_PLUS)
                             .durationDays(30)
-                            .price(BigDecimal.valueOf(2500000))
+                            .price(BigDecimal.valueOf(99000))
                             .status(SubscriptionStatus.ACTIVE)
-                            .startsAt(now.minus(2, ChronoUnit.DAYS))
-                            .expiresAt(now.plus(28, ChronoUnit.DAYS))
-                            .createdAt(now.minus(2, ChronoUnit.DAYS))
+                            .startsAt(now.minus(5, ChronoUnit.DAYS))
+                            .expiresAt(now.plus(25, ChronoUnit.DAYS))
+                            .createdAt(now.minus(5, ChronoUnit.DAYS))
                             .build());
             subscriptionRepository.saveAll(sampleSubs);
             log.info("==> [H2 Profile] Seeded {} sample subscriptions for UC-108.", sampleSubs.size());

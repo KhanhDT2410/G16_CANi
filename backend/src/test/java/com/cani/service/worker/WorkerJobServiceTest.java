@@ -1325,4 +1325,79 @@ class WorkerJobServiceTest {
         assertThat(summary.getTotalEarnings()).isEqualTo(BigDecimal.ZERO);
     }
 
+    // =========================================================================
+    // UC-BANK: TESTS FOR GET & UPDATE WORKER BANK ACCOUNT (VIETQR INTEGRATION)
+    // =========================================================================
+
+    @Test
+    @DisplayName("UTC095 - getBankAccount() - Success: Worker đã có tài khoản ngân hàng sinh mã VietQR chuẩn xác")
+    void getBankAccount_Success_WithExistingBankInfo() {
+        worker.setBankCode("MB");
+        worker.setBankAccountNumber("0912345678");
+        worker.setBankAccountName("NGUYEN VAN A");
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        WorkerBankAccountDto dto = workerJobService.getBankAccount(userId);
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.getBankCode()).isEqualTo("MB");
+        assertThat(dto.getBankAccountNumber()).isEqualTo("0912345678");
+        assertThat(dto.getBankAccountName()).isEqualTo("NGUYEN VAN A");
+        assertThat(dto.getVietQrUrl()).contains("https://img.vietqr.io/image/MB-0912345678-compact2.png");
+        assertThat(dto.getVietQrUrl()).contains("accountName=NGUYEN+VAN+A");
+    }
+
+    @Test
+    @DisplayName("UTC096 - getBankAccount() - Success: Worker chưa cài đặt ngân hàng trả về null và không có mã VietQR")
+    void getBankAccount_Success_WithoutBankInfo() {
+        worker.setBankCode(null);
+        worker.setBankAccountNumber(null);
+        worker.setBankAccountName(null);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        WorkerBankAccountDto dto = workerJobService.getBankAccount(userId);
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.getBankCode()).isNull();
+        assertThat(dto.getBankAccountNumber()).isNull();
+        assertThat(dto.getVietQrUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("UTC097 - updateBankAccount() - Success: Chuẩn hóa chữ hoa bankCode, trim số tài khoản và lưu thành công")
+    void updateBankAccount_Success() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerRepository.save(any(Worker.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkerBankAccountDto request = WorkerBankAccountDto.builder()
+                .bankCode("vcb")
+                .bankAccountNumber("  1029384756  ")
+                .bankAccountName("nguyen van b")
+                .build();
+
+        WorkerBankAccountDto result = workerJobService.updateBankAccount(userId, request);
+
+        assertThat(result.getBankCode()).isEqualTo("VCB");
+        assertThat(result.getBankAccountNumber()).isEqualTo("1029384756");
+        assertThat(result.getBankAccountName()).isEqualTo("NGUYEN VAN B");
+        assertThat(result.getVietQrUrl()).contains("https://img.vietqr.io/image/VCB-1029384756-compact2.png");
+        verify(workerRepository).save(worker);
+    }
+
+    @Test
+    @DisplayName("UTC098 - updateBankAccount() - Failure: Không tìm thấy hồ sơ Worker ném ResourceNotFoundException")
+    void updateBankAccount_Failure_WorkerNotFound() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.empty());
+
+        WorkerBankAccountDto request = WorkerBankAccountDto.builder()
+                .bankCode("TCB")
+                .bankAccountNumber("1900123456")
+                .bankAccountName("PHAM DUY HUNG")
+                .build();
+
+        assertThatThrownBy(() -> workerJobService.updateBankAccount(userId, request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy thông tin Worker");
+    }
+
 }

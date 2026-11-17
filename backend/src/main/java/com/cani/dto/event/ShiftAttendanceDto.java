@@ -42,4 +42,10 @@ public class ShiftAttendanceDto {
     private BigDecimal agreedWage;
     private String workerBio;
     private Integer yearsExperience;
+
+    // Thông tin tài khoản ngân hàng thụ hưởng & mã VietQR phục vụ thanh toán trực tiếp (Non-Escrow)
+    private String bankCode;
+    private String bankAccountNumber;
+    private String bankAccountName;
+    private String vietQrUrl;
 }

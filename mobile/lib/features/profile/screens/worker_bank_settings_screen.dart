@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:cani/core/constants/banks.dart';
+import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 
 class WorkerBankSettingsScreen extends ConsumerStatefulWidget {
@@ -44,21 +45,59 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
       final savedAccount = await _storage.read(key: 'cani_worker_bank_account');
       final savedName = await _storage.read(key: 'cani_worker_bank_owner');
 
-      if (!mounted) return;
+      if (mounted) {
+        setState(() {
+          if (savedBank != null && kSupportedBanks.any((b) => b.code == savedBank)) {
+            _selectedBankCode = savedBank;
+          }
+          _accountNumberCtrl.text = savedAccount ?? '';
+          _accountNameCtrl.text = (savedName != null && savedName.isNotEmpty)
+              ? savedName
+              : (user?.fullName.toUpperCase() ?? '');
+          _isLoading = false;
+        });
+      }
 
-      setState(() {
-        if (savedBank != null && kSupportedBanks.any((b) => b.code == savedBank)) {
-          _selectedBankCode = savedBank;
+      // Tải dữ liệu chính xác từ Backend API để luôn đồng bộ trạng thái đám mây
+      final dio = ref.read(dioProvider);
+      final response = await dio.get('/v1/workers/bank-account');
+      if (response.statusCode == 200 && response.data != null) {
+        final body = response.data;
+        final data = body is Map<String, dynamic> && body.containsKey('data')
+            ? body['data'] as Map<String, dynamic>?
+            : body as Map<String, dynamic>?;
+
+        if (data != null) {
+          final serverBank = data['bankCode'] as String?;
+          final serverAccount = data['bankAccountNumber'] as String?;
+          final serverName = data['bankAccountName'] as String?;
+
+          if (serverAccount != null && serverAccount.isNotEmpty && mounted) {
+            setState(() {
+              if (serverBank != null && kSupportedBanks.any((b) => b.code == serverBank)) {
+                _selectedBankCode = serverBank;
+              }
+              _accountNumberCtrl.text = serverAccount;
+              if (serverName != null && serverName.isNotEmpty) {
+                _accountNameCtrl.text = serverName;
+              }
+            });
+
+            // Đồng bộ ngược vào cache thiết bị
+            await Future.wait([
+              if (serverBank != null) _storage.write(key: 'cani_worker_bank_code', value: serverBank),
+              _storage.write(key: 'cani_worker_bank_account', value: serverAccount),
+              if (serverName != null) _storage.write(key: 'cani_worker_bank_owner', value: serverName),
+            ]);
+          }
         }
-        _accountNumberCtrl.text = savedAccount ?? '';
-        _accountNameCtrl.text = (savedName != null && savedName.isNotEmpty)
-            ? savedName
-            : (user?.fullName.toUpperCase() ?? '');
-        _isLoading = false;
-      });
+      }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      debugPrint('Thông tin ngân hàng load từ cache cục bộ (Backend offline hoặc chưa có): $e');
+    } finally {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -71,6 +110,18 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
     final accountName = _accountNameCtrl.text.trim().toUpperCase();
 
     try {
+      // 1. Gửi lên Backend Database để Event Organizer thấy mã VietQR thanh toán
+      final dio = ref.read(dioProvider);
+      await dio.put(
+        '/v1/workers/bank-account',
+        data: {
+          'bankCode': bankCode,
+          'bankAccountNumber': accountNum,
+          'bankAccountName': accountName,
+        },
+      );
+
+      // 2. Lưu vào FlutterSecureStorage của thiết bị để dùng offline & hiển thị tức thì
       await Future.wait([
         _storage.write(key: 'cani_worker_bank_code', value: bankCode),
         _storage.write(key: 'cani_worker_bank_account', value: accountNum),
@@ -82,19 +133,19 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã lưu thông tin tài khoản ngân hàng thành công'),
+          content: Text('Đã lưu thông tin tài khoản ngân hàng thành công lên hệ thống'),
           backgroundColor: Color(0xFF059669),
         ),
       );
     } catch (e) {
-      debugPrint('Lỗi lưu thông tin ngân hàng vào storage: $e');
+      debugPrint('Lỗi lưu thông tin ngân hàng lên máy chủ: $e');
       if (!mounted) return;
       setState(() => _isSaving = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Không thể lưu thông tin vào thiết bị. Vui lòng thử lại.'),
-          backgroundColor: Color(0xFFDC2626),
+        SnackBar(
+          content: Text('Lỗi cập nhật tài khoản ngân hàng: ${e.toString()}'),
+          backgroundColor: const Color(0xFFDC2626),
         ),
       );
     }

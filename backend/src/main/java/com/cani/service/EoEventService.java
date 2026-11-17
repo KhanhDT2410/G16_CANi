@@ -11,6 +11,7 @@ import com.cani.entity.enums.VerificationStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
+import com.cani.util.VietQrUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -911,6 +912,14 @@ public class EoEventService {
             }
         }
 
+        String bankCode = worker != null ? worker.getBankCode() : null;
+        String bankAccountNumber = worker != null ? worker.getBankAccountNumber() : null;
+        String bankAccountName = worker != null ? worker.getBankAccountName() : null;
+        if ((bankAccountName == null || bankAccountName.isBlank()) && u != null) {
+            bankAccountName = u.getFullName();
+        }
+        String vietQrUrl = VietQrUtil.buildVietQrUrl(bankCode, bankAccountNumber, bankAccountName, agreedWage);
+
         return ShiftAttendanceDto.builder()
                 .assignmentId(sa.getAssignmentId())
                 .workerId(worker != null ? worker.getWorkerId() : null)
@@ -936,6 +945,10 @@ public class EoEventService {
                 .agreedWage(agreedWage)
                 .workerBio(worker != null ? worker.getBio() : null)
                 .yearsExperience(worker != null ? worker.getYearsExperience() : 0)
+                .bankCode(bankCode)
+                .bankAccountNumber(bankAccountNumber)
+                .bankAccountName(bankAccountName)
+                .vietQrUrl(vietQrUrl)
                 .build();
     }
 

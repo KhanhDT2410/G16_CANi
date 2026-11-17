@@ -93,6 +93,18 @@ public class Worker {
     private SkillTier skillTier = SkillTier.STARTER;
 
     // -------------------------------------------------------------------------
+    // THÔNG TIN TÀI KHOẢN NGÂN HÀNG THỤ HƯỞNG (VIETQR NHẬN LƯƠNG TRỰC TIẾP)
+    // -------------------------------------------------------------------------
+    @Column(name = "bank_code", length = 30)
+    private String bankCode;
+
+    @Column(name = "bank_account_number", length = 50)
+    private String bankAccountNumber;
+
+    @Column(name = "bank_account_name", length = 100)
+    private String bankAccountName;
+
+    // -------------------------------------------------------------------------
     // CÁC THUỘC TÍNH THUỘC BẢNG worker_preferences (@SecondaryTable)
     // -------------------------------------------------------------------------
     @Column(table = "worker_preferences", name = "base_address", columnDefinition = "TEXT")

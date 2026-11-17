@@ -11,6 +11,7 @@ import com.cani.entity.enums.ShiftStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
+import com.cani.util.VietQrUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -645,6 +646,53 @@ public class WorkerJobService {
         workerRepository.save(worker);
         log.info("Worker {} đã cập nhật hồ sơ kinh nghiệm: {} năm kinh nghiệm", userId, worker.getYearsExperience());
         return getWorkerExperience(userId);
+    }
+
+    // =========================================================================
+    // UC-BANK: QUẢN LÝ TÀI KHOẢN NGÂN HÀNG THỤ HƯỞNG (VIETQR NHẬN THÙ LAO)
+    // =========================================================================
+    @Transactional(readOnly = true)
+    public WorkerBankAccountDto getBankAccount(UUID userId) {
+        Worker worker = getWorkerOrThrow(userId);
+        String name = worker.getBankAccountName();
+        if ((name == null || name.isBlank()) && worker.getUser() != null) {
+            name = worker.getUser().getFullName();
+        }
+
+        String vietQr = VietQrUtil.buildVietQrUrl(
+                worker.getBankCode(),
+                worker.getBankAccountNumber(),
+                name,
+                null
+        );
+
+        return WorkerBankAccountDto.builder()
+                .bankCode(worker.getBankCode())
+                .bankAccountNumber(worker.getBankAccountNumber())
+                .bankAccountName(name)
+                .vietQrUrl(vietQr)
+                .build();
+    }
+
+    @Transactional
+    public WorkerBankAccountDto updateBankAccount(UUID userId, WorkerBankAccountDto dto) {
+        Worker worker = getWorkerOrThrow(userId);
+
+        if (dto.getBankCode() != null) {
+            worker.setBankCode(dto.getBankCode().trim().toUpperCase());
+        }
+        if (dto.getBankAccountNumber() != null) {
+            worker.setBankAccountNumber(dto.getBankAccountNumber().trim().replaceAll("\\s+", ""));
+        }
+        if (dto.getBankAccountName() != null) {
+            worker.setBankAccountName(dto.getBankAccountName().trim().toUpperCase());
+        }
+
+        workerRepository.save(worker);
+        log.info("Worker {} đã cập nhật tài khoản ngân hàng thụ hưởng: Bank={}, AccNum={}",
+                userId, worker.getBankCode(), worker.getBankAccountNumber());
+
+        return getBankAccount(userId);
     }
 
     // =========================================================================

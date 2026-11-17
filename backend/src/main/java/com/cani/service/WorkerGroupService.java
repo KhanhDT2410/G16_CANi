@@ -23,10 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -132,15 +129,29 @@ public class WorkerGroupService {
                 worker.getWorkerId(), MembershipStatus.PENDING
         );
 
+        if (memberships.isEmpty()) {
+            return List.of();
+        }
+
+        // Batch fetch leaders to avoid N+1 queries
+        Set<UUID> leaderIds = memberships.stream()
+                .map(m -> m.getWorkerGroup().getLeaderWorkerId())
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, String> leaderNameMap = workerRepository.findAllById(leaderIds).stream()
+                .collect(Collectors.toMap(
+                        Worker::getWorkerId,
+                        w -> w.getUser() != null ? w.getUser().getFullName() : w.getFullName(),
+                        (existing, replacement) -> existing
+                ));
+
         return memberships.stream()
                 .map(m -> {
                     WorkerGroup g = m.getWorkerGroup();
-                    String leaderName = "N/A";
-                    if (g.getLeaderWorkerId() != null) {
-                        leaderName = workerRepository.findById(g.getLeaderWorkerId())
-                                .map(w -> w.getUser() != null ? w.getUser().getFullName() : w.getFullName())
-                                .orElse("N/A");
-                    }
+                    String leaderName = g.getLeaderWorkerId() != null
+                            ? leaderNameMap.getOrDefault(g.getLeaderWorkerId(), "N/A")
+                            : "N/A";
                     return mapToGroupDto(g, leaderName);
                 })
                 .toList();

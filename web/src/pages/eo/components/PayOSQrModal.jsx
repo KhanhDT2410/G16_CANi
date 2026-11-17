@@ -13,7 +13,9 @@ export default function PayOSQrModal({ isOpen, onClose, data, onConfirm }) {
 
   const formatCurrency = (val) => new Intl.NumberFormat('vi-VN').format(val || 0);
 
-  const qrValue = data.qrCode || `https://img.vietqr.io/image/MB-${data.accountNumber || '2622014789096'}-compact2.png?amount=${data.amount}&addInfo=${encodeURIComponent(data.description || '')}&accountName=${encodeURIComponent(data.accountName || 'PHAM DUY HUNG')}`;
+  const qrValue = data.qrCode || (data.accountNumber
+    ? `https://img.vietqr.io/image/${data.bin || '970422'}-${data.accountNumber}-compact2.png?amount=${data.amount}&addInfo=${encodeURIComponent(data.description || '')}&accountName=${encodeURIComponent(data.accountName || 'CANi Platform')}`
+    : '');
 
   const isRawQrString = data.qrCode && data.qrCode.startsWith('000201');
 

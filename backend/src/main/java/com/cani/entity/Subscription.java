@@ -32,7 +32,7 @@ public class Subscription {
     private EventOrganizer eventOrganizer;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "plan_id", nullable = false)
+    @JoinColumn(name = "plan_id", nullable = true)
     private Plan plan;
 
     @Column(name = "price_paid", precision = 15, scale = 2)

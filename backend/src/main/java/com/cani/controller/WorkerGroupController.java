@@ -60,6 +60,18 @@ public class WorkerGroupController {
     }
 
     /**
+     * Xem danh sách các lời mời gia nhập nhóm đang chờ xác nhận
+     */
+    @Operation(summary = "Lời mời vào nhóm thợ", description = "Lấy danh sách các nhóm thợ mà Worker được mời tham gia nhưng chưa xác nhận.")
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/my/invites")
+    public ResponseEntity<ApiResponse<List<WorkerGroupResponseDto>>> getMyPendingInvites(Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<WorkerGroupResponseDto> list = workerGroupService.getMyPendingInvites(userId);
+        return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách lời mời vào nhóm thợ thành công"));
+    }
+
+    /**
      * Tìm kiếm và duyệt danh sách các nhóm thợ
      */
     @Operation(summary = "Tìm kiếm nhóm thợ", description = "Duyệt danh sách các nhóm thợ có phân trang và tìm kiếm theo tên hoặc kỹ năng.")

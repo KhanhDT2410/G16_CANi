@@ -165,7 +165,6 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
   if (!activeEvents || activeEvents.length === 0 || eventsFinancialData.length === 0) {
     return (
       <div className="eo-widget-card animate-fade-in-up" style={{ marginTop: '1.25rem', padding: '3.5rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
         <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
           Chưa Có Dữ Liệu Vận Hành & Ngân Sách
         </h4>

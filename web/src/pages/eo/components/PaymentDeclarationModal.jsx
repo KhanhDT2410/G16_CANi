@@ -23,9 +23,11 @@ const PaymentDeclarationModal = ({
   const amount = paymentForm.declaredAmount || selectedAssignment.agreedWage || 0;
   const hasBankInfo = Boolean(bankCode && accountNumber);
 
-  const dynamicVietQrUrl = hasBankInfo
-    ? `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accountName)}`
-    : null;
+  const dynamicVietQrUrl = (selectedAssignment.vietQrUrl && amount === (selectedAssignment.agreedWage || 0))
+    ? selectedAssignment.vietQrUrl
+    : (hasBankInfo
+      ? `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accountName)}`
+      : (selectedAssignment.vietQrUrl || null));
 
   return (
     <div className="eo-modal-overlay">

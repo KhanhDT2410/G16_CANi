@@ -123,6 +123,30 @@ public class WorkerGroupService {
     }
 
     /**
+     * Xem danh sách các lời mời gia nhập nhóm đang chờ xác nhận (Pending Invites)
+     */
+    @Transactional(readOnly = true)
+    public List<WorkerGroupResponseDto> getMyPendingInvites(UUID userId) {
+        Worker worker = getWorkerByUserId(userId);
+        List<WorkerGroupMembership> memberships = membershipRepository.findByWorker_WorkerIdAndStatus(
+                worker.getWorkerId(), MembershipStatus.PENDING
+        );
+
+        return memberships.stream()
+                .map(m -> {
+                    WorkerGroup g = m.getWorkerGroup();
+                    String leaderName = "N/A";
+                    if (g.getLeaderWorkerId() != null) {
+                        leaderName = workerRepository.findById(g.getLeaderWorkerId())
+                                .map(w -> w.getUser() != null ? w.getUser().getFullName() : w.getFullName())
+                                .orElse("N/A");
+                    }
+                    return mapToGroupDto(g, leaderName);
+                })
+                .toList();
+    }
+
+    /**
      * Tìm kiếm và duyệt danh sách các nhóm thợ trên nền tảng
      */
     @Transactional(readOnly = true)
@@ -202,11 +226,6 @@ public class WorkerGroupService {
         final boolean hasFullAccess = canViewFullPii;
         List<WorkerGroupMembership> list = membershipRepository.findByGroupIdWithWorkerDetails(groupId);
         return list.stream().map(m -> mapToMemberDto(m, hasFullAccess)).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<WorkerGroupMemberResponseDto> getGroupMembers(UUID groupId) {
-        return getGroupMembers(null, groupId);
     }
 
     /**

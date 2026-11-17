@@ -307,6 +307,77 @@ class EoEventServiceTest {
         assertTrue(ex.getMessage().contains("sau"));
     }
 
+    @Test
+    @DisplayName("UTC006e - createEvent() - Abnormal: Vietnamese Telex keyboard mash in event name (e.g. sdada ád ádasd ád da ád)")
+    void createEvent_ThrowsBadRequest_WhenNameIsVietnameseTelexMash() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("sdada ád ádasd ád da ád")
+                .venueAddress("Hà Nội")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("không hợp lệ") || ex.getMessage().contains("vô nghĩa"));
+    }
+
+    @Test
+    @DisplayName("UTC006f - createEvent() - Abnormal: Vietnamese Telex keyboard mash in event description (e.g. ádas ád ád ád ádasd ád)")
+    void createEvent_ThrowsBadRequest_WhenDescriptionIsVietnameseTelexMash() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("Hung event")
+                .description("ádas ád ád ád ádasd ád")
+                .venueAddress("Hà Nội")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.createEvent(userId, dto));
+        assertTrue(ex.getMessage().contains("Mô tả") || ex.getMessage().contains("vô nghĩa"));
+    }
+
+    @Test
+    @DisplayName("UTC006g - createEvent() - Normal: Venue address with acronyms and postal code (ĐHQG, 13131) must NOT be blocked")
+    void createEvent_Success_WhenVenueAddressContainsAcronymsAndPostalCode() {
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> {
+            Event e = invocation.getArgument(0);
+            e.setEventId(UUID.randomUUID());
+            return e;
+        });
+
+        CreateEventRequestDto dto = CreateEventRequestDto.builder()
+                .name("Hung event")
+                .description("Vừa phải")
+                .venueAddress("Ngõ 2 Cổng Phụ ĐHQG, Xã Hòa Lạc, Hà Nội, 13131, Việt Nam")
+                .venueLat(21.012)
+                .venueLng(105.525)
+                .build();
+
+        EventResponseDto result = eoEventService.createEvent(userId, dto);
+        assertNotNull(result);
+        assertEquals("Hung event", result.getName());
+        assertEquals("Ngõ 2 Cổng Phụ ĐHQG, Xã Hòa Lạc, Hà Nội, 13131, Việt Nam", result.getVenueAddress());
+    }
+
+    @Test
+    @DisplayName("UTC006h - isGibberishOrSpam() - Unit test comprehensive cases")
+    void isGibberishOrSpam_ComprehensiveUnitTests() {
+        // True spam / mash
+        assertTrue(EoEventService.isGibberishOrSpam("sdada ád ádasd ád da ád"));
+        assertTrue(EoEventService.isGibberishOrSpam("ádas ád ád ád ádasd ád"));
+        assertTrue(EoEventService.isGibberishOrSpam("ád ád ád"));
+        assertTrue(EoEventService.isGibberishOrSpam("test test test"));
+        assertTrue(EoEventService.isGibberishOrSpam("asdasdasd asdasd"));
+        assertTrue(EoEventService.isGibberishOrSpam("qwertyuiop"));
+
+        // Valid legitimate texts
+        assertFalse(EoEventService.isGibberishOrSpam("Hung event"));
+        assertFalse(EoEventService.isGibberishOrSpam("Vừa phải"));
+        assertFalse(EoEventService.isGibberishOrSpam("Hội nghị Công nghệ FPT 2026"));
+        assertFalse(EoEventService.isGibberishOrSpam("Gala Dinner tri ân khách hàng"));
+    }
+
 
     // =========================================================================
     // updateEvent()

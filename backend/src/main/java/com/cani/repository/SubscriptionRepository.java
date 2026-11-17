@@ -26,6 +26,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
 
     Optional<Subscription> findFirstByEventOrganizer_EoIdAndStatusOrderByCreatedAtDesc(UUID eoId, SubscriptionStatus status);
 
+    boolean existsByPlan_PlanId(UUID planId);
+
     List<Subscription> findByCreatedAtBetween(Instant from, Instant to);
 
     Page<Subscription> findByCreatedAtBetween(Instant from, Instant to, Pageable pageable);

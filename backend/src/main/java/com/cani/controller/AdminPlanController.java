@@ -121,12 +121,17 @@ public class AdminPlanController {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói cước: " + planId));
 
+        if (subscriptionRepository.existsByPlan_PlanId(planId)) {
+            throw new BadRequestException("Không thể xóa gói cước '" + plan.getPlanName() + "' vì đã có nhà tổ chức sự kiện đăng ký sử dụng.");
+        }
+
         try {
             planRepository.delete(plan);
-            log.info("Admin đã xóa gói cước: {}", planId);
+            log.info("Admin đã xóa gói cước: {} ({})", planId, plan.getPlanName());
             return ResponseEntity.ok(ApiResponse.ok(null, "Xóa gói cước thành công"));
         } catch (Exception ex) {
-            throw new BadRequestException("Không thể xóa gói cước này vì đã có dữ liệu đăng ký hoặc liên kết ràng buộc.");
+            log.warn("Lỗi khi xóa gói cước {}: {}", planId, ex.getMessage());
+            throw new BadRequestException("Không thể xóa gói cước này vì có liên kết dữ liệu ràng buộc.");
         }
     }
 

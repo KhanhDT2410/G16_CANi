@@ -5,12 +5,15 @@ import com.cani.service.*;
 import com.cani.dto.admin.user.UpdateUserStatusRequestDto;
 import com.cani.dto.admin.user.UserDetailResponseDto;
 import com.cani.dto.admin.user.UserFilterRequest;
+import com.cani.dto.admin.user.UserSummaryResponseDto;
 import com.cani.dto.response.PageResponse;
 import com.cani.entity.AuditLog;
 import com.cani.entity.EventOrganizer;
+import com.cani.entity.SkillVerificationRequest;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.enums.KycStatus;
+import com.cani.entity.enums.SkillVerificationStatus;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
 import com.cani.entity.enums.VerificationStatus;
@@ -18,6 +21,7 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.AuditLogRepository;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.SkillVerificationRequestRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,6 +61,9 @@ class AdminUserServiceTest {
 
     @Mock
     private EventOrganizerRepository eventOrganizerRepository;
+
+    @Mock
+    private SkillVerificationRequestRepository skillVerificationRequestRepository;
 
     @Mock
     private AuditLogService auditLogService;
@@ -136,6 +143,9 @@ class AdminUserServiceTest {
     void testGetUsers_Success() {
         Page<User> page = new PageImpl<>(List.of(sampleWorkerUser, sampleEoUser), PageRequest.of(0, 10), 2);
         when(userRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
+        when(eventOrganizerRepository.findByUser_UserIdIn(List.of(eoUserId))).thenReturn(List.of(sampleEo));
+        when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId()))).thenReturn(List.of());
 
         UserFilterRequest filter = UserFilterRequest.builder()
                 .search("Worker")
@@ -153,10 +163,75 @@ class AdminUserServiceTest {
     }
 
     @Test
+    @DisplayName("getUsers - Worker đã eKYC APPROVED và skill APPROVED hiển thị đúng trạng thái")
+    void testGetUsers_WorkerWithApprovedKycAndApprovedSkill() {
+        SkillVerificationRequest approvedReq = SkillVerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .worker(sampleWorker)
+                .status(SkillVerificationStatus.APPROVED)
+                .createdAt(Instant.now())
+                .build();
+
+        when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sampleWorkerUser), PageRequest.of(0, 10), 1));
+        when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
+        when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId())))
+                .thenReturn(List.of(approvedReq));
+
+        PageResponse<UserSummaryResponseDto> result = adminUserService.getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).hasSize(1);
+        UserSummaryResponseDto workerDto = result.getContent().get(0);
+        assertThat(workerDto.getKycStatus()).isEqualTo("APPROVED");
+        assertThat(workerDto.getSkillStatus()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    @DisplayName("getUsers - Worker chưa từng kê khai kỹ năng thì skillStatus trả về NOT_FOUND")
+    void testGetUsers_WorkerWithoutSkillDeclaration_ReturnsNotFound() {
+        when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(sampleWorkerUser), PageRequest.of(0, 10), 1));
+        when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
+        when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId())))
+                .thenReturn(List.of());
+
+        PageResponse<UserSummaryResponseDto> result = adminUserService.getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).hasSize(1);
+        UserSummaryResponseDto workerDto = result.getContent().get(0);
+        assertThat(workerDto.getKycStatus()).isEqualTo("APPROVED");
+        assertThat(workerDto.getSkillStatus()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("getUsers - Người dùng vai trò ADMIN thì kycStatus và skillStatus đều là null")
+    void testGetUsers_AdminRole_BothStatusesNull() {
+        User adminUser = User.builder()
+                .userId(adminUserId)
+                .email("admin@cani.vn")
+                .fullName("Platform Admin")
+                .role(UserRole.ADMIN)
+                .status(UserStatus.ACTIVE)
+                .build();
+
+        when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(adminUser), PageRequest.of(0, 10), 1));
+
+        PageResponse<UserSummaryResponseDto> result = adminUserService.getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).hasSize(1);
+        UserSummaryResponseDto adminDto = result.getContent().get(0);
+        assertThat(adminDto.getKycStatus()).isNull();
+        assertThat(adminDto.getSkillStatus()).isNull();
+    }
+
+    @Test
     @DisplayName("getUserById - Trả về chi tiết người dùng Worker kèm thông tin Worker profile")
     void testGetUserById_Worker_Success() {
         when(userRepository.findById(workerUserId)).thenReturn(Optional.of(sampleWorkerUser));
         when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(sampleWorker));
+        when(skillVerificationRequestRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(sampleWorker.getWorkerId()))
+                .thenReturn(List.of());
 
         UserDetailResponseDto result = adminUserService.getUserById(workerUserId);
 
@@ -165,6 +240,7 @@ class AdminUserServiceTest {
         assertThat(result.getFullName()).isEqualTo("Nguyen Van Worker");
         assertThat(result.getWorkerProfile()).isNotNull();
         assertThat(result.getWorkerProfile().getKycStatus()).isEqualTo(KycStatus.APPROVED);
+        assertThat(result.getWorkerProfile().getSkillStatus()).isEqualTo("NOT_FOUND");
         assertThat(result.getWorkerProfile().getReliabilityScore()).isEqualTo(98);
         assertThat(result.getEoProfile()).isNull();
     }

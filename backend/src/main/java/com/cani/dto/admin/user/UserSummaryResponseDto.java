@@ -24,6 +24,8 @@ public class UserSummaryResponseDto {
     private UserStatus status;
     private String avatarUrl;
     private Boolean emailVerified;
+    private String kycStatus;
+    private String skillStatus;
     private Instant lastLoginAt;
     private Instant createdAt;
     private Instant updatedAt;

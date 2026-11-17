@@ -4,6 +4,7 @@ import com.cani.dto.admin.user.*;
 import com.cani.dto.response.PageResponse;
 import com.cani.entity.AuditLog;
 import com.cani.entity.EventOrganizer;
+import com.cani.entity.SkillVerificationRequest;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.enums.UserRole;
@@ -12,6 +13,7 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.AuditLogRepository;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.SkillVerificationRequestRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import com.cani.repository.specification.UserSpecification;
@@ -25,9 +27,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,6 +42,7 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final WorkerRepository workerRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
+    private final SkillVerificationRequestRepository skillVerificationRequestRepository;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
@@ -47,7 +52,55 @@ public class AdminUserService {
     public PageResponse<UserSummaryResponseDto> getUsers(UserFilterRequest filter, Pageable pageable) {
         Pageable sanitizedPageable = sanitizePageable(pageable);
         Page<User> userPage = userRepository.findAll(UserSpecification.filterUsers(filter), sanitizedPageable);
-        return PageResponse.from(userPage.map(this::toSummaryDto));
+        List<User> users = userPage.getContent();
+
+        if (users.isEmpty()) {
+            return PageResponse.from(userPage.map(this::toSummaryDto));
+        }
+
+        List<UUID> workerUserIds = users.stream()
+                .filter(u -> u.getRole() == UserRole.WORKER)
+                .map(User::getUserId)
+                .toList();
+
+        List<UUID> eoUserIds = users.stream()
+                .filter(u -> u.getRole() == UserRole.EVENT_ORGANIZER)
+                .map(User::getUserId)
+                .toList();
+
+        Map<UUID, Worker> workerByUserMap = workerUserIds.isEmpty() ? Map.of() :
+                workerRepository.findByUser_UserIdIn(workerUserIds).stream()
+                        .collect(Collectors.toMap(w -> w.getUser().getUserId(), w -> w, (existing, replacement) -> existing));
+
+        List<UUID> workerIds = workerByUserMap.values().stream()
+                .map(Worker::getWorkerId)
+                .toList();
+
+        Map<UUID, String> latestSkillByWorkerMap;
+        if (workerIds.isEmpty()) {
+            latestSkillByWorkerMap = Map.of();
+        } else {
+            List<SkillVerificationRequest> skillRequests = skillVerificationRequestRepository.findByWorker_WorkerIdIn(workerIds);
+            latestSkillByWorkerMap = skillRequests.stream()
+                    .collect(Collectors.groupingBy(
+                            req -> req.getWorker().getWorkerId(),
+                            Collectors.collectingAndThen(
+                                    Collectors.maxBy(Comparator.comparing(
+                                            SkillVerificationRequest::getCreatedAt,
+                                            Comparator.nullsLast(Comparator.naturalOrder())
+                                    )),
+                                    optReq -> optReq
+                                            .map(req -> req.getStatus() != null ? req.getStatus().name() : "NOT_FOUND")
+                                            .orElse("NOT_FOUND")
+                            )
+                    ));
+        }
+
+        Map<UUID, EventOrganizer> eoByUserMap = eoUserIds.isEmpty() ? Map.of() :
+                eventOrganizerRepository.findByUser_UserIdIn(eoUserIds).stream()
+                        .collect(Collectors.toMap(eo -> eo.getUser().getUserId(), eo -> eo, (existing, replacement) -> existing));
+
+        return PageResponse.from(userPage.map(user -> toSummaryDto(user, workerByUserMap, eoByUserMap, latestSkillByWorkerMap)));
     }
 
     /**
@@ -133,7 +186,27 @@ public class AdminUserService {
         return pageable;
     }
 
-    private UserSummaryResponseDto toSummaryDto(User user) {
+    private UserSummaryResponseDto toSummaryDto(
+            User user,
+            Map<UUID, Worker> workerByUserMap,
+            Map<UUID, EventOrganizer> eoByUserMap,
+            Map<UUID, String> latestSkillByWorkerMap
+    ) {
+        String kycStatus = null;
+        String skillStatus = null;
+
+        if (user.getRole() == UserRole.WORKER) {
+            Worker worker = workerByUserMap.get(user.getUserId());
+            kycStatus = (worker != null && worker.getKycStatus() != null) ? worker.getKycStatus().name() : null;
+            skillStatus = (worker != null)
+                    ? latestSkillByWorkerMap.getOrDefault(worker.getWorkerId(), "NOT_FOUND")
+                    : "NOT_FOUND";
+        } else if (user.getRole() == UserRole.EVENT_ORGANIZER) {
+            EventOrganizer eo = eoByUserMap.get(user.getUserId());
+            kycStatus = (eo != null && eo.getVerificationStatus() != null) ? eo.getVerificationStatus().name() : null;
+            skillStatus = null;
+        }
+
         return UserSummaryResponseDto.builder()
                 .id(user.getUserId())
                 .email(user.getEmail())
@@ -143,10 +216,16 @@ public class AdminUserService {
                 .status(user.getStatus())
                 .avatarUrl(user.getAvatarUrl())
                 .emailVerified(user.getEmailVerified())
+                .kycStatus(kycStatus)
+                .skillStatus(skillStatus)
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
+    }
+
+    private UserSummaryResponseDto toSummaryDto(User user) {
+        return toSummaryDto(user, Map.of(), Map.of(), Map.of());
     }
 
     private UserDetailResponseDto toDetailDto(User user) {
@@ -168,11 +247,14 @@ public class AdminUserService {
     }
 
     private WorkerProfileSummaryDto toWorkerProfileDto(Worker worker) {
+        String skillStatus = resolveWorkerSkillStatus(worker.getWorkerId());
+
         return WorkerProfileSummaryDto.builder()
                 .workerId(worker.getWorkerId())
                 .fullName(worker.getFullName())
                 .cccdNumber(worker.getCccdNumber())
                 .kycStatus(worker.getKycStatus())
+                .skillStatus(skillStatus)
                 .reliabilityScore(worker.getReliabilityScore())
                 .ratingAvg(worker.getRatingAvg())
                 .ratingCount(worker.getRatingCount())
@@ -182,6 +264,18 @@ public class AdminUserService {
                 .isOnline(worker.getIsOnline())
                 .yearsExperience(worker.getYearsExperience())
                 .build();
+    }
+
+    private String resolveWorkerSkillStatus(UUID workerId) {
+        if (workerId == null) {
+            return "NOT_FOUND";
+        }
+        List<SkillVerificationRequest> list = skillVerificationRequestRepository
+                .findByWorker_WorkerIdOrderByCreatedAtDesc(workerId);
+        if (list == null || list.isEmpty() || list.get(0).getStatus() == null) {
+            return "NOT_FOUND";
+        }
+        return list.get(0).getStatus().name();
     }
 
     private EoProfileSummaryDto toEoProfileDto(EventOrganizer eo) {

@@ -9,9 +9,6 @@ import { RevenueDashboardView } from '../../features/revenue-dashboard';
 import { RsAppealsView } from '../../features/rs-appeals';
 import { NoShowView } from '../../features/no-shows';
 import AdminSidebar from './components/AdminSidebar';
-// Tạm thời ẩn tính năng eKYC và Thẩm định kỹ năng AI theo yêu cầu nhóm để xem xét thêm
-// import { EkycVerificationView } from '../../features/ekyc-verification';
-// import { SkillVerificationView } from '../../features/skill-verification';
 import './AdminPage.css';
 
 const TAB_METADATA = {

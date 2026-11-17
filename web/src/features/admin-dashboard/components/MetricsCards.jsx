@@ -14,7 +14,7 @@ const formatVnd = (amount) => {
 
 export const MetricsCards = ({ metrics, onNavigateTab }) => {
   if (!metrics) return null;
-  const { users = {}, verifications = {}, operations = {}, revenue = {} } = metrics;
+  const { users = {}, operations = {}, revenue = {} } = metrics;
 
   return (
     <div className="dashboard-metrics-grid">
@@ -77,29 +77,7 @@ export const MetricsCards = ({ metrics, onNavigateTab }) => {
         </div>
       </div>
 
-      {/* 3. Thống kê Thẩm định chờ xử lý */}
-      <div className="dashboard-metric-section">
-        <div className="metric-section-header">
-          <div className="metric-section-title"><span>Hàng Đợi Chờ Thẩm Định</span></div>
-          <span className="metric-section-badge">Cần xử lý</span>
-        </div>
-        <div className="metric-kpi-main">
-          <div>
-            <div className="metric-kpi-val">{verifications.totalPendingCount?.toLocaleString('vi-VN') || 0}</div>
-            <div className="metric-kpi-sub">Tổng hồ sơ đang chờ xét duyệt</div>
-          </div>
-        </div>
-        <div className="metric-sub-items">
-          <div className="metric-sub-item"><span className="metric-sub-label">Căn cước người lao động</span><span className="metric-sub-val">{verifications.pendingWorkerEkycCount || 0}</span></div>
-          <div className="metric-sub-item"><span className="metric-sub-label">Thông tin doanh nghiệp</span><span className="metric-sub-val">{verifications.pendingEoEkycCount || 0}</span></div>
-          <div className="metric-sub-item" style={{ gridColumn: 'span 2' }}>
-            <span className="metric-sub-label">Chứng chỉ kỹ năng tay nghề</span>
-            <span className="metric-sub-val">{verifications.pendingSkillVerificationsCount || 0}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Thống kê Vận hành Sự kiện & Ca làm việc */}
+      {/* 3. Thống kê Vận hành Sự kiện & Ca làm việc */}
       <div className="dashboard-metric-section">
         <div className="metric-section-header">
           <div className="metric-section-title"><span>Sự Kiện & Ca Làm Việc</span></div>

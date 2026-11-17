@@ -106,10 +106,12 @@ export default function EOSubscriptionTab() {
           <div className="sub-metric-item">
             <span className="sub-metric-label">Hạn sử dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem', color: '#e2e8f0' }}>
-              {currentSubscription?.endDate ? formatDate(currentSubscription.endDate) : 'Theo số lượng sự kiện'}
+              {currentSubscription?.expiresAt || currentSubscription?.endDate
+                ? formatDate(currentSubscription.expiresAt || currentSubscription.endDate)
+                : 'Theo số lượng sự kiện'}
             </span>
             <span className="sub-metric-hint">
-              Mã giao dịch: {currentSubscription?.transactionRef || 'N/A'}
+              Mã gói: {currentSubscription?.subscriptionId ? currentSubscription.subscriptionId.substring(0, 8) : 'N/A'}
             </span>
           </div>
         </div>
@@ -169,7 +171,7 @@ export default function EOSubscriptionTab() {
                     <div className="pricing-cost">
                       <span className="cost-amount">{formatCurrency(plan.price)}</span>
                       <span className="cost-currency">VNĐ</span>
-                      <span className="cost-period">/ {plan.eventQuota ? `${plan.eventQuota} sự kiện` : 'gói'}</span>
+                      <span className="cost-period">/ {plan.maxEvents ? `${plan.maxEvents} sự kiện` : (plan.eventQuota ? `${plan.eventQuota} sự kiện` : 'gói')}</span>
                     </div>
 
                     <ul className="pricing-features">
@@ -252,9 +254,9 @@ export default function EOSubscriptionTab() {
               </thead>
               <tbody>
                 {history.map((item) => (
-                  <tr key={item.subscriptionId}>
+                  <tr key={item.subscriptionId || idx}>
                     <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                      {item.transactionRef || item.subscriptionId.substring(0, 8)}
+                      {item.transactionRef || (item.subscriptionId ? item.subscriptionId.substring(0, 8) : 'GÓI-CANI')}
                     </td>
                     <td>
                       <strong>{item.planName}</strong>
@@ -263,18 +265,18 @@ export default function EOSubscriptionTab() {
                       </div>
                     </td>
                     <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                      {formatCurrency(item.amountPaid)} đ
+                      {formatCurrency(item.price ?? item.amountPaid ?? 0)} đ
                     </td>
                     <td>
-                      <span>VNPay / PayOS</span>
+                      <span>PayOS VietQR</span>
                     </td>
                     <td>
                       <span style={{ fontWeight: 600, color: item.remainingEvents > 0 ? '#059669' : '#64748b' }}>
-                        {item.remainingEvents} / {item.eventsQuota || 1} còn lại
+                        {item.remainingEvents} / {item.maxEvents || item.eventsQuota || 1} còn lại
                       </span>
                     </td>
                     <td style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                      {formatDate(item.startDate)}
+                      {formatDate(item.createdAt || item.startsAt || item.startDate)}
                     </td>
                     <td>
                       <span

@@ -375,15 +375,16 @@ const ShiftCreateModal = ({
             >
               <div style={{ fontSize: '0.8rem', color: '#1e3a8a' }}>
                 <strong>Gợi ý mức lương:</strong>{' '}
-                Khung thị trường <strong>{wageRec.min.toLocaleString()}đ - {wageRec.max.toLocaleString()}đ/giờ</strong>{' '}
-                (Khuyên dùng: <strong>{wageRec.recommended.toLocaleString()}đ/giờ</strong>)
+                Khung thị trường <strong>{((wageRec && wageRec.min) || 40000).toLocaleString()}đ - {((wageRec && wageRec.max) || 60000).toLocaleString()}đ/giờ</strong>{' '}
+                (Khuyên dùng: <strong>{((wageRec && wageRec.recommended) || 45000).toLocaleString()}đ/giờ</strong>)
               </div>
               <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => {
-                    setNewShift({ ...newShift, hourlyWage: wageRec.min });
-                    setShiftPackageWage(Math.round(wageRec.min * safeHours));
+                    const minVal = (wageRec && wageRec.min) || 40000;
+                    setNewShift({ ...newShift, hourlyWage: minVal });
+                    setShiftPackageWage(Math.round(minVal * safeHours));
                   }}
                   style={{
                     fontSize: '0.73rem',
@@ -396,13 +397,14 @@ const ShiftCreateModal = ({
                     cursor: 'pointer',
                   }}
                 >
-                  Sàn: {wageRec.min.toLocaleString()}đ
+                  Sàn: {((wageRec && wageRec.min) || 40000).toLocaleString()}đ
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setNewShift({ ...newShift, hourlyWage: wageRec.recommended });
-                    setShiftPackageWage(Math.round(wageRec.recommended * safeHours));
+                    const recVal = (wageRec && wageRec.recommended) || 45000;
+                    setNewShift({ ...newShift, hourlyWage: recVal });
+                    setShiftPackageWage(Math.round(recVal * safeHours));
                   }}
                   style={{
                     fontSize: '0.73rem',
@@ -415,13 +417,14 @@ const ShiftCreateModal = ({
                     cursor: 'pointer',
                   }}
                 >
-                  Khuyên dùng: {wageRec.recommended.toLocaleString()}đ
+                  Khuyên dùng: {((wageRec && wageRec.recommended) || 45000).toLocaleString()}đ
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setNewShift({ ...newShift, hourlyWage: wageRec.max });
-                    setShiftPackageWage(Math.round(wageRec.max * safeHours));
+                    const maxVal = (wageRec && wageRec.max) || 60000;
+                    setNewShift({ ...newShift, hourlyWage: maxVal });
+                    setShiftPackageWage(Math.round(maxVal * safeHours));
                   }}
                   style={{
                     fontSize: '0.73rem',
@@ -434,7 +437,7 @@ const ShiftCreateModal = ({
                     cursor: 'pointer',
                   }}
                 >
-                  Thu hút nhanh: {wageRec.max.toLocaleString()}đ
+                  Thu hút nhanh: {((wageRec && wageRec.max) || 60000).toLocaleString()}đ
                 </button>
               </div>
             </div>

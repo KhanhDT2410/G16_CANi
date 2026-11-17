@@ -48,6 +48,7 @@ export const ADMIN_NAV_GROUPS = [
       { id: 'config_matching', label: 'Thuật Toán Ghép Nối', icon: <MatchingConfigIcon /> },
       { id: 'config_operation', label: 'Vận Hành & Điểm Uy Tín', icon: <OperationConfigIcon /> },
       { id: 'config_financial', label: 'Tài Chính & Hoa Hồng', icon: <FinancialConfigIcon /> },
+      { id: 'plans', label: 'Quản Lý Gói Dịch Vụ', icon: <FinancialConfigIcon /> },
       { id: 'config_general', label: 'Hệ Thống & Tài Khoản', icon: <GeneralConfigIcon /> },
     ],
   },

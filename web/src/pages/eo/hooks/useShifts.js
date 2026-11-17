@@ -111,12 +111,12 @@ export function calculateShiftRiskAnalysis(shift = {}) {
   if (wage < rec.min * 0.8) {
     riskScore += 55;
     reasons.push(
-      `Thù lao (${wage.toLocaleString()}đ/giờ) thấp hơn trên 20% so với mức sàn khuyến nghị (${rec.min.toLocaleString()}đ/giờ) cho vị trí "${role}".`
+      `Thù lao (${(wage || 0).toLocaleString()}đ/giờ) thấp hơn trên 20% so với mức sàn khuyến nghị (${((rec && rec.min) || 40000).toLocaleString()}đ/giờ) cho vị trí "${role}".`
     );
   } else if (wage < rec.min) {
     riskScore += 35;
     reasons.push(
-      `Thù lao (${wage.toLocaleString()}đ/giờ) đang thấp hơn mức tối thiểu đề xuất (${rec.min.toLocaleString()}đ/giờ) của vị trí "${role}".`
+      `Thù lao (${(wage || 0).toLocaleString()}đ/giờ) đang thấp hơn mức tối thiểu đề xuất (${((rec && rec.min) || 40000).toLocaleString()}đ/giờ) của vị trí "${role}".`
     );
   } else if (wage >= rec.max) {
     riskScore -= 10;

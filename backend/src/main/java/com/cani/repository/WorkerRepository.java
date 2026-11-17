@@ -14,6 +14,8 @@ public interface WorkerRepository extends JpaRepository<Worker, UUID> {
 
     Optional<Worker> findByUser_UserId(UUID userId);
 
+    List<Worker> findByUser_UserIdIn(Collection<UUID> userIds);
+
     List<Worker> findByIsOnlineTrue();
 
     boolean existsByCccdNumberInAndWorkerIdNot(Collection<String> cccdNumbers, UUID workerId);

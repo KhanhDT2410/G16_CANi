@@ -25,3 +25,19 @@ export const USER_STATUS_LABELS = {
   SUSPENDED: { label: 'Tạm đình chỉ', badgeClass: 'badge-status-suspended' },
   PENDING_VERIFICATION: { label: 'Chờ xác thực', badgeClass: 'badge-status-pending' },
 };
+
+export const KYC_STATUS_LABELS = {
+  APPROVED: { label: 'Đã xác thực', badgeClass: 'badge-status-active' },
+  PENDING: { label: 'Chờ duyệt', badgeClass: 'badge-status-pending' },
+  PENDING_REVIEW: { label: 'Chờ duyệt', badgeClass: 'badge-status-pending' },
+  REJECTED: { label: 'Bị từ chối', badgeClass: 'badge-status-locked' },
+  SUSPICIOUS: { label: 'Nghi vấn', badgeClass: 'badge-status-suspended' },
+  NOT_SUBMITTED: { label: 'Chưa nộp', badgeClass: 'badge-status-pending' },
+  UNVERIFIED: { label: 'Chưa xác thực', badgeClass: 'badge-status-pending' },
+};
+
+export const SKILL_STATUS_LABELS = {
+  APPROVED: { label: 'Đã duyệt', badgeClass: 'badge-status-active' },
+  REJECTED: { label: 'Bị từ chối', badgeClass: 'badge-status-locked' },
+  NOT_FOUND: { label: 'Chưa kê khai', badgeClass: 'badge-status-pending' },
+};

@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { USER_ROLE_LABELS, USER_STATUS_LABELS } from '../types/userManagement.constants';
+import {
+  USER_ROLE_LABELS,
+  USER_STATUS_LABELS,
+  KYC_STATUS_LABELS,
+  SKILL_STATUS_LABELS,
+} from '../types/userManagement.constants';
 
 const DetailItem = ({ label, value, color, badgeClass }) => (
   <div>
@@ -53,8 +58,10 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
           <>
             <div className="user-modal-body">
               {/* Thông tin cơ bản */}
-              <div className="detail-section">
-                <h4>Thông Tin Cơ Bản</h4>
+              <div className="user-detail-section">
+                <div className="detail-section-title">
+                  <h4>Thông Tin Cơ Bản</h4>
+                </div>
                 <div className="detail-grid">
                   <DetailItem label="Họ và tên" value={user.fullName} />
                   <DetailItem label="Email" value={user.email} />
@@ -69,11 +76,23 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
 
               {/* Hồ sơ Worker nếu có */}
               {user.workerProfile && (
-                <div className="detail-section">
-                  <h4>Hồ Sơ Nhân Sự (Worker Profile)</h4>
+                <div className="user-detail-section">
+                  <div className="detail-section-title">
+                    <h4>Hồ Sơ Nhân Sự</h4>
+                    <span className="detail-section-subtitle">(Worker Profile)</span>
+                  </div>
                   <div className="detail-grid">
                     <DetailItem label="Số CCCD" value={user.workerProfile.cccdNumber} />
-                    <DetailItem label="Trạng thái eKYC" value={user.workerProfile.kycStatus} />
+                    <DetailItem
+                      label="Trạng thái eKYC"
+                      value={KYC_STATUS_LABELS[user.workerProfile.kycStatus]?.label || user.workerProfile.kycStatus}
+                      badgeClass={KYC_STATUS_LABELS[user.workerProfile.kycStatus]?.badgeClass}
+                    />
+                    <DetailItem
+                      label="Trạng thái Skill"
+                      value={SKILL_STATUS_LABELS[user.workerProfile.skillStatus]?.label || user.workerProfile.skillStatus || 'Chưa kê khai'}
+                      badgeClass={SKILL_STATUS_LABELS[user.workerProfile.skillStatus]?.badgeClass || 'badge-status-pending'}
+                    />
                     <DetailItem label="Điểm uy tín" value={`${user.workerProfile.reliabilityScore} / 100`} color="#16a34a" />
                     <DetailItem label="Đánh giá trung bình" value={`${user.workerProfile.ratingAvg} (${user.workerProfile.ratingCount || 0} lượt)`} color="#d97706" />
                     <DetailItem label="Ca hoàn thành" value={`${user.workerProfile.totalShiftsCompleted} ca`} />
@@ -84,8 +103,11 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
 
               {/* Hồ sơ Nhà tổ chức nếu có */}
               {user.eoProfile && (
-                <div className="detail-section">
-                  <h4>Hồ Sơ Nhà Tổ Chức (Event Organizer)</h4>
+                <div className="user-detail-section">
+                  <div className="detail-section-title">
+                    <h4>Hồ Sơ Nhà Tổ Chức</h4>
+                    <span className="detail-section-subtitle">(Event Organizer)</span>
+                  </div>
                   <div className="detail-grid">
                     <DetailItem label="Tên công ty / Đơn vị" value={user.eoProfile.companyName} />
                     <DetailItem label="Mã số thuế" value={user.eoProfile.taxId} />

@@ -19,6 +19,7 @@ public class WorkerProfileSummaryDto {
     private String fullName;
     private String cccdNumber;
     private KycStatus kycStatus;
+    private String skillStatus;
     private Integer reliabilityScore;
     private BigDecimal ratingAvg;
     private Integer ratingCount;

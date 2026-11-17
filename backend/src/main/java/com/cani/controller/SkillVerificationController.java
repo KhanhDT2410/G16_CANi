@@ -72,9 +72,8 @@ public class SkillVerificationController {
         SkillVerificationResponseDto response = verificationService.submitVerification(workerId, file, skillId, notes);
 
         String message = switch (response.getRoutingDecision()) {
-            case AUTO_APPROVE -> "Xác thực AI thành công! Kỹ năng đã được phê duyệt và cộng SP_verify.";
-            case ADMIN_REVIEW -> "Tài liệu hợp lệ ở mức trung bình. Đã chuyển hồ sơ sang hàng đợi Admin duyệt.";
-            case REJECT -> "Tài liệu không đạt chuẩn xác thực: " + response.getRoutingReason();
+            case AUTO_APPROVE -> "Xác thực AI thành công! Kỹ năng đã được phê duyệt tự động và cộng SP_verify.";
+            case ADMIN_REVIEW, REJECT -> "Tài liệu không đạt chuẩn xác thực AI: " + response.getRoutingReason();
         };
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response, message));

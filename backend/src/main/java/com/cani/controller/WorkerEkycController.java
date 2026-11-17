@@ -51,9 +51,7 @@ public class WorkerEkycController {
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
-            message = "Xác thực danh tính eKYC thành công! Tài khoản của bạn đã được cấp tích xanh định danh.";
-        } else if ("PENDING_REVIEW".equals(result.getStatus())) {
-            message = "Hồ sơ eKYC của bạn đã được tiếp nhận và đang chờ đội ngũ CSKH/Admin phê duyệt.";
+            message = "Xác thực danh tính eKYC thành công! Tài khoản của bạn đã được tự động cấp tích xanh định danh.";
         } else {
             message = "Xác thực eKYC không thành công: " + result.getRoutingReason();
         }

@@ -108,7 +108,7 @@ class WorkerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Chuyển hàng đợi Admin duyệt khi ảnh hơi mờ hoặc điểm khớp khuôn mặt trung bình")
+    @DisplayName("Từ chối eKYC và yêu cầu chụp lại khi ảnh hơi mờ hoặc điểm khớp khuôn mặt chưa đạt")
     void shouldSetPendingReviewWhenAiConfidenceIsMedium() {
         EkycIdentityResultDto aiResult = EkycIdentityResultDto.builder()
                 .idNumber("079201012345")
@@ -116,7 +116,7 @@ class WorkerEkycServiceTest {
                 .ocrConfidence(0.75)
                 .faceMatchScore(72.0)
                 .routingDecision("MANUAL_REVIEW")
-                .routingReason("Ảnh selfie có bóng mờ nhẹ, cần Admin thẩm định thủ công")
+                .routingReason("Ảnh selfie có bóng mờ nhẹ, cần chụp lại rõ nét")
                 .build();
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
@@ -131,9 +131,9 @@ class WorkerEkycServiceTest {
         EkycVerificationResultDto result = workerEkycService.submitEkyc(workerUser.getUserId(), frontFile, backFile, selfieFile);
 
         assertThat(result).isNotNull();
-        assertThat(result.getStatus()).isEqualTo("PENDING_REVIEW");
-        assertThat(result.getRoutingDecision()).isEqualTo("MANUAL_REVIEW");
-        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.PENDING);
+        assertThat(result.getStatus()).isEqualTo("REJECTED");
+        assertThat(result.getRoutingDecision()).isEqualTo("REJECTED");
+        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.REJECTED);
     }
 
     @Test
@@ -163,10 +163,8 @@ class WorkerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Chuyển sang MANUAL_REVIEW khi chạy MOCK_EKYC nhưng bật cờ EKYC_STRICT=true")
-    void shouldRouteToManualReviewWhenMockProviderAndStrictModeEnabled() {
-        ReflectionTestUtils.setField(workerEkycService, "ekycStrict", true);
-
+    @DisplayName("AI tự động phê duyệt ngay và cấp tích xanh khi hồ sơ đạt chuẩn (AUTO_APPROVED)")
+    void shouldAutoApproveWhenAiConfidenceIsHigh() {
         EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
                 .idNumber("079201012345")
                 .fullName("NGUYỄN VĂN AN")
@@ -186,10 +184,9 @@ class WorkerEkycServiceTest {
 
         EkycVerificationResultDto result = workerEkycService.submitEkyc(workerUser.getUserId(), frontFile, backFile, selfieFile);
 
-        assertThat(result.getStatus()).isEqualTo("PENDING_REVIEW");
-        assertThat(result.getRoutingDecision()).isEqualTo("MANUAL_REVIEW");
-        assertThat(result.getRoutingReason()).contains("EKYC_STRICT=true");
-        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.PENDING);
+        assertThat(result.getStatus()).isEqualTo("APPROVED");
+        assertThat(result.getRoutingDecision()).isEqualTo("AUTO_APPROVED");
+        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
     }
 
     @Test

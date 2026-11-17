@@ -168,8 +168,8 @@ class SkillVerificationServiceTest {
         );
 
         assertNotNull(response);
-        assertEquals(RoutingDecision.ADMIN_REVIEW, response.getRoutingDecision());
-        assertEquals(SkillVerificationStatus.PENDING_REVIEW, response.getStatus());
+        assertEquals(RoutingDecision.REJECT, response.getRoutingDecision());
+        assertEquals(SkillVerificationStatus.REJECTED, response.getStatus());
         assertEquals(0, response.getSpAwarded());
 
         verify(workerSkillPointRepository, never()).save(any(WorkerSkillPoint.class));

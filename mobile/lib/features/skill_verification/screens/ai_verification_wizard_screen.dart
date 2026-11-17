@@ -355,7 +355,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
 
   Widget _buildStep3Result() {
     final result = ref.watch(skillVerificationProvider).lastResult;
-    final isAutoApprove = result?.routingDecision == 'AUTO_APPROVE';
+    final isAutoApprove = result?.routingDecision == 'AUTO_APPROVE' || result?.status == 'APPROVED';
 
     return Column(
       children: [
@@ -366,7 +366,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
             decoration: BoxDecoration(
               color: SkillHubColors.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isAutoApprove ? Colors.green : Colors.orange, width: 1.5),
+              border: Border.all(color: isAutoApprove ? Colors.green : Colors.red, width: 1.5),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -375,35 +375,62 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     width: 58,
                     height: 58,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFCAF0F8),
+                      color: isAutoApprove ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
                       shape: BoxShape.circle,
-                      border: Border.all(color: isAutoApprove ? Colors.green : Colors.orange, width: 2),
+                      border: Border.all(color: isAutoApprove ? Colors.green : Colors.red, width: 2),
                     ),
                     child: Icon(
-                      isAutoApprove ? Icons.check : Icons.access_time,
-                      color: isAutoApprove ? Colors.green : Colors.orange,
+                      isAutoApprove ? Icons.check_circle_outline : Icons.cancel_outlined,
+                      color: isAutoApprove ? Colors.green : Colors.red,
                       size: 32,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    isAutoApprove ? 'Chứng chỉ hợp lệ' : 'Đang chờ quản trị viên duyệt',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: SkillHubColors.textPrimary),
+                    isAutoApprove ? 'Chứng chỉ hợp lệ - Đã duyệt ngay' : 'Chứng chỉ chưa đạt chuẩn nhận diện',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: isAutoApprove ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F9FD),
+                      color: isAutoApprove ? const Color(0xFFE8F9FD) : const Color(0xFFFEE2E2),
                       borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: SkillHubColors.ctaPrimary),
+                      border: Border.all(color: isAutoApprove ? SkillHubColors.ctaPrimary : Colors.redAccent),
                     ),
                     child: Text(
-                      '+${result?.spAwarded ?? 25} SP đã cộng',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: SkillHubColors.ctaHover),
+                      isAutoApprove
+                          ? '+${result?.spAwarded ?? 25} SP đã cộng'
+                          : 'Chưa đủ điều kiện cấp SP',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isAutoApprove ? SkillHubColors.ctaHover : const Color(0xFFDC2626),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
+                  if (!isAutoApprove && result?.routingReason != null && result!.routingReason.isNotEmpty) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFECACA)),
+                      ),
+                      child: Text(
+                        result.routingReason,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B), height: 1.4),
+                      ),
+                    ),
+                  ],
                   _buildResultRow('Kỹ năng nhận diện:', result?.skillName ?? 'Nghiệp vụ sự kiện'),
                   _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Cơ sở đào tạo uy tín'),
                   _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Khớp thông tin CCCD'),
@@ -418,12 +445,17 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
           width: double.infinity,
           height: 48,
           child: ElevatedButton(
-            onPressed: () => setState(() => _step = 4),
+            onPressed: isAutoApprove
+                ? () => setState(() => _step = 4)
+                : () => setState(() => _step = 1),
             style: ElevatedButton.styleFrom(
-              backgroundColor: SkillHubColors.ctaPrimary,
+              backgroundColor: isAutoApprove ? SkillHubColors.ctaPrimary : const Color(0xFFEF4444),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('TIẾP TỤC CẬP NHẬT HỒ SƠ', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+            child: Text(
+              isAutoApprove ? 'TIẾP TỤC CẬP NHẬT HỒ SƠ' : 'CHỤP LẠI TÀI LIỆU KHÁC',
+              style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+            ),
           ),
         ),
       ],

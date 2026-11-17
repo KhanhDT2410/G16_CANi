@@ -254,17 +254,52 @@ const EventCreationWizardModal = ({
     const str = text.trim().toLowerCase();
     if (str.length < 3) return false;
 
-    // 1. Ký tự đơn lặp lại liên tiếp >= 4 lần (ví dụ: aaaaa, 11111, .....)
-    if (/^(.)\1{3,}$/.test(str)) return true;
+    // 1. Ký tự đơn lặp lại liên tiếp >= 4 lần (ví dụ: aaaaa, 11111)
+    if (/(.)\1{3,}/.test(str)) return true;
 
     // 2. Cặp ký tự lặp lại >= 3 lần (ví dụ: ababab, cdcdcd)
-    if (/^(.{2})\1{2,}$/.test(str)) return true;
-
-    // 3. Nguyên âm tiếng Việt & tiếng Anh
-    const VOWELS = /[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/i;
+    if (/(.{2})\1{2,}/.test(str)) return true;
 
     // Tách từ theo khoảng trắng
     const words = str.split(/\s+/).filter(Boolean);
+
+    // 3. Lặp từ liên tiếp >= 3 lần (ví dụ: "ád ád ád", "test test test")
+    let consecutiveWord = null;
+    let consecutiveCount = 0;
+    for (const w of words) {
+      if (w === consecutiveWord) {
+        consecutiveCount++;
+        if (consecutiveCount >= 3) return true;
+      } else {
+        consecutiveWord = w;
+        consecutiveCount = 1;
+      }
+    }
+
+    // 4. Các mẫu cào phím (Keyboard mash) phổ biến (Telex / Qwerty home row)
+    const MASH_PATTERNS = /(asdasd|sdasd|ádasd|sdada|adasd|sdfsdf|dfghj|fghjk|ghjkl|qwerty|zxcvb)/i;
+    if (MASH_PATTERNS.test(str)) return true;
+
+    // 5. Kiểm tra tần suất từ chiếm ưu thế bất thường (ví dụ: "ádas ád ád ád ádasd ád")
+    if (words.length >= 4) {
+      const counts = {};
+      for (const w of words) counts[w] = (counts[w] || 0) + 1;
+      const maxCount = Math.max(...Object.values(counts));
+      if (maxCount / words.length >= 0.45) return true;
+    }
+
+    // 6. Độ đa dạng ký tự (Character Diversity / Entropy) trên chuỗi chữ cái
+    const cleanLetters = str.replace(/[^a-zàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/gi, '');
+    if (cleanLetters.length >= 10) {
+      const uniqueChars = new Set(cleanLetters.split('')).size;
+      const ratio = uniqueChars / cleanLetters.length;
+      if (uniqueChars <= 4 || ratio < 0.30) {
+        return true;
+      }
+    }
+
+    // 7. Nguyên âm tiếng Việt & tiếng Anh
+    const VOWELS = /[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/i;
 
     // Kiểm tra từng từ: nếu từ dài >= 4 ký tự nhưng KHÔNG chứa bất kỳ nguyên âm nào (và không phải toàn số)
     const hasVowellessLongWord = words.some((w) => {
@@ -274,11 +309,11 @@ const EventCreationWizardModal = ({
     });
     if (hasVowellessLongWord) return true;
 
-    // 4. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd, asdfgh)
+    // 8. Chuỗi phụ âm liên tiếp >= 5 ký tự không ngắt quãng (như sdfdsfsdfsd, asdfgh)
     const CONSONANTS_RUN = /[^aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ\s\d,.\-_/()]{5,}/i;
     if (CONSONANTS_RUN.test(str)) return true;
 
-    // 5. Chuỗi tổng thể >= 6 ký tự nhưng không có nguyên âm nào
+    // 9. Chuỗi tổng thể >= 6 ký tự nhưng không có nguyên âm nào
     const nonSpace = str.replace(/\s+/g, '');
     if (nonSpace.length >= 6 && !VOWELS.test(nonSpace) && !/^\d+$/.test(nonSpace)) {
       return true;
@@ -338,8 +373,6 @@ const EventCreationWizardModal = ({
       errs.venueAddress = 'Vui lòng chọn hoặc nhập địa chỉ tổ chức cụ thể.';
     } else if (addr.length < 6) {
       errs.venueAddress = 'Địa chỉ tổ chức quá ngắn (tối thiểu 6 ký tự).';
-    } else if (isGibberishOrSpam(addr)) {
-      errs.venueAddress = 'Địa chỉ tổ chức không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.';
     }
 
     return errs;

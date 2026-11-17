@@ -177,15 +177,36 @@ public class WorkerGroupService {
     }
 
     /**
-     * Xem danh sách thành viên trong nhóm thợ
+     * Xem danh sách thành viên trong nhóm thợ (Mask PII nếu không phải thành viên nhóm)
      */
     @Transactional(readOnly = true)
-    public List<WorkerGroupMemberResponseDto> getGroupMembers(UUID groupId) {
-        if (!workerGroupRepository.existsById(groupId)) {
-            throw new ResourceNotFoundException("WorkerGroup", "id", groupId);
+    public List<WorkerGroupMemberResponseDto> getGroupMembers(UUID currentUserId, UUID groupId) {
+        WorkerGroup group = workerGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkerGroup", "id", groupId));
+
+        boolean canViewFullPii = false;
+        if (currentUserId != null) {
+            Optional<Worker> callerOpt = workerRepository.findByUser_UserId(currentUserId);
+            if (callerOpt.isPresent()) {
+                UUID callerWorkerId = callerOpt.get().getWorkerId();
+                if (callerWorkerId.equals(group.getLeaderWorkerId())) {
+                    canViewFullPii = true;
+                } else {
+                    canViewFullPii = membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, callerWorkerId)
+                            .filter(m -> m.getStatus() == MembershipStatus.ACTIVE)
+                            .isPresent();
+                }
+            }
         }
+
+        final boolean hasFullAccess = canViewFullPii;
         List<WorkerGroupMembership> list = membershipRepository.findByGroupIdWithWorkerDetails(groupId);
-        return list.stream().map(this::mapToMemberDto).toList();
+        return list.stream().map(m -> mapToMemberDto(m, hasFullAccess)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkerGroupMemberResponseDto> getGroupMembers(UUID groupId) {
+        return getGroupMembers(null, groupId);
     }
 
     /**
@@ -315,6 +336,9 @@ public class WorkerGroupService {
     @Transactional
     public WorkerGroupMemberResponseDto acceptGroupInvite(UUID userId, UUID groupId) {
         Worker worker = getWorkerByUserId(userId);
+        WorkerGroup group = workerGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkerGroup", "id", groupId));
+
         WorkerGroupMembership membership = membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(
                 groupId, worker.getWorkerId()
         ).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lời mời gia nhập nhóm này"));
@@ -323,13 +347,22 @@ public class WorkerGroupService {
             throw new BadRequestException("Bạn đã là thành viên chính thức của nhóm");
         }
 
+        if (membership.getStatus() != MembershipStatus.PENDING) {
+            throw new BadRequestException("Bạn không có lời mời hợp lệ để gia nhập nhóm này.");
+        }
+
+        int activeCount = membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE);
+        if (group.getMaxSize() != null && activeCount >= group.getMaxSize()) {
+            throw new BadRequestException("Nhóm đã đạt số lượng thành viên tối đa (" + group.getMaxSize() + " người)");
+        }
+
         membership.setStatus(MembershipStatus.ACTIVE);
         membership.setJoinedAt(Instant.now());
         WorkerGroupMembership saved = membershipRepository.save(membership);
 
         recalculateGroupMetrics(groupId);
         log.info("Worker {} đã gia nhập nhóm {}", worker.getWorkerId(), groupId);
-        return mapToMemberDto(saved);
+        return mapToMemberDto(saved, true);
     }
 
     /**
@@ -378,15 +411,27 @@ public class WorkerGroupService {
         group.setMemberCount(count);
 
         if (count > 0) {
-            double avgRatingSum = activeMembers.stream()
-                    .map(m -> m.getWorker().getRatingAvg() != null ? m.getWorker().getRatingAvg().doubleValue() : 5.0)
-                    .reduce(0.0, Double::sum);
+            List<WorkerGroupMembership> ratedMembers = activeMembers.stream()
+                    .filter(m -> m.getWorker() != null && m.getWorker().getRatingAvg() != null && m.getWorker().getRatingAvg().compareTo(BigDecimal.ZERO) > 0)
+                    .toList();
+
+            if (!ratedMembers.isEmpty()) {
+                double avgRatingSum = ratedMembers.stream()
+                        .mapToDouble(m -> m.getWorker().getRatingAvg().doubleValue())
+                        .sum();
+                group.setAvgRating(BigDecimal.valueOf(avgRatingSum / ratedMembers.size()).setScale(2, RoundingMode.HALF_UP));
+            } else {
+                group.setAvgRating(BigDecimal.ZERO);
+            }
+
             int rsSum = activeMembers.stream()
-                    .map(m -> m.getWorker().getReliabilityScore() != null ? m.getWorker().getReliabilityScore() : 100)
+                    .map(m -> m.getWorker() != null && m.getWorker().getReliabilityScore() != null ? m.getWorker().getReliabilityScore() : 100)
                     .reduce(0, Integer::sum);
 
-            group.setAvgRating(BigDecimal.valueOf(avgRatingSum / count).setScale(2, RoundingMode.HALF_UP));
             group.setReliabilityScore(rsSum / count);
+        } else {
+            group.setAvgRating(BigDecimal.ZERO);
+            group.setReliabilityScore(100);
         }
 
         workerGroupRepository.save(group);
@@ -416,14 +461,26 @@ public class WorkerGroupService {
     }
 
     private WorkerGroupMemberResponseDto mapToMemberDto(WorkerGroupMembership m) {
+        return mapToMemberDto(m, true);
+    }
+
+    private WorkerGroupMemberResponseDto mapToMemberDto(WorkerGroupMembership m, boolean canViewFullPii) {
         Worker w = m.getWorker();
         User u = w != null ? w.getUser() : null;
+        String rawPhone = u != null ? u.getPhone() : null;
+        String displayPhone = rawPhone;
+        if (!canViewFullPii && rawPhone != null && rawPhone.length() >= 7) {
+            displayPhone = rawPhone.substring(0, 3) + "****" + rawPhone.substring(rawPhone.length() - 3);
+        } else if (!canViewFullPii && rawPhone != null) {
+            displayPhone = "***";
+        }
+
         return WorkerGroupMemberResponseDto.builder()
                 .membershipId(m.getMembershipId())
                 .workerId(w != null ? w.getWorkerId() : null)
                 .userId(u != null ? u.getUserId() : null)
                 .fullName(u != null ? u.getFullName() : (w != null ? w.getFullName() : "N/A"))
-                .phone(u != null ? u.getPhone() : null)
+                .phone(displayPhone)
                 .avatarUrl(u != null ? u.getAvatarUrl() : null)
                 .roleInGroup(m.getRoleInGroup())
                 .roleTitle(m.getRoleTitle())

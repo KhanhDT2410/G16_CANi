@@ -100,12 +100,17 @@ public class WorkerGroupController {
     }
 
     /**
-     * Xem danh sách thành viên trong nhóm thợ
+     * Xem danh sách thành viên trong nhóm thợ (Chỉ hiển thị đầy đủ SĐT cho thành viên trong nhóm hoặc Admin)
      */
     @Operation(summary = "Xem thành viên nhóm", description = "Lấy danh sách thành viên, chức danh, điểm uy tín và lịch sử làm việc của từng người trong nhóm.")
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN', 'EVENT_ORGANIZER')")
     @GetMapping("/{id}/members")
-    public ResponseEntity<ApiResponse<List<WorkerGroupMemberResponseDto>>> getGroupMembers(@PathVariable UUID id) {
-        List<WorkerGroupMemberResponseDto> members = workerGroupService.getGroupMembers(id);
+    public ResponseEntity<ApiResponse<List<WorkerGroupMemberResponseDto>>> getGroupMembers(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        UUID currentUserId = SecurityUtils.getCurrentUserId(authentication);
+        List<WorkerGroupMemberResponseDto> members = workerGroupService.getGroupMembers(currentUserId, id);
         return ResponseEntity.ok(ApiResponse.ok(members, "Lấy danh sách thành viên nhóm thành công"));
     }
 

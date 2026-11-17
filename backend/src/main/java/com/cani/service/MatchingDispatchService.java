@@ -303,8 +303,9 @@ public class MatchingDispatchService {
             return 0;
         }
 
-        double emergencyRadius = (customRadiusKm != null && customRadiusKm > 0) ? customRadiusKm : 25.0;
-        log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km", shiftId, emergencyRadius);
+        double rawRadius = (customRadiusKm != null && customRadiusKm > 0) ? customRadiusKm : 25.0;
+        double emergencyRadius = Math.min(Math.max(rawRadius, 1.0), 50.0);
+        log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km (Capped max 50km)", shiftId, emergencyRadius);
 
         int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
         if (needed <= 0) {

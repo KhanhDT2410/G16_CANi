@@ -473,8 +473,11 @@ public class EoEventService {
                 .status(com.cani.entity.enums.PaymentStatus.NOT_DECLARED)
                 .build());
 
-        payment.setAgreedAmount(actualAmount);
-        paymentRepository.save(payment);
+        // Chỉ cập nhật agreedAmount tính theo giờ thực tế nếu Payment chưa được EO khai báo thanh toán (NOT_DECLARED)
+        if (payment.getStatus() == com.cani.entity.enums.PaymentStatus.NOT_DECLARED) {
+            payment.setAgreedAmount(actualAmount);
+            paymentRepository.save(payment);
+        }
 
         String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
         return mapToShiftAttendanceDto(sa, resolveEoUserId(eo, userId), actualAmount, checklistSummary);

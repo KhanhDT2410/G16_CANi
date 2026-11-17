@@ -20,6 +20,18 @@ public final class QrCryptoUtil {
 
     private QrCryptoUtil() {}
 
+    private static String getSecret() {
+        String env = System.getenv("CANI_QR_HMAC_SECRET");
+        if (env != null && !env.isBlank()) {
+            return env.trim();
+        }
+        String prop = System.getProperty("cani.qr.hmac-secret");
+        if (prop != null && !prop.isBlank()) {
+            return prop.trim();
+        }
+        return DEFAULT_SECRET;
+    }
+
     /**
      * Sinh chữ ký HMAC-SHA256 độ dài 16 ký tự hex gọn nhẹ, tối ưu render QR Code trên camera di động.
      *
@@ -32,13 +44,13 @@ public final class QrCryptoUtil {
         }
         try {
             Mac mac = Mac.getInstance(HMAC_ALGO);
-            SecretKeySpec secretKeySpec = new SecretKeySpec(DEFAULT_SECRET.getBytes(StandardCharsets.UTF_8), HMAC_ALGO);
+            SecretKeySpec secretKeySpec = new SecretKeySpec(getSecret().getBytes(StandardCharsets.UTF_8), HMAC_ALGO);
             mac.init(secretKeySpec);
             byte[] hmacBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hmacBytes).substring(0, 16);
         } catch (Exception e) {
             log.error("Lỗi khi sinh chữ ký HMAC cho dữ liệu QR: {}", e.getMessage());
-            return Integer.toHexString(data.hashCode());
+            return "";
         }
     }
 

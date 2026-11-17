@@ -201,7 +201,7 @@ export default function EOMyTeamTab() {
             Chưa có nhân sự nào trong danh sách quen thuộc.
           </p>
           <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem' }}>
-            Sau mỗi ca làm việc hoàn thành hoặc bằng cách nhập số điện thoại, bạn có thể thêm nhân sự vào danh sách quen thuộc để ưu tiên điều động cho các sự kiện tiếp theo.
+            Bằng cách nhập số điện thoại của nhân sự, bạn có thể lưu vào danh sách quen thuộc để gắn thẻ phân nhóm và ưu tiên gửi lời mời điều phối cho các sự kiện tiếp theo.
           </p>
           <button
             type="button"

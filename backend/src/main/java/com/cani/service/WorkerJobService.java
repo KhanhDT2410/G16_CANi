@@ -235,41 +235,15 @@ public class WorkerJobService {
         Shift shift = assignment.getShift();
         Instant now = Instant.now();
 
-        // 1. Xác thực mã QR Check-in
+        // 1. Xác thực mã QR Check-in bảo mật động (HMAC-SHA256 Anti-spoofing)
         String qrContent = request != null && request.getQrContent() != null ? request.getQrContent().trim() : "";
         if (qrContent.startsWith("CANI_CHECKOUT:")) {
             throw new BadRequestException("Đây là mã QR Check-out (Kết ca). Vui lòng quét mã QR Check-in để vào ca làm việc!");
         }
-        if (!qrContent.startsWith("CANI_CHECKIN:") || shift == null || shift.getShiftId() == null) {
-            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-in chính thức của sự kiện!");
+        if (shift == null || shift.getShiftId() == null) {
+            throw new BadRequestException("Thông tin ca làm việc không hợp lệ.");
         }
-        String scannedShiftPart = qrContent.substring("CANI_CHECKIN:".length()).trim();
-        String scannedShiftId = scannedShiftPart;
-        if (scannedShiftPart.contains(":")) {
-            String[] parts = scannedShiftPart.split(":");
-            scannedShiftId = parts[0].trim();
-            if (parts.length >= 2) {
-                try {
-                    long epochSeconds = Long.parseLong(parts[1].trim());
-                    long currentEpochSeconds = Instant.now().getEpochSecond();
-                    // Mã QR động đổi theo thời gian: cho phép lệch tối đa 5 phút (300s) chống in giấy / chụp ảnh cũ
-                    if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
-                        throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
-                    }
-                    // Xác thực chữ ký số HMAC-SHA256 (Anti-spoofing) nếu mã có kèm chữ ký từ server
-                    if (parts.length >= 3) {
-                        String signature = parts[2].trim();
-                        String dataToVerify = "CANI_CHECKIN:" + scannedShiftId + ":" + epochSeconds;
-                        if (signature.length() == 16 && !com.cani.util.QrCryptoUtil.verifySignature(dataToVerify, signature)) {
-                            throw new BadRequestException("Chữ ký bảo mật mã QR không hợp lệ hoặc đã bị can thiệp. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
-                        }
-                    }
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        if (!scannedShiftId.equalsIgnoreCase(shift.getShiftId().toString())) {
-            throw new BadRequestException("Mã QR Check-in này không thuộc ca làm việc hiện tại của bạn!");
-        }
+        validateAndExtractShiftId(qrContent, "CANI_CHECKIN:", shift.getShiftId());
 
         // 2. Kiểm tra khoảng cách Geofence nếu có tọa độ
         if (request != null && request.getLat() != null && request.getLng() != null && shift != null) {
@@ -346,39 +320,15 @@ public class WorkerJobService {
         }
         Shift shift = assignment.getShift();
 
+        // 1. Xác thực mã QR Check-out bảo mật động (HMAC-SHA256 Anti-spoofing)
         String qrContent = request != null && request.getQrContent() != null ? request.getQrContent().trim() : "";
         if (qrContent.startsWith("CANI_CHECKIN:")) {
             throw new BadRequestException("Đây là mã QR Check-in (Vào ca). Vui lòng quét mã QR Check-out để kết thúc ca làm việc!");
         }
-        if (!qrContent.startsWith("CANI_CHECKOUT:") || shift == null || shift.getShiftId() == null) {
-            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR Check-out chính thức của ca làm việc!");
+        if (shift == null || shift.getShiftId() == null) {
+            throw new BadRequestException("Thông tin ca làm việc không hợp lệ.");
         }
-        String scannedShiftPart = qrContent.substring("CANI_CHECKOUT:".length()).trim();
-        String scannedShiftId = scannedShiftPart;
-        if (scannedShiftPart.contains(":")) {
-            String[] parts = scannedShiftPart.split(":");
-            scannedShiftId = parts[0].trim();
-            if (parts.length >= 2) {
-                try {
-                    long epochSeconds = Long.parseLong(parts[1].trim());
-                    long currentEpochSeconds = Instant.now().getEpochSecond();
-                    if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
-                        throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
-                    }
-                    // Xác thực chữ ký số HMAC-SHA256 (Anti-spoofing) nếu mã có kèm chữ ký từ server
-                    if (parts.length >= 3) {
-                        String signature = parts[2].trim();
-                        String dataToVerify = "CANI_CHECKOUT:" + scannedShiftId + ":" + epochSeconds;
-                        if (signature.length() == 16 && !com.cani.util.QrCryptoUtil.verifySignature(dataToVerify, signature)) {
-                            throw new BadRequestException("Chữ ký bảo mật mã QR không hợp lệ hoặc đã bị can thiệp. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
-                        }
-                    }
-                } catch (NumberFormatException ignored) {}
-            }
-        }
-        if (!scannedShiftId.equalsIgnoreCase(shift.getShiftId().toString())) {
-            throw new BadRequestException("Mã QR Check-out này không thuộc ca làm việc hiện tại của bạn!");
-        }
+        validateAndExtractShiftId(qrContent, "CANI_CHECKOUT:", shift.getShiftId());
 
         AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
                 .orElseThrow(() -> new BadRequestException("Bạn chưa check-in vào ca làm việc này nên không thể check-out."));
@@ -1204,5 +1154,45 @@ public class WorkerJobService {
                 .proofImageUrl(attendanceOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .proofSubmittedAt(attendanceOpt.map(AttendanceLog::getProofSubmittedAt).orElse(null))
                 .build();
+    }
+
+    /**
+     * Xác thực và bóc tách shiftId từ mã QR động bảo mật (HMAC-SHA256 Anti-spoofing).
+     * Bắt buộc mã QR phải có định dạng: PREFIX:<shiftId>:<epochSeconds>:<signature>.
+     */
+    private String validateAndExtractShiftId(String qrContent, String expectedPrefix, UUID expectedShiftId) {
+        if (qrContent == null || !qrContent.startsWith(expectedPrefix)) {
+            throw new BadRequestException("Mã QR không hợp lệ. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
+        }
+        String scannedShiftPart = qrContent.substring(expectedPrefix.length()).trim();
+        String[] parts = scannedShiftPart.split(":");
+        if (parts.length < 3) {
+            throw new BadRequestException("Mã QR không đúng định dạng bảo mật động (thiếu chữ ký số HMAC chống gian lận). Vui lòng quét mã QR trực tiếp trên màn hình sự kiện!");
+        }
+
+        String scannedShiftId = parts[0].trim();
+        long epochSeconds;
+        try {
+            epochSeconds = Long.parseLong(parts[1].trim());
+        } catch (NumberFormatException e) {
+            throw new BadRequestException("Mã QR không hợp lệ (thời gian làm mới không đúng định dạng).");
+        }
+
+        long currentEpochSeconds = Instant.now().getEpochSecond();
+        if (Math.abs(currentEpochSeconds - epochSeconds) > 300) {
+            throw new BadRequestException("Mã QR đã hết hạn hiệu lực do thời gian làm mới. Vui lòng quét mã QR đang hiển thị trực tiếp trên màn hình sự kiện!");
+        }
+
+        String signature = parts[2].trim();
+        String dataToVerify = expectedPrefix + scannedShiftId + ":" + epochSeconds;
+        if (!com.cani.util.QrCryptoUtil.verifySignature(dataToVerify, signature)) {
+            throw new BadRequestException("Chữ ký bảo mật mã QR không hợp lệ hoặc đã bị can thiệp. Vui lòng quét mã QR chính thức từ Nhà tổ chức!");
+        }
+
+        if (expectedShiftId != null && !scannedShiftId.equalsIgnoreCase(expectedShiftId.toString())) {
+            String actionName = expectedPrefix.contains("CHECKIN") ? "Check-in" : "Check-out";
+            throw new BadRequestException("Mã QR " + actionName + " này không thuộc ca làm việc hiện tại của bạn!");
+        }
+        return scannedShiftId;
     }
 }

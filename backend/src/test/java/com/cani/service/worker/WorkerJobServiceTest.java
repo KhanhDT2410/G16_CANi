@@ -422,13 +422,20 @@ class WorkerJobServiceTest {
     // =========================================================================
     // 6. checkinAssignment() - UTC016 to UTC019
     // =========================================================================
+    private String makeValidQr(String prefix, UUID shiftId) {
+        long epoch = Instant.now().getEpochSecond();
+        String data = prefix + shiftId + ":" + epoch;
+        String sig = com.cani.util.QrCryptoUtil.generateSignature(data);
+        return data + ":" + sig;
+    }
+
     @Test
     @DisplayName("UTC016 - checkinAssignment() - Normal: Quét mã QR hợp lệ, điểm danh đúng giờ thành công")
     void checkinAssignment_Success_OnTimeCheckin() {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).lat(10.7769).lng(106.7009).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).lat(10.7769).lng(106.7009).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -467,7 +474,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + UUID.randomUUID()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", UUID.randomUUID())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -478,13 +485,45 @@ class WorkerJobServiceTest {
     }
 
     @Test
+    @DisplayName("UTC018b - checkinAssignment() - Security: Quét mã QR thiếu chữ ký HMAC ném BadRequestException")
+    void checkinAssignment_Security_MissingHmacSignatureThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        String legacyNoHmacQr = "CANI_CHECKIN:" + activeShift.getShiftId() + ":" + Instant.now().getEpochSecond();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder().qrContent(legacyNoHmacQr).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkinAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chữ ký số HMAC");
+    }
+
+    @Test
+    @DisplayName("UTC018c - checkinAssignment() - Security: Quét mã QR bị giả mạo chữ ký HMAC ném BadRequestException")
+    void checkinAssignment_Security_ForgedHmacSignatureThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        String forgedQr = "CANI_CHECKIN:" + activeShift.getShiftId() + ":" + Instant.now().getEpochSecond() + ":fake1234fake1234";
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder().qrContent(forgedQr).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkinAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chữ ký bảo mật mã QR không hợp lệ");
+    }
+
+    @Test
     @DisplayName("UTC019 - checkinAssignment() - Boundary: Điểm danh muộn quá 15 phút ghi nhận LATE")
     void checkinAssignment_Boundary_LateCheckinSetsStatusLate() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setStartTime(Instant.now().minus(20, ChronoUnit.MINUTES));
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -504,7 +543,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CANCELLED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -520,7 +559,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId())
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId()))
                 .lat(11.5).lng(107.5) // ~100km away
                 .build();
 
@@ -539,7 +578,7 @@ class WorkerJobServiceTest {
         activeShift.setStartTime(Instant.now().minus(14, ChronoUnit.MINUTES).minus(50, ChronoUnit.SECONDS));
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKIN:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -564,7 +603,7 @@ class WorkerJobServiceTest {
                 .attendanceId(UUID.randomUUID()).shiftAssignment(sa).worker(worker)
                 .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS)).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -599,7 +638,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -618,7 +657,7 @@ class WorkerJobServiceTest {
         AttendanceLog log = AttendanceLog.builder()
                 .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS)).checkoutTime(Instant.now().minus(1, ChronoUnit.HOURS)).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -636,7 +675,7 @@ class WorkerJobServiceTest {
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
-                .qrContent("CANI_CHECKOUT:" + activeShift.getShiftId()).build();
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));

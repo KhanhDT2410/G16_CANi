@@ -716,6 +716,16 @@ const EventCreationWizardModal = ({
                   setNewEvent({ ...newEvent, name: e.target.value });
                   if (step1Errors.name) setStep1Errors((prev) => ({ ...prev, name: null }));
                 }}
+                onBlur={() => {
+                  const val = newEvent.name?.trim() || '';
+                  if (!val) {
+                    setStep1Errors((prev) => ({ ...prev, name: 'Vui lòng nhập tên sự kiện.' }));
+                  } else if (val.length < 6) {
+                    setStep1Errors((prev) => ({ ...prev, name: 'Tên sự kiện quá ngắn (tối thiểu 6 ký tự).' }));
+                  } else if (isGibberishOrSpam(val)) {
+                    setStep1Errors((prev) => ({ ...prev, name: 'Tên sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa (vui lòng nhập tên có nghĩa).' }));
+                  }
+                }}
               />
               {step1Errors.name && (
                 <div style={{ color: '#ef4444', fontSize: '0.785rem', marginTop: '0.35rem', fontWeight: 600 }}>
@@ -738,6 +748,16 @@ const EventCreationWizardModal = ({
                 onChange={(e) => {
                   setNewEvent({ ...newEvent, description: e.target.value });
                   if (step1Errors.description) setStep1Errors((prev) => ({ ...prev, description: null }));
+                }}
+                onBlur={() => {
+                  const val = newEvent.description?.trim() || '';
+                  if (val) {
+                    if (val.length < 5) {
+                      setStep1Errors((prev) => ({ ...prev, description: 'Mô tả sự kiện quá ngắn (tối thiểu 5 ký tự nếu nhập).' }));
+                    } else if (isGibberishOrSpam(val)) {
+                      setStep1Errors((prev) => ({ ...prev, description: 'Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.' }));
+                    }
+                  }
                 }}
               />
               {step1Errors.description && (

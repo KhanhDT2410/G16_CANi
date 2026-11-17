@@ -326,7 +326,7 @@ export default function EOPage() {
                       textTransform: 'uppercase',
                     }}
                   >
-                    {displayName || 'PHẠM DUY HƯNG!'}
+                    {displayName}
                   </h1>
                   <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, fontWeight: 500 }}>
                     Quản lý sự kiện, tuyển dụng nhân sự và theo dõi vận hành trên CANi.

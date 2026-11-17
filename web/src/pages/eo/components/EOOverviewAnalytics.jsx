@@ -82,54 +82,6 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
       };
     });
 
-    // Nếu dữ liệu mẫu chưa có hoặc ít, bổ sung để biểu đồ luôn đẹp mắt
-    if (list.length === 0) {
-      return [
-        {
-          eventId: 'sample-1',
-          name: 'Đám Cưới Hòa Lạc',
-          eventDate: '2026-11-14',
-          venueAddress: 'Thạch Thất, Hà Nội',
-          shiftsCount: 3,
-          totalRequired: 19,
-          totalConfirmed: 14,
-          fillRate: 74,
-          revenue: 18500000,
-          staffingCost: 11320000,
-          grossProfit: 7180000,
-          marginRate: 39,
-        },
-        {
-          eventId: 'sample-2',
-          name: 'Gala Dinner Doanh Nghiệp',
-          eventDate: '2026-11-20',
-          venueAddress: 'Trung Tâm Hội Nghị Quốc Gia',
-          shiftsCount: 2,
-          totalRequired: 12,
-          totalConfirmed: 10,
-          fillRate: 83,
-          revenue: 12400000,
-          staffingCost: 7800000,
-          grossProfit: 4600000,
-          marginRate: 37,
-        },
-        {
-          eventId: 'sample-3',
-          name: 'Hội Thảo Tech Expo',
-          eventDate: '2026-11-28',
-          venueAddress: 'Cầu Giấy, Hà Nội',
-          shiftsCount: 2,
-          totalRequired: 8,
-          totalConfirmed: 8,
-          fillRate: 100,
-          revenue: 8500000,
-          staffingCost: 5200000,
-          grossProfit: 3300000,
-          marginRate: 39,
-        },
-      ];
-    }
-
     return list;
   }, [activeEvents]);
 
@@ -181,12 +133,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
 
     const list = Object.values(map);
     if (list.length === 0) {
-      return [
-        { role: 'Phục vụ bàn tiệc (F&B)', totalCost: 6500000, totalWorkers: 12, color: '#6366f1' },
-        { role: 'Lễ tân / PG / PB sự kiện', totalCost: 4800000, totalWorkers: 8, color: '#0ea5e9' },
-        { role: 'Setup & Hậu cần sân khấu', totalCost: 3800000, totalWorkers: 6, color: '#f59e0b' },
-        { role: 'Điều phối & Kỹ thuật âm thanh', totalCost: 2400000, totalWorkers: 4, color: '#10b981' },
-      ];
+      return [];
     }
 
     const totalCalculatedCost = list.reduce((sum, item) => sum + item.totalCost, 0) || 1;
@@ -217,6 +164,20 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
       { percent: 0, val: 0 },
     ];
   }, [chartMax]);
+
+  if (!activeEvents || activeEvents.length === 0 || eventsFinancialData.length === 0) {
+    return (
+      <div className="eo-widget-card animate-fade-in-up" style={{ marginTop: '1.25rem', padding: '3.5rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
+        <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
+          Chưa Có Dữ Liệu Vận Hành & Tài Chính
+        </h4>
+        <p style={{ margin: '0 auto', maxWidth: '480px', fontSize: '0.85rem', lineHeight: 1.5 }}>
+          Khi bạn tạo và xuất bản các sự kiện, hệ thống sẽ tự động tổng hợp chi phí nhân sự, dự toán ngân sách và tỷ trọng vai trò tại đây.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="eo-overview-analytics-container animate-fade-in-up" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

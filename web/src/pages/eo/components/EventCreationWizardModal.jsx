@@ -371,8 +371,6 @@ const EventCreationWizardModal = ({
     const addr = data.venueAddress?.trim() || '';
     if (!addr) {
       errs.venueAddress = 'Vui lòng chọn hoặc nhập địa chỉ tổ chức cụ thể.';
-    } else if (addr.length < 6) {
-      errs.venueAddress = 'Địa chỉ tổ chức quá ngắn (tối thiểu 6 ký tự).';
     }
 
     return errs;

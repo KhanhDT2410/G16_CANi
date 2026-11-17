@@ -1187,12 +1187,6 @@ public class EoEventService {
                 throw new BadRequestException("Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
             }
         }
-        if (venueAddress != null && !venueAddress.isBlank()) {
-            String trimmedVenue = venueAddress.trim();
-            if (trimmedVenue.length() < 6) {
-                throw new BadRequestException("Địa chỉ tổ chức sự kiện quá ngắn (tối thiểu 6 ký tự).");
-            }
-        }
         if (startTime != null && endTime != null) {
             if (!endTime.isAfter(startTime)) {
                 throw new BadRequestException("Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện.");

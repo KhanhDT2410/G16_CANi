@@ -5,6 +5,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentSource;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.AttendanceStatus;
+import com.cani.entity.enums.MembershipStatus;
 import com.cani.entity.enums.PaymentStatus;
 import com.cani.entity.enums.ProposalStatus;
 import com.cani.entity.enums.ShiftStatus;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,6 +68,9 @@ public class WorkerJobService {
     private final PaymentRepository paymentRepository;
     private final ProposalStatusUpdater proposalStatusUpdater;
     private final ObjectMapper objectMapper;
+
+    @Autowired(required = false)
+    private WorkerGroupMembershipRepository workerGroupMembershipRepository;
 
     /**
      * Bật / tắt trạng thái "Bắt đầu kiếm việc" (Online status)
@@ -169,6 +174,7 @@ public class WorkerJobService {
                 .status(AssignmentStatus.CONFIRMED)
                 .eoConfirmed(false)
                 .build();
+        attachGroupInfoIfPresent(assignment, worker);
         assignment = shiftAssignmentRepository.save(assignment);
 
         // Tạo bản ghi theo dõi thanh toán trực tiếp (Non-Escrow)
@@ -527,6 +533,7 @@ public class WorkerJobService {
                 .status(AssignmentStatus.CONFIRMED)
                 .eoConfirmed(false)
                 .build();
+        attachGroupInfoIfPresent(assignment, worker);
         assignment = shiftAssignmentRepository.save(assignment);
 
         directPaymentService.createInitialPayment(assignment);
@@ -1242,5 +1249,22 @@ public class WorkerJobService {
             throw new BadRequestException("Mã QR " + actionName + " này không thuộc ca làm việc hiện tại của bạn!");
         }
         return scannedShiftId;
+    }
+
+    private void attachGroupInfoIfPresent(ShiftAssignment assignment, Worker worker) {
+        if (workerGroupMembershipRepository == null || worker == null || assignment == null) return;
+        try {
+            List<WorkerGroupMembership> activeMemberships = workerGroupMembershipRepository
+                    .findByWorker_WorkerIdAndStatus(worker.getWorkerId(), MembershipStatus.ACTIVE);
+            if (!activeMemberships.isEmpty()) {
+                WorkerGroupMembership m = activeMemberships.get(0);
+                if (m.getWorkerGroup() != null) {
+                    assignment.setGroupId(m.getWorkerGroup().getGroupId());
+                    assignment.setIsGroupLeader(worker.getWorkerId().equals(m.getWorkerGroup().getLeaderWorkerId()));
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Không thể gán group info cho assignment: {}", ex.getMessage());
+        }
     }
 }

@@ -953,6 +953,23 @@ public class EoEventService {
     }
 
     private EventResponseDto mapToEventResponseDto(Event e, List<Shift> shifts) {
+        BigDecimal effectiveTotalPaid = e.getTotalPaid();
+        if ((effectiveTotalPaid == null || effectiveTotalPaid.compareTo(BigDecimal.ZERO) == 0)
+                && e.getEventId() != null && paymentRepository != null) {
+            try {
+                List<Payment> eventPayments = paymentRepository.findByEventId(e.getEventId());
+                if (eventPayments != null && !eventPayments.isEmpty()) {
+                    effectiveTotalPaid = eventPayments.stream()
+                            .filter(p -> p.getStatus() == com.cani.entity.enums.PaymentStatus.CONFIRMED_FULL
+                                    || p.getStatus() == com.cani.entity.enums.PaymentStatus.CONFIRMED_PARTIAL
+                                    || p.getStatus() == com.cani.entity.enums.PaymentStatus.DECLARED_PENDING_WORKER)
+                            .map(p -> p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount())
+                            .filter(java.util.Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                }
+            } catch (Exception ignored) {}
+        }
+
         return EventResponseDto.builder()
                 .eventId(e.getEventId())
                 .name(e.getName())
@@ -971,7 +988,7 @@ public class EoEventService {
                 .totalRequiredWorkers(e.getTotalRequiredWorkers())
                 .totalConfirmedWorkers(e.getTotalConfirmedWorkers())
                 .totalEstimatedCost(e.getTotalEstimatedCost())
-                .totalPaid(e.getTotalPaid())
+                .totalPaid(effectiveTotalPaid != null ? effectiveTotalPaid : BigDecimal.ZERO)
                 .createdAt(e.getCreatedAt())
                 .shifts(shifts.stream().map(this::mapToShiftResponseDto).collect(Collectors.toList()))
                 .build();
@@ -1180,8 +1197,8 @@ public class EoEventService {
         }
         if (description != null && !description.isBlank()) {
             String trimmedDesc = description.trim();
-            if (trimmedDesc.length() < 5) {
-                throw new BadRequestException("Mô tả quy mô sự kiện quá ngắn (tối thiểu 5 ký tự nếu nhập).");
+            if (trimmedDesc.length() < 3) {
+                throw new BadRequestException("Mô tả quy mô sự kiện quá ngắn (tối thiểu 3 ký tự nếu nhập).");
             }
             if (isGibberishOrSpam(trimmedDesc)) {
                 throw new BadRequestException("Mô tả sự kiện không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");

@@ -43,6 +43,7 @@ public class AuthService {
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
     private final EmailOtpService emailOtpService;
+    private final NotificationService notificationService;
     private final org.springframework.core.env.Environment environment;
 
     @Transactional
@@ -130,6 +131,21 @@ public class AuthService {
                             .build());
             worker.setFullName(finalUser.getFullName());
             workerRepository.save(worker);
+
+            if (notificationService != null) {
+                try {
+                    notificationService.sendNotification(
+                            finalUser,
+                            "Chào mừng bạn đến với CANi!",
+                            "Vui lòng hoàn tất xác thực danh tính eKYC (CCCD) để mở khóa Job Radar và nhận các ca làm việc gần bạn.",
+                            com.cani.entity.enums.NotificationType.SYSTEM,
+                            "EKYC",
+                            finalUser.getUserId()
+                    );
+                } catch (Exception e) {
+                    log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getMessage());
+                }
+            }
         }
 
         log.info("Đã đăng ký tài khoản thành công cho user: {}, role: {}", savedUser.getEmail(), assignedRole);

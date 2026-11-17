@@ -73,6 +73,10 @@ public class WorkerJobService {
     public Worker setOnlineStatus(UUID userId, WorkerOnlineStatusRequestDto dto) {
         Worker worker = getWorkerOrThrow(userId);
 
+        if (Boolean.TRUE.equals(dto.getIsOnline()) && worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            throw new BadRequestException("Tài khoản chưa hoàn tất định danh eKYC. Vui lòng xác thực CCCD để kích hoạt chế độ tìm việc.");
+        }
+
         worker.setIsOnline(dto.getIsOnline());
         if (dto.getCurrentLat() != null && dto.getCurrentLng() != null) {
             worker.setBaseLat(dto.getCurrentLat());
@@ -107,6 +111,11 @@ public class WorkerJobService {
     @Transactional
     public ShiftAssignmentResponseDto acceptProposal(UUID userId, UUID proposalId) {
         Worker worker = getWorkerOrThrow(userId);
+
+        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            throw new BadRequestException("Tài khoản chưa hoàn tất định danh eKYC. Vui lòng xác thực CCCD trước khi nhận việc.");
+        }
+
         DispatchProposal proposal = getWorkerProposalOrThrow(proposalId, worker);
 
         if (proposal.getStatus() != ProposalStatus.PENDING) {
@@ -437,6 +446,11 @@ public class WorkerJobService {
         if (userId != null) {
             Worker worker = workerRepository.findByUser_UserId(userId).orElse(null);
             if (worker != null) {
+                // Yêu cầu eKYC: Tài khoản chưa hoàn tất định danh -> không hiển thị danh sách việc làm gần đó
+                if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+                    log.info("Worker {} chưa hoàn tất eKYC (KycStatus={}), ẩn danh sách công việc gần đó", userId, worker.getKycStatus());
+                    return Collections.emptyList();
+                }
                 workerActiveAssignments = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
                         worker.getWorkerId(),
                         List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING)
@@ -513,6 +527,11 @@ public class WorkerJobService {
     @Transactional
     public ShiftAssignmentResponseDto applyForShift(UUID userId, UUID shiftId) {
         Worker worker = getWorkerOrThrow(userId);
+
+        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            throw new BadRequestException("Tài khoản chưa hoàn tất định danh eKYC. Vui lòng xác thực CCCD trước khi ứng tuyển ca làm việc.");
+        }
+
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy ca làm việc ID: " + shiftId));
 

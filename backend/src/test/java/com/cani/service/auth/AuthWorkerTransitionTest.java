@@ -63,6 +63,9 @@ class AuthWorkerTransitionTest {
     @Mock
     private Environment environment;
 
+    @Mock
+    private com.cani.service.NotificationService notificationService;
+
     @InjectMocks
     private AuthService authService;
 

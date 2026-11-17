@@ -188,6 +188,11 @@ public class MatchingDispatchService {
             return false;
         }
 
+        // 1b. Bắt buộc tài khoản đã hoàn tất định danh eKYC (KycStatus == APPROVED)
+        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            return false;
+        }
+
         // 2. Tài khoản User phải ACTIVE
         if (worker.getUser() == null || worker.getUser().getStatus() != UserStatus.ACTIVE) {
             return false;

@@ -102,6 +102,7 @@ class WorkerJobServiceTest {
                 .workerId(UUID.randomUUID())
                 .user(workerUser)
                 .fullName("Lê Văn Worker")
+                .kycStatus(KycStatus.APPROVED)
                 .isOnline(true)
                 .reliabilityScore(90)
                 .totalShiftsCompleted(5)
@@ -197,6 +198,19 @@ class WorkerJobServiceTest {
         assertThat(result.getBaseLng()).isEqualTo(106.5);
     }
 
+    @Test
+    @DisplayName("UTC003b - setOnlineStatus() - Abnormal: Worker chưa eKYC (kycStatus=PENDING) không được bật tìm việc")
+    void setOnlineStatus_Abnormal_UnverifiedEkycThrowsBadRequestException() {
+        worker.setKycStatus(KycStatus.PENDING);
+        WorkerOnlineStatusRequestDto dto = WorkerOnlineStatusRequestDto.builder()
+                .isOnline(true).currentLat(10.7769).currentLng(106.7009).build();
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        assertThatThrownBy(() -> workerJobService.setOnlineStatus(userId, dto))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chưa hoàn tất định danh eKYC");
+    }
+
     // =========================================================================
     // 2. getMyProposals() - UTC004 to UTC006
     // =========================================================================
@@ -270,6 +284,17 @@ class WorkerJobServiceTest {
         assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("không còn khả dụng");
+    }
+
+    @Test
+    @DisplayName("UTC008b - acceptProposal() - Abnormal: Worker chưa eKYC (kycStatus=PENDING) không được nhận việc")
+    void acceptProposal_Abnormal_UnverifiedEkycThrowsBadRequestException() {
+        worker.setKycStatus(KycStatus.PENDING);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chưa hoàn tất định danh eKYC");
     }
 
     @Test
@@ -675,6 +700,17 @@ class WorkerJobServiceTest {
         assertThat(list).isEmpty();
     }
 
+    @Test
+    @DisplayName("UTC026c - getNearbyShifts() - Boundary: Worker chưa hoàn tất eKYC (KycStatus != APPROVED) bị ẩn danh sách việc làm gần đó")
+    void getNearbyShifts_ReturnsEmptyList_WhenWorkerNotApprovedEkyc() {
+        worker.setKycStatus(KycStatus.PENDING);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 10.0);
+
+        assertThat(list).isEmpty();
+    }
+
     // =========================================================================
     // 9. applyForShift() - UTC027 to UTC030
     // =========================================================================
@@ -698,6 +734,17 @@ class WorkerJobServiceTest {
         assertThat(res.getStatus()).isEqualTo(AssignmentStatus.CONFIRMED);
         verify(directPaymentService).createInitialPayment(any());
         verify(eventRepository).save(mockEvent);
+    }
+
+    @Test
+    @DisplayName("UTC027b - applyForShift() - Abnormal: Worker chưa eKYC (kycStatus=PENDING) không được ứng tuyển ca")
+    void applyForShift_Abnormal_UnverifiedEkycThrowsBadRequestException() {
+        worker.setKycStatus(KycStatus.PENDING);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        assertThatThrownBy(() -> workerJobService.applyForShift(userId, activeShift.getShiftId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chưa hoàn tất định danh eKYC");
     }
 
     @Test

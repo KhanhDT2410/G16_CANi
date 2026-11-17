@@ -95,6 +95,7 @@ class MatchingDispatchServiceTest {
                 .workerId(UUID.randomUUID())
                 .user(user1)
                 .fullName("Nguyễn Văn Online")
+                .kycStatus(KycStatus.APPROVED)
                 .isOnline(true)
                 .reliabilityScore(85)
                 .ratingAvg(BigDecimal.valueOf(4.8))
@@ -109,6 +110,7 @@ class MatchingDispatchServiceTest {
                 .workerId(UUID.randomUUID())
                 .user(user2)
                 .fullName("Trần Thị Offline")
+                .kycStatus(KycStatus.APPROVED)
                 .isOnline(false)
                 .reliabilityScore(90)
                 .ratingAvg(BigDecimal.valueOf(5.0))
@@ -123,6 +125,7 @@ class MatchingDispatchServiceTest {
                 .workerId(UUID.randomUUID())
                 .user(user3)
                 .fullName("Lê Văn Uy Tín Thấp")
+                .kycStatus(KycStatus.APPROVED)
                 .isOnline(true)
                 .reliabilityScore(45)
                 .ratingAvg(BigDecimal.valueOf(3.5))
@@ -137,6 +140,7 @@ class MatchingDispatchServiceTest {
                 .workerId(UUID.randomUUID())
                 .user(user4)
                 .fullName("Phạm Thị Kỳ Cựu")
+                .kycStatus(KycStatus.APPROVED)
                 .isOnline(true)
                 .reliabilityScore(95)
                 .ratingAvg(BigDecimal.valueOf(4.9))
@@ -226,6 +230,29 @@ class MatchingDispatchServiceTest {
         }
 
         @Test
+        @DisplayName("MATCH006b: Worker chưa hoàn tất eKYC (kycStatus != APPROVED) bị loại khỏi danh sách dispatch")
+        void passHardFilter_UnverifiedEkycWorker_FilteredOut() {
+            User activeUser = User.builder().userId(UUID.randomUUID()).role(UserRole.WORKER).status(UserStatus.ACTIVE).build();
+            Worker unverifiedWorker = Worker.builder()
+                    .workerId(UUID.randomUUID())
+                    .user(activeUser)
+                    .kycStatus(KycStatus.PENDING)
+                    .isOnline(true)
+                    .reliabilityScore(90)
+                    .baseLat(10.7769)
+                    .baseLng(106.7009)
+                    .build();
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(unverifiedWorker));
+
+            int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
+
+            assertEquals(0, dispatched);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("MATCH007: Worker có điểm uy tín < 60 bị loại bỏ")
         void passHardFilter_LowReliabilityScore_FilteredOut() {
             when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
@@ -292,6 +319,7 @@ class MatchingDispatchServiceTest {
             Worker farWorker = Worker.builder()
                     .workerId(UUID.randomUUID())
                     .user(User.builder().userId(UUID.randomUUID()).role(UserRole.WORKER).status(UserStatus.ACTIVE).build())
+                    .kycStatus(KycStatus.APPROVED)
                     .isOnline(true)
                     .reliabilityScore(90)
                     .baseLat(10.9574) // Biên Hòa (~26km)
@@ -457,6 +485,7 @@ class MatchingDispatchServiceTest {
                     .workerId(UUID.randomUUID())
                     .user(User.builder().userId(UUID.randomUUID()).role(UserRole.WORKER).status(UserStatus.ACTIVE).build())
                     .fullName("Worker B Xa Hơn")
+                    .kycStatus(KycStatus.APPROVED)
                     .isOnline(true)
                     .reliabilityScore(80)
                     .ratingAvg(BigDecimal.valueOf(4.0))

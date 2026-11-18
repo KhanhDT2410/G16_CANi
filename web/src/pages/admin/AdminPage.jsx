@@ -10,6 +10,7 @@ import { RevenueDashboardView } from '../../features/revenue-dashboard';
 import { RsAppealsView } from '../../features/rs-appeals';
 import { NoShowView } from '../../features/no-shows';
 import { AdminPlansView } from '../../features/admin-plans';
+import { WageMatrixView } from '../../features/admin-wage-matrix';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
 
@@ -65,6 +66,10 @@ const TAB_METADATA = {
   plans: {
     title: 'Thiết Lập Giá & Hạn Mức Gói Dịch Vụ',
     subtitle: 'Quy định đơn giá (VNĐ), hạn mức sự kiện, ca làm, nhân sự và tính năng Matching cho Ban tổ chức sự kiện',
+  },
+  wage_matrix: {
+    title: 'Biểu Ma Trận Thù Lao Chuẩn',
+    subtitle: 'Thiết lập định mức thù lao thị trường theo khu vực, thời điểm ca và mức độ khẩn cấp',
   },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',
@@ -182,6 +187,7 @@ const AdminPage = () => {
           {activeTab === 'config_operation' && <SystemConfigView activeCategory="OPERATION" />}
           {activeTab === 'config_financial' && <SystemConfigView activeCategory="FINANCIAL" />}
           {activeTab === 'plans' && <AdminPlansView />}
+          {activeTab === 'wage_matrix' && <WageMatrixView />}
           {activeTab === 'config_general' && <SystemConfigView activeCategory="GENERAL" />}
           {activeTab === 'configs' && <SystemConfigView activeCategory="ALL" />}
         </section>

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:cani/app/cani_tokens.dart';
+
 /// Item descriptor for [BottomNavBar].
 class BottomNavItem {
   final IconData icon;
@@ -38,10 +40,10 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = Theme.of(context).cani;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final effectiveActiveColor = activeColor ?? const Color(0xFF00BBA6);
-    final effectiveBgColor = backgroundColor ??
-        (isDark ? const Color(0xFF1E293B) : Colors.white);
+    final effectiveActiveColor = activeColor ?? tokens.brand;
+    final effectiveBgColor = backgroundColor ?? tokens.surface;
 
     return SafeArea(
       top: false,
@@ -55,16 +57,14 @@ class BottomNavBar extends StatelessWidget {
           color: effectiveBgColor,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: isDark
-                ? const Color(0xFF334155).withValues(alpha: 0.7)
-                : const Color(0xFFE2E8F0),
+            color: tokens.border,
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
               color: isDark
-                  ? Colors.black.withValues(alpha: 0.40)
-                  : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
+                  ? const Color(0x66000000)
+                  : const Color(0x1F0F172A),
               blurRadius: 20,
               offset: Offset(0, isDark ? 8 : 6),
             ),
@@ -79,7 +79,6 @@ class BottomNavBar extends StatelessWidget {
             return _PillNavItem(
               item: item,
               isSelected: isSelected,
-              isDark: isDark,
               activeColor: effectiveActiveColor,
               onTap: () {
                 if (!isSelected) {
@@ -98,14 +97,12 @@ class BottomNavBar extends StatelessWidget {
 class _PillNavItem extends StatelessWidget {
   final BottomNavItem item;
   final bool isSelected;
-  final bool isDark;
   final Color activeColor;
   final VoidCallback onTap;
 
   const _PillNavItem({
     required this.item,
     required this.isSelected,
-    required this.isDark,
     required this.activeColor,
     required this.onTap,
   });
@@ -131,9 +128,9 @@ class _PillNavItem extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildIcon(),
-            AnimatedCrossFade(
-              firstChild: Padding(
+            _buildIcon(context),
+            if (isSelected)
+              Padding(
                 padding: const EdgeInsets.only(left: 7),
                 child: Text(
                   item.label,
@@ -146,21 +143,14 @@ class _PillNavItem extends StatelessWidget {
                   ),
                 ),
               ),
-              secondChild: const SizedBox.shrink(),
-              crossFadeState: isSelected
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              duration: const Duration(milliseconds: 240),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildIcon() {
-    final inactiveColor =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Widget _buildIcon(BuildContext context) {
+    final inactiveColor = Theme.of(context).cani.textMuted;
 
     final iconWidget = Icon(
       isSelected ? item.selectedIcon : item.icon,

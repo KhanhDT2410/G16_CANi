@@ -50,10 +50,6 @@ class ProfileCvBlock extends ConsumerWidget {
             ? const Color(0xFFD97706)
             : (data.isEkycRejected ? const Color(0xFFDC2626) : const Color(0xFF64748B)));
 
-    final bioText = (exp?.bio != null && exp!.bio!.trim().isNotEmpty)
-        ? exp.bio!.trim()
-        : 'Chưa cập nhật giới thiệu bản thân';
-
     final yearsExpText = '${exp?.yearsExperience ?? 0} năm kinh nghiệm';
 
     return Container(

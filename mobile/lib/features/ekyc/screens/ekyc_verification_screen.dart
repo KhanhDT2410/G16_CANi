@@ -816,14 +816,14 @@ class _EkycVerificationScreenState
                       content: Text(
                         res.isApproved
                             ? 'Xác thực định danh eKYC thành công! Đã cấp tích xanh.'
-                            : 'Định danh chưa đạt chuẩn: ${res.routingReason ?? "Vui lòng chụp lại ảnh"}',
+                            : 'Định danh chưa đạt chuẩn: ${res.routingReason.isNotEmpty ? res.routingReason : "Vui lòng chụp lại ảnh"}',
                       ),
                       backgroundColor: res.isApproved ? const Color(0xFF10B981) : const Color(0xFFDC2626),
                     ),
                   );
                 } else {
                   final err = (res != null && res.isRejected)
-                      ? (res.routingReason ?? 'Hồ sơ eKYC bị từ chối hoặc số CCCD đã được sử dụng.')
+                      ? (res.routingReason.isNotEmpty ? res.routingReason : 'Hồ sơ eKYC bị từ chối hoặc số CCCD đã được sử dụng.')
                       : (currentState.errorMessage ?? 'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.');
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

@@ -13,4 +13,5 @@ public class AttendanceCheckRequestDto {
     private String qrContent;
     private Double lat;
     private Double lng;
+    private String proofImageUrl;
 }

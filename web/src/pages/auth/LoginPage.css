@@ -1,0 +1,335 @@
+/* LoginPage.css - Split 2-Panel Modern Auth Layout (Chuẩn Mockup) */
+
+.cani-login-split-page {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: #f1f5f9;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   1. CỘT TRÁI: HERO GRAPHIC & BRANDING PANEL
+   ========================================================================== */
+.login-hero-panel {
+  flex: 1.15;
+  background: linear-gradient(135deg, #091e3a 0%, #102a4c 50%, #0d3b66 100%);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3rem 4rem;
+  color: #ffffff;
+  overflow: hidden;
+  border-top-right-radius: 40px;
+  border-bottom-right-radius: 40px;
+  box-shadow: 10px 0 30px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+}
+
+/* Concert Backdrop Image with Dark Blur Overlay */
+.login-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  background-image: url('https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1400&q=80');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.18;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.login-hero-top {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+}
+
+.login-hero-top .cani-brandmark-svg path[fill="#0B1B3D"],
+.login-hero-top .cani-brandmark-svg circle[fill="#0B1B3D"],
+.login-hero-top .cani-brandmark-svg rect[fill="#0B1B3D"] {
+  fill: #ffffff !important;
+}
+
+.login-hero-top span,
+.login-hero-top div {
+  color: #ffffff !important;
+}
+
+.login-hero-content {
+  position: relative;
+  z-index: 10;
+  max-width: 440px;
+  margin: auto 0;
+}
+
+.login-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.35rem 0.95rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #bfdbfe;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.login-hero-title {
+  font-size: 2.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #ffffff;
+  margin: 0 0 1rem;
+  letter-spacing: -0.025em;
+  text-shadow: 0 3px 15px rgba(0, 0, 0, 0.6);
+}
+
+.login-hero-subtitle {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin: 0 0 2rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.login-feature-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.login-feat-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0.65rem 1.15rem;
+  border-radius: 999px;
+  width: fit-content;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #f8fafc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.login-feat-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateX(4px);
+}
+
+.feat-pill-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+}
+
+/* Staff Coordinator Image spanning on the right half of left panel */
+.login-hero-staff-container {
+  position: absolute;
+  top: 0;
+  right: -30px;
+  bottom: 0;
+  width: 50%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.login-staff-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% top;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.25) 18%, rgba(0, 0, 0, 1) 50%);
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.25) 18%, rgba(0, 0, 0, 1) 50%);
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+}
+
+/* ==========================================================================
+   2. CỘT PHẢI: FORM ĐĂNG NHẬP (FLOATING CARD)
+   ========================================================================== */
+.login-form-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  background: #f8fafc;
+  background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.login-form-wrapper {
+  width: 100%;
+  max-width: 440px;
+}
+
+.login-form-wrapper .auth-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 2.75rem 2.5rem;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+}
+
+/* Input Fields with icons inside */
+.input-wrapper.has-left-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-field-icon {
+  position: absolute;
+  left: 1rem;
+  pointer-events: none;
+  color: #64748b;
+  z-index: 2;
+}
+
+.form-input.with-icon {
+  padding-left: 2.85rem !important;
+  border-radius: 12px;
+  height: 48px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  font-size: 0.925rem;
+  transition: all 0.2s ease;
+}
+
+.form-input.with-icon:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.12);
+}
+
+.form-input.with-eye {
+  padding-right: 2.75rem !important;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  right: 0.85rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: color 0.15s ease;
+}
+
+.toggle-password-btn:hover {
+  color: #0f172a;
+}
+
+/* Submit Button Pill Style with Arrow */
+.btn-pill-primary {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  height: 48px;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  font-size: 0.975rem !important;
+  font-weight: 700 !important;
+  border: none !important;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease !important;
+  margin-top: 0.5rem;
+}
+
+.btn-pill-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1 0%, #1d4ed8 100%) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.45);
+}
+
+.btn-submit-arrow {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+/* Google Button Pill */
+.btn-google-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  height: 48px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.btn-google-pill:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.07);
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 1.75rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.auth-footer a {
+  color: #2563eb;
+  font-weight: 700;
+  text-decoration: none;
+  margin-left: 0.25rem;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .login-hero-panel {
+    display: none;
+  }
+  .login-form-panel {
+    flex: 1;
+    padding: 2rem 1rem;
+  }
+}
+

@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
+import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/attendance_qr_scanner_screen.dart';
+import 'package:cani/features/job_proposals/screens/shift_detail_execution_screen.dart';
 import 'package:cani/features/job_proposals/widgets/shift_navigation_sheet.dart';
 import 'package:cani/features/job_radar/data/job_radar_repository.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
+import 'package:cani/features/job_radar/widgets/job_proposal_dispatch_card.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_map_painter.dart';
 import 'package:cani/features/job_radar/widgets/radar_sliding_job_card.dart';
 import 'package:cani/features/job_radar/widgets/urgent_shift_hero_card.dart';
@@ -23,29 +27,175 @@ class JobRadarScreen extends ConsumerStatefulWidget {
 }
 
 class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
+  List<ShiftAssignmentItem> _activeShifts = [];
+  List<JobProposalItem> _pendingProposals = [];
   ShiftAssignmentItem? _urgentShift;
   bool _isLoadingUrgent = false;
+  int _homeTopTabIndex = 0; // 0: Việc của tôi, 1: Lời mời làm việc
 
   @override
   void initState() {
     super.initState();
     _loadUrgentShift();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(ekycProvider.notifier).checkStatus();
+    });
   }
 
   Future<void> _loadUrgentShift() async {
     setState(() => _isLoadingUrgent = true);
     try {
       final repo = ref.read(proposalRepositoryProvider);
-      final assigns = await repo.fetchAssignments();
+      final results = await Future.wait([
+        repo.fetchAssignments(),
+        repo.fetchProposals().catchError((_) => <JobProposalItem>[]),
+      ]);
+      final assigns = results[0] as List<ShiftAssignmentItem>;
+      final proposals = results[1] as List<JobProposalItem>;
       final active = assigns.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).toList();
       if (mounted) {
         setState(() {
+          _activeShifts = active;
+          _pendingProposals = proposals;
           _urgentShift = active.isNotEmpty ? active.first : null;
+          // Nếu có lời mời làm việc mới mà chưa có ca đang nhận thì đẩy sang tab Lời mời làm việc ngay
+          if (proposals.isNotEmpty && active.isEmpty) {
+            _homeTopTabIndex = 1;
+          }
           _isLoadingUrgent = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingUrgent = false);
+    }
+  }
+
+  Future<void> _acceptProposalOnHome(JobProposalItem item) async {
+    try {
+      await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
+      ref.invalidate(proposalsCountProvider);
+      ref.read(jobRadarProvider.notifier).scanNearbyShifts();
+      await _loadUrgentShift();
+      if (mounted) {
+        setState(() => _homeTopTabIndex = 0);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Nhận ca "${item.jobType}" thành công! Đã chuyển vào mục Việc của tôi.'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể nhận ca: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectProposalOnHome(JobProposalItem item) async {
+    try {
+      await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
+      ref.invalidate(proposalsCountProvider);
+      if (mounted) {
+        setState(() {
+          _pendingProposals.removeWhere((p) => p.proposalId == item.proposalId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã bỏ qua lời mời làm việc này.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi từ chối lời mời: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openInviteCodeDialogOnHome() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tham gia ca bằng Mã Mời', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'CANI-XXXXXX',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.confirmation_number_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () {
+              final code = controller.text.trim();
+              if (code.isNotEmpty) Navigator.pop(ctx, code);
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0066FF)),
+            child: const Text('Tham Gia'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      try {
+        await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
+        ref.invalidate(proposalsCountProvider);
+        await _loadUrgentShift();
+        if (mounted) {
+          setState(() => _homeTopTabIndex = 0);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tham gia ca làm việc thành công! Đã thêm vào Việc của tôi.'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+        }
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: ${err.toString().replaceAll("Exception: ", "")}'),
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _openExecutionScreen(ShiftAssignmentItem a) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShiftDetailExecutionScreen(assignment: a),
+      ),
+    );
+    if (updated == true) {
+      _loadUrgentShift();
     }
   }
 
@@ -80,6 +230,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     final notifier = ref.read(jobRadarProvider.notifier);
     final authState = ref.watch(authStateProvider);
     final skillState = ref.watch(skillVerificationProvider);
+    final ekycState = ref.watch(ekycProvider);
+
+    final isEkycApproved = ekycState.result?.isApproved ?? false;
 
     final user = authState.user;
     final userName = user?.fullName.isNotEmpty == true ? user!.fullName : 'Nhân Sự';
@@ -140,7 +293,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                           height: 12,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: state.isOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                            color: (isEkycApproved && state.isOnline)
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF94A3B8),
                             border: Border.all(
                               color: isDark ? const Color(0xFF1E293B) : Colors.white,
                               width: 2.2,
@@ -187,19 +342,25 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     ),
                   ),
 
-                  // Nút Bật/Tắt Sẵn sàng nhận việc
+                  // Nút Bật/Tắt Sẵn sàng nhận việc (Yêu cầu đã eKYC)
                   InkWell(
-                    onTap: () => notifier.toggleOnlineStatus(),
+                    onTap: () {
+                      if (!isEkycApproved) {
+                        _showEkycRequiredDialog(context);
+                        return;
+                      }
+                      notifier.toggleOnlineStatus();
+                    },
                     borderRadius: BorderRadius.circular(999),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: state.isOnline
+                        color: (isEkycApproved && state.isOnline)
                             ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFE8FDF3))
                             : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: state.isOnline
+                          color: (isEkycApproved && state.isOnline)
                               ? (isDark ? const Color(0xFF059669) : const Color(0xFFB7F4D8))
                               : (isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0)),
                         ),
@@ -210,17 +371,23 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                state.isOnline ? 'Đang nhận việc' : 'Tạm nghỉ',
+                                !isEkycApproved
+                                    ? 'Chưa eKYC'
+                                    : (state.isOnline ? 'Đang nhận việc' : 'Tạm nghỉ'),
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
-                                  color: state.isOnline
-                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                  color: !isEkycApproved
+                                      ? const Color(0xFFF59E0B)
+                                      : (state.isOnline
+                                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                                 ),
                               ),
                               Text(
-                                state.isOnline ? 'GPS bật' : 'GPS tắt',
+                                !isEkycApproved
+                                    ? 'Chưa kích hoạt'
+                                    : (state.isOnline ? 'GPS bật' : 'GPS tắt'),
                                 style: TextStyle(
                                   fontSize: 8.5,
                                   color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
@@ -235,13 +402,15 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                             height: 18,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(99),
-                              color: state.isOnline
+                              color: (isEkycApproved && state.isOnline)
                                   ? const Color(0xFF10B981)
                                   : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                             ),
                             child: AnimatedAlign(
                               duration: const Duration(milliseconds: 200),
-                              alignment: state.isOnline ? Alignment.centerRight : Alignment.centerLeft,
+                              alignment: (isEkycApproved && state.isOnline)
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
                               child: Container(
                                 width: 14,
                                 height: 14,
@@ -262,184 +431,424 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
             ),
             const SizedBox(height: 10),
 
-            // 2. Thẻ Ca Làm Khẩn Cấp Kế Tiếp Hôm Nay (Hero Card nếu có)
-            if (_urgentShift != null && !_isLoadingUrgent)
-              UrgentShiftHeroCard(
-                assignment: _urgentShift!,
-                onNavigate: () => _openNavigation(_urgentShift!),
-                onQrScan: () => _openQrScanner(_urgentShift!),
-              ),
+            // Banner cảnh báo eKYC nếu tài khoản chưa được phê duyệt eKYC
+            if (!isEkycApproved)
+              _buildEkycWarningBanner(context, isDark, ekycState),
 
-            // 3. Thanh Bán Kính & Chuyển Đổi Bản Đồ / Danh Sách
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  Text(
-                    'Bán kính:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Wrap(
-                    spacing: 6,
-                    children: [5.0, 10.0, 15.0].map((r) {
-                      final isSel = state.searchRadiusKm == r;
-                      return InkWell(
-                        onTap: () => notifier.setRadius(r),
-                        borderRadius: BorderRadius.circular(999),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isSel
-                                ? const Color(0xFF0077FF)
-                                : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: isSel
-                                  ? const Color(0xFF0077FF)
-                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            // 2. Thanh 2 Tab Trên Trang Chủ: "Việc của tôi" & "Lời mời làm việc"
+            if (isEkycApproved && !_isLoadingUrgent)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE8EEF7),
+                              borderRadius: BorderRadius.circular(11),
+                              border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
                             ),
-                            boxShadow: isSel
-                                ? const [BoxShadow(color: Color(0x400077FF), blurRadius: 6, offset: Offset(0, 2))]
-                                : null,
-                          ),
-                          child: Text(
-                            '${r.toInt()} km',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: isSel
-                                  ? Colors.white
-                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => setState(() => _homeTopTabIndex = 0),
+                                    borderRadius: BorderRadius.circular(9),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: _homeTopTabIndex == 0
+                                            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        'Việc của tôi (${_activeShifts.length})',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: _homeTopTabIndex == 0 ? FontWeight.w800 : FontWeight.w600,
+                                          color: _homeTopTabIndex == 0
+                                              ? const Color(0xFF0066FF)
+                                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => setState(() => _homeTopTabIndex = 1),
+                                    borderRadius: BorderRadius.circular(9),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: _homeTopTabIndex == 1
+                                            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Lời mời làm việc (${_pendingProposals.length})',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: _homeTopTabIndex == 1 ? FontWeight.w800 : FontWeight.w600,
+                                              color: _homeTopTabIndex == 1
+                                                  ? const Color(0xFF0066FF)
+                                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                            ),
+                                          ),
+                                          if (_pendingProposals.isNotEmpty) ...[
+                                            const SizedBox(width: 5),
+                                            Container(
+                                              width: 7,
+                                              height: 7,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFFEF4444),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  const Spacer(),
-                  InkWell(
-                    onTap: () => notifier.toggleRadarView(),
-                    borderRadius: BorderRadius.circular(999),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            state.isRadarView ? Icons.list_alt : Icons.map_outlined,
-                            size: 14,
-                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            state.isRadarView ? 'Danh sách' : 'Bản đồ',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: _openInviteCodeDialogOnHome,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F7FF),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.confirmation_number_outlined, size: 15, color: Color(0xFF0066FF)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Mã mời',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0066FF),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
 
-            // 4. Nội Dung Chính: Bản Đồ Radar Hoặc Danh Sách
-            Expanded(
-              child: state.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : state.isRadarView
-                      ? Stack(
-                          children: [
-                            // Bản đồ Radar Map
-                            Positioned.fill(
+            // Nội dung của Tab đang chọn trên Trang chủ
+            if (isEkycApproved && !_isLoadingUrgent && _homeTopTabIndex == 0) ...[
+              if (_urgentShift != null)
+                UrgentShiftHeroCard(
+                  assignment: _urgentShift!,
+                  onNavigate: () => _openNavigation(_urgentShift!),
+                  onQrScan: () => _openQrScanner(_urgentShift!),
+                  onOpenDetail: () => _openExecutionScreen(_urgentShift!),
+                ),
+              if (_activeShifts.length > 1)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Các ca làm khác đang trực / sắp tới (${_activeShifts.length - 1}):',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        height: 58,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _activeShifts.length - 1,
+                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                          itemBuilder: (ctx, idx) {
+                            final a = _activeShifts[idx + 1];
+                            return InkWell(
+                              onTap: () => _openExecutionScreen(a),
+                              borderRadius: BorderRadius.circular(12),
                               child: Container(
-                                margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(24),
+                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFF0077FF).withValues(alpha: 0.3)),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF0077FF).withValues(alpha: 0.08),
-                                      blurRadius: 18,
+                                      color: Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
-                                clipBehavior: Clip.antiAlias,
-                                child: JobRadarMapWidget(
-                                  shifts: state.nearbyShifts,
-                                  selectedShift: state.selectedShift,
-                                  maxRadiusKm: state.searchRadiusKm,
-                                  isOnline: state.isOnline,
-                                  userLat: state.userLat,
-                                  userLng: state.userLng,
-                                  onRecenterGps: () => notifier.refreshCurrentLocation(),
-                                  onSelectShift: (shift) {
-                                    notifier.selectShift(shift);
-                                  },
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.work_outline, size: 16, color: Color(0xFF0066FF)),
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          a.jobType,
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                        ),
+                                        Text(
+                                          a.eventName,
+                                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.arrow_forward_ios, size: 11, color: Color(0xFF94A3B8)),
+                                  ],
                                 ),
                               ),
-                            ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
 
-                            // Badge số ca tìm thấy ở góc trên bản đồ (Chỉ hiện khi Đang bật nhận việc)
-                            if (state.isOnline)
-                              Positioned(
-                                top: 10,
-                                right: 24,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.94),
-                                    borderRadius: BorderRadius.circular(999),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: isDark
-                                            ? Colors.black.withValues(alpha: 0.35)
-                                            : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
-                                        blurRadius: 8,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Text(
-                                    '${state.nearbyShifts.length} ca trong bán kính ${state.searchRadiusKm.toInt()} km',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+            if (isEkycApproved && !_isLoadingUrgent && _homeTopTabIndex == 1) ...[
+              if (_pendingProposals.isNotEmpty)
+                JobProposalDispatchCard(
+                  proposal: _pendingProposals.first,
+                  onAccept: () => _acceptProposalOnHome(_pendingProposals.first),
+                  onReject: () => _rejectProposalOnHome(_pendingProposals.first),
+                )
+              else
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mail_outline_rounded, size: 18, color: Color(0xFF0066FF)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Chưa có lời mời làm việc mới. Bạn có thể nhập mã mời hoặc chọn ca trên bản đồ bên dưới.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+
+            // 3. Thanh Bán Kính & Chuyển Đổi Bản Đồ / Danh Sách (Chỉ hiển thị khi đã hoàn tất eKYC)
+            if (isEkycApproved)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      'Bán kính:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Wrap(
+                      spacing: 6,
+                      children: [5.0, 10.0, 15.0].map((r) {
+                        final isSel = state.searchRadiusKm == r;
+                        return InkWell(
+                          onTap: () => notifier.setRadius(r),
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: isSel
+                                  ? const Color(0xFF0077FF)
+                                  : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: isSel
+                                    ? const Color(0xFF0077FF)
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              ),
+                              boxShadow: isSel
+                                  ? const [BoxShadow(color: Color(0x400077FF), blurRadius: 6, offset: Offset(0, 2))]
+                                  : null,
+                            ),
+                            child: Text(
+                              '${r.toInt()} km',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: isSel
+                                    ? Colors.white
+                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => notifier.toggleRadarView(),
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              state.isRadarView ? Icons.list_alt : Icons.map_outlined,
+                              size: 14,
+                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              state.isRadarView ? 'Danh sách' : 'Bản đồ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (isEkycApproved) const SizedBox(height: 6),
+
+            // 4. Nội Dung Chính: Khóa eKYC hoặc Bản Đồ Radar / Danh Sách
+            Expanded(
+              child: !isEkycApproved
+                  ? _buildEkycLockedState(context, isDark, ekycState)
+                  : (state.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : state.isRadarView
+                          ? Stack(
+                              children: [
+                                // Bản đồ Radar Map
+                                Positioned.fill(
+                                  child: Container(
+                                    margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(24),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0077FF).withValues(alpha: 0.08),
+                                          blurRadius: 18,
+                                        ),
+                                      ],
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: JobRadarMapWidget(
+                                      shifts: state.nearbyShifts,
+                                      selectedShift: state.selectedShift,
+                                      maxRadiusKm: state.searchRadiusKm,
+                                      isOnline: state.isOnline,
+                                      userLat: state.userLat,
+                                      userLng: state.userLng,
+                                      onRecenterGps: () => notifier.refreshCurrentLocation(),
+                                      onSelectShift: (shift) {
+                                        notifier.selectShift(shift);
+                                      },
                                     ),
                                   ),
                                 ),
-                              ),
 
-                            // Sliding Job Card ở dưới đáy bản đồ
-                            if (selectedOrFirstShift != null)
-                              Positioned(
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                child: RadarSlidingJobCard(
-                                  shift: selectedOrFirstShift,
-                                  onViewDetails: () => _showShiftDetails(context, selectedOrFirstShift),
-                                  onApply: () => _applyQuick(context, selectedOrFirstShift),
-                                ),
-                              ),
-                          ],
-                        )
-                      : _buildListView(context, state, notifier),
+                                // Badge số ca tìm thấy ở góc trên bản đồ (Chỉ hiện khi Đang bật nhận việc)
+                                if (state.isOnline)
+                                  Positioned(
+                                    top: 10,
+                                    right: 24,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.94),
+                                        borderRadius: BorderRadius.circular(999),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isDark
+                                                ? Colors.black.withValues(alpha: 0.35)
+                                                : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Text(
+                                        '${state.nearbyShifts.length} ca trong bán kính ${state.searchRadiusKm.toInt()} km',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                // Sliding Job Card ở dưới đáy bản đồ
+                                if (selectedOrFirstShift != null)
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    child: RadarSlidingJobCard(
+                                      shift: selectedOrFirstShift,
+                                      onViewDetails: () => _showShiftDetails(context, selectedOrFirstShift),
+                                      onApply: () => _applyQuick(context, selectedOrFirstShift),
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : _buildListView(context, state, notifier)),
             ),
           ],
         ),
@@ -552,9 +961,27 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                         '${shift.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ/h',
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF16A34A)),
                       ),
-                      Text(
-                        'Cần: ${shift.remainingWorkers}/${shift.requiredWorkers} người',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: shift.emergency
+                              ? const Color(0xFFFEF2F2)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: shift.emergency
+                                ? const Color(0xFFFCA5A5)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        child: Text(
+                          shift.emergency ? '🚨 Khẩn cấp (Mở ứng tuyển)' : 'Chờ lời mời (Matching)',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: shift.emergency ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -586,11 +1013,23 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   }
 
   Future<void> _applyQuick(BuildContext context, NearbyShiftItem shift) async {
+    if (!shift.emergency) {
+      if (mounted) {
+        ScaffoldMessenger.of(this.context).showSnackBar(
+          const SnackBar(
+            content: Text('Ca này chưa ở chế độ khẩn cấp — hãy chờ lời mời việc (Matching) từ Ban tổ chức!'),
+            backgroundColor: Color(0xFFF59E0B),
+          ),
+        );
+      }
+      return;
+    }
     try {
       await ref.read(jobRadarRepositoryProvider).applyForShift(shift.shiftId);
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();
-      _loadUrgentShift();
+      await _loadUrgentShift();
       if (mounted) {
+        setState(() => _homeTopTabIndex = 0);
         ScaffoldMessenger.of(this.context).showSnackBar(
           SnackBar(
             content: Text('Ứng tuyển thành công ca: ${shift.jobType} tại ${shift.eventName}!'),
@@ -608,5 +1047,330 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         );
       }
     }
+  }
+
+  void _showEkycRequiredDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.shield_outlined, color: Color(0xFFF59E0B), size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Yêu Cầu Xác Thực eKYC',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Để bật trạng thái nhận việc và quét các ca làm gần bạn trên Job Radar, bạn cần hoàn tất xác thực danh tính (CCCD) theo quy định an toàn của CANi.',
+          style: TextStyle(fontSize: 13.5, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Để sau', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EkycVerificationScreen()),
+              ).then((_) {
+                ref.read(ekycProvider.notifier).checkStatus();
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0077FF),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            child: const Text('Xác thực ngay', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEkycWarningBanner(BuildContext context, bool isDark, EkycState ekycState) {
+    final isPending = ekycState.result?.isPending ?? false;
+    final isRejected = ekycState.result?.isRejected ?? false;
+
+    final Color bannerBg = isPending
+        ? (isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF))
+        : (isRejected
+            ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : const Color(0xFFFEF2F2))
+            : (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFFFBEB)));
+
+    final Color bannerBorder = isPending
+        ? (isDark ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE))
+        : (isRejected
+            ? (isDark ? const Color(0xFFB91C1C) : const Color(0xFFFECACA))
+            : (isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A)));
+
+    final Color primaryColor = isPending
+        ? const Color(0xFF3B82F6)
+        : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFD97706));
+
+    final String message = isPending
+        ? 'Hồ sơ eKYC đang được xét duyệt. Radar sẽ mở khóa ngay khi hoàn tất.'
+        : (isRejected
+            ? 'Hồ sơ eKYC trước đó bị từ chối. Vui lòng xác thực lại.'
+            : 'Chưa xác thực CCCD: Hoàn tất eKYC để bật nhận việc & mở khóa Radar.');
+
+    final String ctaLabel = isPending ? 'Chi tiết' : (isRejected ? 'Chụp lại' : 'Xác thực');
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bannerBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: bannerBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isPending ? Icons.hourglass_top_rounded : (isRejected ? Icons.error_outline : Icons.shield_outlined),
+            size: 18,
+            color: primaryColor,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 11.5, color: primaryColor, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EkycVerificationScreen()),
+              ).then((_) {
+                ref.read(ekycProvider.notifier).checkStatus();
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                ctaLabel,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEkycLockedState(BuildContext context, bool isDark, EkycState ekycState) {
+    final isPending = ekycState.result?.isPending ?? false;
+    final isRejected = ekycState.result?.isRejected ?? false;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon khiên khóa nổi bật
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: isPending
+                        ? [const Color(0xFF3B82F6), const Color(0xFF1D4ED8)]
+                        : (isRejected
+                            ? [const Color(0xFFEF4444), const Color(0xFFB91C1C)]
+                            : [const Color(0xFFF59E0B), const Color(0xFFD97706)]),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isPending
+                              ? const Color(0xFF3B82F6)
+                              : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)))
+                          .withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    isPending
+                        ? Icons.hourglass_top_rounded
+                        : (isRejected ? Icons.gpp_bad_rounded : Icons.lock_outline_rounded),
+                    color: Colors.white,
+                    size: 38,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Tiêu đề trạng thái
+              Text(
+                isPending
+                    ? 'Hồ Sơ Đang Chờ Phê Duyệt'
+                    : (isRejected ? 'Định Danh eKYC Bị Từ Chối' : 'Tính Năng Radar Tìm Việc Đang Khóa'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Nội dung mô tả
+              Text(
+                isPending
+                    ? 'Hồ sơ CCCD của bạn đã được gửi thành công và đang được hệ thống đối soát tự động. Ngay khi được phê duyệt, tính năng Radar tìm việc sẽ tự động kích hoạt.'
+                    : (isRejected
+                        ? 'Hồ sơ xác thực CCCD trước đó không đạt yêu cầu: ${ekycState.result?.routingReason ?? "Hình ảnh mờ hoặc thông tin không trùng khớp"}. Vui lòng tiến hành chụp lại.'
+                        : 'Theo quy chuẩn bảo vệ quyền lợi và an toàn ca làm việc tại CANi, tài khoản cần xác thực căn cước công dân (eKYC) trước khi có thể tìm và nhận việc gần bạn.'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Danh sách quyền lợi sau khi eKYC
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    _buildBenefitRow(
+                      icon: Icons.radar_rounded,
+                      title: 'Mở khóa bản đồ Job Radar & quét việc làm quanh bạn',
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildBenefitRow(
+                      icon: Icons.toggle_on_rounded,
+                      title: 'Bật chế độ Sẵn sàng nhận việc để nhận ca tức thì',
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildBenefitRow(
+                      icon: Icons.payments_outlined,
+                      title: 'Thanh toán lương minh bạch và bảo hiểm ca trực',
+                      isDark: isDark,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Nút CTA hành động
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const EkycVerificationScreen()),
+                    ).then((_) {
+                      ref.read(ekycProvider.notifier).checkStatus();
+                    });
+                  },
+                  icon: Icon(
+                    isPending
+                        ? Icons.visibility_outlined
+                        : (isRejected ? Icons.refresh_rounded : Icons.verified_user_rounded),
+                    size: 18,
+                  ),
+                  label: Text(
+                    isPending
+                        ? 'XEM CHI TIẾT TIẾN ĐỘ'
+                        : (isRejected ? 'CHỤP LẠI CCCD & KHUÔN MẶT' : 'XÁC THỰC CCCD NGAY (1 - 2 PHÚT)'),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isPending
+                        ? const Color(0xFF2563EB)
+                        : (isRejected ? const Color(0xFFDC2626) : const Color(0xFF0077FF)),
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBenefitRow({required IconData icon, required String title, required bool isDark}) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF0077FF)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -532,10 +532,8 @@ class _EkycVerificationScreenState
           const SizedBox(height: 12),
           Text(
             item.isApproved
-                ? 'Chúc mừng! Hồ sơ của bạn đã được phê duyệt thành công.'
-                : (item.isPending
-                      ? 'Hồ sơ đã gửi thành công, đang chờ CSKH kiểm duyệt.'
-                      : 'Định danh chưa hoàn tất, vui lòng thử lại.'),
+                ? 'Chúc mừng! Hồ sơ của bạn đã được AI phê duyệt thành công.'
+                : 'Định danh chưa đạt chuẩn nhận diện, vui lòng chụp lại ảnh.',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,
@@ -810,18 +808,23 @@ class _EkycVerificationScreenState
             ? () async {
                 final success = await notifier.submitVerification();
                 if (!mounted) return;
-                if (success) {
+                final currentState = ref.read(ekycProvider);
+                final res = currentState.result;
+                if (success && res != null && !res.isRejected) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Đã gửi hồ sơ eKYC thẩm định thành công!'),
-                      backgroundColor: Color(0xFF10B981),
+                    SnackBar(
+                      content: Text(
+                        res.isApproved
+                            ? 'Xác thực định danh eKYC thành công! Đã cấp tích xanh.'
+                            : 'Định danh chưa đạt chuẩn: ${res.routingReason.isNotEmpty ? res.routingReason : "Vui lòng chụp lại ảnh"}',
+                      ),
+                      backgroundColor: res.isApproved ? const Color(0xFF10B981) : const Color(0xFFDC2626),
                     ),
                   );
-                  // Không gọi _navigateToHome() tại đây để người dùng nhìn thấy kết quả chi tiết
                 } else {
-                  final err =
-                      ref.read(ekycProvider).errorMessage ??
-                      'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.';
+                  final err = (res != null && res.isRejected)
+                      ? (res.routingReason.isNotEmpty ? res.routingReason : 'Hồ sơ eKYC bị từ chối hoặc số CCCD đã được sử dụng.')
+                      : (currentState.errorMessage ?? 'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.');
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(err),

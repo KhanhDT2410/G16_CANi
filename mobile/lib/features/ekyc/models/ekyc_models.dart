@@ -61,7 +61,7 @@ class EkycVerificationItem {
       routingDecision: json['routingDecision'] ?? 'MANUAL_REVIEW',
       routingReason: json['routingReason'] ?? '',
       status: json['status'] ?? 'PENDING_REVIEW',
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) ?? DateTime.now() : DateTime.now(),
+      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'])?.toLocal() ?? DateTime.now() : DateTime.now(),
     );
   }
 

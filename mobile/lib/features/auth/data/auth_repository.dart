@@ -204,7 +204,13 @@ class AuthRepository {
       final message = (e.response?.data is Map)
           ? (e.response?.data as Map)['message']?.toString()
           : null;
-      throw Exception(message ?? 'Đồng bộ tài khoản Google với hệ thống CANi thất bại.');
+      if (message != null && message.isNotEmpty) {
+        throw Exception(message);
+      }
+      if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout) {
+        throw Exception('Không thể kết nối đến máy chủ CANi. Vui lòng kiểm tra kết nối mạng.');
+      }
+      throw Exception('Đồng bộ tài khoản Google với hệ thống CANi thất bại (${e.response?.statusCode ?? e.type.name}).');
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Lỗi Google Sign-In: ${e.toString()}');

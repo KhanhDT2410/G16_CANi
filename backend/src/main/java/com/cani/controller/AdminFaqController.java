@@ -116,6 +116,18 @@ public class AdminFaqController {
     }
 
     /**
+     * Tải ảnh minh họa FAQ trực tiếp từ thiết bị local lên máy chủ.
+     * POST /api/v1/admin/faqs/upload-image
+     */
+    @PostMapping(value = "/upload-image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> uploadFaqImage(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        String url = faqService.uploadFaqImage(file);
+        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of("url", url), "Tải ảnh từ thiết bị thành công"));
+    }
+
+    /**
      * Thống kê lượt xem và tỷ lệ giảm tải ticket (Ticket Deflection Rate).
      * GET /api/v1/admin/faqs/analytics
      */

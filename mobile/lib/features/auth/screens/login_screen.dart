@@ -117,7 +117,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   AuthTextField(
                     controller: _emailController,
                     label: 'Email',
-                    hintText: 'worker@cani.vn',
+                    hintText: 'Nhập địa chỉ email của bạn',
                     keyboardType: TextInputType.emailAddress,
                     prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF0077FF), size: 20),
                     validator: (val) {

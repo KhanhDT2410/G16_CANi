@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../features/auth/api/supabaseClient';
 import { authApi } from '../../features/auth/api/authApi';
+import { useAuth } from '../../features/auth';
 
 /**
  * Trang Đón Tiếp Callback OAuth Google (/auth/callback)
@@ -9,11 +10,27 @@ import { authApi } from '../../features/auth/api/authApi';
  */
 const AuthCallbackPage = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [status, setStatus] = useState('Đang hoàn tất xác thực với Google...');
   const [errorMessage, setErrorMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
+    // 0. Phòng vệ an toàn: Nếu bằng cách nào đó URL thanh toán PayOS (?orderCode=...) bị lạc vào trang này,
+    // lập tức điều hướng trở về cổng Quản lý Gói cước của Nhà tổ chức sự kiện (EO), tuyệt đối không xử lý như OAuth Google
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPayOS =
+      urlParams.has('orderCode') ||
+      urlParams.has('payos') ||
+      urlParams.has('cancel') ||
+      urlParams.get('code') === '00' ||
+      urlParams.get('status') === 'PAID';
+
+    if (isPayOS) {
+      navigate('/eo?tab=subscription&' + urlParams.toString(), { replace: true });
+      return;
+    }
+
     let isHandled = false;
 
     const processSession = async (session) => {
@@ -35,16 +52,8 @@ const AuthCallbackPage = () => {
           return;
         }
 
-        // Lưu thông tin phiên đăng nhập
-        if (loginData.token) {
-          localStorage.setItem('cani_token', loginData.token);
-        }
-        if (loginData.refreshToken) {
-          localStorage.setItem('cani_refresh_token', loginData.refreshToken);
-        }
-        if (loginData.user) {
-          localStorage.setItem('cani_user', JSON.stringify(loginData.user));
-        }
+        // Lưu thông tin phiên đăng nhập vào AuthContext & localStorage
+        login(loginData.user, loginData.token, loginData.refreshToken);
 
         setStatus('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
@@ -69,7 +78,6 @@ const AuthCallbackPage = () => {
     };
 
     // 1. Kiểm tra nếu có mã code từ PKCE OAuth (?code=...)
-    const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
 
     if (authCode) {

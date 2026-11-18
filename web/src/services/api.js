@@ -29,10 +29,16 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('cani_token');
       localStorage.removeItem('cani_user');
-      if (
-        !window.location.pathname.includes('/login') &&
-        !window.location.pathname.includes('/register')
-      ) {
+      const pathname = window.location.pathname;
+      const isPublicPath =
+        pathname === '/' ||
+        pathname === '' ||
+        pathname.startsWith('/login') ||
+        pathname.startsWith('/register') ||
+        pathname.startsWith('/support') ||
+        pathname.startsWith('/auth');
+
+      if (!isPublicPath) {
         window.location.href = '/login';
       }
     }

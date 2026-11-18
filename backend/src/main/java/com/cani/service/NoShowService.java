@@ -79,10 +79,19 @@ public class NoShowService {
         assignment.setStatus(AssignmentStatus.NO_SHOW);
         shiftAssignmentRepository.save(assignment);
 
-        // Mở lại vị trí còn thiếu cho Shift
+        // Mở lại vị trí còn thiếu cho Shift và bật chế độ khẩn cấp (emergency)
         Shift shift = assignment.getShift();
-        if (shift.getRemainingWorkers() != null) {
-            shift.setRemainingWorkers(shift.getRemainingWorkers() + 1);
+        if (shift != null) {
+            if (shift.getConfirmedWorkers() != null && shift.getConfirmedWorkers() > 0) {
+                shift.setConfirmedWorkers(shift.getConfirmedWorkers() - 1);
+            }
+            if (shift.getRemainingWorkers() != null) {
+                shift.setRemainingWorkers(shift.getRemainingWorkers() + 1);
+            }
+            if (shift.getStatus() == com.cani.entity.enums.ShiftStatus.FULLY_STAFFED) {
+                shift.setStatus(com.cani.entity.enums.ShiftStatus.ACTIVE);
+            }
+            shift.setEmergency(true);
             shiftRepository.save(shift);
         }
 

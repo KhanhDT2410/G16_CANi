@@ -7,13 +7,13 @@ import './AdminDashboard.css';
  * Component chính cho Bảng điều khiển Quản trị & Phân tích số liệu (UC-86)
  */
 const AdminDashboardView = ({ onNavigateTab }) => {
-  const { metrics, activities, loading, refreshing, error, isDemoFallback, refresh } = useAdminDashboard();
+  const { metrics, activities, loading, refreshing, error, refresh } = useAdminDashboard();
 
   if (loading) {
     return (
       <div className="dashboard-container">
         <div className="skeleton" style={{ height: '56px', borderRadius: '12px' }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
           <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
           <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
           <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
@@ -47,15 +47,6 @@ const AdminDashboardView = ({ onNavigateTab }) => {
       <div className="dashboard-toolbar">
         <div className="dashboard-toolbar-title">
           <span>Tổng Quan Vận Hành Nền Tảng</span>
-          {isDemoFallback && (
-            <span
-              className="dashboard-demo-badge"
-              title="Backend đang tắt hoặc chưa đăng nhập Admin - Hiển thị dữ liệu mẫu để bạn test giao diện"
-            >
-              <span className="dashboard-demo-dot" />
-              <span>Chế độ Demo (Offline)</span>
-            </span>
-          )}
         </div>
         <button
           type="button"

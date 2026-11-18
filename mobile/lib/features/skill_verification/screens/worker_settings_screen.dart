@@ -135,8 +135,8 @@ class _WorkerSettingsScreenState extends ConsumerState<WorkerSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // NHÓM 1: TIÊU CHÍ TÌM VIỆC & MATCHING (UC-26, UC-34)
-                _buildSectionTitle('Tiêu chí tìm việc & ghép ca (UC-26 / UC-34)'),
+                // NHÓM 1: TIÊU CHÍ TÌM VIỆC & MATCHING
+                _buildSectionTitle('Tiêu chí tìm việc & ghép ca'),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -312,7 +312,7 @@ class _WorkerSettingsScreenState extends ConsumerState<WorkerSettingsScreen> {
                           child: const Icon(Icons.calendar_month_rounded, color: Color(0xFF0066FF), size: 20),
                         ),
                         title: const Text(
-                          'Lịch rảnh cố định hàng tuần (UC-25)',
+                          'Lịch rảnh cố định hàng tuần',
                           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                         ),
                         subtitle: const Text(

@@ -16,7 +16,7 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
       >
         <div>
           <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-            Khai Báo Lương & Quyết Toán Non-Escrow (Mục 11 SRS)
+            Khai Báo Lương & Quyết Toán Thù Lao Nhân Sự
           </h3>
           <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
             Đối soát chấm công GPS QR, thanh toán trực tiếp sau ca và xuất chứng từ chi chuẩn kế toán.
@@ -64,14 +64,19 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
           <tbody>
             {payments.map((p) => (
               <tr key={p.paymentId}>
-                <td style={{ fontWeight: 600 }}>{p.assignmentId}</td>
+                <td
+                  style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }}
+                  title={p.assignmentId}
+                >
+                  {p.assignmentId?.length > 14 ? `${p.assignmentId.substring(0, 8)}...` : p.assignmentId}
+                </td>
                 <td>{p.workerName}</td>
                 <td>{p.jobType}</td>
                 <td style={{ fontWeight: 600 }}>
-                  {p.agreedAmount.toLocaleString()} đ
+                  {(p.agreedAmount != null ? p.agreedAmount : 0).toLocaleString()} đ
                 </td>
                 <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
-                  {p.declaredAmount > 0 ? `${p.declaredAmount.toLocaleString()} đ` : 'Chưa trả'}
+                  {p.declaredAmount > 0 ? `${(p.declaredAmount || 0).toLocaleString()} đ` : 'Chưa trả'}
                 </td>
                 <td>{p.paymentMethod || '—'}</td>
                 <td style={{ fontSize: '0.85rem', color: '#64748b' }}>
@@ -118,7 +123,7 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
                         cursor: 'pointer',
                       }}
                       onClick={() => onOpenDisputeModal && onOpenDisputeModal(p)}
-                      title="Gửi khiếu nại tranh chấp lên Customer Care (UC-96)"
+                      title="Gửi khiếu nại tranh chấp lên bộ phận CSKH"
                     >
                       Khiếu Nại
                     </button>

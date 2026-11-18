@@ -7,9 +7,9 @@ export const USER_ROLES = {
 
 export const USER_ROLE_LABELS = {
   ADMIN: { label: 'Quản trị viên', badgeClass: 'badge-role-admin' },
-  CUSTOMER_CARE: { label: 'Chăm sóc KH', badgeClass: 'badge-role-cc' },
-  EVENT_ORGANIZER: { label: 'Nhà tổ chức (EO)', badgeClass: 'badge-role-eo' },
-  WORKER: { label: 'Nhân sự (Worker)', badgeClass: 'badge-role-worker' },
+  CUSTOMER_CARE: { label: 'Chăm sóc khách hàng', badgeClass: 'badge-role-cc' },
+  EVENT_ORGANIZER: { label: 'Nhà tổ chức sự kiện', badgeClass: 'badge-role-eo' },
+  WORKER: { label: 'Người lao động', badgeClass: 'badge-role-worker' },
 };
 
 export const USER_STATUSES = {
@@ -24,4 +24,20 @@ export const USER_STATUS_LABELS = {
   LOCKED: { label: 'Đã khóa', badgeClass: 'badge-status-locked' },
   SUSPENDED: { label: 'Tạm đình chỉ', badgeClass: 'badge-status-suspended' },
   PENDING_VERIFICATION: { label: 'Chờ xác thực', badgeClass: 'badge-status-pending' },
+};
+
+export const KYC_STATUS_LABELS = {
+  APPROVED: { label: 'Đã xác thực', badgeClass: 'badge-status-active' },
+  PENDING: { label: 'Chờ duyệt', badgeClass: 'badge-status-pending' },
+  PENDING_REVIEW: { label: 'Chờ duyệt', badgeClass: 'badge-status-pending' },
+  REJECTED: { label: 'Bị từ chối', badgeClass: 'badge-status-locked' },
+  SUSPICIOUS: { label: 'Nghi vấn', badgeClass: 'badge-status-suspended' },
+  NOT_SUBMITTED: { label: 'Chưa nộp', badgeClass: 'badge-status-pending' },
+  UNVERIFIED: { label: 'Chưa xác thực', badgeClass: 'badge-status-pending' },
+};
+
+export const SKILL_STATUS_LABELS = {
+  APPROVED: { label: 'Đã duyệt', badgeClass: 'badge-status-active' },
+  REJECTED: { label: 'Bị từ chối', badgeClass: 'badge-status-locked' },
+  NOT_FOUND: { label: 'Chưa kê khai', badgeClass: 'badge-status-pending' },
 };

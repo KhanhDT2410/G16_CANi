@@ -31,39 +31,16 @@
 
 /* Icon Box */
 .metric-icon-box {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.metric-icon-box.dashboard {
   background: #f8fafc;
-  color: #334155;
-  border: 1px solid #e2e8f0;
-}
-
-.metric-icon-box.users {
-  background: #eff6ff;
-  color: #2563eb;
-}
-
-.metric-icon-box.verifications {
-  background: #fef2f2;
-  color: #dc2626;
-}
-
-.metric-icon-box.operations {
-  background: #ecfdf5;
-  color: #059669;
-}
-
-.metric-icon-box.activities {
-  background: #f1f5f9;
   color: #475569;
+  border: 1px solid #e2e8f0;
 }
 
 /* Refresh Button */
@@ -170,26 +147,26 @@
 .metric-section-badge {
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 0.2rem 0.55rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 9999px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
 }
 
-.metric-section-badge.badge-blue {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #dbeafe;
+.rev-growth-inline {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 0.75rem;
+  margin-left: 0.35rem;
 }
 
-.metric-section-badge.badge-red {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fee2e2;
+.rev-growth-inline.positive {
+  color: #059669;
 }
 
-.metric-section-badge.badge-green {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #d1fae5;
+.rev-growth-inline.negative {
+  color: #dc2626;
 }
 
 .metric-kpi-main {
@@ -202,6 +179,7 @@
 .metric-kpi-val {
   font-size: 2.15rem;
   font-weight: 800;
+  color: #0f172a;
   letter-spacing: -0.03em;
   line-height: 1.1;
 }

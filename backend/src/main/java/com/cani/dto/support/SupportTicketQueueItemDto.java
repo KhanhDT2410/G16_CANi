@@ -28,7 +28,13 @@ public class SupportTicketQueueItemDto {
     private String subject;
     private TicketStatus status;
     private UUID userId;
+    private String userName;
+    private String userPhone;
+    private String userEmail;
+    private String userAvatar;
     private UUID assignedTo;
+    private String assignedName;
+    private String assignedRole;
     private Instant slaDeadline;
     private Instant lastMessageAt;
     private Boolean slaAtRisk;

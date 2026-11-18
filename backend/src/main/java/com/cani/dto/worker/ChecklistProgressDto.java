@@ -17,4 +17,8 @@ public class ChecklistProgressDto {
     private Boolean isCompleted = false;
 
     private Instant completedAt;
+
+    private String evidenceImageUrl;
+
+    private Instant evidenceSubmittedAt;
 }

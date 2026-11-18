@@ -68,7 +68,29 @@ export const authApi = {
   },
 
   resetPassword: async (params) => {
-    await apiClient.post('/auth/reset-password', params);
+    try {
+      const response = await apiClient.post('/auth/reset-password', params);
+      return response.data;
+    } catch (error) {
+      if (!error.response) {
+        throw new Error('Không thể kết nối đến máy chủ Backend.');
+      }
+      const message = error.response.data?.message || 'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại.';
+      throw new Error(message);
+    }
+  },
+
+  confirmResetPassword: async (params) => {
+    try {
+      const response = await apiClient.post('/auth/confirm-reset-password', params);
+      return response.data;
+    } catch (error) {
+      if (!error.response) {
+        throw new Error('Không thể kết nối đến máy chủ Backend.');
+      }
+      const message = error.response.data?.message || 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra mã OTP.';
+      throw new Error(message);
+    }
   },
 
   logout: async () => {

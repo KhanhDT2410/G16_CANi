@@ -35,8 +35,14 @@ public class RegisterRequest {
     @NotNull(message = "Loại tài khoản bắt buộc phải chọn")
     private AccountType accountType;
 
+    // Loại hình tổ chức: 'ENTERPRISE' (Doanh nghiệp) hoặc 'INDIVIDUAL' (Cá nhân tự do)
+    private String organizerType;
+
     // Tên công ty/tổ chức (nếu đăng ký EVENT_ORGANIZER từ Web)
     private String companyName;
+
+    // Mã số kinh doanh / Mã số thuế (dành cho Doanh nghiệp)
+    private String taxId;
 
     @NotBlank(message = "Mã xác thực OTP không được để trống")
     @Size(min = 6, max = 6, message = "Mã OTP phải gồm đúng 6 chữ số")

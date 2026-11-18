@@ -181,3 +181,33 @@
   color: #6b7280;
   cursor: not-allowed;
 }
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS (EoEkycTab)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .eo-ekyc-card {
+    padding: 1.25rem 1rem;
+    border-radius: 12px;
+  }
+
+  .ekyc-upload-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .upload-box {
+    min-height: 150px;
+    padding: 1rem;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .profile-form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}

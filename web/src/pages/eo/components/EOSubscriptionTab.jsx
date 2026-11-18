@@ -1,4 +1,5 @@
 import React from 'react';
+import { showToast } from '../../../components/common/Toast';
 import { useSubscription } from '../hooks/useSubscription';
 import PayOSQrModal from './PayOSQrModal';
 import './EOSubscriptionTab.css';
@@ -14,10 +15,8 @@ export default function EOSubscriptionTab() {
     setActiveSubTab,
     payOSModalData,
     setPayOSModalData,
-    handlePurchaseVNPay,
     handlePurchasePayOS,
     handleConfirmPayOS,
-    handleSimulateDemo,
   } = useSubscription();
 
   const formatCurrency = (val) => {
@@ -41,6 +40,7 @@ export default function EOSubscriptionTab() {
 
   const isCurrentActive =
     currentSubscription &&
+    Boolean(currentSubscription.subscriptionId) &&
     currentSubscription.status === 'ACTIVE' &&
     currentSubscription.remainingEvents > 0;
 
@@ -50,9 +50,9 @@ export default function EOSubscriptionTab() {
       <div className="sub-current-card">
         <div className="sub-current-header">
           <div className="sub-current-title-group">
-            <h2>Gói Dịch Vụ & Hạn Mức Điều Phối</h2>
+            <h2>Gói Dịch Vụ Sự Kiện</h2>
             <p className="sub-current-subtitle">
-              Mô hình thanh toán theo Sự kiện (Pay-per-Event Quota). Tuân thủ mô hình Non-Escrow & Nghị định 52/2024/NĐ-CP.
+              Quản lý số lượng sự kiện và phương thức tuyển dụng nhân sự trên nền tảng CANi.
             </p>
           </div>
           <div>
@@ -60,13 +60,17 @@ export default function EOSubscriptionTab() {
               <span className="sub-status-pill status-active">
                 Đang Hoạt Động: {currentSubscription.planName}
               </span>
-            ) : currentSubscription && currentSubscription.status === 'CONSUMED' ? (
+            ) : currentSubscription && currentSubscription.subscriptionId && currentSubscription.remainingEvents === 0 ? (
               <span className="sub-status-pill status-consumed">
-                Đã Sử Dụng Hết Hạn Mức
+                Đã Hết Hạn Mức Gói
+              </span>
+            ) : currentSubscription && currentSubscription.subscriptionId && currentSubscription.isExpired ? (
+              <span className="sub-status-pill status-expired">
+                Gói Đã Hết Hạn
               </span>
             ) : (
               <span className="sub-status-pill status-none">
-                Chưa Có Gói Kích Hoạt
+                Chưa Có Gói Matching (Chế độ Mời Miễn Phí)
               </span>
             )}
           </div>
@@ -79,46 +83,52 @@ export default function EOSubscriptionTab() {
               {currentSubscription?.remainingEvents ?? 0} <small style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Event</small>
             </span>
             <span className="sub-metric-hint">
-              {isCurrentActive ? 'Đủ điều kiện xuất bản sự kiện & ca làm' : 'Cần nạp thêm gói để xuất bản sự kiện'}
+              {isCurrentActive ? 'Đủ điều kiện xuất bản sự kiện Matching' : 'Chế độ Mời người miễn phí không giới hạn. Mua gói để bật Matching.'}
             </span>
           </div>
 
           <div className="sub-metric-item">
             <span className="sub-metric-label">Chế độ tuyển dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem' }}>
-              {currentSubscription?.planType === 'MATCHING_PLUS'
-                ? 'Matching Radar AI + Mời'
-                : currentSubscription?.planType === 'INVITE_ONLY'
-                ? 'Mời Trực Tiếp (Invite Mode)'
-                : 'Chưa kích hoạt'}
+              {isCurrentActive
+                ? (currentSubscription?.planType === 'ENTERPRISE'
+                  ? 'Ghép Đôi Ưu Tiên + Cứu Hộ'
+                  : currentSubscription?.planType === 'MATCHING_PLUS'
+                  ? 'Ghép Đôi Tiêu Chuẩn'
+                  : currentSubscription?.planType === 'FREE_TRIAL'
+                  ? 'Ghép Đôi Dùng Thử'
+                  : 'Mời Trực Tiếp')
+                : 'Mời Trực Tiếp (Miễn Phí)'}
             </span>
             <span className="sub-metric-hint">
-              {currentSubscription?.planType === 'MATCHING_PLUS'
-                ? 'Tự động quét nhân sự bán kính 15km'
-                : 'Phân phối qua link / QR bảo mật'}
+              {isCurrentActive
+                ? 'Tự động kết nối nhân sự theo bán kính vị trí'
+                : 'Tìm kiếm và gửi lời mời không giới hạn'}
             </span>
           </div>
 
           <div className="sub-metric-item">
             <span className="sub-metric-label">Hạn sử dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem', color: '#e2e8f0' }}>
-              {currentSubscription?.endDate ? formatDate(currentSubscription.endDate) : 'Vô thời hạn (theo Quota)'}
+              {currentSubscription?.expiresAt || currentSubscription?.endDate
+                ? formatDate(currentSubscription.expiresAt || currentSubscription.endDate)
+                : 'Theo số lượng sự kiện'}
             </span>
             <span className="sub-metric-hint">
-              Mã giao dịch: {currentSubscription?.transactionRef || 'N/A'}
+              Mã gói: {currentSubscription?.subscriptionId ? currentSubscription.subscriptionId.substring(0, 8) : 'N/A'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 2. SUB-NAVIGATION TABS (W-06 SPEC) */}
+      {/* 2. SUB-NAVIGATION TABS */}
       <div className="sub-tabs-bar">
         <button
           type="button"
           className={`sub-tab-btn ${activeSubTab === 'plans' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('plans')}
         >
-          Danh Mục Gói Cước (UC-10, UC-11)
+          Danh Mục Gói Dịch Vụ
         </button>
         <button
           type="button"
@@ -136,18 +146,9 @@ export default function EOSubscriptionTab() {
         </button>
       </div>
 
-      {/* 3. SUB-TAB: PLANS & PURCHASE (UC-10, UC-11) */}
+      {/* 3. SUB-TAB: PLANS & PURCHASE */}
       {activeSubTab === 'plans' && (
         <>
-          <div className="demo-sandbox-notice">
-            <div className="demo-notice-content">
-              <h4>Môi Trường Thử Nghiệm VNPay Sandbox Gateway & Non-Escrow Compliance</h4>
-              <p>
-                Hệ thống CANi tích hợp Cổng thanh toán <strong>PayOS VietQR</strong> và <strong>VNPay Sandbox</strong>. Khi chọn hình thức thanh toán, bạn có thể quét mã VietQR tự động khớp tiền hoặc bấm <strong>"[Demo] Giả lập thanh toán"</strong> để kích hoạt gói ngay lập tức phục vụ demo hội đồng.
-              </p>
-            </div>
-          </div>
-
           {loading ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
               Đang tải danh mục gói cước từ máy chủ...
@@ -156,6 +157,7 @@ export default function EOSubscriptionTab() {
             <div className="sub-pricing-grid">
               {plans.map((plan) => {
                 const isMatching = plan.planType === 'MATCHING_PLUS';
+                const isFree = plan.price === 0;
 
                 return (
                   <div
@@ -163,6 +165,7 @@ export default function EOSubscriptionTab() {
                     className={`pricing-card ${isMatching ? 'featured' : ''}`}
                   >
                     {isMatching && <div className="pricing-badge">Khuyên Dùng</div>}
+                    {isFree && <div className="pricing-badge" style={{ background: '#10b981' }}>Miễn Phí</div>}
 
                     <div className="pricing-header">
                       <h3 className="pricing-title">{plan.name}</h3>
@@ -172,7 +175,7 @@ export default function EOSubscriptionTab() {
                     <div className="pricing-cost">
                       <span className="cost-amount">{formatCurrency(plan.price)}</span>
                       <span className="cost-currency">VNĐ</span>
-                      <span className="cost-period">/ Sự kiện</span>
+                      <span className="cost-period">/ {plan.maxEvents ? `${plan.maxEvents} sự kiện` : (plan.eventQuota ? `${plan.eventQuota} sự kiện` : 'gói')}</span>
                     </div>
 
                     <ul className="pricing-features">
@@ -185,43 +188,66 @@ export default function EOSubscriptionTab() {
                     </ul>
 
                     <div className="pricing-actions">
-                      <button
-                        type="button"
-                        className="btn-purchase-vnpay"
-                        style={{ background: '#059669' }}
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handlePurchasePayOS(plan.planType)}
-                      >
-                        {purchasingPlan === plan.planType ? (
-                          'Đang khởi tạo PayOS...'
+                      {isFree ? (
+                        currentSubscription?.planType === 'FREE_TRIAL' ? (
+                          <div
+                            style={{
+                              textAlign: 'center',
+                              padding: '0.75rem 1rem',
+                              background: '#f8fafc',
+                              borderRadius: '10px',
+                              border: '1px dashed #cbd5e1',
+                              color: '#64748b',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {currentSubscription.remainingEvents > 0
+                              ? '✓ Đang kích hoạt gói dùng thử'
+                              : '✓ Đã sử dụng hết lượt trải nghiệm'}
+                          </div>
+                        ) : currentSubscription?.subscriptionId ? (
+                          <div
+                            style={{
+                              textAlign: 'center',
+                              padding: '0.75rem 1rem',
+                              background: '#f8fafc',
+                              borderRadius: '10px',
+                              border: '1px dashed #cbd5e1',
+                              color: '#64748b',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            ✓ Đang sử dụng gói trả phí
+                          </div>
                         ) : (
-                          'Quét Mã VietQR (PayOS MBBank)'
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn-purchase-vnpay"
-                        style={{ background: '#0284c7' }}
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handlePurchaseVNPay(plan.planType)}
-                      >
-                        {purchasingPlan === plan.planType ? (
-                          'Đang kết nối VNPay...'
-                        ) : (
-                          `Thanh toán VNPay Sandbox (${formatCurrency(plan.price)} đ)`
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn-demo-simulate"
-                        disabled={purchasingPlan !== null}
-                        onClick={() => handleSimulateDemo(plan.planType)}
-                        title="Dành riêng cho Hội đồng chấm đồ án: Giả lập thanh toán thành công tức thì"
-                      >
-                        [Demo Sandbox] Giả Lập Thành Công
-                      </button>
+                          <button
+                            type="button"
+                            className="btn-purchase-vnpay"
+                            style={{ background: '#10b981', width: '100%' }}
+                            disabled={purchasingPlan !== null}
+                            onClick={() => handlePurchasePayOS(plan.planType)}
+                          >
+                            {purchasingPlan === plan.planType
+                              ? 'Đang kích hoạt...'
+                              : 'Kích Hoạt Trải Nghiệm (0 VNĐ)'}
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-purchase-vnpay"
+                          style={{ background: '#2563eb', width: '100%' }}
+                          disabled={purchasingPlan !== null}
+                          onClick={() => handlePurchasePayOS(plan.planType)}
+                        >
+                          {purchasingPlan === plan.planType
+                            ? 'Đang chuyển sang PayOS...'
+                            : 'Thanh toán qua PayOS VietQR'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -231,7 +257,7 @@ export default function EOSubscriptionTab() {
         </>
       )}
 
-      {/* 4. SUB-TAB: TRANSACTION HISTORY (UC-12) */}
+      {/* 4. SUB-TAB: TRANSACTION HISTORY */}
       {activeSubTab === 'history' && (
         <div className="sub-history-container">
           {history.length === 0 ? (
@@ -254,16 +280,16 @@ export default function EOSubscriptionTab() {
                   <th>Gói Cước</th>
                   <th>Số Tiền</th>
                   <th>Cổng TT</th>
-                  <th>Quota Sự Kiện</th>
+                  <th>Số Sự Kiện</th>
                   <th>Thời Gian Mua</th>
                   <th>Trạng Thái</th>
                 </tr>
               </thead>
               <tbody>
-                {history.map((item) => (
-                  <tr key={item.subscriptionId}>
+                {history.map((item, idx) => (
+                  <tr key={item.subscriptionId || idx}>
                     <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                      {item.transactionRef || item.subscriptionId.substring(0, 8)}
+                      {item.transactionRef || (item.subscriptionId ? item.subscriptionId.substring(0, 8) : 'GÓI-CANI')}
                     </td>
                     <td>
                       <strong>{item.planName}</strong>
@@ -272,18 +298,18 @@ export default function EOSubscriptionTab() {
                       </div>
                     </td>
                     <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                      {formatCurrency(item.amountPaid)} đ
+                      {formatCurrency(item.price ?? item.amountPaid ?? 0)} đ
                     </td>
                     <td>
-                      <span>VNPay / PayOS</span>
+                      <span>PayOS VietQR</span>
                     </td>
                     <td>
                       <span style={{ fontWeight: 600, color: item.remainingEvents > 0 ? '#059669' : '#64748b' }}>
-                        {item.remainingEvents} / {item.eventsQuota || 1} còn lại
+                        {item.remainingEvents} / {item.maxEvents || item.eventsQuota || 1} còn lại
                       </span>
                     </td>
                     <td style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                      {formatDate(item.startDate)}
+                      {formatDate(item.createdAt || item.startsAt || item.startDate)}
                     </td>
                     <td>
                       <span
@@ -317,10 +343,10 @@ export default function EOSubscriptionTab() {
         <div className="sub-settings-container animate-fade-in-up" style={{ backgroundColor: '#ffffff', borderRadius: '1rem', border: '1px solid #e2e8f0', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
           <div style={{ marginBottom: '1.5rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-              Cài Đặt Gói Cước & Quota Vận Hành
+              Cài Đặt Gói Dịch Vụ
             </h3>
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#64748b' }}>
-              Cấu hình hạn ngạch sự kiện, cảnh báo quota, cổng thanh toán VietQR mặc định và thông tin xuất hóa đơn VAT.
+              Cấu hình hạn ngạch sự kiện, cảnh báo khi hết lượt, cổng thanh toán VietQR mặc định và thông tin xuất hóa đơn VAT.
             </p>
           </div>
 
@@ -334,8 +360,8 @@ export default function EOSubscriptionTab() {
               <div className="eo-form-group">
                 <label>Gói Cước Mặc Định Khi Tạo Sự Kiện Mới</label>
                 <select className="eo-form-select" defaultValue="MATCHING_PLUS">
-                  <option value="MATCHING_PLUS">Gói Matching Radar AI (80,000 đ / sự kiện) - Tự động quét 15km</option>
-                  <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
+                  <option value="MATCHING_PLUS">Gói Tự Động Ghép Đôi (80.000 đ / sự kiện)</option>
+                  <option value="INVITE_ONLY">Gói Mời Trực Tiếp (50.000 đ / sự kiện)</option>
                 </select>
                 <span className="eo-field-helper">Gói ưu tiên được chọn sẵn khi bạn tạo sự kiện mới.</span>
               </div>
@@ -343,15 +369,14 @@ export default function EOSubscriptionTab() {
               <div className="eo-form-group">
                 <label>Cổng Thanh Toán Ưu Tiên Mặc Định</label>
                 <select className="eo-form-select" defaultValue="PAYOS_VIETQR">
-                  <option value="PAYOS_VIETQR">PayOS VietQR MBBank (Tự động khớp tiền 24/7)</option>
-                  <option value="VNPAY">Cổng VNPay Sandbox Gateway</option>
-                  <option value="MANUAL">Chuyển khoản theo số tài khoản</option>
+                  <option value="PAYOS_VIETQR">PayOS VietQR (Tự động khớp tiền 24/7)</option>
+                  <option value="MANUAL">Chuyển khoản trực tiếp theo số tài khoản</option>
                 </select>
-                <span className="eo-field-helper">Phương thức xuất hiện đầu tiên tại Bước 3 thanh toán.</span>
+                <span className="eo-field-helper">Phương thức xuất hiện mặc định khi thanh toán.</span>
               </div>
 
               <div className="eo-form-group">
-                <label>Ngưỡng Cảnh Báo Khi Sắp Hết Quota Sự Kiện</label>
+                <label>Ngưỡng Cảnh Báo Khi Sắp Hết Lượt Tạo Sự Kiện</label>
                 <select className="eo-form-select" defaultValue="1">
                   <option value="1">Khi còn &le; 1 sự kiện (Khuyên dùng)</option>
                   <option value="2">Khi còn &le; 2 sự kiện</option>
@@ -361,7 +386,7 @@ export default function EOSubscriptionTab() {
               </div>
 
               <div className="eo-form-group">
-                <label>Tự Động Mở PayOS VietQR Khi Hết Hạn Quota</label>
+                <label>Tự Động Tạo Mã QR Thanh Toán Khi Hết Lượt</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <input type="checkbox" id="autoQrCheck" defaultChecked style={{ width: 18, height: 18 }} />
                   <label htmlFor="autoQrCheck" style={{ margin: 0, fontWeight: 500, cursor: 'pointer', fontSize: '0.85rem' }}>
@@ -371,43 +396,7 @@ export default function EOSubscriptionTab() {
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem', marginBottom: '1.5rem' }}>
-              <h4 style={{ margin: '0 0 0.5rem', fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
-                Thông Tin Xuất Hóa Đơn Điện Tử Doanh Nghiệp (VAT E-Invoice)
-              </h4>
-              <p style={{ margin: '0 0 1rem', fontSize: '0.825rem', color: '#64748b' }}>
-                Dùng để tự động xuất hóa đơn thuế giá trị gia tăng (VAT) cho mỗi giao dịch mua gói cước CANi.
-              </p>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                <div className="eo-form-group">
-                  <label>Tên Doanh Nghiệp / Công Ty *</label>
-                  <input type="text" className="eo-form-input" defaultValue="Công ty Cổ phần Sự kiện Quốc tế CANi" required />
-                </div>
-
-                <div className="eo-form-group">
-                  <label>Mã Số Thuế (MST) *</label>
-                  <input type="text" className="eo-form-input" defaultValue="0109887766" required />
-                </div>
-
-                <div className="eo-form-group">
-                  <label>Email Nhận Hóa Đơn Điện Tử *</label>
-                  <input type="email" className="eo-form-input" defaultValue="finance@cani.vn" required />
-                </div>
-
-                <div className="eo-form-group">
-                  <label>Người Đại Diện Doanh Nghiệp</label>
-                  <input type="text" className="eo-form-input" defaultValue="Phạm Duy Hưng" />
-                </div>
-
-                <div className="eo-form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Địa Chỉ Trụ Sở Đăng Ký Kinh Doanh *</label>
-                  <input type="text" className="eo-form-input" defaultValue="Tầng 8, Tòa nhà Innovation, Cầu Giấy, Hà Nội" required />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
               <button
                 type="submit"
                 className="eo-btn-primary"

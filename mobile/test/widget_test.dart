@@ -36,7 +36,7 @@ void main() {
       await tester.pump();
     }
 
-    expect(find.text('Đăng Nhập'), findsOneWidget);
+    expect(find.textContaining('Đăng nhập'), findsOneWidget);
     expect(find.text('Đăng ký ngay'), findsOneWidget);
   });
 }

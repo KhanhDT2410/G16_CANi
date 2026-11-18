@@ -107,10 +107,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
             maxZoom: 19.0,
           ),
           children: [
-            // Lớp gạch bản đồ CartoDB Voyager mượt mà, không bị chặn bởi nhà mạng Việt Nam
+            // Lớp gạch bản đồ OpenStreetMap chuẩn mở toàn cầu (Không cần API key, không bị watermark)
             TileLayer(
-              urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.cani.cani',
               maxZoom: 19,
               errorTileCallback: (tile, error, stackTrace) {

@@ -136,9 +136,14 @@
   gap: 0.75rem;
   border-bottom: 2px solid #e2e8f0;
   padding-bottom: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  scrollbar-width: thin;
 }
 
 .sub-tab-btn {
+  flex-shrink: 0;
   background: none;
   border: none;
   font-size: 0.95rem;
@@ -371,12 +376,14 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .sub-table {
   width: 100%;
+  min-width: 680px;
   border-collapse: collapse;
   text-align: left;
   font-size: 0.875rem;
@@ -388,12 +395,14 @@
   font-weight: 600;
   padding: 0.85rem 1.25rem;
   border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
 }
 
 .sub-table td {
   padding: 1rem 1.25rem;
   border-bottom: 1px solid #f1f5f9;
   color: #1e293b;
+  white-space: nowrap;
 }
 
 .sub-table tr:hover {
@@ -409,5 +418,55 @@
   text-align: center;
   color: #64748b;
   font-size: 0.95rem;
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS (EOSubscriptionTab)
+   ========================================================================== */
+@media (max-width: 768px) {
+  .sub-current-card {
+    padding: 1.25rem 1rem;
+    border-radius: 12px;
+  }
+
+  .sub-current-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .sub-metrics-row {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 1rem;
+    padding-top: 1rem;
+  }
+
+  .sub-metric-val {
+    font-size: 1.25rem;
+  }
+
+  .sub-pricing-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .pricing-card {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sub-metrics-row {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .pricing-title {
+    font-size: 1.15rem;
+  }
+
+  .cost-amount {
+    font-size: 1.85rem;
+  }
 }
 

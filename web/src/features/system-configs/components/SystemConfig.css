@@ -86,23 +86,23 @@
 }
 
 .btn-config-refresh {
-  width: 36px;
-  height: 36px;
-  display: flex;
+  padding: 0.55rem 0.95rem;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.15rem;
-  color: #4b5563;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
   border-radius: 0.5rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-config-refresh:hover:not(:disabled) {
-  background: #e5e7eb;
-  color: #111827;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 /* Controls: Search & Category Tabs */
@@ -143,12 +143,52 @@
   right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #9ca3af;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  color: #64748b;
   cursor: pointer;
-  font-size: 0.85rem;
-  padding: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  transition: all 0.15s ease;
+}
+
+.sys-config-search-clear:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Badge nhóm cấu hình hiện tại tinh gọn (thay thế dãy tab rải rác) */
+.sys-config-active-group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.95rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  font-size: 0.84rem;
+}
+
+.pill-prefix {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.pill-category-name {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.pill-count-badge {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  font-weight: 600;
+  font-size: 0.76rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: 9999px;
 }
 
 .sys-config-category-tabs {
@@ -249,6 +289,12 @@
   letter-spacing: 0.02em;
 }
 
+.badge-cat-matching {
+  background: #fdf4ff;
+  color: #a21caf;
+  border: 1px solid #f0abfc;
+}
+
 .badge-cat-financial {
   background: #ecfdf5;
   color: #047857;
@@ -328,43 +374,129 @@
   margin-bottom: 0.75rem;
 }
 
+/* Split Stepper Control Bar (ADM-09) */
+.sys-config-stepper-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sys-config-stepper-bar:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.sys-config-stepper-bar.bar-dirty {
+  border-color: #f59e0b;
+  background: #fffdfa;
+}
+
+/* Left zone: Number/Text input + Unit label */
+.stepper-left-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.sys-config-stepper-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+  padding: 0.5rem 0;
+  min-width: 50px;
+}
+
+/* Remove native browser number spin buttons */
+.sys-config-stepper-input::-webkit-outer-spin-button,
+.sys-config-stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sys-config-stepper-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.sys-config-unit-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* Vertical divider line */
+.stepper-vertical-divider {
+  width: 1px;
+  height: 22px;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}
+
+/* Right zone: Stepper +/- buttons */
+.stepper-actions-section {
+  display: flex;
+  align-items: center;
+  padding: 0.2rem 0.35rem;
+  gap: 0.25rem;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.btn-stepper-action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-stepper-action:hover:not(:disabled) {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.btn-stepper-action:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.btn-stepper-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Retain legacy class for fallback */
 .sys-config-input-wrapper {
   position: relative;
   flex: 1;
   display: flex;
   align-items: center;
-}
-
-.sys-config-val-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #111827;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  outline: none;
-  transition: all 0.15s ease;
-  box-sizing: border-box;
-}
-
-.sys-config-val-input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.sys-config-val-input.input-modified {
-  border-color: #f59e0b;
-  background: #fffbeb;
-}
-
-.sys-config-unit-label {
-  position: absolute;
-  right: 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #6b7280;
-  pointer-events: none;
 }
 
 .btn-card-save-single {
@@ -494,15 +626,20 @@
 }
 
 .btn-modal-close {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  color: #9ca3af;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .btn-modal-close:hover {
-  color: #111827;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .sys-config-modal-body {
@@ -619,4 +756,257 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ==========================================================================
+   Matching Formula Card Styles (ADM-09)
+   ========================================================================== */
+
+.matching-formula-card {
+  background: #ffffff;
+  border: 1px solid #e0e7ff;
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formula-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.formula-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #6366f1;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  width: fit-content;
+}
+
+.formula-title-group {
+  flex: 1;
+}
+
+.formula-title-group h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e1b4b;
+  margin: 0.2rem 0;
+}
+
+.formula-title-group p {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.formula-status-pill {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.8rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.formula-status-pill.valid {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.formula-status-pill.invalid {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+/* Math Formula Box */
+.formula-math-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.85rem 1.2rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.formula-highlight {
+  font-weight: 700;
+  color: #1e293b;
+  background: #e2e8f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.formula-op {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.formula-term {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.formula-term.dist {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.formula-term.rating {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.formula-term.exp {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.formula-term.rs {
+  background: #f5f3ff;
+  color: #6b21a8;
+  border: 1px solid #ddd6fe;
+}
+
+.formula-term.bonus {
+  background: #fdf2f8;
+  color: #9d174d;
+  border: 1px solid #fbcfe8;
+}
+
+/* Progress bar */
+.formula-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.formula-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.formula-bar-hint {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.formula-bar {
+  display: flex;
+  height: 26px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+  background: #e5e7eb;
+}
+
+.bar-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffffff;
+  transition: width 0.3s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 0.25rem;
+}
+
+.seg-dist {
+  background: #2563eb;
+}
+
+.seg-rating {
+  background: #d97706;
+}
+
+.seg-exp {
+  background: #059669;
+}
+
+.seg-rs {
+  background: #7c3aed;
+}
+
+/* 4 Factor Details */
+.formula-factors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.factor-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #f3f4f6;
+}
+
+.factor-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 0.3rem;
+  flex-shrink: 0;
+}
+
+.dot-dist {
+  background: #2563eb;
+}
+
+.dot-rating {
+  background: #d97706;
+}
+
+.dot-exp {
+  background: #059669;
+}
+
+.dot-rs {
+  background: #7c3aed;
+}
+
+.factor-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.factor-text strong {
+  font-size: 0.82rem;
+  color: #1f2937;
+}
+
+.factor-text span {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
 

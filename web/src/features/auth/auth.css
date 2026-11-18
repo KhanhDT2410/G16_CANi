@@ -100,6 +100,48 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
+.form-input.input-error {
+  border-color: #ef4444 !important;
+  background-color: #fffaf0;
+}
+
+.form-input.input-error:focus {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18) !important;
+}
+
+.field-error-text {
+  font-size: 0.8125rem;
+  color: #dc2626;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  line-height: 1.35;
+}
+
+.field-hint-text {
+  font-size: 0.775rem;
+  color: #64748b;
+  margin-top: 0.35rem;
+  line-height: 1.35;
+}
+
+.otp-feedback-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.5rem;
+  color: #166534;
+  font-size: 0.8125rem;
+  margin-top: 0.45rem;
+  line-height: 1.4;
+}
+
 .toggle-password-btn {
   position: absolute;
   right: 0.75rem;

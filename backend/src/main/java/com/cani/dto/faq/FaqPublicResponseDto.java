@@ -15,7 +15,11 @@ public class FaqPublicResponseDto {
     private UUID id;
     private FaqCategory category;
     private String question;
+    private String summary;
     private String answer;
+    private String imageUrl;
+    private String attachmentUrl;
+    private String attachmentName;
     private Integer viewCount;
 }
 

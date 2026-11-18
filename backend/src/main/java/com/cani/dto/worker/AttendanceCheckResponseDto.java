@@ -23,5 +23,6 @@ public class AttendanceCheckResponseDto {
     private Instant checkoutTime;
     private BigDecimal hoursWorked;
     private Boolean isOnTime;
+    private String proofImageUrl;
     private String message;
 }

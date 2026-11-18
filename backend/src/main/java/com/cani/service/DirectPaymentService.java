@@ -9,6 +9,7 @@ import com.cani.entity.enums.PaymentStatus;
 import com.cani.exception.AppException;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
+import com.cani.util.VietQrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -40,7 +43,14 @@ public class DirectPaymentService {
     private final ShiftAssignmentRepository assignmentRepository;
 
     @Autowired(required = false)
+    private com.cani.repository.EventRepository eventRepository;
+
+    @Autowired(required = false)
     private NotificationService notificationService;
+
+    @org.springframework.context.annotation.Lazy
+    @Autowired(required = false)
+    private DisputeService disputeService;
 
     /**
      * Khởi tạo bản ghi Payment khi Worker được gán vào ca làm việc
@@ -57,12 +67,12 @@ public class DirectPaymentService {
             return null;
         }
 
-        // Tính thù lao dự kiến
+        // Tính thù lao dự kiến chuẩn xác qua BigDecimal (chống làm tròn sai số qua double)
         BigDecimal agreedAmount = BigDecimal.ZERO;
         if (shift.getHourlyWage() != null && shift.getStartTime() != null && shift.getEndTime() != null) {
-            long minutes = Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes();
-            double hours = Math.max(1.0, minutes / 60.0);
-            agreedAmount = shift.getHourlyWage().multiply(BigDecimal.valueOf(hours))
+            long minutes = Math.max(60, Duration.between(shift.getStartTime(), shift.getEndTime()).toMinutes());
+            BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+            agreedAmount = shift.getHourlyWage().multiply(hours)
                     .add(shift.getAllowance() != null ? shift.getAllowance() : BigDecimal.ZERO);
         }
 
@@ -88,7 +98,14 @@ public class DirectPaymentService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phân công công việc: " + dto.getAssignmentId()));
 
         Payment payment = paymentRepository.findByAssignmentId(dto.getAssignmentId())
-                .orElseGet(() -> createInitialPayment(assignment));
+                .orElseGet(() -> {
+                    try {
+                        return createInitialPayment(assignment);
+                    } catch (DataIntegrityViolationException ex) {
+                        return paymentRepository.findByAssignmentId(dto.getAssignmentId())
+                                .orElseThrow(() -> ex);
+                    }
+                });
 
         if (payment == null || payment.getEventOrganizer() == null) {
             throw new IllegalArgumentException("Không đủ thông tin sự kiện/ca làm hoặc Worker để khởi tạo thanh toán cho phân công: " + dto.getAssignmentId());
@@ -106,6 +123,7 @@ public class DirectPaymentService {
         payment.setStatus(PaymentStatus.DECLARED_PENDING_WORKER);
 
         Payment saved = paymentRepository.save(payment);
+        updateEventTotalPaid(saved.getEventId());
         log.info("EO {} đã khai báo thanh toán {} VND cho Worker {} (Assignment {})",
                 eoId, dto.getDeclaredAmount(), payment.getWorker().getWorkerId(), dto.getAssignmentId());
 
@@ -141,6 +159,16 @@ public class DirectPaymentService {
             throw new IllegalStateException("Bạn không có quyền xác nhận thanh toán này");
         }
 
+        if (assignmentRepository != null) {
+            ShiftAssignment assignment = assignmentRepository.findById(assignmentId).orElse(null);
+            if (assignment != null && assignment.getStatus() != null
+                    && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.CHECKED_IN
+                    && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.COMPLETED) {
+                throw new com.cani.exception.BadRequestException(
+                        "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca (trạng thái hiện tại: " + assignment.getStatus() + ")");
+            }
+        }
+
         String rawStatus = dto.getConfirmStatus() != null ? dto.getConfirmStatus().trim().toUpperCase() : "";
         String normalizedConfirmStatus;
         if ("RECEIVED_FULL".equals(rawStatus) || "CONFIRMED_FULL".equals(rawStatus)) {
@@ -161,9 +189,50 @@ public class DirectPaymentService {
         payment.setWorkerComment(dto.getComment());
 
         Payment saved = paymentRepository.save(payment);
+        updateEventTotalPaid(saved.getEventId());
+
+        if ("NOT_RECEIVED".equals(normalizedConfirmStatus) && disputeService != null) {
+            UUID workerUserId = (payment.getWorker() != null && payment.getWorker().getUser() != null)
+                    ? payment.getWorker().getUser().getUserId()
+                    : workerId;
+            String description = (dto.getComment() != null && !dto.getComment().isBlank())
+                    ? dto.getComment().trim()
+                    : "Worker xác nhận chưa nhận được thù lao khi kết thúc ca làm việc.";
+            try {
+                com.cani.dto.dispute.CreateDisputeRequestDto disputeReq = com.cani.dto.dispute.CreateDisputeRequestDto.builder()
+                        .assignmentId(assignmentId)
+                        .type(com.cani.entity.enums.DisputeType.PAYMENT)
+                        .title("Khiếu nại chưa nhận đủ thù lao")
+                        .description(description)
+                        .build();
+                disputeService.createDispute(workerUserId, disputeReq);
+                log.info("Đã tự động tạo Dispute thanh toán cho Assignment {}", assignmentId);
+            } catch (Exception ex) {
+                log.warn("Không tạo thêm Dispute mới cho Assignment {} (có thể đã tồn tại tranh chấp mở): {}", assignmentId, ex.getMessage());
+            }
+        }
+
         log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, normalizedConfirmStatus, assignmentId);
 
         return mapToDto(saved);
+    }
+
+    private void updateEventTotalPaid(UUID eventId) {
+        if (eventId == null || eventRepository == null) return;
+        eventRepository.findById(eventId).ifPresent(event -> {
+            List<Payment> payments = paymentRepository.findByEventId(eventId);
+            if (payments != null) {
+                BigDecimal sum = payments.stream()
+                        .filter(p -> p.getStatus() == PaymentStatus.CONFIRMED_FULL
+                                || p.getStatus() == PaymentStatus.CONFIRMED_PARTIAL
+                                || p.getStatus() == PaymentStatus.DECLARED_PENDING_WORKER)
+                        .map(p -> p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount())
+                        .filter(java.util.Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                event.setTotalPaid(sum);
+                eventRepository.save(event);
+            }
+        });
     }
 
     @Transactional(readOnly = true)
@@ -225,6 +294,16 @@ public class DirectPaymentService {
     }
 
     private PaymentResponseDto mapToDto(Payment p) {
+        Worker w = p.getWorker();
+        String bankCode = w != null ? w.getBankCode() : null;
+        String bankAccountNumber = w != null ? w.getBankAccountNumber() : null;
+        String bankAccountName = w != null ? w.getBankAccountName() : null;
+        if ((bankAccountName == null || bankAccountName.isBlank()) && w != null && w.getUser() != null) {
+            bankAccountName = w.getUser().getFullName();
+        }
+        BigDecimal amount = p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount();
+        String workerVietQrUrl = VietQrUtil.buildVietQrUrl(bankCode, bankAccountNumber, bankAccountName, amount);
+
         return PaymentResponseDto.builder()
                 .paymentId(p.getPaymentId())
                 .eventId(p.getEventId())
@@ -232,8 +311,8 @@ public class DirectPaymentService {
                 .assignmentId(p.getAssignmentId())
                 .eoId(p.getEventOrganizer() != null ? p.getEventOrganizer().getEoId() : null)
                 .eoCompanyName(p.getEventOrganizer() != null ? p.getEventOrganizer().getCompanyName() : "")
-                .workerId(p.getWorker() != null ? p.getWorker().getWorkerId() : null)
-                .workerName(p.getWorker() != null && p.getWorker().getUser() != null ? p.getWorker().getUser().getFullName() : "")
+                .workerId(w != null ? w.getWorkerId() : null)
+                .workerName(w != null && w.getUser() != null ? w.getUser().getFullName() : "")
                 .agreedAmount(p.getAgreedAmount())
                 .declaredAmount(p.getDeclaredAmount())
                 .status(p.getStatus())
@@ -245,6 +324,10 @@ public class DirectPaymentService {
                 .workerConfirmStatus(p.getWorkerConfirmStatus())
                 .workerComment(p.getWorkerComment())
                 .createdAt(p.getCreatedAt())
+                .bankCode(bankCode)
+                .bankAccountNumber(bankAccountNumber)
+                .bankAccountName(bankAccountName)
+                .workerVietQrUrl(workerVietQrUrl)
                 .build();
     }
 }

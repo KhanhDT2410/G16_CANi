@@ -41,7 +41,7 @@ const TransferDisputeModal = ({ dispute, staff = [], onClose, onSubmit }) => {
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
           <div>
-            <h3>Chuyển Tranh Chấp Cho Nhân Sự Khác (UC-99)</h3>
+            <h3>Chuyển Tranh Chấp Cho Nhân Sự Khác</h3>
             <span className="dispute-modal-subtitle">
               Mã đơn: <code>{dispute.id}</code> — Tiêu đề: {dispute.title}
             </span>

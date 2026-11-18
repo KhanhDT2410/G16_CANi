@@ -75,6 +75,47 @@ class JobDetailBottomSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // Ảnh minh họa ca làm / đồng phục (nếu EO có cung cấp)
+          if (shift.imageUrl != null && shift.imageUrl!.trim().isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Stack(
+                children: [
+                  Image.network(
+                    shift.imageUrl!.trim(),
+                    height: 140,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
+                  ),
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.checkroom_rounded, size: 12, color: Colors.white),
+                          SizedBox(width: 4),
+                          Text(
+                            'Ảnh ca làm / Đồng phục yêu cầu',
+                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
           // Tên sự kiện & Khoảng cách
           Row(
             children: [
@@ -214,7 +255,26 @@ class JobDetailBottomSheet extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
+
+          // Ghi chú thanh toán Non-Escrow (Minh bạch phương thức thanh toán)
+          Row(
+            children: [
+              const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  '* Tiền thù lao do Ban tổ chức thanh toán trực tiếp cho bạn sau ca (không qua CANi ví điện tử).',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
 
           // Hàng nút thao tác: Chỉ đường Google Maps + Ứng tuyển ca làm
           Row(
@@ -237,20 +297,54 @@ class JobDetailBottomSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              // Nút Ứng tuyển
+              // Nút Ứng tuyển (Chỉ mở khi ca đang ở chế độ Khẩn cấp / Emergency)
               Expanded(
                 flex: 6,
                 child: SizedBox(
                   height: 48,
-                  child: FilledButton.icon(
-                    onPressed: onApply,
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Ứng tuyển ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0066FF),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
+                  child: shift.emergency
+                      ? FilledButton.icon(
+                          onPressed: onApply,
+                          icon: const Icon(Icons.flash_on_rounded, size: 18),
+                          label: const Text('Ứng tuyển khẩn cấp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        )
+                      : Container(
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.schedule_send_rounded,
+                                size: 16,
+                                color: Color(0xFF64748B),
+                              ),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Chờ lời mời (Matching)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: Color(0xFF475569),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
               ),
             ],

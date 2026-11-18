@@ -42,7 +42,6 @@ const SystemConfigEditModal = ({ config, onClose, onSave, isSaving }) => {
         <div className="sys-config-modal-header">
           <div>
             <h3 className="modal-title">Chỉnh Sửa Tham Số Hệ Thống</h3>
-            <span className="modal-key-badge">{config.key}</span>
           </div>
           <button
             type="button"
@@ -50,7 +49,7 @@ const SystemConfigEditModal = ({ config, onClose, onSave, isSaving }) => {
             onClick={onClose}
             disabled={isSaving}
           >
-            ✕
+            Đóng
           </button>
         </div>
 

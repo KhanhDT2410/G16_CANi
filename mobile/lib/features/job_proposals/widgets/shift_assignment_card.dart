@@ -10,6 +10,7 @@ class ShiftAssignmentCard extends StatelessWidget {
   final VoidCallback? onOpenChecklist;
   final VoidCallback? onCancelAssignment;
   final VoidCallback? onRateOrganizer;
+  final VoidCallback? onTap;
 
   const ShiftAssignmentCard({
     super.key,
@@ -20,6 +21,7 @@ class ShiftAssignmentCard extends StatelessWidget {
     this.onOpenChecklist,
     this.onCancelAssignment,
     this.onRateOrganizer,
+    this.onTap,
   });
 
   @override
@@ -68,7 +70,9 @@ class ShiftAssignmentCard extends StatelessWidget {
             child: Container(color: barColor),
           ),
 
-          Padding(
+          InkWell(
+            onTap: onTap,
+            child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 15, 15, 15),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,6 +156,19 @@ class ShiftAssignmentCard extends StatelessWidget {
                     letterSpacing: -0.1,
                   ),
                 ),
+                if (a.imageUrl != null && a.imageUrl!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      a.imageUrl!.trim(),
+                      height: 100,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, stack) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
 
                 // Thời gian & Địa điểm
@@ -226,7 +243,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                             onPressed: onOpenChecklist,
                             icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF0D9488)),
                             label: const Text(
-                              'Checklist việc',
+                              'Vận hành & Checklist',
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
                             ),
                             style: TextButton.styleFrom(
@@ -397,6 +414,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
           ),
         ],
       ),

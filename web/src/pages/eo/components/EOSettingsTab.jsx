@@ -1,36 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { showToast } from '../../../components/common/Toast';
+import { blockListService } from '../../../services/blockListService';
 
 /**
  * EOSettingsTab
- * Màn hình Cài đặt Tổng thể cho Ban Tổ Chức (EO), bao gồm Cài đặt Gói Cước, Hóa Đơn & Tiêu Chuẩn Tuyển Dụng
+ * Màn hình Cài đặt cho Ban Tổ Chức (EO): Thông Báo & Vận Hành và Danh Sách Chặn
  */
-export default function EOSettingsTab({ onNavigateToSubscription }) {
-  const [activeSection, setActiveSection] = useState('PACKAGE'); // 'PACKAGE' | 'RECRUITMENT' | 'INVOICE' | 'NOTIFICATIONS'
-
-  const [packageSettings, setPackageSettings] = useState({
-    defaultPlan: 'MATCHING_PLUS', // 'INVITE_ONLY' | 'MATCHING_PLUS'
-    alertThreshold: 1, // Báo động khi còn <= 1 event quota
-    autoPayOSPrompt: true, // Tự động gợi ý PayOS VietQR khi hết quota
-    paymentMethod: 'PAYOS_VIETQR', // 'PAYOS_VIETQR' | 'VNPAY' | 'MANUAL_TRANSFER'
-  });
-
-  const [recruitmentSettings, setRecruitmentSettings] = useState({
-    defaultRadiusKm: 15,
-    minReliabilityScore: 60,
-    defaultHourlyWage: 50000,
-    defaultAllowance: 20000,
-    requireDressCode: true,
-    autoApproveAboveScore: 85,
-  });
-
-  const [invoiceSettings, setInvoiceSettings] = useState({
-    companyName: 'Công ty Cổ phần Sự kiện Quốc tế CANi',
-    taxId: '0109887766',
-    invoiceEmail: 'finance@cani.vn',
-    legalAddress: 'Tầng 8, Tòa nhà Innovation, Cầu Giấy, Hà Nội',
-    representativeName: 'Phạm Duy Hưng',
-  });
+export default function EOSettingsTab() {
+  const [activeSection, setActiveSection] = useState('NOTIFICATIONS'); // 'NOTIFICATIONS' | 'BLOCKLIST'
 
   const [notificationSettings, setNotificationSettings] = useState({
     notifyOnWorkerAccept: true,
@@ -39,18 +16,41 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
     dailyReportEmail: true,
   });
 
-  // Load cài đặt đã lưu từ LocalStorage (nếu có)
+  const [blockedList, setBlockedList] = useState([]);
+  const [loadingBlocked, setLoadingBlocked] = useState(false);
+
+  const fetchBlockedList = async () => {
+    setLoadingBlocked(true);
+    try {
+      const data = await blockListService.getBlockedList();
+      setBlockedList(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn('Lỗi tải danh sách chặn:', err);
+      setBlockedList([]);
+    } finally {
+      setLoadingBlocked(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === 'BLOCKLIST') {
+      fetchBlockedList();
+    }
+  }, [activeSection]);
+
+  const handleUnblock = async (blockedUserId, name) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn bỏ chặn "${name || 'người này'}" không?`)) return;
+    try {
+      await blockListService.unblockUser(blockedUserId);
+      showToast('Đã bỏ chặn người dùng thành công!', 'success');
+      fetchBlockedList();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi bỏ chặn', 'error');
+    }
+  };
+
   useEffect(() => {
     try {
-      const savedPkg = localStorage.getItem('cani_eo_package_settings');
-      if (savedPkg) setPackageSettings(JSON.parse(savedPkg));
-
-      const savedRec = localStorage.getItem('cani_eo_recruitment_settings');
-      if (savedRec) setRecruitmentSettings(JSON.parse(savedRec));
-
-      const savedInv = localStorage.getItem('cani_eo_invoice_settings');
-      if (savedInv) setInvoiceSettings(JSON.parse(savedInv));
-
       const savedNotif = localStorage.getItem('cani_eo_notif_settings');
       if (savedNotif) setNotificationSettings(JSON.parse(savedNotif));
     } catch (e) {
@@ -61,9 +61,6 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
   const handleSaveAll = (e) => {
     e?.preventDefault();
     try {
-      localStorage.setItem('cani_eo_package_settings', JSON.stringify(packageSettings));
-      localStorage.setItem('cani_eo_recruitment_settings', JSON.stringify(recruitmentSettings));
-      localStorage.setItem('cani_eo_invoice_settings', JSON.stringify(invoiceSettings));
       localStorage.setItem('cani_eo_notif_settings', JSON.stringify(notificationSettings));
       showToast('Đã lưu cấu hình cài đặt thành công!', 'success');
     } catch {
@@ -78,10 +75,10 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-              Cài Đặt Hệ Thống & Cấu Hình Gói Dịch Vụ
+              Cài Đặt Thông Báo & Quản Lý Danh Sách Chặn
             </h3>
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#64748b' }}>
-              Quản lý gói dịch vụ đăng tin, định mức thù lao tuyển dụng và thông tin pháp nhân xuất hóa đơn.
+              Quản lý tuỳ chọn nhận thông báo vận hành sự kiện và danh sách nhân sự bị hạn chế.
             </p>
           </div>
 
@@ -91,64 +88,13 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
             style={{ fontSize: '0.85rem', padding: '0.55rem 1.25rem' }}
             onClick={handleSaveAll}
           >
-            Lưu Toàn Bộ Cài Đặt
+            Lưu Cài Đặt
           </button>
         </div>
       </div>
 
       {/* 2. SUB-NAVIGATION TABS */}
       <div className="sub-tabs-bar" style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
-        <button
-          type="button"
-          className={`sub-tab-btn ${activeSection === 'PACKAGE' ? 'active' : ''}`}
-          onClick={() => setActiveSection('PACKAGE')}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: 6,
-            background: activeSection === 'PACKAGE' ? '#eff6ff' : 'transparent',
-            color: activeSection === 'PACKAGE' ? '#1d4ed8' : '#64748b',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Cài Đặt Gói Cước & Quota
-        </button>
-
-        <button
-          type="button"
-          className={`sub-tab-btn ${activeSection === 'RECRUITMENT' ? 'active' : ''}`}
-          onClick={() => setActiveSection('RECRUITMENT')}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: 6,
-            background: activeSection === 'RECRUITMENT' ? '#eff6ff' : 'transparent',
-            color: activeSection === 'RECRUITMENT' ? '#1d4ed8' : '#64748b',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Tiêu Chuẩn Tuyển Dụng & Matching
-        </button>
-
-        <button
-          type="button"
-          className={`sub-tab-btn ${activeSection === 'INVOICE' ? 'active' : ''}`}
-          onClick={() => setActiveSection('INVOICE')}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: 6,
-            background: activeSection === 'INVOICE' ? '#eff6ff' : 'transparent',
-            color: activeSection === 'INVOICE' ? '#1d4ed8' : '#64748b',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Hóa Đơn Điện Tử (VAT)
-        </button>
-
         <button
           type="button"
           className={`sub-tab-btn ${activeSection === 'NOTIFICATIONS' ? 'active' : ''}`}
@@ -165,233 +111,26 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
         >
           Thông Báo & Vận Hành
         </button>
+
+        <button
+          type="button"
+          className={`sub-tab-btn ${activeSection === 'BLOCKLIST' ? 'active' : ''}`}
+          onClick={() => setActiveSection('BLOCKLIST')}
+          style={{
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: 6,
+            background: activeSection === 'BLOCKLIST' ? '#eff6ff' : 'transparent',
+            color: activeSection === 'BLOCKLIST' ? '#1d4ed8' : '#64748b',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Danh sách chặn
+        </button>
       </div>
 
-      {/* 3. NỘI DUNG TỪNG SECTION */}
-
-      {/* SECTION 1: CÀI ĐẶT GÓI CƯỚC & QUOTA */}
-      {activeSection === 'PACKAGE' && (
-        <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-              Cấu Hình Gói Dịch Vụ Đăng Tin & Điều Phối
-            </h4>
-            <button
-              type="button"
-              className="widget-link-btn"
-              onClick={onNavigateToSubscription}
-              style={{ fontSize: '0.85rem' }}
-            >
-              Xem danh mục gói & mua thêm Quota &rarr;
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div className="eo-form-group">
-              <label>Gói Cước Mặc Định Khi Tạo Sự Kiện Mới</label>
-              <select
-                className="eo-form-select"
-                value={packageSettings.defaultPlan}
-                onChange={(e) => setPackageSettings({ ...packageSettings, defaultPlan: e.target.value })}
-              >
-                <option value="MATCHING_PLUS">Gói Matching Radar AI (80,000 đ / sự kiện)</option>
-                <option value="INVITE_ONLY">Gói Mời Trực Tiếp - Invite Mode (50,000 đ / sự kiện)</option>
-              </select>
-              <span className="eo-field-helper">
-                Gói được chọn sẵn khi bạn bước vào quy trình tạo sự kiện.
-              </span>
-            </div>
-
-            <div className="eo-form-group">
-              <label>Cổng Thanh Toán Ưu Tiên Mặc Định</label>
-              <select
-                className="eo-form-select"
-                value={packageSettings.paymentMethod}
-                onChange={(e) => setPackageSettings({ ...packageSettings, paymentMethod: e.target.value })}
-              >
-                <option value="PAYOS_VIETQR">Cổng PayOS VietQR MBBank (Tự động khớp tiền)</option>
-                <option value="VNPAY">Cổng VNPay Sandbox Gateway</option>
-                <option value="MANUAL_TRANSFER">Chuyển khoản thủ công</option>
-              </select>
-              <span className="eo-field-helper">
-                Hệ thống ưu tiên sinh mã QR VietQR Napas 24/7 tức thì.
-              </span>
-            </div>
-
-            <div className="eo-form-group">
-              <label>Cảnh Báo Khi Hạn Mức Quota Sự Kiện Còn Lại</label>
-              <select
-                className="eo-form-select"
-                value={packageSettings.alertThreshold}
-                onChange={(e) => setPackageSettings({ ...packageSettings, alertThreshold: parseInt(e.target.value) })}
-              >
-                <option value={1}>Còn &le; 1 sự kiện (Khuyên dùng)</option>
-                <option value={2}>Còn &le; 2 sự kiện</option>
-                <option value={3}>Còn &le; 3 sự kiện</option>
-              </select>
-              <span className="eo-field-helper">
-                Hệ thống sẽ gửi thông báo để bạn chủ động bổ sung gói trước khi sự kiện bắt đầu.
-              </span>
-            </div>
-
-            <div className="eo-form-group">
-              <label>Tự Động Mở PayOS VietQR Khi Hết Quota</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem' }}>
-                <input
-                  type="checkbox"
-                  id="autoPayOS"
-                  checked={packageSettings.autoPayOSPrompt}
-                  onChange={(e) => setPackageSettings({ ...packageSettings, autoPayOSPrompt: e.target.checked })}
-                  style={{ width: 18, height: 18 }}
-                />
-                <label htmlFor="autoPayOS" style={{ margin: 0, fontWeight: 500, cursor: 'pointer' }}>
-                  Hiển thị mã thanh toán PayOS tức thì ở Bước 3 khi tạo ca
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SECTION 2: TIÊU CHUẨN TUYỂN DỤNG & MATCHING */}
-      {activeSection === 'RECRUITMENT' && (
-        <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
-          <h4 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-            Quy Chuẩn Tuyển Dụng & Tiêu Chí Ghép Nối Ứng Viên (Matching Engine)
-          </h4>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div className="eo-form-group">
-              <label>Bán Kính Quét Radar Mặc Định (km)</label>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                className="eo-form-input"
-                value={recruitmentSettings.defaultRadiusKm}
-                onChange={(e) => setRecruitmentSettings({ ...recruitmentSettings, defaultRadiusKm: parseInt(e.target.value) || 15 })}
-              />
-              <span className="eo-field-helper">
-                Bán kính ưu tiên phát tín hiệu tuyển dụng tới Worker quanh địa điểm tổ chức.
-              </span>
-            </div>
-
-            <div className="eo-form-group">
-              <label>Điểm Uy Tín Tối Thiểu (Reliability Score / 100)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                className="eo-form-input"
-                value={recruitmentSettings.minReliabilityScore}
-                onChange={(e) => setRecruitmentSettings({ ...recruitmentSettings, minReliabilityScore: parseInt(e.target.value) || 60 })}
-              />
-              <span className="eo-field-helper">
-                Chỉ ghép nối những Worker có điểm độ tin cậy đạt từ mức này trở lên.
-              </span>
-            </div>
-
-            <div className="eo-form-group">
-              <label>Thù Lao Đề Xuất Mặc Định (VNĐ/giờ)</label>
-              <input
-                type="number"
-                min="20000"
-                step="5000"
-                className="eo-form-input"
-                value={recruitmentSettings.defaultHourlyWage}
-                onChange={(e) => setRecruitmentSettings({ ...recruitmentSettings, defaultHourlyWage: parseInt(e.target.value) || 50000 })}
-              />
-              <span className="eo-field-helper">
-                Mức lương tự động điền khi tạo ca mới (tối thiểu 20,000 đ/h theo quy định).
-              </span>
-            </div>
-
-            <div className="eo-form-group">
-              <label>Phụ Cấp Ca Mặc Định (VNĐ/ca)</label>
-              <input
-                type="number"
-                step="10000"
-                className="eo-form-input"
-                value={recruitmentSettings.defaultAllowance}
-                onChange={(e) => setRecruitmentSettings({ ...recruitmentSettings, defaultAllowance: parseInt(e.target.value) || 0 })}
-              />
-              <span className="eo-field-helper">
-                Hỗ trợ xăng xe hoặc ăn trưa cho nhân sự ca.
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SECTION 3: HÓA ĐƠN ĐIỆN TỬ (VAT) */}
-      {activeSection === 'INVOICE' && (
-        <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
-          <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-            Thông Tin Xuất Hóa Đơn Điện Tử Doanh Nghiệp (VAT E-Invoice)
-          </h4>
-          <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
-            Dùng để tự động xuất hóa đơn giá trị gia tăng (VAT 8-10%) cho mỗi giao dịch mua gói cước dịch vụ CANi.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div className="eo-form-group">
-              <label>Tên Doanh Nghiệp / Công Ty *</label>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.companyName}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, companyName: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group">
-              <label>Mã Số Thuế (MST) *</label>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.taxId}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, taxId: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group">
-              <label>Email Nhận Hóa Đơn Điện Tử *</label>
-              <input
-                type="email"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.invoiceEmail}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, invoiceEmail: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group">
-              <label>Người Đại Diện Pháp Luật</label>
-              <input
-                type="text"
-                className="eo-form-input"
-                value={invoiceSettings.representativeName}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, representativeName: e.target.value })}
-              />
-            </div>
-
-            <div className="eo-form-group" style={{ gridColumn: '1 / -1' }}>
-              <label>Địa Chỉ Trụ Sở Doanh Nghiệp (Theo GPKD) *</label>
-              <input
-                type="text"
-                required
-                className="eo-form-input"
-                value={invoiceSettings.legalAddress}
-                onChange={(e) => setInvoiceSettings({ ...invoiceSettings, legalAddress: e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SECTION 4: THÔNG BÁO & VẬN HÀNH */}
+      {/* SECTION 1: THÔNG BÁO & VẬN HÀNH */}
       {activeSection === 'NOTIFICATIONS' && (
         <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
           <h4 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
@@ -403,7 +142,7 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
               {
                 id: 'notifWorker',
                 title: 'Thông báo tức thì khi có Worker nhận ca',
-                desc: 'Gửi tin nhắn thông báo khi thuật toán Matching Radar ghép nối thành công ứng viên',
+                desc: 'Gửi tin nhắn thông báo khi hệ thống tự động kết nối thành công ứng viên',
                 checked: notificationSettings.notifyOnWorkerAccept,
                 onChange: (v) => setNotificationSettings({ ...notificationSettings, notifyOnWorkerAccept: v }),
               },
@@ -461,7 +200,109 @@ export default function EOSettingsTab({ onNavigateToSubscription }) {
           </div>
         </div>
       )}
+
+      {/* SECTION 2: DANH SÁCH CHẶN (BLOCK LIST) */}
+      {activeSection === 'BLOCKLIST' && (
+        <div className="eo-widget-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
+                Danh Sách Nhân Sự Bị Chặn ({blockedList.length})
+              </h4>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.825rem', color: '#64748b' }}>
+                Những nhân sự trong danh sách này sẽ không thể nhìn thấy hoặc nhận ca làm việc của bạn trong tương lai.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="eo-btn-secondary"
+              onClick={fetchBlockedList}
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+            >
+              Làm mới
+            </button>
+          </div>
+
+          {loadingBlocked ? (
+            <div style={{ padding: '2rem 0', textAlign: 'center', color: '#64748b' }}>
+              Đang tải danh sách chặn...
+            </div>
+          ) : blockedList.length === 0 ? (
+            <div style={{
+              padding: '2.5rem 1.5rem',
+              textAlign: 'center',
+              backgroundColor: '#f8fafc',
+              borderRadius: '12px',
+              border: '1.5px dashed #cbd5e1',
+              color: '#64748b',
+            }}>
+              <p style={{ margin: '0 0 0.5rem', fontWeight: 600, color: '#334155' }}>
+                Hiện tại bạn chưa chặn bất kỳ nhân sự nào.
+              </p>
+              <p style={{ margin: 0, fontSize: '0.825rem' }}>
+                Bạn có thể chặn nhân sự trực tiếp từ danh sách nhân sự của từng sự kiện nếu họ vi phạm quy chế.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {blockedList.map((item) => (
+                <div
+                  key={item.id || item.blockedUserId}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.85rem 1.15rem',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+                        {item.blockedUserName || item.blockedName || 'Nhân sự đã chặn'}
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        {item.blockedUserEmail || item.blockedEmail || ''}
+                      </span>
+                    </div>
+                    {item.reason && (
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.8rem', color: '#dc2626' }}>
+                        Lý do: <em>{item.reason}</em>
+                      </div>
+                    )}
+                    <div style={{ marginTop: '0.2rem', fontSize: '0.725rem', color: '#94a3b8' }}>
+                      Chặn lúc: {item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : 'Gần đây'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleUnblock(item.blockedUserId || item.id, item.blockedUserName || item.blockedName)}
+                    style={{
+                      padding: '0.4rem 0.85rem',
+                      backgroundColor: '#f1f5f9',
+                      color: '#0f172a',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e2e8f0'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                  >
+                    Bỏ Chặn
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-

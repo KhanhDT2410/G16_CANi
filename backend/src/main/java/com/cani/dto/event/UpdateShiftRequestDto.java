@@ -48,6 +48,8 @@ public class UpdateShiftRequestDto {
 
     private String dressCode;
 
+    private String imageUrl;
+
     private String locationAddress;
 
     private Double locationLat;

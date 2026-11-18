@@ -4,7 +4,7 @@
 > **Người phụ trách Backend:** QuyTH  
 > **Phiên bản:** 1.0.0 (Spring Boot 3.5.1 / Java 21)  
 > **Base URL:** `/api/v1/admin/users`  
-> **Quyền hạn bắt buộc (RBAC):** Bắt buộc Bearer JWT Token của người dùng có Role `ADMIN`.
+> **Quyền hạn bắt buộc (RBAC):** Bắt buộc Bearer JWT Token của người dùng có Role `ADMIN` (Admin only; Customer Care KHÔNG có quyền hạn truy cập module này).
 
 ---
 
@@ -57,6 +57,8 @@ Authorization: Bearer <admin_jwt_token>
         "status": "ACTIVE",
         "avatarUrl": "https://storage.cani.vn/avatars/u1.png",
         "emailVerified": true,
+        "kycStatus": "APPROVED",
+        "skillStatus": "APPROVED",
         "lastLoginAt": "2026-10-26T14:20:00Z",
         "createdAt": "2026-10-20T08:00:00Z",
         "updatedAt": "2026-10-26T14:20:00Z"
@@ -114,6 +116,7 @@ Authorization: Bearer <admin_jwt_token>
       "fullName": "Nguyễn Văn Worker",
       "cccdNumber": "079201004567",
       "kycStatus": "APPROVED",
+      "skillStatus": "APPROVED",
       "reliabilityScore": 98,
       "ratingAvg": 4.85,
       "ratingCount": 15,
@@ -242,3 +245,20 @@ Authorization: Bearer <admin_jwt_token>
     "timestamp": "2026-10-26T20:45:00.456"
   }
   ```
+
+---
+
+### 2.4. Quy Định Dữ Liệu Định Danh (eKYC) & Kỹ Năng (Skill) Read-Only
+
+Từ phiên bản tích hợp AI quyết định tự động (loại bỏ quy trình duyệt thủ công):
+* **Quyền hạn:** `Admin only` — Customer Care (CC) không có quyền truy cập module này.
+* `kycStatus` (String):
+  - Đối với `WORKER`: Lấy từ `worker.kycStatus` (`APPROVED`, `PENDING`, `REJECTED`, `NOT_SUBMITTED`).
+  - Đối với `EVENT_ORGANIZER`: Lấy từ `eo.verificationStatus` (`APPROVED`, `PENDING_REVIEW`, `REJECTED`, `UNVERIFIED`).
+  - Đối với role khác (`ADMIN`, `CUSTOMER_CARE`): `null`.
+* `skillStatus` (String):
+  - Chỉ áp dụng đối với `WORKER` (trả về `null` đối với các role khác).
+  - Có 3 giá trị chuẩn:
+    * `APPROVED`: Đã được AI thẩm định và chấp thuận chứng chỉ kỹ năng.
+    * `REJECTED`: Bị AI từ chối chứng chỉ.
+    * `NOT_FOUND`: Người lao động chưa từng kê khai hoặc nộp chứng chỉ kỹ năng nào.

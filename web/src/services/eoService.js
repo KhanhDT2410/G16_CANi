@@ -143,6 +143,12 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // Xóa sự kiện khỏi danh sách (Soft Delete)
+  deleteEvent: async (eventId) => {
+    const response = await apiClient.delete(`/v1/eo/events/${eventId}`);
+    return response.data?.data;
+  },
+
   // UC-18: Cập nhật ca làm việc
   updateShift: async (shiftId, shiftData) => {
     const response = await apiClient.put(`/v1/eo/events/shifts/${shiftId}`, shiftData);
@@ -208,14 +214,14 @@ export const eoService = {
         },
         {
           planType: 'MATCHING_PLUS',
-          name: 'Gói Radar Matching + Mời (Matching Plus)',
-          description: 'Toàn bộ tính năng Invite Mode + Thuật toán AI Radar tự động quét và ghép nối Worker phù hợp nhất trong bán kính.',
+          name: 'Gói Tự Động Ghép Đôi + Mời (Matching Plus)',
+          description: 'Toàn bộ tính năng Invite Mode + Thuật toán tự động kết nối Worker phù hợp nhất trong bán kính.',
           price: 80000,
           currency: 'VND',
           eventsQuota: 1,
           features: [
             'Bao gồm toàn bộ tính năng Gói Mời Trực Tiếp',
-            'Kích hoạt Matching Radar AI đề xuất Worker tự động',
+            'Tự động đề xuất và kết nối Worker phù hợp nhất',
             'Quét ứng viên theo bán kính GPS (15km), độ tin cậy >= 80%',
             'Worker chủ động nhận việc qua Mobile App tức thì',
             'Tối ưu hóa tốc độ lấp đầy ca làm việc trong 15 phút',
@@ -342,6 +348,12 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // Kích hoạt tự động tìm kiếm Worker cho một ca làm việc (Publish shift)
+  dispatchForShift: async (shiftId) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`);
+    return response.data?.data;
+  },
+
   // ==========================================
   // BONUS 1: EMERGENCY BROADCAST POOL (SECTION 11 CANi_Flow_v8.txt)
   // ==========================================
@@ -353,6 +365,29 @@ export const eoService = {
       // Fallback tự động gọi dispatch chuẩn kèm metadata
       const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`, emergencyData);
       return response.data?.data;
+    }
+  },
+
+  // Tải ảnh sự kiện hoặc ca làm việc trực tiếp từ máy tính lên
+  uploadImage: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/v1/eo/events/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data?.data?.url;
+  },
+
+  // Lấy danh sách toàn bộ nhân sự tham gia trong sự kiện kèm điểm uy tín, tuổi, trạng thái
+  getEventWorkers: async (eventId) => {
+    try {
+      const response = await apiClient.get(`/v1/eo/events/${eventId}/workers`);
+      return response.data?.data || [];
+    } catch (error) {
+      console.warn('Lỗi getEventWorkers:', error);
+      return [];
     }
   },
 };

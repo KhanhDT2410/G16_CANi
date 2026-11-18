@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { eoService } from '../../../services/eoService';
+import { showToast } from '../../../components/common/Toast';
+import { WAGE_RECOMMENDATIONS_MAP, calculateShiftRiskAnalysis } from '../hooks/useShifts';
+import ShiftChecklistEditor from './ShiftChecklistEditor';
 
 /**
  * ShiftCreateModal
- * Modal thêm ca làm việc kèm gợi ý định mức lương Wage Matrix 4D, mô tả công việc và checklist (No Emoji)
+ * Modal thêm ca làm việc kèm gợi ý lương, lựa chọn tính theo giờ/theo ca, cảnh báo khó tìm nhân sự & checklist kéo thả
  */
 const ShiftCreateModal = ({
   isOpen,
@@ -16,41 +20,72 @@ const ShiftCreateModal = ({
   shiftDurationHours = 4,
   calculateShiftTotal,
 }) => {
-  const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
+  const [shiftPackageWage, setShiftPackageWage] = useState(
+    Math.round(Number(newShift?.hourlyWage || 50000) * Math.max(0.5, Number(shiftDurationHours || 4)))
+  );
+  const fileInputRef = useRef(null);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn tệp hình ảnh (JPG, PNG, WEBP, GIF)', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Dung lượng ảnh tối đa là 5MB', 'error');
+      return;
+    }
+    setUploadingImg(true);
+    try {
+      const res = await eoService.uploadImage(file);
+      const url = res.url || res;
+      setNewShift((prev) => ({ ...prev, imageUrl: url }));
+      showToast('Tải ảnh ca làm việc thành công!', 'success');
+    } catch (err) {
+      showToast('Lỗi khi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploadingImg(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   if (!isOpen) return null;
 
+  const safeHours = Math.max(0.5, Number(shiftDurationHours || 4));
   const totalCost = calculateShiftTotal ? calculateShiftTotal() : 0;
-  const checklistList = Array.isArray(newShift.checklistItems) ? newShift.checklistItems : [];
 
-  const handleAddChecklist = (e) => {
-    e?.preventDefault();
-    if (!newChecklistItem.trim()) return;
-    setNewShift((prev) => ({
-      ...prev,
-      checklistItems: [...(prev.checklistItems || []), newChecklistItem.trim()],
-    }));
-    setNewChecklistItem('');
+  const handleSwitchWageMode = (mode) => {
+    setWageMode(mode);
+    if (mode === 'PER_SHIFT') {
+      setShiftPackageWage(Math.round(Number(newShift.hourlyWage || 50000) * safeHours));
+    }
   };
 
-  const handleRemoveChecklist = (indexToRemove) => {
+  const handlePackageWageChange = (val) => {
+    const pkg = Math.max(0, parseFloat(val) || 0);
+    setShiftPackageWage(pkg);
+    const computedHourly = Math.max(0, Math.round(pkg / safeHours));
     setNewShift((prev) => ({
       ...prev,
-      checklistItems: (prev.checklistItems || []).filter((_, idx) => idx !== indexToRemove),
+      hourlyWage: computedHourly,
     }));
   };
 
-  const handleQuickAddChecklist = (item) => {
-    if (checklistList.includes(item)) return;
-    setNewShift((prev) => ({
-      ...prev,
-      checklistItems: [...(prev.checklistItems || []), item],
-    }));
+  const recMap = Object.keys(wageRecommendationsMap).length > 0 ? wageRecommendationsMap : WAGE_RECOMMENDATIONS_MAP;
+  const rawRec = recMap[newShift.jobType] || { min: 40000, max: 60000, defaultWage: 45000, recommended: 45000 };
+  const wageRec = {
+    min: Number(rawRec.min || 40000),
+    max: Number(rawRec.max || 60000),
+    recommended: Number(rawRec.recommended || rawRec.defaultWage || 45000),
   };
+  const riskInfo = calculateShiftRiskAnalysis(newShift);
 
   return (
     <div className="eo-modal-overlay">
-      <div className="eo-modal-box" style={{ maxWidth: '640px' }}>
+      <div className="eo-modal-box" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
             Thêm Ca Làm Việc & Tiêu Chí Tuyển Dụng
@@ -58,39 +93,113 @@ const ShiftCreateModal = ({
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#9ca3af' }}
+            style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b', fontWeight: 600 }}
           >
-            Dong
+            Đóng ✕
           </button>
         </div>
 
         <form onSubmit={onSubmit}>
           <div className="eo-form-group">
             <label>Vị Trí / Vai Trò Cần Tuyển *</label>
-            <select
-              className="eo-form-select"
+            <input
+              type="text"
+              list="create-shift-roles-list"
+              className="eo-form-input"
+              placeholder="Nhập vị trí hoặc chọn gợi ý (VD: Phục vụ bàn, Lễ tân, MC, Kỹ thuật...)"
               value={newShift.jobType}
-              onChange={(e) => onRoleChange ? onRoleChange(e.target.value) : setNewShift({ ...newShift, jobType: e.target.value })}
-            >
+              onChange={(e) =>
+                onRoleChange ? onRoleChange(e.target.value) : setNewShift({ ...newShift, jobType: e.target.value })
+              }
+              required
+            />
+            <datalist id="create-shift-roles-list">
               {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
+                <option key={role} value={role} />
               ))}
-            </select>
+            </datalist>
+          </div>
 
-            {/* Gợi ý Ma trận Lương Wage Matrix 4D */}
-            {wageRecommendationsMap[newShift.jobType] && (
-              <div className="wage-recommendation-badge animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
-                <div>
-                  <strong>Gợi ý Ma trận Lương (Wage Matrix 4D):</strong>{' '}
-                  <span className="wage-range">
-                    {wageRecommendationsMap[newShift.jobType].min.toLocaleString()} đ -{' '}
-                    {wageRecommendationsMap[newShift.jobType].max.toLocaleString()} đ / giờ
+          {/* Hình ảnh minh họa ca làm / Đồng phục - Nằm trong 1 div riêng cho ảnh to rõ */}
+          <div className="eo-form-group">
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</span>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>
+                Hỗ trợ JPG, PNG, WEBP, GIF (Tối đa 5MB)
+              </span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImageUpload}
+              />
+              <button
+                type="button"
+                disabled={uploadingImg}
+                onClick={() => fileInputRef.current?.click()}
+                className="eo-btn-secondary"
+                style={{ fontSize: '0.825rem', padding: '0.45rem 0.95rem', whiteSpace: 'nowrap', fontWeight: 600 }}
+              >
+                {uploadingImg ? 'Đang tải ảnh lên...' : 'Tải ảnh từ máy tính'}
+              </button>
+              {!newShift.imageUrl && (
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Chưa chọn ảnh từ máy tính</span>
+              )}
+            </div>
+
+            {newShift.imageUrl && (
+              <div
+                style={{
+                  marginTop: '0.65rem',
+                  borderRadius: '0.625rem',
+                  border: '1px solid #cbd5e1',
+                  overflow: 'hidden',
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <img
+                  src={newShift.imageUrl}
+                  alt="Ảnh minh họa ca làm"
+                  style={{
+                    width: '100%',
+                    maxHeight: '220px',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.45rem 0.85rem',
+                    backgroundColor: '#ffffff',
+                    borderTop: '1px solid #e2e8f0',
+                  }}
+                >
+                  <span style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
+                    Đã tải ảnh minh họa ca làm việc
                   </span>
-                  <div className="wage-subnote">
-                    Đặc điểm: {wageRecommendationsMap[newShift.jobType].note}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNewShift({ ...newShift, imageUrl: '' })}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#dc2626',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Gỡ ảnh
+                  </button>
                 </div>
               </div>
             )}
@@ -117,7 +226,18 @@ const ShiftCreateModal = ({
                 required
                 className="eo-form-input"
                 value={newShift.startTime}
-                onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const s = new Date(val);
+                  const en = new Date(newShift.endTime);
+                  const dur = !isNaN(s.getTime()) && !isNaN(en.getTime()) && en > s ? parseFloat(((en - s) / 3600000).toFixed(1)) : safeHours;
+                  if (wageMode === 'PER_SHIFT') {
+                    const computed = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
+                    setNewShift({ ...newShift, startTime: val, hourlyWage: computed });
+                  } else {
+                    setNewShift({ ...newShift, startTime: val });
+                  }
+                }}
               />
             </div>
             <div className="eo-form-group">
@@ -127,34 +247,272 @@ const ShiftCreateModal = ({
                 required
                 className="eo-form-input"
                 value={newShift.endTime}
-                onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const s = new Date(newShift.startTime);
+                  const en = new Date(val);
+                  const dur = !isNaN(s.getTime()) && !isNaN(en.getTime()) && en > s ? parseFloat(((en - s) / 3600000).toFixed(1)) : safeHours;
+                  if (wageMode === 'PER_SHIFT') {
+                    const computed = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
+                    setNewShift({ ...newShift, endTime: val, hourlyWage: computed });
+                  } else {
+                    setNewShift({ ...newShift, endTime: val });
+                  }
+                }}
               />
             </div>
           </div>
 
-          <div className="eo-form-row">
-            <div className="eo-form-group">
-              <label>Số Lượng Nhân Sự Cần Tuyển *</label>
-              <input
-                type="number"
-                min="1"
-                required
-                className="eo-form-input"
-                value={newShift.requiredWorkers}
-                onChange={(e) => setNewShift({ ...newShift, requiredWorkers: parseInt(e.target.value) || 1 })}
-              />
+          {/* Chọn tính theo giờ hoặc theo ca */}
+          <div className="eo-form-group" style={{ marginBottom: '0.6rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <label style={{ margin: 0 }}>Hình Thức Tính Thù Lao *</label>
+              <div style={{ display: 'inline-flex', backgroundColor: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchWageMode('HOURLY')}
+                  style={{
+                    padding: '0.3rem 0.75rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    backgroundColor: wageMode === 'HOURLY' ? '#2563eb' : 'transparent',
+                    color: wageMode === 'HOURLY' ? '#ffffff' : '#475569',
+                  }}
+                >
+                  Tính theo giờ (VNĐ/giờ)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchWageMode('PER_SHIFT')}
+                  style={{
+                    padding: '0.3rem 0.75rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    backgroundColor: wageMode === 'PER_SHIFT' ? '#2563eb' : 'transparent',
+                    color: wageMode === 'PER_SHIFT' ? '#ffffff' : '#475569',
+                  }}
+                >
+                  Tính theo ca (Trọn gói/ca)
+                </button>
+              </div>
             </div>
-            <div className="eo-form-group">
-              <label>Thù Lao Giờ (VNĐ/giờ) *</label>
-              <input
-                type="number"
-                min="20000"
-                step="5000"
-                required
-                className="eo-form-input"
-                value={newShift.hourlyWage}
-                onChange={(e) => setNewShift({ ...newShift, hourlyWage: parseFloat(e.target.value) || 0 })}
-              />
+
+            <div className="eo-form-row" style={{ marginBottom: 0 }}>
+              <div className="eo-form-group" style={{ marginBottom: 0 }}>
+                <label>Số Lượng Nhân Sự Cần Tuyển *</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  className="eo-form-input"
+                  value={newShift.requiredWorkers}
+                  onChange={(e) =>
+                    setNewShift({ ...newShift, requiredWorkers: Math.max(1, parseInt(e.target.value, 10) || 1) })
+                  }
+                />
+              </div>
+
+              {wageMode === 'HOURLY' ? (
+                <div className="eo-form-group" style={{ marginBottom: 0 }}>
+                  <label>Thù Lao Theo Giờ (VNĐ/giờ) *</label>
+                  <input
+                    type="number"
+                    min="20000"
+                    step="5000"
+                    required
+                    className="eo-form-input"
+                    value={newShift.hourlyWage}
+                    onChange={(e) => {
+                      const val = Math.max(0, parseFloat(e.target.value) || 0);
+                      setNewShift({ ...newShift, hourlyWage: val });
+                      setShiftPackageWage(Math.round(val * safeHours));
+                    }}
+                  />
+                  <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                    = {Math.round(Number(newShift.hourlyWage || 0) * safeHours).toLocaleString()}đ / ca ({safeHours}h)
+                  </div>
+                </div>
+              ) : (
+                <div className="eo-form-group" style={{ marginBottom: 0 }}>
+                  <label>Mức Lương Trọn Gói Theo Ca (VNĐ/ca) *</label>
+                  <input
+                    type="number"
+                    min="20000"
+                    step="10000"
+                    required
+                    className="eo-form-input"
+                    value={shiftPackageWage}
+                    onChange={(e) => handlePackageWageChange(e.target.value)}
+                  />
+                  <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                    Quy đổi: ~{Number(newShift.hourlyWage || 0).toLocaleString()}đ/giờ ({safeHours}h)
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* GỢI Ý MỨC LƯƠNG THỊ TRƯỜNG & CẢNH BÁO KHÓ TÌM NHÂN SỰ */}
+          <div style={{ marginBottom: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div
+              style={{
+                padding: '0.65rem 0.9rem',
+                borderRadius: '0.5rem',
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+              }}
+            >
+              <div style={{ fontSize: '0.8rem', color: '#1e3a8a' }}>
+                <strong>Gợi ý mức lương:</strong>{' '}
+                Khung thị trường <strong>{((wageRec && wageRec.min) || 40000).toLocaleString()}đ - {((wageRec && wageRec.max) || 60000).toLocaleString()}đ/giờ</strong>{' '}
+                (Khuyên dùng: <strong>{((wageRec && wageRec.recommended) || 45000).toLocaleString()}đ/giờ</strong>)
+              </div>
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const minVal = (wageRec && wageRec.min) || 40000;
+                    setNewShift({ ...newShift, hourlyWage: minVal });
+                    setShiftPackageWage(Math.round(minVal * safeHours));
+                  }}
+                  style={{
+                    fontSize: '0.73rem',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '0.35rem',
+                    border: '1px solid #93c5fd',
+                    backgroundColor: Number(newShift.hourlyWage) === wageRec.min ? '#2563eb' : '#ffffff',
+                    color: Number(newShift.hourlyWage) === wageRec.min ? '#ffffff' : '#1d4ed8',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sàn: {((wageRec && wageRec.min) || 40000).toLocaleString()}đ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const recVal = (wageRec && wageRec.recommended) || 45000;
+                    setNewShift({ ...newShift, hourlyWage: recVal });
+                    setShiftPackageWage(Math.round(recVal * safeHours));
+                  }}
+                  style={{
+                    fontSize: '0.73rem',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '0.35rem',
+                    border: '1px solid #2563eb',
+                    backgroundColor: Number(newShift.hourlyWage) === wageRec.recommended ? '#2563eb' : '#dbeafe',
+                    color: Number(newShift.hourlyWage) === wageRec.recommended ? '#ffffff' : '#1e40af',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Khuyên dùng: {((wageRec && wageRec.recommended) || 45000).toLocaleString()}đ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const maxVal = (wageRec && wageRec.max) || 60000;
+                    setNewShift({ ...newShift, hourlyWage: maxVal });
+                    setShiftPackageWage(Math.round(maxVal * safeHours));
+                  }}
+                  style={{
+                    fontSize: '0.73rem',
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '0.35rem',
+                    border: '1px solid #93c5fd',
+                    backgroundColor: Number(newShift.hourlyWage) === wageRec.max ? '#2563eb' : '#ffffff',
+                    color: Number(newShift.hourlyWage) === wageRec.max ? '#ffffff' : '#1d4ed8',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Thu hút nhanh: {((wageRec && wageRec.max) || 60000).toLocaleString()}đ
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: '0.7rem 0.95rem',
+                borderRadius: '0.5rem',
+                backgroundColor:
+                  riskInfo.level === 'HIGH'
+                    ? '#fef2f2'
+                    : riskInfo.level === 'MEDIUM'
+                    ? '#fffbeb'
+                    : '#f0fdf4',
+                border:
+                  riskInfo.level === 'HIGH'
+                    ? '1px solid #fecaca'
+                    : riskInfo.level === 'MEDIUM'
+                    ? '1px solid #fde68a'
+                    : '1px solid #bbf7d0',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color:
+                      riskInfo.level === 'HIGH'
+                        ? '#b91c1c'
+                        : riskInfo.level === 'MEDIUM'
+                        ? '#b45309'
+                        : '#15803d',
+                  }}
+                >
+                  {riskInfo.level === 'HIGH'
+                    ? 'Khó tìm nhân sự'
+                    : riskInfo.level === 'MEDIUM'
+                    ? 'Khá khó tìm nhân sự'
+                    : 'Dễ tìm nhân sự'}
+                </span>
+                {riskInfo.level !== 'LOW' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextWage = Math.max(Number(newShift.hourlyWage) || 0, wageRec.recommended);
+                      setNewShift({
+                        ...newShift,
+                        hourlyWage: nextWage,
+                        maxDistanceKm: Math.max(Number(newShift.maxDistanceKm) || 15, 15),
+                      });
+                      setShiftPackageWage(Math.round(nextWage * safeHours));
+                    }}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '0.2rem 0.65rem',
+                      borderRadius: '0.35rem',
+                      border: 'none',
+                      backgroundColor: riskInfo.level === 'HIGH' ? '#dc2626' : '#d97706',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Tối ưu ngay để dễ tìm người
+                  </button>
+                )}
+              </div>
+              {riskInfo.reasons.length > 0 && (
+                <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem', fontSize: '0.78rem', color: '#475569' }}>
+                  {riskInfo.reasons.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
@@ -163,10 +521,19 @@ const ShiftCreateModal = ({
               <label>Phụ Cấp Thêm (VNĐ)</label>
               <input
                 type="number"
+                min="0"
                 step="10000"
                 className="eo-form-input"
                 value={newShift.allowance}
-                onChange={(e) => setNewShift({ ...newShift, allowance: parseFloat(e.target.value) || 0 })}
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => {
+                  const raw = parseFloat(e.target.value);
+                  setNewShift({ ...newShift, allowance: isNaN(raw) || raw < 0 ? 0 : raw });
+                }}
               />
             </div>
             <div className="eo-form-group">
@@ -177,119 +544,18 @@ const ShiftCreateModal = ({
                 max="50"
                 className="eo-form-input"
                 value={newShift.maxDistanceKm}
-                onChange={(e) => setNewShift({ ...newShift, maxDistanceKm: parseFloat(e.target.value) || 15 })}
+                onChange={(e) =>
+                  setNewShift({ ...newShift, maxDistanceKm: Math.max(1, parseFloat(e.target.value) || 15) })
+                }
               />
             </div>
           </div>
 
-          {/* Checklist công việc */}
-          <div className="eo-form-group" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-            <label style={{ fontWeight: 600, color: '#334155', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Checklist Đầu Việc Cho Ca Làm (Quy Trình Kiểm Tra)</span>
-              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{checklistList.length} đầu việc</span>
-            </label>
-            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0.6rem' }}>
-              Worker sẽ phải tích xác nhận các đầu việc này trong app di động CANi khi thực hiện ca.
-            </p>
-
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <input
-                type="text"
-                className="eo-form-input"
-                style={{ flex: 1 }}
-                placeholder="Nhập đầu việc mới (VD: Có mặt trước 20 phút...)"
-                value={newChecklistItem}
-                onChange={(e) => setNewChecklistItem(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddChecklist();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="eo-btn-secondary"
-                style={{ whiteSpace: 'nowrap', padding: '0.5rem 0.85rem' }}
-                onClick={handleAddChecklist}
-              >
-                + Thêm
-              </button>
-            </div>
-
-            {/* Gợi ý checklist nhanh */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', alignSelf: 'center' }}>Gợi ý:</span>
-              {[
-                'Có mặt trước 20 phút nhận thẻ',
-                'Quét mã QR Check-in',
-                'Đồng phục sơ mi trắng quần sẫm màu',
-                'Báo cáo quản lý trước khi ra về',
-              ].map((suggestItem) => (
-                <button
-                  key={suggestItem}
-                  type="button"
-                  onClick={() => handleQuickAddChecklist(suggestItem)}
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '4px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    cursor: 'pointer',
-                    color: '#475569',
-                  }}
-                >
-                  + {suggestItem}
-                </button>
-              ))}
-            </div>
-
-            {/* Danh sách items đã thêm */}
-            {checklistList.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                {checklistList.map((item, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '0.375rem',
-                      padding: '0.4rem 0.75rem',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span>
-                      <strong style={{ color: '#2563eb', marginRight: '0.4rem' }}>#{idx + 1}</strong>
-                      {item}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveChecklist(idx)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#ef4444',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        padding: '0 0.25rem',
-                      }}
-                      title="Xóa đầu việc"
-                    >
-                      X
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '0.5rem' }}>
-                Chưa có đầu việc checklist nào. Hãy thêm để Worker nắm rõ nhiệm vụ.
-              </div>
-            )}
-          </div>
+          {/* Checklist Đầu Việc Cho Ca Này */}
+          <ShiftChecklistEditor
+            items={newShift.checklistItems || []}
+            onChange={(updatedItems) => setNewShift((prev) => ({ ...prev, checklistItems: updatedItems }))}
+          />
 
           {/* Chi phí ước tính hiển thị realtime */}
           <div className="shift-cost-summary-box">
@@ -306,7 +572,7 @@ const ShiftCreateModal = ({
               = ({shiftDurationHours}h x {Number(newShift.requiredWorkers || 1)} người x {Number(newShift.hourlyWage || 0).toLocaleString()}đ/h) + {Number(newShift.allowance || 0).toLocaleString()}đ phụ cấp
             </div>
             <div className="shift-cost-note">
-              Thù lao này EO thanh toán trực tiếp cho Worker sau ca làm (Mô hình Non-Escrow - CANi không thu cọc lương).
+              Thù lao này Ban tổ chức thanh toán trực tiếp cho nhân sự sau ca làm việc.
             </div>
           </div>
 

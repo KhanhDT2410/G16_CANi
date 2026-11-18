@@ -52,6 +52,12 @@ public class AttendanceLog {
     @Column(name = "checkout_qr_hash", length = 255)
     private String checkoutQrHash;
 
+    @Column(name = "proof_image_url", length = 500)
+    private String proofImageUrl;
+
+    @Column(name = "proof_submitted_at")
+    private Instant proofSubmittedAt;
+
     @Column(name = "hours_worked", precision = 5, scale = 2)
     @Builder.Default
     private BigDecimal hoursWorked = BigDecimal.ZERO;

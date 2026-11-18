@@ -3,7 +3,6 @@ package com.cani.controller;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
 import com.cani.dto.response.ApiResponse;
-
 import com.cani.security.SecurityUtils;
 import com.cani.service.WorkerEkycService;
 import jakarta.validation.Valid;
@@ -52,9 +51,7 @@ public class WorkerEkycController {
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
-            message = "Xác thực danh tính eKYC thành công! Tài khoản của bạn đã được cấp tích xanh định danh.";
-        } else if ("PENDING_REVIEW".equals(result.getStatus())) {
-            message = "Hồ sơ eKYC của bạn đã được tiếp nhận và đang chờ đội ngũ CSKH/Admin phê duyệt.";
+            message = "Xác thực danh tính eKYC thành công! Tài khoản của bạn đã được tự động cấp tích xanh định danh.";
         } else {
             message = "Xác thực eKYC không thành công: " + result.getRoutingReason();
         }
@@ -73,6 +70,18 @@ public class WorkerEkycController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.getMyEkycStatus(userId);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy thông tin trạng thái eKYC thành công"));
+    }
+
+    /**
+     * Worker yêu cầu reset lại hồ sơ eKYC để định danh lại từ đầu
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/workers/ekyc/reset")
+    public ResponseEntity<ApiResponse<Void>> resetMyEkyc(Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        ekycService.resetMyEkyc(userId);
+        return ResponseEntity
+                .ok(ApiResponse.ok(null, "Reset trạng thái eKYC thành công. Bạn có thể tiến hành định danh lại."));
     }
 
     /**

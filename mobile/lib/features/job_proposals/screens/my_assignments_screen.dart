@@ -9,19 +9,21 @@ import '../widgets/job_proposal_invite_card.dart';
 import '../widgets/payment_confirm_dialog.dart';
 import '../widgets/rate_eo_dialog.dart';
 import '../widgets/shift_assignment_card.dart';
-import '../widgets/shift_checklist_sheet.dart';
 import '../widgets/shift_navigation_sheet.dart';
 import 'attendance_qr_scanner_screen.dart';
+import 'shift_detail_execution_screen.dart';
 
 class MyAssignmentsScreen extends ConsumerStatefulWidget {
-  const MyAssignmentsScreen({super.key});
+  final int initialTabIndex;
+
+  const MyAssignmentsScreen({super.key, this.initialTabIndex = 0});
 
   @override
   ConsumerState<MyAssignmentsScreen> createState() => _MyAssignmentsScreenState();
 }
 
 class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
-  int _selectedTabIndex = 0; // 0: Lời mời việc, 1: Ca đã nhận
+  int _selectedTabIndex = 0; // 0: Việc của tôi, 1: Lời mời làm việc
   List<JobProposalItem> _proposals = [];
   List<ShiftAssignmentItem> _assignments = [];
   bool _isLoading = true;
@@ -29,6 +31,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTabIndex = widget.initialTabIndex;
     _loadAllData();
   }
 
@@ -100,13 +103,13 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
               declaredAmount: 0,
             ),
           );
-          _selectedTabIndex = 1; // Tự động chuyển sang Tab Ca đã nhận
+          _selectedTabIndex = 0; // Tự động chuyển sang Tab Việc của tôi
         });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Nhận ca thành công! Ca làm đã được thêm vào mục Ca Đã Nhận.'),
+              content: Text('Nhận ca thành công! Ca làm đã được thêm vào mục Việc Của Tôi.'),
               backgroundColor: Color(0xFF16A34A),
             ),
           );
@@ -250,13 +253,16 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
-  void _openChecklistSheet(ShiftAssignmentItem a) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ShiftChecklistSheet(assignment: a),
+  Future<void> _openExecutionScreen(ShiftAssignmentItem a) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShiftDetailExecutionScreen(assignment: a),
+      ),
     );
+    if (updated == true) {
+      _loadAllData();
+    }
   }
 
   Future<void> _openCancelDialog(ShiftAssignmentItem a) async {
@@ -341,7 +347,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🎉 Tham gia ca làm thành công qua mã mời!'),
+              content: Text('Tham gia ca làm việc thành công!'),
               backgroundColor: Color(0xFF16A34A),
             ),
           );
@@ -394,7 +400,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF0077FF), size: 22),
-                            tooltip: 'Nhập mã mời ca làm (Screen 092)',
+                            tooltip: 'Nhập mã mời ca làm',
                             onPressed: _openInviteCodeDialog,
                           ),
                           Container(
@@ -438,15 +444,15 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                       children: [
                         _buildSegmentButton(
                           index: 0,
-                          label: 'Lời Mời Việc',
-                          count: _proposals.length,
+                          label: 'Việc Của Tôi',
+                          count: _assignments.length,
                           isDark: isDark,
                         ),
                         const SizedBox(width: 4),
                         _buildSegmentButton(
                           index: 1,
-                          label: 'Ca Đã Nhận',
-                          count: _assignments.length,
+                          label: 'Lời Mời Làm Việc',
+                          count: _proposals.length,
                           isDark: isDark,
                         ),
                       ],
@@ -463,8 +469,8 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                   : RefreshIndicator(
                       onRefresh: _loadAllData,
                       child: _selectedTabIndex == 0
-                          ? _buildProposalsFeed(isDark)
-                          : _buildAssignmentsFeed(isDark),
+                          ? _buildAssignmentsFeed(isDark)
+                          : _buildProposalsFeed(isDark),
                     ),
             ),
           ],
@@ -639,10 +645,11 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
 
         return ShiftAssignmentCard(
           assignment: item,
+          onTap: () => _openExecutionScreen(item),
           onNavigate: () => _openNavigationSheet(item),
           onQrScan: () => _openQrScanner(item, !isCheckedIn),
           onConfirmPayment: () => _openPaymentDialog(item),
-          onOpenChecklist: () => _openChecklistSheet(item),
+          onOpenChecklist: () => _openExecutionScreen(item),
           onCancelAssignment: () => _openCancelDialog(item),
           onRateOrganizer: () => _openRateDialog(item),
         );

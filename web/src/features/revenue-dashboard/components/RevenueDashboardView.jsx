@@ -53,7 +53,7 @@ export const RevenueDashboardView = () => {
         <div>
           <h2 className="rev-page-title">Báo Cáo Doanh Thu & Chỉ Số Tài Chính</h2>
           <p className="rev-page-subtitle">
-            Giám sát doanh số gói dịch vụ, khối lượng đối soát Non-Escrow và các giao dịch cổng VNPay
+            Giám sát doanh số gói dịch vụ, khối lượng đối soát thanh toán trực tiếp và các giao dịch cổng VNPay
           </p>
         </div>
 

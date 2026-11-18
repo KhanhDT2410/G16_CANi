@@ -1,7 +1,15 @@
-import React from 'react';
-import { showToast } from '../../../components/common/Toast';
+import React, { useState } from 'react';
 
-export default function EOSidebar({ activeNav, onNavClick, isCollapsed = false, onToggleCollapse }) {
+export default function EOSidebar({
+  activeNav,
+  activeEventSubTab = 'list',
+  onNavClick,
+  onEventSubTabClick,
+  isCollapsed = false,
+  onToggleCollapse,
+}) {
+  const [isEventsSubMenuOpen, setIsEventsSubMenuOpen] = useState(true);
+
   const navItems = [
     {
       key: 'overview',
@@ -18,6 +26,7 @@ export default function EOSidebar({ activeNav, onNavClick, isCollapsed = false, 
     {
       key: 'events',
       label: 'Quản lý sự kiện',
+      hasSubMenu: true,
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -26,18 +35,11 @@ export default function EOSidebar({ activeNav, onNavClick, isCollapsed = false, 
           <line x1="3" y1="10" x2="21" y2="10"></line>
         </svg>
       ),
-    },
-    {
-      key: 'recruitment',
-      label: 'Tuyển dụng nhân sự',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="9" cy="7" r="4"></circle>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-        </svg>
-      ),
+      subItems: [
+        { key: 'list', label: 'Danh sách sự kiện' },
+        { key: 'detail', label: 'Chi tiết sự kiện' },
+        { key: 'cancelled', label: 'Sự kiện đã xóa' },
+      ],
     },
     {
       key: 'payments',
@@ -51,44 +53,32 @@ export default function EOSidebar({ activeNav, onNavClick, isCollapsed = false, 
     },
     {
       key: 'subscription',
-      label: 'Gói dịch vụ (W-06)',
+      label: 'Gói dịch vụ',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line>
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-          <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+      ),
+    },
+    {
+      key: 'my-team',
+      label: 'Nhân sự quen thuộc',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
       ),
     },
     {
       key: 'profile',
-      label: 'Hồ sơ & eKYC',
+      label: 'Hồ sơ tổ chức',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
           <circle cx="12" cy="7" r="4"></circle>
-        </svg>
-      ),
-    },
-    {
-      key: 'analytics',
-      label: 'Báo cáo & thống kê',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6" y1="20" x2="6" y2="14"></line>
-        </svg>
-      ),
-    },
-    {
-      key: 'support',
-      label: 'Hỗ trợ kỹ thuật',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
-          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
         </svg>
       ),
     },
@@ -130,39 +120,167 @@ export default function EOSidebar({ activeNav, onNavClick, isCollapsed = false, 
         {navItems.map((item) => {
           const isActive = activeNav === item.key;
           return (
-            <button
-              key={item.key}
-              type="button"
-              className={`eo-nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => onNavClick(item.key)}
-              title={isCollapsed ? item.label : undefined}
-            >
-              <span className="nav-svg-icon">{item.icon}</span>
-              {!isCollapsed && <span className="nav-label">{item.label}</span>}
-            </button>
+            <React.Fragment key={item.key}>
+              <button
+                type="button"
+                className={`eo-nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => {
+                  onNavClick(item.key);
+                  if (item.hasSubMenu) {
+                    setIsEventsSubMenuOpen(true);
+                  }
+                }}
+                title={isCollapsed ? item.label : undefined}
+              >
+                <span className="nav-svg-icon">{item.icon}</span>
+                {!isCollapsed && (
+                  <>
+                    <span className="nav-label">{item.label}</span>
+                    {item.hasSubMenu && (
+                      <span
+                        className="nav-chevron-right"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsEventsSubMenuOpen((prev) => !prev);
+                        }}
+                        title={isEventsSubMenuOpen ? 'Thu gọn menu con' : 'Mở rộng menu con'}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 24,
+                          height: 24,
+                          borderRadius: 6,
+                          transition: 'transform 0.2s ease',
+                          transform: isEventsSubMenuOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ›
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+
+              {/* Sub-menu mở rộng của Quản lý sự kiện */}
+              {!isCollapsed && item.hasSubMenu && isEventsSubMenuOpen && (
+                <div
+                  className="eo-nav-submenu"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    paddingLeft: '2.1rem',
+                    marginTop: '2px',
+                    marginBottom: '6px',
+                  }}
+                >
+                  {item.subItems.map((sub) => {
+                    const isSubActive = isActive && activeEventSubTab === sub.key;
+                    return (
+                      <button
+                        key={sub.key}
+                        type="button"
+                        onClick={() => {
+                          onNavClick('events');
+                          onEventSubTabClick?.(sub.key);
+                        }}
+                        style={{
+                          textAlign: 'left',
+                          background: isSubActive ? '#eff6ff' : 'transparent',
+                          color: isSubActive ? '#2563eb' : '#64748b',
+                          fontWeight: isSubActive ? 700 : 500,
+                          border: 'none',
+                          borderLeft: isSubActive ? '2.5px solid #2563eb' : '2.5px solid #e2e8f0',
+                          padding: '0.45rem 0.75rem',
+                          fontSize: '0.82rem',
+                          borderRadius: '0 6px 6px 0',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {sub.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
       </nav>
 
-      {/* Promo Card ở đáy sidebar - Chỉ hiển thị khi mở rộng */}
+      {/* Promo Card: Nâng Cấp Gói Dịch Vụ Chuẩn Mockup Ảnh 2 */}
       {!isCollapsed && (
-        <div className="eo-sidebar-promo-card animate-fade-in-up">
-          <div className="promo-badge-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-            </svg>
+        <div
+          className="eo-sidebar-promo-card animate-fade-in-up"
+          style={{
+            margin: '1rem 0.85rem 0.75rem',
+            padding: '1.25rem 1rem 1rem',
+            background: '#ffffff',
+            borderRadius: '18px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.05)',
+            textAlign: 'center',
+            position: 'relative',
+          }}
+        >
+          {/* Icon Crown & Lotus Badge */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.65rem' }}>
+            <img
+              src="/assets/eo-crown-badge.png"
+              alt="VIP Subscription"
+              style={{ width: 56, height: 'auto', display: 'block' }}
+            />
           </div>
-          <h4 className="promo-title">Tổ chức sự kiện dễ dàng</h4>
-          <p className="promo-desc">
-            Tự động hóa tuyển dụng, điểm danh QR và thanh toán trực tiếp sau ca.
+
+          <h4
+            style={{
+              margin: '0 0 0.35rem',
+              fontSize: '0.95rem',
+              fontWeight: 800,
+              color: '#0f172a',
+            }}
+          >
+            Nâng cấp gói dịch vụ
+          </h4>
+
+          <p
+            style={{
+              margin: '0 0 0.85rem',
+              fontSize: '0.78rem',
+              color: '#64748b',
+              lineHeight: 1.45,
+            }}
+          >
+            Mở khóa nhiều tính năng nâng cao và tối ưu vận hành sự kiện.
           </p>
+
           <button
             type="button"
-            className="promo-link-btn"
-            onClick={() => showToast('Mở tài liệu hướng dẫn tổ chức sự kiện!', 'info')}
+            onClick={() => onNavClick('subscription')}
+            style={{
+              width: '100%',
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '0.6rem 0.85rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
           >
-            Tìm hiểu thêm &rarr;
+            Xem các gói dịch vụ &rarr;
           </button>
         </div>
       )}

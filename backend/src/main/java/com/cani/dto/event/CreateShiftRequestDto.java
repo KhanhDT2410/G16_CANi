@@ -60,5 +60,7 @@ public class CreateShiftRequestDto {
 
     private String dressCode;
 
+    private String imageUrl;
+
     private String checklist;
 }

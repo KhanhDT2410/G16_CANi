@@ -5,6 +5,7 @@ import com.cani.entity.enums.SkillVerificationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,7 +14,13 @@ public interface SkillVerificationRequestRepository extends JpaRepository<SkillV
 
     List<SkillVerificationRequest> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
+    List<SkillVerificationRequest> findByWorker_WorkerIdIn(Collection<UUID> workerIds);
+
     List<SkillVerificationRequest> findByStatusOrderByCreatedAtAsc(SkillVerificationStatus status);
+
+    List<SkillVerificationRequest> findAllByOrderByCreatedAtDesc();
+
+    List<SkillVerificationRequest> findByStatusOrderByCreatedAtDesc(SkillVerificationStatus status);
 
     long countByStatus(SkillVerificationStatus status);
 }

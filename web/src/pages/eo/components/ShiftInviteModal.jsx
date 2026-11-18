@@ -1,39 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 
-export default function ShiftInviteModal({ isOpen, onClose, shift, event }) {
+export default function ShiftInviteModal({ isOpen, onClose, shift }) {
   const [invite, setInvite] = useState(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && shift) {
-      loadInvite();
-    } else {
-      setInvite(null);
-    }
-  }, [isOpen, shift]);
-
-  const loadInvite = async () => {
-    setLoading(true);
-    try {
-      const data = await eoService.getShiftInvite(shift.shiftId);
-      if (data) {
-        setInvite(data);
-      } else {
-        // Nếu chưa có, tự động sinh mã mới
-        handleGenerateNewInvite();
-      }
-    } catch {
-      handleGenerateNewInvite();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGenerateNewInvite = async () => {
+  const handleGenerateNewInvite = useCallback(async () => {
+    if (!shift?.shiftId) return;
     setGenerating(true);
     try {
       const maxSlots = Math.max(
@@ -51,7 +27,32 @@ export default function ShiftInviteModal({ isOpen, onClose, shift, event }) {
     } finally {
       setGenerating(false);
     }
-  };
+  }, [shift]);
+
+  const loadInvite = useCallback(async () => {
+    if (!shift?.shiftId) return;
+    setLoading(true);
+    try {
+      const data = await eoService.getShiftInvite(shift.shiftId);
+      if (data) {
+        setInvite(data);
+      } else {
+        handleGenerateNewInvite();
+      }
+    } catch {
+      handleGenerateNewInvite();
+    } finally {
+      setLoading(false);
+    }
+  }, [shift?.shiftId, handleGenerateNewInvite]);
+
+  useEffect(() => {
+    if (isOpen && shift) {
+      loadInvite();
+    } else {
+      setInvite(null);
+    }
+  }, [isOpen, shift, loadInvite]);
 
   const handleCopy = (text, label) => {
     if (!text) return;

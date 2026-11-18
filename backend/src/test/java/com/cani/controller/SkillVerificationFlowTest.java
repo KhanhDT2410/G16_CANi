@@ -296,7 +296,7 @@ class SkillVerificationFlowTest {
                         .with(authentication(createAuthToken(workerUser))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Xác thực AI thành công! Kỹ năng đã được phê duyệt và cộng SP_verify."))
+                .andExpect(jsonPath("$.message").value("Xác thực AI thành công! Kỹ năng đã được phê duyệt tự động và cộng SP_verify."))
                 .andExpect(jsonPath("$.data.workerId").value(workerId.toString()))
                 .andExpect(jsonPath("$.data.routingDecision").value("AUTO_APPROVE"))
                 .andExpect(jsonPath("$.data.status").value("APPROVED"))

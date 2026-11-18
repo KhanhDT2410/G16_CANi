@@ -3,6 +3,7 @@ import EventCreationWizardModal from './EventCreationWizardModal';
 import ShiftCreateModal from './ShiftCreateModal';
 import PaymentDeclarationModal from './PaymentDeclarationModal';
 import PublishEventModal from './PublishEventModal';
+import CancelEventModal from './CancelEventModal';
 import ShiftQrModal from './ShiftQrModal';
 import ShiftInviteModal from './ShiftInviteModal';
 import DisputeModal from './DisputeModal';
@@ -21,6 +22,7 @@ export default function EOModals({
   setInviteModal,
   disputeModal,
   setDisputeModal,
+  onEventCreated,
 }) {
   return (
     <>
@@ -28,6 +30,7 @@ export default function EOModals({
         isOpen={events.showEventModal}
         onClose={() => events.setShowEventModal(false)}
         onSuccess={events.loadEvents}
+        onEventCreated={onEventCreated}
         newEvent={events.newEvent}
         setNewEvent={events.setNewEvent}
         locating={events.locating}
@@ -62,6 +65,14 @@ export default function EOModals({
         payMethod={events.publishPayMethod}
         setPayMethod={events.setPublishPayMethod}
         onExecutePublish={events.handleExecutePublish}
+      />
+
+      <CancelEventModal
+        isOpen={Boolean(events.cancelModal?.isOpen)}
+        event={events.cancelModal?.event}
+        onClose={events.handleCloseCancelModal}
+        onConfirm={events.handleConfirmCancelEvent}
+        loading={events.cancelModal?.loading}
       />
 
       <ShiftQrModal

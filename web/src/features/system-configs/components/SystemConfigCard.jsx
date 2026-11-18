@@ -11,6 +11,27 @@ const SystemConfigCard = ({
   const meta = getConfigMeta(config.key);
   const currentValue = dirty ? dirty.value : config.value;
   const isDirty = dirty !== undefined && dirty.value !== config.value;
+  const isNumeric = meta.type === 'number';
+
+  const handleStep = (direction) => {
+    if (isSaving) return;
+    const step = parseFloat(meta.step) || 1;
+    const current = parseFloat(currentValue);
+    const base = isNaN(current) ? (parseFloat(meta.defaultValue) || 0) : current;
+    const min = meta.min !== undefined ? meta.min : 0;
+    const max = meta.max !== undefined ? meta.max : Infinity;
+
+    let next = base + direction * step;
+    if (min !== undefined && next < min) next = min;
+    if (max !== undefined && next > max) next = max;
+
+    const stepDecimals = meta.step && meta.step.includes('.')
+      ? meta.step.split('.')[1].length
+      : (String(step).includes('.') ? String(step).split('.')[1].length : 0);
+
+    const formatted = stepDecimals > 0 ? next.toFixed(stepDecimals) : String(Math.round(next));
+    onValueChange(config.key, formatted);
+  };
 
   const formatDate = (isoString) => {
     if (!isoString) return 'Chưa cập nhật';
@@ -30,6 +51,8 @@ const SystemConfigCard = ({
 
   const getCategoryBadgeClass = (category) => {
     switch (category) {
+      case 'MATCHING':
+        return 'badge-cat-matching';
       case 'FINANCIAL':
         return 'badge-cat-financial';
       case 'OPERATION':
@@ -39,17 +62,26 @@ const SystemConfigCard = ({
     }
   };
 
+  const getCategoryLabel = (category) => {
+    switch (category) {
+      case 'MATCHING':
+        return 'Ghép nối';
+      case 'FINANCIAL':
+        return 'Tài chính';
+      case 'OPERATION':
+        return 'Vận hành';
+      default:
+        return 'Hệ thống';
+    }
+  };
+
   return (
     <div className={`sys-config-card ${isDirty ? 'card-dirty' : ''}`}>
       {/* Card Header */}
       <div className="sys-config-card-header">
         <div className="sys-config-card-badges">
           <span className={`cat-pill ${getCategoryBadgeClass(meta.category)}`}>
-            {meta.category === 'FINANCIAL'
-              ? 'Tài chính'
-              : meta.category === 'OPERATION'
-              ? 'Vận hành'
-              : 'Hệ thống'}
+            {getCategoryLabel(meta.category)}
           </span>
           {isDirty && <span className="dirty-pill">Chưa lưu</span>}
         </div>
@@ -63,27 +95,58 @@ const SystemConfigCard = ({
         </button>
       </div>
 
-      {/* Title & Key */}
+      {/* Title */}
       <h3 className="sys-config-card-title">{meta.label}</h3>
-      <div className="sys-config-card-key">{config.key}</div>
 
       {/* Description / Hint */}
       <p className="sys-config-card-desc">
         {config.description || meta.hint}
       </p>
 
-      {/* Value Input Area */}
+      {/* Value Input Area with Split Stepper Bar */}
       <div className="sys-config-input-group">
-        <div className="sys-config-input-wrapper">
-          <input
-            type={meta.type || 'text'}
-            step={meta.step || 'any'}
-            className={`sys-config-val-input ${isDirty ? 'input-modified' : ''}`}
-            value={currentValue}
-            onChange={(e) => onValueChange(config.key, e.target.value)}
-            disabled={isSaving}
-          />
-          {meta.unit && <span className="sys-config-unit-label">{meta.unit}</span>}
+        <div className={`sys-config-stepper-bar ${isDirty ? 'bar-dirty' : ''}`}>
+          {/* Left zone: Value input + Unit label */}
+          <div className="stepper-left-section">
+            <input
+              type={meta.type || 'text'}
+              step={meta.step || 'any'}
+              className="sys-config-stepper-input"
+              value={currentValue}
+              onChange={(e) => onValueChange(config.key, e.target.value)}
+              disabled={isSaving}
+            />
+            {meta.unit && <span className="sys-config-unit-text">{meta.unit}</span>}
+          </div>
+
+          {/* Right zone: Divider line + Stepper buttons for numeric parameters */}
+          {isNumeric && (
+            <>
+              <div className="stepper-vertical-divider" />
+              <div className="stepper-actions-section">
+                <button
+                  type="button"
+                  className="btn-stepper-action"
+                  onClick={() => handleStep(-1)}
+                  disabled={isSaving}
+                  title="Giảm giá trị"
+                  aria-label="Giảm"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  className="btn-stepper-action"
+                  onClick={() => handleStep(1)}
+                  disabled={isSaving}
+                  title="Tăng giá trị"
+                  aria-label="Tăng"
+                >
+                  +
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {isDirty && (

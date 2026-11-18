@@ -71,11 +71,12 @@ class EkycState {
     String? confirmedResidenceAddress,
     String? confirmedIssueDate,
     bool clearError = false,
+    bool clearResult = false,
   }) {
     return EkycState(
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      result: result ?? this.result,
+      result: clearResult ? null : (result ?? this.result),
       frontBytes: frontBytes ?? this.frontBytes,
       frontFileName: frontFileName ?? this.frontFileName,
       backBytes: backBytes ?? this.backBytes,
@@ -112,6 +113,8 @@ class EkycNotifier extends StateNotifier<EkycState> {
     final status = await _repository.getMyEkycStatus();
     if (status != null) {
       state = state.copyWith(result: status);
+    } else {
+      state = state.copyWith(clearResult: true);
     }
   }
 
@@ -182,8 +185,11 @@ class EkycNotifier extends StateNotifier<EkycState> {
     }
   }
 
-  void resetForm() {
+  Future<void> resetForm() async {
     state = const EkycState();
+    try {
+      await _repository.resetEkyc();
+    } catch (_) {}
   }
 }
 

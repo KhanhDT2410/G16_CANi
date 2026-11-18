@@ -9,6 +9,7 @@ import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/profile/providers/profile_providers.dart';
+import 'package:cani/features/profile/providers/worker_experience_provider.dart';
 import 'package:cani/features/profile/widgets/profile_block_cv.dart';
 import 'package:cani/features/profile/widgets/profile_block_ekyc.dart';
 import 'package:cani/features/profile/widgets/profile_block_identity.dart';
@@ -53,6 +54,7 @@ class _WorkerProfileScreenState extends ConsumerState<WorkerProfileScreen> {
       await Future.wait([
         ref.read(skillVerificationProvider.notifier).loadAll(),
         ref.read(ekycProvider.notifier).checkStatus(),
+        ref.read(workerExperienceProvider.notifier).loadExperience(),
       ]);
     } catch (e) {
       debugPrint('Lỗi nạp dữ liệu hồ sơ cá nhân: $e');

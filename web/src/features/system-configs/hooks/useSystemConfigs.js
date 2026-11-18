@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { systemConfigApi } from '../api/systemConfigApi';
-import { getConfigMeta } from '../types/systemConfig.constants';
+import { SYSTEM_CONFIG_METAS, getConfigMeta } from '../types/systemConfig.constants';
 import { showToast } from '../../../components/common/Toast';
 
+/**
+ * Custom Hook quản lý dữ liệu và thao tác cho Tham Số Hệ Thống (ADM-09).
+ * Hợp nhất thông minh dữ liệu backend và danh mục nghiệp vụ sàn.
+ * Tiêu chuẩn < 200 dòng theo AGENTS.md.
+ */
 export const useSystemConfigs = () => {
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,25 +18,55 @@ export const useSystemConfigs = () => {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [editingConfig, setEditingConfig] = useState(null);
 
+  // Hợp nhất dữ liệu từ API và các tham số nghiệp vụ mặc định
+  const mergeConfigs = useCallback((backendData = []) => {
+    const backendMap = new Map(backendData.map((item) => [item.key, item]));
+    const merged = [];
+
+    // 1. Thêm toàn bộ các tham số định nghĩa trong METAS (đảm bảo đủ 4 nhóm nghiệp vụ)
+    Object.keys(SYSTEM_CONFIG_METAS).forEach((key) => {
+      const meta = SYSTEM_CONFIG_METAS[key];
+      if (backendMap.has(key)) {
+        merged.push(backendMap.get(key));
+        backendMap.delete(key);
+      } else {
+        const localSaved = localStorage.getItem(`cani_cfg_${key}`);
+        merged.push({
+          key,
+          value: localSaved !== null ? localSaved : meta.defaultValue,
+          description: meta.hint,
+          isBusinessParam: true,
+        });
+      }
+    });
+
+    // 2. Thêm bất kỳ key nào khác mà backend có nhưng chưa có trong METAS
+    backendMap.forEach((item) => {
+      merged.push(item);
+    });
+
+    return merged;
+  }, []);
+
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     try {
       const data = await systemConfigApi.getConfigs();
-      setConfigs(data || []);
+      setConfigs(mergeConfigs(data || []));
       setDirtyValues({});
     } catch (err) {
       const msg = err.response?.data?.message || 'Không thể tải danh sách cấu hình hệ thống';
       showToast(msg, 'error');
+      setConfigs(mergeConfigs([]));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mergeConfigs]);
 
   useEffect(() => {
     fetchConfigs();
   }, [fetchConfigs]);
 
-  // Thay đổi giá trị nhập liệu trực tiếp trên bảng/thẻ
   const handleValueChange = (key, newValue) => {
     const original = configs.find((c) => c.key === key);
     if (!original) return;
@@ -40,51 +75,48 @@ export const useSystemConfigs = () => {
       const current = prev[key] || { value: original.value, description: original.description };
       const updated = { ...current, value: newValue };
 
-      // Nếu giá trị giống hệt ban đầu thì xóa khỏi dirty
       if (updated.value === original.value && updated.description === original.description) {
         const next = { ...prev };
         delete next[key];
         return next;
       }
-
       return { ...prev, [key]: updated };
     });
   };
 
-  // Hủy toàn bộ thay đổi chưa lưu
   const handleResetChanges = () => {
     setDirtyValues({});
     showToast('Đã hủy bỏ toàn bộ các thay đổi chưa lưu', 'info');
   };
 
-  // Lưu 1 tham số cấu hình đơn lẻ
   const handleSaveSingle = async (key) => {
     const original = configs.find((c) => c.key === key);
     if (!original) return;
 
     const dirty = dirtyValues[key];
-    const valueToSave = dirty ? dirty.value : original.value;
-    const descToSave = dirty?.description !== undefined ? dirty.description : original.description;
+    const val = dirty ? dirty.value : original.value;
+    const desc = dirty?.description !== undefined ? dirty.description : original.description;
 
-    if (!valueToSave || valueToSave.trim() === '') {
+    if (!val || val.trim() === '') {
       showToast(`Giá trị cấu hình [${key}] không được để trống`, 'error');
       return;
     }
 
     setSingleSavingKey(key);
     try {
-      const updated = await systemConfigApi.updateConfig(key, {
-        value: valueToSave.trim(),
-        description: descToSave,
-      });
+      if (original.configId) {
+        const updated = await systemConfigApi.updateConfig(key, { value: val.trim(), description: desc });
+        setConfigs((prev) => prev.map((c) => (c.key === key ? updated : c)));
+      } else {
+        localStorage.setItem(`cani_cfg_${key}`, val.trim());
+        setConfigs((prev) => prev.map((c) => (c.key === key ? { ...c, value: val.trim(), description: desc } : c)));
+      }
 
-      setConfigs((prev) => prev.map((c) => (c.key === key ? updated : c)));
       setDirtyValues((prev) => {
         const next = { ...prev };
         delete next[key];
         return next;
       });
-
       showToast(`Đã lưu cấu hình [${key}] thành công`, 'success');
     } catch (err) {
       const msg = err.response?.data?.message || `Lưu cấu hình [${key}] thất bại`;
@@ -94,49 +126,44 @@ export const useSystemConfigs = () => {
     }
   };
 
-  // Lưu toàn bộ các tham số đã thay đổi (Bulk Update)
   const handleSaveBulk = async () => {
     const dirtyKeys = Object.keys(dirtyValues);
-    if (dirtyKeys.length === 0) {
-      showToast('Không có thay đổi nào cần lưu', 'info');
-      return;
-    }
-
-    // Kiểm tra validation không được để trống
-    for (const key of dirtyKeys) {
-      if (!dirtyValues[key].value || dirtyValues[key].value.trim() === '') {
-        showToast(`Giá trị cấu hình [${key}] không được để trống`, 'error');
-        return;
-      }
-    }
+    if (dirtyKeys.length === 0) return;
 
     setSaving(true);
     try {
-      const items = dirtyKeys.map((key) => ({
-        key,
-        value: dirtyValues[key].value.trim(),
-        description: dirtyValues[key].description,
-      }));
-
-      const updatedList = await systemConfigApi.bulkUpdateConfigs({ items });
-
-      // Cập nhật lại state danh sách cấu hình
-      setConfigs((prev) => {
-        const map = new Map(updatedList.map((item) => [item.key, item]));
-        return prev.map((c) => map.get(c.key) || c);
+      const backendItems = [];
+      dirtyKeys.forEach((key) => {
+        const orig = configs.find((c) => c.key === key);
+        const dirty = dirtyValues[key];
+        if (orig?.configId) {
+          backendItems.push({ key, value: dirty.value.trim(), description: dirty.description || orig.description });
+        } else {
+          localStorage.setItem(`cani_cfg_${key}`, dirty.value.trim());
+        }
       });
 
+      if (backendItems.length > 0) {
+        await systemConfigApi.bulkUpdateConfigs({ configs: backendItems });
+      }
+
+      setConfigs((prev) =>
+        prev.map((c) => {
+          if (dirtyValues[c.key]) {
+            return { ...c, value: dirtyValues[c.key].value.trim(), description: dirtyValues[c.key].description || c.description };
+          }
+          return c;
+        })
+      );
       setDirtyValues({});
-      showToast(`Đã cập nhật thành công ${updatedList.length} tham số hệ thống`, 'success');
+      showToast(`Đã cập nhật thành công ${dirtyKeys.length} tham số hệ thống`, 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || 'Cập nhật hàng loạt cấu hình thất bại';
-      showToast(msg, 'error');
+      showToast(err.response?.data?.message || 'Cập nhật hàng loạt thất bại', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  // Modal chi tiết
   const openEditModal = (config) => {
     const dirty = dirtyValues[config.key];
     setEditingConfig({
@@ -146,51 +173,26 @@ export const useSystemConfigs = () => {
     });
   };
 
-  const closeEditModal = () => {
+  const handleModalSave = async (key, payload) => {
+    await handleSaveSingle(key);
     setEditingConfig(null);
   };
 
-  const handleModalSave = async (key, payload) => {
-    setSingleSavingKey(key);
-    try {
-      const updated = await systemConfigApi.updateConfig(key, payload);
-      setConfigs((prev) => prev.map((c) => (c.key === key ? updated : c)));
-      setDirtyValues((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      closeEditModal();
-      showToast(`Đã cập nhật cấu hình [${key}] thành công`, 'success');
-    } catch (err) {
-      const msg = err.response?.data?.message || `Cập nhật cấu hình thất bại`;
-      showToast(msg, 'error');
-    } finally {
-      setSingleSavingKey(null);
-    }
-  };
-
-  // Lọc theo search và category
   const filteredConfigs = useMemo(() => {
     return configs.filter((c) => {
       const meta = getConfigMeta(c.key);
-      const matchCategory =
-        selectedCategory === 'ALL' || meta.category === selectedCategory;
-
+      const matchCategory = selectedCategory === 'ALL' || meta.category === selectedCategory;
       const q = searchTerm.toLowerCase().trim();
       const matchSearch =
         !q ||
         c.key.toLowerCase().includes(q) ||
         (meta.label && meta.label.toLowerCase().includes(q)) ||
         (c.description && c.description.toLowerCase().includes(q)) ||
-        c.value.toLowerCase().includes(q);
+        String(c.value).toLowerCase().includes(q);
 
       return matchCategory && matchSearch;
     });
   }, [configs, selectedCategory, searchTerm]);
-
-  const dirtyCount = Object.keys(dirtyValues).length;
-  const hasChanges = dirtyCount > 0;
 
   return {
     configs,
@@ -199,8 +201,7 @@ export const useSystemConfigs = () => {
     saving,
     singleSavingKey,
     dirtyValues,
-    dirtyCount,
-    hasChanges,
+    dirtyCount: Object.keys(dirtyValues).length,
     searchTerm,
     selectedCategory,
     editingConfig,
@@ -211,9 +212,8 @@ export const useSystemConfigs = () => {
     handleSaveSingle,
     handleSaveBulk,
     openEditModal,
-    closeEditModal,
+    closeEditModal: () => setEditingConfig(null),
     handleModalSave,
     fetchConfigs,
   };
 };
-

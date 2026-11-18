@@ -13,10 +13,13 @@ import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.PaymentRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -35,9 +39,11 @@ public class AuthService {
     private final UserRepository userRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final WorkerRepository workerRepository;
+    private final PaymentRepository paymentRepository;
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
     private final EmailOtpService emailOtpService;
+    private final NotificationService notificationService;
     private final org.springframework.core.env.Environment environment;
 
     @Transactional
@@ -109,7 +115,12 @@ public class AuthService {
                             .user(finalUser)
                             .build());
             if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
-                eo.setCompanyName(request.getCompanyName());
+                eo.setCompanyName(request.getCompanyName().trim());
+            } else if ("INDIVIDUAL".equalsIgnoreCase(request.getOrganizerType()) || eo.getCompanyName() == null) {
+                eo.setCompanyName(request.getFullName().trim());
+            }
+            if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
+                eo.setTaxId(request.getTaxId().trim());
             }
             eventOrganizerRepository.save(eo);
         } else {
@@ -120,6 +131,21 @@ public class AuthService {
                             .build());
             worker.setFullName(finalUser.getFullName());
             workerRepository.save(worker);
+
+            if (notificationService != null) {
+                try {
+                    notificationService.sendNotification(
+                            finalUser,
+                            "Chào mừng bạn đến với CANi!",
+                            "Vui lòng hoàn tất xác thực danh tính eKYC (CCCD) để mở khóa Job Radar và nhận các ca làm việc gần bạn.",
+                            com.cani.entity.enums.NotificationType.SYSTEM,
+                            "EKYC",
+                            finalUser.getUserId()
+                    );
+                } catch (Exception e) {
+                    log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getMessage());
+                }
+            }
         }
 
         log.info("Đã đăng ký tài khoản thành công cho user: {}, role: {}", savedUser.getEmail(), assignedRole);
@@ -128,9 +154,13 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
         SupabaseSession session = null;
         try {
-            session = supabaseAuthClient.signInWithPassword(request.getEmail(), request.getPassword());
+            session = supabaseAuthClient.signInWithPassword(email, request.getPassword());
+        } catch (BadRequestException e) {
+            // Re-throw lỗi xác thực sai mật khẩu từ GoTrue, không nuốt thành lỗi kết nối
+            throw e;
         } catch (Exception e) {
             log.warn("Supabase GoTrue auth failed or unreachable: {}. Falling back to local check...", e.getMessage());
         }
@@ -145,9 +175,15 @@ public class AuthService {
             accessToken = session.getAccessToken();
             refreshToken = session.getRefreshToken();
             expiresIn = session.getExpiresIn();
-        } else if (environment.acceptsProfiles("h2")) {
+        } else if (environment.acceptsProfiles(Profiles.of("h2"))) {
+            // Xác thực mật khẩu seed ở profile H2 offline (theo tài liệu run.md: Password123!)
+            String expectedH2Password = "Password123!";
+            if (request.getPassword() == null || !expectedH2Password.equals(request.getPassword().trim())) {
+                throw new BadRequestException("Email hoặc mật khẩu không chính xác");
+            }
+
             // Chỉ profile h2 (dev offline, H2DataSeeder) được phép fallback dev-token.
-            User localUser = userRepository.findByEmail(request.getEmail())
+            User localUser = userRepository.findByEmail(email)
                     .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không chính xác"));
             userId = localUser.getUserId();
             accessToken = "dev-token-" + userId;
@@ -155,13 +191,13 @@ public class AuthService {
             expiresIn = 86400L;
         } else {
             // ponytail: Supabase không thể đạt ở prod/dev-thẳng-Supabase → 503 thay vì dev-token (auth bypass).
-            log.error("Supabase GoTrue không khả dụng, không thể cấp token cho {}", request.getEmail());
+            log.error("Supabase GoTrue không khả dụng, không thể cấp token cho {}", email);
             throw new AppException("Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại sau.",
                     org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         User user = userRepository.findById(userId)
-                .or(() -> userRepository.findByEmail(request.getEmail()))
+                .or(() -> userRepository.findByEmail(email))
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy thông tin tài khoản trong hệ thống"));
 
         if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
@@ -180,14 +216,24 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginResponse googleLogin(GoogleLoginRequest request) {
+    public synchronized LoginResponse googleLogin(GoogleLoginRequest request) {
         try {
             // 1. Xác thực chữ ký token từ Supabase bằng JWKS ES256
             Jwt jwt = jwtDecoder.decode(request.getSupabaseAccessToken());
-            UUID userId = UUID.fromString(jwt.getSubject());
             String email = jwt.getClaimAsString("email");
+            if (email == null || email.isBlank()) {
+                throw new BadRequestException("Không tìm thấy thông tin email từ phiên xác thực Google");
+            }
 
-            User user = userRepository.findById(userId)
+            UUID parsedUserId;
+            try {
+                parsedUserId = UUID.fromString(jwt.getSubject());
+            } catch (Exception e) {
+                parsedUserId = UUID.nameUUIDFromBytes(email.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            final UUID finalUserId = parsedUserId;
+
+            User user = userRepository.findById(finalUserId)
                     .or(() -> userRepository.findByEmail(email))
                     .orElseGet(() -> {
                 String fullName = email;
@@ -203,7 +249,7 @@ public class AuthService {
                 }
 
                 User newUser = User.builder()
-                        .userId(userId)
+                        .userId(finalUserId)
                         .email(email)
                         .fullName(fullName)
                         .role(initialRole)
@@ -232,16 +278,62 @@ public class AuthService {
                 return saved;
             });
 
+            // Nếu người dùng đăng nhập từ Web Portal với targetRole là EVENT_ORGANIZER
+            // và tài khoản hiện tại đang ở vai trò WORKER:
+            // - Kiểm tra tài khoản có phải Worker thực thụ (đã có CCCD / đã hoàn thành ca làm) hay không.
+            // - Nếu là tài khoản mới / chưa có lịch sử làm việc (do trigger Supabase tự động gán WORKER):
+            //   Tiến hành chuyển đổi vai trò sang EVENT_ORGANIZER và xóa profile Worker rác.
+            if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())
+                    && user.getRole() == UserRole.WORKER
+                    && !"worker@cani.vn".equalsIgnoreCase(user.getEmail())) {
+
+                Optional<Worker> workerOpt = workerRepository.findByUser_UserId(user.getUserId());
+                boolean isEstablishedWorker = workerOpt.map(w ->
+                        (w.getCccdNumber() != null && !w.getCccdNumber().isBlank()) ||
+                        (w.getTotalShiftsCompleted() != null && w.getTotalShiftsCompleted() > 0)
+                ).orElse(false);
+
+                if (!isEstablishedWorker) {
+                    log.info("Cập nhật vai trò người dùng Google OAuth {} sang EVENT_ORGANIZER từ Web Portal", user.getEmail());
+                    user.setRole(UserRole.EVENT_ORGANIZER);
+                    user = userRepository.save(user);
+
+                    // Xóa profile worker rác do trigger Supabase tự sinh (chỉ xóa khi chưa có dữ liệu thanh toán)
+                    workerOpt.ifPresent(w -> {
+                        boolean hasFinancialRecords = paymentRepository != null && paymentRepository.existsByWorker_WorkerId(w.getWorkerId());
+                        if (!hasFinancialRecords) {
+                            workerRepository.delete(w);
+                        } else {
+                            log.info("Worker {} đã có dữ liệu thanh toán (Payment), bảo toàn dữ liệu và không xóa khi nâng cấp lên EO", w.getWorkerId());
+                        }
+                    });
+                }
+            }
+
             if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
                 throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
             }
 
+            // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
+            if (user.getRole() == UserRole.EVENT_ORGANIZER) {
+                final User eoUser = user;
+                eventOrganizerRepository.findByUser_UserId(eoUser.getUserId())
+                        .orElseGet(() -> eventOrganizerRepository.save(
+                                EventOrganizer.builder()
+                                        .user(eoUser)
+                                        .companyName(eoUser.getFullName() != null && !eoUser.getFullName().isBlank()
+                                                ? eoUser.getFullName()
+                                                : "Ban Tổ Chức")
+                                        .build()
+                        ));
+            }
+
             user.setLastLoginAt(Instant.now());
-            userRepository.save(user);
+            User finalSavedUser = userRepository.save(user);
 
             return LoginResponse.builder()
                     .token(request.getSupabaseAccessToken())
-                    .user(toUserDto(user))
+                    .user(toUserDto(finalSavedUser))
                     .build();
         } catch (JwtException e) {
             log.error("Token Supabase Google không hợp lệ: {}", e.getMessage());
@@ -267,7 +359,8 @@ public class AuthService {
 
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        emailOtpService.sendOtp(request.getEmail(), "RESET_PASSWORD");
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        emailOtpService.sendOtp(email, "RESET_PASSWORD");
     }
 
     @Transactional

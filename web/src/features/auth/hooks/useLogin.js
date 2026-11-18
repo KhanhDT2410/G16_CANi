@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
+import { useAuth } from './useAuth';
 
 export const useLogin = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -55,15 +57,7 @@ export const useLogin = () => {
         return;
       }
 
-      if (data.token) {
-        localStorage.setItem('cani_token', data.token);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('cani_refresh_token', data.refreshToken);
-      }
-      if (data.user) {
-        localStorage.setItem('cani_user', JSON.stringify(data.user));
-      }
+      login(data.user, data.token, data.refreshToken);
 
       switch (data.user?.role) {
         case 'ADMIN':

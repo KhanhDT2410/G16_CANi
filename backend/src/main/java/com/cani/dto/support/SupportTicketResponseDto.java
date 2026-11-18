@@ -24,6 +24,10 @@ public class SupportTicketResponseDto {
     private UUID id;
     private String referenceNo;
     private UUID userId;
+    private String userName;
+    private String userPhone;
+    private String userEmail;
+    private String userAvatar;
     private TicketCategory category;
     private TicketPriority priority;
     private String subject;
@@ -31,6 +35,8 @@ public class SupportTicketResponseDto {
     private List<String> attachments;
     private TicketStatus status;
     private UUID assignedTo;
+    private String assignedName;
+    private String assignedRole;
     private Instant slaDeadline;
     private UUID resolvedBy;
     private Instant closedAt;

@@ -22,7 +22,7 @@ public class SkillVisionAiProperties {
     /**
      * Tên mô hình Vision AI
      */
-    private String model = "gemini-3.5-flash-lite";
+    private String model = "gemini-1.5-flash";
 
     /**
      * Endpoint API

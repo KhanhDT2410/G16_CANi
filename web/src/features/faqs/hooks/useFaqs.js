@@ -23,6 +23,7 @@ export const useFaqs = (mode = 'admin') => {
       const params = {};
       if (filters.status && filters.status !== 'ALL') params.status = filters.status;
       if (filters.category && filters.category !== 'ALL') params.category = filters.category;
+      params.size = filters.size || 100;
       const data = await faqApi.getFaqs(params);
       setFaqs(data?.content || []);
     } catch (err) {

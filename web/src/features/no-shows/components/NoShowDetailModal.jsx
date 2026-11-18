@@ -80,7 +80,7 @@ export const NoShowDetailModal = ({ item, onClose, onNavigateAppeal }) => {
           </div>
 
           <div className="detail-row">
-            <span className="label">Trạng thái Kháng cáo (UC-94)</span>
+            <span className="label">Trạng thái Kháng cáo</span>
             <span className="value">
               {item.appealId ? (
                 <span style={{ fontWeight: 700, color: '#4f46e5' }}>

@@ -25,6 +25,9 @@ public class EventResponseDto {
     private Double venueLat;
     private Double venueLng;
     private LocalDate eventDate;
+    private Instant startTime;
+    private Instant endTime;
+    private String imageUrl;
     private EventMode mode;
     private EventStatus status;
     private Integer readinessScore;

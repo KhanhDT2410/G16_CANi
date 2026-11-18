@@ -1,11 +1,8 @@
 package com.cani.controller;
 
-import com.cani.dto.dispute.AddDisputeEvidenceRequestDto;
-import com.cani.dto.dispute.CreateDisputeRequestDto;
-import com.cani.dto.dispute.DisputeDetailResponseDto;
-import com.cani.dto.dispute.EscalateDisputeRequestDto;
+import com.cani.dto.dispute.*;
 import com.cani.dto.response.ApiResponse;
-import com.cani.security.SecurityUtils;
+import com.cani.entity.User;
 import com.cani.service.DisputeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +15,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Controller Dispute — endpoint cho hai bên liên quan (Worker / Event Organizer).
- * SRS UC-96 (nộp), UC-97/104 (xem chi tiết + lịch sử), UC-98 (bằng chứng), UC-101 (kháng nghị).
+ * Controller Dispute — endpoint cho hai bên liên quan (Worker / Event
+ * Organizer).
+ * SRS UC-96 (nộp), UC-97/104 (xem chi tiết + lịch sử), UC-98 (bằng chứng),
+ * UC-101 (kháng nghị).
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/disputes")
+@RequestMapping({ "/api/v1/disputes", "/v1/disputes" })
 @RequiredArgsConstructor
 public class DisputeController {
 
@@ -36,8 +35,7 @@ public class DisputeController {
     @PostMapping
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> createDispute(
             @Valid @RequestBody CreateDisputeRequestDto request,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.createDispute(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response,
@@ -51,8 +49,7 @@ public class DisputeController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> getDisputeDetail(
             @PathVariable("id") UUID id,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.getDisputeDetail(id, userId);
         return ResponseEntity.ok(ApiResponse.ok(response, "Lấy chi tiết tranh chấp thành công"));
@@ -64,8 +61,7 @@ public class DisputeController {
      */
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<DisputeDetailResponseDto>>> getMyDisputes(
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<DisputeDetailResponseDto> response = disputeService.getMyDisputes(userId);
         return ResponseEntity.ok(ApiResponse.ok(response, "Lấy lịch sử tranh chấp thành công"));
@@ -79,8 +75,7 @@ public class DisputeController {
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> addEvidence(
             @PathVariable("id") UUID id,
             @Valid @RequestBody AddDisputeEvidenceRequestDto request,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.addEvidence(id, userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Đã nạp bằng chứng cho tranh chấp"));
@@ -94,11 +89,24 @@ public class DisputeController {
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> escalateDispute(
             @PathVariable("id") UUID id,
             @Valid @RequestBody EscalateDisputeRequestDto request,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.escalateDispute(id, userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response,
                 "Đã kháng nghị lên quản trị viên. Quyết định cuối sẽ được thông báo sớm"));
+    }
+
+    private UUID currentUserId(Authentication authentication) {
+        if (authentication == null) {
+            return null;
+        }
+        if (authentication.getPrincipal() instanceof User u) {
+            return u.getUserId();
+        }
+        try {
+            return com.cani.security.SecurityUtils.getCurrentUserId(authentication);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

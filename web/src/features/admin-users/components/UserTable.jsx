@@ -1,4 +1,7 @@
-import { USER_ROLE_LABELS, USER_STATUS_LABELS } from '../types/userManagement.constants';
+import {
+  USER_ROLE_LABELS,
+  USER_STATUS_LABELS,
+} from '../types/userManagement.constants';
 
 const UserTable = ({
   users,

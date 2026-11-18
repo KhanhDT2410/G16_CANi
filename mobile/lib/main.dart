@@ -10,18 +10,30 @@ import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: ApiConstants.supabaseUrl,
-    publishableKey: ApiConstants.supabaseAnonKey,
-  );
+  if (ApiConstants.supabaseUrl.isNotEmpty && ApiConstants.supabaseAnonKey.isNotEmpty) {
+    try {
+      await Supabase.initialize(
+        url: ApiConstants.supabaseUrl,
+        publishableKey: ApiConstants.supabaseAnonKey,
+      );
+    } catch (e) {
+      debugPrint('[Supabase Init Warning] Failed to initialize Supabase: $e');
+    }
+  } else {
+    debugPrint('[Supabase Init Info] Supabase credentials not provided. Skipping initialization.');
+  }
 
   // Khởi tạo Firebase Cloud Messaging (FCM) & Kênh thông báo nổi (Heads-up banner)
   await FcmService.initialize(
     onNotificationNavigate: (data) {
       debugPrint('[Notification Navigate] Navigating from notification data: $data');
+      final rawType = (data['type'] ?? data['payload'] ?? '').toString().toUpperCase();
+      final isProposal = rawType.contains('NEW_PROPOSAL') ||
+          rawType.contains('EMERGENCY_PROPOSAL') ||
+          rawType.contains('PROPOSAL');
       rootNavigatorKey.currentState?.push(
         MaterialPageRoute(
-          builder: (_) => const MyAssignmentsScreen(),
+          builder: (_) => MyAssignmentsScreen(initialTabIndex: isProposal ? 1 : 0),
         ),
       );
     },

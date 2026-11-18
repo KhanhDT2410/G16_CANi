@@ -6,8 +6,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 6MB
+      max-file-size: 10MB
+      max-request-size: 35MB
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://db.hgnilsojrauajmyslhug.supabase.co:5432/postgres?sslmode=require}
@@ -53,6 +53,9 @@ spring:
     clean-disabled: true
     schemas: public
     default-schema: public
+    validate-on-migrate: false
+    ignore-migration-patterns:
+      - "*:missing"
 
 management:
   endpoints:
@@ -80,37 +83,41 @@ cani:
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-3.5-flash}
+      model: ${GEMINI_MODEL:gemini-3.8-flash}
       url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
       timeout-ms: 20000
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
     strict: ${EKYC_STRICT:false}
     vnpt:
-      enabled: ${VNPT_EKYC_ENABLED:false}
+      enabled: ${VNPT_EKYC_ENABLED:true}
       base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}
-      token-id: ${VNPT_EKYC_TOKEN_ID:}
-      token-key: ${VNPT_EKYC_TOKEN_KEY:}
-      access-token: ${VNPT_EKYC_ACCESS_TOKEN:}
+      token-id: ${VNPT_EKYC_TOKEN_ID:5e7a3b1b-db74-1656-e063-63199f0a717f}
+      token-key: ${VNPT_EKYC_TOKEN_KEY:MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAlvv9EToVRDb3ZS58HaSGBNDHN9GLm9lROWE4CxyRMHib2K1XCmSS6suua/4coDMvthnv8zKmUy25BiplQtd6MMCAwEAAQ==}
+      access-token: ${VNPT_EKYC_ACCESS_TOKEN:eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0cmFuc2FjdGlvbl9pZCI6IjhjOGJiM2I4LTE4ZGUtNDRkMS1iZjdlLWExMThiOTNkNzdhMSIsInN1YiI6IjYyNzc5Y2Y4LWNlOGUtMTFmMS1hYTMzLTA3OTQ3MmMwODFkMyIsImF1ZCI6WyJyZXN0c2VydmljZSJdLCJ1c2VyX25hbWUiOiJodW5naG9jZnB0QGdtYWlsLmNvbSIsInNjb3BlIjpbInJlYWQiXSwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3QiLCJuYW1lIjoiaHVuZ2hvY2ZwdEBnbWFpbC5jb20iLCJleHAiOjE3OTQ1ODYzMzMsInV1aWRfYWNjb3VudCI6IjYyNzc5Y2Y4LWNlOGUtMTFmMS1hYTMzLTA3OTQ3MmMwODFkMyIsImF1dGhvcml0aWVzIjpbIlVTRVIiXSwianRpIjoiZmZhZTgwYzYtMzQ5OS00NGJlLWE0NWItODNiNGM0ZDU1OThlIiwiY2xpZW50X2lkIjoiY2xpZW50YXBwIn0.zwhXILWHszWfaZrlgYTyGG9PtEp4KRFoCoO2PtVRxxXOHeXjSLrMWRfNJEQKiRYdEeNdRD27MIKC6kGrKIfwaF_qnW6v4bcDdzy6U7M5ShXGmmDXeVN-AMhZob3z--h7iBbLPlZdo-u-CuxQrQyseWOyN194N2RxTCKfTmMooxh5WaDKu0OmRngt1hGFsMmEUsXOmfxSDgj66uw52f2jm3JusR6pbIju9EeUi7lzz4TTknSt_5Hw_OwOzyzNj1v1r_RJFuQQ2VmuK6v4MG7gXbDb55U1CtNa_bSNJ0XyKH5OyAbWRG-7L5rvxcXD-k35UeRMr_WvZuTNCGB6myhVIA}
       mac-address: ${VNPT_EKYC_MAC_ADDRESS:TEST1}
       timeout-ms: 25000
   firebase:
     enabled: ${FIREBASE_ENABLED:true}
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
   subscription:
-    strict: ${SUBSCRIPTION_STRICT:false}
-  vnpay:
-    pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-    tmn-code: ${VNPAY_TMN_CODE:CANIVN01}
-    hash-secret: ${VNPAY_HASH_SECRET:RAIQUIOWGHG2CILNLNIZFYKTMPI4U0SZ}
-    return-url: ${VNPAY_RETURN_URL:http://localhost:5173/eo?tab=subscription}
+    strict: ${SUBSCRIPTION_STRICT:true}
+    demo-enabled: ${SUBSCRIPTION_DEMO_ENABLED:false}
   payos:
     endpoint: ${PAYOS_ENDPOINT:https://api-merchant.payos.vn}
-    client-id: ${PAYOS_CLIENT_ID:856cf773-33b5-4da1-8cf0-adf01233ba1a}
-    api-key: ${PAYOS_API_KEY:0e56b01d-3514-4ad9-901b-4afd203f1a44}
-    checksum-key: ${PAYOS_CHECKSUM_KEY:04ec2256d44a67dfcaa6fb04c9a741365bff5cd9911afd8f96cadd3efaf1ddfc}
-    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo?payos=success}
-    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?payos=cancel}
+    client-id: ${PAYOS_CLIENT_ID:}
+    api-key: ${PAYOS_API_KEY:}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:}
+    return-url: ${PAYOS_RETURN_URL:http://localhost:5173/eo}
+    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:5173/eo?cancel=true}
   sla-scan:
     enabled: ${SLA_SCAN_ENABLED:true}
     cron: ${SLA_SCAN_CRON:0 */15 * * * *}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha

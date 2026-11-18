@@ -21,5 +21,11 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
 
     boolean existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(String cccdNumberHash, String status, UUID workerId);
 
+    boolean existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(
+            String cccdNumberHash, java.util.Collection<String> statuses, UUID workerId);
+
+    boolean existsByCccdNumberHashAndStatusInAndWorker_User_UserIdNot(
+            String cccdNumberHash, java.util.Collection<String> statuses, UUID userId);
+
     long countByStatus(String status);
 }

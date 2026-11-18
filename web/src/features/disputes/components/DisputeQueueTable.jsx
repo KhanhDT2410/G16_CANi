@@ -71,11 +71,12 @@ const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide, onTra
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
                     <button
                       type="button"
-                      className="btn-quick-fill"
-                      style={{ margin: 0 }}
+                      className="btn-quick-fill btn-action-chat"
+                      style={{ margin: 0, fontWeight: 600, color: 'var(--color-primary)', borderColor: 'var(--color-primary)' }}
                       onClick={() => onSelect(item.id)}
+                      title="Mở không gian đối thoại và xử lý tranh chấp"
                     >
-                      Chi tiết
+                      Mở đối thoại
                     </button>
                     {item.status === 'OPEN' && (
                       <button

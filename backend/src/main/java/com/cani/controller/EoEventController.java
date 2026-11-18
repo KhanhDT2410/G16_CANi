@@ -65,7 +65,7 @@ public class EoEventController {
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        String reason = body != null ? body.get("reason") : "Ban tổ chức hủy sự kiện";
+        String reason = body != null ? body.get("reason") : null;
         EventResponseDto cancelled = eoEventService.cancelEvent(userId, eventId, reason);
         return ResponseEntity.ok(ApiResponse.ok(cancelled, "Đã hủy sự kiện thành công!"));
     }
@@ -83,6 +83,21 @@ public class EoEventController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftResponseDto shift = eoEventService.addShiftToEvent(userId, eventId, request);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Thêm ca làm việc thành công vào sự kiện."));
+    }
+
+    /**
+     * UC-20 (WBS 74.0): EO tạo hàng loạt Ca làm việc (Bulk Create Shifts)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/{eventId}/shifts/bulk")
+    public ResponseEntity<ApiResponse<List<ShiftResponseDto>>> addBulkShifts(
+            @PathVariable("eventId") UUID eventId,
+            @Valid @RequestBody CreateBulkShiftsRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<ShiftResponseDto> shifts = eoEventService.addBulkShifts(userId, eventId, request);
+        return ResponseEntity.ok(ApiResponse.ok(shifts, "Tạo hàng loạt " + shifts.size() + " ca làm việc thành công!"));
     }
 
     /**
@@ -159,6 +174,21 @@ public class EoEventController {
     }
 
     /**
+     * UC-83: EO báo cáo công việc không đạt yêu cầu / chưa hoàn thành (Report Incomplete Work)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/assignments/{assignmentId}/report-incomplete")
+    public ResponseEntity<ApiResponse<com.cani.dto.dispute.DisputeDetailResponseDto>> reportIncompleteWork(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @Valid @RequestBody ReportIncompleteWorkRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        com.cani.dto.dispute.DisputeDetailResponseDto dispute = eoEventService.reportIncompleteWork(userId, assignmentId, request);
+        return ResponseEntity.ok(ApiResponse.ok(dispute, "Đã gửi báo cáo công việc không đạt yêu cầu tới Bộ phận CSKH xử lý!"));
+    }
+
+    /**
      * UC-69: EO đánh giá Worker sau ca làm việc (Rate Worker 1-5★)
      */
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
@@ -201,6 +231,20 @@ public class EoEventController {
     }
 
     /**
+     * Xóa Sự kiện khỏi danh sách của EO (Soft delete)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @DeleteMapping("/{eventId}")
+    public ResponseEntity<ApiResponse<Void>> deleteEvent(
+            @PathVariable("eventId") UUID eventId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        eoEventService.deleteEvent(userId, eventId);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã xóa sự kiện khỏi danh sách thành công!"));
+    }
+
+    /**
      * EO xuất bản Sự kiện và tự động kích hoạt Matching Engine (Non-Escrow)
      */
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
@@ -226,5 +270,85 @@ public class EoEventController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftResponseDto shift = eoEventService.publishShift(userId, shiftId);
         return ResponseEntity.ok(ApiResponse.ok(shift, "Kích hoạt điều phối tìm Worker cho ca làm việc thành công!"));
+    }
+
+    /**
+     * UC-59: EO kích hoạt điều phối khẩn cấp (Emergency Dispatch) khi ca làm việc thiếu nhân sự
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/shifts/{shiftId}/emergency-dispatch")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> triggerEmergencyDispatch(
+            @PathVariable("shiftId") UUID shiftId,
+            @RequestParam(required = false) Double radiusKm,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        int dispatched = eoEventService.triggerEmergencyDispatch(userId, shiftId, radiusKm);
+        return ResponseEntity.ok(ApiResponse.ok(
+                Map.of("shiftId", shiftId, "dispatchedCount", dispatched, "emergency", true),
+                "Kích hoạt điều phối khẩn cấp thành công! Đã gửi " + dispatched + " đề xuất khẩn cấp đến Worker xung quanh."
+        ));
+    }
+
+    /**
+     * Tắt điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/shifts/{shiftId}/emergency-dispatch/off")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> disableEmergencyDispatch(
+            @PathVariable("shiftId") UUID shiftId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        eoEventService.disableEmergencyDispatch(userId, shiftId);
+        return ResponseEntity.ok(ApiResponse.ok(
+                Map.of("shiftId", shiftId, "emergency", false),
+                "Đã tắt chế độ điều phối khẩn cấp cho ca làm việc."
+        ));
+    }
+
+    /**
+     * Lấy danh sách toàn bộ nhân sự tham gia trong sự kiện kèm điểm uy tín, tuổi, trạng thái
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/{eventId}/workers")
+    public ResponseEntity<ApiResponse<List<ShiftAttendanceDto>>> getEventWorkers(
+            @PathVariable("eventId") UUID eventId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<ShiftAttendanceDto> workers = eoEventService.getEventWorkersList(userId, eventId);
+        return ResponseEntity.ok(ApiResponse.ok(workers, "Lấy danh sách nhân sự sự kiện thành công!"));
+    }
+
+    /**
+     * Tải ảnh minh họa sự kiện hoặc ca làm việc từ thiết bị local lên máy chủ
+     * POST /api/v1/eo/events/upload-image
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping(value = "/upload-image", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadEventImage(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        String url = eoEventService.uploadEventImage(file);
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("url", url), "Tải ảnh từ thiết bị lên thành công!"));
+    }
+
+    /**
+     * Xem / phục vụ ảnh sự kiện & ca làm việc
+     * GET /api/v1/eo/events/images/{filename}
+     */
+    @GetMapping("/images/{filename:.+}")
+    public ResponseEntity<org.springframework.core.io.Resource> getEventImage(@PathVariable("filename") String filename) {
+        org.springframework.core.io.Resource resource = eoEventService.loadEventImage(filename);
+        String contentType = "image/jpeg";
+        if (filename.toLowerCase().endsWith(".png")) contentType = "image/png";
+        else if (filename.toLowerCase().endsWith(".webp")) contentType = "image/webp";
+        else if (filename.toLowerCase().endsWith(".gif")) contentType = "image/gif";
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
     }
 }

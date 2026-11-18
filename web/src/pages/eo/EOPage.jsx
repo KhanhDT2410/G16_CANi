@@ -10,23 +10,34 @@ import { usePayments } from './hooks/usePayments';
 import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
 import EOMetricsGrid from './components/EOMetricsGrid';
+import EOOverviewAnalytics from './components/EOOverviewAnalytics';
 import EOEventsTab from './components/EOEventsTab';
-import EORecruitmentTab from './components/EORecruitmentTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoProfileTab from './components/EoProfileTab';
-import EOAnalyticsTab from './components/EOAnalyticsTab';
 import EOSettingsTab from './components/EOSettingsTab';
+import EOMyTeamTab from './components/EOMyTeamTab';
 import EOModals from './components/EOModals';
+import EventDetailModal from './components/EventDetailModal';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
+import EkycRequiredModal from './components/EkycRequiredModal';
+import { eoService } from '../../services/eoService';
+
 import { SupportTicketsCenterView } from '../../features/support-tickets';
 import './EOPage.css';
 
 export default function EOPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Custom Domain Hooks - Khởi tạo sớm trước effect và local state
+  const events = useEvents();
+  const shifts = useShifts({ onReloadEvents: events.loadEvents });
+  const payments = usePayments();
+
   const [activeNav, setActiveNav] = useState('overview');
-  const [activeTab, setActiveTab] = useState('events');
+  const [activeTab, setActiveTab] = useState('overview');
+  const [activeEventSubTab, setActiveEventSubTab] = useState('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('cani_eo_sidebar_collapsed') === 'true';
@@ -52,8 +63,17 @@ export default function EOPage() {
     const handleSwitch = (e) => {
       const targetTab = e.detail?.tab;
       if (targetTab) {
-        setActiveTab(targetTab);
-        setActiveNav(targetTab);
+        if (targetTab === 'recruitment') {
+          setActiveTab('events');
+          setActiveNav('events');
+          setActiveEventSubTab('list');
+        } else if (targetTab === 'analytics') {
+          setActiveTab('overview');
+          setActiveNav('overview');
+        } else {
+          setActiveTab(targetTab);
+          setActiveNav(targetTab);
+        }
         try {
           setSearchParams({ tab: targetTab }, { replace: true });
         } catch (err) {
@@ -67,37 +87,47 @@ export default function EOPage() {
   }, [setSearchParams]);
 
   // Lắng nghe tìm kiếm toàn cục từ Header Search Box
+  const { setSearchQuery } = events;
   useEffect(() => {
     const handleGlobalSearch = (e) => {
       const q = e.detail?.query ?? '';
-      events.setSearchQuery(q);
+      setSearchQuery(q);
       if (q.trim()) {
-        setActiveTab((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
-        setActiveNav((prev) => (prev !== 'events' && prev !== 'recruitment' ? 'events' : prev));
+        setActiveTab('events');
+        setActiveNav('events');
+        setActiveEventSubTab('list');
       }
     };
     window.addEventListener('cani_global_search', handleGlobalSearch);
     return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
-  }, [events]);
+  }, [setSearchQuery]);
 
-  // Kiểm tra nếu có redirect từ VNPay (?tab=subscription hoặc chứa param vnp_) hoặc điều hướng tab (?tab=profile)
+  // Kiểm tra nếu có redirect từ VNPay / PayOS (?tab=subscription hoặc chứa param vnp_, payos, orderCode) hoặc điều hướng tab (?tab=profile)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'subscription' || searchParams.has('vnp_ResponseCode')) {
+    if (
+      tabParam === 'subscription' ||
+      searchParams.has('vnp_ResponseCode') ||
+      searchParams.has('payos') ||
+      searchParams.has('orderCode')
+    ) {
       setActiveTab('subscription');
       setActiveNav('subscription');
     } else if (tabParam === 'profile' || tabParam === 'ekyc') {
       setActiveTab('profile');
       setActiveNav('profile');
-    } else if (tabParam && ['events', 'recruitment', 'payments', 'analytics', 'settings', 'support'].includes(tabParam)) {
+    } else if (tabParam === 'recruitment') {
+      setActiveTab('events');
+      setActiveNav('events');
+      setActiveEventSubTab('list');
+    } else if (tabParam === 'analytics' || tabParam === 'overview') {
+      setActiveTab('overview');
+      setActiveNav('overview');
+    } else if (tabParam && ['events', 'payments', 'subscription', 'profile', 'my-team', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
   }, [searchParams]);
-
-  const events = useEvents();
-  const shifts = useShifts({ onReloadEvents: events.loadEvents });
-  const payments = usePayments();
 
   const [mapModal, setMapModal] = useState({
     isOpen: false,
@@ -120,19 +150,83 @@ export default function EOPage() {
   });
 
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [detailEvent, setDetailEvent] = useState(null);
+  const [detailInitialTab, setDetailInitialTab] = useState('SHIFTS');
+  const [ekycStatus, setEkycStatus] = useState('APPROVED');
+  const [showEkycModal, setShowEkycModal] = useState(false);
+
+  // Đồng bộ detailEvent khi danh sách events được tải lại (thêm ca, xuất bản, sửa sự kiện)
+  useEffect(() => {
+    if (detailEvent?.eventId && Array.isArray(events.events)) {
+      const updated = events.events.find((e) => e.eventId === detailEvent.eventId);
+      if (updated) {
+        setDetailEvent(updated);
+      }
+    }
+  }, [events.events, detailEvent?.eventId]);
+
+  const handleOpenEventDetailPage = (evt, initialTab = 'SHIFTS') => {
+    if (!evt) return;
+    setDetailEvent(evt);
+    setDetailInitialTab(initialTab);
+    setActiveTab('events');
+    setActiveNav('events');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Lấy trạng thái eKYC của Nhà tổ chức
+  const fetchEkycStatus = async () => {
+    try {
+      const res = await eoService.getEkycStatus();
+      if (res?.status) {
+        setEkycStatus(res.status);
+      }
+    } catch (err) {
+      console.warn('Lỗi kiểm tra eKYC status:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchEkycStatus();
+    const handleEkycUpdated = () => fetchEkycStatus();
+    window.addEventListener('cani_ekyc_updated', handleEkycUpdated);
+    return () => window.removeEventListener('cani_ekyc_updated', handleEkycUpdated);
+  }, []);
+
+  const handleOpenCreateEvent = () => {
+    if (ekycStatus !== 'APPROVED') {
+      setShowEkycModal(true);
+      return;
+    }
+    events.setShowEventModal(true);
+  };
 
   const handleNavClick = (navKey) => {
+    setDetailEvent(null);
     setActiveNav(navKey);
-    let target = 'events';
-    if (navKey === 'overview' || navKey === 'events') target = 'events';
-    else if (navKey === 'recruitment') target = 'recruitment';
-    else if (navKey === 'payments') target = 'payments';
-    else if (navKey === 'subscription') target = 'subscription';
-    else if (navKey === 'profile' || navKey === 'ekyc') target = 'profile';
-    else if (navKey === 'analytics') target = 'analytics';
-    else if (navKey === 'settings') target = 'settings';
-    else if (navKey === 'support') target = 'support';
-    
+    let target = 'overview';
+    if (navKey === 'overview' || navKey === 'analytics') {
+      target = 'overview';
+    } else if (navKey === 'events') {
+      target = 'events';
+    } else if (navKey === 'recruitment') {
+      target = 'events';
+      setActiveNav('events');
+      setActiveEventSubTab('recruitment');
+    } else if (navKey === 'payments') {
+      target = 'payments';
+    } else if (navKey === 'subscription') {
+      target = 'subscription';
+    } else if (navKey === 'profile' || navKey === 'ekyc') {
+      target = 'profile';
+    } else if (navKey === 'my-team') {
+      target = 'my-team';
+    } else if (navKey === 'support') {
+      target = 'support';
+    } else if (navKey === 'settings') {
+      target = 'settings';
+    }
+
     setActiveTab(target);
     try {
       setSearchParams({ tab: target }, { replace: true });
@@ -143,6 +237,18 @@ export default function EOPage() {
   };
 
   const switchTab = (tabKey) => {
+    if (tabKey === 'recruitment') {
+      setActiveTab('events');
+      setActiveNav('events');
+      setActiveEventSubTab('list');
+      try {
+        setSearchParams({ tab: 'events' }, { replace: true });
+      } catch (err) {
+        console.warn('Lỗi setSearchParams:', err);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setActiveTab(tabKey);
     setActiveNav(tabKey);
     try {
@@ -153,7 +259,25 @@ export default function EOPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const displayName = user?.fullName || user?.username || 'Duy Hưng';
+  const handleEventSubTabChange = (subKey) => {
+    if (subKey === 'detail') {
+      const target = detailEvent || (Array.isArray(events.events) ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0] : null);
+      setDetailEvent(target);
+      setDetailInitialTab('SHIFTS');
+      setActiveEventSubTab('detail');
+      return;
+    }
+    setDetailEvent(null);
+    setDetailInitialTab('SHIFTS');
+    setActiveEventSubTab(subKey);
+    if (subKey === 'cancelled') {
+      events.setStatusFilter('CANCELLED');
+    } else if (events.statusFilter === 'CANCELLED') {
+      events.setStatusFilter('ALL');
+    }
+  };
+
+  const displayName = user?.fullName || user?.username || 'Ban Tổ Chức';
 
   return (
     <div className="eo-dashboard-container">
@@ -161,101 +285,207 @@ export default function EOPage() {
         <EOSidebar
           activeNav={activeNav}
           onNavClick={handleNavClick}
+          activeEventSubTab={activeEventSubTab}
+          onEventSubTabClick={handleEventSubTabChange}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={toggleSidebarCollapse}
         />
 
         <main className="eo-main-stream">
-          {/* Hero Banner & Metrics Grid chỉ hiển thị ở tab Sự kiện / Tổng quan */}
-          {(activeTab === 'events' || activeNav === 'overview') && (
+          {/* TRANG TỔNG QUAN (Gộp Báo Cáo & Thống Kê Tài Chính + Uy Tín vào Tổng Quan) */}
+          {activeTab === 'overview' && (
             <>
-              <section className="eo-hero-banner">
-                <div className="hero-content">
-                  <h1 className="hero-greeting">Chào mừng bạn quay trở lại, {displayName}!</h1>
-                  <p className="hero-subtitle">
-                    Hôm nay bạn có <strong>{events.events.length} sự kiện</strong> sắp diễn ra. Hãy kiểm tra danh sách điểm danh và phân công ca làm nhé.
+              <section
+                className="eo-hero-banner-clean"
+                style={{
+                  background: 'linear-gradient(90deg, #dbeafe 0%, #edf5ff 35%, #daebfe 70%, #dbeafe 100%)',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '20px',
+                  padding: '1.4rem 2rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  minHeight: '110px',
+                  boxShadow: '0 4px 18px rgba(37, 99, 235, 0.06)',
+                }}
+              >
+                {/* 1. Phần chữ bên trái */}
+                <div className="eo-hero-banner-text" style={{ maxWidth: '60%', zIndex: 2 }}>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', marginBottom: '2px' }}>
+                    Chào mừng trở lại,
+                  </div>
+                  <h1
+                    style={{
+                      fontSize: '1.75rem',
+                      fontWeight: 900,
+                      color: '#0f172a',
+                      margin: '0 0 0.35rem',
+                      letterSpacing: '-0.025em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {displayName}
+                  </h1>
+                  <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, fontWeight: 500 }}>
+                    Quản lý sự kiện, tuyển dụng nhân sự và theo dõi vận hành trên CANi.
                   </p>
-                  <button type="button" className="hero-action-btn" onClick={() => events.setShowEventModal(true)}>
-                    <span className="btn-plus-icon">+</span> Tạo Sự Kiện Mới
-                  </button>
+                </div>
+
+                {/* 2. Ảnh minh họa sân khấu sự kiện & lịch 3D bên phải (Chuẩn 100% Mockup Ảnh 1) */}
+                <div
+                  className="eo-hero-banner-art"
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}
+                >
+                  <img
+                    src="/assets/eo-banner-stage.png"
+                    alt="CANi Event Stage & Calendar"
+                    style={{
+                      height: '100%',
+                      width: 'auto',
+                      objectFit: 'cover',
+                      objectPosition: 'right center',
+                      display: 'block',
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
                 </div>
               </section>
 
-              <EOMetricsGrid metrics={events.metrics} />
+              {/* Banner cảnh báo khi tài khoản chưa hoàn tất eKYC */}
+              {ekycStatus && ekycStatus !== 'APPROVED' && (
+                <div className="eo-ekyc-warning-banner">
+                  <div className="warning-banner-left">
+                    <span className="warning-icon">⚠️</span>
+                    <div>
+                      <strong>Tài khoản chưa hoàn tất định danh eKYC</strong>
+                      <p>
+                        {ekycStatus === 'PENDING_REVIEW'
+                          ? 'Hồ sơ eKYC của bạn đang trong quá trình thẩm định. Bạn cần được phê duyệt để mở khóa tạo sự kiện.'
+                          : 'Bạn cần hoàn tất xác thực định danh (CCCD/ĐKKD) để được phép tạo sự kiện và tuyển dụng nhân sự trên CANi.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-verify-ekyc-now"
+                    onClick={() => switchTab('profile')}
+                  >
+                    {ekycStatus === 'PENDING_REVIEW' ? 'Xem Trạng Thái eKYC →' : 'Xác Thực Định Danh Ngay →'}
+                  </button>
+                </div>
+              )}
+
+              <EOMetricsGrid
+                metrics={events.metrics}
+                onOpenActiveEventDetail={() => {
+                  const active = events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0];
+                  if (active) {
+                    handleOpenEventDetailPage(active);
+                  }
+                }}
+              />
+
+              {/* Bảng Số Liệu Vận Hành & Thống Kê Tổng Quát (Pure Analytics & Operational Metrics) */}
+              <EOOverviewAnalytics
+                events={events.events}
+                onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
+              />
             </>
           )}
 
-          <div className="eo-pill-tabs">
-            <button type="button" className={`pill-tab ${activeTab === 'events' ? 'active' : ''}`} onClick={() => switchTab('events')}>
-              Sự Kiện Của Tôi ({events.events.length})
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'recruitment' ? 'active' : ''}`} onClick={() => switchTab('recruitment')}>
-              Tuyển Dụng & Matching
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => switchTab('payments')}>
-              Thanh Toán & Khai Báo Lương ({payments.payments.length})
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'subscription' ? 'active' : ''}`} onClick={() => switchTab('subscription')}>
-              Gói Dịch Vụ & Quota (W-06)
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'profile' || activeTab === 'ekyc' ? 'active' : ''}`} onClick={() => switchTab('profile')}>
-              Hồ Sơ & eKYC
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => switchTab('analytics')}>
-              Báo Cáo & Thống Kê
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => switchTab('settings')}>
-              Cài Đặt Hệ Thống
-            </button>
-            <button type="button" className={`pill-tab ${activeTab === 'support' ? 'active' : ''}`} onClick={() => switchTab('support')}>
-              Hỗ Trợ Kỹ Thuật (Tickets)
-            </button>
-          </div>
-
+          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN HOẶC TRANG CHI TIẾT SỰ KIỆN */}
           {activeTab === 'events' && (
-            <EOEventsTab
-              loading={events.loading}
-              filteredEvents={events.filteredEvents}
-              searchQuery={events.searchQuery}
-              setSearchQuery={events.setSearchQuery}
-              statusFilter={events.statusFilter}
-              setStatusFilter={events.setStatusFilter}
-              sortBy={events.sortBy}
-              setSortBy={events.setSortBy}
-              expandedEventId={shifts.expandedEventId}
-              setExpandedEventId={shifts.setExpandedEventId}
-              onOpenCreateEvent={() => events.setShowEventModal(true)}
-              onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
-              onOpenEditEvent={events.setEditingEvent}
-              onCancelEvent={events.handleCancelEvent}
-              onOpenConfirmPublish={(evt) => {
-                if (!evt.totalShifts || evt.totalShifts === 0) {
-                  showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi kích hoạt Matching!', 'warning');
-                  shifts.setSelectedEventId(evt.eventId);
-                  shifts.setShowShiftModal(true);
-                  return;
+            (detailEvent || activeEventSubTab === 'detail') ? (
+              <EventDetailModal
+                isOpen={true}
+                asPage={true}
+                initialTab={detailInitialTab}
+                allEvents={events.events}
+                onSelectEvent={(nextEvt) => setDetailEvent(nextEvt)}
+                onClose={() => {
+                  setDetailEvent(null);
+                  setDetailInitialTab('SHIFTS');
+                  handleEventSubTabChange('list');
+                }}
+                event={
+                  detailEvent ||
+                  (Array.isArray(events.events)
+                    ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0]
+                    : null)
                 }
-                events.openConfirmPublish(evt);
-              }}
-              onOpenMap={setMapModal}
-              onOpenQr={shifts.handleOpenShiftQr}
-              onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-              onOpenAttendance={shifts.handleOpenAttendance}
-              onEditShift={shifts.setEditingShift}
-              onCancelShift={shifts.handleCancelShift}
-            />
-          )}
-
-          {activeTab === 'recruitment' && (
-            <EORecruitmentTab
-              events={events.events}
-              onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
-              onOpenQr={shifts.handleOpenShiftQr}
-              onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-              onOpenAttendance={shifts.handleOpenAttendance}
-              onOpenCreateEvent={() => events.setShowEventModal(true)}
-              onReloadEvents={events.loadEvents}
-            />
+                onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
+                onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+                onOpenConfirmPublish={(evt) => {
+                  const shiftCount = evt.totalShifts || (Array.isArray(evt.shifts) ? evt.shifts.length : 0);
+                  if (!shiftCount) {
+                    showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi đăng tuyển!', 'warning');
+                    shifts.setSelectedEventId(evt.eventId);
+                    shifts.setShowShiftModal(true);
+                    return;
+                  }
+                  events.openConfirmPublish(evt);
+                }}
+                onOpenEditEvent={events.setEditingEvent}
+                onEditShift={shifts.setEditingShift}
+                onCancelShift={shifts.handleCancelShift}
+                onReloadEvents={events.loadEvents}
+                onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+              />
+            ) : (
+              <EOEventsTab
+                loading={events.loading}
+                allEvents={events.events}
+                filteredEvents={events.filteredEvents}
+                searchQuery={events.searchQuery}
+                setSearchQuery={events.setSearchQuery}
+                statusFilter={events.statusFilter}
+                setStatusFilter={events.setStatusFilter}
+                sortBy={events.sortBy}
+                setSortBy={events.setSortBy}
+                expandedEventId={shifts.expandedEventId}
+                setExpandedEventId={shifts.setExpandedEventId}
+                activeSubTab={activeEventSubTab}
+                onSubTabChange={handleEventSubTabChange}
+                onOpenEventDetail={handleOpenEventDetailPage}
+                onDeleteEvent={events.handleDeleteEvent}
+                onOpenCreateEvent={handleOpenCreateEvent}
+                onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
+                onOpenEditEvent={events.setEditingEvent}
+                onCancelEvent={events.handleCancelEvent}
+                onOpenConfirmPublish={(evt) => {
+                  const shiftCount = evt.totalShifts || (Array.isArray(evt.shifts) ? evt.shifts.length : 0);
+                  if (!shiftCount) {
+                    showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi kích hoạt tìm kiếm!', 'warning');
+                    shifts.setSelectedEventId(evt.eventId);
+                    shifts.setShowShiftModal(true);
+                    return;
+                  }
+                  events.openConfirmPublish(evt);
+                }}
+                onOpenMap={setMapModal}
+                onOpenQr={shifts.handleOpenShiftQr}
+                onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+                onOpenAttendance={shifts.handleOpenAttendance}
+                onEditShift={shifts.setEditingShift}
+                onCancelShift={shifts.handleCancelShift}
+                onReloadEvents={events.loadEvents}
+                onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+              />
+            )
           )}
 
           {activeTab === 'payments' && (
@@ -273,30 +503,50 @@ export default function EOPage() {
 
           {activeTab === 'subscription' && <EOSubscriptionTab />}
 
+          {activeTab === 'my-team' && <EOMyTeamTab />}
+
           {(activeTab === 'profile' || activeTab === 'ekyc') && <EoProfileTab />}
 
-          {activeTab === 'analytics' && (
-            <EOAnalyticsTab
-              events={events.events}
-              payments={payments.payments}
-              onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
-            />
-          )}
-
-          {activeTab === 'settings' && (
-            <EOSettingsTab onNavigateToSubscription={() => switchTab('subscription')} />
-          )}
-
-          {/* NỘI DUNG TAB HỖ TRỢ KỸ THUẬT & PHIẾU YÊU CẦU (UC-105 / UC-106) */}
+          {/* Hỗ trợ kỹ thuật & Phiếu yêu cầu (UC-105 / UC-106) */}
           {activeTab === 'support' && (
             <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
               <SupportTicketsCenterView />
             </div>
           )}
+
+          {activeTab === 'settings' && (
+            <EOSettingsTab onNavigateToSubscription={() => switchTab('subscription')} />
+          )}
         </main>
 
-        <EORightSidebar />
-      </div >
+        {activeTab === 'overview' && (
+          <EORightSidebar
+            metrics={events.metrics}
+            events={events.events}
+            onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
+            onOpenQr={(targetEvt) => {
+              const active = targetEvt?.eventId
+                ? targetEvt
+                : (events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0]);
+              if (active) {
+                handleOpenEventDetailPage(active, 'QR_ATTENDANCE');
+              } else {
+                handleNavClick('events');
+                handleEventSubTabChange('list');
+              }
+            }}
+            onOpenRecruitment={() => {
+              handleNavClick('events');
+              handleEventSubTabChange('recruitment');
+            }}
+            onOpenSubscription={() => switchTab('subscription')}
+            onViewAllEvents={() => {
+              handleNavClick('events');
+              handleEventSubTabChange('list');
+            }}
+          />
+        )}
+      </div>
 
       <EOModals
         events={events}
@@ -308,6 +558,12 @@ export default function EOPage() {
         setInviteModal={setInviteModal}
         disputeModal={disputeModal}
         setDisputeModal={setDisputeModal}
+        onEventCreated={async (createdEvt) => {
+          const refreshed = await events.loadEvents();
+          const list = Array.isArray(refreshed) ? refreshed : events.events;
+          const found = list.find((e) => e.eventId === createdEvt?.eventId) || createdEvt;
+          handleOpenEventDetailPage(found);
+        }}
       />
 
       {/* Modal Xuất Phiếu Chi Thù Lao & Quyết Toán Kế Toán (Mẫu 02-TT / NĐ 52/2024/NĐ-CP) */}
@@ -317,11 +573,18 @@ export default function EOPage() {
         events={events.events}
         payments={payments.payments}
         companyInfo={{
-          companyName: user?.companyName || user?.fullName || 'HUNG COMPANY',
-          taxCode: user?.taxCode || '0108923489',
-          address: user?.address || 'Tòa nhà FPT, Khu CNC Hòa Lạc, Thạch Thất, Hà Nội',
-          organizerName: user?.fullName || 'Duy Hưng Phạm',
+          companyName: user?.companyName || user?.fullName || 'Đơn vị tổ chức sự kiện',
+          taxCode: user?.taxCode || 'Chưa cập nhật',
+          address: user?.address || 'Chưa cập nhật địa chỉ',
+          organizerName: user?.fullName || user?.username || 'Đại diện Ban Tổ Chức',
         }}
+      />
+      {/* Modal Cảnh Báo Yêu Cầu eKYC Trước Khi Tạo Sự Kiện */}
+      <EkycRequiredModal
+        isOpen={showEkycModal}
+        onClose={() => setShowEkycModal(false)}
+        onNavigateToEkyc={() => switchTab('profile')}
+        ekycStatus={ekycStatus}
       />
     </div >
   );

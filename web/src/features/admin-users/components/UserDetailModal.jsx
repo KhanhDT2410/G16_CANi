@@ -1,143 +1,127 @@
-import { USER_ROLE_LABELS, USER_STATUS_LABELS } from '../types/userManagement.constants';
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  USER_ROLE_LABELS,
+  USER_STATUS_LABELS,
+  KYC_STATUS_LABELS,
+  SKILL_STATUS_LABELS,
+} from '../types/userManagement.constants';
+
+const DetailItem = ({ label, value, color, badgeClass }) => (
+  <div>
+    <span className="detail-label">{label}:</span>{' '}
+    {badgeClass ? (
+      <span className={badgeClass}>{value}</span>
+    ) : (
+      <span className="detail-value" style={color ? { color } : undefined}>{value || '—'}</span>
+    )}
+  </div>
+);
 
 const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
+  useEffect(() => {
+    if (!user && !loading) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [user, loading, onClose]);
+
   if (!user && !loading) return null;
 
   const roleInfo = user?.role ? (USER_ROLE_LABELS[user.role] || { label: user.role }) : null;
   const statusInfo = user?.status ? (USER_STATUS_LABELS[user.status] || { label: user.status }) : null;
 
-  return (
-    <div className="user-modal-overlay" onClick={onClose}>
+  const modalNode = (
+    <div className="user-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="user-modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="user-modal-header">
           <h3>Chi Tiết Tài Khoản Người Dùng</h3>
-          <button type="button" className="btn-modal-close" onClick={onClose}>
+          <button type="button" className="btn-modal-close" onClick={onClose} aria-label="Đóng cửa sổ">
             &times;
           </button>
         </div>
 
         {loading ? (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <div className="user-modal-body" style={{ padding: '3rem 1.5rem', textAlign: 'center' }}>
             <div className="cani-spinner" style={{ margin: '0 auto 1rem' }} />
             <span>Đang tải thông tin chi tiết...</span>
           </div>
         ) : (
-          <div>
-            {/* Thông tin định danh */}
-            <div className="detail-section">
-              <h4>Thông Tin Cơ Bản</h4>
-              <div className="detail-grid">
-                <div>
-                  <span className="detail-label">Họ và tên:</span>{' '}
-                  <span className="detail-value">{user.fullName}</span>
+          <>
+            <div className="user-modal-body">
+              {/* Thông tin cơ bản */}
+              <div className="user-detail-section">
+                <div className="detail-section-title">
+                  <h4>Thông Tin Cơ Bản</h4>
                 </div>
-                <div>
-                  <span className="detail-label">Email:</span>{' '}
-                  <span className="detail-value">{user.email}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Số điện thoại:</span>{' '}
-                  <span className="detail-value">{user.phone || '—'}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Vai trò:</span>{' '}
-                  <span className={roleInfo?.badgeClass}>{roleInfo?.label}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Trạng thái:</span>{' '}
-                  <span className={statusInfo?.badgeClass}>{statusInfo?.label}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Email Verified:</span>{' '}
-                  <span className="detail-value">{user.emailVerified ? 'Đã xác thực' : 'Chưa xác thực'}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Ngày tạo:</span>{' '}
-                  <span className="detail-value">{user.createdAt ? new Date(user.createdAt).toLocaleString('vi-VN') : '—'}</span>
-                </div>
-                <div>
-                  <span className="detail-label">Đăng nhập gần nhất:</span>{' '}
-                  <span className="detail-value">{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('vi-VN') : '—'}</span>
+                <div className="detail-grid">
+                  <DetailItem label="Họ và tên" value={user.fullName} />
+                  <DetailItem label="Email" value={user.email} />
+                  <DetailItem label="Số điện thoại" value={user.phone} />
+                  <DetailItem label="Vai trò" value={roleInfo?.label} badgeClass={roleInfo?.badgeClass} />
+                  <DetailItem label="Trạng thái" value={statusInfo?.label} badgeClass={statusInfo?.badgeClass} />
+                  <DetailItem label="Email Verified" value={user.emailVerified ? 'Đã xác thực' : 'Chưa xác thực'} />
+                  <DetailItem label="Ngày tạo" value={user.createdAt ? new Date(user.createdAt).toLocaleString('vi-VN') : null} />
+                  <DetailItem label="Đăng nhập gần nhất" value={user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('vi-VN') : null} />
                 </div>
               </div>
+
+              {/* Hồ sơ Worker nếu có */}
+              {user.workerProfile && (
+                <div className="user-detail-section">
+                  <div className="detail-section-title">
+                    <h4>Hồ Sơ Nhân Sự</h4>
+                    <span className="detail-section-subtitle">(Worker Profile)</span>
+                  </div>
+                  <div className="detail-grid">
+                    <DetailItem label="Số CCCD" value={user.workerProfile.cccdNumber} />
+                    <DetailItem
+                      label="Trạng thái eKYC"
+                      value={KYC_STATUS_LABELS[user.workerProfile.kycStatus]?.label || user.workerProfile.kycStatus}
+                      badgeClass={KYC_STATUS_LABELS[user.workerProfile.kycStatus]?.badgeClass}
+                    />
+                    <DetailItem
+                      label="Trạng thái Skill"
+                      value={SKILL_STATUS_LABELS[user.workerProfile.skillStatus]?.label || user.workerProfile.skillStatus || 'Chưa kê khai'}
+                      badgeClass={SKILL_STATUS_LABELS[user.workerProfile.skillStatus]?.badgeClass || 'badge-status-pending'}
+                    />
+                    <DetailItem label="Điểm uy tín" value={`${user.workerProfile.reliabilityScore} / 100`} color="#16a34a" />
+                    <DetailItem label="Đánh giá trung bình" value={`${user.workerProfile.ratingAvg} (${user.workerProfile.ratingCount || 0} lượt)`} color="#d97706" />
+                    <DetailItem label="Ca hoàn thành" value={`${user.workerProfile.totalShiftsCompleted} ca`} />
+                    <DetailItem label="Hủy ca / Bỏ ca" value={`${user.workerProfile.totalCancellations} hủy / ${user.workerProfile.totalNoshows} bỏ`} color="#dc2626" />
+                  </div>
+                </div>
+              )}
+
+              {/* Hồ sơ Nhà tổ chức nếu có */}
+              {user.eoProfile && (
+                <div className="user-detail-section">
+                  <div className="detail-section-title">
+                    <h4>Hồ Sơ Nhà Tổ Chức</h4>
+                    <span className="detail-section-subtitle">(Event Organizer)</span>
+                  </div>
+                  <div className="detail-grid">
+                    <DetailItem label="Tên công ty / Đơn vị" value={user.eoProfile.companyName} />
+                    <DetailItem label="Mã số thuế" value={user.eoProfile.taxId} />
+                    <DetailItem label="Địa chỉ" value={user.eoProfile.address} />
+                    <DetailItem label="Kiểm duyệt doanh nghiệp" value={user.eoProfile.verificationStatus} />
+                    <DetailItem label="Đánh giá trung bình" value={`${user.eoProfile.ratingAvg} (${user.eoProfile.ratingCount || 0} lượt)`} color="#d97706" />
+                    <DetailItem label="Sự kiện đã hoàn tất" value={`${user.eoProfile.totalEventsCompleted} sự kiện`} />
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Hồ sơ Worker nếu có */}
-            {user.workerProfile && (
-              <div className="detail-section">
-                <h4>Hồ Sơ Nhân Sự (Worker Profile)</h4>
-                <div className="detail-grid">
-                  <div>
-                    <span className="detail-label">Số CCCD:</span>{' '}
-                    <span className="detail-value">{user.workerProfile.cccdNumber || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Trạng thái eKYC:</span>{' '}
-                    <span className="detail-value">{user.workerProfile.kycStatus || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Điểm uy tín:</span>{' '}
-                    <span className="detail-value" style={{ color: '#16a34a' }}>
-                      {user.workerProfile.reliabilityScore} / 100
-                    </span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Đánh giá trung bình:</span>{' '}
-                    <span className="detail-value" style={{ color: '#d97706' }}>
-                      {user.workerProfile.ratingAvg} ({user.workerProfile.ratingCount || 0} lượt)
-                    </span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Ca hoàn thành:</span>{' '}
-                    <span className="detail-value">{user.workerProfile.totalShiftsCompleted} ca</span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Hủy ca / Bỏ ca:</span>{' '}
-                    <span className="detail-value" style={{ color: '#dc2626' }}>
-                      {user.workerProfile.totalCancellations} hủy / {user.workerProfile.totalNoshows} bỏ
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Hồ sơ Nhà tổ chức nếu có */}
-            {user.eoProfile && (
-              <div className="detail-section">
-                <h4>Hồ Sơ Nhà Tổ Chức (Event Organizer)</h4>
-                <div className="detail-grid">
-                  <div>
-                    <span className="detail-label">Tên công ty / Đơn vị:</span>{' '}
-                    <span className="detail-value">{user.eoProfile.companyName || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Mã số thuế:</span>{' '}
-                    <span className="detail-value">{user.eoProfile.taxId || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Địa chỉ:</span>{' '}
-                    <span className="detail-value">{user.eoProfile.address || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Kiểm duyệt doanh nghiệp:</span>{' '}
-                    <span className="detail-value">{user.eoProfile.verificationStatus || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Đánh giá trung bình:</span>{' '}
-                    <span className="detail-value" style={{ color: '#d97706' }}>
-                      {user.eoProfile.ratingAvg} ({user.eoProfile.ratingCount || 0} lượt)
-                    </span>
-                  </div>
-                  <div>
-                    <span className="detail-label">Sự kiện đã hoàn tất:</span>{' '}
-                    <span className="detail-value">{user.eoProfile.totalEventsCompleted} sự kiện</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Modal Footer Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+            <div className="user-modal-footer">
               <button
                 type="button"
                 className="btn-filter-reset"
@@ -171,11 +155,13 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
                 </button>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
 };
 
 export default UserDetailModal;

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import CreateTicketModal from './CreateTicketModal';
 import TicketDetailModal from './TicketDetailModal';
 import TransferTicketModal from './TransferTicketModal';
@@ -7,6 +8,7 @@ export const TicketModalsGroup = ({
   isCreateOpen,
   onCreateClose,
   onCreateSubmit,
+  createPrefill,
   isDetailOpen,
   onDetailClose,
   selectedTicket,
@@ -27,12 +29,15 @@ export const TicketModalsGroup = ({
   onCloseConfirm,
   loading,
 }) => {
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <>
       <CreateTicketModal
         isOpen={isCreateOpen}
         onClose={onCreateClose}
         onSubmit={onCreateSubmit}
+        prefillData={createPrefill}
         loading={loading}
       />
 
@@ -65,9 +70,9 @@ export const TicketModalsGroup = ({
         ticket={activeTicket}
         loading={loading}
       />
-    </>
+    </>,
+    document.body
   );
 };
 
 export default TicketModalsGroup;
-

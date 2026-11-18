@@ -13,6 +13,7 @@ import {
   FinancialConfigIcon,
   GeneralConfigIcon,
   PricingPlanIcon,
+  WageMatrixIcon,
 } from './AdminSidebarIcons';
 
 // Danh mục phân nhóm menu chức năng Admin thuần tiếng Việt
@@ -52,6 +53,7 @@ export const ADMIN_NAV_GROUPS = [
       { id: 'config_operation', label: 'Vận Hành & Điểm Uy Tín', icon: <OperationConfigIcon /> },
       { id: 'config_financial', label: 'Tài Chính & Hoa Hồng', icon: <FinancialConfigIcon /> },
       { id: 'plans', label: 'Thiết Lập Giá Gói Dịch Vụ', icon: <PricingPlanIcon /> },
+      { id: 'wage_matrix', label: 'Biểu Thù Lao Chuẩn', icon: <WageMatrixIcon /> },
       { id: 'config_general', label: 'Hệ Thống & Tài Khoản', icon: <GeneralConfigIcon /> },
     ],
   },

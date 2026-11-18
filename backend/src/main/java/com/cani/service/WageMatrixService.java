@@ -10,17 +10,20 @@ import com.cani.entity.enums.TimeSlot;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.WageMatrixRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +52,22 @@ public class WageMatrixService {
     public PageResponse<WageMatrixResponseDto> filterWageMatrix(
             City city, String jobType, Boolean isActive, Pageable pageable
     ) {
-        Page<WageMatrix> page = wageMatrixRepository.filterWageMatrix(city, jobType, isActive, pageable);
+        Specification<WageMatrix> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (city != null) {
+                predicates.add(cb.equal(root.get("city"), city));
+            }
+            if (jobType != null && !jobType.trim().isEmpty()) {
+                String pattern = "%" + jobType.trim().toLowerCase() + "%";
+                predicates.add(cb.like(cb.lower(root.get("jobType")), pattern));
+            }
+            if (isActive != null) {
+                predicates.add(cb.equal(root.get("isActive"), isActive));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<WageMatrix> page = wageMatrixRepository.findAll(spec, pageable);
         return PageResponse.from(page.map(this::mapToDto));
     }
 

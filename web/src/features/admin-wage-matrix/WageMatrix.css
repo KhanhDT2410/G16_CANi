@@ -1,0 +1,570 @@
+/* WageMatrix.css - Quản trị Biểu Ma Trận Thù Lao Chuẩn (UC-34) */
+
+.wage-matrix-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* 1. Stats Toolbar */
+.wage-matrix-stats-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.wage-stats-group {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.wage-stat-pill {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.wage-stat-pill strong {
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+
+.wage-stat-pill.success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.wage-stat-pill.success strong {
+  color: #15803d;
+}
+
+.wage-stat-pill.warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.wage-stat-pill.warning strong {
+  color: #b45309;
+}
+
+/* 2. Filter Card */
+.wage-matrix-filter-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.wage-matrix-filter-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 170px;
+}
+
+.filter-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.filter-select,
+.filter-input {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.filter-select:focus,
+.filter-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-filter-submit {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-filter-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-filter-reset {
+  padding: 0.5rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-filter-reset:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.btn-create-wage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-create-wage:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+/* 3. Table Styling */
+.wage-matrix-table-wrapper {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.wage-matrix-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.wage-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.wage-matrix-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wage-matrix-table td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.wage-matrix-table tr:hover td {
+  background: #fbfcfe;
+}
+
+.wage-job-badge {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.wage-city-text {
+  color: #475569;
+  font-weight: 500;
+}
+
+.wage-slot-badge,
+.wage-lead-badge {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.775rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+}
+
+.wage-rate-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wage-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.775rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wage-status-pill.active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.wage-status-pill.inactive {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.wage-status-pill .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.wage-table-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.btn-action-edit,
+.btn-action-delete {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.775rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-edit {
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.btn-action-edit:hover {
+  background: #eff6ff;
+}
+
+.btn-action-delete {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.btn-action-delete:hover {
+  background: #fef2f2;
+}
+
+/* 4. Pagination */
+.wage-matrix-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pagination-info {
+  font-size: 0.825rem;
+  color: #64748b;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-page-nav {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.825rem;
+  font-weight: 500;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-page-nav:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.btn-page-nav:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 5. Modal Căn Giữa Tuyệt Đối Màn Hình */
+.wage-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.wage-modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 580px;
+  margin: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  animation: modalSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  max-height: calc(100vh - 3rem);
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.wage-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.wage-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.btn-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.btn-modal-close:hover {
+  color: #0f172a;
+}
+
+.wage-modal-form {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+}
+
+.wage-modal-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.modal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.modal-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.modal-field label {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.modal-field .req {
+  color: #ef4444;
+}
+
+.modal-field input[type='text'],
+.modal-field input[type='number'],
+.modal-field select {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.modal-field input:focus,
+.modal-field select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.job-type-suggestions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.suggestion-label {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.btn-job-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.725rem;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-job-chip:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.modal-field.checkbox-field {
+  grid-column: 1 / -1;
+  padding-top: 0.25rem;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+}
+
+.wage-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-modal-cancel {
+  padding: 0.55rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-modal-cancel:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.btn-modal-submit {
+  padding: 0.55rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-modal-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+}

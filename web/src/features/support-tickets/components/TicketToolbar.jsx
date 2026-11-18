@@ -4,6 +4,7 @@ const FILTER_LABELS = {
   OPEN: 'Chờ Tiếp Nhận',
   IN_PROGRESS: 'Đang Xử Lý',
   SLA_RISK: 'Sắp Quá Hạn SLA',
+  CHAT: 'Tin Nhắn Trực Tiếp',
 };
 
 /**

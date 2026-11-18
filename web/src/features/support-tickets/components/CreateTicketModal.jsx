@@ -1,12 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TICKET_CATEGORIES, TICKET_CATEGORY_CONFIG } from '../types/ticket.constants';
 import { showToast } from '../../../components/common/Toast';
 
-export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading }) => {
+export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillData }) => {
   const [category, setCategory] = useState(TICKET_CATEGORIES.ACCOUNT);
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      if (prefillData) {
+        setSubject(prefillData.subject || '');
+        setDescription(prefillData.description || '');
+      }
+    } else {
+      document.body.style.overflow = '';
+      setSubject('');
+      setDescription('');
+      setAttachmentUrl('');
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen, prefillData]);
 
   if (!isOpen) return null;
 
@@ -29,9 +45,7 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading }) => {
     };
 
     const res = await onSubmit(payload);
-    if (res) {
-      onClose();
-    }
+    if (res) onClose();
   };
 
   return (
@@ -127,4 +141,3 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading }) => {
 };
 
 export default CreateTicketModal;
-

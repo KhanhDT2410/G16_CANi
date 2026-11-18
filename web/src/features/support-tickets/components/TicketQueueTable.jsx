@@ -7,7 +7,7 @@ import {
  * Bảng hàng đợi Phiếu Hỗ Trợ Khách Hàng cho CSKH / Quản trị viên.
  * - Hiển thị danh tính khách hàng (Tên, SĐT, Email).
  * - Mã phiếu xuống dòng gọn gàng theo chiều dọc, tối ưu diện tích.
- * - Cột Thao Tác căn sát lề trái với thứ tự nút: Xem Phiếu -> Chat Trực Tiếp -> Tiếp Nhận.
+ * - Cột Thao Tác căn sát lề trái với thứ tự nút: Xem Phiếu -> Nhắn Tin Trực Tiếp -> Tiếp Nhận.
  * - Cảnh báo SLA "Sắp hết hạn" nhỏ gọn, tinh tế.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
@@ -128,7 +128,7 @@ export const TicketQueueTable = ({
                   )}
                 </td>
 
-                {/* Nút thao tác: Sát về lề trái; Thứ tự: Xem Phiếu -> Chat Trực Tiếp -> Tiếp Nhận */}
+                {/* Nút thao tác: Sát về lề trái; Thứ tự: Xem Phiếu -> Nhắn Tin Trực Tiếp -> Tiếp Nhận */}
                 <td style={{ textAlign: 'left' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <button
@@ -143,7 +143,7 @@ export const TicketQueueTable = ({
                       className="ticket-btn ticket-btn-chat ticket-btn-sm"
                       onClick={() => onOpenChat(t)}
                     >
-                      Chat Trực Tiếp
+                      Nhắn Tin Trực Tiếp
                     </button>
                     {t.status === 'OPEN' && !t.assignedTo && onAssign && (
                       <button

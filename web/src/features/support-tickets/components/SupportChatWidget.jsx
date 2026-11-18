@@ -1,25 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../auth';
-import { supportTicketApi } from '../api/supportTicketApi';
+import { supportChatApi } from '../api/supportChatApi';
 import './SupportChatWidget.css';
 
 const QUICK_FAQS = [
-  {
-    q: 'Không quét được mã QR điểm danh ca',
-    a: 'Nếu QR ca sự kiện bị mờ hoặc lỗi GPS, bạn hãy báo Quản lý ca (EO) quét điểm danh thủ công hoặc gửi ảnh chứng minh vào đây để CSKH hỗ trợ nhé!',
-  },
-  {
-    q: 'Bao lâu thì nhận được thù lao ca làm?',
-    a: 'Thù lao sẽ được chuyển khoản trực tiếp sau khi Nhà tổ chức hoàn tất đối soát ca (chậm nhất 24 giờ sau khi kết thúc sự kiện).',
-  },
-  {
-    q: 'Làm thế nào để kháng cáo điểm uy tín?',
-    a: 'Bạn vào mục "Kháng cáo điểm uy tín" trong vòng 7 ngày kể từ khi bị trừ điểm, kèm ảnh chụp minh chứng bất khả kháng để được duyệt hoàn điểm.',
-  },
-  {
-    q: 'Tôi muốn gặp chuyên viên CSKH trực tiếp',
-    a: 'Chuyên viên CSKH của CANi đã nhận được yêu cầu của bạn. Vui lòng để lại tin nhắn chi tiết, chúng tôi sẽ phản hồi trong giây lát!',
-  },
+  { q: 'Không quét được mã QR điểm danh ca', a: 'Nếu QR ca sự kiện bị mờ hoặc lỗi GPS, bạn hãy báo Quản lý ca (EO) quét điểm danh thủ công hoặc gửi ảnh chứng minh vào đây để CSKH hỗ trợ nhé!' },
+  { q: 'Bao lâu thì nhận được thù lao ca làm?', a: 'Thù lao sẽ được chuyển khoản trực tiếp sau khi Nhà tổ chức hoàn tất đối soát ca (chậm nhất 24 giờ sau khi kết thúc sự kiện).' },
+  { q: 'Làm thế nào để kháng cáo điểm uy tín?', a: 'Bạn vào mục "Kháng cáo điểm uy tín" trong vòng 7 ngày kể từ khi bị trừ điểm, kèm ảnh chụp minh chứng bất khả kháng để được duyệt hoàn điểm.' },
+  { q: 'Tôi muốn gặp chuyên viên CSKH trực tiếp', a: 'Chuyên viên CSKH của CANi đã nhận được yêu cầu của bạn. Vui lòng để lại tin nhắn chi tiết, chúng tôi sẽ phản hồi trong giây lát!' },
 ];
 
 export const SupportChatWidget = () => {
@@ -27,21 +15,33 @@ export const SupportChatWidget = () => {
   const isStaff = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    {
-      id: 'welcome',
-      isBot: true,
-      text: `Xin chào ${user?.fullName ? user.fullName : 'bạn'}! CANi có thể hỗ trợ gì cho bạn hôm nay?`,
-      time: 'Vừa xong',
-    },
+    { id: 'welcome', isBot: true, text: `Xin chào ${user?.fullName || 'bạn'}! CANi có thể hỗ trợ gì cho bạn hôm nay?`, time: 'Vừa xong' },
   ]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    let isMounted = true;
+    if (user && !isStaff && isOpen) {
+      supportChatApi.getMyConversation()
+        .then((res) => {
+          if (isMounted && res?.messages?.length > 0) {
+            setMessages(res.messages.map((m) => ({
+              id: m.id,
+              isBot: m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN',
+              text: m.messageText,
+              time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            })));
+          }
+        })
+        .catch(() => { });
     }
+    return () => { isMounted = false; };
+  }, [user, isStaff, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
 
   if (isStaff) return null;
@@ -61,46 +61,18 @@ export const SupportChatWidget = () => {
     if (!customText) setInputText('');
     setSending(true);
 
-    // Gửi ngầm lên Backend nếu đã đăng nhập để lưu vào Support Tickets
     try {
-      if (user) {
-        await supportTicketApi.createTicket({
-          category: 'GENERAL',
-          subject: `Tin nhắn hỗ trợ từ ${user.fullName || 'Người dùng'}`,
-          description: textToSend.length >= 30 ? textToSend : `${textToSend} (Yêu cầu gửi qua khung Live Chat)`,
-        });
-      }
-    } catch {
-      // Bỏ qua lỗi mạng để cuộc trò chuyện trên UI không bị gián đoạn
-    }
-
-    // Phản hồi tự động để trải nghiệm chat tức thời
-    setTimeout(() => {
-      const botReply = {
-        id: String(Date.now() + 1),
-        isBot: true,
-        text: 'Cảm ơn bạn! Yêu cầu hỗ trợ đã được chuyển tới chuyên viên CSKH đang trực ca. Chúng tôi sẽ phản hồi trong ít phút.',
-        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, botReply]);
-      setSending(false);
-    }, 800);
+      if (user) await supportChatApi.sendUserMessage({ messageText: textToSend });
+    } catch { /* Bỏ qua lỗi mạng */ } finally { setSending(false); }
   };
 
   const handleQuickFaqClick = (faq) => {
-    const userMsg = {
-      id: String(Date.now()),
-      isBot: false,
-      text: faq.q,
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    };
-    const botReply = {
-      id: String(Date.now() + 1),
-      isBot: true,
-      text: faq.a,
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages((prev) => [...prev, userMsg, botReply]);
+    const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    setMessages((prev) => [
+      ...prev,
+      { id: String(Date.now()), isBot: false, text: faq.q, time: now },
+      { id: String(Date.now() + 1), isBot: true, text: faq.a, time: now },
+    ]);
   };
 
   return (
@@ -125,7 +97,6 @@ export const SupportChatWidget = () => {
       {/* 2. Cửa sổ chat nổi (Chat Window) */}
       {isOpen && (
         <div className="support-chat-window animate-scale-in">
-          {/* Header */}
           <div className="support-chat-header">
             <div className="support-header-brand">
               <div className="support-avatar-circle">🎧</div>
@@ -137,17 +108,11 @@ export const SupportChatWidget = () => {
                 </div>
               </div>
             </div>
-            <button
-              type="button"
-              className="support-close-btn"
-              onClick={() => setIsOpen(false)}
-              title="Đóng chat"
-            >
+            <button type="button" className="support-close-btn" onClick={() => setIsOpen(false)} title="Đóng chat">
               ✕
             </button>
           </div>
 
-          {/* Body: Messages Stream */}
           <div className="support-chat-body">
             {messages.map((m) => (
               <div key={m.id} className={`support-msg ${m.isBot ? 'bot' : 'user'}`}>
@@ -156,17 +121,11 @@ export const SupportChatWidget = () => {
               </div>
             ))}
 
-            {/* Gợi ý câu hỏi nhanh (Quick FAQs) khi mới vào */}
             {messages.length <= 2 && (
               <div className="support-quick-faqs">
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Câu hỏi thường gặp:</span>
                 {QUICK_FAQS.map((faq, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    className="support-faq-chip"
-                    onClick={() => handleQuickFaqClick(faq)}
-                  >
+                  <button key={idx} type="button" className="support-faq-chip" onClick={() => handleQuickFaqClick(faq)}>
                     💡 {faq.q}
                   </button>
                 ))}
@@ -175,14 +134,7 @@ export const SupportChatWidget = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Footer: Input Bar */}
-          <form
-            className="support-chat-footer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-          >
+          <form className="support-chat-footer" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
             <input
               type="text"
               className="support-chat-input"
@@ -191,12 +143,7 @@ export const SupportChatWidget = () => {
               onChange={(e) => setInputText(e.target.value)}
               disabled={sending}
             />
-            <button
-              type="submit"
-              className="support-send-btn"
-              disabled={!inputText.trim() || sending}
-              title="Gửi tin nhắn"
-            >
+            <button type="submit" className="support-send-btn" disabled={!inputText.trim() || sending} title="Gửi tin nhắn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -210,4 +157,3 @@ export const SupportChatWidget = () => {
 };
 
 export default SupportChatWidget;
-

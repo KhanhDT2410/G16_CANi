@@ -33,6 +33,8 @@ spring:
     clean-disabled: true
     schemas: public
     default-schema: public
+    ignore-migration-patterns:
+      - "*:missing"
 
 server:
   port: ${SERVER_PORT:8080}

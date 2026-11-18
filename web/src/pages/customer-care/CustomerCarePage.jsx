@@ -33,6 +33,7 @@ const TAB_METADATA = {
 export const CustomerCarePage = () => {
   const [activeTab, setActiveTab] = useState('tickets');
   const [ticketFilter, setTicketFilter] = useState('ALL');
+  const [ticketRefreshKey, setTicketRefreshKey] = useState(0);
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem('cani_cc_sidebar_collapsed') === 'true';
@@ -54,11 +55,17 @@ export const CustomerCarePage = () => {
   };
 
   const currentMeta = useMemo(() => {
+    if (activeTab === 'tickets' && ticketFilter === 'CHAT') {
+      return {
+        title: 'Tin Nhắn Trực Tiếp',
+        subtitle: 'Hộp thư hội thoại trực tiếp với Nhà tổ chức sự kiện và Nhân viên',
+      };
+    }
     return TAB_METADATA[activeTab] || {
       title: 'Cổng Chăm Sóc Khách Hàng',
       subtitle: 'Tiếp nhận yêu cầu, giải quyết tranh chấp và hỗ trợ người dùng nền tảng',
     };
-  }, [activeTab]);
+  }, [activeTab, ticketFilter]);
 
   return (
     <div className="cc-layout animate-fade-in">
@@ -79,6 +86,15 @@ export const CustomerCarePage = () => {
             <h1 className="cc-topbar-title">{currentMeta.title}</h1>
             <p className="cc-topbar-subtitle">{currentMeta.subtitle}</p>
           </div>
+          {activeTab === 'tickets' && (
+            <button
+              type="button"
+              className="ticket-btn ticket-btn-secondary"
+              onClick={() => setTicketRefreshKey((k) => k + 1)}
+            >
+              Làm Mới
+            </button>
+          )}
         </header>
 
         <section className="cc-content-card">
@@ -86,6 +102,7 @@ export const CustomerCarePage = () => {
             <SupportTicketsCenterView
               activeFilter={ticketFilter}
               onFilterChange={setTicketFilter}
+              refreshKey={ticketRefreshKey}
             />
           )}
           {activeTab === 'disputes' && <DisputeCenterView />}

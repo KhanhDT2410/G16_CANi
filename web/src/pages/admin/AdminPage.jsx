@@ -74,6 +74,7 @@ const TAB_METADATA = {
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [ticketFilter, setTicketFilter] = useState('ALL');
+  const [ticketRefreshKey, setTicketRefreshKey] = useState(0);
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem('cani_admin_sidebar_collapsed') === 'true';
@@ -104,11 +105,17 @@ const AdminPage = () => {
   };
 
   const currentMeta = useMemo(() => {
+    if (activeTab === 'tickets' && ticketFilter === 'CHAT') {
+      return {
+        title: 'Tin Nhắn Trực Tiếp',
+        subtitle: 'Hộp thư hội thoại trực tiếp với Nhà tổ chức sự kiện và Nhân viên',
+      };
+    }
     return TAB_METADATA[activeTab] || {
       title: 'Cổng Quản Trị Hệ Thống',
       subtitle: 'Giám sát vận hành, quản trị người dùng và cấu hình hệ thống',
     };
-  }, [activeTab]);
+  }, [activeTab, ticketFilter]);
 
   return (
     <div className="admin-layout animate-fade-in">
@@ -129,6 +136,15 @@ const AdminPage = () => {
             <h1 className="admin-topbar-title">{currentMeta.title}</h1>
             <p className="admin-topbar-subtitle">{currentMeta.subtitle}</p>
           </div>
+          {activeTab === 'tickets' && (
+            <button
+              type="button"
+              className="ticket-btn ticket-btn-secondary"
+              onClick={() => setTicketRefreshKey((k) => k + 1)}
+            >
+              Làm Mới
+            </button>
+          )}
         </header>
 
         <section className="admin-content-card">
@@ -142,6 +158,7 @@ const AdminPage = () => {
             <SupportTicketsCenterView
               activeFilter={ticketFilter}
               onFilterChange={setTicketFilter}
+              refreshKey={ticketRefreshKey}
             />
           )}
           {activeTab === 'faqs' && <FaqView />}

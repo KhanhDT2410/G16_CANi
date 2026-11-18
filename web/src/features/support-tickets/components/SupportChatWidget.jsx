@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../auth';
 import { supportChatApi } from '../api/supportChatApi';
 import './SupportChatWidget.css';
@@ -10,39 +10,176 @@ const QUICK_FAQS = [
   { q: 'Tôi muốn gặp chuyên viên CSKH trực tiếp', a: 'Chuyên viên CSKH của CANi đã nhận được yêu cầu của bạn. Vui lòng để lại tin nhắn chi tiết, chúng tôi sẽ phản hồi trong giây lát!' },
 ];
 
+const STORAGE_KEY_POS = 'cani_support_chat_widget_pos';
+const DRAG_THRESHOLD = 6; // pixels di chuyển tối thiểu để nhận diện là Drag thay vì Click
+
 export const SupportChatWidget = () => {
   const { user } = useAuth();
   const isStaff = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
+
+  // Trạng thái hiển thị 3 cấp độ:
+  // 1. isOpen = false: Bong bóng chat nhỏ (FAB)
+  // 2. isOpen = true, isMinimized = true: Thanh nổi thu gọn (Dock Pill)
+  // 3. isOpen = true, isMinimized = false: Cửa sổ chat đầy đủ (Expanded Window)
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+
   const [messages, setMessages] = useState([
     { id: 'welcome', isBot: true, text: `Xin chào ${user?.fullName || 'bạn'}! CANi có thể hỗ trợ gì cho bạn hôm nay?`, time: 'Vừa xong' },
   ]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
+  // Toạ độ kéo thả tự do
+  const [position, setPosition] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_POS);
+      if (saved) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return null; // null = dùng toạ độ CSS mặc định (góc dưới bên phải)
+  });
+
+  const messagesEndRef = useRef(null);
+  const dragRef = useRef({
+    isDragging: false,
+    startX: 0,
+    startY: 0,
+    elemStartX: 0,
+    elemStartY: 0,
+    hasMoved: false,
+  });
+
+  // Clamp toạ độ an toàn trong khung hình
+  const clampPosition = useCallback((x, y, width = 380, height = 520) => {
+    const maxX = Math.max(16, window.innerWidth - width - 16);
+    const maxY = Math.max(16, window.innerHeight - height - 16);
+    return {
+      x: Math.min(Math.max(16, x), maxX),
+      y: Math.min(Math.max(16, y), maxY),
+    };
+  }, []);
+
+  // Tự động điều chỉnh toạ độ khi người dùng thay đổi kích thước cửa sổ trình duyệt
+  useEffect(() => {
+    const handleResize = () => {
+      setPosition((prev) => {
+        if (!prev) return null;
+        return clampPosition(prev.x, prev.y, isMinimized ? 260 : 380, isMinimized ? 48 : 520);
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [clampPosition, isMinimized]);
+
+  // Đồng bộ tin nhắn hội thoại và Polling cập nhật tin nhắn mới mỗi 4s khi đang mở chat
   useEffect(() => {
     let isMounted = true;
-    if (user && !isStaff && isOpen) {
-      supportChatApi.getMyConversation()
-        .then((res) => {
-          if (isMounted && res?.messages?.length > 0) {
-            setMessages(res.messages.map((m) => ({
-              id: m.id,
-              isBot: m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN',
-              text: m.messageText,
-              time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-            })));
-          }
-        })
-        .catch(() => { });
-    }
-    return () => { isMounted = false; };
-  }, [user, isStaff, isOpen]);
+    if (!user || isStaff || !isOpen) return;
 
+    const fetchMessages = async () => {
+      try {
+        const res = await supportChatApi.getMyConversation();
+        if (!isMounted || !res?.messages) return;
+
+        setMessages((prev) => {
+          const apiMessages = res.messages.map((m) => ({
+            id: m.id,
+            isBot: m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN',
+            text: m.messageText,
+            time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          }));
+
+          // Nếu có tin nhắn mới từ CSKH khi đang thu nhỏ, tăng badge thông báo
+          if (isMinimized && apiMessages.length > prev.length) {
+            setUnreadCount((c) => c + (apiMessages.length - prev.length));
+          }
+          return apiMessages.length > 0 ? apiMessages : prev;
+        });
+      } catch { /* Bỏ qua lỗi mạng nền */ }
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user, isStaff, isOpen, isMinimized]);
+
+  // Tự động cuộn xuống tin nhắn mới nhất khi đang mở toàn phần
   useEffect(() => {
-    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isOpen]);
+    if (isOpen && !isMinimized) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen, isMinimized]);
+
+  // Quản lý kéo thả thông qua Pointer Events chuẩn công nghiệp
+  const startDrag = (e, currentWidth, currentHeight) => {
+    // Không kích hoạt kéo thả nếu người dùng click vào nút con (close, minimize, input, button)
+    if (e.target.closest('button, input, textarea, a, .support-faq-chip')) return;
+
+    e.preventDefault();
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+
+    let initX = position?.x;
+    let initY = position?.y;
+
+    if (initX == null || initY == null) {
+      // Tính toạ độ hiện tại trên màn hình nếu đang dùng vị trí CSS mặc định
+      const rect = e.currentTarget.getBoundingClientRect();
+      initX = rect.left;
+      initY = rect.top;
+    }
+
+    dragRef.current = {
+      isDragging: true,
+      startX: clientX,
+      startY: clientY,
+      elemStartX: initX,
+      elemStartY: initY,
+      hasMoved: false,
+    };
+
+    const onPointerMove = (moveEvent) => {
+      if (!dragRef.current.isDragging) return;
+      const dx = moveEvent.clientX - dragRef.current.startX;
+      const dy = moveEvent.clientY - dragRef.current.startY;
+
+      if (!dragRef.current.hasMoved && Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
+        dragRef.current.hasMoved = true;
+      }
+
+      if (dragRef.current.hasMoved) {
+        const nextX = dragRef.current.elemStartX + dx;
+        const nextY = dragRef.current.elemStartY + dy;
+        const clamped = clampPosition(nextX, nextY, currentWidth, currentHeight);
+        setPosition(clamped);
+      }
+    };
+
+    const onPointerUp = () => {
+      if (!dragRef.current.isDragging) return;
+      dragRef.current.isDragging = false;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+
+      if (dragRef.current.hasMoved) {
+        setPosition((currentPos) => {
+          if (currentPos) {
+            try {
+              localStorage.setItem(STORAGE_KEY_POS, JSON.stringify(currentPos));
+            } catch { /* ignore */ }
+          }
+          return currentPos;
+        });
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
 
   if (isStaff) return null;
 
@@ -63,7 +200,9 @@ export const SupportChatWidget = () => {
 
     try {
       if (user) await supportChatApi.sendUserMessage({ messageText: textToSend });
-    } catch { /* Bỏ qua lỗi mạng */ } finally { setSending(false); }
+    } catch { /* Bỏ qua lỗi mạng */ } finally {
+      setSending(false);
+    }
   };
 
   const handleQuickFaqClick = (faq) => {
@@ -75,29 +214,110 @@ export const SupportChatWidget = () => {
     ]);
   };
 
+  // Tính style toạ độ tuỳ biến nếu đã kéo thả
+  const positionStyle = position ? {
+    position: 'fixed',
+    left: `${position.x}px`,
+    top: `${position.y}px`,
+    right: 'auto',
+    bottom: 'auto',
+  } : {};
+
   return (
     <>
-      {/* 1. Nút bong bóng chat nổi */}
-      <button
-        type="button"
-        className="support-chat-bubble-btn animate-fade-in"
-        onClick={() => setIsOpen((prev) => !prev)}
-        title="Trò chuyện hỗ trợ trực tuyến"
-        aria-label="Mở khung chat hỗ trợ"
-      >
-        <span className="support-chat-icon-wrap">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          <span className="support-chat-badge-dot" />
-        </span>
-        <span>Hỗ trợ trực tuyến</span>
-      </button>
+      {/* TRƯỜNG HỢP 1: BONG BÓNG CHAT NỔI (KHI ĐANG ĐÓNG) */}
+      {!isOpen && (
+        <button
+          type="button"
+          className="support-chat-bubble-btn animate-fade-in draggable-support-element"
+          style={positionStyle}
+          onPointerDown={(e) => startDrag(e, 180, 50)}
+          onClick={(e) => {
+            if (dragRef.current.hasMoved) {
+              e.stopPropagation();
+              return;
+            }
+            setIsOpen(true);
+            setIsMinimized(false);
+            setUnreadCount(0);
+          }}
+          title="Nhấn giữ để di chuyển · Nhấp để mở khung chat"
+          aria-label="Mở khung chat hỗ trợ"
+        >
+          <span className="support-chat-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span className="support-chat-badge-dot" />
+          </span>
+          <span>Hỗ trợ trực tuyến</span>
+        </button>
+      )}
 
-      {/* 2. Cửa sổ chat nổi (Chat Window) */}
-      {isOpen && (
-        <div className="support-chat-window animate-scale-in">
-          <div className="support-chat-header">
+      {/* TRƯỜNG HỢP 2: THANH NỔI THU GỌN (MINIMIZED PILL DOCK) */}
+      {isOpen && isMinimized && (
+        <div
+          className="support-chat-minimized-pill animate-scale-in draggable-support-element"
+          style={positionStyle}
+          onPointerDown={(e) => startDrag(e, 260, 48)}
+          title="Nhấn giữ để di chuyển thanh hỗ trợ"
+        >
+          <div
+            className="minimized-pill-body"
+            onClick={(e) => {
+              if (dragRef.current.hasMoved) {
+                e.stopPropagation();
+                return;
+              }
+              setIsMinimized(false);
+              setUnreadCount(0);
+            }}
+          >
+            <span className="support-status-dot" />
+            <span className="minimized-pill-title">Hỗ Trợ CANi</span>
+            {unreadCount > 0 && (
+              <span className="minimized-pill-unread-badge">+{unreadCount}</span>
+            )}
+          </div>
+          <div className="minimized-pill-actions">
+            <button
+              type="button"
+              className="support-header-icon-btn"
+              onClick={() => {
+                setIsMinimized(false);
+                setUnreadCount(0);
+              }}
+              title="Phóng to cửa sổ chat"
+            >
+              🗖
+            </button>
+            <button
+              type="button"
+              className="support-header-icon-btn"
+              onClick={() => {
+                setIsOpen(false);
+                setIsMinimized(false);
+              }}
+              title="Đóng hẳn khung chat"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TRƯỜNG HỢP 3: CỬA SỔ CHAT MỞ RỘNG TOÀN PHẦN (EXPANDED WINDOW) */}
+      {isOpen && !isMinimized && (
+        <div
+          className="support-chat-window animate-scale-in"
+          style={positionStyle}
+        >
+          {/* Thanh Header đóng vai trò tay cầm kéo thả (Drag Handle) */}
+          <div
+            className="support-chat-header draggable-header"
+            onPointerDown={(e) => startDrag(e, 380, 520)}
+            title="Nhấn giữ thanh tiêu đề để di chuyển cửa sổ chat"
+          >
             <div className="support-header-brand">
               <div className="support-avatar-circle">🎧</div>
               <div className="support-header-info">
@@ -108,9 +328,25 @@ export const SupportChatWidget = () => {
                 </div>
               </div>
             </div>
-            <button type="button" className="support-close-btn" onClick={() => setIsOpen(false)} title="Đóng chat">
-              ✕
-            </button>
+
+            <div className="support-header-actions">
+              <button
+                type="button"
+                className="support-header-icon-btn"
+                onClick={() => setIsMinimized(true)}
+                title="Thu nhỏ khung chat xuống thanh nổi"
+              >
+                —
+              </button>
+              <button
+                type="button"
+                className="support-header-icon-btn"
+                onClick={() => setIsOpen(false)}
+                title="Đóng chat"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="support-chat-body">

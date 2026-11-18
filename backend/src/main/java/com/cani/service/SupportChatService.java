@@ -102,8 +102,8 @@ public class SupportChatService {
 
                 msg = messageRepository.save(msg);
 
-                // Cập nhật preview và số tin chưa đọc phía CSKH
-                conv.setLastMessagePreview(req.getMessageText());
+                // Cập nhật preview (cắt ngắn chống tràn cột 500 ký tự) và số tin chưa đọc phía CSKH
+                conv.setLastMessagePreview(formatMessagePreview(req.getMessageText()));
                 conv.setLastMessageAt(Instant.now());
                 conv.setUnreadStaffCount((conv.getUnreadStaffCount() == null ? 0 : conv.getUnreadStaffCount()) + 1);
                 conversationRepository.save(conv);
@@ -294,8 +294,8 @@ public class SupportChatService {
 
                 msg = messageRepository.save(msg);
 
-                // Cập nhật preview và tăng unread của User
-                conv.setLastMessagePreview(req.getMessageText());
+                // Cập nhật preview (cắt ngắn chống tràn cột 500 ký tự) và tăng unread của User
+                conv.setLastMessagePreview(formatMessagePreview(req.getMessageText()));
                 conv.setLastMessageAt(Instant.now());
                 conv.setUnreadUserCount((conv.getUnreadUserCount() == null ? 0 : conv.getUnreadUserCount()) + 1);
                 conversationRepository.save(conv);
@@ -333,5 +333,11 @@ public class SupportChatService {
                                 .isRead(msg.getIsRead())
                                 .createdAt(msg.getCreatedAt())
                                 .build();
+        }
+
+        private String formatMessagePreview(String text) {
+                if (text == null) return "";
+                String trimmed = text.trim();
+                return trimmed.length() > 490 ? trimmed.substring(0, 487) + "..." : trimmed;
         }
 }

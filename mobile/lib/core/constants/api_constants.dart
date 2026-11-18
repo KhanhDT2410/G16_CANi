@@ -12,9 +12,9 @@ class ApiConstants {
     if (kIsWeb) {
       return 'http://localhost:8080';
     }
-    // Trên thiết bị thật hoặc máy ảo di động (Android / iOS):
-    // Trỏ thẳng tới địa chỉ IP LAN của máy chủ backend để tránh lỗi "Connection refused"
-    return 'http://192.168.100.31:8080';
+    // Trên thiết bị cắm cáp USB (qua adb reverse tcp:8080 tcp:8080) hoặc máy chủ local:
+    // Mặc định kết nối qua 127.0.0.1:8080 (cực nhanh, không phụ thuộc mạng Wi-Fi)
+    return 'http://127.0.0.1:8080';
   }
 
   static final String baseUrl = const String.fromEnvironment(

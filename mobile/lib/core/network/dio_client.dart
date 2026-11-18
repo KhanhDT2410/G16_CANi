@@ -25,15 +25,14 @@ final dioProvider = Provider<Dio>((ref) {
     AuthInterceptor(),
     InterceptorsWrapper(
       onError: (error, handler) async {
-        // Tự động fallback sang IP LAN máy chủ nếu kết nối localhost bị từ chối trên thiết bị thật
+        // Tự động fallback nếu kết nối thất bại (thử qua IP LAN máy tính 192.168.1.20 hoặc Emulator 10.0.2.2)
         if ((error.type == DioExceptionType.connectionError ||
                 error.type == DioExceptionType.connectionTimeout) &&
-            error.requestOptions.extra['retried_lan'] == null &&
-            error.requestOptions.baseUrl.contains('localhost')) {
+            error.requestOptions.extra['retried_lan'] == null) {
           error.requestOptions.extra['retried_lan'] = true;
-          final lanBaseUrl = error.requestOptions.baseUrl.replaceFirst('localhost', '192.168.100.31');
+          
+          final fallbackHosts = ['192.168.1.20:8080', '10.0.2.2:8080', 'localhost:8080', '127.0.0.1:8080'];
           final rawData = error.requestOptions.data;
-          final retryData = rawData is FormData ? rawData.clone() : rawData;
           final retryHeaders = Map<String, dynamic>.from(error.requestOptions.headers);
           if (rawData is FormData) {
             retryHeaders.remove('content-type');
@@ -46,21 +45,33 @@ final dioProvider = Provider<Dio>((ref) {
             responseType: error.requestOptions.responseType,
             contentType: rawData is FormData ? null : error.requestOptions.contentType,
             validateStatus: error.requestOptions.validateStatus,
-            receiveTimeout: error.requestOptions.receiveTimeout,
-            sendTimeout: error.requestOptions.sendTimeout,
+            receiveTimeout: const Duration(seconds: 4),
+            sendTimeout: const Duration(seconds: 4),
           );
-          try {
-            final fallbackDio = Dio(BaseOptions(baseUrl: lanBaseUrl));
-            final response = await fallbackDio.request(
-              error.requestOptions.path,
-              data: retryData,
-              queryParameters: error.requestOptions.queryParameters,
-              options: retryOptions,
+
+          for (final host in fallbackHosts) {
+            if (error.requestOptions.baseUrl.contains(host)) continue;
+            final fallbackBaseUrl = error.requestOptions.baseUrl.replaceAll(
+              RegExp(r'(127\.0\.0\.1|localhost|192\.168\.\d+\.\d+|10\.0\.2\.2):8080'),
+              host,
             );
-            dio.options.baseUrl = lanBaseUrl;
-            return handler.resolve(response);
-          } catch (_) {
-            // Nếu fallback LAN cũng không thành công thì chuyển tiếp lỗi ban đầu
+            try {
+              final retryData = rawData is FormData ? rawData.clone() : rawData;
+              final fallbackDio = Dio(BaseOptions(
+                baseUrl: fallbackBaseUrl,
+                connectTimeout: const Duration(seconds: 3),
+              ));
+              final response = await fallbackDio.request(
+                error.requestOptions.path,
+                data: retryData,
+                queryParameters: error.requestOptions.queryParameters,
+                options: retryOptions,
+              );
+              dio.options.baseUrl = fallbackBaseUrl;
+              return handler.resolve(response);
+            } catch (_) {
+              // Tiếp tục thử host kế tiếp
+            }
           }
         }
         handler.next(error);

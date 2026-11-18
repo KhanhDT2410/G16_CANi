@@ -16,6 +16,21 @@ const AuthCallbackPage = () => {
   const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
+    // 0. Phòng vệ an toàn: Nếu bằng cách nào đó URL thanh toán PayOS (?orderCode=...) bị lạc vào trang này,
+    // lập tức điều hướng trở về cổng Quản lý Gói cước của Nhà tổ chức sự kiện (EO), tuyệt đối không xử lý như OAuth Google
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPayOS =
+      urlParams.has('orderCode') ||
+      urlParams.has('payos') ||
+      urlParams.has('cancel') ||
+      urlParams.get('code') === '00' ||
+      urlParams.get('status') === 'PAID';
+
+    if (isPayOS) {
+      navigate('/eo?tab=subscription&' + urlParams.toString(), { replace: true });
+      return;
+    }
+
     let isHandled = false;
 
     const processSession = async (session) => {
@@ -63,7 +78,6 @@ const AuthCallbackPage = () => {
     };
 
     // 1. Kiểm tra nếu có mã code từ PKCE OAuth (?code=...)
-    const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
 
     if (authCode) {

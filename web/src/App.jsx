@@ -24,10 +24,20 @@ function PageFallback() {
 }
 
 function App() {
-  // Tự động chuyển tiếp nếu Supabase fallback redirect về trang chủ kèm mã xác thực ?code=
+  // Tự động chuyển tiếp nếu Supabase fallback redirect về trang chủ kèm mã xác thực OAuth Google (?code=...)
+  // Chú ý: Tuyệt đối không chuyển tiếp nếu đây là callback thanh toán PayOS (?orderCode=... hoặc ?status=PAID hoặc code=00)
   if (typeof window !== 'undefined') {
     const searchParams = new URLSearchParams(window.location.search);
-    if (searchParams.has('code') && window.location.pathname !== '/auth/callback') {
+    const isPayOSReturn =
+      searchParams.has('orderCode') ||
+      searchParams.has('payos') ||
+      searchParams.has('cancel') ||
+      searchParams.get('code') === '00' ||
+      searchParams.get('status') === 'PAID' ||
+      searchParams.get('status') === 'CANCELLED';
+
+    // Chỉ chuyển hướng về /auth/callback nếu là mã OAuth thực sự (không phải PayOS) và người dùng đang ở trang chủ '/'
+    if (!isPayOSReturn && searchParams.has('code') && window.location.pathname === '/') {
       window.location.replace('/auth/callback' + window.location.search + window.location.hash);
       return null;
     }

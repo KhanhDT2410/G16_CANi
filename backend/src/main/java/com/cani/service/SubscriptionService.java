@@ -424,14 +424,20 @@ public class SubscriptionService {
         // 4. Khi Gateway báo PAID (hoặc demoEnabled) và order hợp lệ của chính EO này -> Kích hoạt đúng gói cước trong order
         if (orderPlanType != null && (isRealPaid || demoEnabled)) {
             pendingOrders.remove("PAYOS_" + orderCode);
+            BigDecimal orderAmount = order != null ? order.price() : null;
             if (payOSOrderRepository != null) {
-                payOSOrderRepository.findByOrderCode(orderCode).ifPresent(po -> {
+                Optional<PayOSOrder> poOpt = payOSOrderRepository.findByOrderCode(orderCode);
+                if (poOpt.isPresent()) {
+                    PayOSOrder po = poOpt.get();
                     po.setStatus("PAID");
                     payOSOrderRepository.save(po);
-                });
+                    if (orderAmount == null) {
+                        orderAmount = po.getAmount();
+                    }
+                }
             }
             String gatewayRef = isRealPaid ? "PAYOS_VIETQR" : "PAYOS_VIETQR_DEMO";
-            return activateSubscription(eo, orderPlanType, gatewayRef, "PAYOS_" + orderCode, "POS_" + orderCode);
+            return activateSubscription(eo, orderPlanType, gatewayRef, "PAYOS_" + orderCode, "POS_" + orderCode, orderAmount);
         }
 
         // 5. Nếu có order nhưng chưa thanh toán trên Gateway -> Báo lỗi
@@ -482,7 +488,8 @@ public class SubscriptionService {
         EventOrganizer eo = eventOrganizerRepository.findById(finalEoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Ban tổ chức sự kiện: " + finalEoId));
 
-        return activateSubscription(eo, planType, "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode);
+        BigDecimal orderAmount = (order != null) ? order.price() : null;
+        return activateSubscription(eo, planType, "PAYOS_VIETQR", "PAYOS_" + orderCode, "POS_" + orderCode, orderAmount);
     }
 
     /**
@@ -529,8 +536,26 @@ public class SubscriptionService {
             String txnRef,
             String externalRef
     ) {
-        // Tìm Plan từ bảng plans trong DB (hoặc fallback)
-        Plan plan = planRepository.findByPlanType(planType)
+        return activateSubscription(eo, planType, method, txnRef, externalRef, null);
+    }
+
+    @Transactional
+    public SubscriptionResponseDto activateSubscription(
+            EventOrganizer eo,
+            PlanType planType,
+            String method,
+            String txnRef,
+            String externalRef,
+            BigDecimal expectedPrice
+    ) {
+        // Tìm Plan từ bảng plans trong DB:
+        // Lưu ý: Dùng findAllByPlanType để an toàn tuyệt đối trước NonUniqueResultException
+        // khi trong bảng plans tồn tại nhiều gói cước cùng loại plan_type (do Admin cấu hình/tạo thêm).
+        List<Plan> dbPlans = planRepository.findAllByPlanType(planType);
+        Plan plan = dbPlans.stream()
+                .filter(p -> p.getPrice() != null && expectedPrice != null && p.getPrice().compareTo(expectedPrice) == 0)
+                .findFirst()
+                .or(() -> dbPlans.stream().findFirst())
                 .orElseGet(() -> {
                     log.warn("Không tìm thấy PlanType {} trong DB plans, khởi tạo tự động từ fallback", planType);
                     SubscriptionPlanDto dto = getPlanDefinition(planType);

@@ -3,6 +3,7 @@ package com.cani.service.eo;
 import com.cani.config.PayOSConfig;
 import com.cani.dto.subscription.*;
 import com.cani.entity.EventOrganizer;
+import com.cani.entity.Plan;
 import com.cani.entity.Subscription;
 import com.cani.entity.User;
 import com.cani.entity.enums.PlanType;
@@ -243,6 +244,50 @@ class SubscriptionServiceTest {
             verify(subscriptionRepository, times(1)).save(any(Subscription.class));
             verify(eventOrganizerRepository, times(1)).save(any(EventOrganizer.class));
             verify(notificationService, times(1)).createAndSend(eq(sampleUserId), anyString(), anyString(), any(), anyString(), any(), anyMap());
+        }
+
+        @Test
+        @DisplayName("UTC008: Bảng plans có nhiều hơn 1 gói cùng PlanType do Admin tạo -> Vẫn kích hoạt thành công, không bị NonUniqueResultException")
+        void confirmPayOSPaymentForUser_MultiplePlansSamePlanType_ActivatesSafely() {
+            long orderCode = 445566L;
+            seedPendingOrder(orderCode, sampleEoId, PlanType.MATCHING_PLUS);
+
+            Plan plan1 = Plan.builder()
+                    .planId(UUID.randomUUID())
+                    .planName("Gói Tiêu Chuẩn 1 Tháng")
+                    .planType(PlanType.MATCHING_PLUS)
+                    .price(BigDecimal.valueOf(99000))
+                    .durationDays(30)
+                    .maxEvents(5)
+                    .maxShifts(25)
+                    .maxWorkers(80)
+                    .build();
+
+            Plan plan2 = Plan.builder()
+                    .planId(UUID.randomUUID())
+                    .planName("Gói Tiêu Chuẩn Khuyến Mãi")
+                    .planType(PlanType.MATCHING_PLUS)
+                    .price(BigDecimal.valueOf(79000))
+                    .durationDays(30)
+                    .maxEvents(5)
+                    .maxShifts(25)
+                    .maxWorkers(80)
+                    .build();
+
+            when(planRepository.findAllByPlanType(PlanType.MATCHING_PLUS)).thenReturn(List.of(plan1, plan2));
+            when(eventOrganizerRepository.findByUser_UserId(sampleUserId)).thenReturn(Optional.of(sampleEo));
+            when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(i -> {
+                Subscription s = i.getArgument(0);
+                s.setSubscriptionId(UUID.randomUUID());
+                return s;
+            });
+            when(eventOrganizerRepository.save(any(EventOrganizer.class))).thenAnswer(i -> i.getArgument(0));
+
+            SubscriptionResponseDto result = subscriptionService.confirmPayOSPaymentForUser(sampleUserId, orderCode);
+
+            assertThat(result).isNotNull();
+            assertThat(result.getPlanName()).isEqualTo("Gói Tiêu Chuẩn 1 Tháng");
+            assertThat(result.getPrice()).isEqualByComparingTo(BigDecimal.valueOf(99000));
         }
 
         @Test

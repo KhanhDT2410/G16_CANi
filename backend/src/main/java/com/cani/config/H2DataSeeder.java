@@ -203,8 +203,8 @@ public class H2DataSeeder implements CommandLineRunner {
         }
 
         if (eo != null && subscriptionRepository.count() == 0) {
-            Plan matchingPlan = planRepository.findByPlanType(PlanType.MATCHING_PLUS).orElse(null);
-            Plan freeTrialPlan = planRepository.findByPlanType(PlanType.FREE_TRIAL).orElse(null);
+            Plan matchingPlan = planRepository.findFirstByPlanType(PlanType.MATCHING_PLUS).orElse(null);
+            Plan freeTrialPlan = planRepository.findFirstByPlanType(PlanType.FREE_TRIAL).orElse(null);
             Instant now = Instant.now();
             List<Subscription> sampleSubs = List.of(
                     Subscription.builder()

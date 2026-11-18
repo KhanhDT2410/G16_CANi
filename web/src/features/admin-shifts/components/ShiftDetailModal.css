@@ -93,3 +93,19 @@
   justify-content: flex-end;
   background: #f8fafc;
 }
+
+@media (max-width: 640px) {
+  .shift-modal-overlay {
+    padding: 0.5rem;
+  }
+  .shift-modal-box {
+    max-width: 96vw;
+    max-height: 95vh;
+    border-radius: 10px;
+  }
+  .shift-modal-header,
+  .shift-modal-body,
+  .shift-modal-footer {
+    padding: 1rem;
+  }
+}

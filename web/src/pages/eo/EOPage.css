@@ -3107,3 +3107,42 @@
   color: #94a3b8;
   font-weight: 500;
 }
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS (EO Mobile Optimization)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .eo-metrics-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .eo-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .search-input-wrapper {
+    width: 100%;
+  }
+
+  .event-search-input {
+    width: 100% !important;
+  }
+
+  .eo-pill-tabs {
+    width: 100%;
+  }
+
+  .eo-event-card-modern {
+    padding: 1rem;
+    gap: 1rem;
+  }
+}

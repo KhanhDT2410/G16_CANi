@@ -445,3 +445,80 @@
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS (MainLayout Shell)
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .main-header {
+    padding: 0.65rem 1.25rem;
+  }
+
+  .main-header-center {
+    max-width: 300px;
+    margin: 0 1rem;
+  }
+
+  .main-content {
+    padding: 1rem 1.25rem 2.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-header {
+    padding: 0.5rem 0.85rem;
+    gap: 0.5rem;
+  }
+
+  .main-header-left {
+    gap: 0.75rem;
+  }
+
+  .main-header-center {
+    display: none;
+  }
+
+  .user-header-compact .user-meta-info,
+  .user-header-compact .user-meta-arrow {
+    display: none;
+  }
+
+  .user-header-compact {
+    padding: 0.2rem;
+  }
+
+  .user-header-group {
+    gap: 0.45rem;
+  }
+
+  .main-content {
+    padding: 0.75rem 0.75rem 2rem;
+  }
+
+  .main-footer {
+    padding: 1rem;
+    font-size: 0.775rem;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-header {
+    padding: 0.45rem 0.65rem;
+  }
+
+  .btn-logout-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .user-avatar-badge {
+    width: 34px;
+    height: 34px;
+    font-size: 0.85rem;
+  }
+
+  .main-content {
+    padding: 0.5rem 0.5rem 1.5rem;
+  }
+}

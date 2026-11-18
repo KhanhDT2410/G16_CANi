@@ -615,3 +615,18 @@
   to { transform: scale(1); opacity: 1; }
 }
 
+@media (max-width: 640px) {
+  .event-detail-modal-overlay {
+    padding: 0.5rem;
+  }
+  .event-detail-modal-box {
+    max-width: 96vw;
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+  .event-detail-modal-header {
+    padding: 1rem;
+    flex-wrap: wrap;
+  }
+}
+

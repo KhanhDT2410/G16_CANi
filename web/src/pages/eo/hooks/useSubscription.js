@@ -67,13 +67,18 @@ export function useSubscription() {
       } else if (
         searchParams.get('payos') === 'success' ||
         searchParams.get('status') === 'PAID' ||
-        (searchParams.get('orderCode') && searchParams.get('cancel') !== 'true')
+        /[?&]status=PAID\b/.test(window.location.href) ||
+        (searchParams.get('orderCode') && searchParams.get('cancel') !== 'true') ||
+        (/[?&]orderCode=(\d+)/.test(window.location.href) && !/[?&]cancel=true\b/.test(window.location.href))
       ) {
-        const orderCode = searchParams.get('orderCode');
+        const orderCode = searchParams.get('orderCode') || (window.location.href.match(/[?&]orderCode=(\d+)/)?.[1]);
         try {
           if (orderCode) {
-            await eoService.confirmPayOSPayment(orderCode);
+            const activatedSub = await eoService.confirmPayOSPayment(orderCode);
             showToast('🎉 Thanh toán VietQR PayOS thành công! Gói cước đã được kích hoạt.', 'success');
+            if (activatedSub) {
+              setCurrentSubscription(activatedSub);
+            }
           }
         } catch (error) {
           console.warn('Lỗi xác nhận PayOS từ callback:', error);
@@ -83,12 +88,14 @@ export function useSubscription() {
           await loadSubscriptionData();
           const newParams = new URLSearchParams(searchParams);
           ['payos', 'orderCode', 'status', 'code', 'id', 'cancel'].forEach((k) => newParams.delete(k));
+          newParams.set('tab', 'subscription');
           setSearchParams(newParams, { replace: true });
         }
-      } else if (searchParams.get('payos') === 'cancel' || searchParams.get('cancel') === 'true') {
+      } else if (searchParams.get('payos') === 'cancel' || searchParams.get('cancel') === 'true' || /[?&]cancel=true\b/.test(window.location.href)) {
         showToast('Giao dịch thanh toán PayOS đã bị hủy.', 'info');
         const newParams = new URLSearchParams(searchParams);
         ['payos', 'orderCode', 'status', 'code', 'id', 'cancel'].forEach((k) => newParams.delete(k));
+        newParams.set('tab', 'subscription');
         setSearchParams(newParams, { replace: true });
       }
     };

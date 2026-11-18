@@ -139,6 +139,17 @@ public class PayOSService {
      * Tra cứu trạng thái giao dịch thanh toán trực tiếp từ PayOS v2 API
      */
     public String getPaymentStatus(long orderCode) {
+        Map<String, Object> details = getPaymentOrderDetails(orderCode);
+        if (details != null && details.containsKey("status")) {
+            return details.get("status").toString();
+        }
+        return "UNKNOWN";
+    }
+
+    /**
+     * Tra cứu chi tiết đơn hàng (status, amount, description) từ PayOS v2 API
+     */
+    public Map<String, Object> getPaymentOrderDetails(long orderCode) {
         String url = payOSConfig.getEndpoint() + "/v2/payment-requests/" + orderCode;
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-client-id", payOSConfig.getClientId());
@@ -150,13 +161,18 @@ public class PayOSService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 if ("00".equals(root.path("code").asText())) {
-                    return root.path("data").path("status").asText("PENDING");
+                    JsonNode data = root.path("data");
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("status", data.path("status").asText("PENDING"));
+                    map.put("amount", data.path("amount").asInt());
+                    map.put("description", data.path("description").asText(""));
+                    return map;
                 }
             }
         } catch (Exception e) {
             log.warn("Lỗi kiểm tra trạng thái đơn hàng PayOS {}: {}", orderCode, e.getMessage());
         }
-        return "UNKNOWN";
+        return null;
     }
 }
 

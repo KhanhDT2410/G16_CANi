@@ -400,10 +400,26 @@ public class SubscriptionService {
         }
 
         // 3. Kiểm tra trạng thái thực tế từ PayOS Gateway
-        String payOsStatus = payOSService.getPaymentStatus(orderCode);
+        Map<String, Object> payOsOrderDetails = payOSService.getPaymentOrderDetails(orderCode);
+        String payOsStatus = payOsOrderDetails != null && payOsOrderDetails.containsKey("status")
+                ? payOsOrderDetails.get("status").toString()
+                : payOSService.getPaymentStatus(orderCode);
         log.info("Xác thực PayOS orderCode {} với PayOS Gateway: status={}", orderCode, payOsStatus);
 
         boolean isRealPaid = "PAID".equalsIgnoreCase(payOsStatus);
+
+        // Phục hồi planType từ Gateway nếu bị mất bộ nhớ đệm
+        if (orderPlanType == null && payOsOrderDetails != null && isRealPaid) {
+            Integer amount = (Integer) payOsOrderDetails.get("amount");
+            if (amount != null) {
+                orderPlanType = planRepository.findAll().stream()
+                        .filter(p -> p.getPrice() != null && p.getPrice().intValue() == amount)
+                        .map(Plan::getPlanType)
+                        .findFirst()
+                        .orElse(PlanType.MATCHING_PLUS);
+                log.info("Khôi phục thành công gói dịch vụ {} cho orderCode {} từ PayOS Gateway theo số tiền {}", orderPlanType, orderCode, amount);
+            }
+        }
 
         // 4. Khi Gateway báo PAID (hoặc demoEnabled) và order hợp lệ của chính EO này -> Kích hoạt đúng gói cước trong order
         if (orderPlanType != null && (isRealPaid || demoEnabled)) {
@@ -554,7 +570,14 @@ public class SubscriptionService {
         Subscription subscription = Subscription.builder()
                 .eventOrganizer(eo)
                 .plan(plan)
+                .planName(plan.getPlanName())
+                .planType(plan.getPlanType())
+                .durationDays(plan.getDurationDays())
+                .price(plan.getPrice())
                 .pricePaid(plan.getPrice())
+                .maxEvents(plan.getMaxEvents())
+                .maxShifts(plan.getMaxShifts())
+                .maxWorkers(plan.getMaxWorkers())
                 .eventsUsed(0)
                 .shiftsUsed(0)
                 .status(SubscriptionStatus.ACTIVE)

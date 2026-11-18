@@ -40,8 +40,8 @@ public class SkillVisionAiClient {
         }
 
         String modelName = properties.getModel();
-        if (modelName == null || modelName.isBlank() || modelName.trim().startsWith("gemini-3.5")) {
-            modelName = "gemini-2.5-flash";
+        if (modelName == null || modelName.isBlank() || modelName.trim().startsWith("gemini-3.5") || modelName.trim().startsWith("gemini-1.5") || modelName.trim().startsWith("gemini-2.5-flash")) {
+            modelName = "gemini-3.8-flash";
         }
         String fullUrl = String.format("%s/%s:generateContent", properties.getUrl(), modelName.trim());
         String prompt = buildPrompt(taxonomySkills, expectedWorkerName);

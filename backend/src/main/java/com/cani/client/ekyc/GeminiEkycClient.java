@@ -57,7 +57,7 @@ public class GeminiEkycClient implements EkycProvider {
                 candidateModels.add(configured);
             }
         }
-        for (String fallbackModel : List.of("gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash-lite")) {
+        for (String fallbackModel : List.of("gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash-lite")) {
             if (!candidateModels.contains(fallbackModel)) {
                 candidateModels.add(fallbackModel);
             }

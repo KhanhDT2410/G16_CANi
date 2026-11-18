@@ -435,7 +435,7 @@ public class H2DataSeeder implements CommandLineRunner {
                         .extractedSkills("[\"Pha chế (Bartender/Barista)\"]")
                         .hasSealOrSignature(true)
                         .overallConfidence(new BigDecimal("0.78"))
-                        .routingDecision(RoutingDecision.MANUAL_REVIEW)
+                        .routingDecision(RoutingDecision.ADMIN_REVIEW)
                         .routingReason("Độ tin cậy OCR ở ngưỡng trung bình (0.78), chuyển Admin / CSKH duyệt thủ công.")
                         .status(SkillVerificationStatus.PENDING_REVIEW)
                         .spAwarded(0)

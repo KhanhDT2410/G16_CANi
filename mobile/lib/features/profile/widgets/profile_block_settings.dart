@@ -47,14 +47,14 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: t.brandSoft,
                   borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                  border: Border.all(color: t.border),
                 ),
-                child: const Text(
+                child: Text(
                   'Hoạt động',
                   style: TextStyle(
-                    color: Color(0xFF1D4ED8),
+                    color: t.brand,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                   ),
@@ -76,7 +76,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
             },
           ),
 
-          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
           // 2. TÀI KHOẢN NGÂN HÀNG THỤ HƯỞNG (WorkerBankSettingsScreen)
           _ClickableRow(
@@ -90,7 +90,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
             },
           ),
 
-          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
           // 3. LỊCH RẢNH CỐ ĐỊNH HÀNG TUẦN (WeeklyAvailabilityScreen)
           _ClickableRow(
@@ -104,7 +104,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
             },
           ),
 
-          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
           // 4. ĐỘI CỦA TÔI (WorkerGroupsScreen)
           _ClickableRow(
@@ -118,7 +118,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
             },
           ),
 
-          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
           // 5. THÔNG BÁO VIỆC LÀM MỚI (Switch)
           Padding(
@@ -163,7 +163,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
             ),
           ),
 
-          const Divider(height: 16, color: Color(0xFFF1F5F9)),
+          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
           // 5. NGÔN NGỮ
           Padding(

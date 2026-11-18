@@ -5,15 +5,15 @@ class SkillHubColors {
   SkillHubColors._();
 
   // Primary Canvas & Surfaces
-  static const Color canvas = Color(0xFFF4FCFE);       // Clean Sky soft ice blue background
+  static const Color canvas = Color(0xFFF8FAFC);       // Web slate-50 background
   static const Color surface = Color(0xFFFFFFFF);      // Pure white card surfaces
-  static const Color surfaceTint = Color(0xFFF0FAFD);  // Container contrast
-  static const Color textPrimary = Color(0xFF03045E);  // Deep navy for high readability & contrast
-  static const Color textSecondary = Color(0xFF0077B6);// Subtitles, metadata, captions
-  static const Color ctaPrimary = Color(0xFF00B4D8);   // Sky cyan-blue active states & highlights
-  static const Color ctaHover = Color(0xFF0077B6);     // Darker cyan/blue hover/active
-  static const Color borderSoft = Color(0xFF90E0EF);   // Soft cyan borders
-  static const Color borderSubtle = Color(0x6690E0EF); // 40% alpha border
+  static const Color surfaceTint = Color(0xFFF1F5F9);  // Container contrast
+  static const Color textPrimary = Color(0xFF0F172A);  // Slate-900 for high readability & contrast
+  static const Color textSecondary = Color(0xFF64748B);// Slate-500 subtitles, metadata, captions
+  static const Color ctaPrimary = Color(0xFF36D1DC);   // Web accent active states & highlights
+  static const Color ctaHover = Color(0xFF4A75D4);     // Web accentDeep hover/active
+  static const Color borderSoft = Color(0xFFE2E8F0);   // Web slate-200 borders
+  static const Color borderSubtle = Color(0x66E2E8F0); // 40% alpha border
 
   // Tier Colors (Single Source of Truth)
   static const Color starter = Color(0xFF00B4D8);

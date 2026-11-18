@@ -21,9 +21,10 @@ void main() {
       ProviderScope(
         overrides: [
           authRepositoryProvider.overrideWith((ref) => _FakeAuthRepository()),
-          // HomeScreen watches proposalsCountProvider unconditionally; stub it
+          // HomeScreen watches assignmentsListProvider unconditionally; stub it
           // so no real Dio HTTP timer is left pending at test teardown.
-          proposalsCountProvider.overrideWith((ref) async => 0),
+          assignmentsListProvider.overrideWith((ref) async => const []),
+          proposalsListProvider.overrideWith((ref) async => const []),
         ],
         child: const CaniApp(),
       ),

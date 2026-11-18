@@ -13,7 +13,7 @@ const AdminDashboardView = ({ onNavigateTab }) => {
     return (
       <div className="dashboard-container">
         <div className="skeleton" style={{ height: '56px', borderRadius: '12px' }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.25rem' }}>
           <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
           <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />
           <div className="skeleton" style={{ height: '220px', borderRadius: '12px' }} />

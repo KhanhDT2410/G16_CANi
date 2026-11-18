@@ -93,6 +93,12 @@
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-subtle);
   overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dispute-table-card > table {
+  min-width: 640px;
 }
 
 .dispute-table {

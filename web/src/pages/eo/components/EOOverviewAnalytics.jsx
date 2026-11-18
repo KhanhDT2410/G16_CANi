@@ -240,10 +240,10 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
       {/* =========================================================================
           KHỐI 2: GRID 2 CỘT: BIỂU ĐỒ HÌNH CỘT ĐỨNG & CƠ CẤU CHI PHÍ THEO VAI TRÒ
           ========================================================================= */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
         
         {/* CỘT TRÁI: BIỂU ĐỒ HÌNH CỘT ĐỨNG SO SÁNH DỰ TOÁN VS THỰC CHI */}
-        <div className="eo-widget-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+        <div className="eo-widget-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
@@ -267,11 +267,11 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
             </div>
           </div>
 
-          {/* VÙNG VẼ BIỂU ĐỒ CỘT ĐỨNG */}
-          <div style={{ position: 'relative', height: '240px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {/* VÙNG VẼ BIỂU ĐỒ CỘT ĐỨNG (Không dùng flex: 1 để tránh flex-basis: 0% làm sập height: 0px khi xếp 1 cột trên Mobile) */}
+          <div style={{ position: 'relative', height: '240px', minHeight: '240px', width: '100%' }}>
             
             {/* 1. Các vạch gióng ngang trục tung Y (Horizontal Grid Lines) */}
-            <div style={{ position: 'absolute', top: 0, left: 45, right: 0, bottom: 42 }}>
+            <div style={{ position: 'absolute', top: 8, left: 42, right: 0, bottom: 48 }}>
               {yAxisTicks.map((tick, tIdx) => {
                 const topPos = 100 - tick.percent;
                 return (
@@ -290,11 +290,11 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                     <span
                       style={{
                         position: 'absolute',
-                        left: -45,
+                        left: -42,
                         fontSize: '0.68rem',
                         fontWeight: 600,
                         color: '#94a3b8',
-                        width: 40,
+                        width: 38,
                         textAlign: 'right',
                         transform: 'translateY(-50%)',
                       }}
@@ -310,13 +310,14 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
             <div
               style={{
                 position: 'absolute',
-                top: 0,
-                left: 55,
-                right: 10,
+                top: 8,
+                left: 46,
+                right: 4,
                 bottom: 0,
                 display: 'flex',
                 alignItems: 'flex-end',
                 justifyContent: 'space-around',
+                gap: '4px',
                 zIndex: 2,
               }}
             >
@@ -333,18 +334,18 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      minWidth: '75px',
+                      minWidth: 0,
                       maxWidth: '110px',
                       flex: 1,
                     }}
                   >
-                    {/* Cặp 2 cột đứng song song */}
+                    {/* Cặp 2 cột đứng song song (height 184px khớp chính xác với 240 - 8 - 48) */}
                     <div
                       style={{
-                        height: '185px',
+                        height: '184px',
                         display: 'flex',
                         alignItems: 'flex-end',
-                        gap: '5px',
+                        gap: '4px',
                         width: '100%',
                         justifyContent: 'center',
                         position: 'relative',
@@ -353,7 +354,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                       {/* Cột 1: Dự toán ngân sách (Indigo) */}
                       <div
                         style={{
-                          width: '20px',
+                          width: 'clamp(10px, 3.2vw, 20px)',
                           height: `${budgetHeightPercent}%`,
                           background: 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
                           borderRadius: '5px 5px 0 0',
@@ -368,7 +369,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                       {/* Cột 2: Đã thanh toán (Green) */}
                       <div
                         style={{
-                          width: '20px',
+                          width: 'clamp(10px, 3.2vw, 20px)',
                           height: `${paidHeightPercent}%`,
                           background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
                           borderRadius: '5px 5px 0 0',
@@ -381,10 +382,11 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                       />
                     </div>
 
-                    {/* Nhãn trục X dưới chân cột */}
+                    {/* Nhãn trục X dưới chân cột (height 48px khớp với bottom: 48 của trục Y) */}
                     <div
                       style={{
-                        marginTop: '8px',
+                        height: '48px',
+                        paddingTop: '6px',
                         textAlign: 'center',
                         width: '100%',
                         display: 'flex',
@@ -394,13 +396,13 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                     >
                       <span
                         style={{
-                          fontSize: '0.72rem',
+                          fontSize: '0.7rem',
                           fontWeight: 700,
                           color: '#1e293b',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          maxWidth: '85px',
+                          maxWidth: '100%',
                           display: 'block',
                         }}
                         title={item.name}
@@ -409,13 +411,14 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                       </span>
                       <span
                         style={{
-                          fontSize: '0.68rem',
+                          fontSize: '0.65rem',
                           fontWeight: 700,
                           color: item.fillRate >= 100 ? '#047857' : '#0369a1',
                           backgroundColor: item.fillRate >= 100 ? '#ecfdf5' : '#f0f9ff',
-                          padding: '1px 5px',
+                          padding: '1px 4px',
                           borderRadius: 4,
                           marginTop: '2px',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {item.totalConfirmed}/{item.totalRequired} NS ({item.fillRate}%)
@@ -431,7 +434,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
 
         {/* CỘT PHẢI: Cơ Cấu Chi Phí Lương Theo Vị Trí Chuyên Môn */}
         <div className="eo-widget-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.15rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.15rem', gap: '0.5rem' }}>
             <div>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
                 Cơ Cấu Chi Phí Lương Theo Vị Trí
@@ -440,7 +443,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                 Phân bổ quỹ lương theo từng nhóm chuyên môn ca làm
               </p>
             </div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', backgroundColor: '#f5f3ff', padding: '3px 8px', borderRadius: 6 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', backgroundColor: '#f5f3ff', padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
               {roleCostBreakdown.length} vị trí
             </span>
           </div>
@@ -448,7 +451,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem', flex: 1, justifyContent: 'center' }}>
             {roleCostBreakdown.map((item, idx) => (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', flexWrap: 'wrap', gap: '4px' }}>
                   <span style={{ fontWeight: 600, color: '#334155' }}>
                     {item.role} <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>({item.totalWorkers} người)</span>
                   </span>

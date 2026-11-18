@@ -71,16 +71,21 @@
 }
 
 @media (max-width: 900px) {
-  .eo-dashboard-layout {
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
+  .eo-dashboard-layout,
+  .eo-dashboard-layout.sidebar-collapsed,
+  .eo-dashboard-layout[class*="tab-"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 1.15rem !important;
   }
-  .eo-sidebar {
-    position: static;
-    width: 100%;
-    margin-bottom: 0.5rem;
-    display: block;
-    top: auto;
+  .eo-sidebar,
+  .eo-sidebar.collapsed {
+    position: static !important;
+    top: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    margin-bottom: 0.25rem;
+    display: block !important;
+    overflow: visible !important;
   }
   .eo-sidebar-nav {
     display: flex !important;
@@ -88,19 +93,26 @@
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     gap: 0.5rem;
-    padding: 0.35rem 0.25rem 0.5rem;
+    padding: 0.45rem !important;
     width: 100%;
     scrollbar-width: thin;
   }
   .eo-sidebar-toggle-header,
-  .eo-sidebar-promo-card {
+  .eo-sidebar-promo-card,
+  .eo-nav-submenu,
+  .nav-chevron-right {
     display: none !important;
   }
-  .eo-nav-item {
+  .eo-nav-item,
+  .eo-sidebar.collapsed .eo-nav-item {
     white-space: nowrap;
     flex-shrink: 0;
-    padding: 0.6rem 1rem;
+    padding: 0.55rem 0.9rem !important;
+    gap: 0.5rem !important;
     border-radius: 10px;
+  }
+  .eo-sidebar.collapsed .eo-nav-item .nav-label {
+    display: inline !important;
   }
   .eo-widget-panel {
     display: flex !important;
@@ -3144,5 +3156,65 @@
   .eo-event-card-modern {
     padding: 1rem;
     gap: 1rem;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE: Modal fluid (mobile/tablet)
+   Phủ toàn bộ modal dùng class .eo-modal-box (inline maxWidth từng modal
+   bị !important ghi đè ở ngưỡng 768px trở xuống).
+   ========================================================================== */
+@media (max-width: 768px) {
+  .eo-hero-banner-clean {
+    padding: 1.15rem 1.25rem !important;
+    border-radius: 16px !important;
+  }
+
+  .eo-hero-banner-text {
+    max-width: 100% !important;
+  }
+
+  .eo-hero-banner-art {
+    opacity: 0.14;
+  }
+
+  .eo-modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .eo-modal-box,
+  .eo-modal-box[style] {
+    max-width: 100% !important;
+    max-height: 92dvh;
+    border-radius: 16px;
+    padding: 1.25rem;
+  }
+
+  .publish-modal-box {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .eo-modal-box {
+    padding: 1rem;
+  }
+}
+
+/* RESPONSIVE: KPI metrics grid + calendar (mobile) */
+@media (max-width: 480px) {
+  .eo-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-weekdays-row,
+  .calendar-days-grid {
+    gap: 1px;
+    font-size: 0.55rem;
+  }
+
+  .calendar-day-cell {
+    font-size: 0.6rem;
   }
 }

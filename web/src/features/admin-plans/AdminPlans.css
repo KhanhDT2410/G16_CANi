@@ -626,3 +626,17 @@
   color: #0f172a;
   margin: 0 0 0.5rem 0;
 }
+
+/* Responsive: form grids (mobile) */
+@media (max-width: 768px) {
+  .form-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .form-grid-2,
+  .form-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}

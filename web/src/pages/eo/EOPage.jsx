@@ -312,7 +312,7 @@ export default function EOPage() {
                 }}
               >
                 {/* 1. Phần chữ bên trái */}
-                <div style={{ maxWidth: '60%', zIndex: 2 }}>
+                <div className="eo-hero-banner-text" style={{ maxWidth: '60%', zIndex: 2 }}>
                   <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', marginBottom: '2px' }}>
                     Chào mừng trở lại,
                   </div>
@@ -335,6 +335,7 @@ export default function EOPage() {
 
                 {/* 2. Ảnh minh họa sân khấu sự kiện & lịch 3D bên phải (Chuẩn 100% Mockup Ảnh 1) */}
                 <div
+                  className="eo-hero-banner-art"
                   style={{
                     position: 'absolute',
                     right: 0,

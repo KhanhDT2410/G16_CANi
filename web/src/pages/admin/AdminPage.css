@@ -434,3 +434,22 @@
     padding: 0.7rem;
   }
 }
+/* Responsive: topbar + content card (mobile) */
+@media (max-width: 768px) {
+  .admin-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+  }
+
+  .admin-content-card {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-topbar {
+    padding: 0.85rem;
+    gap: 0.5rem;
+  }
+}

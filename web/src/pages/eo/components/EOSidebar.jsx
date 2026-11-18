@@ -166,6 +166,7 @@ export default function EOSidebar({
               {/* Sub-menu mở rộng của Quản lý sự kiện */}
               {!isCollapsed && item.hasSubMenu && isEventsSubMenuOpen && (
                 <div
+                  className="eo-nav-submenu"
                   style={{
                     display: 'flex',
                     flexDirection: 'column',

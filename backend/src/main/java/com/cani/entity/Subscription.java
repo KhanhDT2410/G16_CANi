@@ -61,7 +61,8 @@ public class Subscription {
     @Column(name = "max_workers")
     private Integer maxWorkers;
 
-    @Column(name = "features")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "features", columnDefinition = "jsonb")
     private String features;
 
     @Column(name = "events_used")

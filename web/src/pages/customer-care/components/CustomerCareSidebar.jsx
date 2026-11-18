@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useStaffChatAlerts } from '../../../features/support-tickets/hooks/useStaffChatAlerts';
 import {
   TicketIcon,
   FaqIcon,
@@ -10,6 +9,7 @@ import {
   ChevronDownIcon,
 } from '../../admin/components/AdminSidebarIcons';
 import { TICKET_SUB_ITEMS } from '../../admin/components/adminSidebar.constants';
+import { useStaffChatAlerts } from '../../../features/support-tickets';
 
 export const CC_NAV_GROUPS = [
   {
@@ -45,7 +45,7 @@ export const CustomerCareSidebar = ({
   onToggleCollapse,
 }) => {
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
-  const { totalUnread: unreadChatCount } = useStaffChatAlerts();
+  const { totalUnread } = useStaffChatAlerts();
 
   return (
     <aside className={`cc-sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Menu chức năng chăm sóc khách hàng">
@@ -89,11 +89,15 @@ export const CustomerCareSidebar = ({
                           if (!collapsed) setTicketsExpanded((p) => !p);
                         }}
                       >
-                        <span className="cc-item-icon">{item.icon}</span>
-                        {!collapsed ? (
+                        <span className="cc-item-icon" style={{ position: 'relative' }}>
+                          {item.icon}
+                          {item.id === 'tickets' && totalUnread > 0 && (
+                            <span className="sidebar-item-dot-badge" title={`${totalUnread} tin nhắn khách mới`} />
+                          )}
+                        </span>
+                        {!collapsed && (
                           <>
                             <span className="cc-item-label">{item.label}</span>
-                            {unreadChatCount > 0 && <span className="sidebar-dot-badge" title={`${unreadChatCount} tin nhắn mới`} />}
                             <button
                               type="button"
                               className="cc-arrow-btn"
@@ -107,8 +111,6 @@ export const CustomerCareSidebar = ({
                               <ChevronDownIcon expanded={ticketsExpanded} />
                             </button>
                           </>
-                        ) : (
-                          unreadChatCount > 0 && <span className="sidebar-collapsed-dot" title={`${unreadChatCount} tin nhắn mới`} />
                         )}
                         {isActive && <span className="cc-active-indicator" />}
                       </div>
@@ -117,6 +119,7 @@ export const CustomerCareSidebar = ({
                         <div className="cc-submenu animate-fade-in">
                           {TICKET_SUB_ITEMS.map((sub) => {
                             const isSubActive = isActive && activeTicketFilter === sub.key;
+                            const isChatSub = sub.key === 'CHAT';
                             return (
                               <button
                                 key={sub.key}
@@ -130,8 +133,10 @@ export const CustomerCareSidebar = ({
                               >
                                 <span className="cc-submenu-bullet" />
                                 <span className="cc-submenu-label">{sub.label}</span>
-                                {sub.key === 'CHAT' && unreadChatCount > 0 && (
-                                  <span className="sidebar-sub-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
+                                {isChatSub && totalUnread > 0 && (
+                                  <span className="sidebar-sub-badge" title={`${totalUnread} tin nhắn mới`}>
+                                    {totalUnread > 99 ? '99+' : totalUnread}
+                                  </span>
                                 )}
                               </button>
                             );

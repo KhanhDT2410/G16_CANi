@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../auth';
 import { useSupportTickets } from '../hooks/useSupportTickets';
-import { supportChatApi } from '../api/supportChatApi';
+import { useStaffChatAlerts } from '../hooks/useStaffChatAlerts';
 import TicketStatsBar from './TicketStatsBar';
 import TicketToolbar from './TicketToolbar';
 import TicketQueueTable from './TicketQueueTable';
@@ -9,6 +9,7 @@ import MyTicketsTable from './MyTicketsTable';
 import TicketModalsGroup from './TicketModalsGroup';
 import StaffMessengerDock from './StaffMessengerDock';
 import LiveChatInboxTable from './LiveChatInboxTable';
+import { ShiftDetailModal, adminShiftApi } from '../../admin-shifts';
 import './SupportTickets.css';
 
 /**
@@ -30,8 +31,12 @@ export const SupportTicketsCenterView = ({
     createTicket, replyTicket, assignTicket, closeTicket, resolveTicket, setSelectedTicket,
   } = useSupportTickets(isStaff ? 'queue' : 'my');
 
-  const [chatConversations, setChatConversations] = useState([]);
-  const [chatLoading, setChatLoading] = useState(false);
+  const {
+    conversations: chatConversations = [],
+    loading: chatLoading,
+    refresh: loadChat,
+  } = useStaffChatAlerts();
+
   const [internalFilter, setInternalFilter] = useState('ALL');
   const activeFilter = propFilter !== undefined ? propFilter : internalFilter;
   const handleFilterChange = (f) => { setInternalFilter(f); if (propOnFilterChange) propOnFilterChange(f); };
@@ -47,32 +52,43 @@ export const SupportTicketsCenterView = ({
   const [activeTicket, setActiveTicket] = useState(null);
   const [activeChatTicket, setActiveChatTicket] = useState(null);
 
-  const loadChat = async () => {
-    if (!isStaff) return;
-    setChatLoading(true);
+  // Xem chi tiết ca làm việc từ khung chat hoặc bảng tin nhắn
+  const [shiftDetail, setShiftDetail] = useState(null);
+  const [shiftDetailLoading, setShiftDetailLoading] = useState(false);
+  const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+
+  const handleOpenShiftDetail = async (shiftId) => {
+    if (!shiftId) return;
     try {
-      const data = await supportChatApi.getStaffConversations();
-      setChatConversations(data || []);
-    } catch { /* ignore */ } finally { setChatLoading(false); }
+      setIsShiftModalOpen(true);
+      setShiftDetailLoading(true);
+      const data = await adminShiftApi.getShiftDetail(shiftId);
+      setShiftDetail(data);
+    } catch {
+      setIsShiftModalOpen(false);
+    } finally {
+      setShiftDetailLoading(false);
+    }
   };
 
   useEffect(() => {
-    if (isStaff) loadChat();
-  }, [isStaff, isChatMode]);
+    // Mở pop-up chat trực tiếp khi có sự kiện từ Header hoặc Sidebar
+    const handleOpenStaffChat = (e) => {
+      if (e.detail) {
+        setActiveChatTicket(e.detail);
+      }
+    };
+    if (window.__cani_pending_chat) {
+      setActiveChatTicket(window.__cani_pending_chat);
+      window.__cani_pending_chat = null;
+    }
+    window.addEventListener('cani_open_staff_chat', handleOpenStaffChat);
+    return () => window.removeEventListener('cani_open_staff_chat', handleOpenStaffChat);
+  }, []);
 
   useEffect(() => {
     if (refreshKey) handleRefresh();
   }, [refreshKey]);
-
-  useEffect(() => {
-    const handleOpenChatEvent = (e) => {
-      if (e.detail?.conversation) {
-        setActiveChatTicket(e.detail.conversation);
-      }
-    };
-    window.addEventListener('cani_open_chat', handleOpenChatEvent);
-    return () => window.removeEventListener('cani_open_chat', handleOpenChatEvent);
-  }, []);
 
   const stats = useMemo(() => ({
     total: queue.length, myCount: myQueue.length,
@@ -132,6 +148,7 @@ export const SupportTicketsCenterView = ({
           conversations={chatConversations}
           loading={chatLoading}
           onOpenChat={(c) => setActiveChatTicket(c)}
+          onOpenShiftDetail={handleOpenShiftDetail}
           onRefresh={loadChat}
         />
       ) : (
@@ -156,27 +173,17 @@ export const SupportTicketsCenterView = ({
       )}
 
       <TicketModalsGroup
-        isCreateOpen={isCreateModalOpen}
-        onCreateClose={() => { setIsCreateModalOpen(false); setCreatePrefill(null); }}
-        onCreateSubmit={createTicket}
-        createPrefill={createPrefill}
-        isDetailOpen={isDetailModalOpen}
-        onDetailClose={() => { setIsDetailModalOpen(false); setSelectedTicket(null); }}
-        selectedTicket={selectedTicket}
-        isStaff={isStaff}
-        onReply={replyTicket}
-        onAssign={assignTicket}
+        isCreateOpen={isCreateModalOpen} onCreateClose={() => { setIsCreateModalOpen(false); setCreatePrefill(null); }}
+        onCreateSubmit={createTicket} createPrefill={createPrefill}
+        isDetailOpen={isDetailModalOpen} onDetailClose={() => { setIsDetailModalOpen(false); setSelectedTicket(null); }}
+        selectedTicket={selectedTicket} isStaff={isStaff} onReply={replyTicket} onAssign={assignTicket}
         onOpenTransferModal={(t) => { setActiveTicket(t); setIsTransferModalOpen(true); }}
         onOpenCloseModal={(t) => { setActiveTicket(t); setIsCloseModalOpen(true); }}
-        onResolve={resolveTicket}
-        detailLoading={detailLoading}
-        isTransferOpen={isTransferModalOpen}
-        onTransferClose={() => { setIsTransferModalOpen(false); setActiveTicket(null); }}
+        onResolve={resolveTicket} detailLoading={detailLoading}
+        isTransferOpen={isTransferModalOpen} onTransferClose={() => { setIsTransferModalOpen(false); setActiveTicket(null); }}
         onTransferConfirm={async (id, target) => { const r = await assignTicket(id, target); if (r && isDetailModalOpen) setIsDetailModalOpen(false); return r; }}
-        activeTicket={activeTicket}
-        ccStaff={ccStaff}
-        isCloseOpen={isCloseModalOpen}
-        onCloseClose={() => { setIsCloseModalOpen(false); setActiveTicket(null); }}
+        activeTicket={activeTicket} ccStaff={ccStaff}
+        isCloseOpen={isCloseModalOpen} onCloseClose={() => { setIsCloseModalOpen(false); setActiveTicket(null); }}
         onCloseConfirm={async (id, rationale) => { const r = await closeTicket(id, rationale); if (r && isDetailModalOpen) setIsDetailModalOpen(false); return r; }}
         loading={loading}
       />
@@ -184,8 +191,24 @@ export const SupportTicketsCenterView = ({
       {isStaff && (
         <StaffMessengerDock
           activeChat={activeChatTicket}
-          onClose={() => { setActiveChatTicket(null); if (isChatMode) loadChat(); }}
+          onClose={() => {
+            setActiveChatTicket(null);
+            if (isChatMode) loadChat();
+            window.dispatchEvent(new CustomEvent('cani_staff_chat_refresh'));
+          }}
           onOpenTicket={(t) => t.referenceNo && handleOpenDetail(t.id)}
+          onOpenShiftDetail={handleOpenShiftDetail}
+        />
+      )}
+
+      {isShiftModalOpen && (
+        <ShiftDetailModal
+          shift={shiftDetail}
+          loading={shiftDetailLoading}
+          onClose={() => {
+            setIsShiftModalOpen(false);
+            setShiftDetail(null);
+          }}
         />
       )}
     </div>

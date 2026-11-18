@@ -42,6 +42,19 @@ export const CustomerCarePage = () => {
     }
   });
 
+  useEffect(() => {
+    const handleOpenStaffChat = () => {
+      setActiveTab('tickets');
+      setTicketFilter('CHAT');
+    };
+    if (window.__cani_pending_chat) {
+      setActiveTab('tickets');
+      setTicketFilter('CHAT');
+    }
+    window.addEventListener('cani_open_staff_chat', handleOpenStaffChat);
+    return () => window.removeEventListener('cani_open_staff_chat', handleOpenStaffChat);
+  }, []);
+
   const handleToggleCollapse = () => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -53,23 +66,6 @@ export const CustomerCarePage = () => {
       return next;
     });
   };
-
-  useEffect(() => {
-    const handleSwitchTab = (e) => {
-      if (e.detail?.tab) setActiveTab(e.detail.tab);
-      if (e.detail?.filter) setTicketFilter(e.detail.filter);
-    };
-    const handleOpenChat = () => {
-      setActiveTab('tickets');
-      setTicketFilter('CHAT');
-    };
-    window.addEventListener('cani_switch_tab', handleSwitchTab);
-    window.addEventListener('cani_open_chat', handleOpenChat);
-    return () => {
-      window.removeEventListener('cani_switch_tab', handleSwitchTab);
-      window.removeEventListener('cani_open_chat', handleOpenChat);
-    };
-  }, []);
 
   const currentMeta = useMemo(() => {
     if (activeTab === 'tickets' && ticketFilter === 'CHAT') {

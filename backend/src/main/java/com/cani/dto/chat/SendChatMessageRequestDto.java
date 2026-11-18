@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,4 +18,9 @@ public class SendChatMessageRequestDto {
     private String messageText;
 
     private String attachmentUrl;
+
+    /**
+     * ID ca làm việc gắn kèm tin nhắn (nếu gửi từ trong ca làm việc; null nếu là chat tự do).
+     */
+    private UUID shiftId;
 }

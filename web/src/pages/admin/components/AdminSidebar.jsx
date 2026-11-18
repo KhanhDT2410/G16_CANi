@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useStaffChatAlerts } from '../../../features/support-tickets/hooks/useStaffChatAlerts';
 import { CollapseToggleIcon, ChevronDownIcon } from './AdminSidebarIcons';
 import { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS } from './adminSidebar.constants';
+import { useStaffChatAlerts } from '../../../features/support-tickets';
 
 export { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS };
 
@@ -18,12 +18,12 @@ export const AdminSidebar = ({
   onToggleCollapse,
 }) => {
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
-  const { totalUnread: unreadChatCount } = useStaffChatAlerts();
+  const { totalUnread } = useStaffChatAlerts();
 
   const renderExpandableItem = (item, isExpanded, onToggleExpand, subItems, activeKey, onSubClick) => {
     const isActive = activeTab === item.id;
     return (
-      <div key={item.id} className="sidebar-expandable-item-wrapper" style={{ position: 'relative' }}>
+      <div key={item.id} className="sidebar-expandable-item-wrapper">
         <div
           className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
           onClick={() => {
@@ -31,11 +31,15 @@ export const AdminSidebar = ({
             if (!collapsed) onToggleExpand();
           }}
         >
-          <span className="sidebar-item-icon">{item.icon}</span>
-          {!collapsed ? (
+          <span className="sidebar-item-icon" style={{ position: 'relative' }}>
+            {item.icon}
+            {item.id === 'tickets' && totalUnread > 0 && (
+              <span className="sidebar-item-dot-badge" title={`${totalUnread} tin nhắn khách mới`} />
+            )}
+          </span>
+          {!collapsed && (
             <>
               <span className="sidebar-item-label">{item.label}</span>
-              {unreadChatCount > 0 && <span className="sidebar-dot-badge" title={`${unreadChatCount} tin nhắn mới`} />}
               <button
                 type="button"
                 className="sidebar-arrow-btn"
@@ -49,8 +53,6 @@ export const AdminSidebar = ({
                 <ChevronDownIcon expanded={isExpanded} />
               </button>
             </>
-          ) : (
-            unreadChatCount > 0 && <span className="sidebar-collapsed-dot" title={`${unreadChatCount} tin nhắn mới`} />
           )}
           {isActive && <span className="sidebar-active-indicator" />}
         </div>
@@ -59,6 +61,7 @@ export const AdminSidebar = ({
           <div className="sidebar-submenu animate-fade-in">
             {subItems.map((sub) => {
               const isSubActive = isActive && activeKey === sub.key;
+              const isChatSub = sub.key === 'CHAT';
               return (
                 <button
                   key={sub.key}
@@ -69,8 +72,10 @@ export const AdminSidebar = ({
                 >
                   <span className="submenu-bullet" />
                   <span className="submenu-label">{sub.label}</span>
-                  {sub.key === 'CHAT' && unreadChatCount > 0 && (
-                    <span className="sidebar-sub-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
+                  {isChatSub && totalUnread > 0 && (
+                    <span className="sidebar-sub-badge" title={`${totalUnread} tin nhắn mới`}>
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </span>
                   )}
                 </button>
               );

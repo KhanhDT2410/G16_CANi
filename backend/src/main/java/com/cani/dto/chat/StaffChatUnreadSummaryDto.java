@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * DTO tóm tắt tin nhắn chưa đọc & hội thoại mới nhất dành cho Header / Sidebar của Admin & CSKH.
+ * DTO tóm tắt trạng thái tin nhắn chưa đọc cho thanh thông báo Header & Sidebar của Admin / CSKH.
  */
 @Data
 @Builder
@@ -16,6 +16,6 @@ import java.util.List;
 @AllArgsConstructor
 public class StaffChatUnreadSummaryDto {
     private Integer totalUnreadCount;
-    private Integer unreadConversationCount;
+    private Integer unreadConversationsCount;
     private List<SupportConversationSummaryDto> recentConversations;
 }

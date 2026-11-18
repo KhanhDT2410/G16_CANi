@@ -3,6 +3,7 @@ export { default as SupportChatWidget } from './components/SupportChatWidget';
 export { default as StaffMessengerDock } from './components/StaffMessengerDock';
 export { default as LiveChatInboxTable } from './components/LiveChatInboxTable';
 export { default as StaffMessageBell } from './components/StaffMessageBell';
+export { default as StaffMessageDropdown } from './components/StaffMessageDropdown';
 export * from './types/ticket.constants';
 export * from './api/supportTicketApi';
 export * from './api/supportChatApi';

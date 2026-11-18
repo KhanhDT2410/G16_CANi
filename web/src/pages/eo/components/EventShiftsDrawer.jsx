@@ -197,6 +197,40 @@ const EventShiftsDrawer = ({
             {shift.status !== 'CANCELLED' && (
               <button
                 type="button"
+                onClick={() => {
+                  const shiftCode = 'SH-' + (shift.shiftId ? String(shift.shiftId).replace(/-/g, '').substring(0, 6).toUpperCase() : '0000');
+                  window.dispatchEvent(
+                    new CustomEvent('cani_open_chat_shift', {
+                      detail: {
+                        shiftId: shift.shiftId,
+                        shiftCode,
+                        shiftName: `${event.name || 'Sự kiện'} - ${shift.jobType}`,
+                      },
+                    })
+                  );
+                }}
+                style={{
+                  background: '#f0fdf4',
+                  color: '#15803d',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+                title="Mở khung chat kết nối CSKH hỗ trợ trực tiếp ca này"
+              >
+                💬 Hỗ Trợ
+              </button>
+            )}
+
+            {shift.status !== 'CANCELLED' && (
+              <button
+                type="button"
                 onClick={() => onCancelShift(shift)}
                 style={{
                   background: '#ffffff',

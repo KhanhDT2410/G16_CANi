@@ -2,6 +2,7 @@ package com.cani.service;
 
 import com.cani.dto.chat.ChatMessageResponseDto;
 import com.cani.dto.chat.SendChatMessageRequestDto;
+import com.cani.dto.chat.StaffChatUnreadSummaryDto;
 import com.cani.dto.chat.SupportConversationDetailDto;
 import com.cani.dto.chat.SupportConversationSummaryDto;
 import com.cani.entity.SupportConversation;
@@ -192,17 +193,16 @@ class SupportChatServiceTest {
         }
 
         @Test
-        @DisplayName("6. getStaffChatUnreadSummary tính đúng tổng số tin chưa đọc và danh sách gần nhất")
-        void getStaffChatUnreadSummary_Success() {
-                when(userRepository.findByRoleIn(anyList())).thenReturn(List.of(mockUser));
-                mockConv.setUnreadStaffCount(3);
+        @DisplayName("6. getStaffUnreadSummary tính toán đúng tổng số tin nhắn chưa đọc")
+        void getStaffUnreadSummary_ReturnsCorrectCounts() {
+                when(userRepository.findByRoleIn(any())).thenReturn(List.of(mockUser));
                 when(conversationRepository.findAll()).thenReturn(List.of(mockConv));
 
-                var summary = supportChatService.getStaffChatUnreadSummary();
+                StaffChatUnreadSummaryDto summary = supportChatService.getStaffUnreadSummary();
 
                 assertThat(summary).isNotNull();
-                assertThat(summary.getTotalUnreadCount()).isEqualTo(3);
-                assertThat(summary.getUnreadConversationCount()).isEqualTo(1);
+                assertThat(summary.getTotalUnreadCount()).isEqualTo(1);
+                assertThat(summary.getUnreadConversationsCount()).isEqualTo(1);
                 assertThat(summary.getRecentConversations()).hasSize(1);
         }
 }

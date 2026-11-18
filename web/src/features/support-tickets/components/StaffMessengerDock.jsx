@@ -7,7 +7,7 @@ import { supportChatApi } from '../api/supportChatApi';
  * Luôn ghim cố định ở góc dưới màn hình qua createPortal, không làm cuộn nhảy trang.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
-export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
+export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenShiftDetail }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
@@ -19,6 +19,9 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
     sender: m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN' ? 'staff' : 'user',
     senderName: m.senderName,
     text: m.messageText,
+    shiftId: m.shiftId,
+    shiftCode: m.shiftCode,
+    shiftName: m.shiftName,
     time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
   });
 
@@ -39,7 +42,6 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
           if (!isMounted) return;
           setConvId(res?.conversation?.id);
           if (res?.messages) setMessages(res.messages.map(formatMessage));
-          window.dispatchEvent(new CustomEvent('cani_staff_chat_updated'));
         })
         .catch(() => { if (isMounted) setMessages(activeChat.chatHistory || []); });
     } else if (activeChat.id && !String(activeChat.id).startsWith('demo-')) {
@@ -48,7 +50,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
         .then((res) => {
           if (isMounted && res?.messages) {
             setMessages(res.messages.map(formatMessage));
-            window.dispatchEvent(new CustomEvent('cani_staff_chat_updated'));
+            window.dispatchEvent(new CustomEvent('cani_staff_chat_refresh'));
           }
         })
         .catch(() => { if (isMounted) setMessages(activeChat.chatHistory || []); });
@@ -99,7 +101,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
     if (convId) {
       try {
         await supportChatApi.sendStaffReply(convId, { messageText: text });
-        window.dispatchEvent(new CustomEvent('cani_staff_chat_updated'));
+        window.dispatchEvent(new CustomEvent('cani_staff_chat_refresh'));
       } catch (err) {
         console.error('Lỗi khi gửi phản hồi:', err);
       }
@@ -127,13 +129,40 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
             <span className="dock-online-badge">Trực tuyến</span>
           </div>
           <div className="dock-customer-field">
-            <span className="dock-field-label">Email:</span>
-            <span className="dock-field-val">{activeChat.userEmail || '—'}</span>
-          </div>
-          <div className="dock-customer-field">
             <span className="dock-field-label">SĐT:</span>
             <span className="dock-field-val">{activeChat.userPhone || '—'}</span>
           </div>
+          <div className="dock-customer-field">
+            <span className="dock-field-label">Email:</span>
+            <span className="dock-field-val">{activeChat.userEmail || '—'}</span>
+          </div>
+          {(activeChat.currentShiftCode || activeChat.shiftCode) && (
+            <div className="dock-customer-field">
+              <span className="dock-field-label">Ca làm:</span>
+              <span className="dock-field-val">
+                <button
+                  type="button"
+                  onClick={() => onOpenShiftDetail && onOpenShiftDetail(activeChat.currentShiftId || activeChat.shiftId)}
+                  style={{
+                    background: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '4px',
+                    padding: '1px 6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                  }}
+                  title="Bấm để xem chi tiết ca làm việc"
+                >
+                  🏷️ {activeChat.currentShiftCode || activeChat.shiftCode} ↗
+                </button>
+              </span>
+            </div>
+          )}
           {activeChat.referenceNo && (
             <div className="dock-customer-field">
               <span className="dock-field-label">Mã phiếu:</span>
@@ -166,7 +195,27 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
         ) : (
           messages.map((m) => (
             <div key={m.id} className={`dock-message-row ${m.sender === 'staff' ? 'from-staff' : 'from-user'}`}>
-              <div className="dock-bubble-sender">{m.senderName}</div>
+              <div className="dock-bubble-sender">
+                <span>{m.senderName}</span>
+                {m.shiftCode && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      fontSize: '0.68rem',
+                      background: '#eff6ff',
+                      color: '#2563eb',
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      fontWeight: 700,
+                      cursor: onOpenShiftDetail ? 'pointer' : 'default',
+                    }}
+                    onClick={() => m.shiftId && onOpenShiftDetail && onOpenShiftDetail(m.shiftId)}
+                    title="Bấm để xem chi tiết ca làm này"
+                  >
+                    🏷️ {m.shiftCode} ↗
+                  </span>
+                )}
+              </div>
               <div className="dock-bubble-text">{m.text}</div>
               <div className="dock-bubble-time">{m.time}</div>
             </div>

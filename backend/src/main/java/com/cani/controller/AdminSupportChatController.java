@@ -30,6 +30,16 @@ public class AdminSupportChatController {
     private final SupportChatService supportChatService;
 
     /**
+     * Lấy tóm tắt số tin nhắn chưa đọc và danh sách người gửi gần nhất cho icon Header & Sidebar.
+     * GET /api/v1/admin/support/chat/unread-summary
+     */
+    @GetMapping("/unread-summary")
+    public ResponseEntity<ApiResponse<StaffChatUnreadSummaryDto>> getUnreadSummary() {
+        StaffChatUnreadSummaryDto dto = supportChatService.getStaffUnreadSummary();
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Lấy tóm tắt tin nhắn chưa đọc thành công"));
+    }
+
+    /**
      * CSKH lấy danh sách hội thoại của người dùng (hỗ trợ tìm kiếm theo tên, SĐT, email).
      * GET /api/v1/admin/support/chat/conversations
      */
@@ -39,16 +49,6 @@ public class AdminSupportChatController {
     ) {
         List<SupportConversationSummaryDto> list = supportChatService.getStaffConversations(query);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách hội thoại thành công"));
-    }
-
-    /**
-     * Lấy tóm tắt tin nhắn chưa đọc & danh sách hội thoại mới nhất cho Header / Sidebar của Admin & CSKH.
-     * GET /api/v1/admin/support/chat/unread-summary
-     */
-    @GetMapping("/unread-summary")
-    public ResponseEntity<ApiResponse<StaffChatUnreadSummaryDto>> getUnreadSummary() {
-        StaffChatUnreadSummaryDto summary = supportChatService.getStaffChatUnreadSummary();
-        return ResponseEntity.ok(ApiResponse.ok(summary, "Lấy tóm tắt tin nhắn chưa đọc thành công"));
     }
 
     /**

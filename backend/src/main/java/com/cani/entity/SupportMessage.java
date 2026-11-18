@@ -42,6 +42,9 @@ public class SupportMessage {
     @Column(name = "attachment_url", length = 500)
     private String attachmentUrl;
 
+    @Column(name = "shift_id")
+    private UUID shiftId;
+
     @Column(name = "is_read", nullable = false)
     @Builder.Default
     private Boolean isRead = false;

@@ -1058,6 +1058,114 @@
   color: #ffffff;
 }
 
+/* ==========================================================================
+   Staff Message Dropdown Styles (Header Notification Popover)
+   ========================================================================== */
+
+.staff-msg-dropdown {
+  width: 400px;
+  max-width: calc(100vw - 24px);
+}
+
+.staff-msg-dropdown-body {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.staff-msg-item {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  padding: 0.85rem 1.15rem;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.staff-msg-item:hover {
+  background: #f8fafc;
+}
+
+.staff-msg-item.unread {
+  background: #eff6ff;
+}
+
+.staff-msg-item.unread:hover {
+  background: #dbeafe;
+}
+
+.staff-msg-name-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.staff-msg-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.staff-msg-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.staff-msg-preview {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 250px;
+}
+
+.staff-msg-preview.font-bold {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.staff-msg-unread-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #2563eb;
+  background: #dbeafe;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.staff-msg-dropdown-footer {
+  padding: 0.75rem 1.15rem;
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+  background: #fbfcfe;
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 14px;
+}
+
+.staff-msg-view-all-btn {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.staff-msg-view-all-btn:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.staff-msg-badge {
+  background: #ef4444;
+  animation: pulse-soft 2s infinite ease-in-out;
+}
+
+
 
 
 

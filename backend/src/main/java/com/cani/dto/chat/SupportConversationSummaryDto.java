@@ -25,4 +25,9 @@ public class SupportConversationSummaryDto {
     private Integer unreadStaffCount;
     private Integer unreadUserCount;
     private String status;
+
+    // Ngữ cảnh ca làm việc gắn kèm (nếu người dùng đang trong ca làm việc hoặc có tin nhắn gần nhất từ ca)
+    private UUID currentShiftId;
+    private String currentShiftCode;
+    private String currentShiftName;
 }

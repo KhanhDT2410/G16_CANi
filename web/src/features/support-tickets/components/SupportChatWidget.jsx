@@ -30,6 +30,19 @@ export const SupportChatWidget = () => {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [activeShiftContext, setActiveShiftContext] = useState(null);
+
+  useEffect(() => {
+    const handleOpenWithShift = (e) => {
+      if (e.detail?.shiftId) {
+        setActiveShiftContext(e.detail);
+        setIsOpen(true);
+        setIsMinimized(false);
+      }
+    };
+    window.addEventListener('cani_open_chat_shift', handleOpenWithShift);
+    return () => window.removeEventListener('cani_open_chat_shift', handleOpenWithShift);
+  }, []);
 
   // Toạ độ kéo thả tự do
   const [position, setPosition] = useState(() => {
@@ -199,7 +212,12 @@ export const SupportChatWidget = () => {
     setSending(true);
 
     try {
-      if (user) await supportChatApi.sendUserMessage({ messageText: textToSend });
+      if (user) {
+        await supportChatApi.sendUserMessage({
+          messageText: textToSend,
+          shiftId: activeShiftContext?.shiftId || null,
+        });
+      }
     } catch { /* Bỏ qua lỗi mạng */ } finally {
       setSending(false);
     }
@@ -369,6 +387,20 @@ export const SupportChatWidget = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {activeShiftContext && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 10px', background: '#eff6ff', borderTop: '1px solid #bfdbfe', fontSize: '0.74rem', color: '#1d4ed8' }}>
+              <span>🏷️ Đang trao đổi về ca: <strong>{activeShiftContext.shiftCode || activeShiftContext.shiftName || 'Ca làm việc'}</strong></span>
+              <button
+                type="button"
+                onClick={() => setActiveShiftContext(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontWeight: 'bold', fontSize: '0.85rem' }}
+                title="Hủy gắn ca làm (chuyển sang chat tự do)"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           <form className="support-chat-footer" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
             <input

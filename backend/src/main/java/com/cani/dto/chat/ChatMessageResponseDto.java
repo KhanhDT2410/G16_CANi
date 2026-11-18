@@ -20,6 +20,9 @@ public class ChatMessageResponseDto {
     private String senderName;
     private String messageText;
     private String attachmentUrl;
+    private UUID shiftId;
+    private String shiftCode;
+    private String shiftName;
     private Boolean isRead;
     private Instant createdAt;
 }

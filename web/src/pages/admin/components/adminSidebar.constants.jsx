@@ -2,6 +2,7 @@ import {
   DashboardIcon,
   RevenueIcon,
   UsersIcon,
+  ShiftIcon,
   NoShowIcon,
   AppealIcon,
   TicketIcon,
@@ -29,6 +30,7 @@ export const ADMIN_NAV_GROUPS = [
     groupLabel: 'Quản trị & Vận hành',
     items: [
       { id: 'users', label: 'Quản Trị Người Dùng', icon: <UsersIcon /> },
+      { id: 'shifts', label: 'Danh Sách Ca Làm Việc', icon: <ShiftIcon /> },
       { id: 'noshows', label: 'Xử Lý Vi Phạm Vắng Mặt', icon: <NoShowIcon /> },
       { id: 'appeals', label: 'Kháng Cáo Điểm Uy Tín', icon: <AppealIcon /> },
     ],
@@ -76,6 +78,10 @@ export const ADMIN_TAB_METADATA = {
   users: {
     title: 'Quản Trị Người Dùng',
     subtitle: 'Tra cứu danh sách, kiểm tra hồ sơ chi tiết và phân quyền khóa hoặc mở tài khoản',
+  },
+  shifts: {
+    title: 'Danh Sách Ca Làm Việc',
+    subtitle: 'Tra cứu thông tin sự kiện, ca làm việc thực tế và đối soát nhân sự tham gia',
   },
   noshows: {
     title: 'Xử Lý Vi Phạm Vắng Mặt',

@@ -5,11 +5,13 @@ import com.cani.dto.chat.SendChatMessageRequestDto;
 import com.cani.dto.chat.StaffChatUnreadSummaryDto;
 import com.cani.dto.chat.SupportConversationDetailDto;
 import com.cani.dto.chat.SupportConversationSummaryDto;
+import com.cani.entity.Shift;
 import com.cani.entity.SupportConversation;
 import com.cani.entity.SupportMessage;
 import com.cani.entity.User;
 import com.cani.entity.enums.UserRole;
 import com.cani.exception.ResourceNotFoundException;
+import com.cani.repository.ShiftRepository;
 import com.cani.repository.SupportConversationRepository;
 import com.cani.repository.SupportMessageRepository;
 import com.cani.repository.UserRepository;
@@ -34,6 +36,7 @@ public class SupportChatService {
         private final SupportConversationRepository conversationRepository;
         private final SupportMessageRepository messageRepository;
         private final UserRepository userRepository;
+        private final ShiftRepository shiftRepository;
 
         /**
          * Lấy hoặc khởi tạo phiên chat của Người dùng hiện tại.
@@ -98,6 +101,7 @@ public class SupportChatService {
                                 .senderName(user.getFullName())
                                 .messageText(req.getMessageText())
                                 .attachmentUrl(req.getAttachmentUrl())
+                                .shiftId(req.getShiftId())
                                 .isRead(false)
                                 .build();
 
@@ -191,9 +195,9 @@ public class SupportChatService {
         }
 
         /**
-         * Lấy tóm tắt tin nhắn chưa đọc & top 10 hội thoại gần nhất cho Header và Sidebar của Admin/CSKH.
+         * Lấy tóm tắt số lượng tin nhắn chưa đọc và các cuộc hội thoại mới nhất cho thanh điều hướng Header & Sidebar.
          */
-        public StaffChatUnreadSummaryDto getStaffChatUnreadSummary() {
+        public StaffChatUnreadSummaryDto getStaffUnreadSummary() {
                 List<SupportConversationSummaryDto> all = getStaffConversations(null);
                 int totalUnread = all.stream()
                                 .mapToInt(c -> c.getUnreadStaffCount() != null ? c.getUnreadStaffCount() : 0)
@@ -201,14 +205,16 @@ public class SupportChatService {
                 int unreadConvs = (int) all.stream()
                                 .filter(c -> c.getUnreadStaffCount() != null && c.getUnreadStaffCount() > 0)
                                 .count();
+
+                // Lấy tối đa 10 hội thoại có phát sinh tin nhắn hoặc có tin nhắn chưa đọc
                 List<SupportConversationSummaryDto> recent = all.stream()
                                 .filter(c -> c.getLastMessageAt() != null || (c.getUnreadStaffCount() != null && c.getUnreadStaffCount() > 0))
                                 .limit(10)
-                                .toList();
+                                .collect(Collectors.toList());
 
                 return StaffChatUnreadSummaryDto.builder()
                                 .totalUnreadCount(totalUnread)
-                                .unreadConversationCount(unreadConvs)
+                                .unreadConversationsCount(unreadConvs)
                                 .recentConversations(recent)
                                 .build();
         }
@@ -328,6 +334,25 @@ public class SupportChatService {
         }
 
         private SupportConversationSummaryDto toSummaryDto(SupportConversation conv, User user) {
+                UUID shiftId = null;
+                String shiftCode = null;
+                String shiftName = null;
+
+                if (conv.getId() != null) {
+                        Optional<SupportMessage> lastShiftMsg = messageRepository
+                                        .findFirstByConversationIdAndShiftIdIsNotNullOrderByCreatedAtDesc(conv.getId());
+                        if (lastShiftMsg.isPresent()) {
+                                shiftId = lastShiftMsg.get().getShiftId();
+                                shiftCode = formatShiftCode(shiftId);
+                                Optional<Shift> sOpt = shiftRepository.findById(shiftId);
+                                if (sOpt.isPresent()) {
+                                        Shift s = sOpt.get();
+                                        String evName = s.getEvent() != null ? s.getEvent().getName() : "Sự kiện";
+                                        shiftName = evName + " - " + s.getJobType();
+                                }
+                        }
+                }
+
                 return SupportConversationSummaryDto.builder()
                                 .id(conv.getId())
                                 .userId(conv.getUserId())
@@ -342,10 +367,25 @@ public class SupportChatService {
                                 .unreadStaffCount(conv.getUnreadStaffCount() != null ? conv.getUnreadStaffCount() : 0)
                                 .unreadUserCount(conv.getUnreadUserCount() != null ? conv.getUnreadUserCount() : 0)
                                 .status(conv.getStatus())
+                                .currentShiftId(shiftId)
+                                .currentShiftCode(shiftCode)
+                                .currentShiftName(shiftName)
                                 .build();
         }
 
         private ChatMessageResponseDto toMessageDto(SupportMessage msg) {
+                String shiftCode = null;
+                String shiftName = null;
+                if (msg.getShiftId() != null) {
+                        shiftCode = formatShiftCode(msg.getShiftId());
+                        Optional<Shift> shiftOpt = shiftRepository.findById(msg.getShiftId());
+                        if (shiftOpt.isPresent()) {
+                                Shift s = shiftOpt.get();
+                                String evName = s.getEvent() != null ? s.getEvent().getName() : "Sự kiện";
+                                shiftName = evName + " - " + s.getJobType();
+                        }
+                }
+
                 return ChatMessageResponseDto.builder()
                                 .id(msg.getId())
                                 .conversationId(msg.getConversationId())
@@ -354,9 +394,18 @@ public class SupportChatService {
                                 .senderName(msg.getSenderName())
                                 .messageText(msg.getMessageText())
                                 .attachmentUrl(msg.getAttachmentUrl())
+                                .shiftId(msg.getShiftId())
+                                .shiftCode(shiftCode)
+                                .shiftName(shiftName)
                                 .isRead(msg.getIsRead())
                                 .createdAt(msg.getCreatedAt())
                                 .build();
+        }
+
+        private String formatShiftCode(UUID shiftId) {
+                if (shiftId == null) return null;
+                String hex = shiftId.toString().replace("-", "").toUpperCase();
+                return "SH-" + hex.substring(0, Math.min(6, hex.length()));
         }
 
         private String formatMessagePreview(String text) {

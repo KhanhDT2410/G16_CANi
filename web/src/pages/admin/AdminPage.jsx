@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UserManagementView } from '../../features/admin-users';
+import { AdminShiftView } from '../../features/admin-shifts';
 import { AdminDashboardView } from '../../features/admin-dashboard';
 import { DisputeCenterView } from '../../features/disputes';
 import { SupportTicketsCenterView } from '../../features/support-tickets';
@@ -24,6 +25,10 @@ const TAB_METADATA = {
   users: {
     title: 'Quản Trị Người Dùng',
     subtitle: 'Tra cứu danh sách, kiểm tra hồ sơ chi tiết và phân quyền khóa hoặc mở tài khoản',
+  },
+  shifts: {
+    title: 'Danh Sách Ca Làm Việc',
+    subtitle: 'Tra cứu thông tin sự kiện, ca làm việc thực tế và đối soát nhân sự tham gia',
   },
   noshows: {
     title: 'Xử Lý Vi Phạm Vắng Mặt',
@@ -83,26 +88,22 @@ const AdminPage = () => {
     }
   });
 
-  // Xử lý sự kiện click vào User block trên Header để trở về Bảng điều khiển chính & điều hướng chat
+  // Xử lý sự kiện click vào User block trên Header để trở về Bảng điều khiển chính & mở chat trực tiếp
   useEffect(() => {
-    const handleNavHome = () => {
-      setActiveTab('dashboard');
-    };
-    const handleSwitchTab = (e) => {
-      if (e.detail?.tab) setActiveTab(e.detail.tab);
-      if (e.detail?.filter) setTicketFilter(e.detail.filter);
-    };
-    const handleOpenChat = () => {
+    const handleNavHome = () => setActiveTab('dashboard');
+    const handleOpenStaffChat = () => {
       setActiveTab('tickets');
       setTicketFilter('CHAT');
     };
+    if (window.__cani_pending_chat) {
+      setActiveTab('tickets');
+      setTicketFilter('CHAT');
+    }
     window.addEventListener('cani_admin_navigate_home', handleNavHome);
-    window.addEventListener('cani_switch_tab', handleSwitchTab);
-    window.addEventListener('cani_open_chat', handleOpenChat);
+    window.addEventListener('cani_open_staff_chat', handleOpenStaffChat);
     return () => {
       window.removeEventListener('cani_admin_navigate_home', handleNavHome);
-      window.removeEventListener('cani_switch_tab', handleSwitchTab);
-      window.removeEventListener('cani_open_chat', handleOpenChat);
+      window.removeEventListener('cani_open_staff_chat', handleOpenStaffChat);
     };
   }, []);
 
@@ -167,6 +168,7 @@ const AdminPage = () => {
           {activeTab === 'appeals' && <RsAppealsView />}
           {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
           {activeTab === 'users' && <UserManagementView />}
+          {activeTab === 'shifts' && <AdminShiftView />}
           {activeTab === 'disputes' && <DisputeCenterView />}
           {activeTab === 'tickets' && (
             <SupportTicketsCenterView

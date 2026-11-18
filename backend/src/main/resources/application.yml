@@ -53,6 +53,7 @@ spring:
     clean-disabled: true
     schemas: public
     default-schema: public
+    validate-on-migrate: false
     ignore-migration-patterns:
       - "*:missing"
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/worker_groups/models/worker_group_models.dart';
 import 'package:cani/features/worker_groups/providers/worker_group_provider.dart';
+import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
 
 class CreateGroupBottomSheet extends ConsumerStatefulWidget {
   const CreateGroupBottomSheet({super.key});
@@ -18,20 +19,10 @@ class _CreateGroupBottomSheetState
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
 
-  String _selectedSkill = 'Phục vụ tiệc sự kiện';
+  String? _selectedSkill;
   int _minSize = 5;
   int _maxSize = 15;
   bool _isSubmitting = false;
-
-  final List<String> _skillOptions = const [
-    'Phục vụ tiệc sự kiện',
-    'Hậu cần và âm thanh ánh sáng',
-    'Lễ tân đón khách',
-    'Pha chế đồ uống',
-    'An ninh và điều phối sự kiện',
-    'Dẫn chương trình và hoạt náo',
-    'Khác',
-  ];
 
   @override
   void dispose() {
@@ -40,7 +31,7 @@ class _CreateGroupBottomSheetState
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(String skillFocus) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
@@ -50,7 +41,7 @@ class _CreateGroupBottomSheetState
       description: _descController.text.trim().isEmpty
           ? null
           : _descController.text.trim(),
-      skillFocus: _selectedSkill,
+      skillFocus: skillFocus,
       minSize: _minSize,
       maxSize: _maxSize,
     );
@@ -82,6 +73,27 @@ class _CreateGroupBottomSheetState
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final skillState = ref.watch(skillVerificationProvider);
+    final skillNames = skillState.taxonomy.map((s) => s.name).toList();
+    final skillOptions = skillNames.isNotEmpty
+        ? skillNames
+        : const [
+            'Phục vụ bàn',
+            'Pha chế (Bartender)',
+            'Bếp / Phụ bếp',
+            'Lễ tân / Check-in',
+            'Điều phối âm thanh ánh sáng',
+            'Hậu cần / Setup',
+            'Thu ngân',
+            'PG / PB',
+            'Bảo vệ / An ninh',
+            'MC / Hoạt náo',
+          ];
+
+    final currentSkill =
+        (_selectedSkill != null && skillOptions.contains(_selectedSkill))
+            ? _selectedSkill!
+            : skillOptions.first;
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
@@ -182,7 +194,7 @@ class _CreateGroupBottomSheetState
               ),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                initialValue: _selectedSkill,
+                initialValue: currentSkill,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -191,7 +203,7 @@ class _CreateGroupBottomSheetState
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
-                items: _skillOptions.map((opt) {
+                items: skillOptions.map((opt) {
                   return DropdownMenuItem(
                     value: opt,
                     child: Text(
@@ -322,7 +334,7 @@ class _CreateGroupBottomSheetState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submit,
+                  onPressed: _isSubmitting ? null : () => _submit(currentSkill),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0D9488),
                     foregroundColor: Colors.white,

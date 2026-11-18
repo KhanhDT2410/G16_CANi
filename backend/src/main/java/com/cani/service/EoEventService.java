@@ -4,6 +4,7 @@ import com.cani.dto.event.*;
 import com.cani.dto.worker.ShiftChecklistItemDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.UserRole;
@@ -166,8 +167,22 @@ public class EoEventService {
             throw new BadRequestException("Vui lòng nhập lý do hủy sự kiện cụ thể (tối thiểu 10 ký tự).");
         }
 
+        EventStatus prevStatus = event.getStatus();
+        boolean isMatching = event.getMode() == EventMode.MATCHING;
+        boolean notStartedYet = event.getStartTime() == null || event.getStartTime().isAfter(Instant.now());
+
         event.setStatus(EventStatus.CANCELLED);
         event = eventRepository.save(event);
+
+        // Trả lại quota khi hủy mà event chưa bắt đầu (chỉ với event đã tiêu quota: MATCHING & ACTIVE)
+        if (isMatching && notStartedYet && prevStatus == EventStatus.ACTIVE && subscriptionService != null) {
+            try {
+                subscriptionService.refundEventQuota(eo);
+                log.info("Hoàn trả 1 quota sự kiện cho EO {} do hủy sự kiện {} trước giờ bắt đầu", eo.getEoId(), eventId);
+            } catch (Exception ex) {
+                log.warn("Không thể hoàn trả quota khi hủy sự kiện: {}", ex.getMessage());
+            }
+        }
 
         List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
         UUID cancelledBy = resolveEoUserId(eo, userId);
@@ -623,17 +638,22 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
 
-        // BR-08: Khấu trừ hạn mức Quota từ Gói cước dịch vụ (nếu áp dụng gói)
-        if (subscriptionService != null) {
-            try {
-                subscriptionService.validateAndDeductEventQuota(eo);
-            } catch (BadRequestException e) {
-                // Quota exceeded hoặc chưa mua gói: Chặn không cho bypass xuất bản sự kiện
-                throw e;
-            } catch (Exception e) {
-                // Chế độ chịu lỗi (Fault-tolerant): Nếu service gói cước gặp sự cố hệ thống, cho phép tiếp tục
-                log.warn("Cảnh báo sự cố SubscriptionService khi trừ quota sự kiện: {}", e.getMessage());
+        // BR-08: Chỉ khấu trừ hạn mức Quota từ Gói cước khi sự kiện kích hoạt Matching Engine (MATCHING)
+        // Chế độ Mời người (INVITE) hoàn toàn miễn phí, không tiêu hao Quota gói dịch vụ
+        if (event.getMode() == EventMode.MATCHING) {
+            if (subscriptionService != null) {
+                try {
+                    subscriptionService.validateAndDeductEventQuota(eo);
+                } catch (BadRequestException e) {
+                    // Quota exceeded hoặc chưa mua gói: Chặn không cho bypass xuất bản sự kiện
+                    throw e;
+                } catch (Exception e) {
+                    // Chế độ chịu lỗi (Fault-tolerant): Nếu service gói cước gặp sự cố hệ thống, cho phép tiếp tục
+                    log.warn("Cảnh báo sự cố SubscriptionService khi trừ quota sự kiện: {}", e.getMessage());
+                }
             }
+        } else {
+            log.info("Sự kiện {} ở chế độ INVITE (Mời trực tiếp): Miễn phí, không tiêu quota gói dịch vụ", event.getName());
         }
 
         event.setStatus(EventStatus.ACTIVE);

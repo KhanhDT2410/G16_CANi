@@ -209,23 +209,56 @@ const EditEventModal = ({
             </div>
 
             {formData.imageUrl && (
-              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
+              <div
+                style={{
+                  marginTop: '0.6rem',
+                  borderRadius: '0.625rem',
+                  border: '1px solid #cbd5e1',
+                  overflow: 'hidden',
+                  backgroundColor: '#f8fafc',
+                }}
+              >
                 <img
                   src={formData.imageUrl}
                   alt="Event Poster Preview"
-                  style={{ width: '70px', height: '42px', objectFit: 'cover', borderRadius: '0.25rem' }}
-                  onError={(e) => { e.target.style.display = 'none'; }}
+                  style={{
+                    width: '100%',
+                    maxHeight: '240px',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
                 />
-                <span style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600, flex: 1 }}>
-                  Đã tải ảnh minh họa từ máy tính
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, imageUrl: '' })}
-                  style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '0.45rem 0.85rem',
+                    backgroundColor: '#ffffff',
+                    borderTop: '1px solid #e2e8f0',
+                  }}
                 >
-                  Gỡ ảnh
-                </button>
+                  <span style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
+                    Đã tải ảnh minh họa từ máy tính
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#dc2626',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Gỡ ảnh
+                  </button>
+                </div>
               </div>
             )}
           </div>

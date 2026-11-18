@@ -73,10 +73,10 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
                 <td>{p.workerName}</td>
                 <td>{p.jobType}</td>
                 <td style={{ fontWeight: 600 }}>
-                  {p.agreedAmount.toLocaleString()} đ
+                  {(p.agreedAmount != null ? p.agreedAmount : 0).toLocaleString()} đ
                 </td>
                 <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
-                  {p.declaredAmount > 0 ? `${p.declaredAmount.toLocaleString()} đ` : 'Chưa trả'}
+                  {p.declaredAmount > 0 ? `${(p.declaredAmount || 0).toLocaleString()} đ` : 'Chưa trả'}
                 </td>
                 <td>{p.paymentMethod || '—'}</td>
                 <td style={{ fontSize: '0.85rem', color: '#64748b' }}>

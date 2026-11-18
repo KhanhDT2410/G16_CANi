@@ -81,19 +81,26 @@ public class PayOSService {
                     JsonNode data = root.path("data");
                     String rawQr = data.path("qrCode").asText("");
                     String checkoutUrl = data.path("checkoutUrl").asText("");
-                    String vietQrImg = "https://img.vietqr.io/image/MB-2622014789096-compact2.png?amount="
-                            + amount + "&addInfo=" + URLEncoder.encode(cleanDesc, StandardCharsets.UTF_8)
-                            + "&accountName=" + URLEncoder.encode("PHAM DUY HUNG", StandardCharsets.UTF_8);
+                    String accNum = data.path("accountNumber").asText(payOSConfig.getDefaultAccountNumber());
+                    String accName = data.path("accountName").asText(payOSConfig.getDefaultAccountName());
+                    String bin = data.path("bin").asText(payOSConfig.getDefaultBin());
+
+                    String qrCode = rawQr;
+                    if (qrCode.isBlank() && !accNum.isBlank()) {
+                        qrCode = "https://img.vietqr.io/image/" + bin + "-" + accNum + "-compact2.png?amount="
+                                + amount + "&addInfo=" + URLEncoder.encode(cleanDesc, StandardCharsets.UTF_8)
+                                + "&accountName=" + URLEncoder.encode(accName, StandardCharsets.UTF_8);
+                    }
 
                     return PayOSPaymentResponseDto.builder()
                             .orderCode(data.path("orderCode").asLong())
                             .amount(data.path("amount").asInt())
                             .description(data.path("description").asText())
-                            .accountNumber(data.path("accountNumber").asText("2622014789096"))
-                            .accountName(data.path("accountName").asText("PHAM DUY HUNG"))
-                            .bin(data.path("bin").asText("970422"))
-                            .checkoutUrl(checkoutUrl.isBlank() ? vietQrImg : checkoutUrl)
-                            .qrCode(rawQr.isBlank() ? vietQrImg : rawQr)
+                            .accountNumber(accNum)
+                            .accountName(accName)
+                            .bin(bin)
+                            .checkoutUrl(checkoutUrl.isBlank() ? qrCode : checkoutUrl)
+                            .qrCode(qrCode)
                             .status(data.path("status").asText("PENDING"))
                             .build();
                 } else {
@@ -104,19 +111,24 @@ public class PayOSService {
             log.error("Lỗi gọi PayOS API: {}", e.getMessage(), e);
         }
 
-        // Fallback: Tạo VietQR trực tiếp theo chuẩn NAPAS với tài khoản MB của bạn
-        log.info("Sử dụng fallback VietQR NAPAS 247 cho MBBank 2622014789096");
-        String vietQrImage = "https://img.vietqr.io/image/MB-2622014789096-compact2.png?amount="
-                + amount + "&addInfo=" + URLEncoder.encode(cleanDesc, StandardCharsets.UTF_8)
-                + "&accountName=" + URLEncoder.encode("PHAM DUY HUNG", StandardCharsets.UTF_8);
+        // Fallback: Tạo VietQR trực tiếp theo cấu hình hệ thống
+        String fallbackAccNum = payOSConfig.getDefaultAccountNumber();
+        String fallbackAccName = payOSConfig.getDefaultAccountName();
+        String fallbackBin = payOSConfig.getDefaultBin();
+        String vietQrImage = "";
+        if (!fallbackAccNum.isBlank()) {
+            vietQrImage = "https://img.vietqr.io/image/" + fallbackBin + "-" + fallbackAccNum + "-compact2.png?amount="
+                    + amount + "&addInfo=" + URLEncoder.encode(cleanDesc, StandardCharsets.UTF_8)
+                    + "&accountName=" + URLEncoder.encode(fallbackAccName, StandardCharsets.UTF_8);
+        }
 
         return PayOSPaymentResponseDto.builder()
                 .orderCode(orderCode)
                 .amount(amount)
                 .description(cleanDesc)
-                .accountNumber("2622014789096")
-                .accountName("PHAM DUY HUNG")
-                .bin("970422")
+                .accountNumber(fallbackAccNum)
+                .accountName(fallbackAccName)
+                .bin(fallbackBin)
                 .checkoutUrl(vietQrImage)
                 .qrCode(vietQrImage)
                 .status("PENDING")

@@ -151,7 +151,7 @@ export default function EmergencyBroadcastModal({
               <strong>Thù lao gốc:</strong> {formatCurrency(currentWage)} đ/giờ
             </div>
             <div>
-              <strong>Rủi ro ca (Risk Score):</strong> <span style={{ fontWeight: 700, color: '#dc2626' }}>Nguy cấp (&lt; 20%)</span>
+              <strong>Tình trạng:</strong> <span style={{ fontWeight: 700, color: '#dc2626' }}>Khó tìm nhân sự (Khẩn cấp)</span>
             </div>
             <div>
               <strong>Địa điểm:</strong> {shift.venueAddress || 'Tại điểm sự kiện'}

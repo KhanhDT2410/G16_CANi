@@ -31,32 +31,12 @@ public class Subscription {
     @JoinColumn(name = "organizer_id", nullable = false)
     private EventOrganizer eventOrganizer;
 
-    @Column(name = "plan_name", nullable = false, length = 100)
-    private String planName;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "plan_id", nullable = true)
+    private Plan plan;
 
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "plan_type", nullable = false)
-    private PlanType planType;
-
-    @Column(name = "duration_days", nullable = false)
-    private Integer durationDays;
-
-    @Column(name = "price", nullable = false, precision = 15, scale = 2)
-    private BigDecimal price;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "features", columnDefinition = "jsonb")
-    private String features;
-
-    @Column(name = "max_events")
-    private Integer maxEvents;
-
-    @Column(name = "max_shifts")
-    private Integer maxShifts;
-
-    @Column(name = "max_workers")
-    private Integer maxWorkers;
+    @Column(name = "price_paid", precision = 15, scale = 2)
+    private BigDecimal pricePaid;
 
     @Column(name = "events_used")
     @Builder.Default
@@ -85,4 +65,127 @@ public class Subscription {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    // =========================================================================
+    // HELPER GETTERS (Tương thích ngược với các service, DTO và RevenueService)
+    // =========================================================================
+    @Transient
+    public String getPlanName() {
+        return plan != null ? plan.getPlanName() : null;
+    }
+
+    @Transient
+    public PlanType getPlanType() {
+        return plan != null ? plan.getPlanType() : null;
+    }
+
+    @Transient
+    public BigDecimal getPrice() {
+        return pricePaid != null ? pricePaid : (plan != null ? plan.getPrice() : BigDecimal.ZERO);
+    }
+
+    @Transient
+    public Integer getMaxEvents() {
+        return plan != null ? plan.getMaxEvents() : 0;
+    }
+
+    @Transient
+    public Integer getMaxShifts() {
+        return plan != null ? plan.getMaxShifts() : 0;
+    }
+
+    @Transient
+    public Integer getMaxWorkers() {
+        return plan != null ? plan.getMaxWorkers() : 0;
+    }
+
+    @Transient
+    public Integer getDurationDays() {
+        return plan != null ? plan.getDurationDays() : 0;
+    }
+
+    @Transient
+    private String customFeatures;
+
+    @Transient
+    public String getFeatures() {
+        return customFeatures != null ? customFeatures : (plan != null ? plan.getFeatures() : null);
+    }
+
+    // =========================================================================
+    // CUSTOM BUILDER (Cho phép các Unit Test cũ gọi .planType(...) / .maxEvents(...)
+    // mà không bị compile error)
+    // =========================================================================
+    public static class SubscriptionBuilder {
+        private Plan plan;
+        private BigDecimal pricePaid;
+
+        private void ensurePlan() {
+            if (this.plan == null) {
+                this.plan = Plan.builder().build();
+            }
+        }
+
+        public SubscriptionBuilder plan(Plan plan) {
+            this.plan = plan;
+            return this;
+        }
+
+        public SubscriptionBuilder planType(PlanType planType) {
+            ensurePlan();
+            this.plan.setPlanType(planType);
+            return this;
+        }
+
+        public SubscriptionBuilder planName(String planName) {
+            ensurePlan();
+            this.plan.setPlanName(planName);
+            return this;
+        }
+
+        public SubscriptionBuilder maxEvents(Integer maxEvents) {
+            ensurePlan();
+            this.plan.setMaxEvents(maxEvents);
+            return this;
+        }
+
+        public SubscriptionBuilder maxShifts(Integer maxShifts) {
+            ensurePlan();
+            this.plan.setMaxShifts(maxShifts);
+            return this;
+        }
+
+        public SubscriptionBuilder maxWorkers(Integer maxWorkers) {
+            ensurePlan();
+            this.plan.setMaxWorkers(maxWorkers);
+            return this;
+        }
+
+        public SubscriptionBuilder durationDays(Integer durationDays) {
+            ensurePlan();
+            this.plan.setDurationDays(durationDays);
+            return this;
+        }
+
+        public SubscriptionBuilder price(BigDecimal price) {
+            this.pricePaid = price;
+            ensurePlan();
+            this.plan.setPrice(price);
+            return this;
+        }
+
+        public SubscriptionBuilder pricePaid(BigDecimal pricePaid) {
+            this.pricePaid = pricePaid;
+            return this;
+        }
+
+        private String customFeatures;
+
+        public SubscriptionBuilder features(String features) {
+            this.customFeatures = features;
+            ensurePlan();
+            this.plan.setFeatures(features);
+            return this;
+        }
+    }
 }

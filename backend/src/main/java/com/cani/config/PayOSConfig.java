@@ -24,6 +24,9 @@ public class PayOSConfig {
     private String checksumKey;
     private String returnUrl;
     private String cancelUrl;
+    private String defaultAccountNumber = "";
+    private String defaultAccountName = "CANi Platform";
+    private String defaultBin = "970422";
 
     /**
      * Tạo chữ ký số HMAC-SHA256 cho yêu cầu tạo link thanh toán (5 trường chuẩn PayOS)

@@ -47,6 +47,12 @@ class SubscriptionBillingSecurityTest {
     private SubscriptionRepository subscriptionRepository;
 
     @Mock
+    private com.cani.repository.PlanRepository planRepository;
+
+    @org.mockito.Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    @Mock
     private EventOrganizerRepository eventOrganizerRepository;
 
     @Mock

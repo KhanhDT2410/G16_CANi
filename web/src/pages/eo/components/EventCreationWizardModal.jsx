@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
-import { ROLES, WAGE_RECOMMENDATIONS_MAP, calculateShiftRiskAnalysis } from '../hooks/useShifts';
+import {
+  ROLES,
+  WAGE_RECOMMENDATIONS_MAP,
+  calculateShiftRiskAnalysis,
+  normalizeChecklistItems,
+  serializeChecklistItems,
+} from '../hooks/useShifts';
 import { getCoordinatesFromAddress } from '../utils/geoUtils';
 import VenueLocationPicker from './VenueLocationPicker';
+import ShiftChecklistEditor from './ShiftChecklistEditor';
 
 /**
  * EventCreationWizardModal
  * Quy trình liên hoàn 3 bước (Clean Enterprise UI - No Icons):
  * 1. Khởi tạo Sự kiện & Địa điểm
- * 2. Thiết lập Danh sách Ca làm việc (Shifts) kèm Wage Recommendation & Risk Score
+ * 2. Thiết lập Danh sách Ca làm việc (Shifts) kèm gợi ý lương, đánh giá khó tìm nhân sự & Checklist
  * 3. Xác nhận Địa chỉ tổ chức cụ thể & Lưu Bản Nháp / Kích Hoạt Tìm Kiếm Ngay -> Mở trang Detail Sự Kiện
  */
 const EventCreationWizardModal = ({
@@ -36,6 +43,9 @@ const EventCreationWizardModal = ({
   // Danh sách các ca làm việc (Shifts) đã thêm vào sự kiện này
   const [shiftsList, setShiftsList] = useState([]);
   const [isAddingShift, setIsAddingShift] = useState(true);
+  const [editingShiftIndex, setEditingShiftIndex] = useState(null);
+  const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
+  const [shiftPackageWage, setShiftPackageWage] = useState(200000);
 
   // Helper định dạng date -> string cho input datetime-local (YYYY-MM-DDTHH:mm)
   const toDateTimeInputVal = (date) => {
@@ -69,14 +79,12 @@ const EventCreationWizardModal = ({
     maxDistanceKm: 15,
     imageUrl: '',
     checklistItems: [
-      'Có mặt trước 20 phút nhận thẻ và vị trí',
-      'Đồng phục chỉn chu theo quy định',
-      'Quét mã QR Check-in đầu ca',
-      'Báo cáo quản lý trước khi kết thúc ca',
+      { id: 'chk_1', title: 'Có mặt trước 20 phút nhận thẻ và vị trí', isRequiredEvidence: false },
+      { id: 'chk_2', title: 'Đồng phục chỉn chu theo quy định', isRequiredEvidence: true },
+      { id: 'chk_3', title: 'Quét mã QR Check-in đầu ca', isRequiredEvidence: false },
+      { id: 'chk_4', title: 'Báo cáo quản lý trước khi kết thúc ca', isRequiredEvidence: false },
     ],
   });
-
-  const [newChecklistItem, setNewChecklistItem] = useState('');
 
   // Xử lý upload ảnh sự kiện từ thiết bị local
   const handleEventImageUpload = async (e) => {
@@ -130,7 +138,45 @@ const EventCreationWizardModal = ({
     }
   };
 
-  // Tính năng Chia Ca Nhanh thực tế: Tự động chia khung giờ sự kiện thành 2 hoặc 3 ca liên tiếp và tạo luôn danh sách ca
+  // Tính số giờ làm việc của ca hiện tại
+  const getDurationHours = (start, end) => {
+    try {
+      const s = new Date(start);
+      const e = new Date(end);
+      const diff = (e - s) / (1000 * 60 * 60);
+      return diff > 0 ? parseFloat(diff.toFixed(1)) : 4;
+    } catch {
+      return 4;
+    }
+  };
+
+  // Nạp 1 ca đã tạo lên Form để người dùng chỉnh sửa lại Vị trí, Mô tả, Lương, Đầu việc Checklist
+  const handleStartEditShift = (shift, index) => {
+    const sTime = toDateTimeInputVal(shift.startTime) || (newEvent.startTime || '2026-11-20T08:00');
+    const eTime = toDateTimeInputVal(shift.endTime) || '2026-11-20T12:00';
+    const dur = getDurationHours(sTime, eTime);
+    const hWage = Number(shift.hourlyWage || 50000);
+    const parsedChecklist = normalizeChecklistItems(shift.checklistItems || shift.checklist);
+
+    setEditingShiftIndex(index);
+    setWageMode('HOURLY');
+    setShiftPackageWage(Math.round(hWage * dur));
+    setCurrentShift({
+      jobType: shift.jobType || '',
+      description: shift.description || '',
+      startTime: sTime,
+      endTime: eTime,
+      requiredWorkers: Number(shift.requiredWorkers || 2),
+      hourlyWage: hWage,
+      allowance: Number(shift.allowance || 0),
+      maxDistanceKm: Number(shift.maxDistanceKm || 15),
+      imageUrl: shift.imageUrl || '',
+      checklistItems: parsedChecklist,
+    });
+    setIsAddingShift(true);
+  };
+
+  // Chia Ca Nhanh: Chỉ chia sẵn khung thời gian cho các ca, để trống checklist/tên đầu việc để người dùng tự chỉnh sửa từng ca
   const handleQuickSplit = async (splitCount) => {
     const evtStart = new Date(createdEvent?.startTime || newEvent.startTime);
     const evtEnd = new Date(createdEvent?.endTime || newEvent.endTime);
@@ -148,14 +194,6 @@ const EventCreationWizardModal = ({
 
     setSubmitting(true);
     try {
-      const checklistJson = JSON.stringify(
-        (currentShift.checklistItems || []).map((item, idx) =>
-          typeof item === 'object' && item.title
-            ? item
-            : { id: `chk_${idx + 1}`, title: String(item).trim() }
-        )
-      );
-
       const safeWage = Math.max(20000, Number(currentShift.hourlyWage || 50000));
       const safeAllowance = Math.max(0, Number(currentShift.allowance || 0));
       const safeWorkers = Math.max(1, Number(currentShift.requiredWorkers || 2));
@@ -164,29 +202,42 @@ const EventCreationWizardModal = ({
       for (let i = 0; i < splitCount; i++) {
         const slotStart = new Date(evtStart.getTime() + i * slotMs);
         const slotEnd = new Date(evtStart.getTime() + (i + 1) * slotMs);
-        const baseJobType = currentShift.jobType || ROLES[0];
+        const defaultRole = ROLES[i % ROLES.length] || ROLES[0];
         const payload = {
-          ...currentShift,
-          jobType: baseJobType,
-          description:
-            currentShift.description?.trim() ||
-            `Ca ${i + 1}/${splitCount} - Phối hợp thực hiện nhiệm vụ tại sự kiện.`,
+          jobType: defaultRole,
+          description: `Ca ${i + 1}/${splitCount} - Vui lòng cập nhật nhiệm vụ và đầu việc cho ca này.`,
           requiredWorkers: safeWorkers,
           hourlyWage: safeWage,
           allowance: safeAllowance,
-          imageUrl: currentShift.imageUrl?.trim() || null,
-          checklist: checklistJson,
+          maxDistanceKm: Number(currentShift.maxDistanceKm || 15),
+          imageUrl: null,
+          checklist: '[]',
           startTime: slotStart.toISOString(),
           endTime: slotEnd.toISOString(),
         };
+        const slotHours = getDurationHours(slotStart, slotEnd);
+        const slotCost = slotHours * safeWorkers * safeWage + safeAllowance;
         const addedShift = await eoService.addShiftToEvent(createdEvent.eventId, payload);
-        createdSlots.push(addedShift);
+        createdSlots.push({
+          ...addedShift,
+          totalCost: Number(addedShift?.totalCost) || slotCost,
+          checklist: '[]',
+          checklistItems: [],
+          isQuickSplitDraft: true,
+        });
       }
 
-      setShiftsList((prev) => [...prev, ...createdSlots]);
-      setIsAddingShift(false);
+      const firstNewIndex = shiftsList.length;
+      const nextList = [...shiftsList, ...createdSlots];
+      setShiftsList(nextList);
+
+      // Mở ngay Ca #1 vừa chia để người dùng tự điền Vị trí, Mô tả và Checklist đầu việc
+      if (createdSlots.length > 0) {
+        handleStartEditShift(createdSlots[0], firstNewIndex);
+      }
+
       showToast(
-        `Đã tự động chia và khởi tạo thành công ${splitCount} ca làm việc liên tiếp trong khung giờ sự kiện!`,
+        `Đã chia khung giờ thành ${splitCount} ca! Hãy nhập tên vị trí và các đầu việc cho từng ca bên dưới.`,
         'success'
       );
     } catch (err) {
@@ -198,18 +249,6 @@ const EventCreationWizardModal = ({
 
   if (!isOpen) return null;
 
-  // Tính số giờ làm việc của ca hiện tại
-  const getDurationHours = (start, end) => {
-    try {
-      const s = new Date(start);
-      const e = new Date(end);
-      const diff = (e - s) / (1000 * 60 * 60);
-      return diff > 0 ? parseFloat(diff.toFixed(1)) : 4;
-    } catch {
-      return 4;
-    }
-  };
-
   const currentDurationHours = getDurationHours(currentShift.startTime, currentShift.endTime);
   const currentShiftTotal =
     currentDurationHours *
@@ -219,33 +258,55 @@ const EventCreationWizardModal = ({
 
   const riskAnalysis = calculateShiftRiskAnalysis(currentShift);
 
-  // Đổi vai trò cho ca hiện tại kèm gợi ý mức lương (Wage Recommendation)
+  // Đổi vai trò cho ca hiện tại kèm gợi ý mức lương
   const handleRoleChange = (role) => {
     const rec = WAGE_RECOMMENDATIONS_MAP[role];
+    const nextHourly = rec ? rec.defaultWage : currentShift.hourlyWage;
     setCurrentShift((prev) => ({
       ...prev,
       jobType: role,
-      hourlyWage: rec ? rec.defaultWage : prev.hourlyWage,
+      hourlyWage: nextHourly,
+    }));
+    if (wageMode === 'PER_SHIFT') {
+      setShiftPackageWage(Math.round(Number(nextHourly || 50000) * currentDurationHours));
+    }
+  };
+
+  const handleSwitchWageMode = (mode) => {
+    setWageMode(mode);
+    if (mode === 'PER_SHIFT') {
+      setShiftPackageWage(Math.round(Number(currentShift.hourlyWage || 50000) * currentDurationHours));
+    }
+  };
+
+  const handlePackageWageChange = (val) => {
+    const pkg = Math.max(0, parseFloat(val) || 0);
+    setShiftPackageWage(pkg);
+    const computedHourly = Math.max(0, Math.round(pkg / Math.max(0.5, currentDurationHours)));
+    setCurrentShift((prev) => ({
+      ...prev,
+      hourlyWage: computedHourly,
     }));
   };
 
-  // Thêm checklist cho ca hiện tại
-  const handleAddChecklist = (e) => {
-    e?.preventDefault();
-    if (!newChecklistItem.trim()) return;
-    setCurrentShift((prev) => ({
-      ...prev,
-      checklistItems: [...(prev.checklistItems || []), newChecklistItem.trim()],
-    }));
-    setNewChecklistItem('');
-  };
-
-  // Xóa checklist
-  const handleRemoveChecklist = (index) => {
-    setCurrentShift((prev) => ({
-      ...prev,
-      checklistItems: (prev.checklistItems || []).filter((_, idx) => idx !== index),
-    }));
+  const handleShiftTimeChange = (field, value) => {
+    const nextStart = field === 'startTime' ? value : currentShift.startTime;
+    const nextEnd = field === 'endTime' ? value : currentShift.endTime;
+    const nextDur = getDurationHours(nextStart, nextEnd);
+    if (wageMode === 'PER_SHIFT') {
+      const computedHourly = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, nextDur)));
+      setCurrentShift((prev) => ({
+        ...prev,
+        [field]: value,
+        hourlyWage: computedHourly,
+      }));
+    } else {
+      setCurrentShift((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+      setShiftPackageWage(Math.round(Number(currentShift.hourlyWage || 0) * nextDur));
+    }
   };
 
   // Hàm kiểm tra chuỗi có phải gõ linh tinh / spam / keyboard mash không
@@ -444,12 +505,17 @@ const EventCreationWizardModal = ({
   };
 
   // ==========================================
-  // BƯỚC 2: THÊM CA LÀM VIỆC (SHIFT) VÀO SỰ KIỆN
+  // BƯỚC 2: THÊM MỚI HOẶC CẬP NHẬT CA LÀM VIỆC (SHIFT) TRONG SỰ KIỆN
   // ==========================================
   const handleSaveShift = async (e) => {
     e?.preventDefault();
     if (!createdEvent?.eventId) {
       showToast('Không tìm thấy sự kiện. Vui lòng thử lại.', 'error');
+      return;
+    }
+
+    if (!currentShift.jobType?.trim()) {
+      showToast('Vui lòng nhập tên vị trí công việc cho ca làm', 'error');
       return;
     }
 
@@ -507,15 +573,12 @@ const EventCreationWizardModal = ({
 
     setSubmitting(true);
     try {
-      const checklistJson = JSON.stringify(
-        (currentShift.checklistItems || []).map((item, idx) =>
-          typeof item === 'object' && item.title
-            ? item
-            : { id: `chk_${idx + 1}`, title: String(item).trim() }
-        )
-      );
+      const normalizedChecklist = normalizeChecklistItems(currentShift.checklistItems);
+      const checklistJson = serializeChecklistItems(normalizedChecklist);
       const payload = {
         ...currentShift,
+        jobType: currentShift.jobType.trim(),
+        description: currentShift.description.trim(),
         requiredWorkers: Math.max(1, Number(currentShift.requiredWorkers || 1)),
         hourlyWage: Math.max(20000, Number(currentShift.hourlyWage || 50000)),
         allowance: Math.max(0, Number(currentShift.allowance || 0)),
@@ -525,9 +588,58 @@ const EventCreationWizardModal = ({
         endTime: sEnd.toISOString(),
       };
 
+      if (editingShiftIndex !== null && shiftsList[editingShiftIndex]) {
+        const targetShift = shiftsList[editingShiftIndex];
+        let updatedShift = {
+          ...targetShift,
+          ...payload,
+          checklistItems: normalizedChecklist,
+          totalCost: currentShiftTotal,
+          isQuickSplitDraft: false,
+        };
+        if (targetShift.shiftId) {
+          const apiRes = await eoService.updateShift(targetShift.shiftId, payload);
+          updatedShift = {
+            ...updatedShift,
+            ...(apiRes || {}),
+            checklist: checklistJson,
+            checklistItems: normalizedChecklist,
+            isQuickSplitDraft: false,
+          };
+        }
+
+        const nextShiftsList = shiftsList.map((item, idx) =>
+          idx === editingShiftIndex ? updatedShift : item
+        );
+        setShiftsList(nextShiftsList);
+
+        // Nếu ca tiếp theo là ca vừa chia nhanh chưa có đầu việc, chuyển sang chỉnh sửa ca tiếp theo luôn
+        const nextIdx = editingShiftIndex + 1;
+        if (nextIdx < nextShiftsList.length && nextShiftsList[nextIdx].isQuickSplitDraft) {
+          handleStartEditShift(nextShiftsList[nextIdx], nextIdx);
+          showToast(
+            `Đã cập nhật Ca #${editingShiftIndex + 1}! Mời bạn nhập tiếp thông tin cho Ca #${nextIdx + 1}.`,
+            'success'
+          );
+        } else {
+          setEditingShiftIndex(null);
+          setIsAddingShift(false);
+          showToast(`Đã cập nhật Ca #${editingShiftIndex + 1} (${updatedShift.jobType}) thành công!`, 'success');
+        }
+        return;
+      }
+
       const addedShift = await eoService.addShiftToEvent(createdEvent.eventId, payload);
-      setShiftsList((prev) => [...prev, addedShift]);
-      
+      setShiftsList((prev) => [
+        ...prev,
+        {
+          ...addedShift,
+          totalCost: Number(addedShift?.totalCost) || currentShiftTotal,
+          checklist: checklistJson,
+          checklistItems: normalizedChecklist,
+        },
+      ]);
+
       // Reset form để sẵn sàng tạo ca tiếp theo với giờ tiếp nối
       const nextRoleIndex = (shiftsList.length + 1) % ROLES.length;
       const nextRole = ROLES[nextRoleIndex];
@@ -541,20 +653,26 @@ const EventCreationWizardModal = ({
         nextEnd = new Date(Math.min(nextStart.getTime() + 4 * 3600 * 1000, eEnd.getTime()));
       }
 
+      const nextDur = getDurationHours(nextStart, nextEnd);
+      const nextWage = nextRec ? nextRec.defaultWage : 50000;
+      setWageMode('HOURLY');
+      setShiftPackageWage(Math.round(nextWage * nextDur));
+      setEditingShiftIndex(null);
+
       setCurrentShift({
         jobType: nextRole,
         description: 'Phối hợp thực hiện nhiệm vụ theo kế hoạch tổ chức sự kiện.',
         startTime: toDateTimeInputVal(nextStart),
         endTime: toDateTimeInputVal(nextEnd),
         requiredWorkers: 2,
-        hourlyWage: nextRec ? nextRec.defaultWage : 50000,
+        hourlyWage: nextWage,
         allowance: 0,
         maxDistanceKm: 15,
         imageUrl: '',
         checklistItems: [
-          'Có mặt đúng giờ quy định',
-          'Quét mã QR Check-in',
-          'Hoàn thành nhiệm vụ được giao',
+          { id: 'chk_1', title: 'Có mặt đúng giờ quy định', isRequiredEvidence: false },
+          { id: 'chk_2', title: 'Quét mã QR Check-in', isRequiredEvidence: false },
+          { id: 'chk_3', title: 'Hoàn thành nhiệm vụ được giao', isRequiredEvidence: false },
         ],
       });
 
@@ -575,6 +693,9 @@ const EventCreationWizardModal = ({
         await eoService.cancelShift(shiftId, 'Ban tổ chức xóa ca');
       }
       setShiftsList((prev) => prev.filter((_, idx) => idx !== index));
+      if (editingShiftIndex === index) {
+        setEditingShiftIndex(null);
+      }
       showToast('Đã xóa ca làm việc thành công!', 'info');
     } catch (err) {
       showToast('Lỗi khi xóa ca: ' + (err.response?.data?.message || err.message), 'error');
@@ -593,8 +714,19 @@ const EventCreationWizardModal = ({
   // ==========================================
   // BƯỚC 3: LƯU BẢN NHÁP HOẶC KÍCH HOẠT TÌM KIẾM NGAY -> MỞ TRANG DETAIL SỰ KIỆN
   // ==========================================
-  const totalWorkers = shiftsList.reduce((sum, s) => sum + (s.requiredWorkers || 0), 0);
-  const totalEstimatedCost = shiftsList.reduce((sum, s) => sum + (Number(s.totalCost) || 0), 0);
+  const computeShiftCost = (s) => {
+    if (Number(s?.totalCost) > 0) return Number(s.totalCost);
+    const hrs = getDurationHours(s?.startTime, s?.endTime);
+    return (
+      hrs *
+        Math.max(1, Number(s?.requiredWorkers || 1)) *
+        Math.max(0, Number(s?.hourlyWage || 0)) +
+      Math.max(0, Number(s?.allowance || 0))
+    );
+  };
+
+  const totalWorkers = shiftsList.reduce((sum, s) => sum + (Number(s.requiredWorkers) || 0), 0);
+  const totalEstimatedCost = shiftsList.reduce((sum, s) => sum + computeShiftCost(s), 0);
 
   const buildFinalEventObject = (statusOverride) => ({
     ...newEvent,
@@ -843,7 +975,7 @@ const EventCreationWizardModal = ({
               </div>
             )}
 
-            {/* ẢNH BANNER / POSTER SỰ KIỆN (CHỈ TẢI TỪ MÁY, ĐÃ XÓA Ô ĐƯỜNG DẪN ẢNH & ICON) */}
+            {/* ẢNH BANNER / POSTER SỰ KIỆN (HIỂN THỊ TRONG 1 DIV RIÊNG BÊN DƯỚI CHO ẢNH TO RÕ) */}
             <div className="eo-form-group">
               <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Ảnh Poster / Banner Sự Kiện (Tùy chọn)</span>
@@ -873,28 +1005,65 @@ const EventCreationWizardModal = ({
                 >
                   {uploadingEventImg ? 'Đang tải ảnh lên...' : 'Tải ảnh từ máy tính'}
                 </button>
+                {!newEvent.imageUrl && (
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Chưa tải ảnh banner</span>
+                )}
+              </div>
 
-                {newEvent.imageUrl && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.35rem 0.65rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
-                    <img
-                      src={newEvent.imageUrl}
-                      alt="Event Poster Preview"
-                      style={{ width: '72px', height: '44px', objectFit: 'cover', borderRadius: '0.25rem' }}
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                    <span style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
-                      Đã tải ảnh lên
+              {newEvent.imageUrl && (
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #cbd5e1',
+                    overflow: 'hidden',
+                    backgroundColor: '#f8fafc',
+                    boxShadow: '0 2px 6px rgba(15, 23, 42, 0.06)',
+                  }}
+                >
+                  <img
+                    src={newEvent.imageUrl}
+                    alt="Event Poster Preview"
+                    style={{
+                      width: '100%',
+                      maxHeight: '240px',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.5rem 0.9rem',
+                      backgroundColor: '#ffffff',
+                      borderTop: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.82rem', color: '#15803d', fontWeight: 600 }}>
+                      Đã tải ảnh poster sự kiện lên thành công
                     </span>
                     <button
                       type="button"
                       onClick={() => setNewEvent({ ...newEvent, imageUrl: '' })}
-                      style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#dc2626',
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                      }}
                     >
                       Gỡ ảnh
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             <VenueLocationPicker
@@ -938,7 +1107,7 @@ const EventCreationWizardModal = ({
         )}
 
         {/* ======================================================== */}
-        {/* BƯỚC 2: TẠO NHIỀU CA LÀM VIỆC (SHIFTS) KÈM WAGE RECOMMEND & RISK SCORE */}
+        {/* BƯỚC 2: TẠO & CHỈNH SỬA CA LÀM VIỆC (SHIFTS) */}
         {/* ======================================================== */}
         {currentStep === 2 && (
           <div className="animate-fade-in-up">
@@ -957,40 +1126,49 @@ const EventCreationWizardModal = ({
                   type="button"
                   className="eo-btn-primary"
                   style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-                  onClick={() => setIsAddingShift(true)}
+                  onClick={() => {
+                    setEditingShiftIndex(null);
+                    setIsAddingShift(true);
+                  }}
                 >
-                  Thêm Ca Mới
+                  + Thêm Ca Mới
                 </button>
               )}
             </div>
 
-            {/* BANNER THỜI GIAN SỰ KIỆN CHA & CÔNG CỤ CHIA CA NHANH (TỰ ĐỘNG TẠO 2 HOẶC 3 CA) */}
-            <div style={{
-              backgroundColor: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              borderRadius: '0.625rem',
-              padding: '0.85rem 1rem',
-              marginBottom: '1.25rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '0.75rem'
-            }}>
+            {/* BANNER THỜI GIAN SỰ KIỆN CHA & CÔNG CỤ CHIA CA NHANH (CHỈ CHIA SẴN GIỜ, CHO PHÉP CHỈNH SỬA TỪNG CA) */}
+            <div
+              style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '0.625rem',
+                padding: '0.85rem 1rem',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+              }}
+            >
               <div>
                 <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e40af', marginBottom: '0.2rem' }}>
                   Khung giờ sự kiện:
                 </div>
                 <div style={{ fontSize: '0.875rem', color: '#1e293b', fontWeight: 600 }}>
-                  {formatDateTimeDisplay(createdEvent?.startTime || newEvent.startTime)} đến {formatDateTimeDisplay(createdEvent?.endTime || newEvent.endTime)}
+                  {formatDateTimeDisplay(createdEvent?.startTime || newEvent.startTime)} đến{' '}
+                  {formatDateTimeDisplay(createdEvent?.endTime || newEvent.endTime)}
                   <span style={{ color: '#2563eb', marginLeft: '0.4rem', fontWeight: 700 }}>
                     ({getDurationHours(createdEvent?.startTime || newEvent.startTime, createdEvent?.endTime || newEvent.endTime)} tiếng)
                   </span>
                 </div>
+                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem' }}>
+                  Chia nhanh chỉ tạo sẵn mốc thời gian cho từng ca; bạn có thể bấm <strong>Chỉnh sửa ca</strong> để tự đặt vị trí & đầu việc.
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>Chia ca nhanh tự động:</span>
+                <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>Chia nhanh thời gian:</span>
                 <button
                   type="button"
                   disabled={submitting}
@@ -1005,7 +1183,7 @@ const EventCreationWizardModal = ({
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
                   }}
-                  title="Tự động chia thời gian sự kiện thành 2 ca liên tiếp và thêm vào danh sách"
+                  title="Chia khung giờ sự kiện thành 2 mốc thời gian ca và mở chỉnh sửa cho từng ca"
                 >
                   Chia 2 Ca
                 </button>
@@ -1023,14 +1201,14 @@ const EventCreationWizardModal = ({
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
                   }}
-                  title="Tự động chia thời gian sự kiện thành 3 ca liên tiếp và thêm vào danh sách"
+                  title="Chia khung giờ sự kiện thành 3 mốc thời gian ca và mở chỉnh sửa cho từng ca"
                 >
                   Chia 3 Ca
                 </button>
               </div>
             </div>
 
-            {/* DANH SÁCH CÁC CA ĐÃ TẠO */}
+            {/* DANH SÁCH CÁC CA ĐÃ TẠO (CÓ NÚT CHỈNH SỬA LẠI TỪNG CA) */}
             {shiftsList.length > 0 && (
               <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#334155', display: 'flex', justifyContent: 'space-between' }}>
@@ -1042,39 +1220,24 @@ const EventCreationWizardModal = ({
 
                 {shiftsList.map((shift, idx) => {
                   const sHours = getDurationHours(shift.startTime, shift.endTime);
+                  const isEditingThis = editingShiftIndex === idx && isAddingShift;
+                  const parsedTasks = normalizeChecklistItems(shift.checklistItems || shift.checklist);
                   return (
                     <div
                       key={shift.shiftId || idx}
                       style={{
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #cbd5e1',
+                        backgroundColor: isEditingThis ? '#eff6ff' : '#ffffff',
+                        border: isEditingThis ? '2px solid #2563eb' : '1px solid #cbd5e1',
                         borderRadius: '0.625rem',
                         padding: '1rem',
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '1rem',
+                        flexDirection: 'column',
+                        gap: '0.75rem',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
                       }}
                     >
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1 }}>
-                        {shift.imageUrl && (
-                          <img
-                            src={shift.imageUrl}
-                            alt={shift.jobType}
-                            style={{
-                              width: '54px',
-                              height: '54px',
-                              objectFit: 'cover',
-                              borderRadius: '0.5rem',
-                              border: '1px solid #cbd5e1',
-                              flexShrink: 0,
-                            }}
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
-                        )}
-
-                        <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '220px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
                             <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: '0.85rem', padding: '0.2rem 0.5rem', borderRadius: '0.35rem' }}>
                               Ca #{idx + 1}
@@ -1083,11 +1246,30 @@ const EventCreationWizardModal = ({
                             <span style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 600 }}>
                               {shift.requiredWorkers} người x {Number(shift.hourlyWage || 0).toLocaleString()} đ/h
                             </span>
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '999px',
+                                backgroundColor: parsedTasks.length > 0 ? '#f0fdf4' : '#fffbeb',
+                                color: parsedTasks.length > 0 ? '#15803d' : '#b45309',
+                                border: parsedTasks.length > 0 ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {parsedTasks.length > 0 ? `${parsedTasks.length} đầu việc` : 'Chưa có đầu việc (Bấm Chỉnh sửa ca)'}
+                            </span>
                           </div>
 
                           <div style={{ fontSize: '0.825rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
-                            <span>Thời gian: {sHours}h ({new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
-                            <span>Dự toán ca: <strong>{(Number(shift.totalCost) || 0).toLocaleString()} đ</strong></span>
+                            <span>
+                              Thời gian: {sHours}h (
+                              {new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
+                              {new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                            </span>
+                            <span>
+                              Dự toán ca: <strong>{computeShiftCost(shift).toLocaleString()} đ</strong>
+                            </span>
                             {shift.allowance > 0 && <span>Phụ cấp: {Number(shift.allowance).toLocaleString()} đ</span>}
                           </div>
 
@@ -1097,42 +1279,102 @@ const EventCreationWizardModal = ({
                             </div>
                           )}
                         </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditShift(shift, idx)}
+                            style={{
+                              backgroundColor: isEditingThis ? '#2563eb' : '#eff6ff',
+                              color: isEditingThis ? '#ffffff' : '#1d4ed8',
+                              border: '1px solid #93c5fd',
+                              borderRadius: '0.375rem',
+                              padding: '0.45rem 0.8rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                            title="Mở form chỉnh sửa tên vị trí, thời gian, lương và đầu việc của ca này"
+                          >
+                            {isEditingThis ? 'Đang sửa ca này' : 'Chỉnh sửa ca'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteShift(shift.shiftId, idx)}
+                            style={{
+                              backgroundColor: '#fef2f2',
+                              color: '#dc2626',
+                              border: '1px solid #fecaca',
+                              borderRadius: '0.375rem',
+                              padding: '0.45rem 0.75rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                            title="Xóa ca làm này khỏi sự kiện"
+                          >
+                            Xóa Ca
+                          </button>
+                        </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteShift(shift.shiftId, idx)}
-                        style={{
-                          backgroundColor: '#fef2f2',
-                          color: '#dc2626',
-                          border: '1px solid #fecaca',
-                          borderRadius: '0.375rem',
-                          padding: '0.45rem 0.75rem',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                        title="Xóa ca làm này khỏi sự kiện"
-                      >
-                        Xóa Ca
-                      </button>
+                      {/* Ảnh ca làm hiển thị trong 1 div riêng cho to rõ */}
+                      {shift.imageUrl && (
+                        <div
+                          style={{
+                            borderRadius: '0.5rem',
+                            overflow: 'hidden',
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: '#f8fafc',
+                          }}
+                        >
+                          <img
+                            src={shift.imageUrl}
+                            alt={shift.jobType}
+                            style={{
+                              width: '100%',
+                              maxHeight: '180px',
+                              objectFit: 'cover',
+                              display: 'block',
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* FORM TẠO CA LÀM VIỆC (SHIFT FORM) */}
+            {/* FORM TẠO HOẶC CHỈNH SỬA CA LÀM VIỆC (SHIFT FORM) */}
             {isAddingShift ? (
-              <form onSubmit={handleSaveShift} style={{ backgroundColor: '#f8fafc', padding: '1.25rem', borderRadius: '0.75rem', border: '1.5px dashed #93c5fd', marginBottom: '1.5rem' }}>
+              <form
+                onSubmit={handleSaveShift}
+                style={{
+                  backgroundColor: '#f8fafc',
+                  padding: '1.25rem',
+                  borderRadius: '0.75rem',
+                  border: editingShiftIndex !== null ? '2px solid #2563eb' : '1.5px dashed #93c5fd',
+                  marginBottom: '1.5rem',
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e40af' }}>
-                    Nhập Thông Tin Ca Làm Việc {shiftsList.length > 0 ? `Thứ ${shiftsList.length + 1}` : 'Đầu Tiên'}
+                    {editingShiftIndex !== null
+                      ? `Đang Chỉnh Sửa Ca #${editingShiftIndex + 1} (Cập nhật Vị trí, Thù lao & Đầu việc)`
+                      : `Nhập Thông Tin Ca Làm Việc ${shiftsList.length > 0 ? `Thứ ${shiftsList.length + 1}` : 'Đầu Tiên'}`}
                   </h4>
                   {shiftsList.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setIsAddingShift(false)}
+                      onClick={() => {
+                        setEditingShiftIndex(null);
+                        setIsAddingShift(false);
+                      }}
                       style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
                     >
                       Thu Gọn
@@ -1171,7 +1413,7 @@ const EventCreationWizardModal = ({
                   />
                 </div>
 
-                {/* Ảnh minh họa ca làm / đồng phục (CHỈ TẢI TỪ MÁY, ĐÃ XÓA Ô ĐƯỜNG DẪN ẢNH & ICON) */}
+                {/* Ảnh minh họa ca làm / đồng phục (XUỐNG 1 DIV RIÊNG CHO ẢNH TO RÕ) */}
                 <div className="eo-form-group">
                   <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Ảnh Minh Họa Ca Làm / Đồng Phục (Tùy chọn)</span>
@@ -1201,28 +1443,63 @@ const EventCreationWizardModal = ({
                     >
                       {uploadingShiftImg ? 'Đang tải ảnh lên...' : 'Tải ảnh từ máy tính'}
                     </button>
+                    {!currentShift.imageUrl && (
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Chưa chọn ảnh minh họa cho ca này</span>
+                    )}
+                  </div>
 
-                    {currentShift.imageUrl && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.35rem 0.65rem', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
-                        <img
-                          src={currentShift.imageUrl}
-                          alt="Preview"
-                          style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '0.25rem' }}
-                          onError={(e) => { e.target.style.display = 'none'; }}
-                        />
+                  {currentShift.imageUrl && (
+                    <div
+                      style={{
+                        marginTop: '0.5rem',
+                        borderRadius: '0.625rem',
+                        border: '1px solid #cbd5e1',
+                        overflow: 'hidden',
+                        backgroundColor: '#ffffff',
+                      }}
+                    >
+                      <img
+                        src={currentShift.imageUrl}
+                        alt="Shift Preview"
+                        style={{
+                          width: '100%',
+                          maxHeight: '220px',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '0.45rem 0.85rem',
+                          borderTop: '1px solid #e2e8f0',
+                        }}
+                      >
                         <span style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
-                          Đã tải ảnh lên
+                          Đã tải ảnh minh họa ca làm việc
                         </span>
                         <button
                           type="button"
                           onClick={() => setCurrentShift({ ...currentShift, imageUrl: '' })}
-                          style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#dc2626',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
                         >
                           Gỡ ảnh
                         </button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="eo-form-row">
@@ -1233,7 +1510,7 @@ const EventCreationWizardModal = ({
                       required
                       className="eo-form-input"
                       value={currentShift.startTime}
-                      onChange={(e) => setCurrentShift({ ...currentShift, startTime: e.target.value })}
+                      onChange={(e) => handleShiftTimeChange('startTime', e.target.value)}
                     />
                   </div>
                   <div className="eo-form-group">
@@ -1243,7 +1520,7 @@ const EventCreationWizardModal = ({
                       required
                       className="eo-form-input"
                       value={currentShift.endTime}
-                      onChange={(e) => setCurrentShift({ ...currentShift, endTime: e.target.value })}
+                      onChange={(e) => handleShiftTimeChange('endTime', e.target.value)}
                     />
                   </div>
                 </div>
@@ -1254,65 +1531,157 @@ const EventCreationWizardModal = ({
                   const sE = new Date(currentShift.endTime);
                   const evS = new Date(createdEvent?.startTime || newEvent.startTime);
                   const evE = new Date(createdEvent?.endTime || newEvent.endTime);
-                  const isOutOfRange = !isNaN(sS.getTime()) && !isNaN(sE.getTime()) && !isNaN(evS.getTime()) && !isNaN(evE.getTime()) && (sS < evS || sE > evE);
+                  const isOutOfRange =
+                    !isNaN(sS.getTime()) &&
+                    !isNaN(sE.getTime()) &&
+                    !isNaN(evS.getTime()) &&
+                    !isNaN(evE.getTime()) &&
+                    (sS < evS || sE > evE);
                   if (isOutOfRange) {
                     return (
-                      <div style={{
-                        backgroundColor: '#fef2f2',
-                        border: '1px solid #fecaca',
-                        borderRadius: '0.375rem',
-                        padding: '0.5rem 0.75rem',
-                        fontSize: '0.8rem',
-                        color: '#dc2626',
-                        marginBottom: '0.75rem',
-                        fontWeight: 600
-                      }}>
-                        Chú ý: Thời gian ca làm phải nằm trọn trong khung giờ sự kiện ({formatDateTimeDisplay(evS)} - {formatDateTimeDisplay(evE)})
+                      <div
+                        style={{
+                          backgroundColor: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          borderRadius: '0.375rem',
+                          padding: '0.5rem 0.75rem',
+                          fontSize: '0.8rem',
+                          color: '#dc2626',
+                          marginBottom: '0.75rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Chú ý: Thời gian ca làm phải nằm trọn trong khung giờ sự kiện ({formatDateTimeDisplay(evS)} -{' '}
+                        {formatDateTimeDisplay(evE)})
                       </div>
                     );
                   }
                   return null;
                 })()}
 
-                <div className="eo-form-row">
-                  <div className="eo-form-group">
-                    <label>Số Lượng Nhân Sự Cần Tuyển *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      className="eo-form-input"
-                      value={currentShift.requiredWorkers}
-                      onKeyDown={(e) => {
-                        if (e.key === '-' || e.key === 'e') e.preventDefault();
+                {/* CHO EO CHỌN TÍNH LƯƠNG THEO GIỜ HOẶC THEO CA */}
+                <div className="eo-form-group" style={{ marginBottom: '0.6rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '0.5rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <label style={{ margin: 0 }}>Hình Thức Tính Thù Lao *</label>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        backgroundColor: '#e2e8f0',
+                        padding: '3px',
+                        borderRadius: '8px',
                       }}
-                      onChange={(e) =>
-                        setCurrentShift({
-                          ...currentShift,
-                          requiredWorkers: Math.max(1, parseInt(e.target.value, 10) || 1),
-                        })
-                      }
-                    />
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchWageMode('HOURLY')}
+                        style={{
+                          padding: '0.35rem 0.85rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: wageMode === 'HOURLY' ? '#2563eb' : 'transparent',
+                          color: wageMode === 'HOURLY' ? '#ffffff' : '#334155',
+                        }}
+                      >
+                        Tính theo giờ (VNĐ/giờ)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchWageMode('PER_SHIFT')}
+                        style={{
+                          padding: '0.35rem 0.85rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          borderRadius: '6px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: wageMode === 'PER_SHIFT' ? '#2563eb' : 'transparent',
+                          color: wageMode === 'PER_SHIFT' ? '#ffffff' : '#334155',
+                        }}
+                      >
+                        Tính theo ca (Trọn gói/ca)
+                      </button>
+                    </div>
                   </div>
-                  <div className="eo-form-group">
-                    <label>Mức Thù Lao Giờ (VNĐ/giờ) *</label>
-                    <input
-                      type="number"
-                      min="20000"
-                      step="5000"
-                      required
-                      className="eo-form-input"
-                      value={currentShift.hourlyWage}
-                      onKeyDown={(e) => {
-                        if (e.key === '-' || e.key === 'e') e.preventDefault();
-                      }}
-                      onChange={(e) =>
-                        setCurrentShift({
-                          ...currentShift,
-                          hourlyWage: Math.max(0, parseFloat(e.target.value) || 0),
-                        })
-                      }
-                    />
+
+                  <div className="eo-form-row" style={{ marginBottom: 0 }}>
+                    <div className="eo-form-group" style={{ marginBottom: 0 }}>
+                      <label>Số Lượng Nhân Sự Cần Tuyển *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        className="eo-form-input"
+                        value={currentShift.requiredWorkers}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e') e.preventDefault();
+                        }}
+                        onChange={(e) =>
+                          setCurrentShift({
+                            ...currentShift,
+                            requiredWorkers: Math.max(1, parseInt(e.target.value, 10) || 1),
+                          })
+                        }
+                      />
+                    </div>
+
+                    {wageMode === 'HOURLY' ? (
+                      <div className="eo-form-group" style={{ marginBottom: 0 }}>
+                        <label>Mức Thù Lao Theo Giờ (VNĐ/giờ) *</label>
+                        <input
+                          type="number"
+                          min="20000"
+                          step="5000"
+                          required
+                          className="eo-form-input"
+                          value={currentShift.hourlyWage}
+                          onKeyDown={(e) => {
+                            if (e.key === '-' || e.key === 'e') e.preventDefault();
+                          }}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                            setCurrentShift({
+                              ...currentShift,
+                              hourlyWage: val,
+                            });
+                            setShiftPackageWage(Math.round(val * currentDurationHours));
+                          }}
+                        />
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          = {Math.round(Number(currentShift.hourlyWage || 0) * currentDurationHours).toLocaleString()}đ / ca ({currentDurationHours} giờ)
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="eo-form-group" style={{ marginBottom: 0 }}>
+                        <label>Mức Thù Lao Trọn Gói Theo Ca (VNĐ/ca) *</label>
+                        <input
+                          type="number"
+                          min="20000"
+                          step="10000"
+                          required
+                          className="eo-form-input"
+                          value={shiftPackageWage}
+                          onKeyDown={(e) => {
+                            if (e.key === '-' || e.key === 'e') e.preventDefault();
+                          }}
+                          onChange={(e) => handlePackageWageChange(e.target.value)}
+                        />
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          Quy đổi tương đương: ~{Number(currentShift.hourlyWage || 0).toLocaleString()}đ/giờ ({currentDurationHours} giờ/ca)
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1334,17 +1703,21 @@ const EventCreationWizardModal = ({
                   <div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0369a1' }}>
                       Gợi ý mức lương thị trường ({currentShift.jobType}):{' '}
-                      {riskAnalysis.recommendation.min.toLocaleString()}đ - {riskAnalysis.recommendation.max.toLocaleString()}đ/giờ
+                      {((riskAnalysis?.recommendation?.min) || 40000).toLocaleString()}đ - {((riskAnalysis?.recommendation?.max) || 60000).toLocaleString()}đ/giờ
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.15rem' }}>
-                      Tiêu chí: {riskAnalysis.recommendation.note} • Mức đề xuất tối ưu:{' '}
-                      <strong>{riskAnalysis.recommendation.defaultWage.toLocaleString()}đ/giờ</strong>
+                      Tiêu chí: {riskAnalysis?.recommendation?.note || 'Tiêu chuẩn'} • Mức đề xuất tối ưu:{' '}
+                      <strong>{((riskAnalysis?.recommendation?.defaultWage) || 50000).toLocaleString()}đ/giờ</strong>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                     <button
                       type="button"
-                      onClick={() => setCurrentShift((prev) => ({ ...prev, hourlyWage: riskAnalysis.recommendation.min }))}
+                      onClick={() => {
+                        const minW = riskAnalysis?.recommendation?.min || 40000;
+                        setCurrentShift((prev) => ({ ...prev, hourlyWage: minW }));
+                        setShiftPackageWage(Math.round(minW * currentDurationHours));
+                      }}
                       style={{
                         fontSize: '0.72rem',
                         padding: '0.25rem 0.55rem',
@@ -1356,11 +1729,15 @@ const EventCreationWizardModal = ({
                         cursor: 'pointer',
                       }}
                     >
-                      Sàn: {riskAnalysis.recommendation.min.toLocaleString()}đ
+                      Sàn: {((riskAnalysis?.recommendation?.min) || 40000).toLocaleString()}đ
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCurrentShift((prev) => ({ ...prev, hourlyWage: riskAnalysis.recommendation.defaultWage }))}
+                      onClick={() => {
+                        const defW = riskAnalysis?.recommendation?.defaultWage || 50000;
+                        setCurrentShift((prev) => ({ ...prev, hourlyWage: defW }));
+                        setShiftPackageWage(Math.round(defW * currentDurationHours));
+                      }}
                       style={{
                         fontSize: '0.72rem',
                         padding: '0.25rem 0.55rem',
@@ -1372,11 +1749,15 @@ const EventCreationWizardModal = ({
                         cursor: 'pointer',
                       }}
                     >
-                      Khuyên dùng: {riskAnalysis.recommendation.defaultWage.toLocaleString()}đ
+                      Khuyên dùng: {((riskAnalysis?.recommendation?.defaultWage) || 50000).toLocaleString()}đ
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCurrentShift((prev) => ({ ...prev, hourlyWage: riskAnalysis.recommendation.max }))}
+                      onClick={() => {
+                        const maxW = riskAnalysis?.recommendation?.max || 60000;
+                        setCurrentShift((prev) => ({ ...prev, hourlyWage: maxW }));
+                        setShiftPackageWage(Math.round(maxW * currentDurationHours));
+                      }}
                       style={{
                         fontSize: '0.72rem',
                         padding: '0.25rem 0.55rem',
@@ -1388,7 +1769,7 @@ const EventCreationWizardModal = ({
                         cursor: 'pointer',
                       }}
                     >
-                      Thu hút nhanh: {riskAnalysis.recommendation.max.toLocaleString()}đ
+                      Thu hút nhanh: {((riskAnalysis?.recommendation?.max) || 60000).toLocaleString()}đ
                     </button>
                   </div>
                 </div>
@@ -1435,7 +1816,7 @@ const EventCreationWizardModal = ({
                   </div>
                 </div>
 
-                {/* CẢNH BÁO RISK SCORE - NGUY CƠ KHÓ TÌM NGƯỜI */}
+                {/* CẢNH BÁO KHÓ TÌM NHÂN SỰ (KHÔNG GHI RISK SCORE) */}
                 <div
                   style={{
                     backgroundColor:
@@ -1458,7 +1839,7 @@ const EventCreationWizardModal = ({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span
                       style={{
-                        fontSize: '0.82rem',
+                        fontSize: '0.85rem',
                         fontWeight: 700,
                         color:
                           riskAnalysis.level === 'HIGH'
@@ -1468,24 +1849,25 @@ const EventCreationWizardModal = ({
                             : '#15803d',
                       }}
                     >
-                      Chỉ số Risk Score (Nguy cơ khó tìm nhân sự): {riskAnalysis.riskScore}% —{' '}
                       {riskAnalysis.level === 'HIGH'
-                        ? 'Rủi ro cao (Khó tìm người)'
+                        ? 'Khó tìm nhân sự'
                         : riskAnalysis.level === 'MEDIUM'
-                        ? 'Rủi ro trung bình (Cần lưu ý)'
-                        : 'An toàn (Dễ thu hút ứng viên)'}
+                        ? 'Khá khó tìm nhân sự'
+                        : 'Dễ tìm nhân sự'}
                     </span>
 
                     {riskAnalysis.level !== 'LOW' && (
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          const nextWage = Math.max(currentShift.hourlyWage, riskAnalysis.recommendation.defaultWage);
                           setCurrentShift((prev) => ({
                             ...prev,
-                            hourlyWage: Math.max(prev.hourlyWage, riskAnalysis.recommendation.defaultWage),
+                            hourlyWage: nextWage,
                             maxDistanceKm: Math.max(prev.maxDistanceKm, 15),
-                          }))
-                        }
+                          }));
+                          setShiftPackageWage(Math.round(nextWage * currentDurationHours));
+                        }}
                         style={{
                           fontSize: '0.75rem',
                           fontWeight: 700,
@@ -1497,7 +1879,7 @@ const EventCreationWizardModal = ({
                           cursor: 'pointer',
                         }}
                       >
-                        Tối ưu ngay để dễ tuyển người
+                        Tối ưu ngay để dễ tìm nhân sự
                       </button>
                     )}
                   </div>
@@ -1511,71 +1893,30 @@ const EventCreationWizardModal = ({
                   )}
                 </div>
 
-                {/* Checklist công việc */}
-                <div className="eo-form-group" style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-                  <label style={{ fontWeight: 600, color: '#334155', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Checklist Đầu Việc Cho Ca Này ({currentShift.checklistItems.length})</span>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đồng bộ app Mobile Worker</span>
-                  </label>
-
-                  <div style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0' }}>
-                    <input
-                      type="text"
-                      className="eo-form-input"
-                      style={{ flex: 1 }}
-                      placeholder="Thêm đầu việc mới..."
-                      value={newChecklistItem}
-                      onChange={(e) => setNewChecklistItem(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddChecklist();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="eo-btn-secondary"
-                      style={{ padding: '0.4rem 0.85rem' }}
-                      onClick={handleAddChecklist}
-                    >
-                      + Thêm
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: '120px', overflowY: 'auto' }}>
-                    {currentShift.checklistItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          backgroundColor: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '0.25rem',
-                          padding: '0.35rem 0.6rem',
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        <span>
-                          <strong style={{ color: '#2563eb', marginRight: '0.35rem' }}>#{idx + 1}</strong>
-                          {item}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveChecklist(idx)}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}
-                        >
-                          X
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* CHECKLIST ĐẦU VIỆC CHO CA NÀY (CÓ NÚT YÊU CẦU EVIDENT + KÉO THẢ ĐẢO VỊ TRÍ) */}
+                <ShiftChecklistEditor
+                  items={currentShift.checklistItems}
+                  onChange={(updatedItems) =>
+                    setCurrentShift((prev) => ({
+                      ...prev,
+                      checklistItems: updatedItems,
+                    }))
+                  }
+                />
 
                 {/* Hộp dự toán cho ca này */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.85rem 1rem', backgroundColor: '#eff6ff', borderRadius: '0.5rem', marginBottom: '1rem', border: '1px solid #bfdbfe' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.35rem',
+                    padding: '0.85rem 1rem',
+                    backgroundColor: '#eff6ff',
+                    borderRadius: '0.5rem',
+                    marginBottom: '1rem',
+                    border: '1px solid #bfdbfe',
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.875rem', color: '#1e40af' }}>
                       Dự toán thù lao ca này: <strong>{currentDurationHours}h x {currentShift.requiredWorkers} người</strong>
@@ -1590,13 +1931,29 @@ const EventCreationWizardModal = ({
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  {editingShiftIndex !== null && (
+                    <button
+                      type="button"
+                      className="eo-btn-secondary"
+                      onClick={() => {
+                        setEditingShiftIndex(null);
+                        setIsAddingShift(false);
+                      }}
+                    >
+                      Hủy sửa ca
+                    </button>
+                  )}
                   <button
                     type="submit"
                     disabled={submitting}
                     className="eo-btn-primary"
                     style={{ background: '#2563eb' }}
                   >
-                    {submitting ? 'Đang lưu...' : 'Lưu Ca'}
+                    {submitting
+                      ? 'Đang lưu...'
+                      : editingShiftIndex !== null
+                      ? `Lưu Cập Nhật Ca #${editingShiftIndex + 1}`
+                      : 'Lưu Ca Làm Việc'}
                   </button>
                 </div>
               </form>
@@ -1634,6 +1991,33 @@ const EventCreationWizardModal = ({
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.25rem' }}>
               Kiểm tra lại thông tin sự kiện, địa chỉ tổ chức cụ thể và các ca làm việc trước khi lưu bản nháp hoặc kích hoạt tìm kiếm nhân sự ngay.
             </p>
+
+            {/* Hiển thị ảnh poster sự kiện trong 1 div riêng to rõ ở Bước 3 */}
+            {(newEvent.imageUrl || createdEvent?.imageUrl) && (
+              <div
+                style={{
+                  marginBottom: '1.25rem',
+                  borderRadius: '0.75rem',
+                  overflow: 'hidden',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#f8fafc',
+                }}
+              >
+                <img
+                  src={newEvent.imageUrl || createdEvent?.imageUrl}
+                  alt={createdEvent?.name || newEvent.name}
+                  style={{
+                    width: '100%',
+                    maxHeight: '240px',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
 
             <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.65rem' }}>

@@ -13,7 +13,7 @@ import 'package:cani/features/skill_verification/screens/skill_hub_screen.dart';
 class ProfileCvBlock extends ConsumerWidget {
   const ProfileCvBlock({super.key});
 
-  void _openEditSheet(BuildContext context, WidgetRef ref) {
+  void _openEditSheet(BuildContext context, WidgetRef ref, {bool focusBio = false}) {
     final exp = ref.read(workerExperienceProvider).experience;
     showModalBottomSheet(
       context: context,
@@ -22,7 +22,10 @@ class ProfileCvBlock extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => WorkerExperienceEditSheet(initialExperience: exp),
+      builder: (_) => WorkerExperienceEditSheet(
+        initialExperience: exp,
+        focusBio: focusBio,
+      ),
     );
   }
 
@@ -126,6 +129,7 @@ class ProfileCvBlock extends ConsumerWidget {
             label: 'Kinh nghiệm sự kiện',
             value: yearsExpText,
             isHighlight: (exp?.yearsExperience ?? 0) > 0,
+            onTap: () => _openEditSheet(context, ref, focusBio: false),
           ),
           const Divider(height: 14, color: Color(0xFFF1F5F9)),
 
@@ -158,7 +162,7 @@ class ProfileCvBlock extends ConsumerWidget {
           ),
           const Divider(height: 14, color: Color(0xFFF1F5F9)),
 
-          // Giới thiệu bản thân (Bio)
+          // Giới thiệu bản thân (Bio) - Cho phép chạm trực tiếp để chỉnh sửa
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -173,24 +177,70 @@ class ProfileCvBlock extends ConsumerWidget {
                           fontWeight: FontWeight.w500,
                         ),
                   ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () => _openEditSheet(context, ref, focusBio: true),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_outlined, size: 13, color: t.accentDeep),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Chỉnh sửa',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: t.accentDeep,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: t.surface.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: t.border.withValues(alpha: 0.5)),
-                ),
-                child: Text(
-                  bioText,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontStyle: (exp?.bio == null || exp!.bio!.trim().isEmpty) ? FontStyle.italic : FontStyle.normal,
-                    color: (exp?.bio == null || exp!.bio!.trim().isEmpty) ? t.muted : t.text,
-                    height: 1.4,
+              InkWell(
+                onTap: () => _openEditSheet(context, ref, focusBio: true),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: t.surface.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: (exp?.bio == null || exp!.bio!.trim().isEmpty)
+                          ? const Color(0xFF0066FF).withValues(alpha: 0.3)
+                          : t.border.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          (exp?.bio != null && exp!.bio!.trim().isNotEmpty)
+                              ? exp.bio!.trim()
+                              : 'Chưa cập nhật giới thiệu bản thân (Chạm để nhập)...',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontStyle: (exp?.bio == null || exp!.bio!.trim().isEmpty) ? FontStyle.italic : FontStyle.normal,
+                            color: (exp?.bio == null || exp!.bio!.trim().isEmpty) ? const Color(0xFF0066FF) : t.text,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.edit_note_rounded,
+                        size: 18,
+                        color: t.accentDeep.withValues(alpha: 0.7),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -209,6 +259,7 @@ class _InfoRow extends StatelessWidget {
     required this.value,
     this.isHighlight = false,
     this.valueColor,
+    this.onTap,
   });
 
   final IconData icon;
@@ -216,12 +267,13 @@ class _InfoRow extends StatelessWidget {
   final String value;
   final bool isHighlight;
   final Color? valueColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).profileX;
 
-    return Row(
+    final row = Row(
       children: [
         Icon(icon, size: 18, color: t.accentDeep),
         const SizedBox(width: 10),
@@ -246,7 +298,24 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ),
+        if (onTap != null) ...[
+          const SizedBox(width: 4),
+          Icon(Icons.edit_outlined, size: 13, color: t.accentDeep.withValues(alpha: 0.8)),
+        ],
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: row,
+        ),
+      );
+    }
+
+    return row;
   }
 }

@@ -18,6 +18,7 @@ class NearbyShiftItem {
   final String? imageUrl;
   final bool isConflicting;
   final String? conflictReason;
+  final bool emergency;
 
   const NearbyShiftItem({
     required this.shiftId,
@@ -39,6 +40,7 @@ class NearbyShiftItem {
     this.imageUrl,
     this.isConflicting = false,
     this.conflictReason,
+    this.emergency = false,
   });
 
   factory NearbyShiftItem.fromJson(Map<String, dynamic> json) {
@@ -62,6 +64,7 @@ class NearbyShiftItem {
       imageUrl: json['imageUrl'] as String?,
       isConflicting: json['isConflicting'] as bool? ?? false,
       conflictReason: json['conflictReason'] as String?,
+      emergency: json['emergency'] as bool? ?? false,
     );
   }
 }

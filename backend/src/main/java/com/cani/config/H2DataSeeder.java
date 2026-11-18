@@ -35,6 +35,9 @@ public class H2DataSeeder implements CommandLineRunner {
     private final ReliabilityLogRepository reliabilityLogRepository;
     private final RsAppealRepository rsAppealRepository;
     private final FaqRepository faqRepository;
+    private final WorkerSkillRepository workerSkillRepository;
+    private final WorkerSkillPointRepository workerSkillPointRepository;
+    private final SkillVerificationRequestRepository skillVerificationRequestRepository;
 
     @Override
     public void run(String... args) {
@@ -309,6 +312,9 @@ public class H2DataSeeder implements CommandLineRunner {
             penaltyLog = reliabilityLogRepository.save(penaltyLog);
 
             worker.setReliabilityScore(75);
+            worker.setTotalShiftsCompleted(5);
+            worker.setKycStatus(KycStatus.APPROVED);
+            worker.setIsOnline(true);
             workerRepository.save(worker);
 
             if (rsAppealRepository.count() == 0) {
@@ -325,6 +331,116 @@ public class H2DataSeeder implements CommandLineRunner {
                         .build();
                 rsAppealRepository.save(appeal);
                 log.info("==> [H2 Profile] Seeded 1 sample RS Appeal for UC-94 (appealId: {}).", appeal.getId());
+            }
+
+            // 4b. Seed WorkerSkill, WorkerSkillPoint & SkillVerificationRequest cho demo Worker
+            if (workerSkillRepository.count() == 0) {
+                Skill sLeTan = skillRepository.findByName("Lễ tân / Check-in").orElse(null);
+                Skill sPhucVu = skillRepository.findByName("Phục vụ bàn").orElse(null);
+                Skill sHauCan = skillRepository.findByName("Hậu cần / Setup sự kiện").orElse(null);
+
+                if (sLeTan != null) {
+                    workerSkillRepository.save(WorkerSkill.builder()
+                            .worker(worker)
+                            .skill(sLeTan)
+                            .proficiency(ExperienceLevel.ADVANCED)
+                            .verificationTier(VerificationTier.AI_DOCUMENT)
+                            .spVerifyAwarded(50)
+                            .verifiedAt(now.minus(5, ChronoUnit.DAYS))
+                            .build());
+                }
+                if (sPhucVu != null) {
+                    workerSkillRepository.save(WorkerSkill.builder()
+                            .worker(worker)
+                            .skill(sPhucVu)
+                            .proficiency(ExperienceLevel.INTERMEDIATE)
+                            .verificationTier(VerificationTier.SELF_DECLARED)
+                            .spVerifyAwarded(0)
+                            .build());
+                }
+                if (sHauCan != null) {
+                    workerSkillRepository.save(WorkerSkill.builder()
+                            .worker(worker)
+                            .skill(sHauCan)
+                            .proficiency(ExperienceLevel.BEGINNER)
+                            .verificationTier(VerificationTier.SELF_DECLARED)
+                            .spVerifyAwarded(0)
+                            .build());
+                }
+                log.info("==> [H2 Profile] Seeded demo WorkerSkills for worker {}", worker.getWorkerId());
+            }
+
+            if (workerSkillPointRepository.count() == 0) {
+                workerSkillPointRepository.save(WorkerSkillPoint.builder()
+                        .worker(worker)
+                        .jobType("Lễ tân / Check-in")
+                        .spVerify(50)
+                        .spExperience(200)
+                        .spRating(110)
+                        .totalSp(360)
+                        .tier(SkillTier.GOLD)
+                        .totalShiftsCompleted(5)
+                        .totalShiftsCancelled(0)
+                        .avgRating(new BigDecimal("4.90"))
+                        .build());
+
+                workerSkillPointRepository.save(WorkerSkillPoint.builder()
+                        .worker(worker)
+                        .jobType("Phục vụ bàn")
+                        .spVerify(0)
+                        .spExperience(120)
+                        .spRating(60)
+                        .totalSp(180)
+                        .tier(SkillTier.SILVER)
+                        .totalShiftsCompleted(3)
+                        .totalShiftsCancelled(0)
+                        .avgRating(new BigDecimal("4.75"))
+                        .build());
+                log.info("==> [H2 Profile] Seeded demo WorkerSkillPoints (GOLD & SILVER)");
+            }
+
+            if (skillVerificationRequestRepository.count() == 0) {
+                Skill sLeTan = skillRepository.findByName("Lễ tân / Check-in").orElse(null);
+                Skill sPhaChe = skillRepository.findByName("Pha chế (Bartender/Barista)").orElse(null);
+
+                skillVerificationRequestRepository.save(SkillVerificationRequest.builder()
+                        .worker(worker)
+                        .skill(sLeTan)
+                        .jobType("Lễ tân / Check-in")
+                        .documentUrl("https://storage.cani.vn/certificates/cert-hospitality-reception.jpg")
+                        .documentName("Chứng chỉ Nghiệp vụ Lễ tân Sự kiện & Khách sạn Quốc tế")
+                        .documentType("CERTIFICATE")
+                        .recipientName("NGUYỄN VĂN AN")
+                        .institution("Trường Cao đẳng Du lịch Sài Gòn")
+                        .issueDate("15/06/2025")
+                        .extractedSkills("[\"Lễ tân / Check-in\", \"Giao tiếp tiếng Anh sự kiện\"]")
+                        .hasSealOrSignature(true)
+                        .overallConfidence(new BigDecimal("0.92"))
+                        .routingDecision(RoutingDecision.AUTO_APPROVE)
+                        .routingReason("AI xác thực chứng chỉ hợp lệ, có dấu mộc đỏ và tên trùng khớp với hồ sơ eKYC.")
+                        .status(SkillVerificationStatus.APPROVED)
+                        .spAwarded(50)
+                        .build());
+
+                skillVerificationRequestRepository.save(SkillVerificationRequest.builder()
+                        .worker(worker)
+                        .skill(sPhaChe)
+                        .jobType("Pha chế (Bartender/Barista)")
+                        .documentUrl("https://storage.cani.vn/certificates/cert-barista-basic.jpg")
+                        .documentName("Giấy chứng nhận Khóa học Pha chế Barista Chuyên nghiệp")
+                        .documentType("CERTIFICATE")
+                        .recipientName("NGUYỄN VĂN AN")
+                        .institution("Trung tâm Đào tạo Pha chế Á Âu")
+                        .issueDate("10/09/2025")
+                        .extractedSkills("[\"Pha chế (Bartender/Barista)\"]")
+                        .hasSealOrSignature(true)
+                        .overallConfidence(new BigDecimal("0.78"))
+                        .routingDecision(RoutingDecision.MANUAL_REVIEW)
+                        .routingReason("Độ tin cậy OCR ở ngưỡng trung bình (0.78), chuyển Admin / CSKH duyệt thủ công.")
+                        .status(SkillVerificationStatus.PENDING_REVIEW)
+                        .spAwarded(0)
+                        .build());
+                log.info("==> [H2 Profile] Seeded 2 demo SkillVerificationRequests (APPROVED & PENDING_REVIEW)");
             }
         }
 
@@ -349,6 +465,11 @@ public class H2DataSeeder implements CommandLineRunner {
                         .build();
                 Event savedEvent1 = eventRepository.save(event1);
 
+                Skill sLeTanRef = skillRepository.findByName("Lễ tân / Check-in").orElse(null);
+                UUID[] shift1Skills = (sLeTanRef != null && sLeTanRef.getSkillId() != null)
+                        ? new UUID[]{sLeTanRef.getSkillId()}
+                        : null;
+
                 Shift shift1 = Shift.builder()
                         .event(savedEvent1)
                         .jobType("Lễ tân / Check-in")
@@ -365,6 +486,8 @@ public class H2DataSeeder implements CommandLineRunner {
                         .endTime(Instant.now().plus(Duration.ofHours(9)))
                         .status(ShiftStatus.ACTIVE)
                         .minExperienceLevel(ExperienceLevel.BEGINNER)
+                        .requiredSkills(shift1Skills)
+                        .emergency(false)
                         .build();
 
                 // Event 2: SECC Q7 (~6.5 km from center)
@@ -435,6 +558,7 @@ public class H2DataSeeder implements CommandLineRunner {
                         .endTime(Instant.now().plus(Duration.ofHours(10)))
                         .status(ShiftStatus.ACTIVE)
                         .minExperienceLevel(ExperienceLevel.BEGINNER)
+                        .emergency(true)
                         .build();
 
                 shiftRepository.saveAll(List.of(shift1, shift2, shift3));

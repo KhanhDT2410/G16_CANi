@@ -27,9 +27,13 @@ void main() async {
   await FcmService.initialize(
     onNotificationNavigate: (data) {
       debugPrint('[Notification Navigate] Navigating from notification data: $data');
+      final rawType = (data['type'] ?? data['payload'] ?? '').toString().toUpperCase();
+      final isProposal = rawType.contains('NEW_PROPOSAL') ||
+          rawType.contains('EMERGENCY_PROPOSAL') ||
+          rawType.contains('PROPOSAL');
       rootNavigatorKey.currentState?.push(
         MaterialPageRoute(
-          builder: (_) => const MyAssignmentsScreen(),
+          builder: (_) => MyAssignmentsScreen(initialTabIndex: isProposal ? 1 : 0),
         ),
       );
     },

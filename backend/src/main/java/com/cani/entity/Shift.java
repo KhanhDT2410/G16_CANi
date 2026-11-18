@@ -114,6 +114,10 @@ public class Shift {
     @Column(name = "checklist", columnDefinition = "jsonb")
     private String checklist;
 
+    @Column(name = "emergency", nullable = false)
+    @Builder.Default
+    private Boolean emergency = false;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

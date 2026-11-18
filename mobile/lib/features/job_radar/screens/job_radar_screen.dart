@@ -961,9 +961,27 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                         '${shift.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ/h',
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF16A34A)),
                       ),
-                      Text(
-                        'Cần: ${shift.remainingWorkers}/${shift.requiredWorkers} người',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.bold),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: shift.emergency
+                              ? const Color(0xFFFEF2F2)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: shift.emergency
+                                ? const Color(0xFFFCA5A5)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        child: Text(
+                          shift.emergency ? '🚨 Khẩn cấp (Mở ứng tuyển)' : 'Chờ lời mời (Matching)',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: shift.emergency ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -995,6 +1013,17 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   }
 
   Future<void> _applyQuick(BuildContext context, NearbyShiftItem shift) async {
+    if (!shift.emergency) {
+      if (mounted) {
+        ScaffoldMessenger.of(this.context).showSnackBar(
+          const SnackBar(
+            content: Text('Ca này chưa ở chế độ khẩn cấp — hãy chờ lời mời việc (Matching) từ Ban tổ chức!'),
+            backgroundColor: Color(0xFFF59E0B),
+          ),
+        );
+      }
+      return;
+    }
     try {
       await ref.read(jobRadarRepositoryProvider).applyForShift(shift.shiftId);
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();

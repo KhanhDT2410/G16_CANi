@@ -50,6 +50,9 @@ class MatchingDispatchServiceTest {
     @Mock
     private NotificationService notificationService;
 
+    @Mock
+    private com.cani.repository.WorkerSkillRepository workerSkillRepository;
+
     @InjectMocks
     private MatchingDispatchService matchingDispatchService;
 
@@ -63,6 +66,7 @@ class MatchingDispatchServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(matchingDispatchService, "notificationService", notificationService);
+        ReflectionTestUtils.setField(matchingDispatchService, "workerSkillRepository", workerSkillRepository);
 
         UUID eventId = UUID.randomUUID();
         sampleEvent = Event.builder()
@@ -284,13 +288,44 @@ class MatchingDispatchServiceTest {
             when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
             when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(experiencedWorker));
             when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
-            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(), anyList())).thenReturn(false);
             when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
 
             int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
 
             assertEquals(1, dispatched);
             verify(dispatchProposalRepository, times(1)).save(any(DispatchProposal.class));
+        }
+
+        @Test
+        @DisplayName("MATCH009b: Ca làm việc có requiredSkills -> Chỉ Worker có đủ kỹ năng mới được nhận đề xuất")
+        void passHardFilter_RequiredSkills_FiltersCorrectly() {
+            UUID reqSkillId = UUID.randomUUID();
+            Skill reqSkill = Skill.builder().skillId(reqSkillId).name("Lễ tân / Check-in").build();
+            sampleShift.setRequiredSkills(new UUID[]{reqSkillId});
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker, experiencedWorker));
+            when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+
+            // onlineWorker chưa có skill; experiencedWorker có đủ skill (AI_DOCUMENT)
+            when(workerSkillRepository.findByWorker_WorkerId(onlineWorker.getWorkerId())).thenReturn(Collections.emptyList());
+            when(workerSkillRepository.findByWorker_WorkerId(experiencedWorker.getWorkerId())).thenReturn(List.of(
+                    WorkerSkill.builder()
+                            .worker(experiencedWorker)
+                            .skill(reqSkill)
+                            .verificationTier(VerificationTier.AI_DOCUMENT)
+                            .build()
+            ));
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(), anyList())).thenReturn(false);
+            when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
+
+            int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
+
+            assertEquals(1, dispatched);
+            verify(dispatchProposalRepository, times(1)).save(argThat(p ->
+                    p.getWorker().getWorkerId().equals(experiencedWorker.getWorkerId())
+            ));
         }
 
         @Test
@@ -370,20 +405,40 @@ class MatchingDispatchServiceTest {
         }
 
         @Test
-        @DisplayName("MATCH014: Worker đã nhận proposal hoặc assignment trước đó cho ca này -> không tạo trùng")
+        @DisplayName("MATCH014: Worker đã nhận proposal đang PENDING/ACCEPTED hoặc assignment trước đó cho ca này -> không tạo trùng")
         void dispatchForShift_DuplicateProposalOrAssignment_SkipsWorker() {
             when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
             when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
             when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
 
-            // Đã tồn tại proposal
-            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(sampleShift.getShiftId(), onlineWorker.getWorkerId()))
+            // Đã tồn tại proposal PENDING hoặc ACCEPTED
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(
+                    eq(sampleShift.getShiftId()), eq(onlineWorker.getWorkerId()), anyList()))
                     .thenReturn(true);
 
             int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
 
             assertEquals(0, dispatched);
             verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("MATCH014b: Worker có proposal cũ đã REJECTED/EXPIRED được phép nhận lại proposal mới")
+        void dispatchForShift_RejectedOrExpiredProposal_AllowsRedispatch() {
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
+            when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+
+            // Không có proposal nào đang PENDING hoặc ACCEPTED
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(
+                    eq(sampleShift.getShiftId()), eq(onlineWorker.getWorkerId()), anyList()))
+                    .thenReturn(false);
+            when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
+
+            int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
+
+            assertEquals(1, dispatched);
+            verify(dispatchProposalRepository, times(1)).save(any(DispatchProposal.class));
         }
 
         @Test
@@ -409,7 +464,7 @@ class MatchingDispatchServiceTest {
             when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
             when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
             when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
-            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(), anyList())).thenReturn(false);
             when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
 
             when(dispatchProposalRepository.save(any(DispatchProposal.class))).thenAnswer(inv -> {
@@ -465,7 +520,7 @@ class MatchingDispatchServiceTest {
             when(shiftRepository.findById(shift2.getShiftId())).thenReturn(Optional.of(shift2));
             when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
             when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
-            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(), anyList())).thenReturn(false);
             when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
 
             // Act
@@ -499,7 +554,7 @@ class MatchingDispatchServiceTest {
             when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
             when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(workerB, onlineWorker));
             when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
-            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(), anyList())).thenReturn(false);
             when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
 
             // Act

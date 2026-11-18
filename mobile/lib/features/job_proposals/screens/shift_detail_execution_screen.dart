@@ -47,6 +47,17 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   File? _proofImageFile;
   String? _uploadedProofUrl;
   bool _isUploadingProof = false;
+  bool _isConfirmingPayment = false;
+
+  bool get _isCheckedIn =>
+      _assignment.status == 'CHECKED_IN' ||
+      (_assignment.checkinTime != null && _assignment.checkoutTime == null);
+
+  bool get _isPaymentConfirmed =>
+      (_assignment.workerConfirmStatus != null && _assignment.workerConfirmStatus!.isNotEmpty) ||
+      _assignment.paymentStatus == 'CONFIRMED_FULL' ||
+      _assignment.paymentStatus == 'CONFIRMED_PARTIAL' ||
+      _assignment.paymentStatus == 'DISPUTED';
 
   // Countdown timer
   Timer? _countdownTimer;
@@ -173,6 +184,15 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _toggleChecklistItem(int index) async {
+    if (!_isCheckedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc!'),
+          backgroundColor: Color(0xFFF59E0B),
+        ),
+      );
+      return;
+    }
     final current = _checklistItems[index];
 
     // Nếu đang hoàn thành mà muốn bỏ hoàn thành
@@ -300,6 +320,15 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _captureEvidenceForTask(int index) async {
+    if (!_isCheckedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vào ca (quét QR check-in) để chụp ảnh nghiệm thu đầu việc!'),
+          backgroundColor: Color(0xFFF59E0B),
+        ),
+      );
+      return;
+    }
     final item = _checklistItems[index];
     try {
       final picked = await _chooseOrCaptureImage();
@@ -489,6 +518,15 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _addNewChecklistItem() async {
+    if (!_isCheckedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vào ca (quét QR check-in) để thêm và tích chọn đầu việc!'),
+          backgroundColor: Color(0xFFF59E0B),
+        ),
+      );
+      return;
+    }
     final titleController = TextEditingController();
     final instructionController = TextEditingController();
 
@@ -639,6 +677,86 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     }
   }
 
+  Future<void> _handleConfirmPayment(String status) async {
+    String comment = 'Đã nhận đủ thù lao theo thỏa thuận.';
+    if (status == 'RECEIVED_PARTIAL' || status == 'NOT_RECEIVED') {
+      final ctrl = TextEditingController();
+      final dialogResult = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            status == 'RECEIVED_PARTIAL' ? 'Xác nhận nhận một phần' : 'Báo cáo chưa nhận thù lao',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: TextField(
+            controller: ctrl,
+            maxLines: 3,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Chi tiết số tiền / Lý do khiếu nại (*)',
+              hintText: status == 'RECEIVED_PARTIAL'
+                  ? 'Ví dụ: Đã nhận 150.000đ tiền mặt, còn thiếu 50.000đ phụ cấp...'
+                  : 'Ví dụ: Đã kết thúc ca làm việc nhưng Ban tổ chức chưa thanh toán thù lao...',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+            FilledButton(
+              onPressed: () {
+                if (ctrl.text.trim().length >= 4) {
+                  Navigator.pop(ctx, ctrl.text.trim());
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: status == 'NOT_RECEIVED' ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+              ),
+              child: const Text('Xác nhận gửi'),
+            ),
+          ],
+        ),
+      );
+      if (dialogResult == null || dialogResult.isEmpty) return;
+      comment = dialogResult;
+    }
+
+    try {
+      setState(() => _isConfirmingPayment = true);
+      await ref.read(proposalRepositoryProvider).confirmPayment(
+            _assignment.assignmentId,
+            status,
+            comment,
+          );
+      await _refreshAssignment();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              status == 'NOT_RECEIVED'
+                  ? 'Đã ghi nhận khiếu nại chưa nhận tiền và mở hồ sơ tranh chấp cho CSKH — bạn có thể kết ca!'
+                  : 'Đã xác nhận thanh toán thành công — bạn có thể kết ca!',
+            ),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi xác nhận thanh toán: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isConfirmingPayment = false);
+      }
+    }
+  }
+
   Future<void> _handleBottomAction() async {
     final isCheckedIn = _assignment.status == 'CHECKED_IN' ||
         (_assignment.checkinTime != null && _assignment.checkoutTime == null);
@@ -668,6 +786,15 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         _refreshAssignment();
       }
     } else {
+      if (!_isPaymentConfirmed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Hãy xác nhận tình trạng thanh toán thù lao ở mục "Thanh toán thù lao" trước khi kết ca!'),
+            backgroundColor: Color(0xFFF59E0B),
+          ),
+        );
+        return;
+      }
       // Check-out: Kiểm tra xem còn task nào chưa hoàn thành hoặc thiếu ảnh không
       final incompleteTasks = _checklistItems.where((i) => !i.isCompleted).toList();
       final missingEvidenceTasks = _checklistItems.where((i) => i.isRequiredEvidence && (i.evidenceImageUrl == null || i.evidenceImageUrl!.isEmpty)).toList();
@@ -1117,6 +1244,34 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                         ),
                         const SizedBox(height: 14),
 
+                        if (!isCheckedIn && !isCompleted)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF451A03) : const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFFBBF24)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.lock_clock_outlined, size: 18, color: Color(0xFFD97706)),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         if (_isLoadingChecklist)
                           const Center(
                             child: Padding(
@@ -1565,6 +1720,165 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     ),
                   ),
 
+                  // 6b. Xác nhận Thanh toán Thù lao (Hard Gate trước Check-out)
+                  if (isCheckedIn || isCompleted)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _isPaymentConfirmed ? const Color(0xFF86EFAC) : const Color(0xFFBFDBFE),
+                          width: 1.5,
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.payments_outlined, size: 20, color: Color(0xFF0066FF)),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'THANH TOÁN THÙ LAO',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _isPaymentConfirmed ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _isPaymentConfirmed ? 'Đã xác nhận' : _assignment.paymentStatus,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isPaymentConfirmed ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Thù lao thỏa thuận:', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                              Text(
+                                '${_assignment.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('BTC khai báo thanh toán:', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                              Text(
+                                _assignment.declaredAmount > 0
+                                    ? '${_assignment.declaredAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ'
+                                    : 'Chưa khai báo',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: _assignment.declaredAmount > 0 ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_assignment.paymentProofUrl != null && _assignment.paymentProofUrl!.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            GestureDetector(
+                              onTap: () => _showEvidenceViewer(_assignment.paymentProofUrl!, 'Chứng từ thanh toán từ BTC'),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  _resolveImageUrl(_assignment.paymentProofUrl!),
+                                  height: 110,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => Container(
+                                    height: 80,
+                                    color: Colors.grey.shade200,
+                                    child: const Center(child: Text('Không thể tải ảnh chứng từ', style: TextStyle(fontSize: 12))),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          if (_isPaymentConfirmed)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF86EFAC)),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.check_circle, size: 18, color: Color(0xFF16A34A)),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Đã xác nhận thanh toán — bạn có thể kết ca',
+                                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (_isConfirmingPayment)
+                            const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
+                          else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () => _handleConfirmPayment('RECEIVED_FULL'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF16A34A),
+                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    child: const Text('Đã nhận đủ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () => _handleConfirmPayment('RECEIVED_PARTIAL'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD97706),
+                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    child: const Text('Đã nhận 1 phần', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () => _handleConfirmPayment('NOT_RECEIVED'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFFDC2626),
+                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    child: const Text('Chưa nhận', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+
                   // 7. Quick Actions Row (Gọi điện, Chat, Chỉ đường)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -1621,7 +1935,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isCompleted
                         ? const Color(0xFF0D9488)
-                        : (isCheckedIn ? const Color(0xFFEA580C) : const Color(0xFF0066FF)),
+                        : (isCheckedIn
+                            ? (_isPaymentConfirmed ? const Color(0xFFEA580C) : const Color(0xFF64748B))
+                            : const Color(0xFF0066FF)),
                     foregroundColor: Colors.white,
                     elevation: 3,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1635,19 +1951,28 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           shape: BoxShape.circle,
                           color: Colors.white.withValues(alpha: 0.2),
                         ),
-                        child: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white),
+                        child: Icon(
+                          (isCheckedIn && !_isPaymentConfirmed) ? Icons.lock_outline : Icons.arrow_forward_ios,
+                          size: 14,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        isCompleted
-                            ? 'ĐÃ HOÀN THÀNH CA (ĐÁNH GIÁ BTC)'
-                            : (isCheckedIn
-                                ? 'QUÉT QR CHECK-OUT (NỘP NGHIỆM THU)'
-                                : 'QUÉT QR CHECK-IN (VÀO CA)'),
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
+                      Flexible(
+                        child: Text(
+                          isCompleted
+                              ? 'ĐÃ HOÀN THÀNH CA (ĐÁNH GIÁ BTC)'
+                              : (isCheckedIn
+                                  ? (_isPaymentConfirmed
+                                      ? 'QUÉT QR CHECK-OUT (NỘP NGHIỆM THU)'
+                                      : 'XÁC NHẬN THANH TOÁN TRƯỚC KHI KẾT CA')
+                                  : 'QUÉT QR CHECK-IN (VÀO CA)'),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.3,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

@@ -14,7 +14,9 @@ import 'attendance_qr_scanner_screen.dart';
 import 'shift_detail_execution_screen.dart';
 
 class MyAssignmentsScreen extends ConsumerStatefulWidget {
-  const MyAssignmentsScreen({super.key});
+  final int initialTabIndex;
+
+  const MyAssignmentsScreen({super.key, this.initialTabIndex = 0});
 
   @override
   ConsumerState<MyAssignmentsScreen> createState() => _MyAssignmentsScreenState();
@@ -29,6 +31,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTabIndex = widget.initialTabIndex;
     _loadAllData();
   }
 

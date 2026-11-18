@@ -297,20 +297,54 @@ class JobDetailBottomSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              // Nút Ứng tuyển
+              // Nút Ứng tuyển (Chỉ mở khi ca đang ở chế độ Khẩn cấp / Emergency)
               Expanded(
                 flex: 6,
                 child: SizedBox(
                   height: 48,
-                  child: FilledButton.icon(
-                    onPressed: onApply,
-                    icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Ứng tuyển ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0066FF),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
+                  child: shift.emergency
+                      ? FilledButton.icon(
+                          onPressed: onApply,
+                          icon: const Icon(Icons.flash_on_rounded, size: 18),
+                          label: const Text('Ứng tuyển khẩn cấp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        )
+                      : Container(
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.schedule_send_rounded,
+                                size: 16,
+                                color: Color(0xFF64748B),
+                              ),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Chờ lời mời (Matching)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: Color(0xFF475569),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                 ),
               ),
             ],

@@ -44,6 +44,13 @@ public class MatchingDispatchService {
     @Autowired(required = false)
     private com.cani.repository.SystemConfigRepository systemConfigRepository;
 
+    @Autowired(required = false)
+    private com.cani.repository.WorkerSkillRepository workerSkillRepository;
+
+    private static final List<ProposalStatus> ACTIVE_PROPOSAL_STATUSES = List.of(
+            ProposalStatus.PENDING, ProposalStatus.ACCEPTED
+    );
+
     private static final double MAX_DISTANCE_KM = 15.0;
     private static final int MIN_RELIABILITY_SCORE = 60;
     private static final int DEFAULT_TIMEOUT_HOURS = 1;
@@ -120,7 +127,7 @@ public class MatchingDispatchService {
             }
 
             // STEP 2: SOFT RANKING SCORE
-            CandidateMatch match = calculateSoftScore(worker, distanceKm);
+            CandidateMatch match = calculateSoftScore(worker, distanceKm, maxAllowedDistanceKm, shift);
             matchedCandidates.add(match);
         }
 
@@ -138,8 +145,8 @@ public class MatchingDispatchService {
 
         for (CandidateMatch candidate : topCandidates) {
             Worker worker = candidate.getWorker();
-            // Nếu đã có proposal hoặc assignment thì không tạo trùng
-            if (dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId()) ||
+            // Chỉ chặn nếu đã có proposal đang chờ/đã nhận (PENDING, ACCEPTED) hoặc đã có assignment
+            if (dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shiftId, worker.getWorkerId(), ACTIVE_PROPOSAL_STATUSES) ||
                 shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
                 continue;
             }
@@ -219,6 +226,24 @@ public class MatchingDispatchService {
             }
         }
 
+        // 4b. Kiểm tra kỹ năng bắt buộc theo tiêu chí ca làm việc (requiredSkills - containsAll)
+        if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
+            Set<UUID> requiredSkillIds = Arrays.stream(shift.getRequiredSkills())
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!requiredSkillIds.isEmpty()) {
+                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
+                Set<UUID> haveSkillIds = workerSkills == null ? Collections.emptySet() :
+                        workerSkills.stream()
+                                .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
+                                .map(ws -> ws.getSkill().getSkillId())
+                                .collect(Collectors.toSet());
+                if (!haveSkillIds.containsAll(requiredSkillIds)) {
+                    return false;
+                }
+            }
+        }
+
         // 5. Kiểm tra xung đột lịch làm việc (Không được trùng ca đã xác nhận/đang chờ)
         List<AssignmentStatus> activeStatuses = List.of(
                 AssignmentStatus.CONFIRMED,
@@ -252,9 +277,10 @@ public class MatchingDispatchService {
     /**
      * Soft Ranking Score: Tính điểm xếp hạng ứng viên dựa trên 4 thành phần + Điểm thưởng
      */
-    private CandidateMatch calculateSoftScore(Worker worker, double distanceKm) {
-        // 1. Distance Score: 100 - (distance / 15) * 100 (Trọng số 0.4)
-        double distanceScore = Math.max(0.0, 100.0 - (distanceKm / MAX_DISTANCE_KM) * 100.0);
+    private CandidateMatch calculateSoftScore(Worker worker, double distanceKm, double maxAllowedDistanceKm, Shift shift) {
+        double effectiveMaxDist = maxAllowedDistanceKm > 0 ? maxAllowedDistanceKm : MAX_DISTANCE_KM;
+        // 1. Distance Score: 100 - (distance / maxAllowedDistanceKm) * 100 (Trọng số 0.4)
+        double distanceScore = Math.max(0.0, 100.0 - (distanceKm / effectiveMaxDist) * 100.0);
 
         // 2. Rating Score: (avg_rating / 5) * 100 (Trọng số 0.3)
         double rating = worker.getRatingAvg() != null ? worker.getRatingAvg().doubleValue() : 5.0;
@@ -272,14 +298,31 @@ public class MatchingDispatchService {
         double idleWorkerBoostConfig = getConfigDouble("fairness.idle_worker_boost", 10.0);
 
         double newWorkerBonus = (completedShifts < 3) ? newWorkerBoostConfig : 0.0;
-        double idleBonus = idleWorkerBoostConfig;
+        double idleBonus = (completedShifts >= 3 && Boolean.TRUE.equals(worker.getIsOnline())) ? idleWorkerBoostConfig : 0.0;
 
-        double finalScore = (0.4 * distanceScore) + (0.3 * ratingScore) + (0.2 * expScore) + (0.1 * rsScore) + newWorkerBonus + idleBonus;
+        // Bonus kỹ năng đã xác thực (AI_DOCUMENT / ADMIN_REVIEW): +10.0 (tương đương +0.1 trên thang chuẩn hóa)
+        double skillBonus = 0.0;
+        if (shift != null && shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
+            Set<UUID> reqIds = Arrays.stream(shift.getRequiredSkills()).filter(Objects::nonNull).collect(Collectors.toSet());
+            List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
+            if (workerSkills != null) {
+                boolean hasVerifiedSkill = workerSkills.stream()
+                        .anyMatch(ws -> ws.getSkill() != null
+                                && reqIds.contains(ws.getSkill().getSkillId())
+                                && ws.getVerificationTier() != null
+                                && ws.getVerificationTier() != com.cani.entity.enums.VerificationTier.SELF_DECLARED);
+                if (hasVerifiedSkill) {
+                    skillBonus = 10.0;
+                }
+            }
+        }
+
+        double finalScore = (0.4 * distanceScore) + (0.3 * ratingScore) + (0.2 * expScore) + (0.1 * rsScore) + newWorkerBonus + idleBonus + skillBonus;
 
         String breakdownJson = String.format(
                 Locale.US,
-                "{\"distanceKm\":%.2f,\"distScore\":%.1f,\"ratingScore\":%.1f,\"expScore\":%.1f,\"rsScore\":%.1f,\"newWorkerBonus\":%.1f,\"idleBonus\":%.1f,\"finalScore\":%.2f}",
-                distanceKm, distanceScore, ratingScore, expScore, rsScore, newWorkerBonus, idleBonus, finalScore
+                "{\"distanceKm\":%.2f,\"distScore\":%.1f,\"ratingScore\":%.1f,\"expScore\":%.1f,\"rsScore\":%.1f,\"newWorkerBonus\":%.1f,\"idleBonus\":%.1f,\"skillBonus\":%.1f,\"finalScore\":%.2f}",
+                distanceKm, distanceScore, ratingScore, expScore, rsScore, newWorkerBonus, idleBonus, skillBonus, finalScore
         );
 
         return CandidateMatch.builder()
@@ -301,6 +344,11 @@ public class MatchingDispatchService {
         if (shift.getStatus() != ShiftStatus.ACTIVE) {
             log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE", shiftId);
             return 0;
+        }
+
+        if (!Boolean.TRUE.equals(shift.getEmergency())) {
+            shift.setEmergency(true);
+            shiftRepository.save(shift);
         }
 
         double rawRadius = (customRadiusKm != null && customRadiusKm > 0) ? customRadiusKm : 25.0;
@@ -329,7 +377,7 @@ public class MatchingDispatchService {
             if (distanceKm > emergencyRadius) {
                 continue;
             }
-            CandidateMatch match = calculateSoftScore(worker, distanceKm);
+            CandidateMatch match = calculateSoftScore(worker, distanceKm, emergencyRadius, shift);
             matchedCandidates.add(match);
         }
 
@@ -345,7 +393,7 @@ public class MatchingDispatchService {
 
         for (CandidateMatch candidate : topCandidates) {
             Worker worker = candidate.getWorker();
-            if (dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId()) ||
+            if (dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shiftId, worker.getWorkerId(), ACTIVE_PROPOSAL_STATUSES) ||
                 shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
                 continue;
             }

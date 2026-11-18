@@ -285,8 +285,25 @@ public class EoEventController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         int dispatched = eoEventService.triggerEmergencyDispatch(userId, shiftId, radiusKm);
         return ResponseEntity.ok(ApiResponse.ok(
-                Map.of("shiftId", shiftId, "dispatchedCount", dispatched),
+                Map.of("shiftId", shiftId, "dispatchedCount", dispatched, "emergency", true),
                 "Kích hoạt điều phối khẩn cấp thành công! Đã gửi " + dispatched + " đề xuất khẩn cấp đến Worker xung quanh."
+        ));
+    }
+
+    /**
+     * Tắt điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/shifts/{shiftId}/emergency-dispatch/off")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> disableEmergencyDispatch(
+            @PathVariable("shiftId") UUID shiftId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        eoEventService.disableEmergencyDispatch(userId, shiftId);
+        return ResponseEntity.ok(ApiResponse.ok(
+                Map.of("shiftId", shiftId, "emergency", false),
+                "Đã tắt chế độ điều phối khẩn cấp cho ca làm việc."
         ));
     }
 

@@ -48,6 +48,10 @@ public class DirectPaymentService {
     @Autowired(required = false)
     private NotificationService notificationService;
 
+    @org.springframework.context.annotation.Lazy
+    @Autowired(required = false)
+    private DisputeService disputeService;
+
     /**
      * Khởi tạo bản ghi Payment khi Worker được gán vào ca làm việc
      */
@@ -155,6 +159,16 @@ public class DirectPaymentService {
             throw new IllegalStateException("Bạn không có quyền xác nhận thanh toán này");
         }
 
+        if (assignmentRepository != null) {
+            ShiftAssignment assignment = assignmentRepository.findById(assignmentId).orElse(null);
+            if (assignment != null && assignment.getStatus() != null
+                    && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.CHECKED_IN
+                    && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.COMPLETED) {
+                throw new com.cani.exception.BadRequestException(
+                        "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca (trạng thái hiện tại: " + assignment.getStatus() + ")");
+            }
+        }
+
         String rawStatus = dto.getConfirmStatus() != null ? dto.getConfirmStatus().trim().toUpperCase() : "";
         String normalizedConfirmStatus;
         if ("RECEIVED_FULL".equals(rawStatus) || "CONFIRMED_FULL".equals(rawStatus)) {
@@ -176,6 +190,28 @@ public class DirectPaymentService {
 
         Payment saved = paymentRepository.save(payment);
         updateEventTotalPaid(saved.getEventId());
+
+        if ("NOT_RECEIVED".equals(normalizedConfirmStatus) && disputeService != null) {
+            UUID workerUserId = (payment.getWorker() != null && payment.getWorker().getUser() != null)
+                    ? payment.getWorker().getUser().getUserId()
+                    : workerId;
+            String description = (dto.getComment() != null && !dto.getComment().isBlank())
+                    ? dto.getComment().trim()
+                    : "Worker xác nhận chưa nhận được thù lao khi kết thúc ca làm việc.";
+            try {
+                com.cani.dto.dispute.CreateDisputeRequestDto disputeReq = com.cani.dto.dispute.CreateDisputeRequestDto.builder()
+                        .assignmentId(assignmentId)
+                        .type(com.cani.entity.enums.DisputeType.PAYMENT)
+                        .title("Khiếu nại chưa nhận đủ thù lao")
+                        .description(description)
+                        .build();
+                disputeService.createDispute(workerUserId, disputeReq);
+                log.info("Đã tự động tạo Dispute thanh toán cho Assignment {}", assignmentId);
+            } catch (Exception ex) {
+                log.warn("Không tạo thêm Dispute mới cho Assignment {} (có thể đã tồn tại tranh chấp mở): {}", assignmentId, ex.getMessage());
+            }
+        }
+
         log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, normalizedConfirmStatus, assignmentId);
 
         return mapToDto(saved);

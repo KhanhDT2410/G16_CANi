@@ -341,22 +341,18 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                 height: 42,
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: s.isConflicting
+                    gradient: (s.isConflicting || !s.emergency)
                         ? null
                         : const LinearGradient(
-                            colors: [Color(0xFF00D2FF), Color(0xFF0066FF)],
+                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
                           ),
-                    color: s.isConflicting ? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)) : null,
+                    color: (s.isConflicting || !s.emergency)
+                        ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+                        : null,
+                    border: (s.isConflicting || !s.emergency)
+                        ? Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
+                        : null,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: s.isConflicting
-                        ? null
-                        : const [
-                            BoxShadow(
-                              color: Color(0x500066FF),
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
                   ),
                   child: ElevatedButton.icon(
                     onPressed: s.isConflicting
@@ -368,23 +364,38 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                               ),
                             );
                           }
-                        : widget.onApply,
+                        : (s.emergency
+                            ? widget.onApply
+                            : () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Ca này đang ghép đôi tự động (Matching). Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp!'),
+                                    backgroundColor: Color(0xFFF59E0B),
+                                  ),
+                                );
+                              }),
                     icon: Icon(
-                      s.isConflicting ? Icons.block : Icons.check,
+                      s.isConflicting
+                          ? Icons.block
+                          : (s.emergency ? Icons.flash_on_rounded : Icons.schedule_send_rounded),
                       size: 16,
-                      color: s.isConflicting ? const Color(0xFF64748B) : Colors.white,
+                      color: (s.isConflicting || !s.emergency) ? const Color(0xFF64748B) : Colors.white,
                     ),
                     label: Text(
-                      s.isConflicting ? 'Trùng lịch ca' : 'Ứng tuyển nhanh',
+                      s.isConflicting
+                          ? 'Trùng lịch ca'
+                          : (s.emergency ? 'Ứng tuyển ngay' : 'Chờ lời mời (Matching)'),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w800,
-                        color: s.isConflicting ? const Color(0xFF64748B) : Colors.white,
+                        color: (s.isConflicting || !s.emergency) ? const Color(0xFF64748B) : Colors.white,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),

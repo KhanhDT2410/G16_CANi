@@ -138,6 +138,7 @@ class WorkerJobServiceTest {
                 .hourlyWage(BigDecimal.valueOf(35000))
                 .allowance(BigDecimal.valueOf(10000))
                 .status(ShiftStatus.ACTIVE)
+                .emergency(true)
                 .checklist("[\"Có mặt trước 15 phút\", \"Đồng phục chỉn chu\"]")
                 .build();
 
@@ -149,6 +150,14 @@ class WorkerJobServiceTest {
                 .status(ProposalStatus.PENDING)
                 .expiresAt(Instant.now().plus(2, ChronoUnit.HOURS))
                 .build();
+
+        lenient().when(paymentRepository.findByAssignmentId(any())).thenReturn(Optional.of(
+                Payment.builder()
+                        .status(PaymentStatus.CONFIRMED_FULL)
+                        .workerConfirmStatus("RECEIVED_FULL")
+                        .declaredAmount(BigDecimal.valueOf(150000))
+                        .build()
+        ));
     }
 
     // =========================================================================
@@ -618,6 +627,25 @@ class WorkerJobServiceTest {
     }
 
     @Test
+    @DisplayName("UTC020b - checkoutAssignment() - Abnormal: Chưa xác nhận thanh toán thù lao (workerConfirmStatus == null) bị chặn Check-out")
+    void checkoutAssignment_Abnormal_PaymentNotConfirmedThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
+                .qrContent(makeValidQr("CANI_CHECKOUT:", activeShift.getShiftId())).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(paymentRepository.findByAssignmentId(assignmentId)).thenReturn(Optional.of(
+                Payment.builder().status(PaymentStatus.NOT_DECLARED).workerConfirmStatus(null).build()
+        ));
+
+        assertThatThrownBy(() -> workerJobService.checkoutAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Hãy xác nhận tình trạng thanh toán thù lao trước khi kết ca");
+    }
+
+    @Test
     @DisplayName("UTC021 - checkoutAssignment() - Abnormal: Quét nhầm mã QR Check-in ném BadRequestException")
     void checkoutAssignment_Abnormal_ScannedCheckinQrThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
@@ -771,8 +799,22 @@ class WorkerJobServiceTest {
         ShiftAssignmentResponseDto res = workerJobService.applyForShift(userId, shiftId);
 
         assertThat(res.getStatus()).isEqualTo(AssignmentStatus.CONFIRMED);
+        assertThat(res.getSource()).isEqualTo(AssignmentSource.DIRECT);
         verify(directPaymentService).createInitialPayment(any());
         verify(eventRepository).save(mockEvent);
+    }
+
+    @Test
+    @DisplayName("UTC027c - applyForShift() - Abnormal: Ca chưa bật chế độ khẩn cấp (emergency=false) bị chặn ứng tuyển trực tiếp")
+    void applyForShift_Abnormal_NotEmergencyShiftThrowsBadRequestException() {
+        activeShift.setEmergency(false);
+        UUID shiftId = activeShift.getShiftId();
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(activeShift));
+
+        assertThatThrownBy(() -> workerJobService.applyForShift(userId, shiftId))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Ca này chưa ở chế độ khẩn cấp");
     }
 
     @Test
@@ -1096,12 +1138,12 @@ class WorkerJobServiceTest {
     // 16. updateShiftChecklist() - UTC047 to UTC049
     // =========================================================================
     @Test
-    @DisplayName("UTC047 - updateShiftChecklist() - Normal: Cập nhật checklist progress vào Assignment")
+    @DisplayName("UTC047 - updateShiftChecklist() - Normal: Cập nhật checklist progress vào Assignment khi đã CHECKED_IN")
     void updateShiftChecklist_Success_SavesProgressWithoutModifyingShift() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setChecklist("[\"Việc 1\"]");
         ShiftAssignment sa = ShiftAssignment.builder()
-                .assignmentId(assignmentId).shift(activeShift).worker(worker).build();
+                .assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1114,6 +1156,21 @@ class WorkerJobServiceTest {
         verify(shiftAssignmentRepository).save(sa);
         verify(shiftRepository, never()).save(any());
         assertThat(res.get(0).getIsCompleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("UTC047b - updateShiftChecklist() - Abnormal: Chưa check-in (status=CONFIRMED/PENDING) bị chặn tích chọn checklist")
+    void updateShiftChecklist_Abnormal_NotCheckedInThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.updateShiftChecklist(userId, assignmentId, UpdateChecklistRequestDto.builder().build()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Bạn phải check-in vào ca trước khi tích chọn đầu việc");
     }
 
     @Test
@@ -1132,7 +1189,7 @@ class WorkerJobServiceTest {
     void updateShiftChecklist_Boundary_InvalidItemIdIgnored() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setChecklist("[\"Việc 1\"]");
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
@@ -1193,10 +1250,10 @@ class WorkerJobServiceTest {
     // 19. createReview() - UTC054 to UTC055
     // =========================================================================
     @Test
-    @DisplayName("UTC054 - createReview() - Normal: Worker gửi đánh giá EO thành công")
+    @DisplayName("UTC054 - createReview() - Normal: Worker gửi đánh giá EO thành công sau khi COMPLETED")
     void createReview_Success_CreatesReviewForOrganizer() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.COMPLETED).build();
         CreateReviewRequestDto req = CreateReviewRequestDto.builder()
                 .rating(5).criteriaWorkEnvironment(5).criteriaSupport(5).criteriaPaymentTiming(5)
                 .comment("Ban tổ chức hỗ trợ chu đáo").build();
@@ -1218,10 +1275,24 @@ class WorkerJobServiceTest {
     }
 
     @Test
+    @DisplayName("UTC054b - createReview() - Abnormal: Chưa hoàn thành ca (status != COMPLETED) bị chặn đánh giá")
+    void createReview_Abnormal_NotCompletedThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CHECKED_IN).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.createReview(userId, assignmentId, CreateReviewRequestDto.builder().build()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ có thể đánh giá Ban tổ chức sau khi đã hoàn thành và kết ca");
+    }
+
+    @Test
     @DisplayName("UTC055 - createReview() - Abnormal: Đã đánh giá trước đó ném BadRequestException")
     void createReview_Abnormal_DuplicateReviewThrowsBadRequestException() {
         UUID assignmentId = UUID.randomUUID();
-        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.COMPLETED).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));

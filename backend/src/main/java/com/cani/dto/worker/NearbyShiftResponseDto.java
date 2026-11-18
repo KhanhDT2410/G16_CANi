@@ -35,4 +35,7 @@ public class NearbyShiftResponseDto {
     @Builder.Default
     private Boolean isConflicting = false;
     private String conflictReason;
+
+    @Builder.Default
+    private Boolean emergency = false;
 }

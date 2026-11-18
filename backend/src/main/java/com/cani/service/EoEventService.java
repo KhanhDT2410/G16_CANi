@@ -708,9 +708,24 @@ public class EoEventService {
             throw new BadRequestException("Chỉ có thể kích hoạt điều phối khẩn cấp cho ca làm việc đang ACTIVE");
         }
 
+        shift.setEmergency(true);
+        shiftRepository.save(shift);
+
         int dispatched = matchingDispatchService.triggerEmergencyDispatch(shiftId, customRadiusKm);
         log.info("EO {} kích hoạt Emergency Dispatch cho ca {}: Đã gửi {} đề xuất", eo.getEoId(), shiftId, dispatched);
         return dispatched;
+    }
+
+    /**
+     * Tắt chế độ điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
+     */
+    @Transactional
+    public void disableEmergencyDispatch(UUID userId, UUID shiftId) {
+        EventOrganizer eo = getEoOrThrow(userId);
+        Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
+        shift.setEmergency(false);
+        shiftRepository.save(shift);
+        log.info("EO {} đã tắt chế độ Emergency Dispatch cho ca {}", eo.getEoId(), shiftId);
     }
 
     // =========================================================================

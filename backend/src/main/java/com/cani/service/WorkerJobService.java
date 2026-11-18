@@ -72,6 +72,12 @@ public class WorkerJobService {
     @Autowired(required = false)
     private WorkerGroupMembershipRepository workerGroupMembershipRepository;
 
+    @Autowired(required = false)
+    private NotificationService notificationService;
+
+    @Autowired(required = false)
+    private jakarta.persistence.EntityManager entityManager;
+
     /**
      * Bật / tắt trạng thái "Bắt đầu kiếm việc" (Online status)
      */
@@ -159,6 +165,7 @@ public class WorkerJobService {
             proposalStatusUpdater.updateStatusInNewTransaction(proposal.getProposalId(), ProposalStatus.REJECTED);
             throw new BadRequestException("Rất tiếc! Ca làm việc này vừa được người khác nhận đủ trước bạn ít giây.");
         }
+        shift = syncShiftAfterAtomicIncrement(shift);
 
         // 3. Cập nhật Proposal -> ACCEPTED
         proposal.setStatus(ProposalStatus.ACCEPTED);
@@ -179,6 +186,7 @@ public class WorkerJobService {
 
         // Tạo bản ghi theo dõi thanh toán trực tiếp (Non-Escrow)
         directPaymentService.createInitialPayment(assignment);
+        notifyEoWorkerAcceptedShift(shift, worker, assignment);
 
         // 5. Cập nhật Event confirmed workers
         Event event = shift.getEvent();
@@ -325,6 +333,12 @@ public class WorkerJobService {
         if (assignment.getStatus() != AssignmentStatus.CHECKED_IN) {
             throw new BadRequestException("Chỉ có thể check-out cho ca làm việc đang ở trạng thái CHECKED_IN (Trạng thái hiện tại: " + assignment.getStatus() + ")");
         }
+        Payment payment = paymentRepository != null
+                ? paymentRepository.findByAssignmentId(assignmentId).orElse(null)
+                : null;
+        if (payment == null || payment.getWorkerConfirmStatus() == null || payment.getWorkerConfirmStatus().isBlank()) {
+            throw new BadRequestException("Hãy xác nhận tình trạng thanh toán thù lao trước khi kết ca (Bước thanh toán bắt buộc).");
+        }
         Shift shift = assignment.getShift();
 
         // 1. Xác thực mã QR Check-out bảo mật động (HMAC-SHA256 Anti-spoofing)
@@ -470,6 +484,7 @@ public class WorkerJobService {
                         .imageUrl(s.getImageUrl())
                         .isConflicting(isConflicting)
                         .conflictReason(conflictReason)
+                        .emergency(Boolean.TRUE.equals(s.getEmergency()))
                         .build());
             }
         }
@@ -494,6 +509,10 @@ public class WorkerJobService {
 
         if (shift.getStatus() != ShiftStatus.ACTIVE) {
             throw new BadRequestException("Ca làm việc này hiện không còn mở tuyển nhân sự.");
+        }
+
+        if (!Boolean.TRUE.equals(shift.getEmergency())) {
+            throw new BadRequestException("Ca này chưa ở chế độ khẩn cấp. Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp — hãy chờ lời mời việc (matching) hoặc quay lại sau khi ca được mở rộng phạm vi tuyển dụng.");
         }
 
         if (shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
@@ -525,11 +544,12 @@ public class WorkerJobService {
         if (updatedRows == 0) {
             throw new BadRequestException("Rất tiếc! Ca làm việc này vừa đủ số lượng nhân sự.");
         }
+        shift = syncShiftAfterAtomicIncrement(shift);
 
         ShiftAssignment assignment = ShiftAssignment.builder()
                 .shift(shift)
                 .worker(worker)
-                .source(AssignmentSource.MATCHING)
+                .source(AssignmentSource.DIRECT)
                 .status(AssignmentStatus.CONFIRMED)
                 .eoConfirmed(false)
                 .build();
@@ -537,6 +557,7 @@ public class WorkerJobService {
         assignment = shiftAssignmentRepository.save(assignment);
 
         directPaymentService.createInitialPayment(assignment);
+        notifyEoWorkerAcceptedShift(shift, worker, assignment);
 
         Event event = shift.getEvent();
         if (event != null) {
@@ -807,6 +828,9 @@ public class WorkerJobService {
     public List<ShiftChecklistItemDto> updateShiftChecklist(UUID userId, UUID assignmentId, UpdateChecklistRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
+        if (assignment.getStatus() != AssignmentStatus.CHECKED_IN) {
+            throw new BadRequestException("Bạn phải check-in vào ca trước khi tích chọn đầu việc (trạng thái hiện tại: " + assignment.getStatus() + ")");
+        }
 
         Shift shift = assignment.getShift();
         String templateJson = shift != null ? shift.getChecklist() : null;
@@ -935,6 +959,9 @@ public class WorkerJobService {
     public ReviewResponseDto createReview(UUID userId, UUID assignmentId, CreateReviewRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
+        if (assignment.getStatus() != AssignmentStatus.COMPLETED) {
+            throw new BadRequestException("Chỉ có thể đánh giá Ban tổ chức sau khi đã hoàn thành và kết ca.");
+        }
 
         UUID reviewerId = worker.getUser().getUserId();
         if (reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, reviewerId).isPresent()) {
@@ -1171,6 +1198,50 @@ public class WorkerJobService {
         }
     }
 
+    private Shift syncShiftAfterAtomicIncrement(Shift shift) {
+        if (shift == null) return null;
+        int confirmed = (shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0) + 1;
+        int required = shift.getRequiredWorkers() != null ? shift.getRequiredWorkers() : 1;
+        int remaining = shift.getRemainingWorkers() != null ? Math.max(0, shift.getRemainingWorkers() - 1) : Math.max(0, required - confirmed);
+        shift.setConfirmedWorkers(confirmed);
+        shift.setRemainingWorkers(remaining);
+        if (confirmed >= required) {
+            shift.setStatus(ShiftStatus.FULLY_STAFFED);
+            shift.setEmergency(false);
+        }
+        if (entityManager != null) {
+            try {
+                if (entityManager.contains(shift)) {
+                    entityManager.refresh(shift);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return shift;
+    }
+
+    private void notifyEoWorkerAcceptedShift(Shift shift, Worker worker, ShiftAssignment assignment) {
+        if (notificationService == null || shift == null || worker == null || assignment == null) return;
+        Event ev = shift.getEvent();
+        if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
+                && ev.getEventOrganizer().getUser().getUserId() != null) {
+            try {
+                UUID eoUserId = ev.getEventOrganizer().getUser().getUserId();
+                notificationService.createAndSend(
+                        eoUserId,
+                        "Worker nhận ca làm việc",
+                        worker.getFullName() + " đã nhận ca \"" + shift.getJobType() + "\" – " + ev.getName(),
+                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                        "ASSIGNMENT",
+                        assignment.getAssignmentId(),
+                        Map.of("assignmentId", assignment.getAssignmentId().toString())
+                );
+            } catch (Exception ex) {
+                log.warn("Không thể gửi thông báo cho EO khi Worker nhận ca {}: {}", shift.getShiftId(), ex.getMessage());
+            }
+        }
+    }
+
     private ShiftAssignmentResponseDto mapToAssignmentDto(ShiftAssignment a) {
         Shift s = a.getShift();
         Event e = s != null ? s.getEvent() : null;
@@ -1182,6 +1253,10 @@ public class WorkerJobService {
 
         Optional<AttendanceLog> attendanceOpt = attendanceLogRepository != null
                 ? attendanceLogRepository.findByShiftAssignment_AssignmentId(a.getAssignmentId())
+                : Optional.empty();
+
+        Optional<Payment> paymentOpt = (paymentRepository != null && a.getAssignmentId() != null)
+                ? paymentRepository.findByAssignmentId(a.getAssignmentId())
                 : Optional.empty();
 
         return ShiftAssignmentResponseDto.builder()
@@ -1208,6 +1283,11 @@ public class WorkerJobService {
                 .imageUrl(s != null ? s.getImageUrl() : null)
                 .proofImageUrl(attendanceOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .proofSubmittedAt(attendanceOpt.map(AttendanceLog::getProofSubmittedAt).orElse(null))
+                .paymentStatus(paymentOpt.map(p -> p.getStatus() != null ? p.getStatus().name() : "NOT_DECLARED").orElse("NOT_DECLARED"))
+                .declaredAmount(paymentOpt.map(Payment::getDeclaredAmount).orElse(BigDecimal.ZERO))
+                .paymentMethod(paymentOpt.map(Payment::getPaymentMethod).orElse(null))
+                .workerConfirmStatus(paymentOpt.map(Payment::getWorkerConfirmStatus).orElse(null))
+                .paymentProofUrl(paymentOpt.map(Payment::getPaymentProofUrl).orElse(null))
                 .build();
     }
 

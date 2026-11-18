@@ -39,6 +39,9 @@ class DirectPaymentServiceTest {
     @Mock
     private ShiftAssignmentRepository assignmentRepository;
 
+    @Mock
+    private DisputeService disputeService;
+
     @InjectMocks
     private DirectPaymentService directPaymentService;
 
@@ -154,8 +157,11 @@ class DirectPaymentServiceTest {
     }
 
     @Test
-    @DisplayName("Worker báo chưa nhận được tiền -> Chuyển sang DISPUTED")
+    @DisplayName("Worker báo chưa nhận được tiền -> Chuyển sang DISPUTED và tự động tạo Dispute thanh toán")
     void shouldConfirmPaymentNotReceivedDispute() {
+        org.springframework.test.util.ReflectionTestUtils.setField(directPaymentService, "disputeService", disputeService);
+        User workerUser = User.builder().userId(UUID.randomUUID()).fullName("Nguyễn Văn An").build();
+        worker.setUser(workerUser);
         initialPayment.setStatus(PaymentStatus.DECLARED_PENDING_WORKER);
 
         ConfirmPaymentRequestDto request = ConfirmPaymentRequestDto.builder()
@@ -171,6 +177,11 @@ class DirectPaymentServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(PaymentStatus.DISPUTED);
         assertThat(response.getWorkerConfirmStatus()).isEqualTo("NOT_RECEIVED");
+        verify(disputeService, times(1)).createDispute(
+                eq(workerUser.getUserId()),
+                argThat(req -> req.getAssignmentId().equals(assignment.getAssignmentId())
+                        && req.getType() == com.cani.entity.enums.DisputeType.PAYMENT)
+        );
     }
 
     @Test

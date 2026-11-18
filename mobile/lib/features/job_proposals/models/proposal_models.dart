@@ -78,6 +78,8 @@ class ShiftAssignmentItem {
   final String? imageUrl;
   final String? proofImageUrl;
   final DateTime? proofSubmittedAt;
+  final String? workerConfirmStatus;
+  final String? paymentProofUrl;
 
   ShiftAssignmentItem({
     required this.assignmentId,
@@ -103,6 +105,8 @@ class ShiftAssignmentItem {
     this.imageUrl,
     this.proofImageUrl,
     this.proofSubmittedAt,
+    this.workerConfirmStatus,
+    this.paymentProofUrl,
   });
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
@@ -130,6 +134,8 @@ class ShiftAssignmentItem {
       imageUrl: json['imageUrl'] as String?,
       proofImageUrl: json['proofImageUrl'] as String?,
       proofSubmittedAt: json['proofSubmittedAt'] != null ? DateTime.tryParse(json['proofSubmittedAt'])?.toLocal() : null,
+      workerConfirmStatus: json['workerConfirmStatus'] as String?,
+      paymentProofUrl: json['paymentProofUrl'] as String?,
     );
   }
 }

@@ -118,22 +118,22 @@ public class Subscription {
 
     public Integer getMaxEvents() {
         if (maxEvents != null) return maxEvents;
-        return plan != null ? plan.getMaxEvents() : 0;
+        return (plan != null && plan.getMaxEvents() != null) ? plan.getMaxEvents() : 0;
     }
 
     public Integer getMaxShifts() {
         if (maxShifts != null) return maxShifts;
-        return plan != null ? plan.getMaxShifts() : 0;
+        return (plan != null && plan.getMaxShifts() != null) ? plan.getMaxShifts() : 0;
     }
 
     public Integer getMaxWorkers() {
         if (maxWorkers != null) return maxWorkers;
-        return plan != null ? plan.getMaxWorkers() : 0;
+        return (plan != null && plan.getMaxWorkers() != null) ? plan.getMaxWorkers() : 0;
     }
 
     public Integer getDurationDays() {
         if (durationDays != null) return durationDays;
-        return plan != null ? plan.getDurationDays() : 0;
+        return (plan != null && plan.getDurationDays() != null) ? plan.getDurationDays() : 0;
     }
 
     @Transient

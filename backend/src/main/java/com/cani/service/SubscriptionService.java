@@ -228,7 +228,50 @@ public class SubscriptionService {
                     .build();
         }
 
-        return mapToDto(activeSubs.get(0));
+        if (activeSubs.size() == 1) {
+            return mapToDto(activeSubs.get(0));
+        }
+
+        // CỘNG DỒN HẠN MỨC & THỜI HẠN (MULTI-SUBSCRIPTION POOL) KHI CÓ NHIỀU HƠN 1 GÓI ĐANG HOẠT ĐỘNG
+        Subscription primarySub = activeSubs.get(0);
+        int totalMaxEvents = activeSubs.stream()
+                .mapToInt(s -> s.getMaxEvents() != null ? s.getMaxEvents() : 0)
+                .sum();
+        int totalEventsUsed = activeSubs.stream()
+                .mapToInt(s -> s.getEventsUsed() != null ? s.getEventsUsed() : 0)
+                .sum();
+        int totalRemainingEvents = Math.max(0, totalMaxEvents - totalEventsUsed);
+
+        int totalMaxShifts = activeSubs.stream()
+                .mapToInt(s -> s.getMaxShifts() != null ? s.getMaxShifts() : 0)
+                .sum();
+        int totalShiftsUsed = activeSubs.stream()
+                .mapToInt(s -> s.getShiftsUsed() != null ? s.getShiftsUsed() : 0)
+                .sum();
+        int totalRemainingShifts = Math.max(0, totalMaxShifts - totalShiftsUsed);
+
+        int maxWorkers = activeSubs.stream()
+                .mapToInt(s -> s.getMaxWorkers() != null ? s.getMaxWorkers() : 0)
+                .max()
+                .orElse(0);
+
+        Instant latestExpiresAt = activeSubs.stream()
+                .map(Subscription::getExpiresAt)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(primarySub.getExpiresAt());
+
+        SubscriptionResponseDto baseDto = mapToDto(primarySub);
+        baseDto.setMaxEvents(totalMaxEvents);
+        baseDto.setEventsUsed(totalEventsUsed);
+        baseDto.setRemainingEvents(totalRemainingEvents);
+        baseDto.setMaxShifts(totalMaxShifts);
+        baseDto.setShiftsUsed(totalShiftsUsed);
+        baseDto.setRemainingShifts(totalRemainingShifts);
+        baseDto.setMaxWorkers(maxWorkers);
+        baseDto.setExpiresAt(latestExpiresAt);
+        baseDto.setPlanName(primarySub.getPlanName() + " (" + activeSubs.size() + " gói cộng dồn)");
+        return baseDto;
     }
 
     @Transactional(readOnly = true)
@@ -252,21 +295,38 @@ public class SubscriptionService {
             throw new BadRequestException("Bạn chưa kích hoạt Gói dịch vụ Matching Engine. Vui lòng đăng ký gói dịch vụ tại mục Gói Dịch Vụ để sử dụng thuật toán ghép đôi, hoặc xuất bản sự kiện ở chế độ Mời Trực Tiếp (Miễn phí).");
         }
 
-        Subscription sub = activeSubs.get(0);
-        int max = sub.getMaxEvents() != null ? sub.getMaxEvents() : 0;
-        int used = sub.getEventsUsed() != null ? sub.getEventsUsed() : 0;
+        // Tìm gói đầu tiên còn quota để khấu trừ (ưu tiên gói có hạn dùng gần nhất trước theo FIFO)
+        List<Subscription> sortedSubs = activeSubs.stream()
+                .sorted(Comparator.comparing(
+                        s -> s.getExpiresAt() != null ? s.getExpiresAt() : Instant.MAX
+                ))
+                .toList();
 
-        if (used >= max) {
+        Subscription availableSub = sortedSubs.stream()
+                .filter(s -> {
+                    int max = s.getMaxEvents() != null ? s.getMaxEvents() : 0;
+                    int used = s.getEventsUsed() != null ? s.getEventsUsed() : 0;
+                    return used < max;
+                })
+                .findFirst()
+                .orElse(null);
+
+        if (availableSub == null) {
+            int totalMax = activeSubs.stream().mapToInt(s -> s.getMaxEvents() != null ? s.getMaxEvents() : 0).sum();
+            int totalUsed = activeSubs.stream().mapToInt(s -> s.getEventsUsed() != null ? s.getEventsUsed() : 0).sum();
             if (strictQuotaEnforcement) {
-                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện của gói (" + used + "/" + max + "). Vui lòng nâng cấp gói tại mục Gói Dịch Vụ hoặc chọn chế độ Mời Trực Tiếp (Miễn phí).");
+                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện của gói (" + totalUsed + "/" + totalMax + "). Vui lòng nâng cấp gói tại mục Gói Dịch Vụ hoặc chọn chế độ Mời Trực Tiếp (Miễn phí).");
             } else {
-                log.info("Chế độ Demo/Dev: EO {} đã hết quota ({}/{}) nhưng strict = false, tiếp tục cho phép.", eo.getEoId(), used, max);
+                log.info("Chế độ Demo/Dev: EO {} đã hết quota ({}/{}) nhưng strict = false, tiếp tục cho phép.", eo.getEoId(), totalUsed, totalMax);
+                availableSub = sortedSubs.get(0);
             }
         }
 
-        sub.setEventsUsed(used + 1);
-        subscriptionRepository.save(sub);
-        log.info("Đã khấu trừ 1 credit Event cho EO {}. Đã dùng: {}/{}", eo.getEoId(), sub.getEventsUsed(), max);
+        int used = availableSub.getEventsUsed() != null ? availableSub.getEventsUsed() : 0;
+        availableSub.setEventsUsed(used + 1);
+        subscriptionRepository.save(availableSub);
+        log.info("Đã khấu trừ 1 credit Event từ gói {} của EO {}. Quota gói: {}/{}",
+                availableSub.getSubscriptionId(), eo.getEoId(), availableSub.getEventsUsed(), availableSub.getMaxEvents());
     }
 
     // =========================================================================
@@ -279,7 +339,11 @@ public class SubscriptionService {
 
         Subscription subToRefund = null;
         if (!activeSubs.isEmpty()) {
-            subToRefund = activeSubs.get(0);
+            // Tìm gói active có eventsUsed > 0 (ưu tiên gói vừa bị khấu trừ)
+            subToRefund = activeSubs.stream()
+                    .filter(s -> s.getEventsUsed() != null && s.getEventsUsed() > 0)
+                    .findFirst()
+                    .orElse(activeSubs.get(0));
         } else {
             List<Subscription> pastSubs = subscriptionRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId());
             if (!pastSubs.isEmpty()) {
@@ -296,8 +360,8 @@ public class SubscriptionService {
         if (used > 0) {
             subToRefund.setEventsUsed(used - 1);
             subscriptionRepository.save(subToRefund);
-            log.info("Đã hoàn trả 1 credit Event cho EO {}. Quota đã dùng giảm xuống: {}/{}",
-                    eo.getEoId(), subToRefund.getEventsUsed(), subToRefund.getMaxEvents());
+            log.info("Đã hoàn trả 1 credit Event cho gói {} của EO {}. Quota đã dùng giảm xuống: {}/{}",
+                    subToRefund.getSubscriptionId(), eo.getEoId(), subToRefund.getEventsUsed(), subToRefund.getMaxEvents());
         }
     }
 
@@ -574,7 +638,23 @@ public class SubscriptionService {
                 });
 
         Instant now = Instant.now();
-        Instant expiresAt = now.plus(Duration.ofDays(plan.getDurationDays()));
+        Instant baseTime = now;
+
+        // Nếu EO đang có gói trả phí active còn hạn (expiresAt > now), tự động gia hạn nối tiếp thời gian sử dụng
+        if (planType != PlanType.FREE_TRIAL) {
+            List<Subscription> existingActive = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
+            Optional<Instant> latestExpiryOpt = existingActive.stream()
+                    .filter(s -> s.getPlanType() != PlanType.FREE_TRIAL)
+                    .map(Subscription::getExpiresAt)
+                    .filter(Objects::nonNull)
+                    .filter(exp -> exp.isAfter(now))
+                    .max(Comparator.naturalOrder());
+            if (latestExpiryOpt.isPresent()) {
+                baseTime = latestExpiryOpt.get();
+                log.info("EO {} gia hạn nối tiếp gói cước: mốc bắt đầu tính hạn mới từ {}", eo.getEoId(), baseTime);
+            }
+        }
+        Instant expiresAt = baseTime.plus(Duration.ofDays(plan.getDurationDays()));
 
         // Nếu EO đang có gói FREE_TRIAL cũ, đánh dấu EXPIRED để ưu tiên gói trả phí mới
         if (planType != PlanType.FREE_TRIAL) {

@@ -466,6 +466,52 @@ class SubscriptionServiceTest {
         }
 
         @Test
+        @DisplayName("UTC013b: EO sở hữu 2 gói ACTIVE cùng lúc -> Tự động cộng dồn hạn mức (8 Event) và lấy hạn sử dụng xa nhất")
+        void getCurrentSubscription_MultipleActivePlans_AccumulatesQuotaAndChainsExpiry() {
+            when(eventOrganizerRepository.findByUser_UserId(sampleUserId)).thenReturn(Optional.of(sampleEo));
+
+            Instant now = Instant.now();
+            Instant exp1 = now.plus(Duration.ofDays(30));
+            Instant exp2 = now.plus(Duration.ofDays(60));
+
+            Subscription sub1 = Subscription.builder()
+                    .subscriptionId(UUID.randomUUID())
+                    .eventOrganizer(sampleEo)
+                    .planName("Mid size")
+                    .planType(PlanType.MATCHING_PLUS)
+                    .maxEvents(4)
+                    .eventsUsed(0)
+                    .status(SubscriptionStatus.ACTIVE)
+                    .startsAt(now)
+                    .expiresAt(exp1)
+                    .build();
+
+            Subscription sub2 = Subscription.builder()
+                    .subscriptionId(UUID.randomUUID())
+                    .eventOrganizer(sampleEo)
+                    .planName("Mid size")
+                    .planType(PlanType.MATCHING_PLUS)
+                    .maxEvents(4)
+                    .eventsUsed(0)
+                    .status(SubscriptionStatus.ACTIVE)
+                    .startsAt(now)
+                    .expiresAt(exp2)
+                    .build();
+
+            when(subscriptionRepository.findActiveSubscriptions(eq(sampleEoId), eq(SubscriptionStatus.ACTIVE), any(Instant.class)))
+                    .thenReturn(List.of(sub1, sub2));
+
+            SubscriptionResponseDto response = subscriptionService.getCurrentSubscription(sampleUserId);
+
+            assertThat(response).isNotNull();
+            assertThat(response.getPlanType()).isEqualTo(PlanType.MATCHING_PLUS);
+            assertThat(response.getMaxEvents()).isEqualTo(8);
+            assertThat(response.getRemainingEvents()).isEqualTo(8);
+            assertThat(response.getPlanName()).contains("2 gói cộng dồn");
+            assertThat(response.getExpiresAt()).isEqualTo(exp2);
+        }
+
+        @Test
         @DisplayName("UTC014: EO chưa mua gói trả về DTO mặc định trạng thái EXPIRED với 0 quota")
         void getCurrentSubscription_NoActivePlan_ReturnsExpiredDefaultDto() {
             when(eventOrganizerRepository.findByUser_UserId(sampleUserId)).thenReturn(Optional.of(sampleEo));
@@ -609,6 +655,45 @@ class SubscriptionServiceTest {
 
             assertThat(exhaustedSub.getEventsUsed()).isEqualTo(11);
             verify(subscriptionRepository, times(1)).save(exhaustedSub);
+        }
+
+        @Test
+        @DisplayName("UTC020: Khấu trừ hạn mức theo FIFO qua nhiều gói cước (khi gói 1 đã hết, khấu trừ sang gói 2)")
+        void validateAndDeductEventQuota_MultipleActivePlans_DeductsViaFIFO() {
+            Instant now = Instant.now();
+            Instant exp1 = now.plus(Duration.ofDays(10));
+            Instant exp2 = now.plus(Duration.ofDays(40));
+
+            Subscription sub1Exhausted = Subscription.builder()
+                    .subscriptionId(UUID.randomUUID())
+                    .eventOrganizer(sampleEo)
+                    .planType(PlanType.MATCHING_PLUS)
+                    .maxEvents(4)
+                    .eventsUsed(4) // Gói 1 đã dùng 4/4
+                    .status(SubscriptionStatus.ACTIVE)
+                    .expiresAt(exp1)
+                    .build();
+
+            Subscription sub2Available = Subscription.builder()
+                    .subscriptionId(UUID.randomUUID())
+                    .eventOrganizer(sampleEo)
+                    .planType(PlanType.MATCHING_PLUS)
+                    .maxEvents(4)
+                    .eventsUsed(1) // Gói 2 đã dùng 1/4 (còn 3)
+                    .status(SubscriptionStatus.ACTIVE)
+                    .expiresAt(exp2)
+                    .build();
+
+            when(subscriptionRepository.findActiveSubscriptions(eq(sampleEoId), eq(SubscriptionStatus.ACTIVE), any(Instant.class)))
+                    .thenReturn(List.of(sub1Exhausted, sub2Available));
+            when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(i -> i.getArgument(0));
+
+            subscriptionService.validateAndDeductEventQuota(sampleEo);
+
+            // Gói 1 giữ nguyên (vẫn 4/4), gói 2 được khấu trừ tăng từ 1 lên 2
+            assertThat(sub1Exhausted.getEventsUsed()).isEqualTo(4);
+            assertThat(sub2Available.getEventsUsed()).isEqualTo(2);
+            verify(subscriptionRepository, times(1)).save(sub2Available);
         }
     }
 }

@@ -205,18 +205,24 @@ public class SubscriptionService {
 
         List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
         if (activeSubs.isEmpty()) {
+            List<Subscription> pastSubs = subscriptionRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId());
+            boolean hadPastSub = !pastSubs.isEmpty();
+            Subscription past = hadPastSub ? pastSubs.get(0) : null;
+            String planName = past != null ? past.getPlanName() + " (Đã hết hạn)" : "Chưa kích hoạt gói (Mời người miễn phí)";
+
             return SubscriptionResponseDto.builder()
+                    .subscriptionId(past != null ? past.getSubscriptionId() : null)
                     .eoId(eo.getEoId())
-                    .planName("Chưa kích hoạt gói")
-                    .planType(PlanType.INVITE_ONLY)
+                    .planName(planName)
+                    .planType(past != null ? past.getPlanType() : PlanType.INVITE_ONLY)
                     .price(BigDecimal.ZERO)
-                    .maxEvents(0)
-                    .eventsUsed(0)
+                    .maxEvents(past != null ? past.getMaxEvents() : 0)
+                    .eventsUsed(past != null ? past.getEventsUsed() : 0)
                     .remainingEvents(0)
-                    .maxShifts(0)
-                    .shiftsUsed(0)
+                    .maxShifts(past != null ? past.getMaxShifts() : 0)
+                    .shiftsUsed(past != null ? past.getShiftsUsed() : 0)
                     .remainingShifts(0)
-                    .maxWorkers(0)
+                    .maxWorkers(past != null ? past.getMaxWorkers() : 0)
                     .status(SubscriptionStatus.EXPIRED)
                     .isExpired(true)
                     .build();
@@ -243,17 +249,7 @@ public class SubscriptionService {
         List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
 
         if (activeSubs.isEmpty()) {
-            // Tự động cấp Gói Trải Nghiệm Khởi Nghiệp Miễn Phí (2 sự kiện) nếu đây là EO mới chưa có gói
-            log.info("EO {} chưa có gói: Tự động kích hoạt Gói Trải Nghiệm Miễn Phí (FREE_TRIAL) 2 sự kiện", eo.getEoId());
-            SubscriptionResponseDto freeSubDto = activateSubscription(eo, PlanType.FREE_TRIAL, "FREE_WELCOME", "FREE_" + System.currentTimeMillis(), "WELCOME_BONUS");
-            Subscription freeSub = subscriptionRepository.findById(freeSubDto.getSubscriptionId()).orElse(null);
-            if (freeSub != null) {
-                activeSubs = List.of(freeSub);
-            } else if (strictQuotaEnforcement) {
-                throw new BadRequestException("Bạn cần mua Gói dịch vụ để tạo sự kiện có Matching Engine.");
-            } else {
-                return;
-            }
+            throw new BadRequestException("Bạn chưa kích hoạt Gói dịch vụ Matching Engine. Vui lòng đăng ký gói dịch vụ tại mục Gói Dịch Vụ để sử dụng thuật toán ghép đôi, hoặc xuất bản sự kiện ở chế độ Mời Trực Tiếp (Miễn phí).");
         }
 
         Subscription sub = activeSubs.get(0);
@@ -262,7 +258,7 @@ public class SubscriptionService {
 
         if (used >= max) {
             if (strictQuotaEnforcement) {
-                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện của gói (" + used + "/" + max + "). Vui lòng nâng cấp gói tại mục Gói Dịch Vụ để tiếp tục.");
+                throw new BadRequestException("Bạn đã sử dụng hết hạn mức tạo sự kiện của gói (" + used + "/" + max + "). Vui lòng nâng cấp gói tại mục Gói Dịch Vụ hoặc chọn chế độ Mời Trực Tiếp (Miễn phí).");
             } else {
                 log.info("Chế độ Demo/Dev: EO {} đã hết quota ({}/{}) nhưng strict = false, tiếp tục cho phép.", eo.getEoId(), used, max);
             }
@@ -281,18 +277,27 @@ public class SubscriptionService {
         Instant now = Instant.now();
         List<Subscription> activeSubs = subscriptionRepository.findActiveSubscriptions(eo.getEoId(), SubscriptionStatus.ACTIVE, now);
 
-        if (activeSubs.isEmpty()) {
-            log.info("EO {} không có gói cước ACTIVE để hoàn trả quota sự kiện", eo.getEoId());
+        Subscription subToRefund = null;
+        if (!activeSubs.isEmpty()) {
+            subToRefund = activeSubs.get(0);
+        } else {
+            List<Subscription> pastSubs = subscriptionRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId());
+            if (!pastSubs.isEmpty()) {
+                subToRefund = pastSubs.get(0);
+            }
+        }
+
+        if (subToRefund == null) {
+            log.info("EO {} không có gói cước nào để hoàn trả quota sự kiện", eo.getEoId());
             return;
         }
 
-        Subscription sub = activeSubs.get(0);
-        int used = sub.getEventsUsed() != null ? sub.getEventsUsed() : 0;
+        int used = subToRefund.getEventsUsed() != null ? subToRefund.getEventsUsed() : 0;
         if (used > 0) {
-            sub.setEventsUsed(used - 1);
-            subscriptionRepository.save(sub);
+            subToRefund.setEventsUsed(used - 1);
+            subscriptionRepository.save(subToRefund);
             log.info("Đã hoàn trả 1 credit Event cho EO {}. Quota đã dùng giảm xuống: {}/{}",
-                    eo.getEoId(), sub.getEventsUsed(), sub.getMaxEvents());
+                    eo.getEoId(), subToRefund.getEventsUsed(), subToRefund.getMaxEvents());
         }
     }
 

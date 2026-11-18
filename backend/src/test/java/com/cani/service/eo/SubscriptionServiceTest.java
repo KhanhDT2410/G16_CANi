@@ -505,33 +505,16 @@ class SubscriptionServiceTest {
         }
 
         @Test
-        @DisplayName("UTC017: EO mới chưa có gói -> tự động kích hoạt Gói Trải Nghiệm FREE_TRIAL và khấu trừ")
-        void validateAndDeductEventQuota_NoSubscription_AutoProvisionsFreeTrialAndDeducts() {
-            Subscription freeSub = Subscription.builder()
-                    .subscriptionId(UUID.randomUUID())
-                    .eventOrganizer(sampleEo)
-                    .planType(PlanType.FREE_TRIAL)
-                    .maxEvents(3)
-                    .eventsUsed(0)
-                    .status(SubscriptionStatus.ACTIVE)
-                    .expiresAt(Instant.now().plus(Duration.ofDays(14)))
-                    .build();
-
+        @DisplayName("UTC017: EO chưa kích hoạt gói cố gắng xuất bản Matching -> ném BadRequestException")
+        void validateAndDeductEventQuota_NoSubscription_ThrowsBadRequestException() {
             when(subscriptionRepository.findActiveSubscriptions(eq(sampleEoId), eq(SubscriptionStatus.ACTIVE), any(Instant.class)))
                     .thenReturn(Collections.emptyList());
-            when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(i -> {
-                Subscription s = i.getArgument(0);
-                s.setSubscriptionId(freeSub.getSubscriptionId());
-                return s;
-            });
-            when(eventOrganizerRepository.save(any(EventOrganizer.class))).thenAnswer(i -> i.getArgument(0));
-            when(subscriptionRepository.findById(any())).thenReturn(Optional.of(freeSub));
 
-            subscriptionService.validateAndDeductEventQuota(sampleEo);
+            BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                    subscriptionService.validateAndDeductEventQuota(sampleEo));
 
-            verify(subscriptionRepository, atLeastOnce()).save(any(Subscription.class));
-            verify(eventOrganizerRepository, times(1)).save(any(EventOrganizer.class));
-            assertThat(freeSub.getEventsUsed()).isEqualTo(1);
+            assertThat(ex.getMessage()).contains("Bạn chưa kích hoạt Gói dịch vụ Matching Engine");
+            verify(subscriptionRepository, never()).save(any(Subscription.class));
         }
 
         @Test

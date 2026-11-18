@@ -40,10 +40,12 @@ const PublishEventModal = ({
   const totalShifts = event.totalShifts || 0;
   const totalCost = event.totalEstimatedCost || 0;
 
+  const isInviteMode = event.mode === 'INVITE';
   const remainingQuota = currentSub?.remainingEvents ?? 0;
   const hasActiveQuota = currentSub && currentSub.status === 'ACTIVE' && remainingQuota > 0;
-  const isOutOfQuota = currentSub && (remainingQuota <= 0 || currentSub.status === 'EXPIRED');
-  const planName = currentSub?.planName || (currentSub?.planType === 'MATCHING_PLUS' ? 'Gói Tiêu Chuẩn (Standard)' : 'Gói Hội Viên CANi');
+  const isOutOfQuota = !isInviteMode && currentSub && currentSub.subscriptionId && (remainingQuota <= 0 || currentSub.status === 'EXPIRED');
+  const hasNoPlan = !isInviteMode && (!currentSub || !currentSub.subscriptionId);
+  const planName = currentSub?.planName || 'Chưa có gói cước';
 
   return (
     <div className="eo-modal-overlay">
@@ -139,6 +141,41 @@ const PublishEventModal = ({
             <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
               Đang kiểm tra hạn mức gói dịch vụ...
             </div>
+          ) : isInviteMode ? (
+            /* TRƯỜNG HỢP 0: SỰ KIỆN CHẾ ĐỘ MỜI NGƯỜI -> 100% MIỄN PHÍ, KHÔNG TRỪ QUOTA */
+            <div
+              style={{
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '12px',
+                padding: '1.15rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span
+                  style={{
+                    backgroundColor: '#dcfce7',
+                    color: '#166534',
+                    fontSize: '0.775rem',
+                    fontWeight: 700,
+                    padding: '0.25rem 0.65rem',
+                    borderRadius: '20px',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  CHẾ ĐỘ MỜI TRỰC TIẾP (MIỄN PHÍ)
+                </span>
+                <span style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: 600 }}>
+                  Không tiêu hao Quota
+                </span>
+              </div>
+              <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#374151', lineHeight: 1.5 }}>
+                Sự kiện này được xuất bản ở chế độ <strong>Mời trực tiếp (Invite)</strong>. Bạn có thể tự do tìm kiếm ứng viên và gửi lời mời mà <strong>hoàn toàn không mất phí và không trừ hạn mức gói</strong>.
+              </p>
+              <div style={{ marginTop: '0.5rem', fontSize: '0.775rem', color: '#16a34a', fontWeight: 600 }}>
+                ✓ Miễn phí tìm kiếm và mời nhân sự không giới hạn.
+              </div>
+            </div>
           ) : hasActiveQuota ? (
             /* TRƯỜNG HỢP 1: ĐANG CÓ GÓI HỘI VIÊN VÀ CÒN LƯỢT */
             <div
@@ -168,10 +205,10 @@ const PublishEventModal = ({
                 </span>
               </div>
               <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#374151', lineHeight: 1.5 }}>
-                Khi xác nhận, hệ thống sẽ <strong>trừ 1 lượt sự kiện</strong> trong gói cước của bạn và tự động kết nối các Worker phù hợp nhất trong bán kính 15km.
+                Khi xác nhận, hệ thống sẽ <strong>trừ 1 lượt sự kiện</strong> trong gói cước của bạn và tự động kích hoạt Matching Engine để kết nối các Worker phù hợp nhất trong bán kính 15km.
               </p>
               <div style={{ marginTop: '0.5rem', fontSize: '0.775rem', color: '#16a34a', fontWeight: 600 }}>
-                ✓ Miễn phí toàn bộ phí điều phối & tìm kiếm theo chính sách gói.
+                ✓ Bao gồm Matching Engine, Job Radar di động, FCM Push & Hỗ trợ biến động ca làm.
               </div>
             </div>
           ) : isOutOfQuota ? (
@@ -191,7 +228,7 @@ const PublishEventModal = ({
                 </span>
               </div>
               <p style={{ margin: '0.25rem 0 0.5rem', fontSize: '0.85rem', color: '#92400e', lineHeight: 1.5 }}>
-                Bạn đã sử dụng hết số lượt tạo sự kiện của gói dịch vụ ({currentSub.eventsUsed || 0}/{currentSub.maxEvents || 0} sự kiện). Vui lòng nâng cấp hoặc mua thêm gói tại mục <strong>Gói Dịch Vụ</strong> để tiếp tục xuất bản và điều phối nhân sự.
+                Bạn đã sử dụng hết số lượt tạo sự kiện của gói dịch vụ ({currentSub?.eventsUsed || 0}/{currentSub?.maxEvents || 0} sự kiện). Vui lòng nâng cấp gói tại mục <strong>Gói Dịch Vụ</strong> để tiếp tục xuất bản sự kiện có Matching Engine.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #fcd34d' }}>
                 <span style={{ fontSize: '0.8rem', color: '#78350f' }}>
@@ -203,7 +240,7 @@ const PublishEventModal = ({
               </div>
             </div>
           ) : (
-            /* TRƯỜNG HỢP 3: TÀI KHOẢN MỚI CHƯA KÍCH HOẠT GÓI -> TẶNG DÙNG THỬ 2 SỰ KIỆN */
+            /* TRƯỜNG HỢP 3: CHƯA CÓ GÓI DỊCH VỤ MATCHING */
             <div
               style={{
                 backgroundColor: '#eff6ff',
@@ -213,20 +250,20 @@ const PublishEventModal = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '1.25rem' }}>🎁</span>
+                <span style={{ fontSize: '1.25rem' }}>⚡</span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e40af' }}>
-                  ƯU ĐÃI CHÀO MỪNG: TẶNG GÓI TRẢI NGHIỆM MIỄN PHÍ
+                  YÊU CẦU GÓI DỊCH VỤ MATCHING ENGINE
                 </span>
               </div>
               <p style={{ margin: '0.25rem 0 0.5rem', fontSize: '0.85rem', color: '#334155', lineHeight: 1.5 }}>
-                Chào mừng bạn đến với CANi! Bạn được <strong>tặng miễn phí 2 lượt sự kiện</strong> để trải nghiệm tốc độ tìm kiếm và ghép đôi nhân sự tự động.
+                Sự kiện này đang chọn chế độ <strong>Ghép đôi tự động (Matching Engine)</strong>. Bạn cần kích hoạt một gói dịch vụ để thuật toán tự động kết nối và đề xuất ứng viên phù hợp.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
                 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                  Hạn mức dùng thử: <strong>2 Sự kiện</strong>
+                  Trạng thái: <strong>Chưa kích hoạt gói dịch vụ</strong>
                 </span>
-                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#16a34a' }}>
-                  0 VNĐ (Miễn Phí)
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563eb' }}>
+                  Cần đăng ký gói
                 </span>
               </div>
             </div>
@@ -243,7 +280,7 @@ const PublishEventModal = ({
           >
             Để Sau
           </button>
-          {isOutOfQuota ? (
+          {!isInviteMode && (isOutOfQuota || hasNoPlan) ? (
             <button
               type="button"
               className="eo-btn-primary"
@@ -264,7 +301,7 @@ const PublishEventModal = ({
                 navigate('/eo?tab=subscription');
               }}
             >
-              <span>Nâng Cấp Gói Dịch Vụ Ngay</span>
+              <span>{hasNoPlan ? 'Đăng Ký Gói Dịch Vụ Ngay' : 'Nâng Cấp Gói Dịch Vụ'}</span>
             </button>
           ) : (
             <button
@@ -284,7 +321,7 @@ const PublishEventModal = ({
               }}
               onClick={onExecutePublish}
             >
-              <span>{hasActiveQuota ? 'Xuất Bản & Trừ 1 Lượt Gói' : 'Kích Hoạt Miễn Phí (0 VNĐ)'}</span>
+              <span>{isInviteMode ? 'Xuất Bản Sự Kiện (Miễn Phí)' : 'Xuất Bản & Trừ 1 Lượt Gói'}</span>
             </button>
           )}
         </div>

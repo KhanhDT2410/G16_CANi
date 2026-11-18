@@ -17,7 +17,6 @@ export default function EOSubscriptionTab() {
     setPayOSModalData,
     handlePurchasePayOS,
     handleConfirmPayOS,
-    handleSimulateDemo,
   } = useSubscription();
 
   const formatCurrency = (val) => {
@@ -41,6 +40,7 @@ export default function EOSubscriptionTab() {
 
   const isCurrentActive =
     currentSubscription &&
+    Boolean(currentSubscription.subscriptionId) &&
     currentSubscription.status === 'ACTIVE' &&
     currentSubscription.remainingEvents > 0;
 
@@ -60,13 +60,17 @@ export default function EOSubscriptionTab() {
               <span className="sub-status-pill status-active">
                 Đang Hoạt Động: {currentSubscription.planName}
               </span>
-            ) : currentSubscription && currentSubscription.status === 'CONSUMED' ? (
+            ) : currentSubscription && currentSubscription.subscriptionId && currentSubscription.remainingEvents === 0 ? (
               <span className="sub-status-pill status-consumed">
-                Đã Sử Dụng Hết Hạn Mức
+                Đã Hết Hạn Mức Gói
+              </span>
+            ) : currentSubscription && currentSubscription.subscriptionId && currentSubscription.isExpired ? (
+              <span className="sub-status-pill status-expired">
+                Gói Đã Hết Hạn
               </span>
             ) : (
               <span className="sub-status-pill status-none">
-                Chưa Có Gói Kích Hoạt
+                Chưa Có Gói Matching (Chế độ Mời Miễn Phí)
               </span>
             )}
           </div>
@@ -79,27 +83,27 @@ export default function EOSubscriptionTab() {
               {currentSubscription?.remainingEvents ?? 0} <small style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Event</small>
             </span>
             <span className="sub-metric-hint">
-              {isCurrentActive ? 'Đủ điều kiện xuất bản sự kiện & ca làm' : 'Cần nạp thêm gói để xuất bản sự kiện'}
+              {isCurrentActive ? 'Đủ điều kiện xuất bản sự kiện Matching' : 'Chế độ Mời người miễn phí không giới hạn. Mua gói để bật Matching.'}
             </span>
           </div>
 
           <div className="sub-metric-item">
             <span className="sub-metric-label">Chế độ tuyển dụng</span>
             <span className="sub-metric-val" style={{ fontSize: '1.15rem' }}>
-              {currentSubscription?.planType === 'ENTERPRISE'
-                ? 'Tự Động Ghép Đôi Ưu Tiên + Cứu Hộ'
-                : currentSubscription?.planType === 'MATCHING_PLUS'
-                ? 'Tự Động Ghép Đôi Tiêu Chuẩn'
-                : currentSubscription?.planType === 'FREE_TRIAL'
-                ? 'Tự Động Ghép Đôi'
-                : currentSubscription?.planType === 'INVITE_ONLY'
-                ? 'Mời Trực Tiếp'
-                : 'Chưa kích hoạt'}
+              {isCurrentActive
+                ? (currentSubscription?.planType === 'ENTERPRISE'
+                  ? 'Ghép Đôi Ưu Tiên + Cứu Hộ'
+                  : currentSubscription?.planType === 'MATCHING_PLUS'
+                  ? 'Ghép Đôi Tiêu Chuẩn'
+                  : currentSubscription?.planType === 'FREE_TRIAL'
+                  ? 'Ghép Đôi Dùng Thử'
+                  : 'Mời Trực Tiếp')
+                : 'Mời Trực Tiếp (Miễn Phí)'}
             </span>
             <span className="sub-metric-hint">
-              {currentSubscription?.planType
+              {isCurrentActive
                 ? 'Tự động kết nối nhân sự theo bán kính vị trí'
-                : 'Cần kích hoạt gói dịch vụ'}
+                : 'Tìm kiếm và gửi lời mời không giới hạn'}
             </span>
           </div>
 
@@ -185,23 +189,52 @@ export default function EOSubscriptionTab() {
 
                     <div className="pricing-actions">
                       {isFree ? (
-                        <div
-                          style={{
-                            textAlign: 'center',
-                            padding: '0.75rem 1rem',
-                            background: '#f8fafc',
-                            borderRadius: '10px',
-                            border: '1px dashed #cbd5e1',
-                            color: '#64748b',
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {currentSubscription?.planType === 'FREE_TRIAL' && currentSubscription.remainingEvents === 0
-                            ? '✓ Đã sử dụng hết lượt trải nghiệm'
-                            : '✓ Tự động kích hoạt khi tạo tài khoản'}
-                        </div>
+                        currentSubscription?.planType === 'FREE_TRIAL' ? (
+                          <div
+                            style={{
+                              textAlign: 'center',
+                              padding: '0.75rem 1rem',
+                              background: '#f8fafc',
+                              borderRadius: '10px',
+                              border: '1px dashed #cbd5e1',
+                              color: '#64748b',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {currentSubscription.remainingEvents > 0
+                              ? '✓ Đang kích hoạt gói dùng thử'
+                              : '✓ Đã sử dụng hết lượt trải nghiệm'}
+                          </div>
+                        ) : currentSubscription?.subscriptionId ? (
+                          <div
+                            style={{
+                              textAlign: 'center',
+                              padding: '0.75rem 1rem',
+                              background: '#f8fafc',
+                              borderRadius: '10px',
+                              border: '1px dashed #cbd5e1',
+                              color: '#64748b',
+                              fontSize: '0.875rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            ✓ Đang sử dụng gói trả phí
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-purchase-vnpay"
+                            style={{ background: '#10b981', width: '100%' }}
+                            disabled={purchasingPlan !== null}
+                            onClick={() => handlePurchasePayOS(plan.planType)}
+                          >
+                            {purchasingPlan === plan.planType
+                              ? 'Đang kích hoạt...'
+                              : 'Kích Hoạt Trải Nghiệm (0 VNĐ)'}
+                          </button>
+                        )
                       ) : (
                         <button
                           type="button"
@@ -253,7 +286,7 @@ export default function EOSubscriptionTab() {
                 </tr>
               </thead>
               <tbody>
-                {history.map((item) => (
+                {history.map((item, idx) => (
                   <tr key={item.subscriptionId || idx}>
                     <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>
                       {item.transactionRef || (item.subscriptionId ? item.subscriptionId.substring(0, 8) : 'GÓI-CANI')}

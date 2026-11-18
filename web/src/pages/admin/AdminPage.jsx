@@ -83,13 +83,27 @@ const AdminPage = () => {
     }
   });
 
-  // Xử lý sự kiện click vào User block trên Header để trở về Bảng điều khiển chính
+  // Xử lý sự kiện click vào User block trên Header để trở về Bảng điều khiển chính & điều hướng chat
   useEffect(() => {
     const handleNavHome = () => {
       setActiveTab('dashboard');
     };
+    const handleSwitchTab = (e) => {
+      if (e.detail?.tab) setActiveTab(e.detail.tab);
+      if (e.detail?.filter) setTicketFilter(e.detail.filter);
+    };
+    const handleOpenChat = () => {
+      setActiveTab('tickets');
+      setTicketFilter('CHAT');
+    };
     window.addEventListener('cani_admin_navigate_home', handleNavHome);
-    return () => window.removeEventListener('cani_admin_navigate_home', handleNavHome);
+    window.addEventListener('cani_switch_tab', handleSwitchTab);
+    window.addEventListener('cani_open_chat', handleOpenChat);
+    return () => {
+      window.removeEventListener('cani_admin_navigate_home', handleNavHome);
+      window.removeEventListener('cani_switch_tab', handleSwitchTab);
+      window.removeEventListener('cani_open_chat', handleOpenChat);
+    };
   }, []);
 
   const handleToggleCollapse = () => {

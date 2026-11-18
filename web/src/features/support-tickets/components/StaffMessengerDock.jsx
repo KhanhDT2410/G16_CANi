@@ -39,13 +39,17 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
           if (!isMounted) return;
           setConvId(res?.conversation?.id);
           if (res?.messages) setMessages(res.messages.map(formatMessage));
+          window.dispatchEvent(new CustomEvent('cani_staff_chat_updated'));
         })
         .catch(() => { if (isMounted) setMessages(activeChat.chatHistory || []); });
     } else if (activeChat.id && !String(activeChat.id).startsWith('demo-')) {
       setConvId(activeChat.id);
       supportChatApi.getStaffConversationDetail(activeChat.id)
         .then((res) => {
-          if (isMounted && res?.messages) setMessages(res.messages.map(formatMessage));
+          if (isMounted && res?.messages) {
+            setMessages(res.messages.map(formatMessage));
+            window.dispatchEvent(new CustomEvent('cani_staff_chat_updated'));
+          }
         })
         .catch(() => { if (isMounted) setMessages(activeChat.chatHistory || []); });
     } else {
@@ -95,6 +99,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket }) => {
     if (convId) {
       try {
         await supportChatApi.sendStaffReply(convId, { messageText: text });
+        window.dispatchEvent(new CustomEvent('cani_staff_chat_updated'));
       } catch (err) {
         console.error('Lỗi khi gửi phản hồi:', err);
       }

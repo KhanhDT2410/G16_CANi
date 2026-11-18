@@ -283,6 +283,39 @@
   opacity: 1;
 }
 
+.sidebar-sub-badge {
+  margin-left: auto;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  line-height: 1.2;
+}
+
+.sidebar-dot-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563eb;
+  display: inline-block;
+  margin-left: auto;
+  margin-right: 0.35rem;
+  flex-shrink: 0;
+}
+
+.sidebar-collapsed-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid #ffffff;
+}
+
 /* Khu vực nội dung bên phải */
 .admin-main-wrapper {
   flex: 1;

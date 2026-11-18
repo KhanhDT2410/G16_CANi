@@ -2,6 +2,7 @@ package com.cani.service;
 
 import com.cani.dto.chat.ChatMessageResponseDto;
 import com.cani.dto.chat.SendChatMessageRequestDto;
+import com.cani.dto.chat.StaffChatUnreadSummaryDto;
 import com.cani.dto.chat.SupportConversationDetailDto;
 import com.cani.dto.chat.SupportConversationSummaryDto;
 import com.cani.entity.SupportConversation;
@@ -187,6 +188,29 @@ public class SupportChatService {
                 });
 
                 return filtered;
+        }
+
+        /**
+         * Lấy tóm tắt tin nhắn chưa đọc & top 10 hội thoại gần nhất cho Header và Sidebar của Admin/CSKH.
+         */
+        public StaffChatUnreadSummaryDto getStaffChatUnreadSummary() {
+                List<SupportConversationSummaryDto> all = getStaffConversations(null);
+                int totalUnread = all.stream()
+                                .mapToInt(c -> c.getUnreadStaffCount() != null ? c.getUnreadStaffCount() : 0)
+                                .sum();
+                int unreadConvs = (int) all.stream()
+                                .filter(c -> c.getUnreadStaffCount() != null && c.getUnreadStaffCount() > 0)
+                                .count();
+                List<SupportConversationSummaryDto> recent = all.stream()
+                                .filter(c -> c.getLastMessageAt() != null || (c.getUnreadStaffCount() != null && c.getUnreadStaffCount() > 0))
+                                .limit(10)
+                                .toList();
+
+                return StaffChatUnreadSummaryDto.builder()
+                                .totalUnreadCount(totalUnread)
+                                .unreadConversationCount(unreadConvs)
+                                .recentConversations(recent)
+                                .build();
         }
 
         /**

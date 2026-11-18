@@ -27,6 +27,12 @@ export const supportChatApi = {
     return response.data?.data;
   },
 
+  /** CSKH lấy tóm tắt tin nhắn chưa đọc & top hội thoại mới nhất cho Header & Sidebar */
+  getStaffUnreadSummary: async () => {
+    const response = await apiClient.get('/v1/admin/support/chat/unread-summary');
+    return response.data?.data || { totalUnreadCount: 0, unreadConversationCount: 0, recentConversations: [] };
+  },
+
   /** CSKH mở hoặc khởi tạo cuộc trò chuyện với một người dùng (EO/Worker) theo userId */
   initiateStaffConversation: async (userId) => {
     const response = await apiClient.post(`/v1/admin/support/chat/initiate/${userId}`);

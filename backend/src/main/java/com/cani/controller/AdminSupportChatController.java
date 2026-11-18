@@ -2,6 +2,7 @@ package com.cani.controller;
 
 import com.cani.dto.chat.ChatMessageResponseDto;
 import com.cani.dto.chat.SendChatMessageRequestDto;
+import com.cani.dto.chat.StaffChatUnreadSummaryDto;
 import com.cani.dto.chat.SupportConversationDetailDto;
 import com.cani.dto.chat.SupportConversationSummaryDto;
 import com.cani.dto.response.ApiResponse;
@@ -38,6 +39,16 @@ public class AdminSupportChatController {
     ) {
         List<SupportConversationSummaryDto> list = supportChatService.getStaffConversations(query);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách hội thoại thành công"));
+    }
+
+    /**
+     * Lấy tóm tắt tin nhắn chưa đọc & danh sách hội thoại mới nhất cho Header / Sidebar của Admin & CSKH.
+     * GET /api/v1/admin/support/chat/unread-summary
+     */
+    @GetMapping("/unread-summary")
+    public ResponseEntity<ApiResponse<StaffChatUnreadSummaryDto>> getUnreadSummary() {
+        StaffChatUnreadSummaryDto summary = supportChatService.getStaffChatUnreadSummary();
+        return ResponseEntity.ok(ApiResponse.ok(summary, "Lấy tóm tắt tin nhắn chưa đọc thành công"));
     }
 
     /**

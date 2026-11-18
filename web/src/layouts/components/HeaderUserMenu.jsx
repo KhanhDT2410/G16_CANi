@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { HelpIcon, LogoutIcon } from './HeaderIcons';
 import { NotificationBell } from '../../features/notifications';
+import { StaffMessageBell } from '../../features/support-tickets';
 
 export const HeaderUserMenu = ({
   isAuthenticated,
@@ -28,6 +29,7 @@ export const HeaderUserMenu = ({
   return (
     <div className="user-header-group">
       <NotificationBell />
+      {isStaff && <StaffMessageBell />}
 
       {!isStaff && (
         <button

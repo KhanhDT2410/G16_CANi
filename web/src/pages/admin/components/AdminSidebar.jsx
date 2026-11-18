@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useStaffChatAlerts } from '../../../features/support-tickets/hooks/useStaffChatAlerts';
 import { CollapseToggleIcon, ChevronDownIcon } from './AdminSidebarIcons';
 import { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS } from './adminSidebar.constants';
 
@@ -17,11 +18,12 @@ export const AdminSidebar = ({
   onToggleCollapse,
 }) => {
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
+  const { totalUnread: unreadChatCount } = useStaffChatAlerts();
 
   const renderExpandableItem = (item, isExpanded, onToggleExpand, subItems, activeKey, onSubClick) => {
     const isActive = activeTab === item.id;
     return (
-      <div key={item.id} className="sidebar-expandable-item-wrapper">
+      <div key={item.id} className="sidebar-expandable-item-wrapper" style={{ position: 'relative' }}>
         <div
           className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
           onClick={() => {
@@ -30,9 +32,10 @@ export const AdminSidebar = ({
           }}
         >
           <span className="sidebar-item-icon">{item.icon}</span>
-          {!collapsed && (
+          {!collapsed ? (
             <>
               <span className="sidebar-item-label">{item.label}</span>
+              {unreadChatCount > 0 && <span className="sidebar-dot-badge" title={`${unreadChatCount} tin nhắn mới`} />}
               <button
                 type="button"
                 className="sidebar-arrow-btn"
@@ -46,6 +49,8 @@ export const AdminSidebar = ({
                 <ChevronDownIcon expanded={isExpanded} />
               </button>
             </>
+          ) : (
+            unreadChatCount > 0 && <span className="sidebar-collapsed-dot" title={`${unreadChatCount} tin nhắn mới`} />
           )}
           {isActive && <span className="sidebar-active-indicator" />}
         </div>
@@ -64,6 +69,9 @@ export const AdminSidebar = ({
                 >
                   <span className="submenu-bullet" />
                   <span className="submenu-label">{sub.label}</span>
+                  {sub.key === 'CHAT' && unreadChatCount > 0 && (
+                    <span className="sidebar-sub-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
+                  )}
                 </button>
               );
             })}

@@ -190,4 +190,19 @@ class SupportChatServiceTest {
                 assertThat(result.getConversation().getUserName()).isEqualTo("Nguyễn Văn An");
                 verify(conversationRepository).save(any(SupportConversation.class));
         }
+
+        @Test
+        @DisplayName("6. getStaffChatUnreadSummary tính đúng tổng số tin chưa đọc và danh sách gần nhất")
+        void getStaffChatUnreadSummary_Success() {
+                when(userRepository.findByRoleIn(anyList())).thenReturn(List.of(mockUser));
+                mockConv.setUnreadStaffCount(3);
+                when(conversationRepository.findAll()).thenReturn(List.of(mockConv));
+
+                var summary = supportChatService.getStaffChatUnreadSummary();
+
+                assertThat(summary).isNotNull();
+                assertThat(summary.getTotalUnreadCount()).isEqualTo(3);
+                assertThat(summary.getUnreadConversationCount()).isEqualTo(1);
+                assertThat(summary.getRecentConversations()).hasSize(1);
+        }
 }

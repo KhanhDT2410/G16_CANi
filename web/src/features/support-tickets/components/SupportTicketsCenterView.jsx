@@ -64,6 +64,16 @@ export const SupportTicketsCenterView = ({
     if (refreshKey) handleRefresh();
   }, [refreshKey]);
 
+  useEffect(() => {
+    const handleOpenChatEvent = (e) => {
+      if (e.detail?.conversation) {
+        setActiveChatTicket(e.detail.conversation);
+      }
+    };
+    window.addEventListener('cani_open_chat', handleOpenChatEvent);
+    return () => window.removeEventListener('cani_open_chat', handleOpenChatEvent);
+  }, []);
+
   const stats = useMemo(() => ({
     total: queue.length, myCount: myQueue.length,
     openCount: queue.filter((t) => t.status === 'OPEN').length,

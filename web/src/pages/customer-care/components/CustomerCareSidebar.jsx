@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useStaffChatAlerts } from '../../../features/support-tickets/hooks/useStaffChatAlerts';
 import {
   TicketIcon,
   FaqIcon,
@@ -44,6 +45,7 @@ export const CustomerCareSidebar = ({
   onToggleCollapse,
 }) => {
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
+  const { totalUnread: unreadChatCount } = useStaffChatAlerts();
 
   return (
     <aside className={`cc-sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Menu chức năng chăm sóc khách hàng">
@@ -88,9 +90,10 @@ export const CustomerCareSidebar = ({
                         }}
                       >
                         <span className="cc-item-icon">{item.icon}</span>
-                        {!collapsed && (
+                        {!collapsed ? (
                           <>
                             <span className="cc-item-label">{item.label}</span>
+                            {unreadChatCount > 0 && <span className="sidebar-dot-badge" title={`${unreadChatCount} tin nhắn mới`} />}
                             <button
                               type="button"
                               className="cc-arrow-btn"
@@ -104,6 +107,8 @@ export const CustomerCareSidebar = ({
                               <ChevronDownIcon expanded={ticketsExpanded} />
                             </button>
                           </>
+                        ) : (
+                          unreadChatCount > 0 && <span className="sidebar-collapsed-dot" title={`${unreadChatCount} tin nhắn mới`} />
                         )}
                         {isActive && <span className="cc-active-indicator" />}
                       </div>
@@ -125,6 +130,9 @@ export const CustomerCareSidebar = ({
                               >
                                 <span className="cc-submenu-bullet" />
                                 <span className="cc-submenu-label">{sub.label}</span>
+                                {sub.key === 'CHAT' && unreadChatCount > 0 && (
+                                  <span className="sidebar-sub-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
+                                )}
                               </button>
                             );
                           })}

@@ -54,6 +54,23 @@ export const CustomerCarePage = () => {
     });
   };
 
+  useEffect(() => {
+    const handleSwitchTab = (e) => {
+      if (e.detail?.tab) setActiveTab(e.detail.tab);
+      if (e.detail?.filter) setTicketFilter(e.detail.filter);
+    };
+    const handleOpenChat = () => {
+      setActiveTab('tickets');
+      setTicketFilter('CHAT');
+    };
+    window.addEventListener('cani_switch_tab', handleSwitchTab);
+    window.addEventListener('cani_open_chat', handleOpenChat);
+    return () => {
+      window.removeEventListener('cani_switch_tab', handleSwitchTab);
+      window.removeEventListener('cani_open_chat', handleOpenChat);
+    };
+  }, []);
+
   const currentMeta = useMemo(() => {
     if (activeTab === 'tickets' && ticketFilter === 'CHAT') {
       return {

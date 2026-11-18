@@ -11,6 +11,7 @@ import {
   OperationConfigIcon,
   FinancialConfigIcon,
   GeneralConfigIcon,
+  PricingPlanIcon,
 } from './AdminSidebarIcons';
 
 // Danh mục phân nhóm menu chức năng Admin thuần tiếng Việt
@@ -48,7 +49,7 @@ export const ADMIN_NAV_GROUPS = [
       { id: 'config_matching', label: 'Thuật Toán Ghép Nối', icon: <MatchingConfigIcon /> },
       { id: 'config_operation', label: 'Vận Hành & Điểm Uy Tín', icon: <OperationConfigIcon /> },
       { id: 'config_financial', label: 'Tài Chính & Hoa Hồng', icon: <FinancialConfigIcon /> },
-      { id: 'plans', label: 'Quản Lý Gói Dịch Vụ', icon: <FinancialConfigIcon /> },
+      { id: 'plans', label: 'Thiết Lập Giá Gói Dịch Vụ', icon: <PricingPlanIcon /> },
       { id: 'config_general', label: 'Hệ Thống & Tài Khoản', icon: <GeneralConfigIcon /> },
     ],
   },
@@ -109,8 +110,8 @@ export const ADMIN_TAB_METADATA = {
     subtitle: 'Quản trị tỷ lệ hoa hồng nền tảng và thời hạn đối soát chuyển khoản thù lao trực tiếp',
   },
   plans: {
-    title: 'Quản Lý Danh Mục Gói Dịch Vụ',
-    subtitle: 'Quy định hạn mức sự kiện, ca làm việc, nhân sự và đơn giá gói cước cho Ban tổ chức sự kiện',
+    title: 'Thiết Lập Giá & Hạn Mức Gói Dịch Vụ',
+    subtitle: 'Quy định đơn giá (VNĐ), hạn mức sự kiện, ca làm, nhân sự và tính năng Matching cho Ban tổ chức sự kiện',
   },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',

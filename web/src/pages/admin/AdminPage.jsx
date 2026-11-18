@@ -58,8 +58,8 @@ const TAB_METADATA = {
     subtitle: 'Quản trị tỷ lệ hoa hồng nền tảng và thời hạn đối soát chuyển khoản thù lao trực tiếp',
   },
   plans: {
-    title: 'Quản Lý Danh Mục Gói Dịch Vụ',
-    subtitle: 'Quy định hạn mức sự kiện, ca làm việc, nhân sự và đơn giá gói cước cho Ban tổ chức sự kiện',
+    title: 'Thiết Lập Giá & Hạn Mức Gói Dịch Vụ',
+    subtitle: 'Quy định đơn giá (VNĐ), hạn mức sự kiện, ca làm, nhân sự và tính năng Matching cho Ban tổ chức sự kiện',
   },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',

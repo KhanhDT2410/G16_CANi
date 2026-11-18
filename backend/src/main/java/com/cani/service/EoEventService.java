@@ -169,7 +169,15 @@ public class EoEventService {
 
         EventStatus prevStatus = event.getStatus();
         boolean isMatching = event.getMode() == EventMode.MATCHING;
-        boolean notStartedYet = event.getStartTime() == null || event.getStartTime().isAfter(Instant.now());
+
+        List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
+        boolean notStartedYet = true;
+        if (event.getStartTime() != null) {
+            notStartedYet = event.getStartTime().isAfter(Instant.now());
+        } else if (!shifts.isEmpty()) {
+            notStartedYet = shifts.stream()
+                    .allMatch(s -> s.getStartTime() == null || s.getStartTime().isAfter(Instant.now()));
+        }
 
         event.setStatus(EventStatus.CANCELLED);
         event = eventRepository.save(event);
@@ -184,7 +192,6 @@ public class EoEventService {
             }
         }
 
-        List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
         UUID cancelledBy = resolveEoUserId(eo, userId);
         String finalReason = reason.trim();
 

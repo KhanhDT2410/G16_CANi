@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -184,11 +185,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _toggleChecklistItem(int index) async {
+    final cani = Theme.of(context).cani;
     if (!_isCheckedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc!'),
-          backgroundColor: Color(0xFFF59E0B),
+        SnackBar(
+          content: const Text('Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc!'),
+          backgroundColor: cani.warning,
         ),
       );
       return;
@@ -212,32 +214,35 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     if (current.isRequiredEvidence && (current.evidenceImageUrl == null || current.evidenceImageUrl!.isEmpty)) {
       final takePhoto = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.camera_alt, color: Color(0xFF0066FF), size: 22),
-              SizedBox(width: 8),
-              Text('Yêu cầu ảnh nghiệm thu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        builder: (ctx) {
+          final ctxCani = Theme.of(ctx).cani;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.camera_alt, color: ctxCani.brand, size: 22),
+                const SizedBox(width: 8),
+                Text('Yêu cầu ảnh nghiệm thu', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              'Đầu việc "${current.title}" yêu cầu chụp ảnh bằng chứng nghiệm thu tại hiện trường.\n\nBạn có muốn chụp ảnh ngay bây giờ không?',
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Đánh dấu tạm'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(ctx, true),
+                icon: const Icon(Icons.camera_alt, size: 16),
+                label: const Text('Chụp ảnh ngay'),
+                style: FilledButton.styleFrom(backgroundColor: ctxCani.brand),
+              ),
             ],
-          ),
-          content: Text(
-            'Đầu việc "${current.title}" yêu cầu chụp ảnh bằng chứng nghiệm thu tại hiện trường.\n\nBạn có muốn chụp ảnh ngay bây giờ không?',
-            style: const TextStyle(fontSize: 13.5, height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Đánh dấu tạm'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(ctx, true),
-              icon: const Icon(Icons.camera_alt, size: 16),
-              label: const Text('Chụp ảnh ngay'),
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0066FF)),
-            ),
-          ],
-        ),
+          );
+        },
       );
 
       if (takePhoto == true) {
@@ -273,6 +278,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<({Uint8List? bytes, String? fileName, String? filePath})?> _chooseOrCaptureImage() async {
+    final cani = Theme.of(context).cani;
     final source = await showModalBottomSheet<String>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -285,12 +291,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFF0066FF)),
+                leading: Icon(Icons.camera_alt_rounded, color: cani.brand),
                 title: const Text('Chụp ảnh trực tiếp bằng Camera', style: TextStyle(fontWeight: FontWeight.w600)),
                 onTap: () => Navigator.of(ctx).pop('camera'),
               ),
               ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF0066FF)),
+                leading: Icon(Icons.photo_library_rounded, color: cani.brand),
                 title: const Text('Chọn ảnh từ Thư viện thiết bị', style: TextStyle(fontWeight: FontWeight.w600)),
                 onTap: () => Navigator.of(ctx).pop('gallery'),
               ),
@@ -320,11 +326,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _captureEvidenceForTask(int index) async {
+    final cani = Theme.of(context).cani;
     if (!_isCheckedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vào ca (quét QR check-in) để chụp ảnh nghiệm thu đầu việc!'),
-          backgroundColor: Color(0xFFF59E0B),
+        SnackBar(
+          content: const Text('Vào ca (quét QR check-in) để chụp ảnh nghiệm thu đầu việc!'),
+          backgroundColor: cani.warning,
         ),
       );
       return;
@@ -423,7 +430,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Không thể tải ảnh nghiệm thu: $e'),
-            backgroundColor: const Color(0xFFDC2626),
+            backgroundColor: cani.danger,
           ),
         );
       }
@@ -518,11 +525,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _addNewChecklistItem() async {
+    final cani = Theme.of(context).cani;
     if (!_isCheckedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vào ca (quét QR check-in) để thêm và tích chọn đầu việc!'),
-          backgroundColor: Color(0xFFF59E0B),
+        SnackBar(
+          content: const Text('Vào ca (quét QR check-in) để thêm và tích chọn đầu việc!'),
+          backgroundColor: cani.warning,
         ),
       );
       return;
@@ -591,6 +599,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _pickProofImage() async {
+    final cani = Theme.of(context).cani;
     try {
       final picked = await _chooseOrCaptureImage();
 
@@ -623,12 +632,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingProof = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Không thể chọn ảnh: $e'),
-            backgroundColor: const Color(0xFFDC2626),
-          ),
-        );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Không thể chọn ảnh: $e'),
+              backgroundColor: cani.danger,
+            ),
+          );
       }
     }
   }
@@ -678,6 +687,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _handleConfirmPayment(String status) async {
+    final cani = Theme.of(context).cani;
     String comment = 'Đã nhận đủ thù lao theo thỏa thuận.';
     if (status == 'RECEIVED_PARTIAL' || status == 'NOT_RECEIVED') {
       final ctrl = TextEditingController();
@@ -710,7 +720,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                 }
               },
               style: FilledButton.styleFrom(
-                backgroundColor: status == 'NOT_RECEIVED' ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                backgroundColor: status == 'NOT_RECEIVED' ? cani.danger : const Color(0xFFD97706),
               ),
               child: const Text('Xác nhận gửi'),
             ),
@@ -746,7 +756,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Lỗi xác nhận thanh toán: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: const Color(0xFFDC2626),
+            backgroundColor: cani.danger,
           ),
         );
       }
@@ -758,6 +768,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _handleBottomAction() async {
+    final cani = Theme.of(context).cani;
     final isCheckedIn = _assignment.status == 'CHECKED_IN' ||
         (_assignment.checkinTime != null && _assignment.checkoutTime == null);
     final isCompleted = _assignment.status == 'COMPLETED' || _assignment.checkoutTime != null;
@@ -788,9 +799,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     } else {
       if (!_isPaymentConfirmed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Hãy xác nhận tình trạng thanh toán thù lao ở mục "Thanh toán thù lao" trước khi kết ca!'),
-            backgroundColor: Color(0xFFF59E0B),
+          SnackBar(
+            content: const Text('Hãy xác nhận tình trạng thanh toán thù lao ở mục "Thanh toán thù lao" trước khi kết ca!'),
+            backgroundColor: cani.warning,
           ),
         );
         return;
@@ -802,31 +813,34 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       if (incompleteTasks.isNotEmpty || missingEvidenceTasks.isNotEmpty) {
         final proceed = await showDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Color(0xFFEAB308), size: 24),
-                SizedBox(width: 8),
-                Text('Chưa hoàn tất checklist', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          builder: (ctx) {
+            final ctxCani = Theme.of(ctx).cani;
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Color(0xFFEAB308), size: 24),
+                  SizedBox(width: 8),
+                  Text('Chưa hoàn tất checklist', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: Text(
+                'Bạn còn ${incompleteTasks.length} đầu việc chưa xong (${missingEvidenceTasks.length} việc chưa nộp ảnh chụp nghiệm thu).\n\nBạn có chắc chắn muốn Check-out kết thúc ca làm ngay bây giờ không?',
+                style: const TextStyle(fontSize: 13.5, height: 1.4),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Xem lại việc'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(backgroundColor: ctxCani.danger),
+                  child: const Text('Vẫn Check-out'),
+                ),
               ],
-            ),
-            content: Text(
-              'Bạn còn ${incompleteTasks.length} đầu việc chưa xong (${missingEvidenceTasks.length} việc chưa nộp ảnh chụp nghiệm thu).\n\nBạn có chắc chắn muốn Check-out kết thúc ca làm ngay bây giờ không?',
-              style: const TextStyle(fontSize: 13.5, height: 1.4),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Xem lại việc'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-                child: const Text('Vẫn Check-out'),
-              ),
-            ],
-          ),
+            );
+          },
         );
 
         if (proceed != true) return;
@@ -902,6 +916,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final cani = theme.cani;
 
     final isCheckedIn = _assignment.status == 'CHECKED_IN' ||
         (_assignment.checkinTime != null && _assignment.checkoutTime == null);
@@ -932,17 +947,17 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: cani.textMuted,
                   ),
                 ),
                 InkWell(
                   onTap: () => _callHotline(hotline),
                   child: Text(
                     'BTC $hotline',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFEF4444),
+                      color: cani.danger,
                     ),
                   ),
                 ),
@@ -953,7 +968,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.help_outline, color: Color(0xFF0066FF)),
+            icon: Icon(Icons.help_outline, color: cani.brand),
             onPressed: () {
               showDialog(
                 context: context,
@@ -1029,10 +1044,10 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                 height: 44,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: const Color(0xFF0066FF).withValues(alpha: 0.1),
-                                  border: Border.all(color: const Color(0xFF0066FF).withValues(alpha: 0.2)),
+                                  color: cani.brand.withValues(alpha: 0.1),
+                                  border: Border.all(color: cani.brand.withValues(alpha: 0.2)),
                                 ),
-                                child: const Icon(Icons.directions, color: Color(0xFF0066FF), size: 22),
+                                child: Icon(Icons.directions, color: cani.brand, size: 22),
                               ),
                             ),
                           ],
@@ -1087,7 +1102,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                            color: isDark ? cani.accent : const Color(0xFF0284C7),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -1121,9 +1136,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           _distanceMeters != null && _distanceMeters! > 200
                               ? Icons.warning_amber_rounded
                               : Icons.check_circle_outline,
-                          color: _distanceMeters != null && _distanceMeters! > 200
-                              ? const Color(0xFFDC2626)
-                              : const Color(0xFF16A34A),
+                            color: _distanceMeters != null && _distanceMeters! > 200
+                                ? cani.danger
+                                : const Color(0xFF16A34A),
                           size: 24,
                         ),
                         const SizedBox(width: 10),
@@ -1164,8 +1179,8 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                         if (_distanceMeters != null && _distanceMeters! > 200)
                           TextButton(
                             onPressed: _openGoogleMapsNavigation,
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFF0066FF),
+                              style: TextButton.styleFrom(
+                                foregroundColor: cani.brand,
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                             ),
                             child: const Text('Chỉ đường', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
@@ -1201,7 +1216,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                             ),
                             Text(
                               'Số lượng: $totalCount',
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                              style: TextStyle(fontSize: 13, color: cani.textMuted),
                             ),
                           ],
                         ),
@@ -1238,7 +1253,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           child: LinearProgressIndicator(
                             value: progress,
                             minHeight: 6,
-                            backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            backgroundColor: cani.border,
                             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0D9488)),
                           ),
                         ),
@@ -1283,13 +1298,13 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                              color: isDark ? const Color(0xFF0F172A) : cani.border,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Text(
                                 'Chưa có đầu việc cụ thể từ BTC. Bạn có thể tự thêm việc cần làm bên dưới.',
-                                style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                                style: TextStyle(fontSize: 12.5, color: cani.textMuted),
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -1310,9 +1325,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                   color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: item.isCompleted
-                                        ? const Color(0xFF86EFAC)
-                                        : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                     color: item.isCompleted
+                                         ? const Color(0xFF86EFAC)
+                                         : (isDark ? const Color(0xFF334155) : cani.border),
                                     width: item.isCompleted ? 1.5 : 1,
                                   ),
                                 ),
@@ -1355,9 +1370,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w700,
                                                     decoration: item.isCompleted ? TextDecoration.lineThrough : null,
-                                                    color: item.isCompleted
-                                                        ? const Color(0xFF64748B)
-                                                        : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                                              color: item.isCompleted
+                                                  ? cani.textMuted
+                                                  : (isDark ? Colors.white : const Color(0xFF0F172A)),
                                                   ),
                                                 ),
                                                 if (item.instruction != null && item.instruction!.isNotEmpty) ...[
@@ -1498,10 +1513,10 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                           ] else ...[
                                             const Icon(Icons.camera_alt_outlined, size: 16, color: Color(0xFF0284C7)),
                                             const SizedBox(width: 6),
-                                            const Expanded(
+                                            Expanded(
                                               child: Text(
                                                 'Cần ảnh chụp nghiệm thu',
-                                                style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                                                style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontStyle: FontStyle.italic),
                                               ),
                                             ),
                                             ElevatedButton.icon(
@@ -1512,7 +1527,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                                 style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white),
                                               ),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF0066FF),
+                                                backgroundColor: cani.brand,
                                                 visualDensity: VisualDensity.compact,
                                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1560,7 +1575,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.camera_alt_outlined, size: 20, color: Color(0xFF0066FF)),
+                            Icon(Icons.camera_alt_outlined, size: 20, color: cani.brand),
                             const SizedBox(width: 8),
                             const Text(
                               'Bằng chứng nghiệm thu ca làm',
@@ -1582,9 +1597,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           ],
                         ),
                         const SizedBox(height: 6),
-                        const Text(
+                        Text(
                           'Chụp ảnh hiện trường sau khi hoàn tất công việc (khu vực sạch sẽ, sản phẩm đã bàn giao, trang phục đúng chuẩn...) để nộp cho Ban tổ chức khi Check-out.',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.35),
+                          style: TextStyle(fontSize: 12, color: cani.textMuted, height: 1.35),
                         ),
                         const SizedBox(height: 12),
 
@@ -1685,7 +1700,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: const Color(0xFF0066FF).withValues(alpha: 0.35),
+                                  color: cani.brand.withValues(alpha: 0.35),
                                   style: BorderStyle.solid,
                                   width: 1.5,
                                 ),
@@ -1697,16 +1712,16 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF0066FF).withValues(alpha: 0.1),
+                                        color: cani.brand.withValues(alpha: 0.1),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: const Icon(Icons.add_a_photo, color: Color(0xFF0066FF), size: 24),
+                                      child: Icon(Icons.add_a_photo, color: cani.brand, size: 24),
                                     ),
                                     const SizedBox(height: 8),
-                                    const Text(
+                                    Text(
                                       'Chụp hoặc tải ảnh bằng chứng nghiệm thu',
                                       style: TextStyle(
-                                        color: Color(0xFF0066FF),
+                                        color: cani.brand,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12.5,
                                       ),
@@ -1738,7 +1753,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.payments_outlined, size: 20, color: Color(0xFF0066FF)),
+                              Icon(Icons.payments_outlined, size: 20, color: cani.brand),
                               const SizedBox(width: 8),
                               const Text(
                                 'THANH TOÁN THÙ LAO',
@@ -1766,7 +1781,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Thù lao thỏa thuận:', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                              Text('Thù lao thỏa thuận:', style: TextStyle(fontSize: 12.5, color: cani.textMuted)),
                               Text(
                                 '${_assignment.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
                                 style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
@@ -1777,7 +1792,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('BTC khai báo thanh toán:', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                              Text('BTC khai báo thanh toán:', style: TextStyle(fontSize: 12.5, color: cani.textMuted)),
                               Text(
                                 _assignment.declaredAmount > 0
                                     ? '${_assignment.declaredAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ'
@@ -1865,9 +1880,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                 Expanded(
                                   child: FilledButton(
                                     onPressed: () => _handleConfirmPayment('NOT_RECEIVED'),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFFDC2626),
-                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                                     style: FilledButton.styleFrom(
+                                       backgroundColor: cani.danger,
+                                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
                                     child: const Text('Chưa nhận', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
@@ -1936,8 +1951,8 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     backgroundColor: isCompleted
                         ? const Color(0xFF0D9488)
                         : (isCheckedIn
-                            ? (_isPaymentConfirmed ? const Color(0xFFEA580C) : const Color(0xFF64748B))
-                            : const Color(0xFF0066FF)),
+                            ? (_isPaymentConfirmed ? const Color(0xFFEA580C) : cani.textMuted)
+                            : cani.brand),
                     foregroundColor: Colors.white,
                     elevation: 3,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

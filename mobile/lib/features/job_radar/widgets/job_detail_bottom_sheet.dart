@@ -1,3 +1,4 @@
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -44,6 +45,7 @@ class JobDetailBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cani = theme.cani;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -260,7 +262,7 @@ class JobDetailBottomSheet extends StatelessWidget {
           // Ghi chú thanh toán Non-Escrow (Minh bạch phương thức thanh toán)
           Row(
             children: [
-              const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
+              Icon(Icons.info_outline, size: 13, color: cani.textMuted),
               const SizedBox(width: 5),
               Expanded(
                 child: Text(
@@ -289,8 +291,8 @@ class JobDetailBottomSheet extends StatelessWidget {
                     icon: const Icon(Icons.navigation_rounded, size: 18),
                     label: const Text('Chỉ đường', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF0066FF),
-                      side: const BorderSide(color: Color(0xFF0066FF), width: 1.5),
+                      foregroundColor: cani.brand,
+                      side: BorderSide(color: cani.brand, width: 1.5),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
@@ -308,7 +310,7 @@ class JobDetailBottomSheet extends StatelessWidget {
                           icon: const Icon(Icons.flash_on_rounded, size: 18),
                           label: const Text('Ứng tuyển khẩn cấp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                           style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFDC2626),
+                            backgroundColor: cani.danger,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         )
@@ -316,21 +318,21 @@ class JobDetailBottomSheet extends StatelessWidget {
                           alignment: Alignment.center,
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
+                            color: cani.border,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: const Color(0xFFCBD5E1),
                             ),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
                                 Icons.schedule_send_rounded,
                                 size: 16,
-                                color: Color(0xFF64748B),
+                                color: cani.textMuted,
                               ),
-                              SizedBox(width: 6),
+                              const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'Chờ lời mời (Matching)',
@@ -345,8 +347,8 @@ class JobDetailBottomSheet extends StatelessWidget {
                             ],
                           ),
                         ),
+                  ),
                 ),
-              ),
             ],
           ),
         ],

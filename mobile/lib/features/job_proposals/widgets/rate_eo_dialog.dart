@@ -1,3 +1,4 @@
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -57,7 +58,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
     }
   }
 
-  Widget _buildStarRow(String label, int currentVal, ValueChanged<int> onChanged, bool isDark) {
+  Widget _buildStarRow(CaniTokens cani, String label, int currentVal, ValueChanged<int> onChanged, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -83,7 +84,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                   padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Icon(
                     star <= currentVal ? Icons.star_rounded : Icons.star_border_rounded,
-                    color: const Color(0xFFF59E0B),
+                    color: cani.warning,
                     size: 22,
                   ),
                 ),
@@ -98,6 +99,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cani = Theme.of(context).cani;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
@@ -135,7 +137,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                         widget.assignment.eventName,
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          color: cani.textMuted,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -154,7 +156,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                      color: cani.border,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -168,7 +170,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           child: Icon(
                             star <= _rating ? Icons.star_rounded : Icons.star_border_rounded,
-                            color: const Color(0xFFF59E0B),
+                            color: cani.warning,
                             size: 36,
                           ),
                         ),
@@ -185,14 +187,14 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                 color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: cani.border,
                 ),
               ),
               child: Column(
                 children: [
-                  _buildStarRow('Môi trường làm việc', _envScore, (v) => setState(() => _envScore = v), isDark),
-                  _buildStarRow('Sự hỗ trợ của Quản lý', _supportScore, (v) => setState(() => _supportScore = v), isDark),
-                  _buildStarRow('Thanh toán minh bạch', _paymentScore, (v) => setState(() => _paymentScore = v), isDark),
+                  _buildStarRow(cani, 'Môi trường làm việc', _envScore, (v) => setState(() => _envScore = v), isDark),
+                  _buildStarRow(cani, 'Sự hỗ trợ của Quản lý', _supportScore, (v) => setState(() => _supportScore = v), isDark),
+                  _buildStarRow(cani, 'Thanh toán minh bạch', _paymentScore, (v) => setState(() => _paymentScore = v), isDark),
                 ],
               ),
             ),
@@ -218,14 +220,14 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                       color: selected
-                          ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF0066FF))
+                          ? cani.brand
                           : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
                     ),
                   ),
                   selected: selected,
                   selectedColor: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.5) : const Color(0xFFDBEAFE),
-                  checkmarkColor: isDark ? const Color(0xFF60A5FA) : const Color(0xFF0066FF),
-                  backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  checkmarkColor: isDark ? const Color(0xFF60A5FA) : cani.brand,
+                  backgroundColor: isDark ? const Color(0xFF1E293B) : cani.border,
                   side: BorderSide(
                     color: selected
                         ? (isDark ? const Color(0xFF2563EB) : const Color(0xFF93C5FD))
@@ -269,7 +271,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                       'Để sau',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        color: cani.textMuted,
                       ),
                     ),
                   ),
@@ -285,7 +287,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0066FF),
+                      backgroundColor: cani.brand,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),

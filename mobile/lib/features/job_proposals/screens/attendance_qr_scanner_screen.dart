@@ -1,3 +1,4 @@
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -267,6 +268,7 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
   Future<void> _showMismatchDialog({required String title, required String message}) async {
     await _controller.stop();
     if (!mounted) return;
+    final cani = Theme.of(context).cani;
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -288,7 +290,7 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
               _controller.start();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0077FF),
+              backgroundColor: cani.brand,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
@@ -302,6 +304,7 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
   @override
   Widget build(BuildContext context) {
     final title = widget.isCheckin ? 'Quét QR Check-in Vào Ca' : 'Quét QR Check-out Kết Ca';
+    final cani = Theme.of(context).cani;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -345,7 +348,7 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: _distanceMeters! > 200
-                          ? const Color(0xFFDC2626).withValues(alpha: 0.92)
+                          ? cani.danger.withValues(alpha: 0.92)
                           : const Color(0xFF16A34A).withValues(alpha: 0.92),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: const [

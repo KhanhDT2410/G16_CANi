@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -128,6 +129,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cani = Theme.of(context).cani;
     final a = widget.assignment;
     final destLat = a.venueLat ?? 10.7769;
     final destLng = a.venueLng ?? 106.7009;
@@ -166,7 +168,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                     color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.4) : Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.directions, color: isDark ? const Color(0xFF38BDF8) : Colors.blue.shade700, size: 24),
+                    child: Icon(Icons.directions, color: isDark ? cani.accent : Colors.blue.shade700, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -185,7 +187,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                         a.eventName,
                         style: TextStyle(
                           fontSize: 13,
-                          color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                          color: isDark ? cani.textMuted : Colors.grey.shade600,
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
@@ -196,7 +198,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close, color: isDark ? const Color(0xFF94A3B8) : null),
+                  icon: Icon(Icons.close, color: isDark ? cani.textMuted : null),
                 ),
               ],
             ),
@@ -287,7 +289,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                               'Tọa độ: $destLat, $destLng',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                                color: isDark ? cani.textMuted : Colors.grey.shade600,
                               ),
                             ),
                           ],
@@ -339,7 +341,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                     Container(width: 1, height: 30, color: isDark ? const Color(0xFF334155) : Colors.teal.shade200),
                     Row(
                       children: [
-                        Icon(Icons.two_wheeler, color: isDark ? const Color(0xFF38BDF8) : Colors.blue.shade800, size: 20),
+                        Icon(Icons.two_wheeler, color: isDark ? cani.accent : Colors.blue.shade800, size: 20),
                         const SizedBox(width: 8),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,7 +352,7 @@ class _ShiftNavigationSheetState extends State<ShiftNavigationSheet> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFF38BDF8) : Colors.blue.shade900,
+                                color: isDark ? cani.accent : Colors.blue.shade900,
                               ),
                             ),
                           ],

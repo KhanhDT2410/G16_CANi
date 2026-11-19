@@ -3,6 +3,7 @@ package com.cani.controller;
 import com.cani.dto.dispute.*;
 import com.cani.dto.response.ApiResponse;
 import com.cani.entity.User;
+import com.cani.security.SecurityUtils;
 import com.cani.service.DisputeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -46,4 +46,10 @@ public class ShiftAssignmentResponseDto {
     private String paymentMethod;
     private String workerConfirmStatus;
     private String paymentProofUrl;
+
+    // Bổ sung thông tin đánh giá 2 chiều (EO <-> Worker) sau ca làm
+    private Integer eoRating;
+    private String eoReviewComment;
+    private Instant eoReviewedAt;
+    private Boolean hasWorkerReviewed;
 }

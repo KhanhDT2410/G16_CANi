@@ -1,0 +1,8 @@
+export 'data/proposal_repository.dart';
+export 'models/proposal_models.dart';
+export 'screens/attendance_qr_scanner_screen.dart';
+export 'screens/my_assignments_screen.dart';
+export 'screens/shift_detail_execution_screen.dart';
+export 'widgets/history_kpi_bar.dart';
+export 'widgets/history_shift_card.dart';
+export 'widgets/shift_assignment_card.dart';

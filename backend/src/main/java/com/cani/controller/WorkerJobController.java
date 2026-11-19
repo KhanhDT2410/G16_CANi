@@ -1,13 +1,19 @@
 package com.cani.controller;
 
 import com.cani.dto.response.ApiResponse;
+import com.cani.dto.response.PageResponse;
 import com.cani.dto.worker.*;
 import com.cani.entity.Worker;
+import com.cani.entity.enums.AssignmentStatus;
 import com.cani.security.SecurityUtils;
 import com.cani.service.WorkerJobService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -94,6 +100,21 @@ public class WorkerJobController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<ShiftAssignmentResponseDto> assignments = workerJobService.getMyAssignments(userId);
         return ResponseEntity.ok(ApiResponse.ok(assignments, "Lấy lịch làm việc thành công"));
+    }
+
+    /**
+     * Lịch sử ca làm việc đã hoàn thành / kết thúc của Worker (Hỗ trợ phân trang và lọc trạng thái)
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @GetMapping("/assignments/history")
+    public ResponseEntity<ApiResponse<PageResponse<ShiftAssignmentResponseDto>>> getAssignmentHistory(
+            @RequestParam(value = "status", required = false) AssignmentStatus status,
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        Page<ShiftAssignmentResponseDto> pageResult = workerJobService.getAssignmentHistory(userId, status, pageable);
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(pageResult), "Lấy lịch sử ca làm việc thành công"));
     }
 
     /**

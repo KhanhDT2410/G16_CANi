@@ -17,6 +17,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -1467,6 +1471,118 @@ class WorkerJobServiceTest {
                 .build();
 
         assertThatThrownBy(() -> workerJobService.updateBankAccount(userId, request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy thông tin Worker");
+    }
+
+    @Test
+    @DisplayName("UTC099 - getAssignmentHistory() - Success: Không có ca làm việc lịch sử trả về trang rỗng")
+    void getAssignmentHistory_WhenEmpty_ReturnsEmptyPage() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        Pageable pageable = PageRequest.of(0, 10);
+        when(shiftAssignmentRepository.findHistoryAssignments(eq(worker.getWorkerId()), isNull(), anyList(), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        Page<ShiftAssignmentResponseDto> result = workerJobService.getAssignmentHistory(userId, null, pageable);
+
+        assertThat(result).isNotNull();
+        assertThat(result.isEmpty()).isTrue();
+        assertThat(result.getTotalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("UTC100 - getAssignmentHistory() - Success: Trả về danh sách phân trang làm giàu đầy đủ dữ liệu chấm công, thanh toán và đánh giá EO")
+    void getAssignmentHistory_Success_ReturnsEnrichedDtoPage() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        Pageable pageable = PageRequest.of(0, 10);
+
+        UUID assignmentId = UUID.randomUUID();
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId)
+                .shift(activeShift)
+                .worker(worker)
+                .status(AssignmentStatus.COMPLETED)
+                .source(AssignmentSource.MATCHING)
+                .eoConfirmed(true)
+                .createdAt(Instant.now())
+                .build();
+
+        Page<ShiftAssignment> assignmentPage = new PageImpl<>(List.of(sa), pageable, 1);
+        when(shiftAssignmentRepository.findHistoryAssignments(eq(worker.getWorkerId()), isNull(), anyList(), eq(pageable)))
+                .thenReturn(assignmentPage);
+
+        AttendanceLog attendanceLog = AttendanceLog.builder()
+                .shiftAssignment(sa)
+                .worker(worker)
+                .checkinTime(Instant.now().minus(Duration.ofHours(4)))
+                .checkoutTime(Instant.now())
+                .hoursWorked(BigDecimal.valueOf(4.0))
+                .attendanceStatus(AttendanceStatus.CHECKED_OUT)
+                .proofImageUrl("https://cani.vn/proof.jpg")
+                .proofSubmittedAt(Instant.now())
+                .build();
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(anySet()))
+                .thenReturn(List.of(attendanceLog));
+
+        Payment payment = Payment.builder()
+                .assignmentId(assignmentId)
+                .worker(worker)
+                .agreedAmount(BigDecimal.valueOf(240000))
+                .declaredAmount(BigDecimal.valueOf(240000))
+                .status(PaymentStatus.CONFIRMED_FULL)
+                .paymentMethod("BANK_TRANSFER")
+                .workerConfirmStatus("CONFIRMED")
+                .build();
+        when(paymentRepository.findByAssignmentIdIn(anySet()))
+                .thenReturn(List.of(payment));
+
+        UUID eoUserId = UUID.randomUUID();
+        Review eoReview = Review.builder()
+                .assignmentId(assignmentId)
+                .reviewerId(eoUserId)
+                .revieweeId(userId)
+                .rating(5)
+                .comment("Hoàn thành xuất sắc nhiệm vụ được giao")
+                .createdAt(Instant.now())
+                .build();
+        Review workerReview = Review.builder()
+                .assignmentId(assignmentId)
+                .reviewerId(userId)
+                .revieweeId(eoUserId)
+                .rating(5)
+                .comment("Ban tổ chức rất chuyên nghiệp")
+                .createdAt(Instant.now())
+                .build();
+        when(reviewRepository.findByAssignmentIdIn(anySet()))
+                .thenReturn(List.of(eoReview, workerReview));
+
+        Page<ShiftAssignmentResponseDto> result = workerJobService.getAssignmentHistory(userId, null, pageable);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        ShiftAssignmentResponseDto dto = result.getContent().get(0);
+        assertThat(dto.getAssignmentId()).isEqualTo(assignmentId);
+        assertThat(dto.getStatus()).isEqualTo(AssignmentStatus.COMPLETED);
+        assertThat(dto.getAttendanceStatus()).isEqualTo("CHECKED_OUT");
+        assertThat(dto.getHoursWorked()).isEqualByComparingTo(BigDecimal.valueOf(4.0));
+        assertThat(dto.getPaymentStatus()).isEqualTo("CONFIRMED_FULL");
+        assertThat(dto.getEoRating()).isEqualTo(5);
+        assertThat(dto.getEoReviewComment()).isEqualTo("Hoàn thành xuất sắc nhiệm vụ được giao");
+        assertThat(dto.getHasWorkerReviewed()).isTrue();
+
+        // Kiểm tra Batch Loading: chỉ gọi findBy...In đúng 1 lần (loại bỏ N+1 query)
+        verify(attendanceLogRepository, times(1)).findByShiftAssignment_AssignmentIdIn(anySet());
+        verify(paymentRepository, times(1)).findByAssignmentIdIn(anySet());
+        verify(reviewRepository, times(1)).findByAssignmentIdIn(anySet());
+    }
+
+    @Test
+    @DisplayName("UTC101 - getAssignmentHistory() - Failure: Không tìm thấy Worker ném ResourceNotFoundException")
+    void getAssignmentHistory_Failure_WorkerNotFound() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.empty());
+        Pageable pageable = PageRequest.of(0, 10);
+
+        assertThatThrownBy(() -> workerJobService.getAssignmentHistory(userId, null, pageable))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Không tìm thấy thông tin Worker");
     }

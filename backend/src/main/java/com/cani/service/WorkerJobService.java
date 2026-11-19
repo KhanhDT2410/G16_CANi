@@ -19,6 +19,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -237,6 +240,64 @@ public class WorkerJobService {
         Worker worker = getWorkerOrThrow(userId);
         List<ShiftAssignment> assignments = shiftAssignmentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
         return assignments.stream().map(this::mapToAssignmentDto).collect(Collectors.toList());
+    }
+
+    /**
+     * Lịch sử các ca làm việc của Worker (Hỗ trợ phân trang, lọc trạng thái và tối ưu hóa O(1) batch query)
+     */
+    @Transactional(readOnly = true)
+    public Page<ShiftAssignmentResponseDto> getAssignmentHistory(UUID userId, AssignmentStatus status, Pageable pageable) {
+        Worker worker = getWorkerOrThrow(userId);
+        List<AssignmentStatus> historyStatuses = List.of(
+                AssignmentStatus.COMPLETED,
+                AssignmentStatus.CANCELLED,
+                AssignmentStatus.NO_SHOW
+        );
+
+        Page<ShiftAssignment> assignmentPage = shiftAssignmentRepository.findHistoryAssignments(
+                worker.getWorkerId(),
+                status,
+                historyStatuses,
+                pageable
+        );
+
+        if (assignmentPage.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        List<ShiftAssignment> assignments = assignmentPage.getContent();
+        Set<UUID> assignmentIds = assignments.stream()
+                .map(ShiftAssignment::getAssignmentId)
+                .collect(Collectors.toSet());
+
+        // 1. Batch Fetching: Chấm công (O(1) thay vì N query)
+        Map<UUID, AttendanceLog> attendanceMap = (attendanceLogRepository != null && !assignmentIds.isEmpty())
+                ? attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(assignmentIds).stream()
+                        .filter(a -> a.getShiftAssignment() != null && a.getShiftAssignment().getAssignmentId() != null)
+                        .collect(Collectors.toMap(a -> a.getShiftAssignment().getAssignmentId(), a -> a, (k1, k2) -> k1))
+                : Collections.emptyMap();
+
+        // 2. Batch Fetching: Thanh toán (O(1) thay vì N query)
+        Map<UUID, Payment> paymentMap = (paymentRepository != null && !assignmentIds.isEmpty())
+                ? paymentRepository.findByAssignmentIdIn(assignmentIds).stream()
+                        .filter(p -> p.getAssignmentId() != null)
+                        .collect(Collectors.toMap(Payment::getAssignmentId, p -> p, (k1, k2) -> k1))
+                : Collections.emptyMap();
+
+        // 3. Batch Fetching: Đánh giá 2 chiều (EO <-> Worker)
+        Map<UUID, List<Review>> reviewMap = (reviewRepository != null && !assignmentIds.isEmpty())
+                ? reviewRepository.findByAssignmentIdIn(assignmentIds).stream()
+                        .filter(r -> r.getAssignmentId() != null)
+                        .collect(Collectors.groupingBy(Review::getAssignmentId))
+                : Collections.emptyMap();
+
+        UUID workerUserId = (worker.getUser() != null) ? worker.getUser().getUserId() : null;
+
+        List<ShiftAssignmentResponseDto> dtoList = assignments.stream()
+                .map(a -> mapToEnrichedAssignmentDto(a, attendanceMap.get(a.getAssignmentId()), paymentMap.get(a.getAssignmentId()), reviewMap.get(a.getAssignmentId()), workerUserId))
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(dtoList, pageable, assignmentPage.getTotalElements());
     }
 
     /**
@@ -1341,6 +1402,75 @@ public class WorkerJobService {
                 .paymentMethod(paymentOpt.map(Payment::getPaymentMethod).orElse(null))
                 .workerConfirmStatus(paymentOpt.map(Payment::getWorkerConfirmStatus).orElse(null))
                 .paymentProofUrl(paymentOpt.map(Payment::getPaymentProofUrl).orElse(null))
+                .build();
+    }
+
+    private ShiftAssignmentResponseDto mapToEnrichedAssignmentDto(
+            ShiftAssignment a,
+            AttendanceLog att,
+            Payment p,
+            List<Review> reviews,
+            UUID workerUserId
+    ) {
+        Shift s = a.getShift();
+        Event e = s != null ? s.getEvent() : null;
+
+        Double venueLat = s != null && s.getLocationLat() != null ? s.getLocationLat()
+                : (e != null && e.getVenueLat() != null ? e.getVenueLat() : DEFAULT_CENTER_LAT);
+        Double venueLng = s != null && s.getLocationLng() != null ? s.getLocationLng()
+                : (e != null && e.getVenueLng() != null ? e.getVenueLng() : DEFAULT_CENTER_LNG);
+
+        Integer eoRating = null;
+        String eoComment = null;
+        Instant eoReviewedAt = null;
+        boolean hasWorkerReviewed = false;
+
+        if (reviews != null && !reviews.isEmpty() && workerUserId != null) {
+            for (Review r : reviews) {
+                if (workerUserId.equals(r.getRevieweeId())) {
+                    eoRating = r.getRating();
+                    eoComment = r.getComment();
+                    eoReviewedAt = r.getCreatedAt();
+                }
+                if (workerUserId.equals(r.getReviewerId())) {
+                    hasWorkerReviewed = true;
+                }
+            }
+        }
+
+        return ShiftAssignmentResponseDto.builder()
+                .assignmentId(a.getAssignmentId())
+                .shiftId(s != null ? s.getShiftId() : null)
+                .eventId(e != null ? e.getEventId() : null)
+                .eventName(e != null ? e.getName() : "Sự kiện")
+                .venueAddress(s != null && s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
+                .jobType(s != null ? s.getJobType() : "")
+                .startTime(s != null ? s.getStartTime() : null)
+                .endTime(s != null ? s.getEndTime() : null)
+                .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
+                .totalPay(calculateSingleWorkerShiftPay(s))
+                .status(a.getStatus())
+                .source(a.getSource())
+                .eoConfirmed(a.getEoConfirmed())
+                .venueLat(venueLat)
+                .venueLng(venueLng)
+                .attendanceStatus(att != null && att.getAttendanceStatus() != null ? att.getAttendanceStatus().name() : "NOT_CHECKED_IN")
+                .checkinTime(att != null ? att.getCheckinTime() : null)
+                .checkoutTime(att != null ? att.getCheckoutTime() : null)
+                .hoursWorked(att != null ? att.getHoursWorked() : BigDecimal.ZERO)
+                .createdAt(a.getCreatedAt())
+                .imageUrl(s != null ? s.getImageUrl() : (e != null ? e.getImageUrl() : null))
+                .proofImageUrl(att != null ? att.getProofImageUrl() : null)
+                .proofSubmittedAt(att != null ? att.getProofSubmittedAt() : null)
+                .paymentStatus(p != null && p.getStatus() != null ? p.getStatus().name() : "NOT_DECLARED")
+                .declaredAmount(p != null && p.getDeclaredAmount() != null ? p.getDeclaredAmount() : BigDecimal.ZERO)
+                .paymentMethod(p != null ? p.getPaymentMethod() : null)
+                .workerConfirmStatus(p != null ? p.getWorkerConfirmStatus() : null)
+                .paymentProofUrl(p != null ? p.getPaymentProofUrl() : null)
+                .eoRating(eoRating)
+                .eoReviewComment(eoComment)
+                .eoReviewedAt(eoReviewedAt)
+                .hasWorkerReviewed(hasWorkerReviewed)
                 .build();
     }
 

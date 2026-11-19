@@ -2,6 +2,8 @@ package com.cani.repository;
 
 import com.cani.entity.ShiftAssignment;
 import com.cani.entity.enums.AssignmentStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +22,23 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
     List<ShiftAssignment> findByWorker_WorkerIdAndStatusIn(UUID workerId, List<AssignmentStatus> statuses);
     Optional<ShiftAssignment> findByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
+
+    @Query(value = "SELECT sa FROM ShiftAssignment sa " +
+                   "JOIN FETCH sa.shift s " +
+                   "LEFT JOIN FETCH s.event e " +
+                   "WHERE sa.worker.workerId = :workerId " +
+                   "AND (:status IS NULL OR sa.status = :status) " +
+                   "AND sa.status IN :historyStatuses",
+           countQuery = "SELECT COUNT(sa) FROM ShiftAssignment sa " +
+                        "WHERE sa.worker.workerId = :workerId " +
+                        "AND (:status IS NULL OR sa.status = :status) " +
+                        "AND sa.status IN :historyStatuses")
+    Page<ShiftAssignment> findHistoryAssignments(
+            @Param("workerId") UUID workerId,
+            @Param("status") AssignmentStatus status,
+            @Param("historyStatuses") List<AssignmentStatus> historyStatuses,
+            Pageable pageable
+    );
 
     @Query("SELECT sa FROM ShiftAssignment sa JOIN sa.shift s WHERE sa.worker.workerId = :workerId AND sa.status IN :activeStatuses AND s.startTime < :endTime AND s.endTime > :startTime")
     List<ShiftAssignment> findConflictingAssignments(

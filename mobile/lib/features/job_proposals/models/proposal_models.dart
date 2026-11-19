@@ -88,6 +88,10 @@ class ShiftAssignmentItem {
   final DateTime? proofSubmittedAt;
   final String? workerConfirmStatus;
   final String? paymentProofUrl;
+  final int? eoRating;
+  final String? eoReviewComment;
+  final DateTime? eoReviewedAt;
+  final bool? hasWorkerReviewed;
 
   ShiftAssignmentItem({
     required this.assignmentId,
@@ -117,6 +121,10 @@ class ShiftAssignmentItem {
     this.proofSubmittedAt,
     this.workerConfirmStatus,
     this.paymentProofUrl,
+    this.eoRating,
+    this.eoReviewComment,
+    this.eoReviewedAt,
+    this.hasWorkerReviewed,
   });
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
@@ -148,6 +156,10 @@ class ShiftAssignmentItem {
       proofSubmittedAt: json['proofSubmittedAt'] != null ? DateTime.tryParse(json['proofSubmittedAt'])?.toLocal() : null,
       workerConfirmStatus: json['workerConfirmStatus'] as String?,
       paymentProofUrl: json['paymentProofUrl'] as String?,
+      eoRating: (json['eoRating'] is num) ? (json['eoRating'] as num).toInt() : null,
+      eoReviewComment: json['eoReviewComment'] as String?,
+      eoReviewedAt: json['eoReviewedAt'] != null ? DateTime.tryParse(json['eoReviewedAt'])?.toLocal() : null,
+      hasWorkerReviewed: json['hasWorkerReviewed'] as bool?,
     );
   }
 }

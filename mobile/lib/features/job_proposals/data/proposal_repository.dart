@@ -46,6 +46,18 @@ final myDisputesListProvider = FutureProvider<List<WorkerDisputeItem>>((ref) asy
   }
 });
 
+/// Thống kê thu nhập và tích lũy thực chiến của Worker (UC-60 / UC-64)
+final incomeSummaryProvider = FutureProvider<WorkerIncomeSummary>((ref) async {
+  final repo = ref.watch(proposalRepositoryProvider);
+  try {
+    return await repo.fetchIncomeSummary();
+  } catch (_) {
+    return const WorkerIncomeSummary();
+  }
+});
+
+/// Quản lý Tab con tại màn hình Ca Làm (0: Đang làm & Sắp tới, 1: Lịch sử ca làm)
+final assignmentsSubTabProvider = StateProvider<int>((ref) => 0);
 class ProposalRepository {
   final Dio _dio;
 

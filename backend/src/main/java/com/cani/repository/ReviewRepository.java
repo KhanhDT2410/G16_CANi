@@ -4,6 +4,7 @@ import com.cani.entity.Review;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import java.util.UUID;
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     Optional<Review> findByAssignmentIdAndReviewerId(UUID assignmentId, UUID reviewerId);
+
+    List<Review> findByAssignmentIdIn(Collection<UUID> assignmentIds);
 
     List<Review> findByRevieweeIdOrderByCreatedAtDesc(UUID revieweeId);
 

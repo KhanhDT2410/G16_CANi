@@ -5,8 +5,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/app/home_screen.dart';
 import 'package:cani/core/constants/banks.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
+import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/profile/providers/profile_providers.dart';
 import 'package:cani/features/profile/providers/worker_bank_provider.dart';
 import 'package:cani/features/profile/providers/worker_experience_provider.dart';
@@ -125,6 +127,11 @@ class ProfileCvBlock extends ConsumerWidget {
                   suffix: ' ca',
                   label: 'Hoàn thành',
                   accentColor: const Color(0xFF10B981),
+                  onTap: () {
+                    // Chuyển sang Tab "Ca Làm" (index 1) và chọn Sub-tab "Lịch sử ca làm" (index 1)
+                    ref.read(assignmentsSubTabProvider.notifier).state = 1;
+                    ref.read(homeTabIndexProvider.notifier).state = 1;
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -192,6 +199,7 @@ class _MetricCard extends StatelessWidget {
     required this.suffix,
     required this.label,
     required this.accentColor,
+    this.onTap,
   });
 
   final IconData icon;
@@ -199,12 +207,13 @@ class _MetricCard extends StatelessWidget {
   final String suffix;
   final String label;
   final Color accentColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).profileX;
 
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
       decoration: BoxDecoration(
         color: t.canvas,
@@ -251,6 +260,17 @@ class _MetricCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return card;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: card,
       ),
     );
   }

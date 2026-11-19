@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { myTeamService } from '../../../services/myTeamService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
+import { WorkerProfileModal } from './worker-profile';
+import { useWorkerProfile } from '../hooks/useWorkerProfile';
 
 export default function EOMyTeamTab() {
   const [team, setTeam] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [favoritedOnly, setFavoritedOnly] = useState(false);
+  const workerProfile = useWorkerProfile();
 
   // Modal thêm nhân sự mới
   const [showAddModal, setShowAddModal] = useState(false);
@@ -233,32 +236,42 @@ export default function EOMyTeamTab() {
                 {/* Header card: Avatar + Info + Star */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                    {w.avatarUrl ? (
-                      <img
-                        src={w.avatarUrl}
-                        alt={w.fullName}
-                        style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: '50%',
-                        backgroundColor: '#eff6ff',
-                        color: '#1d4ed8',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: '1rem',
-                      }}>
-                        {(w.fullName || 'W').charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                    <div
+                      onClick={() => workerProfile.openProfile(w.workerId)}
+                      style={{ cursor: 'pointer' }}
+                      title="Bấm để xem hồ sơ năng lực chi tiết"
+                    >
+                      {w.avatarUrl ? (
+                        <img
+                          src={w.avatarUrl}
+                          alt={w.fullName}
+                          style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: '50%',
+                          backgroundColor: '#eff6ff',
+                          color: '#1d4ed8',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 800,
+                          fontSize: '1rem',
+                        }}>
+                          {(w.fullName || 'W').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
 
-                    <div>
-                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
-                        {w.fullName}
+                    <div
+                      onClick={() => workerProfile.openProfile(w.workerId)}
+                      style={{ cursor: 'pointer' }}
+                      title="Bấm để xem hồ sơ năng lực chi tiết"
+                    >
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0066FF' }}>
+                        {w.fullName} <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>↗</span>
                       </h4>
                       <div style={{ fontSize: '0.775rem', color: '#64748b', marginTop: '0.15rem' }}>
                         SĐT: <strong>{w.phone || 'Chưa cập nhật'}</strong>
@@ -367,7 +380,24 @@ export default function EOMyTeamTab() {
                 </div>
 
                 {/* Footer action buttons */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => workerProfile.openProfile(w.workerId)}
+                    className="eo-btn-secondary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      padding: '0.35rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                    }}
+                    title="Xem chi tiết hồ sơ năng lực & bằng cấp"
+                  >
+                    Xem Hồ Sơ ↗
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => handleBlockWorker(w)}
@@ -512,6 +542,15 @@ export default function EOMyTeamTab() {
           </div>
         </div>
       )}
+
+      {/* Modal Xem Hồ Sơ Năng Lực Chi Tiết */}
+      <WorkerProfileModal
+        isOpen={workerProfile.isOpen}
+        loading={workerProfile.loading}
+        error={workerProfile.error}
+        profile={workerProfile.profile}
+        onClose={workerProfile.closeProfile}
+      />
     </div>
   );
 }

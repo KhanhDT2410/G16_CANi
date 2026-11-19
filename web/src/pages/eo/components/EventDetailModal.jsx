@@ -4,6 +4,8 @@ import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import { getDynamicEventStatus, getDynamicShiftStatus } from '../utils/eventHelpers';
+import { WorkerProfileModal } from './worker-profile';
+import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import './EventDetailModal.css';
 
 export default function EventDetailModal({
@@ -28,6 +30,7 @@ export default function EventDetailModal({
   const [eventWorkers, setEventWorkers] = useState([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [searchWorker, setSearchWorker] = useState('');
+  const workerProfile = useWorkerProfile();
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
 
@@ -858,22 +861,35 @@ export default function EventDetailModal({
                     return (
                       <div key={w.assignmentId || idx} className="event-worker-card">
                         <div className="worker-card-left">
-                          {w.avatarUrl ? (
-                            <img
-                              src={w.avatarUrl}
-                              alt={w.workerName}
-                              className="worker-avatar-frame"
-                              onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="worker-avatar-placeholder">
-                              {(w.workerName || 'W').charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <div
+                            onClick={() => workerProfile.openProfile(w.workerId || w.userId)}
+                            style={{ cursor: 'pointer' }}
+                            title="Bấm để xem hồ sơ năng lực chi tiết"
+                          >
+                            {w.avatarUrl ? (
+                              <img
+                                src={w.avatarUrl}
+                                alt={w.workerName}
+                                className="worker-avatar-frame"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="worker-avatar-placeholder">
+                                {(w.workerName || 'W').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
 
                           <div className="worker-info-main">
                             <div className="worker-name-row">
-                              <span className="worker-name-text">{w.workerName}</span>
+                              <span
+                                className="worker-name-text"
+                                onClick={() => workerProfile.openProfile(w.workerId || w.userId)}
+                                style={{ cursor: 'pointer', color: '#0066FF' }}
+                                title="Bấm để xem hồ sơ năng lực chi tiết"
+                              >
+                                {w.workerName} ↗
+                              </span>
                               <span className="worker-age-badge">
                                 {w.workerAge ? `${w.workerAge} tuổi` : '22 tuổi'} {w.workerDob ? `(${w.workerDob})` : ''}
                               </span>
@@ -963,6 +979,23 @@ export default function EventDetailModal({
                             </span>
                           )}
 
+                          <button
+                            type="button"
+                            onClick={() => workerProfile.openProfile(w.workerId || w.userId)}
+                            className="eo-btn-secondary"
+                            style={{
+                              padding: '0.35rem 0.65rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                            }}
+                            title="Xem chi tiết hồ sơ năng lực"
+                          >
+                            Xem Hồ Sơ ↗
+                          </button>
+
                           {w.userId && (
                             <button
                               type="button"
@@ -1006,6 +1039,15 @@ export default function EventDetailModal({
             {asPage ? 'Quay lại danh sách sự kiện' : 'Đóng'}
           </button>
         </div>
+
+        {/* Modal Xem Hồ Sơ Năng Lực Worker */}
+        <WorkerProfileModal
+          isOpen={workerProfile.isOpen}
+          loading={workerProfile.loading}
+          error={workerProfile.error}
+          profile={workerProfile.profile}
+          onClose={workerProfile.closeProfile}
+        />
     </div>
   );
 

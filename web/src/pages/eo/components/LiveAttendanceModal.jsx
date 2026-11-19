@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import RateWorkerModal from './RateWorkerModal';
+import { WorkerProfileModal } from './worker-profile';
+import { useWorkerProfile } from '../hooks/useWorkerProfile';
 
 /**
  * LiveAttendanceModal
@@ -21,6 +23,7 @@ const LiveAttendanceModal = ({
   const [verifyingId, setVerifyingId] = useState(null);
   const [selectedForReview, setSelectedForReview] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const workerProfile = useWorkerProfile();
 
   const loadAttendance = useCallback(async () => {
     if (!shift?.shiftId) return;
@@ -185,7 +188,21 @@ const LiveAttendanceModal = ({
                       <tr key={item.assignmentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         {/* Nhân sự */}
                         <td style={{ padding: '12px 14px' }}>
-                          <div style={{ fontWeight: 600, color: '#1e293b' }}>{item.workerName}</div>
+                          <div
+                            onClick={() => workerProfile.openProfile(item.workerId || item.userId)}
+                            style={{
+                              fontWeight: 600,
+                              color: '#0066FF',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            title="Bấm để xem hồ sơ năng lực chi tiết"
+                          >
+                            <span>{item.workerName}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>↗</span>
+                          </div>
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.workerPhone}</div>
                           <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 2 }}>
                             ⭐ {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
@@ -349,6 +366,15 @@ const LiveAttendanceModal = ({
           submitting={submittingReview}
         />
       )}
+
+      {/* Modal Xem Hồ sơ Năng lực Worker */}
+      <WorkerProfileModal
+        isOpen={workerProfile.isOpen}
+        loading={workerProfile.loading}
+        error={workerProfile.error}
+        profile={workerProfile.profile}
+        onClose={workerProfile.closeProfile}
+      />
     </>
   );
 };

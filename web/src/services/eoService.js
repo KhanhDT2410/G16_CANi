@@ -390,4 +390,16 @@ export const eoService = {
       return [];
     }
   },
+
+  // Lấy hồ sơ nghề nghiệp chi tiết của Worker cho EO (trực tiếp từ Database)
+  getWorkerProfile: async (workerId) => {
+    const response = await apiClient.get(`/v1/eo/workers/${workerId}/profile`);
+    return response.data?.data;
+  },
+
+  // Lấy hồ sơ công khai của Nhà tổ chức sự kiện (EO)
+  getEoPublicProfile: async (eoId) => {
+    const response = await apiClient.get(`/v1/eo/${eoId}/public-profile`);
+    return response.data?.data;
+  },
 };

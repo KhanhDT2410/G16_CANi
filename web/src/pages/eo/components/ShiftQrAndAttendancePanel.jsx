@@ -3,6 +3,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import RateWorkerModal from './RateWorkerModal';
+import { WorkerProfileModal } from './worker-profile';
+import { useWorkerProfile } from '../hooks/useWorkerProfile';
 
 /**
  * ShiftQrAndAttendancePanel
@@ -23,6 +25,7 @@ export default function ShiftQrAndAttendancePanel({
   const ROTATE_INTERVAL = 20;
   const [countdown, setCountdown] = useState(ROTATE_INTERVAL);
   const [refreshNonce, setRefreshNonce] = useState(Date.now());
+  const workerProfile = useWorkerProfile();
 
   const [attendanceList, setAttendanceList] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
@@ -471,7 +474,21 @@ export default function ShiftQrAndAttendancePanel({
                     return (
                       <tr key={item.assignmentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 14px' }}>
-                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.workerName}</div>
+                          <div
+                            onClick={() => workerProfile.openProfile(item.workerId || item.userId)}
+                            style={{
+                              fontWeight: 700,
+                              color: '#0066FF',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            title="Bấm để xem hồ sơ năng lực chi tiết của nhân sự"
+                          >
+                            <span>{item.workerName}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>↗</span>
+                          </div>
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.workerPhone}</div>
                           <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 2 }}>
                             ⭐ {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
@@ -611,6 +628,14 @@ export default function ShiftQrAndAttendancePanel({
         assignment={selectedForReview}
         submitting={submittingReview}
         onSubmit={handleSubmitReview}
+      />
+
+      <WorkerProfileModal
+        isOpen={workerProfile.isOpen}
+        loading={workerProfile.loading}
+        error={workerProfile.error}
+        profile={workerProfile.profile}
+        onClose={workerProfile.closeProfile}
       />
     </div>
   );

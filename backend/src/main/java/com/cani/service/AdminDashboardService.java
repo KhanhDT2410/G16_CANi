@@ -95,7 +95,8 @@ public class AdminDashboardService {
     }
 
     /**
-     * Lấy 10 hoạt động quản trị gần nhất từ bảng audit_logs, kết hợp thông tin người thực hiện (Admin).
+     * Lấy 10 hoạt động quản trị gần nhất từ bảng audit_logs, kết hợp thông tin người thực hiện (Admin)
+     * và thông tin đối tượng người dùng bị tác động (Target User).
      */
     public List<AdminRecentActivityResponseDto> getRecentActivities() {
         List<AuditLog> auditLogs = auditLogRepository.findTop10ByOrderByCreatedAtDesc();
@@ -103,26 +104,43 @@ public class AdminDashboardService {
             return Collections.emptyList();
         }
 
-        // Batch lookup danh sách người thực hiện để tránh N+1 query
-        Set<UUID> userIds = auditLogs.stream()
+        // Batch lookup danh sách người thực hiện (Admin/CSKH/Hệ thống)
+        Set<UUID> actorUserIds = auditLogs.stream()
                 .map(AuditLog::getUserId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<UUID, User> userMap = userIds.isEmpty()
+        // Batch lookup danh sách đối tượng người dùng bị tác động (Target User khi entityType == "USER")
+        Set<UUID> targetUserIds = auditLogs.stream()
+                .filter(log -> "USER".equalsIgnoreCase(log.getEntityType()))
+                .map(AuditLog::getEntityId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Set<UUID> allUserIds = new HashSet<>(actorUserIds);
+        allUserIds.addAll(targetUserIds);
+
+        Map<UUID, User> userMap = allUserIds.isEmpty()
                 ? Collections.emptyMap()
-                : userRepository.findAllById(userIds).stream()
+                : userRepository.findAllById(allUserIds).stream()
                     .collect(Collectors.toMap(User::getUserId, Function.identity()));
 
         return auditLogs.stream()
-                .map(logEntry -> toActivityDto(logEntry, userMap.get(logEntry.getUserId())))
+                .map(logEntry -> toActivityDto(logEntry, userMap.get(logEntry.getUserId()), userMap.get(logEntry.getEntityId())))
                 .collect(Collectors.toList());
     }
 
-    private AdminRecentActivityResponseDto toActivityDto(AuditLog logEntry, User adminUser) {
+    private AdminRecentActivityResponseDto toActivityDto(AuditLog logEntry, User adminUser, User targetUser) {
         String adminName = adminUser != null ? adminUser.getFullName() : "Hệ thống";
         String adminEmail = adminUser != null ? adminUser.getEmail() : null;
         String adminAvatarUrl = adminUser != null ? adminUser.getAvatarUrl() : null;
+
+        String targetEntityName = null;
+        String targetEntityEmail = null;
+        if ("USER".equalsIgnoreCase(logEntry.getEntityType()) && targetUser != null) {
+            targetEntityName = targetUser.getFullName();
+            targetEntityEmail = targetUser.getEmail();
+        }
 
         return AdminRecentActivityResponseDto.builder()
                 .id(logEntry.getAuditId())
@@ -134,6 +152,8 @@ public class AdminDashboardService {
                 .actionDescription(formatActionDescription(logEntry.getAction(), logEntry.getEntityType()))
                 .entityType(logEntry.getEntityType())
                 .entityId(logEntry.getEntityId())
+                .targetEntityName(targetEntityName)
+                .targetEntityEmail(targetEntityEmail)
                 .oldValues(logEntry.getOldValues())
                 .newValues(logEntry.getNewValues())
                 .ipAddress(logEntry.getIpAddress())

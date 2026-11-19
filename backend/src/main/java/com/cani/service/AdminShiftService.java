@@ -5,9 +5,11 @@ import com.cani.dto.admin.shift.AdminShiftSummaryDto;
 import com.cani.dto.admin.shift.AdminShiftWorkerDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.PaymentStatus;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.AttendanceLogRepository;
+import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.repository.ShiftRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ public class AdminShiftService {
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final AttendanceLogRepository attendanceLogRepository;
+    private final PaymentRepository paymentRepository;
 
     /**
      * Lấy danh sách ca làm việc cho Admin & CSKH (hỗ trợ lọc từ khóa và trạng thái, có phân trang).
@@ -117,6 +120,11 @@ public class AdminShiftService {
                             .checkinTime(attLog.map(AttendanceLog::getCheckinTime).orElse(null))
                             .checkoutTime(attLog.map(AttendanceLog::getCheckoutTime).orElse(null))
                             .attendanceStatus(attLog.map(al -> al.getAttendanceStatus() != null ? al.getAttendanceStatus().name() : "NONE").orElse("NONE"))
+                            .checklistProgress(sa.getChecklistProgress())
+                            .proofImageUrl(attLog.map(AttendanceLog::getProofImageUrl).orElse(null))
+                            .isOnTime(attLog.map(AttendanceLog::getIsOnTime).orElse(null))
+                            .eoConfirmed(sa.getEoConfirmed())
+                            .eoConfirmedAt(sa.getEoConfirmedAt())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -124,6 +132,12 @@ public class AdminShiftService {
         Event event = shift.getEvent();
         EventOrganizer eo = event != null ? event.getEventOrganizer() : null;
         User eoUser = eo != null ? eo.getUser() : null;
+
+        PaymentStatus paymentStatus = null;
+        List<Payment> shiftPayments = paymentRepository.findByShiftId(shiftId);
+        if (!shiftPayments.isEmpty()) {
+            paymentStatus = shiftPayments.get(shiftPayments.size() - 1).getStatus();
+        }
 
         return AdminShiftDetailDto.builder()
                 .shiftId(shift.getShiftId())
@@ -156,6 +170,7 @@ public class AdminShiftService {
                 .minReliabilityScore(shift.getMinReliabilityScore())
                 .dressCode(shift.getDressCode())
                 .checklist(shift.getChecklist())
+                .paymentStatus(paymentStatus)
                 .createdAt(shift.getCreatedAt())
                 .workers(workers)
                 .build();

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminDashboardApi } from '../api/adminDashboardApi';
 import { revenueApi } from '../../revenue-dashboard/api/revenueApi';
+import { userManagementApi } from '../../admin-users';
 import { showToast } from '../../../components/common/Toast';
 
 const DEFAULT_REVENUE_METRICS = {
@@ -55,8 +56,46 @@ export const useAdminDashboard = () => {
           metricsData.revenue = DEFAULT_REVENUE_METRICS;
         }
 
+        let enrichedActivities = activitiesData || [];
+        // Nếu backend chưa restart và chưa có targetEntityName, tự động tra cứu bổ sung theo entityId:
+        const missingUserIds = [
+          ...new Set(
+            enrichedActivities
+              .filter((a) => a.entityType === 'USER' && !a.targetEntityName && a.entityId)
+              .map((a) => a.entityId)
+          ),
+        ];
+
+        if (missingUserIds.length > 0) {
+          try {
+            const userResults = await Promise.allSettled(
+              missingUserIds.map((id) => userManagementApi.getUserById(id))
+            );
+            const userMap = {};
+            missingUserIds.forEach((id, idx) => {
+              const res = userResults[idx];
+              if (res.status === 'fulfilled' && res.value) {
+                userMap[id] = res.value;
+              }
+            });
+
+            enrichedActivities = enrichedActivities.map((a) => {
+              if (a.entityType === 'USER' && !a.targetEntityName && a.entityId && userMap[a.entityId]) {
+                return {
+                  ...a,
+                  targetEntityName: userMap[a.entityId].fullName,
+                  targetEntityEmail: userMap[a.entityId].email,
+                };
+              }
+              return a;
+            });
+          } catch (lookupErr) {
+            console.warn('Không thể tra cứu thông tin tên người dùng cho log:', lookupErr);
+          }
+        }
+
         setMetrics(metricsData);
-        setActivities(activitiesData || []);
+        setActivities(enrichedActivities);
         if (isRefresh) {
           showToast('Đã làm mới dữ liệu Bảng điều khiển từ Backend!', 'success');
         }

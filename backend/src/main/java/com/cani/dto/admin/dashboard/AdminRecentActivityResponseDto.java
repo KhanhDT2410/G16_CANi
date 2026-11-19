@@ -60,6 +60,16 @@ public class AdminRecentActivityResponseDto {
     private UUID entityId;
 
     /**
+     * Tên đối tượng bị tác động (Ví dụ: Họ và tên người dùng nếu entityType == USER)
+     */
+    private String targetEntityName;
+
+    /**
+     * Email của đối tượng bị tác động nếu có
+     */
+    private String targetEntityEmail;
+
+    /**
      * Giá trị cũ dạng JSON
      */
     private String oldValues;

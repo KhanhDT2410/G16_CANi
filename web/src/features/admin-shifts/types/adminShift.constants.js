@@ -49,3 +49,11 @@ export const WORKER_ASSIGNMENT_STATUS_CONFIG = {
   CANCELLED: { label: 'Đã hủy', color: '#dc2626', bg: '#fef2f2' },
   NO_SHOW: { label: 'Vắng mặt', color: '#991b1b', bg: '#fee2e2' },
 };
+
+export const PAYMENT_STATUS_CONFIG = {
+  PENDING: { label: 'Chờ thanh toán', bg: '#fef3c7', color: '#d97706' },
+  ESCROW_PAID: { label: 'Đã giữ tiền cọc (Escrow)', bg: '#eff6ff', color: '#2563eb' },
+  RELEASED: { label: 'Đã giải ngân thù lao', bg: '#ecfdf5', color: '#059669' },
+  REFUNDED: { label: 'Đã hoàn tiền', bg: '#f1f5f9', color: '#475569' },
+  DISPUTED: { label: 'Đang tranh chấp tiền', bg: '#fef2f2', color: '#dc2626' },
+};

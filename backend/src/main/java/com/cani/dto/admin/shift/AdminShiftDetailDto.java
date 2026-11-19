@@ -1,6 +1,7 @@
 package com.cani.dto.admin.shift;
 
 import com.cani.entity.enums.ExperienceLevel;
+import com.cani.entity.enums.PaymentStatus;
 import com.cani.entity.enums.ShiftStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -52,6 +53,7 @@ public class AdminShiftDetailDto {
     private String dressCode;
     private String checklist;
     private Instant createdAt;
+    private PaymentStatus paymentStatus;
 
     // Danh sách nhân sự tham gia ca
     private List<AdminShiftWorkerDto> workers;

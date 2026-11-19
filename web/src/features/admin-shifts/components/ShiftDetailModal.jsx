@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { SHIFT_STATUS_CONFIG, WORKER_ASSIGNMENT_STATUS_CONFIG } from '../types/adminShift.constants';
+import { SHIFT_STATUS_CONFIG, PAYMENT_STATUS_CONFIG } from '../types/adminShift.constants';
+import ShiftWorkerTable from './ShiftWorkerTable';
 import './ShiftDetailModal.css';
 
 /**
  * Modal Xem Chi Tiết Ca Làm Việc (Căn giữa tuyệt đối qua createPortal).
+ * Đầy đủ thông tin đối soát tiến độ Worker & trách nhiệm EO.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const ShiftDetailModal = ({ shift, loading, onClose }) => {
@@ -36,30 +38,45 @@ export const ShiftDetailModal = ({ shift, loading, onClose }) => {
     }
   };
 
+  const parseTemplateChecklist = (rawChecklist) => {
+    if (!rawChecklist) return [];
+    try {
+      const list = typeof rawChecklist === 'string' ? JSON.parse(rawChecklist) : rawChecklist;
+      if (Array.isArray(list)) {
+        return list.map((item, idx) => {
+          if (typeof item === 'string') return { id: `chk_${idx + 1}`, title: item };
+          return { id: item.id || `chk_${idx + 1}`, title: item.title || item.name || `Nhiệm vụ ${idx + 1}` };
+        });
+      }
+    } catch (e) {
+      console.warn('Lỗi phân tích checklist template:', e);
+    }
+    return [];
+  };
+
+  const templateChecklist = shift ? parseTemplateChecklist(shift.checklist) : [];
   const statusCfg = shift ? (SHIFT_STATUS_CONFIG[shift.status] || {
-    label: shift.status || 'Chưa rõ',
-    bg: '#f1f5f9',
-    color: '#475569',
+    label: shift.status || 'Chưa rõ', bg: '#f1f5f9', color: '#475569',
+  }) : null;
+
+  const paymentCfg = shift?.paymentStatus ? (PAYMENT_STATUS_CONFIG[shift.paymentStatus] || {
+    label: shift.paymentStatus, bg: '#f1f5f9', color: '#475569',
   }) : null;
 
   const modalContent = (
     <div className="shift-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="shift-modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="shift-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <h3>Ca Làm: {shift?.shiftCode || '—'}</h3>
             {statusCfg && (
-              <span
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: 12,
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  background: statusCfg.bg,
-                  color: statusCfg.color,
-                }}
-              >
+              <span className="shift-status-pill" style={{ background: statusCfg.bg, color: statusCfg.color }}>
                 {statusCfg.label}
+              </span>
+            )}
+            {paymentCfg && (
+              <span className="shift-payment-pill" style={{ background: paymentCfg.bg, color: paymentCfg.color }}>
+                💳 {paymentCfg.label}
               </span>
             )}
           </div>
@@ -74,150 +91,70 @@ export const ShiftDetailModal = ({ shift, loading, onClose }) => {
           ) : shift ? (
             <>
               {/* Lưới thông tin Sự kiện & EO */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '1rem',
-                  background: '#f8fafc',
-                  padding: '1rem',
-                  borderRadius: 8,
-                  border: '1px solid #e2e8f0',
-                }}
-              >
+              <div className="shift-info-grid">
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Sự Kiện & Vị Trí
-                  </div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem', marginTop: 2 }}>
-                    {shift.eventName}
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 600 }}>
-                    Vị trí: {shift.jobType}
-                  </div>
+                  <div className="grid-label">Sự Kiện & Vị Trí</div>
+                  <div className="grid-main-val">{shift.eventName}</div>
+                  <div className="grid-sub-val" style={{ color: '#2563eb' }}>Vị trí: {shift.jobType}</div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Nhà Tổ Chức (EO)
-                  </div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem', marginTop: 2 }}>
-                    {shift.eoName}
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: '#475569' }}>
-                    SĐT: {shift.eoPhone} • {shift.eoEmail}
-                  </div>
-                  {shift.companyName && (
-                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{shift.companyName}</div>
-                  )}
+                  <div className="grid-label">Nhà Tổ Chức (EO)</div>
+                  <div className="grid-main-val">{shift.eoName}</div>
+                  <div className="grid-sub-val">SĐT: {shift.eoPhone} • {shift.eoEmail}</div>
+                  {shift.companyName && <div className="grid-company-val">{shift.companyName}</div>}
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Thời Gian & Địa Điểm
-                  </div>
-                  <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.85rem', marginTop: 2 }}>
+                  <div className="grid-label">Thời Gian & Địa Điểm</div>
+                  <div className="grid-main-val" style={{ fontSize: '0.85rem' }}>
                     {formatDateTime(shift.startTime)} — {formatDateTime(shift.endTime)}
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: 2 }}>
-                    {shift.venueAddress || '—'}
-                  </div>
+                  <div className="grid-sub-val">{shift.venueAddress || '—'}</div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Nhân Sự & Thù Lao
-                  </div>
-                  <div style={{ fontWeight: 700, color: '#059669', fontSize: '0.95rem', marginTop: 2 }}>
+                  <div className="grid-label">Nhân Sự & Thù Lao</div>
+                  <div className="grid-main-val" style={{ color: '#059669' }}>
                     {Number(shift.hourlyWage || 0).toLocaleString()} đ / giờ
                   </div>
-                  <div style={{ fontSize: '0.82rem', color: '#475569' }}>
+                  <div className="grid-sub-val">
                     Tuyển: <strong>{shift.confirmedWorkers || 0}</strong> / {shift.requiredWorkers || 0} người
                   </div>
-                  {shift.dressCode && (
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
-                      Đồng phục: {shift.dressCode}
-                    </div>
-                  )}
+                  {shift.dressCode && <div className="grid-dress-val">Đồng phục: {shift.dressCode}</div>}
                 </div>
               </div>
 
-              {shift.description && (
-                <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    Mô Tả Công Việc:
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: '#475569', background: '#ffffff', padding: '0.75rem', borderRadius: 6, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap' }}>
-                    {shift.description}
-                  </div>
-                </div>
-              )}
-
-              {/* Danh sách Worker */}
-              <div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
-                  Danh Sách Nhân Viên Đã Nhận Ca ({shift.workers?.length || 0})
-                </div>
-
-                {(!shift.workers || shift.workers.length === 0) ? (
-                  <div style={{ textAlign: 'center', padding: '1.25rem', color: '#94a3b8', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    Chưa có nhân viên nào được duyệt vào ca này.
+              {/* Mô tả & Đầu việc EO đã giao */}
+              <div className="shift-task-assignment-section">
+                <div className="section-title-sm">Nhiệm Vụ & Đầu Việc EO Đã Giao:</div>
+                {shift.description && (
+                  <div className="shift-description-box">{shift.description}</div>
+                )}
+                {templateChecklist.length > 0 ? (
+                  <div className="shift-checklist-template-box">
+                    <div className="checklist-subhead">Checklist đầu việc chuẩn ({templateChecklist.length} mục):</div>
+                    <div className="checklist-chips">
+                      {templateChecklist.map((task, idx) => (
+                        <div key={task.id} className="checklist-chip-item">
+                          <span className="chip-index">{idx + 1}.</span>
+                          <span className="chip-title">{task.title}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-                    <table className="tickets-table" style={{ margin: 0 }}>
-                      <thead>
-                        <tr>
-                          <th>Nhân Viên</th>
-                          <th>Số Điện Thoại</th>
-                          <th>Trạng Thái Nhận Việc</th>
-                          <th>Giờ Điểm Danh</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {shift.workers.map((w) => {
-                          const wStatus = WORKER_ASSIGNMENT_STATUS_CONFIG[w.status] || {
-                            label: w.status, color: '#475569', bg: '#f1f5f9',
-                          };
-                          return (
-                            <tr key={w.assignmentId}>
-                              <td>
-                                <div style={{ fontWeight: 600, color: '#1e293b' }}>
-                                  {w.workerName}
-                                  {w.isGroupLeader && (
-                                    <span style={{ marginLeft: 6, fontSize: '0.7rem', background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
-                                      Trưởng nhóm
-                                    </span>
-                                  )}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{w.workerEmail}</div>
-                              </td>
-                              <td>{w.workerPhone || '—'}</td>
-                              <td>
-                                <span
-                                  style={{
-                                    padding: '2px 8px',
-                                    borderRadius: 10,
-                                    fontSize: '0.72rem',
-                                    fontWeight: 600,
-                                    background: wStatus.bg,
-                                    color: wStatus.color,
-                                  }}
-                                >
-                                  {wStatus.label}
-                                </span>
-                              </td>
-                              <td style={{ fontSize: '0.8rem' }}>
-                                <div>Vào: {w.checkinTime ? formatDateTime(w.checkinTime) : 'Chưa điểm danh'}</div>
-                                {w.checkoutTime && <div>Ra: {formatDateTime(w.checkoutTime)}</div>}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  <div className="text-muted-box">Ca làm này không thiết lập danh sách checklist nhiệm vụ.</div>
                 )}
+              </div>
+
+              {/* Bảng nhân sự & Tiến độ làm việc */}
+              <div className="shift-workers-section">
+                <div className="section-title-md">
+                  <span>Tiến Độ Nhân Viên Nhận Ca ({shift.workers?.length || 0})</span>
+                  <span className="sub-helper">Bấm vào thanh tiến độ để kiểm tra chi tiết từng đầu việc</span>
+                </div>
+                <ShiftWorkerTable workers={shift.workers} templateChecklist={templateChecklist} />
               </div>
             </>
           ) : null}

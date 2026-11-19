@@ -26,4 +26,9 @@ public class AdminShiftWorkerDto {
     private Instant checkinTime;
     private Instant checkoutTime;
     private String attendanceStatus;
+    private String checklistProgress;
+    private String proofImageUrl;
+    private Boolean isOnTime;
+    private Boolean eoConfirmed;
+    private Instant eoConfirmedAt;
 }

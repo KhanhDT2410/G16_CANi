@@ -6,6 +6,7 @@ enum ScanType {
   cccdFront,
   cccdBack,
   selfie,
+  workProof,
 }
 
 class CardScanResult {
@@ -178,9 +179,12 @@ class _CardScannerScreenState extends State<CardScannerScreen>
 
   void _confirmPhoto() {
     if (_capturedBytes == null) return;
-    final prefix = widget.scanType == ScanType.cccdFront
-        ? 'cccd_front'
-        : (widget.scanType == ScanType.cccdBack ? 'cccd_back' : 'selfie');
+    final prefix = switch (widget.scanType) {
+      ScanType.cccdFront => 'cccd_front',
+      ScanType.cccdBack => 'cccd_back',
+      ScanType.selfie => 'selfie',
+      ScanType.workProof => 'work_proof',
+    };
     final fileName = '${prefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
     Navigator.of(context).pop(CardScanResult(
@@ -204,6 +208,8 @@ class _CardScannerScreenState extends State<CardScannerScreen>
         return 'Chụp Mặt Sau CCCD';
       case ScanType.selfie:
         return 'Chụp Chân Dung Khuôn Mặt';
+      case ScanType.workProof:
+        return 'Chụp Ảnh Bằng Chứng Nghiệm Thu';
     }
   }
 
@@ -215,6 +221,8 @@ class _CardScannerScreenState extends State<CardScannerScreen>
         return 'Đưa mặt sau CCCD vào khung chữ nhật';
       case ScanType.selfie:
         return 'Giữ khuôn mặt chính diện trong khung hình';
+      case ScanType.workProof:
+        return 'Chụp rõ hiện trường hoặc kết quả đầu việc trong khung hình';
     }
   }
 
@@ -247,9 +255,12 @@ class _CardScannerScreenState extends State<CardScannerScreen>
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final isSelfie = widget.scanType == ScanType.selfie;
-                    final cardWidth = constraints.maxWidth * 0.88;
-                    // Tỉ lệ thẻ ID-1 chuẩn ISO/IEC 7810: 85.6mm x 53.98mm (~1.58)
-                    final cardHeight = isSelfie ? cardWidth * 1.25 : cardWidth / 1.58;
+                    final isWorkProof = widget.scanType == ScanType.workProof;
+                    final cardWidth = constraints.maxWidth * (isWorkProof ? 0.90 : 0.88);
+                    // Tỉ lệ thẻ ID-1 chuẩn ISO/IEC 7810: 85.6mm x 53.98mm (~1.58), hoặc khung rộng cho ảnh nghiệm thu
+                    final cardHeight = isWorkProof
+                        ? constraints.maxHeight * 0.58
+                        : (isSelfie ? cardWidth * 1.25 : cardWidth / 1.58);
                     final left = (constraints.maxWidth - cardWidth) / 2;
                     final top = (constraints.maxHeight - cardHeight) / 2 - 20;
                     final cardRect = Rect.fromLTWH(left, top, cardWidth, cardHeight);
@@ -265,39 +276,40 @@ class _CardScannerScreenState extends State<CardScannerScreen>
                           ),
                         ),
 
-                        // Tia Laser quét lên xuống
-                        AnimatedBuilder(
-                          animation: _laserAnimation,
-                          builder: (context, child) {
-                            final laserTop = cardRect.top + cardRect.height * _laserAnimation.value;
-                            return Positioned(
-                              left: cardRect.left + 8,
-                              top: laserTop,
-                              width: cardRect.width - 16,
-                              child: Container(
-                                height: 2.5,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Colors.transparent,
-                                      Color(0xFF00E676),
-                                      Color(0xFF69F0AE),
-                                      Color(0xFF00E676),
-                                      Colors.transparent,
+                        // Tia Laser quét lên xuống (chỉ dùng khi quét CCCD/Selfie eKYC)
+                        if (!isWorkProof)
+                          AnimatedBuilder(
+                            animation: _laserAnimation,
+                            builder: (context, child) {
+                              final laserTop = cardRect.top + cardRect.height * _laserAnimation.value;
+                              return Positioned(
+                                left: cardRect.left + 8,
+                                top: laserTop,
+                                width: cardRect.width - 16,
+                                child: Container(
+                                  height: 2.5,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Colors.transparent,
+                                        Color(0xFF00E676),
+                                        Color(0xFF69F0AE),
+                                        Color(0xFF00E676),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF00E676).withValues(alpha: 0.6),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
                                     ],
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF00E676).withValues(alpha: 0.6),
-                                      blurRadius: 8,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
                                 ),
-                              ),
-                            );
-                          },
-                        ),
+                              );
+                            },
+                          ),
 
                         // Hướng dẫn căn chỉnh phía trên khung
                         Positioned(

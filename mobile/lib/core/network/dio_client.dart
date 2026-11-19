@@ -31,7 +31,13 @@ final dioProvider = Provider<Dio>((ref) {
             error.requestOptions.extra['retried_lan'] == null) {
           error.requestOptions.extra['retried_lan'] = true;
           
-          final fallbackHosts = ['192.168.1.20:8080', '10.0.2.2:8080', 'localhost:8080', '127.0.0.1:8080'];
+          final fallbackHosts = [
+            '192.168.100.31:8080',
+            '192.168.1.20:8080',
+            '10.0.2.2:8080',
+            'localhost:8080',
+            '127.0.0.1:8080',
+          ];
           final rawData = error.requestOptions.data;
           final retryHeaders = Map<String, dynamic>.from(error.requestOptions.headers);
           if (rawData is FormData) {

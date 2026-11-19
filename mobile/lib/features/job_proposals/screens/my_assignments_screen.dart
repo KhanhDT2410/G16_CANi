@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
-import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/cancel_assignment_dialog.dart';
@@ -96,6 +95,86 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
+  // UC-73: Nhập mã mời ca làm việc (Screen 092)
+  Future<void> _openInviteCodeDialog() async {
+    final t = Theme.of(context).cani;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nhập Mã Mời Tham Gia Ca', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                hintText: 'CANI-XXXXXX',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.confirmation_number_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton(
+            onPressed: () {
+              final code = controller.text.trim();
+              if (code.isNotEmpty) Navigator.pop(ctx, code);
+            },
+            style: FilledButton.styleFrom(backgroundColor: t.brand),
+            child: const Text('Tham Gia'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      try {
+        await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Tham gia ca làm việc thành công!'),
+              backgroundColor: t.success,
+            ),
+          );
+          ref.invalidate(assignmentsListProvider);
+        }
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi: $err'),
+              backgroundColor: t.danger,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _handleHeaderQrScan(List<ShiftAssignmentItem> assignments) {
+    if (assignments.isEmpty) {
+      _openInviteCodeDialog();
+      return;
+    }
+    final active = assignments.firstWhere(
+      (a) => a.status == 'CHECKED_IN' || a.status == 'CONFIRMED',
+      orElse: () => assignments.first,
+    );
+    final isCheckedIn = active.status == 'CHECKED_IN';
+    _openQrScanner(active, !isCheckedIn);
+  }
+
   Future<void> _openExecutionScreen(ShiftAssignmentItem a) async {
     final updated = await Navigator.push<bool>(
       context,
@@ -144,8 +223,6 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).cani;
-    final radarState = ref.watch(jobRadarProvider);
-    final locationLabel = radarState.isRealLocation ? 'GPS Thực Tế' : 'Q.7, TP.HCM';
 
     final data = ref.watch(assignmentsListProvider);
     final isLoading = data.isLoading;
@@ -158,7 +235,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header: tiêu đề + chip vị trí
+            // Header: tiêu đề + nút quét QR / nhập mã mời
             Container(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
               color: t.surface,
@@ -175,27 +252,49 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                       letterSpacing: -0.2,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: t.brandSoft,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: t.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.location_on, size: 14, color: t.brand),
-                        const SizedBox(width: 4),
-                        Text(
-                          locationLabel,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.confirmation_number_outlined, color: t.brand, size: 22),
+                        tooltip: 'Nhập mã mời ca làm',
+                        onPressed: _openInviteCodeDialog,
+                      ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => _handleHeaderQrScan(sorted),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
                             color: t.brand,
+                            borderRadius: BorderRadius.circular(999),
+                            boxShadow: [
+                              BoxShadow(
+                                color: t.brand.withValues(alpha: 0.28),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.qr_code_scanner_rounded, size: 15, color: Colors.white),
+                              SizedBox(width: 5),
+                              Text(
+                                'Quét QR',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),

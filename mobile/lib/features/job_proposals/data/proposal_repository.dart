@@ -523,4 +523,80 @@ class ProposalRepository {
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tham gia ca qua mã mời này.'), e);
     }
   }
+
+  // Chat trực tiếp trong Ca làm việc giữa Worker, EO (Ban tổ chức) và CSKH
+  Future<List<ShiftChatMessageItem>> fetchShiftChatMessages(String shiftId) async {
+    try {
+      final response = await _dio.get('/v1/support/chat/my');
+      final myMessages = <ShiftChatMessageItem>[];
+      if (response.data != null && response.data['data'] != null) {
+        final rawList = response.data['data']['messages'];
+        if (rawList is List) {
+          for (final item in rawList) {
+            if (item is Map<String, dynamic>) {
+              final msg = ShiftChatMessageItem.fromJson(item);
+              if (msg.shiftId == null || msg.shiftId!.isEmpty || msg.shiftId == shiftId) {
+                myMessages.add(msg);
+              }
+            }
+          }
+        }
+      }
+
+      // Gộp thêm toàn bộ tin nhắn chung theo shiftId (từ phía EO hoặc CSKH gắn với ca này)
+      try {
+        final shiftRes = await _dio.get('/v1/support/chat/shift/$shiftId');
+        if (shiftRes.data != null && shiftRes.data['data'] is List) {
+          final seenIds = myMessages.map((m) => m.id).toSet();
+          for (final item in (shiftRes.data['data'] as List)) {
+            if (item is Map<String, dynamic>) {
+              final msg = ShiftChatMessageItem.fromJson(item);
+              if (!seenIds.contains(msg.id)) {
+                myMessages.add(msg);
+                seenIds.add(msg.id);
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // Fallback nếu endpoint shift/{shiftId} chưa sẵn sàng
+      }
+
+      myMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return myMessages;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải tin nhắn ca làm việc.'), e);
+    }
+  }
+
+  Future<ShiftChatMessageItem> sendShiftChatMessage({
+    required String shiftId,
+    required String messageText,
+    String? attachmentUrl,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/v1/support/chat/send',
+        data: {
+          'messageText': messageText.trim(),
+          'shiftId': shiftId,
+          'attachmentUrl': ?attachmentUrl,
+        },
+      );
+      if (response.data != null && response.data['data'] is Map<String, dynamic>) {
+        return ShiftChatMessageItem.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+      return ShiftChatMessageItem(
+        id: 'local-${DateTime.now().millisecondsSinceEpoch}',
+        senderId: '',
+        senderRole: 'WORKER',
+        senderName: 'Tôi',
+        messageText: messageText.trim(),
+        shiftId: shiftId,
+        createdAt: DateTime.now(),
+      );
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể gửi tin nhắn.'), e);
+    }
+  }
 }

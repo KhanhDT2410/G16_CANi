@@ -96,12 +96,27 @@ export const SupportChatWidget = () => {
         if (!isMounted || !res?.messages) return;
 
         setMessages((prev) => {
-          const apiMessages = res.messages.map((m) => ({
-            id: m.id,
-            isBot: m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN',
-            text: m.messageText,
-            time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          }));
+          const apiMessages = res.messages.map((m) => {
+            const isFromOther =
+              m.senderRole === 'CUSTOMER_CARE' ||
+              m.senderRole === 'ADMIN' ||
+              (user?.userId && m.senderId && String(m.senderId) !== String(user.userId)) ||
+              (user?.role && m.senderRole && m.senderRole !== user.role);
+            return {
+              id: m.id,
+              isBot: isFromOther,
+              senderLabel: isFromOther
+                ? (m.senderRole === 'WORKER'
+                    ? `👷 Nhân sự: ${m.senderName || 'Worker'}`
+                    : (m.senderRole === 'EVENT_ORGANIZER'
+                        ? `🏢 BTC: ${m.senderName || 'EO'}`
+                        : `🎧 ${m.senderName || 'CSKH CANi'}`))
+                : null,
+              shiftCode: m.shiftCode,
+              text: m.messageText,
+              time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            };
+          });
 
           // Nếu có tin nhắn mới từ CSKH khi đang thu nhỏ, tăng badge thông báo
           if (isMinimized && apiMessages.length > prev.length) {
@@ -370,6 +385,16 @@ export const SupportChatWidget = () => {
           <div className="support-chat-body">
             {messages.map((m) => (
               <div key={m.id} className={`support-msg ${m.isBot ? 'bot' : 'user'}`}>
+                {(m.senderLabel || m.shiftCode) && (
+                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {m.senderLabel && <span>{m.senderLabel}</span>}
+                    {m.shiftCode && (
+                      <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '1px 5px', borderRadius: 4, fontSize: '0.62rem' }}>
+                        {m.shiftCode}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="support-msg-bubble">{m.text}</div>
                 <span className="support-msg-time">{m.time}</span>
               </div>

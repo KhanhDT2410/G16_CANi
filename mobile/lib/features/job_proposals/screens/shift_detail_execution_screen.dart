@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/rate_eo_dialog.dart';
+import '../widgets/shift_chat_sheet.dart';
 import 'attendance_qr_scanner_screen.dart';
 import '../../ekyc/screens/card_scanner_screen.dart';
 import '../../../core/constants/api_constants.dart';
@@ -311,7 +312,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     if (source == 'camera') {
       final scanResult = await Navigator.of(context).push<CardScanResult>(
         MaterialPageRoute(
-          builder: (_) => const CardScannerScreen(scanType: ScanType.cccdFront),
+          builder: (_) => const CardScannerScreen(scanType: ScanType.workProof),
         ),
       );
       if (scanResult == null) return null;
@@ -684,6 +685,15 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         );
       }
     }
+  }
+
+  void _openChatSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ShiftChatSheet(assignment: _assignment),
+    );
   }
 
   Future<void> _handleConfirmPayment(String status) async {
@@ -1907,12 +1917,8 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                         ),
                         _buildQuickAction(
                           icon: Icons.chat_outlined,
-                          label: 'Chat CSKH',
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Đang kết nối trung tâm trợ giúp CSKH CANi...')),
-                            );
-                          },
+                          label: 'Chat BTC / CSKH',
+                          onTap: _openChatSheet,
                         ),
                         _buildQuickAction(
                           icon: Icons.map_outlined,

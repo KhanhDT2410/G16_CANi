@@ -24,14 +24,22 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.addAll([
     AuthInterceptor(),
     InterceptorsWrapper(
+      onRequest: (options, handler) {
+        // Chuẩn hóa đường dẫn: loại bỏ tiền tố '/api' nếu repository truyền '/api/v1/...'
+        if (options.path.startsWith('/api/')) {
+          options.path = options.path.substring(4);
+        }
+        return handler.next(options);
+      },
       onError: (error, handler) async {
-        // Tự động fallback nếu kết nối thất bại (thử qua IP LAN máy tính 192.168.1.20 hoặc Emulator 10.0.2.2)
+        // Tự động fallback nếu kết nối thất bại (thử qua IP LAN máy tính 192.168.1.10 hoặc Emulator 10.0.2.2)
         if ((error.type == DioExceptionType.connectionError ||
                 error.type == DioExceptionType.connectionTimeout) &&
             error.requestOptions.extra['retried_lan'] == null) {
           error.requestOptions.extra['retried_lan'] = true;
           
           final fallbackHosts = [
+            '192.168.1.10:8080',
             '192.168.100.31:8080',
             '192.168.1.20:8080',
             '10.0.2.2:8080',

@@ -77,6 +77,9 @@ public class EoEventService {
     @Autowired(required = false)
     private SubscriptionService subscriptionService;
 
+    @Autowired(required = false)
+    private SkillProgressionService skillProgressionService;
+
     /**
      * EO tạo Sự kiện mới (Trạng thái DRAFT)
      */
@@ -489,6 +492,9 @@ public class EoEventService {
         if (worker != null && !wasAlreadyCompleted) {
             worker.setTotalShiftsCompleted((worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
             workerRepository.save(worker);
+            if (skillProgressionService != null) {
+                skillProgressionService.recordCompletedShift(worker, sa.getShift());
+            }
         }
 
         log.info("EO {} đã duyệt hoàn thành ca cho Assignment {}", userId, assignmentId);
@@ -614,6 +620,9 @@ public class EoEventService {
 
         review = reviewRepository.save(review);
         updateWorkerRatingAndReliability(worker, request.getRating());
+        if (skillProgressionService != null) {
+            skillProgressionService.recordShiftRating(worker, sa.getShift(), request.getRating());
+        }
 
         log.info("EO {} đã đánh giá {} sao cho Worker {} (Assignment: {})", eoUserId, request.getRating(), worker.getWorkerId(), assignmentId);
         return review;

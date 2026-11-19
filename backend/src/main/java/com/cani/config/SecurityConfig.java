@@ -51,7 +51,8 @@ public class SecurityConfig {
                     "/api/v1/workers/skills/tiers/config",
                     "/api/v1/eo/subscriptions/payos-webhook",
                     "/api/v1/eo/events/images/**",
-                    "/api/v1/workers/proof/**"
+                    "/api/v1/workers/proof/**",
+                    "/api/v1/workers/skills/documents/**"
                 ).permitAll()
                 // Thẩm định chứng chỉ kỹ năng (UC-47): Customer Care cùng quyền kiểm duyệt với Admin
                 .requestMatchers("/api/v1/workers/skills/admin/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")

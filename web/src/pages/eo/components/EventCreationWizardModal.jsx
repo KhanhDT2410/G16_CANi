@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import {
@@ -28,7 +28,15 @@ const EventCreationWizardModal = ({
   setNewEvent,
   onGetCurrentLocation,
   locating,
+  skillTaxonomy = [],
 }) => {
+  const skillNameMap = useMemo(() => {
+    const map = {};
+    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
+      if (sk && sk.skillId) map[sk.skillId] = sk.name;
+    });
+    return map;
+  }, [skillTaxonomy]);
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [createdEvent, setCreatedEvent] = useState(null);
@@ -78,6 +86,7 @@ const EventCreationWizardModal = ({
     allowance: 20000,
     maxDistanceKm: 15,
     imageUrl: '',
+    requiredSkills: [],
     checklistItems: [
       { id: 'chk_1', title: 'Có mặt trước 20 phút nhận thẻ và vị trí', isRequiredEvidence: false },
       { id: 'chk_2', title: 'Đồng phục chỉn chu theo quy định', isRequiredEvidence: true },
@@ -171,6 +180,7 @@ const EventCreationWizardModal = ({
       allowance: Number(shift.allowance || 0),
       maxDistanceKm: Number(shift.maxDistanceKm || 15),
       imageUrl: shift.imageUrl || '',
+      requiredSkills: Array.isArray(shift.requiredSkills) ? shift.requiredSkills : [],
       checklistItems: parsedChecklist,
     });
     setIsAddingShift(true);
@@ -211,6 +221,7 @@ const EventCreationWizardModal = ({
           allowance: safeAllowance,
           maxDistanceKm: Number(currentShift.maxDistanceKm || 15),
           imageUrl: null,
+          requiredSkills: [],
           checklist: '[]',
           startTime: slotStart.toISOString(),
           endTime: slotEnd.toISOString(),
@@ -583,6 +594,7 @@ const EventCreationWizardModal = ({
         hourlyWage: Math.max(20000, Number(currentShift.hourlyWage || 50000)),
         allowance: Math.max(0, Number(currentShift.allowance || 0)),
         imageUrl: currentShift.imageUrl?.trim() || null,
+        requiredSkills: Array.isArray(currentShift.requiredSkills) ? currentShift.requiredSkills : [],
         checklist: checklistJson,
         startTime: sStart.toISOString(),
         endTime: sEnd.toISOString(),
@@ -669,6 +681,7 @@ const EventCreationWizardModal = ({
         allowance: 0,
         maxDistanceKm: 15,
         imageUrl: '',
+        requiredSkills: [],
         checklistItems: [
           { id: 'chk_1', title: 'Có mặt đúng giờ quy định', isRequiredEvidence: false },
           { id: 'chk_2', title: 'Quét mã QR Check-in', isRequiredEvidence: false },
@@ -1272,6 +1285,27 @@ const EventCreationWizardModal = ({
                             </span>
                             {shift.allowance > 0 && <span>Phụ cấp: {Number(shift.allowance).toLocaleString()} đ</span>}
                           </div>
+
+                          {Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                              {shift.requiredSkills.map((skillId) => (
+                                <span
+                                  key={skillId}
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    padding: '0.15rem 0.5rem',
+                                    borderRadius: '999px',
+                                    backgroundColor: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    border: '1px solid #bfdbfe',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {skillNameMap[skillId] || 'Kỹ năng yêu cầu'}
+                                </span>
+                              ))}
+                            </div>
+                          )}
 
                           {shift.description && (
                             <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.35rem', fontStyle: 'italic' }}>
@@ -1891,6 +1925,55 @@ const EventCreationWizardModal = ({
                       ))}
                     </ul>
                   )}
+                </div>
+
+                {/* KỸ NĂNG BẮT BUỘC CHO CA NÀY */}
+                <div className="eo-form-group" style={{ marginBottom: '1rem' }}>
+                  <label>Kỹ Năng Bắt Buộc (chọn nhiều)</label>
+                  {skillTaxonomy.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
+                      {skillTaxonomy.map((sk) => {
+                        const checked =
+                          Array.isArray(currentShift.requiredSkills) &&
+                          currentShift.requiredSkills.includes(sk.skillId);
+                        return (
+                          <button
+                            key={sk.skillId}
+                            type="button"
+                            onClick={() => {
+                              const base = Array.isArray(currentShift.requiredSkills)
+                                ? currentShift.requiredSkills
+                                : [];
+                              const next = checked
+                                ? base.filter((id) => id !== sk.skillId)
+                                : [...base, sk.skillId];
+                              setCurrentShift({ ...currentShift, requiredSkills: next });
+                            }}
+                            style={{
+                              fontSize: '0.76rem',
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '0.45rem',
+                              border: checked ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                              backgroundColor: checked ? '#dbeafe' : '#ffffff',
+                              color: checked ? '#1d4ed8' : '#475569',
+                              fontWeight: checked ? 700 : 500,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {checked ? '✓ ' : ''}
+                            {sk.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '0.3rem' }}>
+                      Đang tải danh mục kỹ năng hoặc chưa có danh mục kỹ năng để chọn.
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.3rem' }}>
+                    Hệ thống chỉ mời ứng viên có đúng kỹ năng này (lọc cứng trong matching). Để trống nếu ca phổ thông không yêu cầu kỹ năng đặc thù.
+                  </div>
                 </div>
 
                 {/* CHECKLIST ĐẦU VIỆC CHO CA NÀY (CÓ NÚT YÊU CẦU EVIDENT + KÉO THẢ ĐẢO VỊ TRÍ) */}

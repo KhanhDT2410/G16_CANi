@@ -372,4 +372,34 @@ class SkillVerificationServiceTest {
         assertEquals("Trường Saigontourist", all.get(0).getInstitution());
         assertTrue(all.get(0).getHasSealOrSignature());
     }
+
+    @Test
+    @DisplayName("Document URL & JobType Integrity: Populates documentUrl and avoids hardcoded 'Phục vụ bàn' on unselected rejection")
+    void testSubmitVerification_PopulatesDocumentUrlAndUnspecifiedJobType() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "random_cv.pdf", "application/pdf", "dummy pdf content".getBytes()
+        );
+        SkillVerificationAiResultDto rejectAi = SkillVerificationAiResultDto.builder()
+                .overallConfidence(0.20)
+                .routingDecision(RoutingDecision.REJECT)
+                .routingReason("Tài liệu tải lên là CV tự khai.")
+                .extractedSkills(List.of())
+                .build();
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findByIsActiveTrue()).thenReturn(List.of(mockSkill));
+        when(skillVisionAiClient.verifyDocument(any(), any(), any())).thenReturn(rejectAi);
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto response = verificationService.submitVerification(workerId, file, null, null);
+
+        assertNotNull(response.getDocumentUrl());
+        assertTrue(response.getDocumentUrl().startsWith("/api/v1/workers/skills/documents/cert_"));
+        assertTrue(response.getDocumentUrl().endsWith(".pdf"));
+        assertEquals("Chưa xác định", response.getJobType());
+    }
 }

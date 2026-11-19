@@ -79,6 +79,9 @@ public class WorkerJobService {
     private NotificationService notificationService;
 
     @Autowired(required = false)
+    private SkillProgressionService skillProgressionService;
+
+    @Autowired(required = false)
     private jakarta.persistence.EntityManager entityManager;
 
     /**
@@ -396,6 +399,9 @@ public class WorkerJobService {
         if (!wasAlreadyCompleted) {
             worker.setTotalShiftsCompleted((worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
             workerRepository.save(worker);
+            if (skillProgressionService != null) {
+                skillProgressionService.recordCompletedShift(worker, assignment.getShift());
+            }
         }
 
         return AttendanceCheckResponseDto.builder()

@@ -10,7 +10,7 @@
 
 -- 1. Skill demo (SELF_DECLARED — đủ để matching hard-filter requiredSkills)
 INSERT INTO worker_skills (worker_id, skill_id, proficiency, verification_tier)
-SELECT DISTINCT ON (s.name)
+SELECT DISTINCT ON (sk.name)
        w.id,
        sk.id,
        'INTERMEDIATE',

@@ -26,6 +26,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -128,8 +129,14 @@ public class AuthService {
                     .orElseGet(() -> Worker.builder()
                             .user(finalUser)
                             .fullName(finalUser.getFullName())
+                            .ratingAvg(BigDecimal.valueOf(5.0))
                             .build());
             worker.setFullName(finalUser.getFullName());
+            if (worker.getRatingCount() == null || worker.getRatingCount() == 0) {
+                if (worker.getRatingAvg() == null || worker.getRatingAvg().compareTo(BigDecimal.ZERO) == 0) {
+                    worker.setRatingAvg(BigDecimal.valueOf(5.0));
+                }
+            }
             workerRepository.save(worker);
 
             if (notificationService != null) {
@@ -270,8 +277,14 @@ public class AuthService {
                             .orElseGet(() -> Worker.builder()
                                     .user(saved)
                                     .fullName(saved.getFullName())
+                                    .ratingAvg(BigDecimal.valueOf(5.0))
                                     .build());
                     worker.setFullName(saved.getFullName());
+                    if (worker.getRatingCount() == null || worker.getRatingCount() == 0) {
+                        if (worker.getRatingAvg() == null || worker.getRatingAvg().compareTo(BigDecimal.ZERO) == 0) {
+                            worker.setRatingAvg(BigDecimal.valueOf(5.0));
+                        }
+                    }
                     workerRepository.save(worker);
                 }
 

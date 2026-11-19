@@ -57,7 +57,7 @@ public class Worker {
 
     @Column(name = "rating_avg", precision = 3, scale = 2)
     @Builder.Default
-    private BigDecimal ratingAvg = BigDecimal.ZERO;
+    private BigDecimal ratingAvg = BigDecimal.valueOf(5.0);
 
     @Column(name = "rating_count")
     @Builder.Default

@@ -150,7 +150,7 @@ class WorkerSkillPointModel {
       totalSp: json['totalSp'] as int? ?? 0,
       tier: json['tier'] as String? ?? 'STARTER',
       totalShiftsCompleted: json['totalShiftsCompleted'] as int? ?? 0,
-      avgRating: (json['avgRating'] as num?)?.toDouble() ?? 0.0,
+      avgRating: (json['avgRating'] as num?)?.toDouble() ?? 5.0,
     );
   }
 }

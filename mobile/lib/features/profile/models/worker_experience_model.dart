@@ -11,7 +11,7 @@ class WorkerExperienceModel {
     this.bio,
     this.totalShiftsCompleted = 0,
     this.skillTier,
-    this.ratingAvg = 0.0,
+    this.ratingAvg = 5.0,
     this.reliabilityScore = 100,
   });
 
@@ -21,7 +21,7 @@ class WorkerExperienceModel {
       bio: json['bio'] as String?,
       totalShiftsCompleted: json['totalShiftsCompleted'] as int? ?? 0,
       skillTier: json['skillTier'] as String?,
-      ratingAvg: (json['ratingAvg'] as num?)?.toDouble() ?? 0.0,
+      ratingAvg: (json['ratingAvg'] as num?)?.toDouble() ?? 5.0,
       reliabilityScore: json['reliabilityScore'] as int? ?? 100,
     );
   }

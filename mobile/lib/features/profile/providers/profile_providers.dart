@@ -28,7 +28,7 @@ class ProfileData {
       skillPoints.isEmpty ? 'STARTER' : skillPoints.first.tier;
 
   double get avgRating =>
-      skillPoints.isEmpty ? 0.0 : skillPoints.first.avgRating;
+      skillPoints.isEmpty ? 5.0 : (skillPoints.first.avgRating > 0 ? skillPoints.first.avgRating : 5.0);
 
   bool get isEkycApproved => ekycResult?.isApproved ?? false;
   bool get isEkycPending => ekycResult?.isPending ?? false;

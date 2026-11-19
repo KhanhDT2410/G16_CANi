@@ -64,7 +64,7 @@ public class WorkerSkillPoint {
 
     @Column(name = "avg_rating", precision = 3, scale = 2)
     @Builder.Default
-    private BigDecimal avgRating = BigDecimal.ZERO;
+    private BigDecimal avgRating = BigDecimal.valueOf(5.0);
 
     @UpdateTimestamp
     @Column(name = "updated_at")

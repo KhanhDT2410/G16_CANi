@@ -92,13 +92,27 @@ public class SkillVisionAiClient {
                 
                 RUBRIC EVALUATION CRITERIA (Total 100%%):
                 1. Identity Match (30%%): recipientName must match the worker identity. If clearly a different person, score = 0%%.
-                2. Issuing Authority & Seal (30%%): Must have official organization/school name and visible seal or authorized signature.
+                2. Issuing Authority & Seal (30%%): Must have official organization/school name and visible seal or authorized signature. EXCEPTION FOR INTERNATIONAL CREDENTIALS: For verified global credentials (e.g. SCA Barista, WSET, Coursera, Google) lacking a traditional Vietnamese red circular stamp, an official Certificate ID, Verification URL, QR code, or authorized digital signature satisfies this authority requirement.
                 3. Skill Alignment (25%%): The credential must demonstrate relevant skills matching a role in the CANi Skill Taxonomy.
                 4. Document Authenticity (15%%): Clear photo, not a selfie, not a meme, no obvious digital tampering.
                 
+                DOCUMENT TYPE INTEGRITY RULE (CRITICAL):
+                - The document MUST be an official Certificate, Degree, Diploma, License, or Vocational Credential issued by an authorized school, academy, training center, or organization with an official stamp/seal or signature.
+                - If the document is a Curriculum Vitae (CV), Resume, Sơ yếu lý lịch, Personal Portfolio, Job Application, or personal project list (even if it lists relevant event experience):
+                  You MUST set routingDecision to "REJECT", overallConfidence <= 0.30, and routingReason explaining in Vietnamese:
+                  "Tài liệu tải lên là Sơ yếu lý lịch (CV) tự khai, không phải Chứng chỉ nghề nghiệp có con dấu mộc đỏ. Vui lòng nộp Giấy chứng nhận/Bằng cấp chính quy để được nâng hạng Tier 2 (PROVEN)."
+                
                 DECISION RULES:
                 - overallConfidence >= 0.80: "AUTO_APPROVE" (Clear official certificate, seal/signature, skill match, name match).
-                - overallConfidence < 0.80: "REJECT" (Provide actionable Vietnamese feedback in routingReason so the worker can retake immediately).
+                - 0.65 <= overallConfidence < 0.80: "ADMIN_REVIEW" (Edge case, e.g. international credential with QR code or slight blur/partial seal; route to Human Customer Care to protect worker rights).
+                - overallConfidence < 0.65: "REJECT" (Clear mismatch, fake, CV, irrelevant document, or unreadable photo; provide actionable Vietnamese feedback).
+                
+                FEW-SHOT REASONING EXAMPLES:
+                * Example 1 (Valid Certificate): Official Barista Certificate from Saigontourist for Pham Duy Hung with red circular seal -> AUTO_APPROVE, confidence 0.95.
+                * Example 2 (International Credential): SCA Barista Skills cert for Pham Duy Hung with QR code and instructor signature but no red seal -> ADMIN_REVIEW, confidence 0.75, reason: "Chứng chỉ quốc tế SCA hợp lệ có mã tra cứu. Đã chuyển Admin phê duyệt thủ công."
+                * Example 3 (Identity Fraud): Barista Certificate from Saigontourist issued to Tran Van An (mismatch with worker) -> REJECT, confidence 0.15, reason: "Họ tên trên chứng chỉ (Trần Văn An) không trùng khớp với chủ tài khoản."
+                * Example 4 (CV / Resume Upload): CV of Nguyen Minh Trang listing F&B and Event experience -> REJECT, confidence 0.25, reason: "Tài liệu tải lên là Sơ yếu lý lịch (CV) tự khai, không phải Chứng chỉ nghề nghiệp có con dấu mộc đỏ. Vui lòng nộp Giấy chứng nhận/Bằng cấp chính quy để được nâng hạng Tier 2 (PROVEN)."
+                * Example 5 (Irrelevant Document): Electricity bill or selfie photo -> REJECT, confidence 0.05, reason: "Tài liệu không phải là chứng chỉ nghề nghiệp hợp lệ."
                 
                 Evaluate the document authenticity and extract information in JSON matching this exact structure:
                 {
@@ -116,7 +130,7 @@ public class SkillVisionAiClient {
                     }
                   ],
                   "overallConfidence": float between 0.0 and 1.0,
-                  "routingDecision": "AUTO_APPROVE" | "REJECT",
+                  "routingDecision": "AUTO_APPROVE" | "ADMIN_REVIEW" | "REJECT",
                   "routingReason": string in Vietnamese explaining the decision and specific feedback
                 }
                 
@@ -239,6 +253,41 @@ public class SkillVisionAiClient {
                     .routingDecision(RoutingDecision.REJECT)
                     .routingReason("Họ tên trên chứng chỉ (Trần Văn Khác) không trùng khớp với chủ tài khoản (" + safeName + ").")
                     .extractedSkills(Collections.emptyList())
+                    .build();
+        }
+
+        // 2b. Case: CV / Resume / Self-declared profile document
+        if (lowerFile.contains("cv") || lowerFile.contains("resume") || lowerFile.contains("so_yeu") || lowerFile.contains("tieu-chuan")) {
+            return SkillVerificationAiResultDto.builder()
+                    .recipientName(safeName)
+                    .institution(null)
+                    .issueDate(null)
+                    .hasSealOrSignature(false)
+                    .overallConfidence(0.25)
+                    .routingDecision(RoutingDecision.REJECT)
+                    .routingReason("Tài liệu tải lên là Sơ yếu lý lịch (CV) tự khai, không phải Chứng chỉ nghề nghiệp có con dấu mộc đỏ. Vui lòng nộp Giấy chứng nhận/Bằng cấp chính quy để được nâng hạng Tier 2 (PROVEN).")
+                    .extractedSkills(Collections.emptyList())
+                    .build();
+        }
+
+        // 2c. Case: International Credential (SCA, WSET, Coursera, Global) -> ADMIN_REVIEW
+        if (lowerFile.contains("international") || lowerFile.contains("sca") || lowerFile.contains("wset") || lowerFile.contains("global")) {
+            return SkillVerificationAiResultDto.builder()
+                    .recipientName(safeName)
+                    .institution("Specialty Coffee Association (SCA) Global")
+                    .issueDate("10/10/2024")
+                    .hasSealOrSignature(true)
+                    .overallConfidence(0.75)
+                    .routingDecision(RoutingDecision.ADMIN_REVIEW)
+                    .routingReason("Chứng chỉ quốc tế SCA hợp lệ có mã tra cứu điện tử. Đã chuyển Admin phê duyệt thủ công.")
+                    .extractedSkills(List.of(
+                            ExtractedSkillDto.builder()
+                                    .skillName("SCA Barista Skills Intermediate")
+                                    .taxonomyRole("Pha chế (Bartender/Barista)")
+                                    .confidenceScore(0.85)
+                                    .evidenceSnippet("Completed SCA Barista Skills Intermediate modules")
+                                    .build()
+                    ))
                     .build();
         }
 

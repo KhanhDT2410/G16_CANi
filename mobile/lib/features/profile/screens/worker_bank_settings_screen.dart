@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:cani/core/constants/banks.dart';
 import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/profile/providers/worker_bank_provider.dart';
 
 class WorkerBankSettingsScreen extends ConsumerStatefulWidget {
   const WorkerBankSettingsScreen({super.key});
@@ -127,6 +128,8 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
         _storage.write(key: 'cani_worker_bank_account', value: accountNum),
         _storage.write(key: 'cani_worker_bank_owner', value: accountName),
       ]);
+
+      ref.read(workerBankProvider.notifier).loadBankAccount();
 
       if (!mounted) return;
       setState(() => _isSaving = false);

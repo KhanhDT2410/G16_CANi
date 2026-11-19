@@ -778,13 +778,13 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     );
   }
 
-  Future<void> _applyQuick(BuildContext context, NearbyShiftItem shift) async {
+  Future<void> _applyQuick(BuildContext ctx, NearbyShiftItem shift) async {
     if (!shift.emergency) {
       if (mounted) {
-        ScaffoldMessenger.of(this.context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Ca này chưa ở chế độ khẩn cấp — hãy chờ lời mời việc (Matching) từ Ban tổ chức!'),
-            backgroundColor: Theme.of(this.context).cani.warning,
+            backgroundColor: Theme.of(context).cani.warning,
           ),
         );
       }
@@ -796,19 +796,19 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
       ref.invalidate(proposalsListProvider);
       ref.invalidate(assignmentsListProvider);
       if (mounted) {
-        ScaffoldMessenger.of(this.context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Ứng tuyển thành công ca: ${shift.jobType} tại ${shift.eventName}!'),
-            backgroundColor: Theme.of(this.context).cani.success,
+            backgroundColor: Theme.of(context).cani.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(this.context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Không thể ứng tuyển: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: Theme.of(this.context).cani.danger,
+            backgroundColor: Theme.of(context).cani.danger,
           ),
         );
       }

@@ -9,6 +9,7 @@ import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/profile/providers/profile_providers.dart';
+import 'package:cani/features/profile/providers/worker_bank_provider.dart';
 import 'package:cani/features/profile/providers/worker_experience_provider.dart';
 import 'package:cani/features/profile/widgets/profile_block_cv.dart';
 import 'package:cani/features/profile/widgets/profile_block_ekyc.dart';
@@ -40,11 +41,19 @@ class _WorkerProfileScreenState extends ConsumerState<WorkerProfileScreen> {
       // Chỉ chủ động kích hoạt nếu state hiện đang rỗng và không trong quá trình tải.
       final skillState = ref.read(skillVerificationProvider);
       final ekycState = ref.read(ekycProvider);
+      final expState = ref.read(workerExperienceProvider);
+      final bankState = ref.read(workerBankProvider);
       if (skillState.skillPoints.isEmpty && !skillState.isLoading) {
         ref.read(skillVerificationProvider.notifier).loadAll();
       }
       if (ekycState.result == null && !ekycState.isLoading) {
         ref.read(ekycProvider.notifier).checkStatus();
+      }
+      if (expState.experience == null && !expState.isLoading) {
+        ref.read(workerExperienceProvider.notifier).loadExperience();
+      }
+      if (bankState.bankAccount == null && !bankState.isLoading) {
+        ref.read(workerBankProvider.notifier).loadBankAccount();
       }
     });
   }
@@ -55,6 +64,7 @@ class _WorkerProfileScreenState extends ConsumerState<WorkerProfileScreen> {
         ref.read(skillVerificationProvider.notifier).loadAll(),
         ref.read(ekycProvider.notifier).checkStatus(),
         ref.read(workerExperienceProvider.notifier).loadExperience(),
+        ref.read(workerBankProvider.notifier).loadBankAccount(),
       ]);
     } catch (e) {
       debugPrint('Lỗi nạp dữ liệu hồ sơ cá nhân: $e');

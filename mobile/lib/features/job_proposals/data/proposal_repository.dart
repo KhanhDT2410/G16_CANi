@@ -22,13 +22,17 @@ final proposalRepositoryProvider = Provider<ProposalRepository>((ref) {
   return ProposalRepository(dio);
 });
 
-final proposalsCountProvider = FutureProvider<int>((ref) async {
+final assignmentsListProvider = FutureProvider<List<ShiftAssignmentItem>>((ref) async {
+  final repo = ref.watch(proposalRepositoryProvider);
+  return repo.fetchAssignments();
+});
+
+final proposalsListProvider = FutureProvider<List<JobProposalItem>>((ref) async {
+  final repo = ref.watch(proposalRepositoryProvider);
   try {
-    final repo = ref.watch(proposalRepositoryProvider);
-    final list = await repo.fetchProposals();
-    return list.length;
+    return await repo.fetchProposals();
   } catch (_) {
-    return 0;
+    return const [];
   }
 });
 

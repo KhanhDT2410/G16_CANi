@@ -1,3 +1,4 @@
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 
 import '../models/proposal_models.dart';
@@ -27,6 +28,7 @@ class ShiftAssignmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = assignment;
+    final cani = Theme.of(context).cani;
     final isCheckedIn = a.status == 'CHECKED_IN' || (a.checkinTime != null && a.checkoutTime == null);
     final isCompleted = a.status == 'COMPLETED' || a.checkoutTime != null;
     final isNotStarted = !isCheckedIn && !isCompleted;
@@ -38,7 +40,7 @@ class ShiftAssignmentCard extends StatelessWidget {
 
     final barColor = isCompleted
         ? const Color(0xFF7E22CE)
-        : (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF0077FF));
+        : (isCheckedIn ? const Color(0xFF10B981) : cani.brand);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -52,7 +54,7 @@ class ShiftAssignmentCard extends StatelessWidget {
           BoxShadow(
             color: isDark
                 ? Colors.black.withValues(alpha: 0.20)
-                : const Color(0xFF0077FF).withValues(alpha: 0.08),
+                : cani.brand.withValues(alpha: 0.08),
             blurRadius: 18,
             offset: const Offset(0, 4),
           ),
@@ -88,7 +90,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                             ? const Color(0xFFF3E8FF)
                             : (isCheckedIn
                                 ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                : const Color(0xFF0077FF).withValues(alpha: 0.10)),
+                                : cani.brand.withValues(alpha: 0.10)),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -101,7 +103,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                               shape: BoxShape.circle,
                               color: isCompleted
                                   ? const Color(0xFF7E22CE)
-                                  : (isCheckedIn ? const Color(0xFF10B981) : const Color(0xFF0077FF)),
+                                  : (isCheckedIn ? const Color(0xFF10B981) : cani.brand),
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -115,7 +117,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                               letterSpacing: 0.5,
                               color: isCompleted
                                   ? const Color(0xFF7E22CE)
-                                  : (isCheckedIn ? const Color(0xFF059669) : const Color(0xFF0077FF)),
+                                  : (isCheckedIn ? const Color(0xFF059669) : cani.brand),
                             ),
                           ),
                         ],
@@ -124,23 +126,23 @@ class ShiftAssignmentCard extends StatelessWidget {
                     InkWell(
                       onTap: onNavigate,
                       borderRadius: BorderRadius.circular(8),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        child: Row(
-                          children: [
-                            Icon(Icons.directions, size: 14, color: Color(0xFF0066FF)),
-                            SizedBox(width: 4),
-                            Text(
-                              'Chỉ đường',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF0066FF),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                       child: Padding(
+                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                         child: Row(
+                           children: [
+                             Icon(Icons.directions, size: 14, color: cani.brand),
+                             const SizedBox(width: 4),
+                             Text(
+                               'Chỉ đường',
+                               style: TextStyle(
+                                 fontSize: 11.5,
+                                 fontWeight: FontWeight.w700,
+                                 color: cani.brand,
+                               ),
+                             ),
+                           ],
+                         ),
+                       ),
                     ),
                   ],
                 ),
@@ -152,7 +154,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14.5,
-                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
+                     color: isDark ? const Color(0xFFF8FAFC) : cani.textMain,
                     letterSpacing: -0.1,
                   ),
                 ),
@@ -174,14 +176,14 @@ class ShiftAssignmentCard extends StatelessWidget {
                 // Thời gian & Địa điểm
                 Row(
                   children: [
-                    const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF0077FF)),
+                    Icon(Icons.access_time_rounded, size: 14, color: cani.brand),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.venueAddress}',
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          color: cani.textMuted,
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
@@ -261,10 +263,10 @@ class ShiftAssignmentCard extends StatelessWidget {
                         Expanded(
                           child: TextButton.icon(
                             onPressed: onCancelAssignment,
-                            icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
-                            label: const Text(
+                            icon: Icon(Icons.cancel_outlined, size: 16, color: cani.danger),
+                            label: Text(
                               'Hủy nhận ca',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.danger),
                             ),
                             style: TextButton.styleFrom(
                               backgroundColor: isDark
@@ -368,7 +370,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDC2626),
+                            color: cani.danger,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Text(
@@ -376,7 +378,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                             style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
                           ),
                         )
-                      else if (isDeclared)
+                      else                       if (isDeclared)
                         InkWell(
                           onTap: onConfirmPayment,
                           borderRadius: BorderRadius.circular(10),
@@ -387,14 +389,14 @@ class ShiftAssignmentCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: const Color(0xFF10B981), width: 1.2),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.edit_note, size: 14, color: Color(0xFF059669)),
-                                SizedBox(width: 4),
+                                Icon(Icons.edit_note, size: 14, color: const Color(0xFF059669)),
+                                const SizedBox(width: 4),
                                 Text(
                                   'Xác nhận thù lao',
-                                  style: TextStyle(color: Color(0xFF059669), fontSize: 10.5, fontWeight: FontWeight.w800),
+                                  style: TextStyle(color: const Color(0xFF059669), fontSize: 10.5, fontWeight: FontWeight.w800),
                                 ),
                               ],
                             ),
@@ -405,7 +407,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                           'Sẽ trả sau ca',
                           style: TextStyle(
                             fontSize: 10.5,
-                            color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
+                            color: isDark ? cani.textMuted : Colors.grey.shade600,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

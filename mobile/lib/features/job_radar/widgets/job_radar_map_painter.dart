@@ -1,3 +1,4 @@
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -93,6 +94,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    final cani = Theme.of(context).cani;
     final userPos = LatLng(widget.userLat, widget.userLng);
 
     return Stack(
@@ -107,11 +109,12 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
             maxZoom: 19.0,
           ),
           children: [
-            // Lớp gạch bản đồ OpenStreetMap chuẩn mở toàn cầu (Không cần API key, không bị watermark)
+            // Lớp gạch bản đồ Google Maps tiếng Việt chuẩn CDN (fallback CartoDB Voyager CDN, thay thế OSM bị lỗi DNS tại VN)
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.cani.cani',
-              maxZoom: 19,
+              urlTemplate: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=vi',
+              subdomains: const ['0', '1', '2', '3'],
+              fallbackUrl: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+              maxZoom: 20,
               errorTileCallback: (tile, error, stackTrace) {
                 // Fallback im lặng khi mất mạng
               },
@@ -120,14 +123,14 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
             // Lớp vòng tròn quét bán kính tìm việc
             CircleLayer(
               circles: [
-                CircleMarker(
-                  point: userPos,
-                  radius: widget.maxRadiusKm * 1000, // Đổi sang mét
-                  useRadiusInMeter: true,
-                  color: (widget.isOnline ? const Color(0xFF0077FF) : Colors.grey).withValues(alpha: 0.10),
-                  borderColor: (widget.isOnline ? const Color(0xFF0077FF) : Colors.grey).withValues(alpha: 0.5),
-                  borderStrokeWidth: 1.8,
-                ),
+                  CircleMarker(
+                    point: userPos,
+                    radius: widget.maxRadiusKm * 1000, // Đổi sang mét
+                    useRadiusInMeter: true,
+                    color: (widget.isOnline ? cani.brand : Colors.grey).withValues(alpha: 0.10),
+                    borderColor: (widget.isOnline ? cani.brand : Colors.grey).withValues(alpha: 0.5),
+                    borderStrokeWidth: 1.8,
+                  ),
               ],
             ),
 
@@ -141,19 +144,19 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                       userPos,
                       LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng),
                     ],
-                    strokeWidth: 6.0,
-                    color: const Color(0xFF0066FF).withValues(alpha: 0.3),
-                    strokeCap: StrokeCap.round,
-                    strokeJoin: StrokeJoin.round,
-                  ),
-                  // Đường lộ trình chính
-                  Polyline(
-                    points: [
-                      userPos,
-                      LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng),
-                    ],
-                    strokeWidth: 3.5,
-                    color: const Color(0xFF0066FF),
+                      strokeWidth: 6.0,
+                      color: cani.brand.withValues(alpha: 0.3),
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
+                    ),
+                    // Đường lộ trình chính
+                    Polyline(
+                      points: [
+                        userPos,
+                        LatLng(widget.selectedShift!.locationLat, widget.selectedShift!.locationLng),
+                      ],
+                      strokeWidth: 3.5,
+                      color: cani.brand,
                     strokeCap: StrokeCap.round,
                     strokeJoin: StrokeJoin.round,
                   ),
@@ -179,20 +182,20 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: (widget.isOnline ? const Color(0xFF0077FF) : Colors.grey).withValues(alpha: 0.25),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: (widget.isOnline ? cani.brand : Colors.grey).withValues(alpha: 0.25),
+                            ),
                           ),
-                        ),
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: widget.isOnline ? const Color(0xFF0066FF) : Colors.grey.shade700,
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: widget.isOnline ? cani.brand : Colors.grey.shade700,
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
@@ -227,10 +230,10 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                             decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFF0B1B3D) : Colors.white,
+                              color: isSelected ? cani.textMain : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isSelected ? const Color(0xFF00D2FF) : const Color(0xFFCBD5E1),
+                                color: isSelected ? cani.accent : const Color(0xFFCBD5E1),
                                 width: isSelected ? 2 : 1,
                               ),
                               boxShadow: [
@@ -246,7 +249,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w800,
-                                color: isSelected ? Colors.white : const Color(0xFF0B1B3D),
+                                color: isSelected ? Colors.white : cani.textMain,
                               ),
                             ),
                           ),
@@ -254,7 +257,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                           Icon(
                             Icons.location_on_rounded,
                             size: isSelected ? 36 : 28,
-                            color: isSelected ? const Color(0xFF0066FF) : const Color(0xFF2563EB),
+                            color: isSelected ? cani.brand : const Color(0xFF2563EB),
                             shadows: [
                               Shadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4),
                             ],
@@ -279,7 +282,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
               FloatingActionButton.small(
                 heroTag: 'map_recenter',
                 backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF0066FF),
+                foregroundColor: cani.brand,
                 elevation: 3,
                 onPressed: _recenter,
                 tooltip: 'Về vị trí GPS của tôi',
@@ -322,7 +325,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B1B3D).withValues(alpha: 0.90),
+                color: cani.textMain.withValues(alpha: 0.90),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -332,9 +335,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                   ),
                 ],
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.visibility_off_outlined, color: Color(0xFFF59E0B), size: 16),
+                  Icon(Icons.visibility_off_outlined, color: cani.warning, size: 16),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -373,7 +376,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                       offset: const Offset(0, 3),
                     ),
                   ],
-                  border: Border.all(color: const Color(0xFF0066FF).withValues(alpha: 0.3), width: 1.5),
+                  border: Border.all(color: cani.brand.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Row(
                   children: [
@@ -383,7 +386,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                         color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.route, color: Color(0xFF0066FF), size: 20),
+                      child: Icon(Icons.route, color: cani.brand, size: 20),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -399,7 +402,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                           ),
                           Text(
                             'Lộ trình: ${widget.selectedShift!.distanceKm.toStringAsFixed(1)} km (~${((widget.selectedShift!.distanceKm / 25.0) * 60).round().clamp(5, 120)} phút đi xe máy)',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF0066FF), fontWeight: FontWeight.w600),
+                            style: TextStyle(fontSize: 11, color: cani.brand, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),

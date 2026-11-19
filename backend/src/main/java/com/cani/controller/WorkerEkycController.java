@@ -80,7 +80,8 @@ public class WorkerEkycController {
     public ResponseEntity<ApiResponse<Void>> resetMyEkyc(Authentication authentication) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ekycService.resetMyEkyc(userId);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Reset trạng thái eKYC thành công. Bạn có thể tiến hành định danh lại."));
+        return ResponseEntity
+                .ok(ApiResponse.ok(null, "Reset trạng thái eKYC thành công. Bạn có thể tiến hành định danh lại."));
     }
 
     /**

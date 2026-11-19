@@ -417,6 +417,18 @@ public class WorkerJobService {
         if (userId != null) {
             Worker worker = workerRepository.findByUser_UserId(userId).orElse(null);
             if (worker != null) {
+                // Ưu tiên tiêu chí tìm việc (Worker Preferences) nếu client không truyền bán kính cụ thể
+                if ((radiusKm == null || radiusKm <= 0) && worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0) {
+                    searchRadius = worker.getMaxDistanceKm();
+                }
+                // Fallback tọa độ cơ sở của Worker nếu GPS client không gửi lên
+                if (userLat == null && worker.getBaseLat() != null) {
+                    centerLat = worker.getBaseLat();
+                }
+                if (userLng == null && worker.getBaseLng() != null) {
+                    centerLng = worker.getBaseLng();
+                }
+
                 // Yêu cầu eKYC: Tài khoản chưa hoàn tất định danh -> không hiển thị danh sách việc làm gần đó
                 if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
                     log.info("Worker {} chưa hoàn tất eKYC (KycStatus={}), ẩn danh sách công việc gần đó", userId, worker.getKycStatus());

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_radar/data/job_radar_repository.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 
@@ -66,19 +67,32 @@ class JobRadarState {
 
 final jobRadarProvider = StateNotifierProvider<JobRadarNotifier, JobRadarState>((ref) {
   final repo = ref.watch(jobRadarRepositoryProvider);
-  return JobRadarNotifier(repo);
+  final proposalRepo = ref.watch(proposalRepositoryProvider);
+  return JobRadarNotifier(repo, proposalRepo);
 });
 
 class JobRadarNotifier extends StateNotifier<JobRadarState> {
   final JobRadarRepository _repo;
+  final ProposalRepository _proposalRepo;
 
-  JobRadarNotifier(this._repo) : super(const JobRadarState()) {
+  JobRadarNotifier(this._repo, this._proposalRepo) : super(const JobRadarState()) {
     initLocationAndScan();
   }
 
-  /// Khởi tạo lấy vị trí GPS thực tế từ máy điện thoại và hỏi quyền nếu cần
+  /// Khởi tạo lấy vị trí GPS thực tế từ máy điện thoại, đồng bộ tiêu chí tìm việc (Preferences)
   Future<void> initLocationAndScan() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
+
+    // Đồng bộ bán kính tìm việc từ Worker Preferences đã lưu
+    try {
+      final prefs = await _proposalRepo.fetchPreferences();
+      if (prefs.maxDistanceKm > 0) {
+        state = state.copyWith(searchRadiusKm: prefs.maxDistanceKm);
+      }
+    } catch (_) {
+      // Dùng bán kính mặc định nếu chưa lưu preferences
+    }
+
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -135,6 +149,17 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     } finally {
       await scanNearbyShifts();
     }
+  }
+
+  /// Tải lại tiêu chí tìm việc (Preferences) và quét lại Radar tức thì
+  Future<void> reloadPreferences() async {
+    try {
+      final prefs = await _proposalRepo.fetchPreferences();
+      if (prefs.maxDistanceKm > 0) {
+        state = state.copyWith(searchRadiusKm: prefs.maxDistanceKm);
+      }
+      await scanNearbyShifts();
+    } catch (_) {}
   }
 
   /// Nút GPS Recenter: Lấy lại vị trí GPS thực tế tức thì

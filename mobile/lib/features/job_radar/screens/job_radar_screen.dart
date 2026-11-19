@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
-import 'package:cani/features/job_proposals/screens/attendance_qr_scanner_screen.dart';
-import 'package:cani/features/job_proposals/screens/shift_detail_execution_screen.dart';
-import 'package:cani/features/job_proposals/widgets/shift_navigation_sheet.dart';
+import 'package:cani/features/job_proposals/widgets/job_proposal_invite_card.dart';
 import 'package:cani/features/job_radar/data/job_radar_repository.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
-import 'package:cani/features/job_radar/widgets/job_proposal_dispatch_card.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_map_painter.dart';
 import 'package:cani/features/job_radar/widgets/radar_sliding_job_card.dart';
-import 'package:cani/features/job_radar/widgets/urgent_shift_hero_card.dart';
 import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
 
 class JobRadarScreen extends ConsumerStatefulWidget {
@@ -27,61 +24,24 @@ class JobRadarScreen extends ConsumerStatefulWidget {
 }
 
 class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
-  List<ShiftAssignmentItem> _activeShifts = [];
-  List<JobProposalItem> _pendingProposals = [];
-  ShiftAssignmentItem? _urgentShift;
-  bool _isLoadingUrgent = false;
-  int _homeTopTabIndex = 0; // 0: Việc của tôi, 1: Lời mời làm việc
-
   @override
   void initState() {
     super.initState();
-    _loadUrgentShift();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(ekycProvider.notifier).checkStatus();
     });
   }
 
-  Future<void> _loadUrgentShift() async {
-    setState(() => _isLoadingUrgent = true);
-    try {
-      final repo = ref.read(proposalRepositoryProvider);
-      final results = await Future.wait([
-        repo.fetchAssignments(),
-        repo.fetchProposals().catchError((_) => <JobProposalItem>[]),
-      ]);
-      final assigns = results[0] as List<ShiftAssignmentItem>;
-      final proposals = results[1] as List<JobProposalItem>;
-      final active = assigns.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).toList();
-      if (mounted) {
-        setState(() {
-          _activeShifts = active;
-          _pendingProposals = proposals;
-          _urgentShift = active.isNotEmpty ? active.first : null;
-          // Nếu có lời mời làm việc mới mà chưa có ca đang nhận thì đẩy sang tab Lời mời làm việc ngay
-          if (proposals.isNotEmpty && active.isEmpty) {
-            _homeTopTabIndex = 1;
-          }
-          _isLoadingUrgent = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingUrgent = false);
-    }
-  }
-
   Future<void> _acceptProposalOnHome(JobProposalItem item) async {
     try {
       await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
-      ref.invalidate(proposalsCountProvider);
+      ref.invalidate(proposalsListProvider);
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();
-      await _loadUrgentShift();
       if (mounted) {
-        setState(() => _homeTopTabIndex = 0);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Nhận ca "${item.jobType}" thành công! Đã chuyển vào mục Việc của tôi.'),
-            backgroundColor: const Color(0xFF16A34A),
+            backgroundColor: Theme.of(context).cani.success,
           ),
         );
       }
@@ -90,7 +50,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Không thể nhận ca: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: const Color(0xFFDC2626),
+            backgroundColor: Theme.of(context).cani.danger,
           ),
         );
       }
@@ -100,11 +60,8 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   Future<void> _rejectProposalOnHome(JobProposalItem item) async {
     try {
       await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
-      ref.invalidate(proposalsCountProvider);
+      ref.invalidate(proposalsListProvider);
       if (mounted) {
-        setState(() {
-          _pendingProposals.removeWhere((p) => p.proposalId == item.proposalId);
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đã bỏ qua lời mời làm việc này.')),
         );
@@ -114,7 +71,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Lỗi khi từ chối lời mời: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: const Color(0xFFDC2626),
+            backgroundColor: Theme.of(context).cani.danger,
           ),
         );
       }
@@ -123,6 +80,8 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
 
   Future<void> _openInviteCodeDialogOnHome() async {
     final controller = TextEditingController();
+    final theme = Theme.of(context);
+    final cani = theme.cani;
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -130,9 +89,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
-              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+              style: TextStyle(fontSize: 13, color: cani.textBody),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -153,7 +112,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
               final code = controller.text.trim();
               if (code.isNotEmpty) Navigator.pop(ctx, code);
             },
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0066FF)),
+            style: FilledButton.styleFrom(backgroundColor: cani.brand),
             child: const Text('Tham Gia'),
           ),
         ],
@@ -163,14 +122,12 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     if (result != null && result.isNotEmpty && mounted) {
       try {
         await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
-        ref.invalidate(proposalsCountProvider);
-        await _loadUrgentShift();
+        ref.invalidate(proposalsListProvider);
         if (mounted) {
-          setState(() => _homeTopTabIndex = 0);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Tham gia ca làm việc thành công! Đã thêm vào Việc của tôi.'),
-              backgroundColor: Color(0xFF16A34A),
+            SnackBar(
+              content: const Text('Tham gia ca làm việc thành công! Đã thêm vào Việc của tôi.'),
+              backgroundColor: Theme.of(context).cani.success,
             ),
           );
         }
@@ -179,48 +136,11 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Lỗi: ${err.toString().replaceAll("Exception: ", "")}'),
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: Theme.of(context).cani.danger,
             ),
           );
         }
       }
-    }
-  }
-
-  Future<void> _openExecutionScreen(ShiftAssignmentItem a) async {
-    final updated = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ShiftDetailExecutionScreen(assignment: a),
-      ),
-    );
-    if (updated == true) {
-      _loadUrgentShift();
-    }
-  }
-
-  void _openNavigation(ShiftAssignmentItem a) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ShiftNavigationSheet(assignment: a),
-    );
-  }
-
-  Future<void> _openQrScanner(ShiftAssignmentItem a) async {
-    final isCheckedIn = a.status == 'CHECKED_IN' || (a.checkinTime != null && a.checkoutTime == null);
-    final success = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AttendanceQrScannerScreen(
-          assignment: a,
-          isCheckin: !isCheckedIn,
-        ),
-      ),
-    );
-    if (success == true) {
-      _loadUrgentShift();
     }
   }
 
@@ -243,6 +163,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     final selectedOrFirstShift = state.selectedShift ?? (state.nearbyShifts.isNotEmpty ? state.nearbyShifts.first : null);
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cani = Theme.of(context).cani;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -261,16 +182,14 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                       Container(
                         width: 44,
                         height: 44,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF00D2FF), Color(0xFF0066FF)],
-                          ),
+                          gradient: LinearGradient(colors: cani.brandGradient),
                           boxShadow: [
                             BoxShadow(
-                              color: Color(0x4D0077FF),
+                              color: cani.brand.withValues(alpha: 0.3),
                               blurRadius: 10,
-                              offset: Offset(0, 3),
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
@@ -293,11 +212,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                           height: 12,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: (isEkycApproved && state.isOnline)
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFF94A3B8),
+                            color: (isEkycApproved && state.isOnline) ? cani.success : cani.textMuted,
                             border: Border.all(
-                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              color: isDark ? cani.surface : Colors.white,
                               width: 2.2,
                             ),
                           ),
@@ -312,29 +229,29 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Chào buổi sáng, $userName!',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
-                            letterSpacing: -0.2,
-                          ),
+                         Text(
+                           'Chào buổi sáng, $userName!',
+                           style: TextStyle(
+                             fontWeight: FontWeight.w800,
+                             fontSize: 15,
+                             color: cani.textMain,
+                             letterSpacing: -0.2,
+                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Row(
                           children: [
-                            const Icon(Icons.star, size: 12, color: Color(0xFFF59E0B)),
+                             Icon(Icons.star, size: 12, color: cani.warning),
                             const SizedBox(width: 4),
                             Text(
                               'Hạng $currentTier · $totalSp SP',
                               style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
+                                   fontSize: 11.5,
+                                   fontWeight: FontWeight.w600,
+                                   color: cani.textMuted,
+                                 ),
                             ),
                           ],
                         ),
@@ -356,13 +273,13 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         color: (isEkycApproved && state.isOnline)
-                            ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFE8FDF3))
-                            : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                            ? cani.successBg
+                            : (isDark ? cani.border : cani.skeleton),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
                           color: (isEkycApproved && state.isOnline)
-                              ? (isDark ? const Color(0xFF059669) : const Color(0xFFB7F4D8))
-                              : (isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0)),
+                              ? cani.success
+                              : (isDark ? cani.borderStrong : cani.border),
                         ),
                       ),
                       child: Row(
@@ -374,25 +291,23 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                                 !isEkycApproved
                                     ? 'Chưa eKYC'
                                     : (state.isOnline ? 'Đang nhận việc' : 'Tạm nghỉ'),
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: !isEkycApproved
-                                      ? const Color(0xFFF59E0B)
-                                      : (state.isOnline
-                                          ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
-                                ),
+                                 style: TextStyle(
+                                   fontSize: 10.5,
+                                   fontWeight: FontWeight.w800,
+                                   color: !isEkycApproved
+                                       ? cani.warning
+                                       : (state.isOnline ? cani.success : cani.textMuted),
+                                 ),
                               ),
                               Text(
                                 !isEkycApproved
                                     ? 'Chưa kích hoạt'
                                     : (state.isOnline ? 'GPS bật' : 'GPS tắt'),
-                                style: TextStyle(
-                                  fontSize: 8.5,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                 style: TextStyle(
+                                   fontSize: 8.5,
+                                   color: cani.textMuted,
+                                   fontWeight: FontWeight.w600,
+                                 ),
                               ),
                             ],
                           ),
@@ -400,12 +315,10 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                           Container(
                             width: 32,
                             height: 18,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(99),
-                              color: (isEkycApproved && state.isOnline)
-                                  ? const Color(0xFF10B981)
-                                  : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                            ),
+                             decoration: BoxDecoration(
+                               borderRadius: BorderRadius.circular(99),
+                               color: (isEkycApproved && state.isOnline) ? cani.success : cani.borderStrong,
+                             ),
                             child: AnimatedAlign(
                               duration: const Duration(milliseconds: 200),
                               alignment: (isEkycApproved && state.isOnline)
@@ -435,246 +348,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
             if (!isEkycApproved)
               _buildEkycWarningBanner(context, isDark, ekycState),
 
-            // 2. Thanh 2 Tab Trên Trang Chủ: "Việc của tôi" & "Lời mời làm việc"
-            if (isEkycApproved && !_isLoadingUrgent)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE8EEF7),
-                              borderRadius: BorderRadius.circular(11),
-                              border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () => setState(() => _homeTopTabIndex = 0),
-                                    borderRadius: BorderRadius.circular(9),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: _homeTopTabIndex == 0
-                                            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(9),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        'Việc của tôi (${_activeShifts.length})',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: _homeTopTabIndex == 0 ? FontWeight.w800 : FontWeight.w600,
-                                          color: _homeTopTabIndex == 0
-                                              ? const Color(0xFF0066FF)
-                                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () => setState(() => _homeTopTabIndex = 1),
-                                    borderRadius: BorderRadius.circular(9),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: _homeTopTabIndex == 1
-                                            ? (isDark ? const Color(0xFF1E293B) : Colors.white)
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(9),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            'Lời mời làm việc (${_pendingProposals.length})',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: _homeTopTabIndex == 1 ? FontWeight.w800 : FontWeight.w600,
-                                              color: _homeTopTabIndex == 1
-                                                  ? const Color(0xFF0066FF)
-                                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                                            ),
-                                          ),
-                                          if (_pendingProposals.isNotEmpty) ...[
-                                            const SizedBox(width: 5),
-                                            Container(
-                                              width: 7,
-                                              height: 7,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFFEF4444),
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: _openInviteCodeDialogOnHome,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F7FF),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFBFDBFE)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.confirmation_number_outlined, size: 15, color: Color(0xFF0066FF)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Mã mời',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF0066FF),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-            // Nội dung của Tab đang chọn trên Trang chủ
-            if (isEkycApproved && !_isLoadingUrgent && _homeTopTabIndex == 0) ...[
-              if (_urgentShift != null)
-                UrgentShiftHeroCard(
-                  assignment: _urgentShift!,
-                  onNavigate: () => _openNavigation(_urgentShift!),
-                  onQrScan: () => _openQrScanner(_urgentShift!),
-                  onOpenDetail: () => _openExecutionScreen(_urgentShift!),
-                ),
-              if (_activeShifts.length > 1)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Các ca làm khác đang trực / sắp tới (${_activeShifts.length - 1}):',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      SizedBox(
-                        height: 58,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _activeShifts.length - 1,
-                          separatorBuilder: (context, index) => const SizedBox(width: 8),
-                          itemBuilder: (ctx, idx) {
-                            final a = _activeShifts[idx + 1];
-                            return InkWell(
-                              onTap: () => _openExecutionScreen(a),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFF0077FF).withValues(alpha: 0.3)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.04),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.work_outline, size: 16, color: Color(0xFF0066FF)),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          a.jobType,
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                        ),
-                                        Text(
-                                          a.eventName,
-                                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Icon(Icons.arrow_forward_ios, size: 11, color: Color(0xFF94A3B8)),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-
-            if (isEkycApproved && !_isLoadingUrgent && _homeTopTabIndex == 1) ...[
-              if (_pendingProposals.isNotEmpty)
-                JobProposalDispatchCard(
-                  proposal: _pendingProposals.first,
-                  onAccept: () => _acceptProposalOnHome(_pendingProposals.first),
-                  onReject: () => _rejectProposalOnHome(_pendingProposals.first),
-                )
-              else
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.mail_outline_rounded, size: 18, color: Color(0xFF0066FF)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Chưa có lời mời làm việc mới. Bạn có thể nhập mã mời hoặc chọn ca trên bản đồ bên dưới.',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+            // 2. Section "Lời mời làm việc": toàn bộ lời mời đang chờ phản hồi
+            if (isEkycApproved)
+              _buildInviteSection(ref.watch(proposalsListProvider), cani),
 
             // 3. Thanh Bán Kính & Chuyển Đổi Bản Đồ / Danh Sách (Chỉ hiển thị khi đã hoàn tất eKYC)
             if (isEkycApproved)
@@ -687,7 +363,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                        color: cani.textMain,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -701,17 +377,13 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
-                              color: isSel
-                                  ? const Color(0xFF0077FF)
-                                  : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                              color: isSel ? cani.brand : (isDark ? cani.surface : Colors.white),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: isSel
-                                    ? const Color(0xFF0077FF)
-                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                color: isSel ? cani.brand : cani.border,
                               ),
                               boxShadow: isSel
-                                  ? const [BoxShadow(color: Color(0x400077FF), blurRadius: 6, offset: Offset(0, 2))]
+                                  ? [BoxShadow(color: cani.brand.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))]
                                   : null,
                             ),
                             child: Text(
@@ -719,9 +391,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
-                                color: isSel
-                                    ? Colors.white
-                                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                                color: isSel ? Colors.white : cani.textMuted,
                               ),
                             ),
                           ),
@@ -730,15 +400,44 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     ),
                     const Spacer(),
                     InkWell(
+                      onTap: _openInviteCodeDialogOnHome,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        height: 30,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: isDark ? cani.surface : cani.brandSoft,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: cani.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.confirmation_number_outlined, size: 14, color: isDark ? cani.accent : cani.brand),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Mã mời',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? cani.accent : cani.brand,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
                       onTap: () => notifier.toggleRadarView(),
                       borderRadius: BorderRadius.circular(999),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          color: isDark ? cani.surface : Colors.white,
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            color: cani.border,
                           ),
                         ),
                         child: Row(
@@ -746,7 +445,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                             Icon(
                               state.isRadarView ? Icons.list_alt : Icons.map_outlined,
                               size: 14,
-                              color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
+                              color: isDark ? cani.accent : cani.brand,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -754,7 +453,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0077FF),
+                                color: isDark ? cani.accent : cani.brand,
                               ),
                             ),
                           ],
@@ -779,15 +478,15 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                                 Positioned.fill(
                                   child: Container(
                                     margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF0077FF).withValues(alpha: 0.08),
-                                          blurRadius: 18,
-                                        ),
-                                      ],
-                                    ),
+                                     decoration: BoxDecoration(
+                                       borderRadius: BorderRadius.circular(24),
+                                       boxShadow: [
+                                         BoxShadow(
+                                           color: Theme.of(context).cani.brand.withValues(alpha: 0.08),
+                                           blurRadius: 18,
+                                         ),
+                                       ],
+                                     ),
                                     clipBehavior: Clip.antiAlias,
                                     child: JobRadarMapWidget(
                                       shifts: state.nearbyShifts,
@@ -811,25 +510,25 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                                     right: 24,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: (isDark ? const Color(0xFF1E293B) : Colors.white).withValues(alpha: 0.94),
-                                        borderRadius: BorderRadius.circular(999),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: isDark
-                                                ? Colors.black.withValues(alpha: 0.35)
-                                                : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
-                                            blurRadius: 8,
-                                          ),
-                                        ],
-                                      ),
-                                      child: Text(
-                                        '${state.nearbyShifts.length} ca trong bán kính ${state.searchRadiusKm.toInt()} km',
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                                        ),
+                                       decoration: BoxDecoration(
+                                         color: (isDark ? cani.surface : Colors.white).withValues(alpha: 0.94),
+                                         borderRadius: BorderRadius.circular(999),
+                                         boxShadow: [
+                                           BoxShadow(
+                                             color: isDark
+                                                 ? Colors.black.withValues(alpha: 0.35)
+                                                 : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
+                                             blurRadius: 8,
+                                           ),
+                                         ],
+                                       ),
+                                       child: Text(
+                                         '${state.nearbyShifts.length} ca trong bán kính ${state.searchRadiusKm.toInt()} km',
+                                         style: TextStyle(
+                                           fontSize: 10.5,
+                                           fontWeight: FontWeight.w800,
+                                           color: isDark ? Colors.white : cani.textBody,
+                                         ),
                                       ),
                                     ),
                                   ),
@@ -856,8 +555,75 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     );
   }
 
+  Widget _buildInviteSection(AsyncValue<List<JobProposalItem>> proposals, CaniTokens cani) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget emptyState = Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? cani.surface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cani.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.inbox_outlined, size: 18, color: isDark ? cani.accent : cani.brand),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Hiện không có lời mời làm việc nào. Bật "Sẵn sàng nhận việc" ở phía trên để nhận ca gần bạn.',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: isDark ? cani.textMuted : cani.textBody,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: proposals.when(
+        loading: () => emptyState,
+        error: (e, _) => emptyState,
+        data: (items) => items.isEmpty
+            ? emptyState
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Lời mời làm việc',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: JobProposalInviteCard(
+                          proposal: item,
+                          onAccept: () => _acceptProposalOnHome(item),
+                          onReject: () => _rejectProposalOnHome(item),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
   Widget _buildListView(BuildContext context, JobRadarState state, JobRadarNotifier notifier) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cani = Theme.of(context).cani;
 
     if (state.nearbyShifts.isEmpty) {
       return Center(
@@ -870,7 +636,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
               'Không có ca làm việc nào trong khu vực này',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                color: cani.textMain,
               ),
             ),
             const SizedBox(height: 8),
@@ -892,7 +658,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: isDark ? const BorderSide(color: Color(0xFF334155)) : BorderSide.none,
+            side: isDark ? BorderSide(color: cani.border) : BorderSide.none,
           ),
           elevation: 1,
           child: InkWell(
@@ -909,14 +675,14 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          shift.eventName,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14.5,
-                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                          ),
-                        ),
+                         child: Text(
+                           shift.eventName,
+                           style: TextStyle(
+                             fontWeight: FontWeight.w800,
+                             fontSize: 14.5,
+                             color: cani.textMain,
+                           ),
+                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -939,39 +705,39 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     ],
                   ),
                   const SizedBox(height: 5),
-                  Text(
-                    shift.jobType,
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0066FF), fontSize: 13),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    shift.locationAddress,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Divider(height: 18, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                   Text(
+                     shift.jobType,
+                     style: TextStyle(fontWeight: FontWeight.w700, color: cani.brand, fontSize: 13),
+                   ),
+                   const SizedBox(height: 4),
+                   Text(
+                     shift.locationAddress,
+                     style: TextStyle(
+                       fontSize: 12,
+                       color: cani.textMuted,
+                     ),
+                     maxLines: 1,
+                     overflow: TextOverflow.ellipsis,
+                   ),
+                   Divider(height: 18, color: isDark ? cani.border : cani.border),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         '${shift.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ/h',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF16A34A)),
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: cani.success),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: shift.emergency
-                              ? const Color(0xFFFEF2F2)
-                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                              ? cani.dangerBg
+                              : (isDark ? cani.surface : const Color(0xFFF1F5F9)),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: shift.emergency
                                 ? const Color(0xFFFCA5A5)
-                                : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                : (isDark ? cani.border : const Color(0xFFCBD5E1)),
                           ),
                         ),
                         child: Text(
@@ -979,7 +745,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
-                            color: shift.emergency ? const Color(0xFFDC2626) : const Color(0xFF64748B),
+                            color: shift.emergency ? cani.danger : cani.textMuted,
                           ),
                         ),
                       ),
@@ -1012,13 +778,13 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     );
   }
 
-  Future<void> _applyQuick(BuildContext context, NearbyShiftItem shift) async {
+  Future<void> _applyQuick(BuildContext ctx, NearbyShiftItem shift) async {
     if (!shift.emergency) {
       if (mounted) {
-        ScaffoldMessenger.of(this.context).showSnackBar(
-          const SnackBar(
-            content: Text('Ca này chưa ở chế độ khẩn cấp — hãy chờ lời mời việc (Matching) từ Ban tổ chức!'),
-            backgroundColor: Color(0xFFF59E0B),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Ca này chưa ở chế độ khẩn cấp — hãy chờ lời mời việc (Matching) từ Ban tổ chức!'),
+            backgroundColor: Theme.of(context).cani.warning,
           ),
         );
       }
@@ -1027,22 +793,22 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     try {
       await ref.read(jobRadarRepositoryProvider).applyForShift(shift.shiftId);
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();
-      await _loadUrgentShift();
+      ref.invalidate(proposalsListProvider);
+      ref.invalidate(assignmentsListProvider);
       if (mounted) {
-        setState(() => _homeTopTabIndex = 0);
-        ScaffoldMessenger.of(this.context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Ứng tuyển thành công ca: ${shift.jobType} tại ${shift.eventName}!'),
-            backgroundColor: const Color(0xFF16A34A),
+            backgroundColor: Theme.of(context).cani.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(this.context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Không thể ứng tuyển: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: const Color(0xFFDC2626),
+            backgroundColor: Theme.of(context).cani.danger,
           ),
         );
       }
@@ -1094,12 +860,12 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                 ref.read(ekycProvider.notifier).checkStatus();
               });
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0077FF),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            ),
+             style: ElevatedButton.styleFrom(
+               backgroundColor: Theme.of(context).cani.brand,
+               foregroundColor: Colors.white,
+               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+             ),
             child: const Text('Xác thực ngay', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
@@ -1110,12 +876,13 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   Widget _buildEkycWarningBanner(BuildContext context, bool isDark, EkycState ekycState) {
     final isPending = ekycState.result?.isPending ?? false;
     final isRejected = ekycState.result?.isRejected ?? false;
+    final cani = Theme.of(context).cani;
 
     final Color bannerBg = isPending
         ? (isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF))
         : (isRejected
-            ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : const Color(0xFFFEF2F2))
-            : (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFFFBEB)));
+            ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : cani.dangerBg)
+            : (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : cani.warningBg));
 
     final Color bannerBorder = isPending
         ? (isDark ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE))
@@ -1124,8 +891,8 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
             : (isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A)));
 
     final Color primaryColor = isPending
-        ? const Color(0xFF3B82F6)
-        : (isRejected ? const Color(0xFFEF4444) : const Color(0xFFD97706));
+        ? cani.brand
+        : (isRejected ? cani.danger : const Color(0xFFD97706));
 
     final String message = isPending
         ? 'Hồ sơ eKYC đang được xét duyệt. Radar sẽ mở khóa ngay khi hoàn tất.'
@@ -1187,6 +954,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   Widget _buildEkycLockedState(BuildContext context, bool isDark, EkycState ekycState) {
     final isPending = ekycState.result?.isPending ?? false;
     final isRejected = ekycState.result?.isRejected ?? false;
+    final cani = Theme.of(context).cani;
 
     return Center(
       child: SingleChildScrollView(
@@ -1194,10 +962,10 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            color: isDark ? cani.surface : Colors.white,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              color: isDark ? cani.border : cani.border,
             ),
             boxShadow: [
               BoxShadow(
@@ -1252,12 +1020,12 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     ? 'Hồ Sơ Đang Chờ Phê Duyệt'
                     : (isRejected ? 'Định Danh eKYC Bị Từ Chối' : 'Tính Năng Radar Tìm Việc Đang Khóa'),
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                  letterSpacing: -0.3,
-                ),
+                 style: TextStyle(
+                   fontSize: 17,
+                   fontWeight: FontWeight.w800,
+                   color: cani.textMain,
+                   letterSpacing: -0.3,
+                 ),
               ),
               const SizedBox(height: 10),
 
@@ -1336,11 +1104,11 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                         : (isRejected ? 'CHỤP LẠI CCCD & KHUÔN MẶT' : 'XÁC THỰC CCCD NGAY (1 - 2 PHÚT)'),
                     style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isPending
-                        ? const Color(0xFF2563EB)
-                        : (isRejected ? const Color(0xFFDC2626) : const Color(0xFF0077FF)),
-                    foregroundColor: Colors.white,
+                   style: ElevatedButton.styleFrom(
+                     backgroundColor: isPending
+                         ? cani.brand
+                         : (isRejected ? cani.danger : cani.brand),
+                     foregroundColor: Colors.white,
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -1356,9 +1124,10 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   }
 
   Widget _buildBenefitRow({required IconData icon, required String title, required bool isDark}) {
+    final cani = Theme.of(context).cani;
     return Row(
       children: [
-        Icon(icon, size: 16, color: const Color(0xFF0077FF)),
+        Icon(icon, size: 16, color: cani.brand),
         const SizedBox(width: 10),
         Expanded(
           child: Text(

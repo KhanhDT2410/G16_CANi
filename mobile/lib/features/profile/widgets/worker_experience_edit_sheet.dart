@@ -20,7 +20,6 @@ class WorkerExperienceEditSheet extends ConsumerStatefulWidget {
 }
 
 class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEditSheet> {
-  late final TextEditingController _yearsController;
   late final TextEditingController _bioController;
   late final FocusNode _bioFocusNode;
   bool _isSaving = false;
@@ -28,9 +27,6 @@ class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEdit
   @override
   void initState() {
     super.initState();
-    _yearsController = TextEditingController(
-      text: (widget.initialExperience?.yearsExperience ?? 0).toString(),
-    );
     _bioController = TextEditingController(
       text: widget.initialExperience?.bio ?? '',
     );
@@ -47,20 +43,19 @@ class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEdit
 
   @override
   void dispose() {
-    _yearsController.dispose();
     _bioController.dispose();
     _bioFocusNode.dispose();
     super.dispose();
   }
 
   Future<void> _handleSave() async {
-    final years = int.tryParse(_yearsController.text.trim()) ?? 0;
     final bio = _bioController.text.trim();
+    final currentYears = widget.initialExperience?.yearsExperience ?? 0;
 
     setState(() => _isSaving = true);
 
     final success = await ref.read(workerExperienceProvider.notifier).updateExperience(
-          yearsExperience: years,
+          yearsExperience: currentYears,
           bio: bio,
         );
 
@@ -71,14 +66,14 @@ class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEdit
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cập nhật thông tin hồ sơ thành công!'),
+          content: Text('Cập nhật giới thiệu bản thân thành công!'),
           backgroundColor: Color(0xFF059669),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Có lỗi xảy ra khi cập nhật hồ sơ.'),
+          content: Text('Có lỗi xảy ra khi cập nhật giới thiệu.'),
           backgroundColor: Color(0xFFDC2626),
         ),
       );
@@ -106,7 +101,7 @@ class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEdit
                 const Icon(Icons.edit_note_rounded, color: Color(0xFF0066FF), size: 24),
                 const SizedBox(width: 8),
                 Text(
-                  'Cập nhật Hồ sơ & Giới thiệu',
+                  'Cập nhật Giới thiệu bản thân',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: t.text,
@@ -121,26 +116,6 @@ class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEdit
             ),
             const SizedBox(height: 16),
             Text(
-              'Số năm kinh nghiệm làm sự kiện',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: t.text),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _yearsController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: 'Ví dụ: 2',
-                suffixText: 'năm',
-                filled: true,
-                fillColor: t.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: t.border),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
               'Giới thiệu bản thân',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: t.text),
             ),
@@ -151,7 +126,7 @@ class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEdit
               maxLines: 4,
               maxLength: 500,
               decoration: InputDecoration(
-                hintText: 'Mô tả ngắn gọn kỹ năng, thái độ làm việc, các loại sự kiện bạn từng tham gia...',
+                hintText: 'Mô tả ngắn gọn kinh nghiệm, phong cách làm việc, thế mạnh cá nhân...',
                 filled: true,
                 fillColor: t.surface,
                 border: OutlineInputBorder(
@@ -180,7 +155,7 @@ class _WorkerExperienceEditSheetState extends ConsumerState<WorkerExperienceEdit
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : const Text(
-                        'Lưu thông tin hồ sơ',
+                        'Lưu giới thiệu bản thân',
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                       ),
               ),

@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:cani/app/app.dart';
+import 'package:cani/app/home_screen.dart';
 import 'package:cani/core/constants/api_constants.dart';
 import 'package:cani/core/notifications/fcm_service.dart';
-import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
+import 'package:cani/features/auth/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,25 +24,26 @@ void main() async {
     debugPrint('[Supabase Init Info] Supabase credentials not provided. Skipping initialization.');
   }
 
+  final container = ProviderContainer();
+
   // Khởi tạo Firebase Cloud Messaging (FCM) & Kênh thông báo nổi (Heads-up banner)
   await FcmService.initialize(
     onNotificationNavigate: (data) {
       debugPrint('[Notification Navigate] Navigating from notification data: $data');
-      final rawType = (data['type'] ?? data['payload'] ?? '').toString().toUpperCase();
-      final isProposal = rawType.contains('NEW_PROPOSAL') ||
-          rawType.contains('EMERGENCY_PROPOSAL') ||
-          rawType.contains('PROPOSAL');
-      rootNavigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => MyAssignmentsScreen(initialTabIndex: isProposal ? 1 : 0),
-        ),
-      );
+      if (!container.read(authStateProvider).isAuthenticated) return;
+
+      final type = data['type'] ?? data['payload']?['type'];
+      final isProposal = type == 'NEW_PROPOSAL' || type == 'EMERGENCY_PROPOSAL' || type == 'PROPOSAL';
+
+      rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+      container.read(homeTabIndexProvider.notifier).state = isProposal ? 0 : 1;
     },
   );
 
   runApp(
-    const ProviderScope(
-      child: CaniApp(),
+    UncontrolledProviderScope(
+      container: container,
+      child: const CaniApp(),
     ),
   );
 }

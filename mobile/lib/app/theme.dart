@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color _primaryColor = Color(0xFF0066FF);
-  static const Color _seedColor = Color(0xFF0066FF);
+  static const Color _primaryColor = Color(0xFF5B86E5);
+  static const Color _seedColor = Color(0xFF5B86E5);
 
   // Light Palette
   static const Color _lightScaffoldBg = Color(0xFFF8FAFC);
@@ -56,7 +56,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: _lightSurface,
-        indicatorColor: const Color(0x260066FF),
+        indicatorColor: const Color(0x265B86E5),
         elevation: 8,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
@@ -99,7 +99,7 @@ class AppTheme {
   static ThemeData get dark {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: _seedColor,
-      primary: const Color(0xFF38BDF8),
+      primary: const Color(0xFF36D1DC),
       surface: _darkSurface,
       brightness: Brightness.dark,
     );
@@ -128,14 +128,14 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: _darkSurface,
-        indicatorColor: const Color(0x3338BDF8),
+        indicatorColor: const Color(0x3336D1DC),
         elevation: 8,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF38BDF8),
+              color: Color(0xFF36D1DC),
             );
           }
           return const TextStyle(
@@ -146,7 +146,7 @@ class AppTheme {
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: Color(0xFF38BDF8));
+            return const IconThemeData(color: Color(0xFF36D1DC));
           }
           return const IconThemeData(color: _darkTextSecondary);
         }),

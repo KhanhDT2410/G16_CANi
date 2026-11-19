@@ -1,3 +1,4 @@
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 
 import '../models/proposal_models.dart';
@@ -32,6 +33,7 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
   @override
   Widget build(BuildContext context) {
     final a = widget.assignment;
+    final cani = Theme.of(context).cani;
     final declaredAmount = a.declaredAmount > 0 ? a.declaredAmount : a.totalPay;
     final methodStr = a.paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản ngân hàng' : 'Tiền mặt';
 
@@ -54,10 +56,10 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0077FF).withValues(alpha: 0.1),
+                        color: cani.brand.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.payments_outlined, color: Color(0xFF0077FF), size: 24),
+                      child: Icon(Icons.payments_outlined, color: cani.brand, size: 24),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -67,7 +69,7 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 20, color: Color(0xFF64748B)),
+                      icon: Icon(Icons.close, size: 20, color: cani.textMuted),
                       onPressed: () => Navigator.of(context).pop(),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -83,7 +85,7 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: cani.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,9 +99,9 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                       const SizedBox(height: 4),
                       Text(
                         'Vị trí: ${a.jobType}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 12, color: cani.textMuted),
                       ),
-                      const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                      Divider(height: 16, color: cani.border),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -124,7 +126,7 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('Tổng thù lao ca:', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                            Text(_formatCurrency(a.totalPay), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            Text(_formatCurrency(a.totalPay), style: TextStyle(fontSize: 12, color: cani.textMuted)),
                           ],
                         ),
                       ],
@@ -141,6 +143,7 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
 
                 // 3 Options
                 _buildOptionTile(
+                  cani,
                   status: 'CONFIRMED_FULL',
                   title: 'Đã nhận đủ toàn bộ',
                   subtitle: 'Đã nhận đủ đúng theo số tiền thỏa thuận',
@@ -149,18 +152,20 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                 ),
                 const SizedBox(height: 8),
                 _buildOptionTile(
+                  cani,
                   status: 'CONFIRMED_PARTIAL',
                   title: 'Nhận một phần',
                   subtitle: 'Số tiền thực nhận ít hơn mức khai báo',
-                  color: const Color(0xFFF59E0B),
+                  color: cani.warning,
                   icon: Icons.warning_amber_rounded,
                 ),
                 const SizedBox(height: 8),
                 _buildOptionTile(
+                  cani,
                   status: 'NOT_RECEIVED',
                   title: 'Chưa nhận được tiền',
                   subtitle: 'Chưa nhận được hoặc sai lệch hoàn toàn (CSKH hỗ trợ)',
-                  color: const Color(0xFFEF4444),
+                  color: cani.danger,
                   icon: Icons.error_outline,
                 ),
                 const SizedBox(height: 14),
@@ -175,10 +180,10 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                     hintText: _selectedStatus == 'CONFIRMED_FULL'
                         ? 'Nhập lời cảm ơn hoặc phản hồi...'
                         : 'Ví dụ: Mới nhận 300k tiền mặt, còn thiếu 200k...',
-                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    hintStyle: TextStyle(fontSize: 12, color: const Color(0xFF94A3B8)),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0077FF), width: 1.5)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cani.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cani.brand, width: 1.5)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   ),
                   validator: (val) {
@@ -201,7 +206,7 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                           side: const BorderSide(color: Color(0xFFCBD5E1)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('Hủy', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                        child: Text('Hủy', style: TextStyle(color: cani.textMuted, fontWeight: FontWeight.w600)),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -218,8 +223,8 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _selectedStatus == 'NOT_RECEIVED'
-                              ? const Color(0xFFDC2626)
-                              : (_selectedStatus == 'CONFIRMED_PARTIAL' ? const Color(0xFFD97706) : const Color(0xFF0077FF)),
+                              ? cani.danger
+                              : (_selectedStatus == 'CONFIRMED_PARTIAL' ? const Color(0xFFD97706) : cani.brand),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -241,7 +246,8 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
     );
   }
 
-  Widget _buildOptionTile({
+  Widget _buildOptionTile(
+    CaniTokens cani, {
     required String status,
     required String title,
     required String subtitle,
@@ -259,7 +265,7 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
           color: isSelected ? color.withValues(alpha: 0.08) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? color : const Color(0xFFE2E8F0),
+            color: isSelected ? color : cani.border,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -283,10 +289,10 @@ class _PaymentConfirmDialogState extends State<PaymentConfirmDialog> {
                       color: isSelected ? color : const Color(0xFF1E293B),
                     ),
                   ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                  ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 11, color: cani.textMuted),
+                    ),
                 ],
               ),
             ),

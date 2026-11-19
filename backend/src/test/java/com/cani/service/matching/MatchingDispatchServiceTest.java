@@ -21,6 +21,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +56,9 @@ class MatchingDispatchServiceTest {
     @Mock
     private com.cani.repository.WorkerSkillRepository workerSkillRepository;
 
+    @Mock
+    private com.cani.repository.WorkerAvailabilityRepository workerAvailabilityRepository;
+
     @InjectMocks
     private MatchingDispatchService matchingDispatchService;
 
@@ -67,6 +73,7 @@ class MatchingDispatchServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(matchingDispatchService, "notificationService", notificationService);
         ReflectionTestUtils.setField(matchingDispatchService, "workerSkillRepository", workerSkillRepository);
+        ReflectionTestUtils.setField(matchingDispatchService, "workerAvailabilityRepository", workerAvailabilityRepository);
 
         UUID eventId = UUID.randomUUID();
         sampleEvent = Event.builder()
@@ -369,6 +376,90 @@ class MatchingDispatchServiceTest {
 
             assertEquals(0, dispatched);
             verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("MATCH012: Tiêu chí Worker yêu cầu lương tối thiểu 50.000đ -> Ca làm 45.000đ bị loại bỏ")
+        void passHardFilter_ShiftWageBelowWorkerMinWage_FilteredOut() {
+            onlineWorker.setMinWage(BigDecimal.valueOf(50000));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
+
+            int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
+
+            assertEquals(0, dispatched);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("MATCH013: Worker chỉ nhận việc trong bán kính 100m -> Ca làm cách ~200m bị loại dù shift cho phép 15km")
+        void passHardFilter_WorkerMaxDistanceKm_Exceeded_FilteredOut() {
+            onlineWorker.setMaxDistanceKm(0.1);
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
+            when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+
+            int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
+
+            assertEquals(0, dispatched);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("MATCH014: Worker đã cấu hình lịch rảnh cố định nhưng ca làm không nằm trong slot rảnh -> Bị loại bỏ")
+        void passHardFilter_ShiftNotInWorkerWeeklyAvailability_FilteredOut() {
+            ZoneId vnZone = ZoneId.of("Asia/Ho_Chi_Minh");
+            ZonedDateTime shiftStart = sampleShift.getStartTime().atZone(vnZone);
+            int shiftDayOfWeek = shiftStart.getDayOfWeek().getValue() % 7;
+            int otherDay = (shiftDayOfWeek + 1) % 7; // Khác ngày của shift
+
+            WorkerAvailability slot = WorkerAvailability.builder()
+                    .worker(onlineWorker)
+                    .dayOfWeek(otherDay)
+                    .startTime(LocalTime.of(8, 0))
+                    .endTime(LocalTime.of(22, 0))
+                    .isAvailable(true)
+                    .build();
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
+            when(workerAvailabilityRepository.findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(onlineWorker.getWorkerId()))
+                    .thenReturn(List.of(slot));
+
+            int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
+
+            assertEquals(0, dispatched);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("MATCH015: Worker có lịch rảnh cố định bao trọn ca làm việc -> Được đề xuất thành công")
+        void passHardFilter_ShiftWithinWorkerWeeklyAvailability_PassesFilter() {
+            ZoneId vnZone = ZoneId.of("Asia/Ho_Chi_Minh");
+            ZonedDateTime shiftStart = sampleShift.getStartTime().atZone(vnZone);
+            int shiftDayOfWeek = shiftStart.getDayOfWeek().getValue() % 7;
+
+            // Slot từ 00:00 đến 23:59 của ngày diễn ra ca làm việc
+            WorkerAvailability slot = WorkerAvailability.builder()
+                    .worker(onlineWorker)
+                    .dayOfWeek(shiftDayOfWeek)
+                    .startTime(LocalTime.of(0, 0))
+                    .endTime(LocalTime.of(23, 59))
+                    .isAvailable(true)
+                    .build();
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker));
+            when(workerAvailabilityRepository.findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(onlineWorker.getWorkerId()))
+                    .thenReturn(List.of(slot));
+            when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+            when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(), anyList())).thenReturn(false);
+            when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any())).thenReturn(false);
+
+            int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
+
+            assertEquals(1, dispatched);
+            verify(dispatchProposalRepository, times(1)).save(any(DispatchProposal.class));
         }
     }
 

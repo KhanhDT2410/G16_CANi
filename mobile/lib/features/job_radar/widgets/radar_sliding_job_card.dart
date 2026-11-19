@@ -1,3 +1,4 @@
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
@@ -33,6 +34,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
   @override
   Widget build(BuildContext context) {
     final s = widget.shift;
+    final cani = Theme.of(context).cani;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
@@ -62,20 +64,20 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
             BoxShadow(
               color: isDark
                   ? Colors.black.withValues(alpha: 0.35)
-                  : const Color(0xFF0B1B3D).withValues(alpha: 0.14),
+                  : cani.textMain.withValues(alpha: 0.14),
               blurRadius: 18,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         child: _isCollapsed
-            ? _buildCollapsedView(isDark, s)
-            : _buildExpandedView(isDark, s),
+            ? _buildCollapsedView(cani, isDark, s)
+            : _buildExpandedView(cani, isDark, s),
       ),
     );
   }
 
-  Widget _buildCollapsedView(bool isDark, NearbyShiftItem s) {
+  Widget _buildCollapsedView(CaniTokens cani, bool isDark, NearbyShiftItem s) {
     return InkWell(
       onTap: () => setState(() => _isCollapsed = false),
       borderRadius: BorderRadius.circular(12),
@@ -86,22 +88,22 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
           Container(
             width: 36,
             height: 4,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0077FF).withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.location_on, size: 15, color: Color(0xFF0077FF)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF475569) : cani.border,
+                borderRadius: BorderRadius.circular(99),
               ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: cani.brand.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.location_on, size: 15, color: cani.brand),
+                ),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -112,7 +114,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12.5,
-                        color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
+                        color: isDark ? const Color(0xFFF8FAFC) : cani.textMain,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -124,8 +126,8 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                       style: TextStyle(
                         fontSize: 10.5,
                         color: s.isConflicting
-                            ? const Color(0xFFDC2626)
-                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ? cani.danger
+                            : cani.textMuted,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -138,18 +140,18 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0077FF).withValues(alpha: 0.1),
+                  color: cani.brand.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'Xem',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0077FF)),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: cani.brand),
                     ),
-                    SizedBox(width: 2),
-                    Icon(Icons.keyboard_arrow_up, size: 16, color: Color(0xFF0077FF)),
+                    const SizedBox(width: 2),
+                    Icon(Icons.keyboard_arrow_up, size: 16, color: cani.brand),
                   ],
                 ),
               ),
@@ -160,7 +162,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
     );
   }
 
-  Widget _buildExpandedView(bool isDark, NearbyShiftItem s) {
+  Widget _buildExpandedView(CaniTokens cani, bool isDark, NearbyShiftItem s) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -177,7 +179,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                   width: 38,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                    color: isDark ? const Color(0xFF475569) : cani.border,
                     borderRadius: BorderRadius.circular(99),
                   ),
                 ),
@@ -185,7 +187,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                 Icon(
                   Icons.keyboard_arrow_down,
                   size: 18,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: cani.textMuted,
                 ),
               ],
             ),
@@ -224,7 +226,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 13.5,
-                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
+                      color: isDark ? const Color(0xFFF8FAFC) : cani.textMain,
                       letterSpacing: -0.1,
                     ),
                     maxLines: 1,
@@ -236,7 +238,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: cani.textMuted,
                     ),
                   ),
                 ],
@@ -282,15 +284,15 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
+                Icon(Icons.warning_amber_rounded, size: 16, color: cani.danger),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     s.conflictReason ?? 'Trùng thời gian với ca bạn đã nhận',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFDC2626),
+                      color: cani.danger,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -325,7 +327,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                   ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      color: isDark ? const Color(0xFF334155) : cani.border,
                       width: 1.5,
                     ),
                     backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -343,11 +345,11 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                   decoration: BoxDecoration(
                     gradient: (s.isConflicting || !s.emergency)
                         ? null
-                        : const LinearGradient(
-                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                        : LinearGradient(
+                            colors: [cani.danger, cani.danger],
                           ),
                     color: (s.isConflicting || !s.emergency)
-                        ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+                        ? (isDark ? const Color(0xFF1E293B) : cani.border)
                         : null,
                     border: (s.isConflicting || !s.emergency)
                         ? Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
@@ -360,7 +362,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(s.conflictReason ?? 'Bạn đã có ca khác trùng khung giờ này!'),
-                                backgroundColor: const Color(0xFFDC2626),
+                                backgroundColor: cani.danger,
                               ),
                             );
                           }
@@ -368,9 +370,9 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                             ? widget.onApply
                             : () {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Ca này đang ghép đôi tự động (Matching). Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp!'),
-                                    backgroundColor: Color(0xFFF59E0B),
+                                  SnackBar(
+                                    content: const Text('Ca này đang ghép đôi tự động (Matching). Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp!'),
+                                    backgroundColor: cani.warning,
                                   ),
                                 );
                               }),
@@ -379,7 +381,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                           ? Icons.block
                           : (s.emergency ? Icons.flash_on_rounded : Icons.schedule_send_rounded),
                       size: 16,
-                      color: (s.isConflicting || !s.emergency) ? const Color(0xFF64748B) : Colors.white,
+                      color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
                     ),
                     label: Text(
                       s.isConflicting
@@ -388,7 +390,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w800,
-                        color: (s.isConflicting || !s.emergency) ? const Color(0xFF64748B) : Colors.white,
+                        color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

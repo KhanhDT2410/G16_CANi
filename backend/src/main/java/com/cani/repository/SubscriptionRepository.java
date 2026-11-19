@@ -22,9 +22,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     List<Subscription> findByEventOrganizer_EoIdOrderByCreatedAtDesc(UUID eoId);
 
     @Query("SELECT s FROM Subscription s WHERE s.eventOrganizer.eoId = :eoId AND s.status = :status AND (s.expiresAt IS NULL OR s.expiresAt > :now) ORDER BY s.createdAt DESC")
-    List<Subscription> findActiveSubscriptions(@Param("eoId") UUID eoId, @Param("status") SubscriptionStatus status, @Param("now") Instant now);
+    List<Subscription> findActiveSubscriptions(@Param("eoId") UUID eoId, @Param("status") SubscriptionStatus status,
+            @Param("now") Instant now);
 
-    Optional<Subscription> findFirstByEventOrganizer_EoIdAndStatusOrderByCreatedAtDesc(UUID eoId, SubscriptionStatus status);
+    Optional<Subscription> findFirstByEventOrganizer_EoIdAndStatusOrderByCreatedAtDesc(UUID eoId,
+            SubscriptionStatus status);
 
     boolean existsByPlan_PlanId(UUID planId);
 
@@ -33,19 +35,23 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     Page<Subscription> findByCreatedAtBetween(Instant from, Instant to, Pageable pageable);
 
     @Query("SELECT s FROM Subscription s WHERE s.plan.planType = :planType AND s.createdAt BETWEEN :from AND :to")
-    List<Subscription> findByPlanTypeAndCreatedAtBetween(@Param("planType") PlanType planType, @Param("from") Instant from, @Param("to") Instant to);
+    List<Subscription> findByPlanTypeAndCreatedAtBetween(@Param("planType") PlanType planType,
+            @Param("from") Instant from, @Param("to") Instant to);
 
     long countByCreatedAtBetween(Instant from, Instant to);
 
     @Query("SELECT count(s) FROM Subscription s WHERE s.plan.planType = :planType AND s.createdAt BETWEEN :from AND :to")
-    long countByPlanTypeAndCreatedAtBetween(@Param("planType") PlanType planType, @Param("from") Instant from, @Param("to") Instant to);
+    long countByPlanTypeAndCreatedAtBetween(@Param("planType") PlanType planType, @Param("from") Instant from,
+            @Param("to") Instant to);
 
     @Query("SELECT COALESCE(SUM(s.pricePaid), 0) FROM Subscription s WHERE s.createdAt >= :from AND s.createdAt < :to")
     BigDecimal sumPriceBetween(@Param("from") Instant from, @Param("to") Instant to);
 
     @Query("SELECT COALESCE(SUM(s.pricePaid), 0) FROM Subscription s WHERE s.plan.planType = :planType AND s.createdAt >= :from AND s.createdAt < :to")
-    BigDecimal sumPriceByPlanTypeBetween(@Param("planType") PlanType planType, @Param("from") Instant from, @Param("to") Instant to);
+    BigDecimal sumPriceByPlanTypeBetween(@Param("planType") PlanType planType, @Param("from") Instant from,
+            @Param("to") Instant to);
 
     @Query("SELECT s FROM Subscription s WHERE s.plan.planType = :planType AND s.createdAt BETWEEN :from AND :to")
-    Page<Subscription> findByPlanTypeAndCreatedAtBetween(@Param("planType") PlanType planType, @Param("from") Instant from, @Param("to") Instant to, Pageable pageable);
+    Page<Subscription> findByPlanTypeAndCreatedAtBetween(@Param("planType") PlanType planType,
+            @Param("from") Instant from, @Param("to") Instant to, Pageable pageable);
 }

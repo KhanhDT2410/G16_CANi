@@ -39,8 +39,7 @@ public class EventOrganizerEkycController {
 
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.submitEkyc(
-                userId, frontImage, backImage, selfieImage, businessLicenseImage, cccdNumber
-        );
+                userId, frontImage, backImage, selfieImage, businessLicenseImage, cccdNumber);
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
@@ -115,6 +114,7 @@ public class EventOrganizerEkycController {
 
         UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.adminReviewEkyc(adminUserId, verificationId, request);
-        return ResponseEntity.ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC doanh nghiệp thành công: " + result.getStatus()));
+        return ResponseEntity
+                .ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC doanh nghiệp thành công: " + result.getStatus()));
     }
 }

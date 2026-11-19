@@ -77,6 +77,12 @@ cd mobile
      flutter run -d android
      ```
      *(Nếu có nhiều thiết bị, chỉ định mã cụ thể: `flutter run -d <device_id>`)*
+  5. **Hiển thị & tương tác màn hình điện thoại trên máy tính (Screen Mirroring):**
+     - Mở một tab Terminal mới hoặc nhấp đúp file `run-mirror.bat`, hoặc gõ trực tiếp:
+     ```powershell
+     scrcpy
+     ```
+     *(Cửa sổ màn hình điện thoại sẽ hiện lên ngay lập tức. Dùng chuột để chạm, vuốt và bàn phím máy tính để gõ phím).*
 
 ---
 

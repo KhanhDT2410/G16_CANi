@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 
 import '../models/proposal_models.dart';
@@ -51,6 +52,7 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
   @override
   Widget build(BuildContext context) {
     final p = widget.proposal;
+    final cani = Theme.of(context).cani;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -64,7 +66,7 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           BoxShadow(
             color: isDark
                 ? Colors.black.withValues(alpha: 0.20)
-                : const Color(0xFF0077FF).withValues(alpha: 0.08),
+                : cani.brand.withValues(alpha: 0.08),
             blurRadius: 18,
             offset: const Offset(0, 4),
           ),
@@ -84,7 +86,7 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
-                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0B1B3D),
+                    color: isDark ? const Color(0xFFF8FAFC) : cani.textMain,
                     letterSpacing: -0.1,
                   ),
                 ),
@@ -157,12 +159,12 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           // Địa chỉ & Thời gian
           Row(
             children: [
-              const Icon(Icons.location_on, size: 15, color: Color(0xFF0077FF)),
+              Icon(Icons.location_on, size: 15, color: cani.brand),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   p.venueAddress,
-                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -172,11 +174,11 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF0077FF)),
+              Icon(Icons.access_time_rounded, size: 15, color: cani.brand),
               const SizedBox(width: 6),
               Text(
                 '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')} - ${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')} (${p.startTime.day}/${p.startTime.month}/${p.startTime.year})',
-                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -202,16 +204,16 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                       letterSpacing: -0.2,
                     ),
                   ),
-                  const Text(
-                    '/ca làm việc',
-                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
-                  ),
+                    Text(
+                      '/ca làm việc',
+                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: cani.textMuted),
+                    ),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                  color: cani.warning.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
@@ -244,7 +246,7 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                     onPressed: widget.onReject,
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        color: isDark ? const Color(0xFF334155) : cani.border,
                         width: 1.5,
                       ),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -265,19 +267,19 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                 flex: 1,
                 child: SizedBox(
                   height: 44,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF00D2FF), Color(0xFF0066FF)],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x500066FF),
-                          blurRadius: 14,
-                          offset: Offset(0, 4),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: cani.brandGradient,
                         ),
-                      ],
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: cani.brand.withValues(alpha: 0x50 / 255),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                     ),
                     child: ElevatedButton(
                       onPressed: widget.onAccept,

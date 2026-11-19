@@ -4,10 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
+import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
 import 'package:cani/features/profile/profile.dart';
 import 'package:cani/shared/widgets/bottom_nav_bar.dart';
+
+/// Index of the currently selected bottom-nav tab. Shared so screens can deep-link / restore.
+final homeTabIndexProvider = StateProvider<int>((ref) => 0);
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +21,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _currentIndex = 0;
 
   final List<Widget> _pages = const [
     JobRadarScreen(),
@@ -51,7 +54,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     final authState = ref.watch(authStateProvider);
-    final proposalsCount = ref.watch(proposalsCountProvider).asData?.value ?? 0;
+    final currentIndex = ref.watch(homeTabIndexProvider);
+    final assignments = ref.watch(assignmentsListProvider).asData?.value ?? const <ShiftAssignmentItem>[];
+    final activeAssignmentsCount =
+        assignments.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).length;
 
     if (authState.isLoading) {
       return const Scaffold(
@@ -67,13 +73,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       body: IndexedStack(
-        index: _currentIndex,
+        index: currentIndex,
         children: _pages,
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: _currentIndex,
+        currentIndex: currentIndex,
         onTap: (index) {
-          setState(() => _currentIndex = index);
+          ref.read(homeTabIndexProvider.notifier).state = index;
         },
         items: [
           const BottomNavItem(
@@ -85,7 +91,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: Icons.assignment_outlined,
             selectedIcon: Icons.assignment_rounded,
             label: 'Ca làm',
-            badgeCount: proposalsCount,
+            badgeCount: activeAssignmentsCount,
           ),
           const BottomNavItem(
             icon: Icons.person_outline_rounded,

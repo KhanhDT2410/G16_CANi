@@ -15,12 +15,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Controller Dispute — endpoint cho hai bên liên quan (Worker / Event Organizer).
- * SRS UC-96 (nộp), UC-97/104 (xem chi tiết + lịch sử), UC-98 (bằng chứng), UC-101 (kháng nghị).
+ * Controller Dispute — endpoint cho hai bên liên quan (Worker / Event
+ * Organizer).
+ * SRS UC-96 (nộp), UC-97/104 (xem chi tiết + lịch sử), UC-98 (bằng chứng),
+ * UC-101 (kháng nghị).
  */
 @Slf4j
 @RestController
-@RequestMapping({"/api/v1/disputes", "/v1/disputes"})
+@RequestMapping({ "/api/v1/disputes", "/v1/disputes" })
 @RequiredArgsConstructor
 public class DisputeController {
 
@@ -33,9 +35,8 @@ public class DisputeController {
     @PostMapping
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> createDispute(
             @Valid @RequestBody CreateDisputeRequestDto request,
-            Authentication authentication
-    ) {
-        UUID userId = currentUserId(authentication);
+            Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.createDispute(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response,
                 "Tranh chấp đã được tạo và chuyển đến bộ phận Chăm sóc khách hàng"));
@@ -48,9 +49,8 @@ public class DisputeController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> getDisputeDetail(
             @PathVariable("id") UUID id,
-            Authentication authentication
-    ) {
-        UUID userId = currentUserId(authentication);
+            Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.getDisputeDetail(id, userId);
         return ResponseEntity.ok(ApiResponse.ok(response, "Lấy chi tiết tranh chấp thành công"));
     }
@@ -61,9 +61,8 @@ public class DisputeController {
      */
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<DisputeDetailResponseDto>>> getMyDisputes(
-            Authentication authentication
-    ) {
-        UUID userId = currentUserId(authentication);
+            Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<DisputeDetailResponseDto> response = disputeService.getMyDisputes(userId);
         return ResponseEntity.ok(ApiResponse.ok(response, "Lấy lịch sử tranh chấp thành công"));
     }
@@ -76,9 +75,8 @@ public class DisputeController {
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> addEvidence(
             @PathVariable("id") UUID id,
             @Valid @RequestBody AddDisputeEvidenceRequestDto request,
-            Authentication authentication
-    ) {
-        UUID userId = currentUserId(authentication);
+            Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.addEvidence(id, userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Đã nạp bằng chứng cho tranh chấp"));
     }
@@ -91,9 +89,8 @@ public class DisputeController {
     public ResponseEntity<ApiResponse<DisputeDetailResponseDto>> escalateDispute(
             @PathVariable("id") UUID id,
             @Valid @RequestBody EscalateDisputeRequestDto request,
-            Authentication authentication
-    ) {
-        UUID userId = currentUserId(authentication);
+            Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
         DisputeDetailResponseDto response = disputeService.escalateDispute(id, userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response,
                 "Đã kháng nghị lên quản trị viên. Quyết định cuối sẽ được thông báo sớm"));

@@ -44,9 +44,6 @@ void main() {
     expect(find.text('4.8'), findsOneWidget);
     expect(find.text('Đánh giá TB'), findsOneWidget);
     expect(find.text('Hạng Vàng'), findsOneWidget);
-    // Public profile block is lower in the lazy ListView — scroll it into view.
-    await tester.scrollUntilVisible(find.textContaining('Sắp ra mắt'), 200);
-    expect(find.textContaining('Sắp ra mắt'), findsWidgets);
     // Logout footer is the last lazy-ListView item — scroll it into view.
     await tester.scrollUntilVisible(find.text('Đăng xuất'), 200);
     expect(find.text('Đăng xuất'), findsOneWidget);

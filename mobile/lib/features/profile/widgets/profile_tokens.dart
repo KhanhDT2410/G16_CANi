@@ -12,22 +12,22 @@ extension ProfileTokensX on ThemeData {
 
 /// Immutable tokens supporting both Clean Sky Light and Slate Dark palettes.
 class ProfileTokens {
-  const ProfileTokens.light()
-      : canvas = const Color(0xFFF4FCFE),
-        surface = const Color(0xFFFFFFFF),
-        text = const Color(0xFF03045E),
-        muted = const Color(0xFF5B6B85),
-        border = const Color(0xFF90E0EF),
-        accent = const Color(0xFF00B4D8),
-        accentSoft = const Color(0xFFE4F7FB),
-        brand = const Color(0xFF3B82F6),
-        brandSoft = const Color(0xFFEAF1FE),
-        accentDeep = const Color(0xFF0066FF),
-        success = const Color(0xFF16A34A),
-        danger = const Color(0xFFDC2626),
-        skeleton = const Color(0xFFDCE7F0),
-        chipSoft = const Color(0xFFFDF6DE),
-        shadowColor = const Color(0x261E4A6B);
+   const ProfileTokens.light()
+       : canvas = const Color(0xFFF8FAFC),
+         surface = const Color(0xFFFFFFFF),
+         text = const Color(0xFF0F172A),
+         muted = const Color(0xFF64748B),
+         border = const Color(0xFFE2E8F0),
+         accent = const Color(0xFF36D1DC),
+         accentSoft = const Color(0xFFEAF9FB),
+         brand = const Color(0xFF5B86E5),
+         brandSoft = const Color(0xFFEEF4FD),
+         accentDeep = const Color(0xFF4A75D4),
+         success = const Color(0xFF10B981),
+         danger = const Color(0xFFEF4444),
+         skeleton = const Color(0xFFE2E8F0),
+         chipSoft = const Color(0xFFEEF4FD),
+         shadowColor = const Color(0x0F0F172A);
 
   const ProfileTokens.dark()
       : canvas = const Color(0xFF0F172A),
@@ -35,7 +35,7 @@ class ProfileTokens {
         text = const Color(0xFFF8FAFC),
         muted = const Color(0xFF94A3B8),
         border = const Color(0xFF334155),
-        accent = const Color(0xFF38BDF8),
+         accent = const Color(0xFF36D1DC),
         accentSoft = const Color(0xFF0C4A6E),
         brand = const Color(0xFF3B82F6),
         brandSoft = const Color(0xFF1E3A8A),

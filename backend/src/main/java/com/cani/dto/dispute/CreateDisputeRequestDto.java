@@ -37,4 +37,3 @@ public class CreateDisputeRequestDto {
 
     private String evidence;
 }
-

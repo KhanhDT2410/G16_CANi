@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -26,6 +27,9 @@ public class NearbyShiftResponseDto {
     private BigDecimal allowance;
     private Instant startTime;
     private Instant endTime;
+    private Instant arrivalTime;
+    private UUID[] requiredSkills;
+    private List<String> requiredSkillNames;
     private Double distanceKm;
     private Integer requiredWorkers;
     private Integer confirmedWorkers;

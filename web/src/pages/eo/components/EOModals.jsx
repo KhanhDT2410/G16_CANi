@@ -46,6 +46,7 @@ export default function EOModals({
         onRoleChange={shifts.handleRoleChange}
         shiftDurationHours={shifts.getShiftDurationHours()}
         calculateShiftTotal={shifts.calculateShiftTotal}
+        skillTaxonomy={shifts.skillTaxonomy}
         onSubmit={shifts.handleAddShift}
       />
 
@@ -118,6 +119,7 @@ export default function EOModals({
         shift={shifts.editingShift}
         roles={ROLES}
         submitting={shifts.submittingEditShift}
+        skillTaxonomy={shifts.skillTaxonomy}
         onSubmit={shifts.handleUpdateShift}
       />
 

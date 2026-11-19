@@ -123,7 +123,7 @@ export function usePayments() {
       declaredAmount: attendanceItem.agreedWage || 200000,
       paymentMethod: 'BANK_TRANSFER',
       externalRef: `VCB-${Date.now().toString().slice(-6)}`,
-      paymentProofUrl: 'https://storage.cani.vn/proofs/bill_example.jpg',
+      paymentProofUrl: '',
     });
     setShowPaymentModal(true);
   };

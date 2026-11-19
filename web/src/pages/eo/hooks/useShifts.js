@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 
@@ -176,16 +176,31 @@ export function useShifts({ onReloadEvents }) {
   const [loadingQr, setLoadingQr] = useState(false);
   const [selectedShiftForAttendance, setSelectedShiftForAttendance] = useState(null);
 
+  // Danh mục kỹ năng (taxonomy) để chọn requiredSkills cho ca — tải 1 lần khi hook mount
+  const [skillTaxonomy, setSkillTaxonomy] = useState([]);
+  useEffect(() => {
+    let active = true;
+    eoService.getSkillTaxonomy().then((list) => {
+      if (active && Array.isArray(list) && list.length > 0) setSkillTaxonomy(list);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const [newShift, setNewShift] = useState({
     jobType: ROLES[0],
     description: 'Hỗ trợ công việc theo phân công của quản lý sự kiện, thái độ niềm nở, chủ động.',
     startTime: '2026-11-20T08:00',
     endTime: '2026-11-20T12:00',
+    arrivalTime: '',
     requiredWorkers: 4,
     hourlyWage: 50000,
     allowance: 20000,
     minReliabilityScore: 60,
     maxDistanceKm: 15,
+    dressCode: '',
+    requiredSkills: [],
     checklistItems: [
       { id: 'chk_1', title: 'Có mặt trước 15-30 phút nhận vị trí', isRequiredEvidence: false },
       { id: 'chk_2', title: 'Đồng phục chỉn chu theo hướng dẫn', isRequiredEvidence: true },
@@ -240,6 +255,16 @@ export function useShifts({ onReloadEvents }) {
       showToast('Số lượng nhân sự cần tuyển tối thiểu là 1 người!', 'error');
       return;
     }
+    // arrivalTime (giờ mở điểm danh) phải nằm trong khung giờ ca nếu có điền
+    if (newShift.arrivalTime) {
+      const aTime = new Date(newShift.arrivalTime);
+      const sTime = new Date(newShift.startTime);
+      const eTime = new Date(newShift.endTime);
+      if (isNaN(aTime.getTime()) || aTime < sTime || aTime > eTime) {
+        showToast('Thời gian mở điểm danh phải nằm trong khoảng giờ của ca làm việc!', 'error');
+        return;
+      }
+    }
     try {
       const checklistStr = Array.isArray(newShift.checklistItems)
         ? serializeChecklistItems(newShift.checklistItems)
@@ -251,6 +276,9 @@ export function useShifts({ onReloadEvents }) {
         hourlyWage: Math.max(20000, Number(newShift.hourlyWage || 20000)),
         allowance: Math.max(0, Number(newShift.allowance || 0)),
         checklist: checklistStr,
+        arrivalTime: newShift.arrivalTime ? new Date(newShift.arrivalTime).toISOString() : null,
+        requiredSkills: Array.isArray(newShift.requiredSkills) ? newShift.requiredSkills : [],
+        dressCode: newShift.dressCode || '',
         startTime: new Date(newShift.startTime).toISOString(),
         endTime: new Date(newShift.endTime).toISOString(),
       });
@@ -356,6 +384,7 @@ export function useShifts({ onReloadEvents }) {
     loadingQr,
     selectedShiftForAttendance,
     setSelectedShiftForAttendance,
+    skillTaxonomy,
     getShiftDurationHours,
     calculateShiftTotal,
     handleRoleChange,

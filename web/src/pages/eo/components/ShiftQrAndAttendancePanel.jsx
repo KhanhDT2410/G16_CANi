@@ -528,22 +528,41 @@ export default function ShiftQrAndAttendancePanel({
                             <span style={{ color: '#d97706', fontWeight: 600 }}>Chờ xác nhận</span>
                           )}
                           {(!item.paymentStatus || item.paymentStatus === 'NOT_DECLARED') && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenPaymentDeclaration?.(item)}
-                              style={{
-                                background: '#fef3c7',
-                                color: '#92400e',
-                                border: '1px solid #fcd34d',
-                                borderRadius: 6,
-                                padding: '4px 8px',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Khai báo trả lương
-                            </button>
+                            item.isChecklistCompleted ? (
+                              <button
+                                type="button"
+                                onClick={() => onOpenPaymentDeclaration?.(item)}
+                                style={{
+                                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '5px 10px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 3px rgba(16, 185, 129, 0.25)',
+                                }}
+                              >
+                                💳 Trả lương & QR
+                              </button>
+                            ) : (
+                              <span
+                                title="Chỉ mở khai báo trả lương sau khi nhân sự đã hoàn thành 100% checklist công việc"
+                                style={{
+                                  background: '#fef3c7',
+                                  color: '#92400e',
+                                  border: '1px solid #fde68a',
+                                  borderRadius: 6,
+                                  padding: '3px 8px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600,
+                                  display: 'inline-block',
+                                }}
+                              >
+                                ⏳ Chờ xong việc
+                              </span>
+                            )
                           )}
                         </td>
 

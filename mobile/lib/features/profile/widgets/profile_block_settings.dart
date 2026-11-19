@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:cani/features/help_center/screens/help_center_screen.dart';
+import 'package:cani/features/job_proposals/screens/my_disputes_screen.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
 import 'package:cani/features/skill_verification/screens/worker_settings_screen.dart';
 import 'package:cani/features/worker_groups/screens/worker_groups_screen.dart';
@@ -69,7 +70,21 @@ class ProfileSettingsBlock extends StatelessWidget {
 
           Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
-          // 3. TRUNG TÂM TRỢ GIÚP & CÂU HỎI THƯỜNG GẶP (HelpCenterScreen)
+          // 3. KHIẾU NẠI & TRANH CHẤP (MyDisputesScreen)
+          _ClickableRow(
+            icon: Icons.gavel_rounded,
+            label: 'Khiếu nại & Tranh chấp',
+            subtitle: 'Theo dõi tiến độ giải quyết thù lao và quyền lợi ca làm',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
+              );
+            },
+          ),
+
+          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
+
+          // 4. TRUNG TÂM TRỢ GIÚP & CÂU HỎI THƯỜNG GẶP (HelpCenterScreen)
           _ClickableRow(
             icon: Icons.help_outline_rounded,
             label: 'Trung tâm Trợ giúp & Câu hỏi thường gặp',

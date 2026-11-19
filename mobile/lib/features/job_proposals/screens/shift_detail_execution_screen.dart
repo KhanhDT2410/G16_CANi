@@ -13,6 +13,7 @@ import '../models/proposal_models.dart';
 import '../widgets/rate_eo_dialog.dart';
 import '../widgets/shift_chat_sheet.dart';
 import 'attendance_qr_scanner_screen.dart';
+import 'my_disputes_screen.dart';
 import '../../ekyc/screens/card_scanner_screen.dart';
 import '../../../core/constants/api_constants.dart';
 
@@ -1924,6 +1925,16 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           icon: Icons.map_outlined,
                           label: 'Bản đồ',
                           onTap: _openGoogleMapsNavigation,
+                        ),
+                        _buildQuickAction(
+                          icon: Icons.gavel_rounded,
+                          label: 'Khiếu nại',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
+                            );
+                          },
                         ),
                       ],
                     ),

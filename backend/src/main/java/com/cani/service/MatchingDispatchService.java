@@ -15,6 +15,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -128,6 +129,11 @@ public class MatchingDispatchService {
 
             // Tính khoảng cách Haversine & kiểm tra bán kính kết hợp (Ca làm việc & Tiêu chí Worker)
             double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
+            if (targetLat == null || targetLng == null || worker.getBaseLat() == null || worker.getBaseLng() == null) {
+                // # ponytail: thiếu tọa độ (worker chưa báo GPS hoặc ca chưa có địa chỉ) -> bỏ kiểm tra bán kính,
+                // cho worker vào candidate; upgrade: bắt worker cập nhật GPS trước khi dispatch.
+                distanceKm = 0.0;
+            }
             double workerMaxDist = (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0)
                     ? worker.getMaxDistanceKm()
                     : maxAllowedDistanceKm;
@@ -192,9 +198,34 @@ public class MatchingDispatchService {
             }
         }
 
+        if (matchedCandidates.isEmpty()) {
+            log.warn("Matching ca {}: KHÔNG TÌM THẤY ứng viên nào đạt điều kiện. "
+                            + "Kiểm tra: worker đang online? kycStatus APPROVED? có GPS? requiredSkills khớp worker_skills? "
+                            + "khung giờ rảnh trùng ca? minWage không vượt lương ca? blocklist? "
+                            + "Tổng worker đã xét: {}",
+                    shiftId, allWorkers.size());
+        }
+
         log.info("Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên, đã gửi {} đề xuất (Proposals).",
                 shiftId, matchedCandidates.size(), createdCount);
         return createdCount;
+    }
+
+    /**
+     * Dọn proposal PENDING đã hết hạn (expiresAt) -> EXPIRED.
+     * Chạy định kỳ 5 phút, không re-dispatch (EO publish lại nếu cần).
+     */
+    @Scheduled(cron = "0 */5 * * * *")
+    @Transactional
+    public void expireStalePendingProposals() {
+        List<DispatchProposal> stale = dispatchProposalRepository
+                .findByStatusAndExpiresAtBefore(ProposalStatus.PENDING, Instant.now());
+        if (stale.isEmpty()) {
+            return;
+        }
+        stale.forEach(p -> p.setStatus(ProposalStatus.EXPIRED));
+        dispatchProposalRepository.saveAll(stale);
+        log.info("Đã chuyển {} proposal PENDING hết hạn sang EXPIRED.", stale.size());
     }
 
     /**
@@ -463,7 +494,9 @@ public class MatchingDispatchService {
                 continue;
             }
             double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
-            if (distanceKm > emergencyRadius) {
+            if (targetLat == null || targetLng == null || worker.getBaseLat() == null || worker.getBaseLng() == null) {
+                distanceKm = 0.0; // cùng chính sách bỏ kiểm tra bán kính khi thiếu tọa độ
+            } else if (distanceKm > emergencyRadius) {
                 continue;
             }
             CandidateMatch match = calculateSoftScore(worker, distanceKm, emergencyRadius, shift);

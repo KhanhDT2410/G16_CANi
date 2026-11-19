@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import '../models/dispute_models.dart';
 import '../models/proposal_models.dart';
 
 class RepositoryException implements Exception {
@@ -31,6 +32,15 @@ final proposalsListProvider = FutureProvider<List<JobProposalItem>>((ref) async 
   final repo = ref.watch(proposalRepositoryProvider);
   try {
     return await repo.fetchProposals();
+  } catch (_) {
+    return const [];
+  }
+});
+
+final myDisputesListProvider = FutureProvider<List<WorkerDisputeItem>>((ref) async {
+  final repo = ref.watch(proposalRepositoryProvider);
+  try {
+    return await repo.fetchMyDisputes();
   } catch (_) {
     return const [];
   }
@@ -597,6 +607,46 @@ class ProposalRepository {
       );
     } catch (e) {
       throw RepositoryException(_extractErrorMessage(e, 'Không thể gửi tin nhắn.'), e);
+    }
+  }
+
+  // Lấy danh sách tranh chấp / khiếu nại của tôi
+  Future<List<WorkerDisputeItem>> fetchMyDisputes() async {
+    try {
+      final response = await _dio.get('/v1/disputes/my');
+      final data = response.data;
+      if (data != null && data['data'] is List) {
+        return (data['data'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map((e) => WorkerDisputeItem.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải danh sách khiếu nại.'), e);
+    }
+  }
+
+  // Tạo mới khiếu nại tranh chấp
+  Future<WorkerDisputeItem> createDispute(CreateDisputePayload payload) async {
+    try {
+      final response = await _dio.post('/v1/disputes', data: payload.toJson());
+      final data = response.data;
+      if (data != null && data['data'] is Map<String, dynamic>) {
+        return WorkerDisputeItem.fromJson(data['data'] as Map<String, dynamic>);
+      }
+      return WorkerDisputeItem(
+        id: 'local-${DateTime.now().millisecondsSinceEpoch}',
+        assignmentId: payload.assignmentId,
+        type: payload.type,
+        status: 'PENDING',
+        title: payload.title,
+        description: payload.description,
+        evidence: payload.evidence,
+        createdAt: DateTime.now(),
+      );
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Gửi khiếu nại thất bại.'), e);
     }
   }
 }

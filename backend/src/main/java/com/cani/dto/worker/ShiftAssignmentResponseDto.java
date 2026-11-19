@@ -24,6 +24,8 @@ public class ShiftAssignmentResponseDto {
     private String jobType;
     private Instant startTime;
     private Instant endTime;
+    private Instant arrivalTime;
+    private java.util.List<String> requiredSkillNames;
     private BigDecimal hourlyWage;
     private BigDecimal totalPay;
     private AssignmentStatus status;

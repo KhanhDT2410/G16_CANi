@@ -97,6 +97,8 @@ public class H2DataSeeder implements CommandLineRunner {
                         Worker worker = Worker.builder()
                                         .user(savedUser)
                                         .fullName(savedUser.getFullName())
+                                        .baseLat(10.7769)
+                                        .baseLng(106.7009)
                                         .build();
                         workerRepository.save(worker);
                         log.info("==> [H2 Profile] Seeded default Worker user: {} (id: {})", workerEmail,

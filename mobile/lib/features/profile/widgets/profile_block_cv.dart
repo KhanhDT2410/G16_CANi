@@ -97,10 +97,10 @@ class ProfileCvBlock extends ConsumerWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.edit_outlined, size: 14, color: t.accentDeep),
+                      Icon(Icons.edit_note_rounded, size: 16, color: t.accentDeep),
                       const SizedBox(width: 4),
                       Text(
-                        'Chỉnh sửa',
+                        'Sửa giới thiệu',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -278,19 +278,19 @@ class _CccdStatusTile extends StatelessWidget {
     final Color statusColor;
 
     if (isApproved) {
-      statusText = 'Đã xác thực CCCD';
+      statusText = 'Đã xác thực';
       statusIcon = Icons.check_circle_rounded;
       statusColor = const Color(0xFF10B981);
     } else if (isPending) {
-      statusText = 'Đang chờ duyệt CCCD';
+      statusText = 'Đang chờ duyệt';
       statusIcon = Icons.hourglass_top_rounded;
       statusColor = const Color(0xFFF59E0B);
     } else if (isRejected) {
-      statusText = 'Cần bổ sung CCCD';
+      statusText = 'Cần bổ sung';
       statusIcon = Icons.error_outline_rounded;
       statusColor = const Color(0xFFEF4444);
     } else {
-      statusText = 'Chưa xác thực CCCD';
+      statusText = 'Chưa xác thực';
       statusIcon = Icons.verified_user_outlined;
       statusColor = const Color(0xFF64748B);
     }
@@ -307,27 +307,28 @@ class _CccdStatusTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(statusIcon, size: 17, color: statusColor),
+            Icon(statusIcon, size: 18, color: statusColor),
             const SizedBox(width: 8),
             Text(
-              'CCCD',
+              'Căn cước công dân',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
                 color: t.text,
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                statusText,
-                textAlign: TextAlign.end,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: statusColor,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
                 ),
               ),
             ),
@@ -504,6 +505,29 @@ class _BioSection extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: t.muted,
+              ),
+            ),
+            const Spacer(),
+            InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_outlined, size: 12, color: t.accentDeep),
+                    const SizedBox(width: 3),
+                    Text(
+                      'Sửa',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: t.accentDeep,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

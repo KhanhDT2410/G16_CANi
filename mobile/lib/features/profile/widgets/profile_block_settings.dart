@@ -2,26 +2,26 @@
 // Đã kết nối WorkerSettingsScreen, WorkerBankSettingsScreen, WeeklyAvailabilityScreen.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:cani/features/profile/screens/worker_bank_settings_screen.dart';
+import 'package:cani/features/profile/providers/profile_providers.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
 import 'package:cani/features/skill_verification/screens/weekly_availability_screen.dart';
 import 'package:cani/features/skill_verification/screens/worker_settings_screen.dart';
 import 'package:cani/features/worker_groups/screens/worker_groups_screen.dart';
 
-class ProfileSettingsBlock extends StatefulWidget {
+class ProfileSettingsBlock extends ConsumerStatefulWidget {
   const ProfileSettingsBlock({super.key});
 
   @override
-  State<ProfileSettingsBlock> createState() => _ProfileSettingsBlockState();
+  ConsumerState<ProfileSettingsBlock> createState() => _ProfileSettingsBlockState();
 }
 
-class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
-  bool _notifEnabled = true;
-
+class _ProfileSettingsBlockState extends ConsumerState<ProfileSettingsBlock> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).profileX;
+    final notifEnabled = ref.watch(notificationSettingsProvider);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -36,29 +36,14 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
         children: [
           Row(
             children: [
+              Icon(Icons.tune_rounded, size: 20, color: t.accentDeep),
+              const SizedBox(width: 8),
               Text(
                 'Cài đặt & Tùy chỉnh',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: t.text,
                       fontWeight: FontWeight.bold,
                     ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: t.brandSoft,
-                  borderRadius: BorderRadius.circular(99),
-                  border: Border.all(color: t.border),
-                ),
-                child: Text(
-                  'Hoạt động',
-                  style: TextStyle(
-                    color: t.brand,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
               ),
             ],
           ),
@@ -78,21 +63,7 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
 
           Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
-          // 2. TÀI KHOẢN NGÂN HÀNG THỤ HƯỞNG (WorkerBankSettingsScreen)
-          _ClickableRow(
-            icon: Icons.account_balance_rounded,
-            label: 'Tài khoản ngân hàng nhận thù lao',
-            subtitle: 'Nhận thanh toán thù lao trực tiếp qua VietQR 247',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const WorkerBankSettingsScreen()),
-              );
-            },
-          ),
-
-          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
-
-          // 3. LỊCH RẢNH CỐ ĐỊNH HÀNG TUẦN (WeeklyAvailabilityScreen)
+          // 2. LỊCH RẢNH CỐ ĐỊNH HÀNG TUẦN (WeeklyAvailabilityScreen)
           _ClickableRow(
             icon: Icons.calendar_month_rounded,
             label: 'Lịch rảnh cố định hàng tuần',
@@ -146,9 +117,9 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
                   ),
                 ),
                 Switch(
-                  value: _notifEnabled,
+                  value: notifEnabled,
                   onChanged: (val) {
-                    setState(() => _notifEnabled = val);
+                    ref.read(notificationSettingsProvider.notifier).toggle(val);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(val ? 'Đã bật thông báo việc làm mới' : 'Đã tắt thông báo việc làm'),
@@ -158,32 +129,6 @@ class _ProfileSettingsBlockState extends State<ProfileSettingsBlock> {
                   },
                   activeThumbColor: t.accent,
                   inactiveTrackColor: t.skeleton,
-                ),
-              ],
-            ),
-          ),
-
-          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
-
-          // 5. NGÔN NGỮ
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Icon(Icons.language_rounded, size: 20, color: t.accentDeep),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Ngôn ngữ ứng dụng',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: t.text,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ),
-                Text(
-                  'Tiếng Việt (Mặc định)',
-                  style: TextStyle(fontSize: 12, color: t.muted, fontWeight: FontWeight.w500),
                 ),
               ],
             ),

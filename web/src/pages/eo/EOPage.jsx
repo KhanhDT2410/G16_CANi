@@ -24,6 +24,7 @@ import EkycRequiredModal from './components/EkycRequiredModal';
 import { eoService } from '../../services/eoService';
 
 import { SupportTicketsCenterView } from '../../features/support-tickets';
+import { DisputeCenterView } from '../../features/disputes';
 import './EOPage.css';
 
 export default function EOPage() {
@@ -444,6 +445,7 @@ export default function EOPage() {
                 onCancelShift={shifts.handleCancelShift}
                 onReloadEvents={events.loadEvents}
                 onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+                skillTaxonomy={shifts.skillTaxonomy}
               />
             ) : (
               <EOEventsTab
@@ -484,6 +486,7 @@ export default function EOPage() {
                 onCancelShift={shifts.handleCancelShift}
                 onReloadEvents={events.loadEvents}
                 onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+                skillTaxonomy={shifts.skillTaxonomy}
               />
             )
           )}
@@ -502,6 +505,13 @@ export default function EOPage() {
           )}
 
           {activeTab === 'subscription' && <EOSubscriptionTab />}
+
+          {/* Tranh chấp & Khiếu nại (Dispute Center - UC-96 -> UC-104) */}
+          {activeTab === 'disputes' && (
+            <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
+              <DisputeCenterView />
+            </div>
+          )}
 
           {activeTab === 'my-team' && <EOMyTeamTab />}
 

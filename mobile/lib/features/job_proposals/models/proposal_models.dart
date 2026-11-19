@@ -8,6 +8,8 @@ class JobProposalItem {
   final String description;
   final DateTime startTime;
   final DateTime endTime;
+  final DateTime? arrivalTime;
+  final List<String> requiredSkillNames;
   final double hourlyWage;
   final double allowance;
   final double totalEstimatedPay;
@@ -25,6 +27,8 @@ class JobProposalItem {
     required this.description,
     required this.startTime,
     required this.endTime,
+    this.arrivalTime,
+    this.requiredSkillNames = const [],
     required this.hourlyWage,
     required this.allowance,
     required this.totalEstimatedPay,
@@ -44,6 +48,8 @@ class JobProposalItem {
       description: json['description'] ?? '',
       startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'])?.toLocal() ?? DateTime.now() : DateTime.now(),
       endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'])?.toLocal() ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
+      arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
+      requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
       hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
       allowance: (json['allowance'] is num) ? (json['allowance'] as num).toDouble() : 0.0,
       totalEstimatedPay: (json['totalEstimatedPay'] is num) ? (json['totalEstimatedPay'] as num).toDouble() : 0.0,
@@ -63,6 +69,8 @@ class ShiftAssignmentItem {
   final String jobType;
   final DateTime startTime;
   final DateTime endTime;
+  final DateTime? arrivalTime;
+  final List<String> requiredSkillNames;
   final double hourlyWage;
   final double totalPay;
   final String status;
@@ -90,6 +98,8 @@ class ShiftAssignmentItem {
     required this.jobType,
     required this.startTime,
     required this.endTime,
+    this.arrivalTime,
+    this.requiredSkillNames = const [],
     required this.hourlyWage,
     required this.totalPay,
     required this.status,
@@ -119,6 +129,8 @@ class ShiftAssignmentItem {
       jobType: json['jobType'] ?? '',
       startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'])?.toLocal() ?? DateTime.now() : DateTime.now(),
       endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'])?.toLocal() ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
+      arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
+      requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
       hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
       totalPay: (json['totalPay'] is num) ? (json['totalPay'] as num).toDouble() : 0.0,
       status: json['status'] ?? 'CONFIRMED',

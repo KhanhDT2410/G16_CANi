@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
@@ -25,6 +25,7 @@ export default function EventDetailModal({
   onNavigateToRecruitment,
   onReloadEvents,
   onOpenPaymentDeclaration,
+  skillTaxonomy = [],
 }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'SHIFTS'); // 'SHIFTS' | 'QR_ATTENDANCE' | 'WORKERS'
   const [eventWorkers, setEventWorkers] = useState([]);
@@ -132,6 +133,24 @@ export default function EventDetailModal({
       return fallback;
     }
   };
+
+  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
+  const skillNameMap = useMemo(() => {
+    const m = {};
+    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
+      if (sk && sk.skillId) m[sk.skillId] = sk.name;
+    });
+    return m;
+  }, [skillTaxonomy]);
+
+  const skillNames = (shift) =>
+    Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0
+      ? (shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') || `${shift.requiredSkills.length} kỹ năng`)
+      : '';
+
+  const hasCustomArrival = (shift) =>
+    shift.arrivalTime && shift.startTime &&
+    new Date(shift.arrivalTime).getTime() !== new Date(shift.startTime).getTime();
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Chưa ấn định ngày';
@@ -536,6 +555,11 @@ export default function EventDetailModal({
                               <span className="shift-job-badge">{shift.jobType}</span>
                               <span className="shift-time-badge">
                                 {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
+                                {hasCustomArrival(shift) && (
+                                  <span style={{ marginLeft: 6, color: '#b45309', fontWeight: 600 }}>
+                                    (Mở điểm danh {formatTime(shift.arrivalTime, '')})
+                                  </span>
+                                )}
                               </span>
                               <span
                                 style={{
@@ -552,6 +576,22 @@ export default function EventDetailModal({
                               </span>
                               {shift.dressCode && (
                                 <span className="shift-dresscode-tag">Đồng phục: {shift.dressCode}</span>
+                              )}
+                              {skillNames(shift) && (
+                                <span
+                                  title="Kỹ năng bắt buộc (matching lọc cứng theo kỹ năng)"
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    color: '#1d4ed8',
+                                    background: '#dbeafe',
+                                    border: '1px solid #bfdbfe',
+                                    padding: '0.15rem 0.5rem',
+                                    borderRadius: '999px',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Kỹ năng: {skillNames(shift)}
+                                </span>
                               )}
                             </div>
                             <div className="shift-wage-tag">

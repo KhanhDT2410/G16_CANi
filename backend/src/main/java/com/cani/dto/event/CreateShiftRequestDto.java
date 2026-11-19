@@ -31,6 +31,9 @@ public class CreateShiftRequestDto {
     @NotNull(message = "Thời gian kết thúc ca không được để trống")
     private Instant endTime;
 
+    /** Giờ mở cửa điểm danh (check-in gate); null -> mặc định = startTime */
+    private Instant arrivalTime;
+
     @NotNull(message = "Số lượng nhân sự cần tuyển không được để trống")
     @Min(value = 1, message = "Số lượng nhân sự phải từ 1 người trở lên")
     @Builder.Default

@@ -5,6 +5,7 @@ import com.cani.entity.enums.ProposalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,4 +18,5 @@ public interface DispatchProposalRepository extends JpaRepository<DispatchPropos
     Optional<DispatchProposal> findByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(UUID shiftId, UUID workerId, List<ProposalStatus> statuses);
+    List<DispatchProposal> findByStatusAndExpiresAtBefore(ProposalStatus status, Instant expiresAt);
 }

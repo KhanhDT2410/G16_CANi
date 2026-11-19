@@ -19,6 +19,7 @@ const ShiftCreateModal = ({
   onRoleChange,
   shiftDurationHours = 4,
   calculateShiftTotal,
+  skillTaxonomy = [],
 }) => {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
@@ -260,6 +261,75 @@ const ShiftCreateModal = ({
                   }
                 }}
               />
+            </div>
+          </div>
+
+          {/* Giờ mở cửa điểm danh (check-in gate) */}
+          <div className="eo-form-group">
+            <label>Thời Gian Mở Điểm Danh (Tùy chọn)</label>
+            <input
+              type="datetime-local"
+              className="eo-form-input"
+              value={newShift.arrivalTime || ''}
+              onChange={(e) => setNewShift({ ...newShift, arrivalTime: e.target.value })}
+            />
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.25rem' }}>
+              Người lao động chỉ được điểm danh từ thời điểm này. Để trống = mở cùng giờ bắt đầu ca.
+            </div>
+          </div>
+
+          {/* Trang phục + Kỹ năng bắt buộc */}
+          <div className="eo-form-row">
+            <div className="eo-form-group">
+              <label>Trang Phục (Dress Code)</label>
+              <input
+                type="text"
+                className="eo-form-input"
+                placeholder="VD: Áo sơ mi trắng, quần tây đen"
+                value={newShift.dressCode || ''}
+                onChange={(e) => setNewShift({ ...newShift, dressCode: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="eo-form-group">
+            <label>Kỹ Năng Bắt Buộc (chọn nhiều)</label>
+            {skillTaxonomy.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
+                {skillTaxonomy.map((sk) => {
+                  const checked = Array.isArray(newShift.requiredSkills) && newShift.requiredSkills.includes(sk.skillId);
+                  return (
+                    <button
+                      key={sk.skillId}
+                      type="button"
+                      onClick={() => {
+                        const base = Array.isArray(newShift.requiredSkills) ? newShift.requiredSkills : [];
+                        const next = checked ? base.filter((id) => id !== sk.skillId) : [...base, sk.skillId];
+                        setNewShift({ ...newShift, requiredSkills: next });
+                      }}
+                      style={{
+                        fontSize: '0.76rem',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '0.45rem',
+                        border: checked ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                        backgroundColor: checked ? '#dbeafe' : '#ffffff',
+                        color: checked ? '#1d4ed8' : '#475569',
+                        fontWeight: checked ? 700 : 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {checked ? '✓ ' : ''}{sk.name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '0.3rem' }}>
+                Chưa có danh mục kỹ năng để chọn (bỏ qua trường này).
+              </div>
+            )}
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.3rem' }}>
+              Hệ thống chỉ mời ứng viên có đúng kỹ năng này (lọc cứng trong matching).
             </div>
           </div>
 

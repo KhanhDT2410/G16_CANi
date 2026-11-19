@@ -189,16 +189,52 @@ const PaymentDeclarationModal = ({
           </div>
 
           <div className="eo-form-group">
-            <label>Link Ảnh Chụp Biên Lai / Bằng Chứng Chuyển Khoản</label>
-            <input
-              type="text"
-              className="eo-form-input"
-              placeholder="https://storage.cani.vn/proofs/bill.jpg"
-              value={paymentForm.paymentProofUrl}
-              onChange={(e) =>
-                setPaymentForm({ ...paymentForm, paymentProofUrl: e.target.value })
-              }
-            />
+            <label>Tải Lên Bằng Chứng / Ảnh Chụp Biên Lai Chuyển Khoản *</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      setPaymentForm({ ...paymentForm, paymentProofUrl: reader.result });
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                className="eo-form-input"
+                style={{ padding: '6px' }}
+              />
+              {paymentForm.paymentProofUrl && (
+                <div style={{ position: 'relative', width: 'fit-content', border: '1px solid #cbd5e1', borderRadius: 8, padding: 4, background: '#f8fafc' }}>
+                  <img
+                    src={paymentForm.paymentProofUrl}
+                    alt="Biên lai chuyển tiền"
+                    style={{ maxHeight: '140px', maxWidth: '240px', objectFit: 'contain', borderRadius: 6, display: 'block' }}
+                  />
+                  <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600, display: 'block', marginTop: 4 }}>
+                    ✓ Đã tải biên lai xác nhận
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '0.5rem',
+              padding: '0.75rem',
+              fontSize: '0.78rem',
+              color: '#1e40af',
+              lineHeight: 1.45,
+              margin: '0.75rem 0',
+            }}
+          >
+            <strong>ℹ️ Quy trình đối soát 2 bên:</strong> Sau khi Ban tổ chức bấm <strong>"Xác nhận đã chuyển"</strong>, hệ thống sẽ gửi thông báo kèm bằng chứng này về ứng dụng của Worker để Worker kiểm tra tài khoản và bấm xác nhận hoàn tất.
           </div>
 
           <div className="eo-modal-footer">
@@ -207,10 +243,14 @@ const PaymentDeclarationModal = ({
               className="eo-btn-secondary"
               onClick={onClose}
             >
-              Đóng
+              Hủy
             </button>
-            <button type="submit" className="eo-btn-primary">
-              Gửi Khai Báo Thanh Toán
+            <button
+              type="submit"
+              className="eo-btn-primary"
+              style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', border: 'none' }}
+            >
+              ✅ Xác Nhận Đã Chuyển Tiền
             </button>
           </div>
         </form>

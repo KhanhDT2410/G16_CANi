@@ -30,11 +30,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -56,6 +58,7 @@ public class WorkerJobService {
 
     private final WorkerRepository workerRepository;
     private final UserRepository userRepository;
+    private final SkillRepository skillRepository;
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final DispatchProposalRepository dispatchProposalRepository;
@@ -260,6 +263,14 @@ public class WorkerJobService {
         }
         validateAndExtractShiftId(qrContent, "CANI_CHECKIN:", shift.getShiftId());
 
+        // Gate thời gian: điểm danh chỉ mở từ giờ đến (arrivalTime ?: startTime) — chặn check-in sớm
+        Instant earliestCheckin = shift.getArrivalTime() != null ? shift.getArrivalTime() : shift.getStartTime();
+        if (earliestCheckin != null && now.isBefore(earliestCheckin)) {
+            String earliestLabel = earliestCheckin.atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
+            throw new BadRequestException("Ca chưa mở điểm danh. Vui lòng quay lại sau " + earliestLabel + ".");
+        }
+
         // 2. Kiểm tra khoảng cách Geofence nếu có tọa độ
         if (request != null && request.getLat() != null && request.getLng() != null && shift != null) {
             Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat()
@@ -336,7 +347,10 @@ public class WorkerJobService {
         Payment payment = paymentRepository != null
                 ? paymentRepository.findByAssignmentId(assignmentId).orElse(null)
                 : null;
-        if (payment == null || payment.getWorkerConfirmStatus() == null || payment.getWorkerConfirmStatus().isBlank()) {
+        // Chỉ chặn khi bản ghi thanh toán TỒN TẠI mà worker chưa xác nhận —
+        // ca chưa được EO declare payment thì vẫn cho kết ca (tránh deadlock rating)
+        if (payment != null
+                && (payment.getWorkerConfirmStatus() == null || payment.getWorkerConfirmStatus().isBlank())) {
             throw new BadRequestException("Hãy xác nhận tình trạng thanh toán thù lao trước khi kết ca (Bước thanh toán bắt buộc).");
         }
         Shift shift = assignment.getShift();
@@ -489,6 +503,9 @@ public class WorkerJobService {
                         .allowance(s.getAllowance())
                         .startTime(s.getStartTime())
                         .endTime(s.getEndTime())
+                        .arrivalTime(s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
+                        .requiredSkills(s.getRequiredSkills())
+                        .requiredSkillNames(resolveSkillNames(s.getRequiredSkills()))
                         .distanceKm(Math.round(distance * 10.0) / 10.0)
                         .requiredWorkers(s.getRequiredWorkers())
                         .confirmedWorkers(s.getConfirmedWorkers())
@@ -503,6 +520,16 @@ public class WorkerJobService {
 
         nearbyList.sort(Comparator.comparingDouble(NearbyShiftResponseDto::getDistanceKm));
         return nearbyList;
+    }
+
+    /** Map skillId -> tên kỹ năng (taxonomy) để mobile hiển thị badge kỹ năng bắt buộc */
+    private List<String> resolveSkillNames(UUID[] skillIds) {
+        if (skillIds == null || skillIds.length == 0) {
+            return Collections.emptyList();
+        }
+        Set<UUID> ids = Arrays.stream(skillIds).filter(Objects::nonNull).collect(Collectors.toSet());
+        List<Skill> skills = skillRepository.findAllById(ids);
+        return skills.stream().map(Skill::getName).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     /**
@@ -751,6 +778,10 @@ public class WorkerJobService {
             throw new BadRequestException("Ca làm việc đã hoàn thành, không thể hủy.");
         }
 
+        if (assignment.getStatus() == AssignmentStatus.CHECKED_IN) {
+            throw new BadRequestException("Bạn đã điểm danh vào ca, không thể hủy nữa. Vui lòng liên hệ bộ phận CSKH để hỗ trợ.");
+        }
+
         Shift shift = assignment.getShift();
         Instant now = Instant.now();
         Instant startTime = shift != null ? shift.getStartTime() : null;
@@ -809,6 +840,11 @@ public class WorkerJobService {
     public List<ShiftChecklistItemDto> getShiftChecklist(UUID userId, UUID assignmentId) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
+        if (assignment.getStatus() != AssignmentStatus.CHECKED_IN
+                && assignment.getStatus() != AssignmentStatus.COMPLETED) {
+            // Chưa điểm danh / chưa kết ca -> checklist chưa mở (ẩn progress)
+            return List.of();
+        }
 
         Shift shift = assignment.getShift();
         String templateJson = shift != null ? shift.getChecklist() : null;
@@ -975,7 +1011,8 @@ public class WorkerJobService {
             throw new BadRequestException("Chỉ có thể đánh giá Ban tổ chức sau khi đã hoàn thành và kết ca.");
         }
 
-        UUID reviewerId = worker.getUser().getUserId();
+        // getWorkerOrThrow tra cứu theo userId nên userId chính là reviewer — tránh NPE worker.getUser()
+        UUID reviewerId = userId;
         if (reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, reviewerId).isPresent()) {
             throw new BadRequestException("Bạn đã gửi đánh giá cho ca làm việc này rồi.");
         }
@@ -1010,7 +1047,7 @@ public class WorkerJobService {
     @Transactional(readOnly = true)
     public Optional<ReviewResponseDto> getAssignmentReview(UUID userId, UUID assignmentId) {
         Worker worker = getWorkerOrThrow(userId);
-        return reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, worker.getUser().getUserId())
+        return reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, userId)
                 .map(this::mapToReviewResponseDto);
     }
 
@@ -1145,6 +1182,8 @@ public class WorkerJobService {
                 .description(s != null ? s.getDescription() : "")
                 .startTime(s != null ? s.getStartTime() : null)
                 .endTime(s != null ? s.getEndTime() : null)
+                .arrivalTime(s != null && s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
+                .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : java.util.Collections.emptyList())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
                 .allowance(s != null ? s.getAllowance() : BigDecimal.ZERO)
                 .totalEstimatedPay(calculateSingleWorkerShiftPay(s))
@@ -1280,6 +1319,8 @@ public class WorkerJobService {
                 .jobType(s != null ? s.getJobType() : "")
                 .startTime(s != null ? s.getStartTime() : null)
                 .endTime(s != null ? s.getEndTime() : null)
+                .arrivalTime(s != null && s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
+                .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
                 .totalPay(calculateSingleWorkerShiftPay(s))
                 .status(a.getStatus())

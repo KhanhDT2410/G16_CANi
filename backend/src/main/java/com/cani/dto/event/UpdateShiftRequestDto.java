@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -29,6 +30,11 @@ public class UpdateShiftRequestDto {
 
     @NotNull(message = "Thời gian kết thúc ca không được để trống")
     private Instant endTime;
+
+    /** Giờ mở cửa điểm danh (check-in gate); null -> mặc định = startTime */
+    private Instant arrivalTime;
+
+    private UUID[] requiredSkills;
 
     @NotNull(message = "Số lượng nhân sự không được để trống")
     @Min(value = 1, message = "Cần tối thiểu 1 nhân sự")

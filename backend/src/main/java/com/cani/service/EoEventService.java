@@ -230,6 +230,7 @@ public class EoEventService {
                 .description(dto.getDescription())
                 .startTime(dto.getStartTime())
                 .endTime(dto.getEndTime())
+                .arrivalTime(dto.getArrivalTime() != null ? dto.getArrivalTime() : dto.getStartTime())
                 .requiredWorkers(workers)
                 .confirmedWorkers(0)
                 .remainingWorkers(workers)
@@ -237,7 +238,7 @@ public class EoEventService {
                 .allowance(allowance)
                 .totalCost(shiftCost)
                 .status(event.getStatus() == EventStatus.ACTIVE ? ShiftStatus.ACTIVE : ShiftStatus.DRAFT)
-                .riskScore(0)
+                .riskScore(0) // ponytail: server luôn trả 0; web tự tính risk client-side (useShifts.js)
                 .locationAddress(dto.getLocationAddress() != null ? dto.getLocationAddress() : event.getVenueAddress())
                 .locationLat(dto.getLocationLat() != null ? dto.getLocationLat() : event.getVenueLat())
                 .locationLng(dto.getLocationLng() != null ? dto.getLocationLng() : event.getVenueLng())
@@ -258,7 +259,17 @@ public class EoEventService {
         event.setTotalEstimatedCost(currentCost.add(shiftCost));
         eventRepository.save(event);
 
-        log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện {}", shift.getJobType(), workers, event.getName());
+        if (event.getStatus() == EventStatus.ACTIVE) {
+            try {
+                int n = matchingDispatchService.dispatchForShift(shift.getShiftId());
+                log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện {} — dispatch {} đề xuất",
+                        shift.getJobType(), workers, event.getName(), n);
+            } catch (Exception e) {
+                log.warn("Thêm ca '{}' thất bại dispatch tìm ứng viên: {}", shift.getJobType(), e.getMessage());
+            }
+        } else {
+            log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện {}", shift.getJobType(), workers, event.getName());
+        }
         return mapToShiftResponseDto(shift);
     }
 
@@ -290,6 +301,7 @@ public class EoEventService {
                     .description(dto.getDescription())
                     .startTime(slot.getStartTime())
                     .endTime(slot.getEndTime())
+                    .arrivalTime(slot.getStartTime())
                     .requiredWorkers(workers)
                     .confirmedWorkers(0)
                     .remainingWorkers(workers)
@@ -315,6 +327,13 @@ public class EoEventService {
             BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost() : BigDecimal.ZERO;
             event.setTotalEstimatedCost(currentCost.add(shiftCost));
 
+            if (event.getStatus() == EventStatus.ACTIVE) {
+                try {
+                    matchingDispatchService.dispatchForShift(shift.getShiftId());
+                } catch (Exception e) {
+                    log.warn("Thêm ca bulk '{}' thất bại dispatch tìm ứng viên: {}", shift.getJobType(), e.getMessage());
+                }
+            }
             results.add(mapToShiftResponseDto(shift));
         }
 
@@ -349,6 +368,8 @@ public class EoEventService {
         shift.setDescription(dto.getDescription());
         shift.setStartTime(dto.getStartTime());
         shift.setEndTime(dto.getEndTime());
+        shift.setArrivalTime(dto.getArrivalTime() != null ? dto.getArrivalTime() : dto.getStartTime());
+        shift.setRequiredSkills(dto.getRequiredSkills());
         shift.setRequiredWorkers(workers);
         int confirmed = shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0;
         shift.setRemainingWorkers(Math.max(0, workers - confirmed));
@@ -847,6 +868,42 @@ public class EoEventService {
         }
     }
 
+    private boolean isChecklistFullyCompleted(String templateJson, String progressJson) {
+        if (templateJson == null || templateJson.isBlank()) {
+            return true;
+        }
+        List<ShiftChecklistItemDto> template = parseChecklistTemplate(templateJson);
+        if (template.isEmpty()) {
+            return true;
+        }
+        if (progressJson == null || progressJson.isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(progressJson);
+            long completed = 0;
+            if (root.isObject()) {
+                Iterator<Map.Entry<String, JsonNode>> fields = root.fields();
+                while (fields.hasNext()) {
+                    Map.Entry<String, JsonNode> field = fields.next();
+                    JsonNode val = field.getValue();
+                    if (val.isObject() && val.has("isCompleted") && val.get("isCompleted").asBoolean()) {
+                        completed++;
+                    }
+                }
+            } else if (root.isArray()) {
+                for (JsonNode n : root) {
+                    if (n.has("isCompleted") && n.get("isCompleted").asBoolean()) {
+                        completed++;
+                    }
+                }
+            }
+            return completed >= template.size();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private List<ShiftChecklistItemDto> parseChecklistTemplate(String checklistJson) {
         if (checklistJson == null || checklistJson.isBlank()) {
             return Collections.emptyList();
@@ -919,6 +976,8 @@ public class EoEventService {
     private ShiftAttendanceDto mapToShiftAttendanceDto(ShiftAssignment sa, UUID eoUserId, BigDecimal agreedWage, String checklistSummary) {
         Worker worker = sa.getWorker();
         User u = worker != null ? worker.getUser() : null;
+        Shift shift = sa.getShift();
+        boolean checklistDone = isChecklistFullyCompleted(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
 
         Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(sa.getAssignmentId());
         Optional<Payment> payOpt = paymentRepository.findByAssignmentId(sa.getAssignmentId());
@@ -982,6 +1041,7 @@ public class EoEventService {
                 .eoConfirmedAt(sa.getEoConfirmedAt())
                 .hasReviewedWorker(reviewed)
                 .checklistProgress(checklistSummary)
+                .isChecklistCompleted(checklistDone)
                 .proofImageUrl(attOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .paymentStatus(payOpt.map(p -> p.getStatus().name()).orElse(PAYMENT_NOT_DECLARED))
                 .agreedWage(agreedWage)
@@ -1114,6 +1174,7 @@ public class EoEventService {
                 .description(s.getDescription())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())
+                .arrivalTime(s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
                 .requiredWorkers(s.getRequiredWorkers())
                 .confirmedWorkers(s.getConfirmedWorkers())
                 .remainingWorkers(s.getRemainingWorkers())
@@ -1130,6 +1191,7 @@ public class EoEventService {
                 .dressCode(s.getDressCode())
                 .imageUrl(s.getImageUrl())
                 .checklist(s.getChecklist())
+                .requiredSkills(s.getRequiredSkills())
                 .build();
     }
 

@@ -177,11 +177,30 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
               Icon(Icons.access_time_rounded, size: 15, color: cani.brand),
               const SizedBox(width: 6),
               Text(
-                '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')} - ${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')} (${p.startTime.day}/${p.startTime.month}/${p.startTime.year})',
+                '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')} - ${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')} (${p.startTime.day}/${p.startTime.month}/${p.startTime.year})${p.arrivalTime != null ? ' · Mở điểm danh ${p.arrivalTime!.hour.toString().padLeft(2, '0')}:${p.arrivalTime!.minute.toString().padLeft(2, '0')}' : ''}',
                 style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontWeight: FontWeight.w600),
               ),
             ],
           ),
+
+          // Kỹ năng bắt buộc (chips) — worker cần biết trước khi accept
+          if (p.requiredSkillNames.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: p.requiredSkillNames.map((n) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                  ),
+                  child: Text('Kỹ năng: $n', style: TextStyle(fontSize: 10.5, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
+                )).toList(),
+              ),
+            ),
           const SizedBox(height: 12),
 
           // Divider mỏng

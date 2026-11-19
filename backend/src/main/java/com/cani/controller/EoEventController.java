@@ -269,7 +269,7 @@ public class EoEventController {
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         ShiftResponseDto shift = eoEventService.publishShift(userId, shiftId);
-        return ResponseEntity.ok(ApiResponse.ok(shift, "Kích hoạt điều phối tìm Worker cho ca làm việc thành công!"));
+        return ResponseEntity.ok(ApiResponse.ok(shift, "Đã kích hoạt điều phối tìm Worker cho ca làm việc. Hệ thống gửi đề xuất cho các ứng viên phù hợp (xem log nếu không có ứng viên đạt điều kiện)."));
     }
 
     /**

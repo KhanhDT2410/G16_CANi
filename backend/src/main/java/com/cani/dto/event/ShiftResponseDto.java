@@ -22,6 +22,8 @@ public class ShiftResponseDto {
     private String description;
     private Instant startTime;
     private Instant endTime;
+    /** Giờ mở cửa điểm danh; null -> mặc định = startTime */
+    private Instant arrivalTime;
     private Integer requiredWorkers;
     private Integer confirmedWorkers;
     private Integer remainingWorkers;
@@ -38,4 +40,6 @@ public class ShiftResponseDto {
     private String dressCode;
     private String imageUrl;
     private String checklist;
+    /** Kỹ năng bắt buộc của ca (matching hard filter + hiển thị web) */
+    private UUID[] requiredSkills;
 }

@@ -37,6 +37,7 @@ public class ShiftAttendanceDto {
     private Instant eoConfirmedAt;
     private Boolean hasReviewedWorker;
     private String checklistProgress;
+    private Boolean isChecklistCompleted;
     private String proofImageUrl;
     private String paymentStatus;
     private BigDecimal agreedWage;

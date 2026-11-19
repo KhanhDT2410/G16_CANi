@@ -202,6 +202,54 @@ class JobDetailBottomSheet extends StatelessWidget {
                 ),
               ],
             ),
+
+          // Giờ mở điểm danh (nếu khác giờ bắt đầu)
+          if (shift.arrivalTime != null &&
+              shift.startTime != null &&
+              shift.arrivalTime!.difference(shift.startTime!).inMinutes >= 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 24),
+              child: Row(
+                children: [
+                  Icon(Icons.fact_check, size: 15, color: Colors.amber.shade800),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Mở điểm danh từ ${shift.arrivalTime!.hour.toString().padLeft(2, '0')}:${shift.arrivalTime!.minute.toString().padLeft(2, '0')}',
+                    style: TextStyle(fontSize: 12, color: Colors.amber.shade800, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+
+          // Kỹ năng bắt buộc
+          if (shift.requiredSkillNames.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.workspace_premium, size: 18, color: Colors.blue.shade700),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: shift.requiredSkillNames
+                          .map((n) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue.shade200),
+                                ),
+                                child: Text(n, style: const TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.w600)),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 16),
 
           // Bảng lương & Quân số

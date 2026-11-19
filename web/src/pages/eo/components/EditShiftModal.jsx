@@ -19,6 +19,7 @@ const EditShiftModal = ({
   roles = [],
   onSubmit,
   submitting,
+  skillTaxonomy = [],
 }) => {
   const defaultRole = roles[0] || 'Lễ tân / Check-in';
 
@@ -30,11 +31,13 @@ const EditShiftModal = ({
     description: '',
     startTime: '',
     endTime: '',
+    arrivalTime: '',
     requiredWorkers: 2,
     hourlyWage: 50000,
     allowance: 0,
     minReliabilityScore: 60,
     dressCode: '',
+    requiredSkills: [],
     checklistItems: [],
   });
 
@@ -75,16 +78,25 @@ const EditShiftModal = ({
       setWageMode('HOURLY');
       setShiftPackageWage(Math.round(hWage * dur));
 
+      // arrivalTime: hiển thị rỗng nếu bằng giờ bắt đầu ca (mặc định)
+      const defaultArrival = shift.arrivalTime && shift.startTime
+        ? new Date(shift.arrivalTime).getTime() === new Date(shift.startTime).getTime()
+          ? ''
+          : formatIsoToInput(shift.arrivalTime)
+        : '';
+
       setFormData({
         jobType: shift.jobType || defaultRole,
         description: shift.description || '',
         startTime: sTime,
         endTime: eTime,
+        arrivalTime: defaultArrival,
         requiredWorkers: shift.requiredWorkers || 2,
         hourlyWage: hWage,
         allowance: shift.allowance || 0,
         minReliabilityScore: shift.minReliabilityScore || 60,
         dressCode: shift.dressCode || '',
+        requiredSkills: Array.isArray(shift.requiredSkills) ? shift.requiredSkills : [],
         checklistItems: normalizeChecklistItems(shift.checklistItems || shift.checklist),
       });
     }
@@ -148,11 +160,21 @@ const EditShiftModal = ({
       showToast('Thời gian kết thúc ca phải sau thời gian bắt đầu!', 'error');
       return;
     }
+    if (formData.arrivalTime) {
+      const aDate = new Date(formData.arrivalTime);
+      if (isNaN(aDate.getTime()) || aDate < sDate || aDate > eDate) {
+        showToast('Thời gian mở điểm danh phải nằm trong khoảng giờ của ca làm việc!', 'error');
+        return;
+      }
+    }
 
     onSubmit(shift.shiftId, {
       ...formData,
       startTime: sDate.toISOString(),
       endTime: eDate.toISOString(),
+      arrivalTime: formData.arrivalTime ? new Date(formData.arrivalTime).toISOString() : null,
+      requiredSkills: Array.isArray(formData.requiredSkills) ? formData.requiredSkills : [],
+      dressCode: formData.dressCode || '',
       requiredWorkers: Math.max(1, Number(formData.requiredWorkers) || 1),
       hourlyWage: Math.max(20000, Number(formData.hourlyWage) || 20000),
       allowance: Math.max(0, Number(formData.allowance) || 0),
@@ -247,6 +269,62 @@ const EditShiftModal = ({
                 value={formData.endTime}
                 onChange={(e) => handleTimeChange('endTime', e.target.value)}
               />
+            </div>
+          </div>
+
+          {/* Giờ mở cửa điểm danh (check-in gate) */}
+          <div className="eo-form-group">
+            <label>Thời Gian Mở Điểm Danh (Tùy chọn)</label>
+            <input
+              type="datetime-local"
+              className="eo-form-input"
+              value={formData.arrivalTime || ''}
+              onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
+            />
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.25rem' }}>
+              Người lao động chỉ được điểm danh từ thời điểm này. Để trống = mở cùng giờ bắt đầu ca.
+            </div>
+          </div>
+
+          {/* Kỹ năng bắt buộc (chọn nhiều) */}
+          <div className="eo-form-group">
+            <label>Kỹ Năng Bắt Buộc (chọn nhiều)</label>
+            {skillTaxonomy.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
+                {skillTaxonomy.map((sk) => {
+                  const checked = Array.isArray(formData.requiredSkills) && formData.requiredSkills.includes(sk.skillId);
+                  return (
+                    <button
+                      key={sk.skillId}
+                      type="button"
+                      onClick={() => {
+                        const base = Array.isArray(formData.requiredSkills) ? formData.requiredSkills : [];
+                        const next = checked ? base.filter((id) => id !== sk.skillId) : [...base, sk.skillId];
+                        setFormData({ ...formData, requiredSkills: next });
+                      }}
+                      style={{
+                        fontSize: '0.76rem',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '0.45rem',
+                        border: checked ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                        backgroundColor: checked ? '#dbeafe' : '#ffffff',
+                        color: checked ? '#1d4ed8' : '#475569',
+                        fontWeight: checked ? 700 : 500,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {checked ? '✓ ' : ''}{sk.name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '0.3rem' }}>
+                Chưa có danh mục kỹ năng để chọn (bỏ qua trường này).
+              </div>
+            )}
+            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.3rem' }}>
+              Hệ thống chỉ mời ứng viên có đúng kỹ năng này (lọc cứng trong matching).
             </div>
           </div>
 

@@ -11,6 +11,8 @@ class NearbyShiftItem {
   final double allowance;
   final DateTime? startTime;
   final DateTime? endTime;
+  final DateTime? arrivalTime;
+  final List<String> requiredSkillNames;
   final double distanceKm;
   final int requiredWorkers;
   final int confirmedWorkers;
@@ -33,6 +35,8 @@ class NearbyShiftItem {
     required this.allowance,
     this.startTime,
     this.endTime,
+    this.arrivalTime,
+    this.requiredSkillNames = const [],
     required this.distanceKm,
     required this.requiredWorkers,
     required this.confirmedWorkers,
@@ -57,6 +61,8 @@ class NearbyShiftItem {
       allowance: (json['allowance'] as num?)?.toDouble() ?? 0.0,
       startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'] as String)?.toLocal() : null,
       endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'] as String)?.toLocal() : null,
+      arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
+      requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       requiredWorkers: (json['requiredWorkers'] as num?)?.toInt() ?? 1,
       confirmedWorkers: (json['confirmedWorkers'] as num?)?.toInt() ?? 0,

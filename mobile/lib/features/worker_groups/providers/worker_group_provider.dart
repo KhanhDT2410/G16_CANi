@@ -6,6 +6,7 @@ import 'package:cani/features/worker_groups/models/worker_group_models.dart';
 
 class WorkerGroupsState {
   final List<WorkerGroupModel> myGroups;
+  final List<WorkerGroupModel> pendingInvites;
   final List<WorkerGroupMemberModel> currentGroupMembers;
   final bool isLoading;
   final bool isMemberLoading;
@@ -13,6 +14,7 @@ class WorkerGroupsState {
 
   const WorkerGroupsState({
     this.myGroups = const [],
+    this.pendingInvites = const [],
     this.currentGroupMembers = const [],
     this.isLoading = false,
     this.isMemberLoading = false,
@@ -21,6 +23,7 @@ class WorkerGroupsState {
 
   WorkerGroupsState copyWith({
     List<WorkerGroupModel>? myGroups,
+    List<WorkerGroupModel>? pendingInvites,
     List<WorkerGroupMemberModel>? currentGroupMembers,
     bool? isLoading,
     bool? isMemberLoading,
@@ -28,6 +31,7 @@ class WorkerGroupsState {
   }) {
     return WorkerGroupsState(
       myGroups: myGroups ?? this.myGroups,
+      pendingInvites: pendingInvites ?? this.pendingInvites,
       currentGroupMembers: currentGroupMembers ?? this.currentGroupMembers,
       isLoading: isLoading ?? this.isLoading,
       isMemberLoading: isMemberLoading ?? this.isMemberLoading,
@@ -39,9 +43,49 @@ class WorkerGroupsState {
 class WorkerGroupsNotifier extends StateNotifier<WorkerGroupsState> {
   WorkerGroupsNotifier(this._ref) : super(const WorkerGroupsState()) {
     loadMyGroups();
+    loadMyPendingInvites();
   }
 
   final Ref _ref;
+
+  Future<void> loadMyPendingInvites() async {
+    try {
+      final dio = _ref.read(dioProvider);
+      final response = await dio.get('/v1/worker-groups/my/invites');
+
+      if (response.statusCode == 200 && response.data != null) {
+        final body = response.data;
+        final listRaw = body is Map<String, dynamic> && body.containsKey('data')
+            ? body['data'] as List<dynamic>?
+            : body as List<dynamic>?;
+
+        final invites = (listRaw ?? [])
+            .map((e) => WorkerGroupModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+
+        state = state.copyWith(pendingInvites: invites);
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải danh sách lời mời vào đội: $e');
+    }
+  }
+
+  Future<bool> acceptInvite(String groupId) async {
+    try {
+      final dio = _ref.read(dioProvider);
+      final response = await dio.post('/v1/worker-groups/$groupId/join');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await loadMyGroups();
+        await loadMyPendingInvites();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Lỗi chấp nhận lời mời vào nhóm: $e');
+      return false;
+    }
+  }
 
   Future<void> loadMyGroups() async {
     state = state.copyWith(isLoading: true, errorMessage: null);

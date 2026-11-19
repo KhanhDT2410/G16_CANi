@@ -193,6 +193,46 @@ class ShiftAssignmentCard extends StatelessWidget {
                   ],
                 ),
 
+                // Giờ mở điểm danh (nếu khác giờ bắt đầu >= 5 phút)
+                if (a.arrivalTime != null &&
+                    a.arrivalTime!.difference(a.startTime).inMinutes >= 5)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.fact_check_rounded, size: 14, color: isDark ? Colors.amberAccent : Colors.amber.shade800),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Mở điểm danh từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')} (check-in sớm sẽ bị chặn)',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.amberAccent : Colors.amber.shade800, fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Kỹ năng bắt buộc (chips)
+                if (a.requiredSkillNames.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: a.requiredSkillNames.map((n) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                        ),
+                        child: Text(n, style: TextStyle(fontSize: 11, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
+                      )).toList(),
+                    ),
+                  ),
+
                 // Nút Quét QR Lớn cao 52px màu Teal nếu ca đang chạy hoặc chờ
                 if (!isCompleted) ...[
                   const SizedBox(height: 12),

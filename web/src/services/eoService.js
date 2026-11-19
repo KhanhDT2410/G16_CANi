@@ -155,6 +155,17 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // Lấy danh mục kỹ năng (taxonomy) để chọn requiredSkills cho ca (endpoint công khai)
+  getSkillTaxonomy: async () => {
+    try {
+      const response = await apiClient.get('/v1/workers/skills/taxonomy');
+      return response.data?.data || [];
+    } catch (error) {
+      console.warn('Không tải được danh mục kỹ năng, bỏ qua requiredSkills:', error.message);
+      return [];
+    }
+  },
+
   // UC-19: Hủy ca làm việc
   cancelShift: async (shiftId, reason) => {
     const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/cancel`, { reason });

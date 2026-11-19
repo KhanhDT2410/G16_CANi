@@ -25,6 +25,8 @@ public class JobProposalResponseDto {
     private String description;
     private Instant startTime;
     private Instant endTime;
+    private Instant arrivalTime;
+    private java.util.List<String> requiredSkillNames;
     private BigDecimal hourlyWage;
     private BigDecimal allowance;
     private BigDecimal totalEstimatedPay;

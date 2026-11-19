@@ -21,6 +21,7 @@ const EventShiftsDrawer = ({
   onCancelShift,
   onReloadEvents,
   onOpenPaymentDeclaration,
+  skillTaxonomy = [],
 }) => {
   const [selectedShiftForPanel, setSelectedShiftForPanel] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
@@ -60,6 +61,19 @@ const EventShiftsDrawer = ({
       return fallback;
     }
   };
+
+  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
+  const skillNameMap = useMemo(() => {
+    const m = {};
+    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
+      if (sk && sk.skillId) m[sk.skillId] = sk.name;
+    });
+    return m;
+  }, [skillTaxonomy]);
+
+  const hasCustomArrival = (shift) =>
+    shift.arrivalTime && shift.startTime &&
+    new Date(shift.arrivalTime).getTime() !== new Date(shift.startTime).getTime();
 
   const getShiftStatusMeta = (shiftObj) => {
     const dyn = getDynamicShiftStatus(shiftObj, event?.status);
@@ -116,9 +130,18 @@ const EventShiftsDrawer = ({
                   Đồng phục: {shift.dressCode}
                 </span>
               )}
+              {Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0 && (
+                <span
+                  style={{ fontSize: '0.75rem', color: '#1d4ed8', background: '#dbeafe', padding: '2px 6px', borderRadius: 4 }}
+                  title="Kỹ năng bắt buộc (matching lọc cứng theo kỹ năng)"
+                >
+                  Kỹ năng: {(shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') || `${shift.requiredSkills.length} kỹ năng`)}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
-              {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')} •{' '}
+              {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
+              {hasCustomArrival(shift) && ` • Mở điểm danh ${formatTime(shift.arrivalTime, '')}`} •{' '}
               <strong>
                 {shift.confirmedWorkers || 0}/{shift.requiredWorkers || 0}
               </strong>{' '}

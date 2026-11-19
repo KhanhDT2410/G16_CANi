@@ -356,111 +356,117 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
             if (isEkycApproved)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Row(
-                  children: [
-                    Text(
-                      'Bán kính:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: cani.textMain,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Bán kính:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: cani.textMain,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Wrap(
-                      spacing: 6,
-                      children: [5.0, 10.0, 15.0].map((r) {
+                      const SizedBox(width: 8),
+                      ...[5.0, 10.0, 15.0].map((r) {
                         final isSel = state.searchRadiusKm == r;
-                        return InkWell(
-                          onTap: () => notifier.setRadius(r),
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: isSel ? cani.brand : (isDark ? cani.surface : Colors.white),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: isSel ? cani.brand : cani.border,
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () => notifier.setRadius(r),
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: isSel ? cani.brand : (isDark ? cani.surface : Colors.white),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: isSel ? cani.brand : cani.border,
+                                ),
+                                boxShadow: isSel
+                                    ? [BoxShadow(color: cani.brand.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))]
+                                    : null,
                               ),
-                              boxShadow: isSel
-                                  ? [BoxShadow(color: cani.brand.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))]
-                                  : null,
-                            ),
-                            child: Text(
-                              '${r.toInt()} km',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: isSel ? Colors.white : cani.textMuted,
+                              child: Text(
+                                '${r.toInt()} km',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: isSel ? Colors.white : cani.textMuted,
+                                ),
                               ),
                             ),
                           ),
                         );
-                      }).toList(),
-                    ),
-                    const Spacer(),
-                    InkWell(
-                      onTap: _openInviteCodeDialogOnHome,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        height: 30,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: isDark ? cani.surface : cani.brandSoft,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: cani.border),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.confirmation_number_outlined, size: 14, color: isDark ? cani.accent : cani.brand),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Mã mời',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? cani.accent : cani.brand,
+                      }),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: _openInviteCodeDialogOnHome,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          height: 30,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: isDark ? cani.surface : cani.brandSoft,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cani.border),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.confirmation_number_outlined, size: 14, color: isDark ? cani.accent : cani.brand),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Mã mời',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark ? cani.accent : cani.brand,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () => notifier.toggleRadarView(),
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: isDark ? cani.surface : Colors.white,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: cani.border,
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              state.isRadarView ? Icons.list_alt : Icons.map_outlined,
-                              size: 14,
-                              color: isDark ? cani.accent : cani.brand,
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () => notifier.toggleRadarView(),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isDark ? cani.surface : Colors.white,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: cani.border,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              state.isRadarView ? 'Danh sách' : 'Bản đồ',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                state.isRadarView ? Icons.list_alt : Icons.map_outlined,
+                                size: 14,
                                 color: isDark ? cani.accent : cani.brand,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 4),
+                              Text(
+                                state.isRadarView ? 'Danh sách' : 'Bản đồ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? cani.accent : cani.brand,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             if (isEkycApproved) const SizedBox(height: 6),

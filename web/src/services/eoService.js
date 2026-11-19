@@ -166,6 +166,12 @@ export const eoService = {
     }
   },
 
+  // BR-16: Tạo hoặc lấy kỹ năng nhập tay (Dynamic Custom Skill)
+  createCustomSkill: async (name, category = 'Tự chọn') => {
+    const response = await apiClient.post('/v1/workers/skills/custom', { name, category });
+    return response.data?.data;
+  },
+
   // UC-19: Hủy ca làm việc
   cancelShift: async (shiftId, reason) => {
     const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/cancel`, { reason });

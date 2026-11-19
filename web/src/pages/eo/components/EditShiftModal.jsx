@@ -7,6 +7,7 @@ import {
   serializeChecklistItems,
 } from '../hooks/useShifts';
 import ShiftChecklistEditor from './ShiftChecklistEditor';
+import ShiftSkillSelector from './ShiftSkillSelector';
 
 /**
  * EditShiftModal
@@ -286,47 +287,12 @@ const EditShiftModal = ({
             </div>
           </div>
 
-          {/* Kỹ năng bắt buộc (chọn nhiều) */}
-          <div className="eo-form-group">
-            <label>Kỹ Năng Bắt Buộc (chọn nhiều)</label>
-            {skillTaxonomy.length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
-                {skillTaxonomy.map((sk) => {
-                  const checked = Array.isArray(formData.requiredSkills) && formData.requiredSkills.includes(sk.skillId);
-                  return (
-                    <button
-                      key={sk.skillId}
-                      type="button"
-                      onClick={() => {
-                        const base = Array.isArray(formData.requiredSkills) ? formData.requiredSkills : [];
-                        const next = checked ? base.filter((id) => id !== sk.skillId) : [...base, sk.skillId];
-                        setFormData({ ...formData, requiredSkills: next });
-                      }}
-                      style={{
-                        fontSize: '0.76rem',
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '0.45rem',
-                        border: checked ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
-                        backgroundColor: checked ? '#dbeafe' : '#ffffff',
-                        color: checked ? '#1d4ed8' : '#475569',
-                        fontWeight: checked ? 700 : 500,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {checked ? '✓ ' : ''}{sk.name}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '0.3rem' }}>
-                Chưa có danh mục kỹ năng để chọn (bỏ qua trường này).
-              </div>
-            )}
-            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.3rem' }}>
-              Hệ thống chỉ mời ứng viên có đúng kỹ năng này (lọc cứng trong matching).
-            </div>
-          </div>
+          {/* Kỹ năng bắt buộc (DYNAMIC CUSTOM SKILLS + TAXONOMY) */}
+          <ShiftSkillSelector
+            selectedSkillIds={formData.requiredSkills}
+            onChange={(nextSkills) => setFormData({ ...formData, requiredSkills: nextSkills })}
+            taxonomy={skillTaxonomy}
+          />
 
           {/* Tùy chọn cách tính lương: Theo giờ hoặc Theo ca */}
           <div className="eo-form-group" style={{ marginBottom: '0.75rem' }}>

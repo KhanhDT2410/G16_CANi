@@ -117,6 +117,17 @@ public class SkillVerificationController {
     }
 
     /**
+     * Create or retrieve dynamic custom skill (for EO / Event Shift creation & Worker)
+     */
+    @PostMapping("/custom")
+    public ResponseEntity<ApiResponse<Skill>> createCustomSkill(
+            @Valid @RequestBody CreateCustomSkillRequestDto request
+    ) {
+        Skill skill = verificationService.getOrCreateCustomSkill(request.getName(), request.getCategory());
+        return ResponseEntity.ok(ApiResponse.ok(skill, "Lưu kỹ năng thành công"));
+    }
+
+    /**
      * Get standard Tier configuration and thresholds (BR-64 Single Source of Truth)
      */
     @GetMapping("/tiers/config")

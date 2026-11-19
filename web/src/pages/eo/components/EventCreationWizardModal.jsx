@@ -11,6 +11,7 @@ import {
 import { getCoordinatesFromAddress } from '../utils/geoUtils';
 import VenueLocationPicker from './VenueLocationPicker';
 import ShiftChecklistEditor from './ShiftChecklistEditor';
+import ShiftSkillSelector from './ShiftSkillSelector';
 
 /**
  * EventCreationWizardModal
@@ -1927,54 +1928,12 @@ const EventCreationWizardModal = ({
                   )}
                 </div>
 
-                {/* KỸ NĂNG BẮT BUỘC CHO CA NÀY */}
-                <div className="eo-form-group" style={{ marginBottom: '1rem' }}>
-                  <label>Kỹ Năng Bắt Buộc (chọn nhiều)</label>
-                  {skillTaxonomy.length > 0 ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
-                      {skillTaxonomy.map((sk) => {
-                        const checked =
-                          Array.isArray(currentShift.requiredSkills) &&
-                          currentShift.requiredSkills.includes(sk.skillId);
-                        return (
-                          <button
-                            key={sk.skillId}
-                            type="button"
-                            onClick={() => {
-                              const base = Array.isArray(currentShift.requiredSkills)
-                                ? currentShift.requiredSkills
-                                : [];
-                              const next = checked
-                                ? base.filter((id) => id !== sk.skillId)
-                                : [...base, sk.skillId];
-                              setCurrentShift({ ...currentShift, requiredSkills: next });
-                            }}
-                            style={{
-                              fontSize: '0.76rem',
-                              padding: '0.25rem 0.6rem',
-                              borderRadius: '0.45rem',
-                              border: checked ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
-                              backgroundColor: checked ? '#dbeafe' : '#ffffff',
-                              color: checked ? '#1d4ed8' : '#475569',
-                              fontWeight: checked ? 700 : 500,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {checked ? '✓ ' : ''}
-                            {sk.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '0.3rem' }}>
-                      Đang tải danh mục kỹ năng hoặc chưa có danh mục kỹ năng để chọn.
-                    </div>
-                  )}
-                  <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.3rem' }}>
-                    Hệ thống chỉ mời ứng viên có đúng kỹ năng này (lọc cứng trong matching). Để trống nếu ca phổ thông không yêu cầu kỹ năng đặc thù.
-                  </div>
-                </div>
+                {/* KỸ NĂNG BẮT BUỘC CHO CA NÀY (DYNAMIC CUSTOM SKILLS + TAXONOMY) */}
+                <ShiftSkillSelector
+                  selectedSkillIds={currentShift.requiredSkills}
+                  onChange={(nextSkills) => setCurrentShift({ ...currentShift, requiredSkills: nextSkills })}
+                  taxonomy={skillTaxonomy}
+                />
 
                 {/* CHECKLIST ĐẦU VIỆC CHO CA NÀY (CÓ NÚT YÊU CẦU EVIDENT + KÉO THẢ ĐẢO VỊ TRÍ) */}
                 <ShiftChecklistEditor

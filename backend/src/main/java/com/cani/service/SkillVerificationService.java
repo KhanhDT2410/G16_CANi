@@ -731,6 +731,41 @@ public class SkillVerificationService {
     }
 
     /**
+     * Create or retrieve a custom skill by name (case-insensitive) (BR-16 dynamic extension).
+     * Cho phép EO/Worker nhập tay kỹ năng mới tự do mà không bị giới hạn trong danh mục tĩnh,
+     * đồng thời chuẩn hóa lưu trữ trong CSDL và cấp UUID để hệ thống matching hoạt động chính xác.
+     */
+    @Transactional
+    public Skill getOrCreateCustomSkill(String rawName, String rawCategory) {
+        if (rawName == null || rawName.trim().isEmpty()) {
+            throw new BadRequestException("Tên kỹ năng không được để trống.");
+        }
+        String trimmedName = rawName.trim();
+        if (trimmedName.length() > 100) {
+            throw new BadRequestException("Tên kỹ năng không được vượt quá 100 ký tự.");
+        }
+
+        // Kiểm tra xem kỹ năng đã tồn tại hay chưa (không phân biệt chữ hoa chữ thường)
+        Optional<Skill> existing = skillRepository.findByNameIgnoreCase(trimmedName);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        String category = (rawCategory != null && !rawCategory.trim().isEmpty())
+                ? rawCategory.trim()
+                : "Tự chọn";
+
+        Skill newSkill = Skill.builder()
+                .name(trimmedName)
+                .category(category)
+                .description("Kỹ năng bổ sung do người dùng nhập")
+                .isActive(true)
+                .build();
+
+        return skillRepository.save(newSkill);
+    }
+
+    /**
      * Resolve Worker ID from authenticated user or explicit ID for Admin.
      * Chống IDOR: Chỉ Admin được phép thao tác thay Worker khác; Worker thường chỉ được thao tác trên chính hồ sơ của mình.
      */

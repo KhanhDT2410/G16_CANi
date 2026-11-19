@@ -13,4 +13,5 @@ public interface SkillRepository extends JpaRepository<Skill, UUID> {
 
     List<Skill> findByIsActiveTrue();
     Optional<Skill> findByName(String name);
+    Optional<Skill> findByNameIgnoreCase(String name);
 }

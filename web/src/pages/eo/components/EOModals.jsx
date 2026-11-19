@@ -35,6 +35,7 @@ export default function EOModals({
         setNewEvent={events.setNewEvent}
         locating={events.locating}
         onGetCurrentLocation={events.handleGetCurrentLocation}
+        skillTaxonomy={shifts.skillTaxonomy}
       />
 
       <ShiftCreateModal

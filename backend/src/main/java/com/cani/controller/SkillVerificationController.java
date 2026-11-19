@@ -8,6 +8,8 @@ import com.cani.service.SkillVerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -121,6 +123,27 @@ public class SkillVerificationController {
     public ResponseEntity<ApiResponse<List<TierConfigDto>>> getTierConfig() {
         List<TierConfigDto> configs = verificationService.getTierConfigs();
         return ResponseEntity.ok(ApiResponse.ok(configs, "Lấy cấu hình ngưỡng Tier thành công"));
+    }
+
+    /**
+     * Serve uploaded certificate image/PDF document
+     */
+    @GetMapping("/documents/{filename:.+}")
+    public ResponseEntity<Resource> getCertificateDocument(@PathVariable("filename") String filename) {
+        Resource file = verificationService.loadCertificateDocument(filename);
+        String lower = filename.toLowerCase();
+        MediaType mediaType = MediaType.IMAGE_JPEG;
+        if (lower.endsWith(".png")) {
+            mediaType = MediaType.IMAGE_PNG;
+        } else if (lower.endsWith(".webp")) {
+            mediaType = MediaType.parseMediaType("image/webp");
+        } else if (lower.endsWith(".pdf")) {
+            mediaType = MediaType.APPLICATION_PDF;
+        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getFilename() + "\"")
+                .contentType(mediaType)
+                .body(file);
     }
 
     /**

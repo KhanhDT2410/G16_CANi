@@ -87,13 +87,16 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
   Future<bool> declareSkills(List<Map<String, dynamic>> skills) async {
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      final updatedSkills = await _repository.declareSkills(skills);
-      final points = await _repository.getSkillPoints().catchError((_) => state.skillPoints);
+      final declaredSubset = await _repository.declareSkills(skills);
+      final results = await Future.wait([
+        _repository.getMySkills().catchError((_) => _mergeSkills(state.mySkills, declaredSubset)),
+        _repository.getSkillPoints().catchError((_) => state.skillPoints),
+      ]);
 
       state = state.copyWith(
         isSubmitting: false,
-        mySkills: updatedSkills,
-        skillPoints: points,
+        mySkills: results[0] as List<WorkerSkillItem>,
+        skillPoints: results[1] as List<WorkerSkillPointModel>,
       );
       return true;
     } catch (e) {
@@ -103,6 +106,16 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
       );
       return false;
     }
+  }
+
+  List<WorkerSkillItem> _mergeSkills(List<WorkerSkillItem> existing, List<WorkerSkillItem> incoming) {
+    final map = <String, WorkerSkillItem>{
+      for (final item in existing) item.skillId: item,
+    };
+    for (final item in incoming) {
+      map[item.skillId] = item;
+    }
+    return map.values.toList();
   }
 
   Future<bool> submitVerification({

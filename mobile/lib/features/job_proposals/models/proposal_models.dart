@@ -381,3 +381,46 @@ class WorkerIncomeSummary {
   }
 }
 
+class ShiftChatMessageItem {
+  final String id;
+  final String senderId;
+  final String senderRole;
+  final String senderName;
+  final String messageText;
+  final String? attachmentUrl;
+  final String? shiftId;
+  final String? shiftCode;
+  final String? shiftName;
+  final DateTime createdAt;
+
+  const ShiftChatMessageItem({
+    required this.id,
+    required this.senderId,
+    required this.senderRole,
+    required this.senderName,
+    required this.messageText,
+    this.attachmentUrl,
+    this.shiftId,
+    this.shiftCode,
+    this.shiftName,
+    required this.createdAt,
+  });
+
+  factory ShiftChatMessageItem.fromJson(Map<String, dynamic> json) {
+    return ShiftChatMessageItem(
+      id: json['id']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? '',
+      senderRole: json['senderRole']?.toString() ?? 'WORKER',
+      senderName: json['senderName']?.toString() ?? 'Người dùng',
+      messageText: json['messageText']?.toString() ?? '',
+      attachmentUrl: json['attachmentUrl']?.toString(),
+      shiftId: json['shiftId']?.toString(),
+      shiftCode: json['shiftCode']?.toString(),
+      shiftName: json['shiftName']?.toString(),
+      createdAt: json['createdAt'] != null
+          ? (DateTime.tryParse(json['createdAt'].toString())?.toLocal() ?? DateTime.now())
+          : DateTime.now(),
+    );
+  }
+}
+

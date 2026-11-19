@@ -71,12 +71,62 @@ public class SupportChatService {
                         conversationRepository.save(conv);
                 }
 
-                List<SupportMessage> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conv.getId());
+                List<SupportMessage> messages = resolveConversationMessages(conv, user);
 
                 return SupportConversationDetailDto.builder()
                                 .conversation(toSummaryDto(conv, user))
                                 .messages(messages.stream().map(this::toMessageDto).toList())
                                 .build();
+        }
+
+        /**
+         * Lấy danh sách toàn bộ tin nhắn trao đổi trực tiếp trong một Ca làm việc (giữa EO, Worker và CSKH).
+         */
+        public List<ChatMessageResponseDto> getShiftMessages(UUID shiftId) {
+                return messageRepository.findByShiftIdOrderByCreatedAtAsc(shiftId)
+                                .stream()
+                                .map(this::toMessageDto)
+                                .toList();
+        }
+
+        private List<SupportMessage> resolveConversationMessages(SupportConversation conv, User user) {
+                List<SupportMessage> ownMessages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conv.getId());
+                if (user == null) {
+                        return ownMessages;
+                }
+                UUID targetUserId = user.getUserId();
+                Set<UUID> relatedShiftIds = new LinkedHashSet<>();
+                for (SupportMessage m : ownMessages) {
+                        if (m.getShiftId() != null) {
+                                relatedShiftIds.add(m.getShiftId());
+                        }
+                }
+                if (user.getRole() == UserRole.EVENT_ORGANIZER && targetUserId != null) {
+                        for (Shift s : shiftRepository.findAll()) {
+                                if (s.getEvent() != null
+                                                && s.getEvent().getEventOrganizer() != null
+                                                && s.getEvent().getEventOrganizer().getUser() != null
+                                                && targetUserId.equals(s.getEvent().getEventOrganizer().getUser().getUserId())) {
+                                        relatedShiftIds.add(s.getShiftId());
+                                }
+                        }
+                }
+
+                Map<UUID, SupportMessage> mergedMap = new LinkedHashMap<>();
+                for (SupportMessage m : ownMessages) {
+                        mergedMap.put(m.getId(), m);
+                }
+                if (!relatedShiftIds.isEmpty()) {
+                        List<SupportMessage> shiftMessages = messageRepository.findByShiftIdInOrderByCreatedAtAsc(relatedShiftIds);
+                        for (SupportMessage sm : shiftMessages) {
+                                mergedMap.put(sm.getId(), sm);
+                        }
+                }
+
+                List<SupportMessage> messages = new ArrayList<>(mergedMap.values());
+                messages.sort(Comparator.comparing(
+                                m -> m.getCreatedAt() != null ? m.getCreatedAt() : Instant.EPOCH));
+                return messages;
         }
 
         /**
@@ -255,7 +305,7 @@ public class SupportChatService {
                         conversationRepository.save(conv);
                 }
 
-                List<SupportMessage> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conv.getId());
+                List<SupportMessage> messages = resolveConversationMessages(conv, user);
 
                 return SupportConversationDetailDto.builder()
                                 .conversation(toSummaryDto(conv, user))

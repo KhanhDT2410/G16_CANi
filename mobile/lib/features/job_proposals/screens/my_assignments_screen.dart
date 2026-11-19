@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/cancel_assignment_dialog.dart';
@@ -253,6 +252,19 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
+  void _handleHeaderQrScan() {
+    if (_assignments.isEmpty) {
+      _openInviteCodeDialog();
+      return;
+    }
+    final active = _assignments.firstWhere(
+      (a) => a.status == 'CHECKED_IN' || a.status == 'CONFIRMED',
+      orElse: () => _assignments.first,
+    );
+    final isCheckedIn = active.status == 'CHECKED_IN';
+    _openQrScanner(active, !isCheckedIn);
+  }
+
   Future<void> _openExecutionScreen(ShiftAssignmentItem a) async {
     final updated = await Navigator.push<bool>(
       context,
@@ -368,8 +380,6 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final radarState = ref.watch(jobRadarProvider);
-    final locationLabel = radarState.isRealLocation ? 'GPS Thực Tế' : 'Q.7, TP.HCM';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -403,26 +413,38 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                             tooltip: 'Nhập mã mời ca làm',
                             onPressed: _openInviteCodeDialog,
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0F7FF),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: const Color(0xFFDBEAFE)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.location_on, size: 14, color: Color(0xFF0077FF)),
-                                const SizedBox(width: 4),
-                                Text(
-                                  locationLabel,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF0077FF),
+                          InkWell(
+                            onTap: _handleHeaderQrScan,
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0077FF),
+                                borderRadius: BorderRadius.circular(999),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF0077FF).withValues(alpha: 0.28),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.qr_code_scanner_rounded, size: 15, color: Colors.white),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'Quét QR',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],

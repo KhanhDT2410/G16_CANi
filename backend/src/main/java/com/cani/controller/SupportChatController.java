@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -37,6 +38,18 @@ public class SupportChatController {
         UUID userId = currentUserId(authentication);
         SupportConversationDetailDto dto = supportChatService.getMyConversation(userId);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Lấy thông tin hội thoại thành công"));
+    }
+
+    /**
+     * Lấy lịch sử tin nhắn trực tiếp trong một Ca làm việc (giữa EO, Worker và CSKH).
+     * GET /api/v1/support/chat/shift/{shiftId}
+     */
+    @GetMapping("/shift/{shiftId}")
+    public ResponseEntity<ApiResponse<List<ChatMessageResponseDto>>> getShiftMessages(
+            @PathVariable UUID shiftId
+    ) {
+        List<ChatMessageResponseDto> list = supportChatService.getShiftMessages(shiftId);
+        return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách tin nhắn ca làm thành công"));
     }
 
     /**

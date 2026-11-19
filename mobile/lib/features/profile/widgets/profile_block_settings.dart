@@ -2,26 +2,17 @@
 // Đã kết nối WorkerSettingsScreen, WorkerBankSettingsScreen, WeeklyAvailabilityScreen.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:cani/features/profile/providers/profile_providers.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
-import 'package:cani/features/skill_verification/screens/weekly_availability_screen.dart';
 import 'package:cani/features/skill_verification/screens/worker_settings_screen.dart';
 import 'package:cani/features/worker_groups/screens/worker_groups_screen.dart';
 
-class ProfileSettingsBlock extends ConsumerStatefulWidget {
+class ProfileSettingsBlock extends StatelessWidget {
   const ProfileSettingsBlock({super.key});
 
   @override
-  ConsumerState<ProfileSettingsBlock> createState() => _ProfileSettingsBlockState();
-}
-
-class _ProfileSettingsBlockState extends ConsumerState<ProfileSettingsBlock> {
-  @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).profileX;
-    final notifEnabled = ref.watch(notificationSettingsProvider);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -49,11 +40,11 @@ class _ProfileSettingsBlockState extends ConsumerState<ProfileSettingsBlock> {
           ),
           const SizedBox(height: 12),
 
-          // 1. TIÊU CHÍ TÌM VIỆC & BÁN KÍNH RADAR (WorkerSettingsScreen)
+          // 1. TIÊU CHÍ TÌM VIỆC & LỊCH RẢNH NHẬN CA (WorkerSettingsScreen)
           _ClickableRow(
-            icon: Icons.radar_rounded,
-            label: 'Tiêu chí tìm việc & Bán kính radar',
-            subtitle: 'Bán kính quét (1-50km), thù lao tối thiểu, khu vực',
+            icon: Icons.tune_rounded,
+            label: 'Tiêu chí tìm việc & Lịch nhận ca',
+            subtitle: 'Bán kính radar, thù lao mong muốn & lịch rảnh hàng tuần',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const WorkerSettingsScreen()),
@@ -63,21 +54,7 @@ class _ProfileSettingsBlockState extends ConsumerState<ProfileSettingsBlock> {
 
           Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
 
-          // 2. LỊCH RẢNH CỐ ĐỊNH HÀNG TUẦN (WeeklyAvailabilityScreen)
-          _ClickableRow(
-            icon: Icons.calendar_month_rounded,
-            label: 'Lịch rảnh cố định hàng tuần',
-            subtitle: 'Thiết lập khung giờ sẵn sàng nhận ca trong tuần',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const WeeklyAvailabilityScreen()),
-              );
-            },
-          ),
-
-          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
-
-          // 4. ĐỘI CỦA TÔI (WorkerGroupsScreen)
+          // 2. ĐỘI CỦA TÔI (WorkerGroupsScreen)
           _ClickableRow(
             icon: Icons.groups_rounded,
             label: 'Đội của tôi',
@@ -87,51 +64,6 @@ class _ProfileSettingsBlockState extends ConsumerState<ProfileSettingsBlock> {
                 MaterialPageRoute(builder: (_) => const WorkerGroupsScreen()),
               );
             },
-          ),
-
-          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
-
-          // 5. THÔNG BÁO VIỆC LÀM MỚI (Switch)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Icon(Icons.notifications_active_outlined, size: 20, color: t.accentDeep),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Thông báo việc làm & Radar matching',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: t.text,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      Text(
-                        'Nhận chuông báo khi có ca làm phù hợp gần bạn',
-                        style: TextStyle(fontSize: 11, color: t.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: notifEnabled,
-                  onChanged: (val) {
-                    ref.read(notificationSettingsProvider.notifier).toggle(val);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(val ? 'Đã bật thông báo việc làm mới' : 'Đã tắt thông báo việc làm'),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  activeThumbColor: t.accent,
-                  inactiveTrackColor: t.skeleton,
-                ),
-              ],
-            ),
           ),
         ],
       ),

@@ -22,6 +22,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -46,6 +49,9 @@ public class MatchingDispatchService {
 
     @Autowired(required = false)
     private com.cani.repository.WorkerSkillRepository workerSkillRepository;
+
+    @Autowired(required = false)
+    private com.cani.repository.WorkerAvailabilityRepository workerAvailabilityRepository;
 
     private static final List<ProposalStatus> ACTIVE_PROPOSAL_STATUSES = List.of(
             ProposalStatus.PENDING, ProposalStatus.ACCEPTED
@@ -120,14 +126,19 @@ public class MatchingDispatchService {
                 continue;
             }
 
-            // Tính khoảng cách Haversine
+            // Tính khoảng cách Haversine & kiểm tra bán kính kết hợp (Ca làm việc & Tiêu chí Worker)
             double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
-            if (distanceKm > maxAllowedDistanceKm) {
+            double workerMaxDist = (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0)
+                    ? worker.getMaxDistanceKm()
+                    : maxAllowedDistanceKm;
+            double effectiveAllowedDistanceKm = Math.min(maxAllowedDistanceKm, workerMaxDist);
+
+            if (distanceKm > effectiveAllowedDistanceKm) {
                 continue;
             }
 
             // STEP 2: SOFT RANKING SCORE
-            CandidateMatch match = calculateSoftScore(worker, distanceKm, maxAllowedDistanceKm, shift);
+            CandidateMatch match = calculateSoftScore(worker, distanceKm, effectiveAllowedDistanceKm, shift);
             matchedCandidates.add(match);
         }
 
@@ -271,7 +282,85 @@ public class MatchingDispatchService {
             }
         }
 
+        // 7. Kiểm tra mức lương tối thiểu theo tiêu chí tìm việc của Worker (Worker Preferences: minWage)
+        if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0) {
+            if (shift.getHourlyWage() != null && shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
+                log.debug("Loại trừ ứng viên {}: Lương ca làm ({} đ) thấp hơn lương tối thiểu mong muốn ({} đ)",
+                        worker.getWorkerId(), shift.getHourlyWage(), worker.getMinWage());
+                return false;
+            }
+        }
+
+        // 8. Kiểm tra lịch rảnh cố định hàng tuần (Worker Availability: 1=T2 ... 6=T7, 0=CN)
+        if (!isShiftCoveredByAvailability(worker, shift)) {
+            log.debug("Loại trừ ứng viên {}: Ca làm không nằm trong khung giờ rảnh hàng tuần đã cài đặt", worker.getWorkerId());
+            return false;
+        }
+
         return true;
+    }
+
+    /**
+     * Kiểm tra ca làm có nằm trong lịch rảnh cố định hàng tuần của Worker hay không.
+     * Quy tắc Kỹ nghệ:
+     * - Nếu Worker chưa cấu hình lịch rảnh (bảng trống) -> xem như rảnh linh hoạt toàn thời gian (return true).
+     * - Nếu Worker đã cấu hình lịch rảnh -> ca làm việc bắt buộc phải nằm trọn trong ít nhất một slot rảnh.
+     */
+    private boolean isShiftCoveredByAvailability(Worker worker, Shift shift) {
+        if (workerAvailabilityRepository == null || shift.getStartTime() == null || shift.getEndTime() == null) {
+            return true;
+        }
+
+        List<WorkerAvailability> slots = workerAvailabilityRepository
+                .findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId());
+
+        if (slots == null || slots.isEmpty()) {
+            return true;
+        }
+
+        List<WorkerAvailability> availableSlots = slots.stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsAvailable()))
+                .toList();
+
+        if (availableSlots.isEmpty()) {
+            return false;
+        }
+
+        ZoneId vnZone = ZoneId.of("Asia/Ho_Chi_Minh");
+        ZonedDateTime shiftStart = shift.getStartTime().atZone(vnZone);
+        ZonedDateTime shiftEnd = shift.getEndTime().atZone(vnZone);
+
+        // Day of week mapping chuẩn CANi: 0=Chủ Nhật, 1=Thứ Hai, ..., 6=Thứ Bảy
+        int shiftDayOfWeek = shiftStart.getDayOfWeek().getValue() % 7;
+        LocalTime shiftStartTime = shiftStart.toLocalTime();
+        LocalTime shiftEndTime = shiftEnd.toLocalTime();
+
+        for (WorkerAvailability slot : availableSlots) {
+            if (slot.getDayOfWeek() == null || slot.getDayOfWeek() != shiftDayOfWeek) {
+                continue;
+            }
+            LocalTime slotStart = slot.getStartTime();
+            LocalTime slotEnd = slot.getEndTime();
+            if (slotStart == null || slotEnd == null) {
+                continue;
+            }
+
+            // Trường hợp 1: Slot trong cùng 1 ngày (ví dụ 08:00 -> 17:00 hoặc 18:00 -> 23:00)
+            if (!slotEnd.isBefore(slotStart)) {
+                if (shiftStart.toLocalDate().equals(shiftEnd.toLocalDate())) {
+                    if (!shiftStartTime.isBefore(slotStart) && !shiftEndTime.isAfter(slotEnd)) {
+                        return true;
+                    }
+                }
+            } else {
+                // Trường hợp 2: Slot làm việc qua đêm (ví dụ 22:00 -> 06:00 hôm sau)
+                if (!shiftStartTime.isBefore(slotStart) || !shiftEndTime.isAfter(slotEnd)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

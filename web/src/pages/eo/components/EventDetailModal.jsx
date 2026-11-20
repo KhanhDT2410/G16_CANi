@@ -25,6 +25,7 @@ export default function EventDetailModal({
   onNavigateToRecruitment,
   onReloadEvents,
   onOpenPaymentDeclaration,
+  onOpenShiftWorkspace,
   skillTaxonomy = [],
 }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'SHIFTS'); // 'SHIFTS' | 'QR_ATTENDANCE' | 'WORKERS'
@@ -520,19 +521,21 @@ export default function EventDetailModal({
             >
               Chi Tiết Ca Làm Việc ({shifts.length})
             </button>
-            <button
-              type="button"
-              className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
-              onClick={() => setActiveTab('QR_ATTENDANCE')}
-            >
-              Trạm Điểm Danh & Mã QR Ca
-            </button>
+            {!onOpenShiftWorkspace && (
+              <button
+                type="button"
+                className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
+                onClick={() => setActiveTab('QR_ATTENDANCE')}
+              >
+                Trạm Điểm Danh & Mã QR Ca
+              </button>
+            )}
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'WORKERS' ? 'active' : ''}`}
               onClick={() => setActiveTab('WORKERS')}
             >
-              Danh Sách Nhân Sự Sự Kiện ({eventWorkers.length || totalConfirmed})
+              Tổng Hợp Nhân Sự Sự Kiện ({eventWorkers.length || totalConfirmed})
             </button>
           </div>
 
@@ -779,12 +782,16 @@ export default function EventDetailModal({
                                 type="button"
                                 className="btn-shift-action emerald"
                                 onClick={() => {
-                                  setActiveWorkspaceShiftId(shift.shiftId);
-                                  setActiveTab('QR_ATTENDANCE');
+                                  if (onOpenShiftWorkspace) {
+                                    onOpenShiftWorkspace(shift);
+                                  } else {
+                                    setActiveWorkspaceShiftId(shift.shiftId);
+                                    setActiveTab('QR_ATTENDANCE');
+                                  }
                                 }}
-                                title="Mở Trạm Điểm Danh & Mã QR của ca này"
+                                title="Mở trang quản lý chi tiết riêng cho ca làm việc này"
                               >
-                                Điểm Danh & Mã QR Ca Này →
+                                📊 Quản Lý Ca & Nhân Sự →
                               </button>
                             </div>
                           </div>

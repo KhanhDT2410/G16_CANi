@@ -19,6 +19,7 @@ import EOSettingsTab from './components/EOSettingsTab';
 import EOMyTeamTab from './components/EOMyTeamTab';
 import EOModals from './components/EOModals';
 import EventDetailModal from './components/EventDetailModal';
+import ShiftWorkspacePage from './components/ShiftWorkspacePage';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
 import EkycRequiredModal from './components/EkycRequiredModal';
 import { eoService } from '../../services/eoService';
@@ -153,6 +154,7 @@ export default function EOPage() {
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState(null);
   const [detailInitialTab, setDetailInitialTab] = useState('SHIFTS');
+  const [workspaceShiftId, setWorkspaceShiftId] = useState(null);
   const [ekycStatus, setEkycStatus] = useState('APPROVED');
   const [showEkycModal, setShowEkycModal] = useState(false);
 
@@ -169,6 +171,7 @@ export default function EOPage() {
   const handleOpenEventDetailPage = (evt, initialTab = 'SHIFTS') => {
     if (!evt) return;
     setDetailEvent(evt);
+    setWorkspaceShiftId(null);
     setDetailInitialTab(initialTab);
     setActiveTab('events');
     setActiveNav('events');
@@ -204,6 +207,7 @@ export default function EOPage() {
 
   const handleNavClick = (navKey) => {
     setDetailEvent(null);
+    setWorkspaceShiftId(null);
     setActiveNav(navKey);
     let target = 'overview';
     if (navKey === 'overview' || navKey === 'analytics') {
@@ -408,46 +412,89 @@ export default function EOPage() {
             </>
           )}
 
-          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN HOẶC TRANG CHI TIẾT SỰ KIỆN */}
-          {activeTab === 'events' && (
-            (detailEvent || activeEventSubTab === 'detail') ? (
-              <EventDetailModal
-                isOpen={true}
-                asPage={true}
-                initialTab={detailInitialTab}
-                allEvents={events.events}
-                onSelectEvent={(nextEvt) => setDetailEvent(nextEvt)}
-                onClose={() => {
-                  setDetailEvent(null);
-                  setDetailInitialTab('SHIFTS');
-                  handleEventSubTabChange('list');
-                }}
-                event={
-                  detailEvent ||
-                  (Array.isArray(events.events)
-                    ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0]
-                    : null)
-                }
-                onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
-                onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-                onOpenConfirmPublish={(evt) => {
-                  const shiftCount = evt.totalShifts || (Array.isArray(evt.shifts) ? evt.shifts.length : 0);
-                  if (!shiftCount) {
-                    showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi đăng tuyển!', 'warning');
-                    shifts.setSelectedEventId(evt.eventId);
-                    shifts.setShowShiftModal(true);
-                    return;
-                  }
-                  events.openConfirmPublish(evt);
-                }}
-                onOpenEditEvent={events.setEditingEvent}
-                onEditShift={shifts.setEditingShift}
-                onCancelShift={shifts.handleCancelShift}
-                onReloadEvents={events.loadEvents}
-                onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
-                skillTaxonomy={shifts.skillTaxonomy}
-              />
-            ) : (
+          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN, CHI TIẾT SỰ KIỆN HOẶC TRANG QUẢN LÝ TỪNG CA */}
+          {activeTab === 'events' && (() => {
+            const resolvedEvent =
+              detailEvent ||
+              (activeEventSubTab === 'detail' && Array.isArray(events.events)
+                ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0]
+                : null);
+
+            const workspaceShift =
+              workspaceShiftId && resolvedEvent
+                ? (resolvedEvent.shifts || []).find((s) => s.shiftId === workspaceShiftId)
+                : null;
+
+            if (workspaceShift && resolvedEvent) {
+              return (
+                <ShiftWorkspacePage
+                  shift={workspaceShift}
+                  event={resolvedEvent}
+                  onSelectShift={(nextShift) => {
+                    setWorkspaceShiftId(nextShift.shiftId);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onBackToEvent={() => {
+                    setWorkspaceShiftId(null);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onEditShift={shifts.setEditingShift}
+                  onCancelShift={shifts.handleCancelShift}
+                  onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+                  onReloadEvents={events.loadEvents}
+                  onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+                  skillTaxonomy={shifts.skillTaxonomy}
+                />
+              );
+            }
+
+            if (resolvedEvent || activeEventSubTab === 'detail') {
+              return (
+                <EventDetailModal
+                  isOpen={true}
+                  asPage={true}
+                  initialTab={detailInitialTab}
+                  allEvents={events.events}
+                  onSelectEvent={(nextEvt) => {
+                    setWorkspaceShiftId(null);
+                    setDetailEvent(nextEvt);
+                  }}
+                  onClose={() => {
+                    setDetailEvent(null);
+                    setWorkspaceShiftId(null);
+                    setDetailInitialTab('SHIFTS');
+                    handleEventSubTabChange('list');
+                  }}
+                  event={resolvedEvent}
+                  onOpenShiftWorkspace={(sh) => {
+                    if (sh?.shiftId) {
+                      setWorkspaceShiftId(sh.shiftId);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
+                  onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+                  onOpenConfirmPublish={(evt) => {
+                    const shiftCount = evt.totalShifts || (Array.isArray(evt.shifts) ? evt.shifts.length : 0);
+                    if (!shiftCount) {
+                      showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi đăng tuyển!', 'warning');
+                      shifts.setSelectedEventId(evt.eventId);
+                      shifts.setShowShiftModal(true);
+                      return;
+                    }
+                    events.openConfirmPublish(evt);
+                  }}
+                  onOpenEditEvent={events.setEditingEvent}
+                  onEditShift={shifts.setEditingShift}
+                  onCancelShift={shifts.handleCancelShift}
+                  onReloadEvents={events.loadEvents}
+                  onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+                  skillTaxonomy={shifts.skillTaxonomy}
+                />
+              );
+            }
+
+            return (
               <EOEventsTab
                 loading={events.loading}
                 allEvents={events.events}
@@ -463,6 +510,11 @@ export default function EOPage() {
                 activeSubTab={activeEventSubTab}
                 onSubTabChange={handleEventSubTabChange}
                 onOpenEventDetail={handleOpenEventDetailPage}
+                onOpenShiftWorkspace={(sh, evt) => {
+                  if (evt) setDetailEvent(evt);
+                  if (sh?.shiftId) setWorkspaceShiftId(sh.shiftId);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 onDeleteEvent={events.handleDeleteEvent}
                 onOpenCreateEvent={handleOpenCreateEvent}
                 onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
@@ -488,8 +540,8 @@ export default function EOPage() {
                 onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
                 skillTaxonomy={shifts.skillTaxonomy}
               />
-            )
-          )}
+            );
+          })()}
 
           {activeTab === 'payments' && (
             <EOPaymentsTab

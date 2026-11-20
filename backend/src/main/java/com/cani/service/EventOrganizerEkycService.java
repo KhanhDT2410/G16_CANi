@@ -44,6 +44,12 @@ public class EventOrganizerEkycService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cani.repository.WorkerRepository workerRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.EventRepository eventRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.ReviewRepository reviewRepository;
+
     @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
     private boolean ekycStrict;
 
@@ -289,6 +295,34 @@ public class EventOrganizerEkycService {
             }
         }
 
+        // Tính số sự kiện thực tế đã chạy/tổ chức và đánh giá thực tế từ DB
+        int actualEventsCount = eo.getTotalEventsCompleted() != null ? eo.getTotalEventsCompleted() : 0;
+        if (eventRepository != null) {
+            long realCount = eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId())
+                    .stream()
+                    .filter(ev -> ev.getStatus() != null
+                            && ev.getStatus() != com.cani.entity.enums.EventStatus.DRAFT
+                            && ev.getStatus() != com.cani.entity.enums.EventStatus.CANCELLED)
+                    .count();
+            actualEventsCount = (int) Math.max(actualEventsCount, realCount);
+        }
+
+        BigDecimal actualRatingAvg = eo.getRatingAvg() != null ? eo.getRatingAvg() : BigDecimal.ZERO;
+        int actualRatingCount = eo.getRatingCount() != null ? eo.getRatingCount() : 0;
+        if (reviewRepository != null) {
+            UUID targetUserId = u != null ? u.getUserId() : userId;
+            List<com.cani.entity.Review> reviews = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(targetUserId);
+            if (reviews != null && !reviews.isEmpty()) {
+                actualRatingCount = reviews.size();
+                double avg = reviews.stream()
+                        .filter(r -> r.getRating() != null)
+                        .mapToInt(com.cani.entity.Review::getRating)
+                        .average()
+                        .orElse(0.0);
+                actualRatingAvg = BigDecimal.valueOf(avg).setScale(1, java.math.RoundingMode.HALF_UP);
+            }
+        }
+
         return EoProfileDto.builder()
                 .eoId(eo.getEoId())
                 .userId(u != null ? u.getUserId() : userId)
@@ -300,9 +334,9 @@ public class EventOrganizerEkycService {
                 .email(u != null ? u.getEmail() : null)
                 .verificationStatus(eo.getVerificationStatus() != null ? eo.getVerificationStatus().name() : "PENDING")
                 .verifiedAt(eo.getVerifiedAt())
-                .ratingAvg(eo.getRatingAvg())
-                .ratingCount(eo.getRatingCount())
-                .totalEventsCompleted(eo.getTotalEventsCompleted())
+                .ratingAvg(actualRatingAvg)
+                .ratingCount(actualRatingCount)
+                .totalEventsCompleted(actualEventsCount)
                 .businessLicenseUrl(businessLicenseUrl)
                 .businessVerificationStatus(businessVerificationStatus)
                 .build();

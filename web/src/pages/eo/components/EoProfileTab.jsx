@@ -35,7 +35,6 @@ export default function EoProfileTab() {
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [submittingEkyc, setSubmittingEkyc] = useState(false);
-  const [isBusinessEntity, setIsBusinessEntity] = useState(false);
 
   // Ẩn / Hiện thông tin nhạy cảm
   const [showSensitive, setShowSensitive] = useState({
@@ -79,7 +78,6 @@ export default function EoProfileTab() {
   // Hồ Sơ Nhà Tổ Chức - Khởi tạo từ thông tin người dùng thực tế
   const [profile, setProfile] = useState({
     companyName: '',
-    taxId: '',
     address: '',
     fullName: user?.fullName || user?.username || '',
     phone: user?.phone || '',
@@ -87,9 +85,8 @@ export default function EoProfileTab() {
     industry: '',
     bio: '',
     ratingAvg: 0,
+    ratingCount: 0,
     totalEventsCompleted: 0,
-    businessLicenseUrl: '',
-    businessVerificationStatus: 'NOT_REGISTERED',
   });
 
   // Trạng thái eKYC
@@ -100,17 +97,13 @@ export default function EoProfileTab() {
     frontImage: null,
     backImage: null,
     selfieImage: null,
-    businessLicenseImage: null,
   });
 
   const [previews, setPreviews] = useState({
     frontImage: null,
     backImage: null,
     selfieImage: null,
-    businessLicenseImage: null,
   });
-
-  // Kiểm tra dữ liệu ban đầu khi mở Tab Hồ sơ
 
   // Tải dữ liệu từ Backend
   const loadData = async () => {
@@ -122,20 +115,16 @@ export default function EoProfileTab() {
       ]);
 
       if (profileRes.status === 'fulfilled' && profileRes.value) {
-        const hasTax = Boolean(profileRes.value.taxId && profileRes.value.taxId.trim());
-        setIsBusinessEntity(hasTax);
         setProfile((prev) => ({
           ...prev,
           companyName: profileRes.value.companyName || prev.companyName,
-          taxId: profileRes.value.taxId || prev.taxId,
           address: profileRes.value.address || prev.address,
           fullName: profileRes.value.fullName || prev.fullName,
           phone: profileRes.value.phone || prev.phone,
           email: profileRes.value.email || prev.email,
-          ratingAvg: profileRes.value.ratingAvg || prev.ratingAvg,
+          ratingAvg: profileRes.value.ratingAvg ?? prev.ratingAvg,
+          ratingCount: profileRes.value.ratingCount ?? prev.ratingCount,
           totalEventsCompleted: profileRes.value.totalEventsCompleted ?? prev.totalEventsCompleted,
-          businessLicenseUrl: profileRes.value.businessLicenseUrl || '',
-          businessVerificationStatus: profileRes.value.businessVerificationStatus || (hasTax ? 'PENDING_REVIEW' : 'NOT_REGISTERED'),
         }));
       }
 
@@ -209,7 +198,6 @@ export default function EoProfileTab() {
         setProfile((prev) => ({
           ...prev,
           companyName: res.companyName || prev.companyName,
-          taxId: res.taxId || prev.taxId,
           address: res.address || prev.address,
           fullName: res.fullName || prev.fullName,
           phone: res.phone || prev.phone,
@@ -250,9 +238,6 @@ export default function EoProfileTab() {
       formData.append('frontImage', files.frontImage);
       formData.append('backImage', files.backImage);
       formData.append('selfieImage', files.selfieImage);
-      if (files.businessLicenseImage) {
-        formData.append('businessLicenseImage', files.businessLicenseImage);
-      }
       if (cleanedCccd) {
         formData.append('cccdNumber', cleanedCccd);
       }
@@ -500,13 +485,17 @@ export default function EoProfileTab() {
         <div className="profile-hero-right">
           <div className="profile-stat-box">
             <div className="profile-stat-value">{profile.totalEventsCompleted ?? 0}</div>
-            <div className="profile-stat-label">Sự kiện đã chạy</div>
+            <div className="profile-stat-label">Sự kiện đã tổ chức</div>
           </div>
           <div className="profile-stat-box">
-            <div className="profile-stat-value" style={{ color: '#16a34a' }}>
-              {profile.totalEventsCompleted > 0 && profile.ratingAvg ? `${profile.ratingAvg.toFixed(1)} / 5.0` : '—'}
+            <div className="profile-stat-value" style={{ color: '#16a34a', fontSize: profile.ratingCount > 0 ? undefined : '1rem' }}>
+              {profile.ratingCount > 0 && Number(profile.ratingAvg) > 0
+                ? `${Number(profile.ratingAvg).toFixed(1)} / 5.0`
+                : 'Chưa có'}
             </div>
-            <div className="profile-stat-label">Độ uy tín tuyển dụng</div>
+            <div className="profile-stat-label">
+              {profile.ratingCount > 0 ? `Đánh giá (${profile.ratingCount} lượt)` : 'Độ uy tín tuyển dụng'}
+            </div>
           </div>
         </div>
       </div>
@@ -575,75 +564,9 @@ export default function EoProfileTab() {
           </div>
 
           <form onSubmit={handleSaveProfile}>
-            {/* Toggle / Nút bấm Đăng Ký Hộ Kinh Doanh & Trạng thái Admin Duyệt */}
-            <div style={{
-              backgroundColor: isBusinessEntity ? '#eff6ff' : '#f8fafc',
-              border: isBusinessEntity ? '1.5px solid #3b82f6' : '1px dashed #cbd5e1',
-              borderRadius: '0.875rem',
-              padding: '1rem 1.25rem',
-              marginBottom: '1.25rem',
-              transition: 'all 0.2s',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={isBusinessEntity}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setIsBusinessEntity(checked);
-                      if (!checked) {
-                        handleProfileFieldChange('taxId', '');
-                      }
-                    }}
-                    style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer' }}
-                  />
-                  <span style={{ fontWeight: 700, fontSize: '0.925rem', color: isBusinessEntity ? '#1d4ed8' : '#334155' }}>
-                    Đăng ký tư cách Hộ kinh doanh / Doanh nghiệp (Có Mã Số Thuế)
-                  </span>
-                </label>
-
-                {/* Trạng thái xác nhận từ Admin */}
-                {isBusinessEntity ? (
-                  profile.businessVerificationStatus === 'APPROVED' ? (
-                    <span className="status-pill approved" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                      ĐÃ ĐƯỢC ADMIN XÁC NHẬN HỘ KINH DOANH
-                    </span>
-                  ) : profile.businessVerificationStatus === 'PENDING_REVIEW' ? (
-                    <span className="status-pill pending" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      ⏳ ĐÃ ĐĂNG KÝ MST - ĐANG CHỜ ADMIN XÁC NHẬN
-                    </span>
-                  ) : (
-                    <span className="status-pill none" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#b45309' }}>
-                      ⚠️ CHỜ ADMIN XÁC NHẬN TƯ CÁCH PHÁP NHÂN
-                    </span>
-                  )
-                ) : (
-                  <span style={{
-                    fontSize: '0.775rem',
-                    padding: '0.25rem 0.65rem',
-                    borderRadius: '9999px',
-                    fontWeight: 600,
-                    backgroundColor: '#e2e8f0',
-                    color: '#475569',
-                  }}>
-                    Mặc định: Cá nhân / Nhà tổ chức
-                  </span>
-                )}
-              </div>
-              <p style={{ margin: '0.4rem 0 0', fontSize: '0.825rem', color: '#64748b', lineHeight: 1.45 }}>
-                {isBusinessEntity
-                  ? 'Khi đăng ký Hộ kinh doanh / Doanh nghiệp, bạn cần điền đầy đủ Tên tổ chức và Mã số thuế để Ban Quản Trị (Admin) thẩm định và phê duyệt tư cách pháp nhân.'
-                  : 'Tài khoản cá nhân / ban tổ chức tự do không bắt buộc có Mã số thuế. Nếu bạn là Hộ kinh doanh hoặc Doanh nghiệp có MST, hãy tích vào ô trên để mở khóa ô điền Mã số thuế.'}
-              </p>
-            </div>
-
             <div className="profile-form-grid-2">
               <div className="profile-form-group">
-                <label>Tên Nhà Tổ Chức / Đơn Vị Sự Kiện *</label>
+                <label>Tên Đơn Vị / Ban Tổ Chức Sự Kiện *</label>
                 <input
                   type="text"
                   required
@@ -651,26 +574,6 @@ export default function EoProfileTab() {
                   value={profile.companyName}
                   onChange={(e) => handleProfileFieldChange('companyName', e.target.value)}
                   placeholder="VD: Ban Tổ Chức Festival hoặc Tên Đơn Vị"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>
-                  Mã Số Thuế (MST) / Số ĐKKD {isBusinessEntity ? '*' : ''}
-                </label>
-                <input
-                  type="text"
-                  required={isBusinessEntity}
-                  disabled={!isBusinessEntity}
-                  className="profile-input"
-                  style={{
-                    backgroundColor: !isBusinessEntity ? '#f1f5f9' : '#ffffff',
-                    cursor: !isBusinessEntity ? 'not-allowed' : 'text',
-                    color: !isBusinessEntity ? '#94a3b8' : 'inherit',
-                  }}
-                  value={profile.taxId}
-                  onChange={(e) => handleProfileFieldChange('taxId', e.target.value)}
-                  placeholder={isBusinessEntity ? "VD: 0109876543 hoặc 0312345678" : "Bấm nút đăng ký hộ kinh doanh phía trên để điền MST"}
                 />
               </div>
 
@@ -1046,102 +949,102 @@ export default function EoProfileTab() {
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                       type="text"
-                        disabled
-                        className="profile-input"
-                        style={{ backgroundColor: '#f1f5f9', color: '#334155', flex: '1 1 240px' }}
-                        value={showSensitive.email ? (profile.email || user?.email) : maskEmail(profile.email || user?.email)}
-                      />
-                      <button
-                        type="button"
-                        disabled={isSendingOtp || otpCountdown > 0}
-                        onClick={handleSendOtp}
-                        className="profile-btn-primary"
-                        style={{ padding: '0.65rem 1.25rem', whiteSpace: 'nowrap', minWidth: '170px' }}
-                      >
-                        {isSendingOtp ? 'Đang gửi...' : otpCountdown > 0 ? `Gửi lại sau (${otpCountdown}s)` : 'Gửi mã OTP qua Email'}
-                      </button>
-                    </div>
+                      disabled
+                      className="profile-input"
+                      style={{ backgroundColor: '#f1f5f9', color: '#334155', flex: '1 1 240px' }}
+                      value={showSensitive.email ? (profile.email || user?.email) : maskEmail(profile.email || user?.email)}
+                    />
+                    <button
+                      type="button"
+                      disabled={isSendingOtp || otpCountdown > 0}
+                      onClick={handleSendOtp}
+                      className="profile-btn-primary"
+                      style={{ padding: '0.65rem 1.25rem', whiteSpace: 'nowrap', minWidth: '170px' }}
+                    >
+                      {isSendingOtp ? 'Đang gửi...' : otpCountdown > 0 ? `Gửi lại sau (${otpCountdown}s)` : 'Gửi mã OTP qua Email'}
+                    </button>
                   </div>
+                </div>
 
-                  {otpStep >= 2 && (
-                    <>
-                      <div className="profile-form-group span-2">
-                        <label>Nhập Mã Xác Thực OTP (6 số từ Email) *</label>
-                        <input
-                          type="text"
-                          required
-                          maxLength={6}
-                          className="profile-input"
-                          style={{ fontSize: '1.2rem', letterSpacing: '0.35em', fontWeight: 700, textAlign: 'center' }}
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                          placeholder="••••••"
-                          autoFocus
-                        />
-                      </div>
+                {otpStep >= 2 && (
+                  <>
+                    <div className="profile-form-group span-2">
+                      <label>Nhập Mã Xác Thực OTP (6 số từ Email) *</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        className="profile-input"
+                        style={{ fontSize: '1.2rem', letterSpacing: '0.35em', fontWeight: 700, textAlign: 'center' }}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="••••••"
+                        autoFocus
+                      />
+                    </div>
 
-                      <div className="profile-form-group">
-                        <label>Mật Khẩu Mới *</label>
-                        <div className="profile-input-wrapper">
-                          <input
-                            type={showOtpPassword ? 'text' : 'password'}
-                            required
-                            minLength={8}
-                            className="profile-input"
-                            value={otpNewPassword}
-                            onChange={(e) => setOtpNewPassword(e.target.value)}
-                            placeholder="Tối thiểu 8 ký tự"
-                          />
-                          <button
-                            type="button"
-                            className="profile-input-eye-btn"
-                            onClick={() => setShowOtpPassword(!showOtpPassword)}
-                            title={showOtpPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                          >
-                            {showOtpPassword ? (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                <line x1="1" y1="1" x2="23" y2="23"></line>
-                              </svg>
-                            ) : (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="profile-form-group">
-                        <label>Xác Nhận Lại Mật Khẩu Mới *</label>
+                    <div className="profile-form-group">
+                      <label>Mật Khẩu Mới *</label>
+                      <div className="profile-input-wrapper">
                         <input
                           type={showOtpPassword ? 'text' : 'password'}
                           required
                           minLength={8}
                           className="profile-input"
-                          value={otpConfirmPassword}
-                          onChange={(e) => setOtpConfirmPassword(e.target.value)}
-                          placeholder="Nhập lại mật khẩu mới"
+                          value={otpNewPassword}
+                          onChange={(e) => setOtpNewPassword(e.target.value)}
+                          placeholder="Tối thiểu 8 ký tự"
                         />
-                      </div>
-
-                      <div className="profile-actions-bar span-2">
                         <button
-                          type="submit"
-                          disabled={isResettingPassword}
-                          className="profile-btn-primary"
+                          type="button"
+                          className="profile-input-eye-btn"
+                          onClick={() => setShowOtpPassword(!showOtpPassword)}
+                          title={showOtpPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                          {isResettingPassword ? 'Đang xác thực & cập nhật...' : 'Xác Nhận & Cập Nhật Mật Khẩu'}
+                          {showOtpPassword ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                              <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </svg>
+                          ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
+                              <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                          )}
                         </button>
                       </div>
-                    </>
-                  )}
-                </div>
-              </form>
+                    </div>
+
+                    <div className="profile-form-group">
+                      <label>Xác Nhận Lại Mật Khẩu Mới *</label>
+                      <input
+                        type={showOtpPassword ? 'text' : 'password'}
+                        required
+                        minLength={8}
+                        className="profile-input"
+                        value={otpConfirmPassword}
+                        onChange={(e) => setOtpConfirmPassword(e.target.value)}
+                        placeholder="Nhập lại mật khẩu mới"
+                      />
+                    </div>
+
+                    <div className="profile-actions-bar span-2">
+                      <button
+                        type="submit"
+                        disabled={isResettingPassword}
+                        className="profile-btn-primary"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        {isResettingPassword ? 'Đang xác thực & cập nhật...' : 'Xác Nhận & Cập Nhật Mật Khẩu'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1151,7 +1054,7 @@ export default function EoProfileTab() {
         <EOSettingsTab />
       )}
 
-          </div>
+    </div>
   );
 }
 

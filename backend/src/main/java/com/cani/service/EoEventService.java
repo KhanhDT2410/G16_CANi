@@ -1081,6 +1081,24 @@ public class EoEventService {
             } catch (Exception ignored) {}
         }
 
+        EventStatus resolvedEventStatus = e.getStatus();
+        if (resolvedEventStatus != EventStatus.CANCELLED && resolvedEventStatus != EventStatus.DRAFT) {
+            Instant now = Instant.now();
+            boolean allShiftsCompleted = shifts != null && !shifts.isEmpty() && shifts.stream()
+                    .allMatch(s -> s.getStatus() == ShiftStatus.COMPLETED || s.getStatus() == ShiftStatus.CANCELLED);
+            if ((e.getEndTime() != null && now.isAfter(e.getEndTime())) || allShiftsCompleted) {
+                resolvedEventStatus = EventStatus.COMPLETED;
+                if (e.getStatus() != EventStatus.COMPLETED) {
+                    e.setStatus(EventStatus.COMPLETED);
+                }
+            } else if (e.getStartTime() != null && !now.isBefore(e.getStartTime())) {
+                resolvedEventStatus = EventStatus.ONGOING;
+                if (e.getStatus() == EventStatus.ACTIVE) {
+                    e.setStatus(EventStatus.ONGOING);
+                }
+            }
+        }
+
         return EventResponseDto.builder()
                 .eventId(e.getEventId())
                 .name(e.getName())
@@ -1093,7 +1111,7 @@ public class EoEventService {
                 .endTime(e.getEndTime())
                 .imageUrl(e.getImageUrl())
                 .mode(e.getMode())
-                .status(e.getStatus())
+                .status(resolvedEventStatus)
                 .readinessScore(e.getReadinessScore())
                 .totalShifts(e.getTotalShifts())
                 .totalRequiredWorkers(e.getTotalRequiredWorkers())
@@ -1176,6 +1194,22 @@ public class EoEventService {
     }
 
     private ShiftResponseDto mapToShiftResponseDto(Shift s) {
+        ShiftStatus resolvedStatus = s.getStatus();
+        if (resolvedStatus != ShiftStatus.CANCELLED && resolvedStatus != ShiftStatus.DRAFT) {
+            Instant now = Instant.now();
+            if (s.getEndTime() != null && now.isAfter(s.getEndTime())) {
+                resolvedStatus = ShiftStatus.COMPLETED;
+                if (s.getStatus() != ShiftStatus.COMPLETED) {
+                    s.setStatus(ShiftStatus.COMPLETED);
+                }
+            } else if (s.getStartTime() != null && !now.isBefore(s.getStartTime())) {
+                resolvedStatus = ShiftStatus.IN_PROGRESS;
+                if (s.getStatus() == ShiftStatus.ACTIVE || s.getStatus() == ShiftStatus.FULLY_STAFFED) {
+                    s.setStatus(ShiftStatus.IN_PROGRESS);
+                }
+            }
+        }
+
         return ShiftResponseDto.builder()
                 .shiftId(s.getShiftId())
                 .eventId(s.getEvent() != null ? s.getEvent().getEventId() : null)
@@ -1190,7 +1224,7 @@ public class EoEventService {
                 .hourlyWage(s.getHourlyWage())
                 .allowance(s.getAllowance())
                 .totalCost(s.getTotalCost())
-                .status(s.getStatus())
+                .status(resolvedStatus)
                 .riskScore(s.getRiskScore())
                 .locationAddress(s.getLocationAddress())
                 .locationLat(s.getLocationLat())
@@ -1201,6 +1235,7 @@ public class EoEventService {
                 .imageUrl(s.getImageUrl())
                 .checklist(s.getChecklist())
                 .requiredSkills(s.getRequiredSkills())
+                .emergency(Boolean.TRUE.equals(s.getEmergency()))
                 .build();
     }
 

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { showToast } from '../../../components/common/Toast';
+import { eoService } from '../../../services/eoService';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import { getDynamicShiftStatus } from '../utils/eventHelpers';
 
@@ -174,6 +175,48 @@ const EventShiftsDrawer = ({
                 title="Mở bảng Điểm danh & Mã QR trực tiếp ngay bên dưới"
               >
                 <span>{isPanelOpen ? '▾ Đóng Điểm Danh & QR' : '▸ Điểm Danh & Mã QR'}</span>
+              </button>
+            )}
+
+            {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const enable = !shift.emergency;
+                  const confirmMsg = enable
+                    ? `Kích hoạt điều phối khẩn cấp (Emergency Dispatch) cho ca "${shift.jobType}"? Nhân sự trên Radar sẽ được tự do nhận ca ngay.`
+                    : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
+                  if (!window.confirm(confirmMsg)) return;
+                  try {
+                    if (enable) {
+                      await eoService.enableEmergencyDispatch(shift.shiftId, 15);
+                      showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}"!`, 'success');
+                    } else {
+                      await eoService.disableEmergencyDispatch(shift.shiftId);
+                      showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
+                    }
+                    onReloadEvents?.();
+                  } catch (err) {
+                    showToast(err.response?.data?.message || err.message || 'Lỗi thao tác khẩn cấp', 'error');
+                  }
+                }}
+                style={{
+                  background: shift.emergency ? '#fef2f2' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                  color: shift.emergency ? '#b91c1c' : '#ffffff',
+                  border: shift.emergency ? '1px solid #f87171' : 'none',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  boxShadow: shift.emergency ? 'none' : '0 2px 6px rgba(225, 29, 72, 0.25)',
+                }}
+                title={shift.emergency ? 'Tắt điều phối khẩn cấp' : 'Bật điều phối khẩn cấp cho ca này'}
+              >
+                {shift.emergency ? '🛑 Tắt Khẩn Cấp' : '🚨 Khẩn Cấp'}
               </button>
             )}
 

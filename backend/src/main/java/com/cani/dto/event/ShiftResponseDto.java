@@ -42,4 +42,6 @@ public class ShiftResponseDto {
     private String checklist;
     /** Kỹ năng bắt buộc của ca (matching hard filter + hiển thị web) */
     private UUID[] requiredSkills;
+    /** Cờ điều phối khẩn cấp (Emergency Dispatch) cho phép radar free-pick */
+    private Boolean emergency;
 }

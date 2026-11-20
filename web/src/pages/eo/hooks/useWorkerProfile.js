@@ -52,3 +52,6 @@ export function useWorkerProfile() {
     setProfile,
   };
 }
+
+export default useWorkerProfile;
+

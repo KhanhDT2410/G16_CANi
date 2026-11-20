@@ -10,6 +10,7 @@ export const HeaderUserMenu = ({
   isAdmin,
   isCustomerCare,
   onUserBlockClick,
+  onHelpClick,
   onLogout,
 }) => {
   const isStaff = isAdmin || isCustomerCare;
@@ -36,7 +37,7 @@ export const HeaderUserMenu = ({
           type="button"
           className="header-help-btn"
           title="Trung tâm trợ giúp"
-          onClick={() => window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail: { tab: 'support' } }))}
+          onClick={onHelpClick}
         >
           <HelpIcon />
         </button>
@@ -73,7 +74,6 @@ export const HeaderUserMenu = ({
             {user.email || 'Chưa cập nhật email'}
           </span>
         </div>
-        {!isStaff && <span className="user-meta-arrow">▾</span>}
       </div>
 
       <button

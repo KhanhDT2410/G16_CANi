@@ -93,12 +93,28 @@ const AdminPage = () => {
     }
   });
 
-  // Xử lý sự kiện click vào User block trên Header để trở về Bảng điều khiển chính & mở chat trực tiếp
+  // Xử lý sự kiện click vào User block trên Header để trở về Bảng điều khiển chính, mở chat hoặc deep-link thông báo
   useEffect(() => {
     const handleNavHome = () => setActiveTab('dashboard');
     const handleOpenStaffChat = () => {
       setActiveTab('tickets');
       setTicketFilter('CHAT');
+    };
+    const handleSwitchTab = (e) => {
+      const tab = e.detail?.tab;
+      if (tab === 'support' || tab === 'tickets') {
+        setActiveTab('tickets');
+      } else if (tab === 'disputes') {
+        setActiveTab('disputes');
+      } else if (tab === 'events' || tab === 'shifts') {
+        setActiveTab('shifts');
+      } else if (tab === 'payments' || tab === 'revenue') {
+        setActiveTab('revenue');
+      } else if (tab === 'appeals') {
+        setActiveTab('appeals');
+      } else if (tab === 'noshows') {
+        setActiveTab('noshows');
+      }
     };
     if (window.__cani_pending_chat) {
       setActiveTab('tickets');
@@ -106,9 +122,11 @@ const AdminPage = () => {
     }
     window.addEventListener('cani_admin_navigate_home', handleNavHome);
     window.addEventListener('cani_open_staff_chat', handleOpenStaffChat);
+    window.addEventListener('cani_switch_tab', handleSwitchTab);
     return () => {
       window.removeEventListener('cani_admin_navigate_home', handleNavHome);
       window.removeEventListener('cani_open_staff_chat', handleOpenStaffChat);
+      window.removeEventListener('cani_switch_tab', handleSwitchTab);
     };
   }, []);
 

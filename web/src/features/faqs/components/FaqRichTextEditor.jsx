@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { showPrompt } from '../../../components/common/PromptModal';
 
 /**
  * Trình soạn thảo Rich Text Editor với thanh công cụ định dạng (Paragraph, B, I, Link, Lists, Table, Quote, Image, Undo/Redo)
@@ -25,15 +26,25 @@ export const FaqRichTextEditor = ({ value, onChange, placeholder, disabled }) =>
     handleInput();
   };
 
-  const handleInsertLink = () => {
+  const handleInsertLink = async () => {
     if (disabled) return;
-    const url = window.prompt('Nhập đường dẫn URL liên kết:');
+    const url = await showPrompt({
+      title: 'Chèn liên kết URL',
+      description: 'Nhập đường dẫn liên kết (https://...) để gắn vào đoạn văn bản.',
+      inputLabel: 'Đường dẫn URL',
+      inputPlaceholder: 'https://...',
+    });
     if (url) exec('createLink', url);
   };
 
-  const handleInsertImage = () => {
+  const handleInsertImage = async () => {
     if (disabled) return;
-    const url = window.prompt('Nhập đường dẫn hình ảnh (URL):');
+    const url = await showPrompt({
+      title: 'Chèn hình ảnh',
+      description: 'Nhập đường dẫn URL của hình ảnh minh họa.',
+      inputLabel: 'Đường dẫn hình ảnh (URL)',
+      inputPlaceholder: 'https://.../image.png',
+    });
     if (url) exec('insertImage', url);
   };
 

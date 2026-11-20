@@ -1,4 +1,11 @@
-export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisputeModal, onOpenVoucherModal }) {
+export default function EOPaymentsTab({
+  payments = [],
+  loading = false,
+  error = null,
+  onOpenPaymentModal,
+  onOpenDisputeModal,
+  onOpenVoucherModal,
+}) {
   return (
     <section className="eo-payments-section animate-fade-in-up">
       {/* Thanh Tiêu Đề & Thao Tác Xuất Phiếu Chi Kế Toán */}
@@ -62,7 +69,31 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
             </tr>
           </thead>
           <tbody>
-            {payments.map((p) => (
+            {loading ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
+                  Đang tải dữ liệu thanh toán ca làm việc...
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#dc2626', fontWeight: 600 }}>
+                  {error}
+                </td>
+              </tr>
+            ) : payments.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '2.75rem 1rem', color: '#64748b' }}>
+                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                    Chưa có khoản thanh toán nào được ghi nhận
+                  </div>
+                  <div style={{ fontSize: '0.84rem' }}>
+                    Mở một ca làm việc đã có nhân sự điểm danh để khai báo và đối soát thù lao trực tiếp.
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              payments.map((p) => (
               <tr key={p.paymentId}>
                 <td
                   style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }}
@@ -130,7 +161,8 @@ export default function EOPaymentsTab({ payments, onOpenPaymentModal, onOpenDisp
                   </div>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLogin } from '../hooks/useLogin';
 import CaniLogo from '../../../components/common/CaniLogo';
 import ForgotPasswordModal from './ForgotPasswordModal';
@@ -183,7 +184,7 @@ export const LoginForm = () => {
       </button>
 
       <div className="auth-footer">
-        Chưa có tài khoản đại diện Ban Tổ Chức? <a href="/register">Đăng ký ngay</a>
+        Chưa có tài khoản đại diện Ban Tổ Chức? <Link to="/register">Đăng ký ngay</Link>
       </div>
 
       <ForgotPasswordModal

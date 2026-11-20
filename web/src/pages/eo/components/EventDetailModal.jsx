@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import { getDynamicEventStatus, getDynamicShiftStatus, getShiftStaffingAlerts } from '../utils/eventHelpers';
 import { WorkerProfileModal } from './worker-profile';
@@ -70,10 +71,16 @@ export default function EventDetailModal({
       showToast('Không tìm thấy thông tin tài khoản để chặn.', 'error');
       return;
     }
-    const reason = window.prompt(
-      `Bạn có chắc chắn muốn chặn nhân sự "${worker.workerName}" không?\n\nNgười này sẽ không thể nhận ca làm việc của bạn trong tương lai.\nNhập lý do chặn (tùy chọn):`,
-      'Không tuân thủ quy định ca làm'
-    );
+    const reason = await showPrompt({
+      title: `Chặn nhân sự "${worker.workerName}"`,
+      description: 'Người này sẽ không thể nhận ca làm việc của bạn trong tương lai.',
+      type: 'danger',
+      confirmText: 'Xác nhận chặn',
+      inputLabel: 'Lý do chặn (tùy chọn)',
+      initialValue: 'Không tuân thủ quy định ca làm',
+      isMultiline: true,
+      allowEmpty: true,
+    });
     if (reason === null) return;
 
     try {
@@ -91,10 +98,15 @@ export default function EventDetailModal({
   };
 
   const handleToggleEmergency = async (shift, enable) => {
-    const confirmMsg = enable
-      ? `Bạn có chắc chắn muốn BẬT điều phối khẩn cấp cho ca "${shift.jobType}"?\n\n- Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự xung quanh.\n- Cho phép nhân sự chủ động nhận ca trực tiếp trên bản đồ.\n- Bán kính tìm kiếm mở rộng tối đa 15km.`
-      : `Bạn có chắc chắn muốn TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
-    if (!window.confirm(confirmMsg)) return;
+    const confirmed = await showConfirm({
+      title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
+      description: enable
+        ? 'Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự trong bán kính tối đa 15km để chủ động nhận ca trực tiếp trên bản đồ.'
+        : `Bạn có chắc chắn muốn TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
+      type: enable ? 'warning' : 'info',
+      confirmText: enable ? 'Bật khẩn cấp' : 'Tắt chế độ',
+    });
+    if (!confirmed) return;
 
     try {
       if (enable) {
@@ -110,6 +122,27 @@ export default function EventDetailModal({
       showToast(msg, 'error');
     }
   };
+
+  const rawShifts = event?.shifts || [];
+  const activeAndDraftShifts = rawShifts
+    .filter((sh) => sh.status !== 'CANCELLED')
+    .sort((a, b) => {
+      const pA = a.status === 'ACTIVE' || a.status === 'OPEN' ? 1 : a.status === 'DRAFT' ? 2 : 1;
+      const pB = b.status === 'ACTIVE' || b.status === 'OPEN' ? 1 : b.status === 'DRAFT' ? 2 : 1;
+      return pA - pB;
+    });
+  const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
+  const shifts = activeAndDraftShifts;
+  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts), [shifts]);
+
+  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
+  const skillNameMap = useMemo(() => {
+    const m = {};
+    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
+      if (sk && sk.skillId) m[sk.skillId] = sk.name;
+    });
+    return m;
+  }, [skillTaxonomy]);
 
   if (!isOpen) return null;
   if (!event) {
@@ -129,20 +162,9 @@ export default function EventDetailModal({
     return null;
   }
 
-  const rawShifts = event.shifts || [];
-  const activeAndDraftShifts = rawShifts
-    .filter((sh) => sh.status !== 'CANCELLED')
-    .sort((a, b) => {
-      const pA = a.status === 'ACTIVE' || a.status === 'OPEN' ? 1 : a.status === 'DRAFT' ? 2 : 1;
-      const pB = b.status === 'ACTIVE' || b.status === 'OPEN' ? 1 : b.status === 'DRAFT' ? 2 : 1;
-      return pA - pB;
-    });
-  const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
-  const shifts = activeAndDraftShifts;
   const totalRequired = event.totalRequiredWorkers || shifts.reduce((s, sh) => s + (sh.requiredWorkers || 0), 0);
   const totalConfirmed = event.totalConfirmedWorkers || shifts.reduce((s, sh) => s + (sh.confirmedWorkers || 0), 0);
   const fillRate = totalRequired > 0 ? Math.round((totalConfirmed / totalRequired) * 100) : 0;
-  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts), [shifts]);
   const hasStaffingShortage = staffingAlerts.length > 0 || (totalRequired > 0 && fillRate < 50);
   const totalCost = event.totalEstimatedCost || shifts.reduce((s, sh) => {
     const hours = sh.startTime && sh.endTime ? Math.max(0.5, (new Date(sh.endTime) - new Date(sh.startTime)) / 3600000) : 4;
@@ -157,15 +179,6 @@ export default function EventDetailModal({
       return fallback;
     }
   };
-
-  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
-  const skillNameMap = useMemo(() => {
-    const m = {};
-    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
-      if (sk && sk.skillId) m[sk.skillId] = sk.name;
-    });
-    return m;
-  }, [skillTaxonomy]);
 
   const skillNames = (shift) =>
     Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0

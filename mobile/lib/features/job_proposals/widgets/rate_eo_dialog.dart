@@ -43,18 +43,32 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
 
   Future<void> _submit() async {
     setState(() => _isSubmitting = true);
-    await ref.read(proposalRepositoryProvider).submitReview(
-          assignmentId: widget.assignment.assignmentId,
-          rating: _rating,
-          criteriaWorkEnvironment: _envScore,
-          criteriaSupport: _supportScore,
-          criteriaPaymentTiming: _paymentScore,
-          comment: _commentCtrl.text.trim(),
-          tags: _selectedTags.toList(),
+    try {
+      await ref.read(proposalRepositoryProvider).submitReview(
+            assignmentId: widget.assignment.assignmentId,
+            rating: _rating,
+            criteriaWorkEnvironment: _envScore,
+            criteriaSupport: _supportScore,
+            criteriaPaymentTiming: _paymentScore,
+            comment: _commentCtrl.text.trim(),
+            tags: _selectedTags.toList(),
+          );
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gửi đánh giá thất bại: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
         );
-    if (mounted) {
-      setState(() => _isSubmitting = false);
-      Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -156,7 +170,7 @@ class _RateEoDialogState extends ConsumerState<RateEoDialog> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: cani.border,
+                      color: cani.textMuted,
                     ),
                   ),
                   const SizedBox(height: 8),

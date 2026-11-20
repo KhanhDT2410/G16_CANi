@@ -58,7 +58,10 @@ class ProfileSecurityBlock extends ConsumerWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => ForgotPasswordScreen(initialEmail: user?.email),
+                  builder: (_) => ForgotPasswordScreen(
+                    initialEmail: user?.email,
+                    isChangePassword: true,
+                  ),
                 ),
               );
             },

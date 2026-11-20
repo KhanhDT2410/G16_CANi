@@ -44,11 +44,15 @@ class EkycResultCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: item.isApproved
                         ? const Color(0xFF10B981)
-                        : const Color(0xFFEF4444),
+                        : (item.isPending
+                            ? const Color(0xFFD97706)
+                            : const Color(0xFFEF4444)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    item.isApproved ? 'APPROVED' : 'REJECTED',
+                    item.isApproved
+                        ? 'APPROVED'
+                        : (item.isPending ? 'PENDING_REVIEW' : 'REJECTED'),
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,

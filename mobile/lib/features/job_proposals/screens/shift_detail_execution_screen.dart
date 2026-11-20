@@ -266,6 +266,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Future<void> _saveChecklistAsync() async {
+    if (!mounted) return;
     try {
       setState(() => _isSavingChecklist = true);
       await ref
@@ -675,19 +676,6 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     }
   }
 
-  Future<void> _callHotline(String phoneNumber) async {
-    final telUri = Uri.parse('tel:$phoneNumber');
-    try {
-      await launchUrl(telUri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể gọi đến số $phoneNumber')),
-        );
-      }
-    }
-  }
-
   void _openChatSheet() {
     showModalBottomSheet(
       context: context,
@@ -785,11 +773,14 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     final isCompleted = _assignment.status == 'COMPLETED' || _assignment.checkoutTime != null;
 
     if (isCompleted) {
-      // Đã xong ca -> Mở Đánh giá Ban tổ chức
-      await showDialog(
+      // Đã xong ca -> Mở Đánh giá Ban tổ chức và làm mới trạng thái ca nếu đã đánh giá
+      final rated = await showDialog<bool>(
         context: context,
         builder: (_) => RateEoDialog(assignment: _assignment),
       );
+      if (rated == true && mounted) {
+        _refreshAssignment();
+      }
       return;
     }
 
@@ -937,8 +928,6 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     final totalCount = _checklistItems.length;
     final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
 
-    const hotline = '0988123456';
-
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -948,33 +937,15 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           icon: Icon(Icons.arrow_back_ios_new, size: 20, color: isDark ? Colors.white : Colors.black87),
           onPressed: () => Navigator.pop(context, true),
         ),
-        title: Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Sự kiện · ',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: cani.textMuted,
-                  ),
-                ),
-                InkWell(
-                  onTap: () => _callHotline(hotline),
-                  child: Text(
-                    'BTC $hotline',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: cani.danger,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        title: Text(
+          '${_assignment.eventName} · ${_assignment.jobType}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: cani.textMain,
+          ),
         ),
         centerTitle: true,
         actions: [
@@ -1859,6 +1830,28 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                 ],
                               ),
                             )
+                          else if (_assignment.paymentStatus == 'NOT_DECLARED' && _assignment.declaredAmount <= 0)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.schedule, size: 18, color: Color(0xFF475569)),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Chờ Ban tổ chức khai báo thanh toán trước khi xác nhận nhận tiền.',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
                           else if (_isConfirmingPayment)
                             const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
                           else
@@ -1905,36 +1898,36 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                       ),
                     ),
 
-                  // 7. Quick Actions Row (Gọi điện, Chat, Chỉ đường)
+                  // 7. Quick Actions Row (Chat, Chỉ đường, Khiếu nại) - co giãn vừa màn hình 360dp
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _buildQuickAction(
-                          icon: Icons.phone_in_talk,
-                          label: 'Điện thoại',
-                          onTap: () => _callHotline(hotline),
+                        Expanded(
+                          child: _buildQuickAction(
+                            icon: Icons.chat_outlined,
+                            label: 'Chat BTC',
+                            onTap: _openChatSheet,
+                          ),
                         ),
-                        _buildQuickAction(
-                          icon: Icons.chat_outlined,
-                          label: 'Chat BTC / CSKH',
-                          onTap: _openChatSheet,
+                        Expanded(
+                          child: _buildQuickAction(
+                            icon: Icons.map_outlined,
+                            label: 'Bản đồ',
+                            onTap: _openGoogleMapsNavigation,
+                          ),
                         ),
-                        _buildQuickAction(
-                          icon: Icons.map_outlined,
-                          label: 'Bản đồ',
-                          onTap: _openGoogleMapsNavigation,
-                        ),
-                        _buildQuickAction(
-                          icon: Icons.gavel_rounded,
-                          label: 'Khiếu nại',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
-                            );
-                          },
+                        Expanded(
+                          child: _buildQuickAction(
+                            icon: Icons.gavel_rounded,
+                            label: 'Khiếu nại',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -2028,7 +2021,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2036,6 +2029,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
             const SizedBox(height: 4),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,

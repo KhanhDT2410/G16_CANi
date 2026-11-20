@@ -1,15 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../features/auth';
 import CaniLogo from '../../components/common/CaniLogo';
 import './LandingPage.css';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Kiểm tra token để xác định trạng thái đăng nhập
-  const token = localStorage.getItem('cani_token');
+  const getDashboardRoute = () => {
+    if (user?.role === 'ADMIN') return '/admin';
+    if (user?.role === 'CUSTOMER_CARE') return '/customer-care';
+    return '/eo';
+  };
 
   const scrollToSection = (id) => {
+    setMobileMenuOpen(false);
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
@@ -17,8 +24,8 @@ export default function LandingPage() {
   };
 
   const handleHeroCta = () => {
-    if (token) {
-      navigate('/eo');
+    if (isAuthenticated) {
+      navigate(getDashboardRoute());
     } else {
       navigate('/register');
     }
@@ -66,11 +73,11 @@ export default function LandingPage() {
           </nav>
 
           <div className="landing-nav-actions">
-            {token ? (
+            {isAuthenticated ? (
               <button
                 type="button"
                 className="landing-btn-register"
-                onClick={() => navigate('/eo')}
+                onClick={() => navigate(getDashboardRoute())}
               >
                 Vào Bảng Điều Khiển
               </button>
@@ -84,8 +91,50 @@ export default function LandingPage() {
                 </Link>
               </>
             )}
+            <button
+              type="button"
+              className="landing-mobile-menu-btn"
+              aria-label="Mở menu điều hướng"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+            >
+              {mobileMenuOpen ? '✕' : '☰'}
+            </button>
           </div>
         </div>
+
+        {mobileMenuOpen && (
+          <div className="landing-mobile-drawer">
+            <button type="button" onClick={() => scrollToSection('hero')}>Trang chủ</button>
+            <button type="button" onClick={() => scrollToSection('products')}>Sản phẩm & Ứng dụng</button>
+            <button type="button" onClick={() => scrollToSection('features')}>Tính năng</button>
+            <button type="button" onClick={() => scrollToSection('workflow')}>Quy trình điều phối</button>
+            <button type="button" onClick={() => scrollToSection('about')}>Về chúng tôi</button>
+            <div className="landing-mobile-drawer-auth">
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  className="landing-btn-register"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate(getDashboardRoute());
+                  }}
+                >
+                  Vào Bảng Điều Khiển
+                </button>
+              ) : (
+                <>
+                  <Link to="/login" className="landing-btn-login" onClick={() => setMobileMenuOpen(false)}>
+                    Đăng nhập
+                  </Link>
+                  <Link to="/register" className="landing-btn-register" onClick={() => setMobileMenuOpen(false)}>
+                    Đăng ký Ban Tổ Chức
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* =========================================================================
@@ -500,9 +549,9 @@ export default function LandingPage() {
             <div>
               <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Hỗ trợ & Quy chế</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <span style={{ color: '#94a3b8' }}>Quy chế nhận thù lao Non-Escrow</span>
-                <span style={{ color: '#94a3b8' }}>Chính sách bảo mật thông tin</span>
-                <span style={{ color: '#94a3b8' }}>Hỗ trợ kỹ thuật 24/7</span>
+                <span onClick={() => scrollToSection('features')} style={{ color: '#94a3b8', cursor: 'pointer' }}>Quy chế nhận thù lao Non-Escrow</span>
+                <span onClick={() => scrollToSection('products')} style={{ color: '#94a3b8', cursor: 'pointer' }}>Bảo mật định danh eKYC & Geofence</span>
+                <Link to="/support" style={{ color: '#94a3b8', textDecoration: 'none' }}>Hỗ trợ kỹ thuật 24/7</Link>
               </div>
             </div>
           </div>

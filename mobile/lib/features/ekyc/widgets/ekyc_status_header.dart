@@ -13,26 +13,39 @@ class EkycStatusHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isApproved = item != null && item!.isApproved;
-    final isRejected = item != null && !isApproved;
+    final isPending = item != null && item!.isPending;
+    final isRejected = item != null && !isApproved && !isPending;
 
     final bgColor = isApproved
         ? const Color(0xFFECFDF5)
-        : (isRejected ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC));
+        : (isPending
+            ? const Color(0xFFFFFBEB)
+            : (isRejected ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC)));
     final borderColor = isApproved
         ? const Color(0xFFA7F3D0)
-        : (isRejected ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0));
+        : (isPending
+            ? const Color(0xFFFDE68A)
+            : (isRejected ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0)));
     final iconColor = isApproved
         ? const Color(0xFF10B981)
-        : (isRejected ? const Color(0xFFEF4444) : const Color(0xFF0077FF));
+        : (isPending
+            ? const Color(0xFFD97706)
+            : (isRejected ? const Color(0xFFEF4444) : const Color(0xFF0077FF)));
     final textColor = isApproved
         ? const Color(0xFF047857)
-        : (isRejected ? const Color(0xFFB91C1C) : const Color(0xFF0B1B3D));
+        : (isPending
+            ? const Color(0xFFB45309)
+            : (isRejected ? const Color(0xFFB91C1C) : const Color(0xFF0B1B3D)));
     final subtitleColor = isApproved
         ? const Color(0xFF065F46)
-        : (isRejected ? const Color(0xFF991B1B) : const Color(0xFF64748B));
+        : (isPending
+            ? const Color(0xFF92400E)
+            : (isRejected ? const Color(0xFF991B1B) : const Color(0xFF64748B)));
     final icon = isApproved
         ? Icons.check_circle
-        : (isRejected ? Icons.error_outline : Icons.fingerprint);
+        : (isPending
+            ? Icons.hourglass_top_rounded
+            : (isRejected ? Icons.error_outline : Icons.fingerprint));
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -63,9 +76,11 @@ class EkycStatusHeader extends StatelessWidget {
                 Text(
                   isApproved
                       ? 'ĐÃ ĐỊNH DANH eKYC (TÍCH XANH)'
-                      : (isRejected
-                          ? 'ĐỊNH DANH CHƯA THÀNH CÔNG'
-                          : 'CHƯA ĐỊNH DANH eKYC'),
+                      : (isPending
+                          ? 'HỒ SƠ ĐANG CHỜ THẨM ĐỊNH'
+                          : (isRejected
+                              ? 'ĐỊNH DANH CHƯA THÀNH CÔNG'
+                              : 'CHƯA ĐỊNH DANH eKYC')),
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -77,9 +92,11 @@ class EkycStatusHeader extends StatelessWidget {
                 Text(
                   isApproved
                       ? 'Tài khoản của bạn đã được AI đối soát CCCD hợp lệ và tự động phê duyệt ngay. Bạn được ưu tiên nhận việc.'
-                      : (isRejected
-                          ? 'Ảnh chụp chưa đạt chuẩn nhận diện của AI. Vui lòng kiểm tra lý do chi tiết bên dưới và chụp lại ngay.'
-                          : 'Vui lòng hoàn thành 3 bước bên dưới để AI tự động xác thực và cấp tích xanh ngay.'),
+                      : (isPending
+                          ? 'Hồ sơ định danh của bạn đã được tiếp nhận và đang chờ Bộ phận CSKH / Admin kiểm duyệt.'
+                          : (isRejected
+                              ? 'Ảnh chụp chưa đạt chuẩn nhận diện của AI. Vui lòng kiểm tra lý do chi tiết bên dưới và chụp lại ngay.'
+                              : 'Vui lòng hoàn thành 3 bước bên dưới để AI tự động xác thực và cấp tích xanh ngay.')),
                   style: TextStyle(
                     fontSize: 12.5,
                     color: subtitleColor,

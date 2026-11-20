@@ -23,6 +23,7 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
     final evidenceCtrl = TextEditingController();
     String selectedType = 'PAYMENT';
     bool isSubmitting = false;
+    String? modalError;
 
     showModalBottomSheet(
       context: context,
@@ -135,7 +136,22 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
                         prefixIcon: const Icon(Icons.link, size: 20),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+                    if (modalError != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Text(
+                          modalError!,
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFB91C1C)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     FilledButton(
                       style: FilledButton.styleFrom(
                         backgroundColor: cani.danger,
@@ -148,13 +164,16 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
                               final title = titleCtrl.text.trim();
                               final desc = descCtrl.text.trim();
                               if (title.isEmpty || desc.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Vui lòng điền đủ tiêu đề và nội dung khiếu nại.')),
-                                );
+                                setModalState(() {
+                                  modalError = 'Vui lòng điền đủ tiêu đề và nội dung khiếu nại.';
+                                });
                                 return;
                               }
 
-                              setModalState(() => isSubmitting = true);
+                              setModalState(() {
+                                isSubmitting = true;
+                                modalError = null;
+                              });
                               try {
                                 final repo = ref.read(proposalRepositoryProvider);
                                 await repo.createDispute(CreateDisputePayload(
@@ -165,21 +184,20 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
                                 ));
 
                                 if (ctx.mounted) Navigator.pop(ctx);
+                                if (!mounted) return;
                                 ref.invalidate(myDisputesListProvider);
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Đã gửi khiếu nại thành công! Bộ phận CSKH sẽ xem xét.'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Đã gửi khiếu nại thành công! Bộ phận CSKH sẽ xem xét.'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
                               } catch (e) {
-                                setModalState(() => isSubmitting = false);
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
-                                  );
+                                if (ctx.mounted) {
+                                  setModalState(() {
+                                    isSubmitting = false;
+                                    modalError = 'Lỗi gửi khiếu nại: $e';
+                                  });
                                 }
                               }
                             },
@@ -201,7 +219,11 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      titleCtrl.dispose();
+      descCtrl.dispose();
+      evidenceCtrl.dispose();
+    });
   }
 
   @override

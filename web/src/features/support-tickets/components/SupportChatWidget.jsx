@@ -54,36 +54,57 @@ export const SupportChatWidget = () => {
   });
 
   const messagesEndRef = useRef(null);
+  const justDraggedRef = useRef(false);
   const dragRef = useRef({
     isDragging: false,
     startX: 0,
     startY: 0,
     elemStartX: 0,
     elemStartY: 0,
+    width: 185,
+    height: 48,
     hasMoved: false,
   });
 
-  // Clamp toạ độ an toàn trong khung hình
-  const clampPosition = useCallback((x, y, width = 380, height = 520) => {
-    const maxX = Math.max(16, window.innerWidth - width - 16);
-    const maxY = Math.max(16, window.innerHeight - height - 16);
+  // Tính kích thước dự kiến của widget theo chế độ hiển thị & viewport
+  const getActiveBounds = useCallback(() => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+    if (!isOpen) {
+      return { width: vw <= 640 ? 156 : 185, height: 48 };
+    }
+    if (isMinimized) {
+      return { width: Math.min(260, Math.max(180, vw - 24)), height: 48 };
+    }
     return {
-      x: Math.min(Math.max(16, x), maxX),
-      y: Math.min(Math.max(16, y), maxY),
+      width: Math.min(375, Math.max(280, vw - 24)),
+      height: Math.min(520, Math.max(360, vh - 32)),
+    };
+  }, [isOpen, isMinimized]);
+
+  // Clamp toạ độ an toàn trong khung hình
+  const clampPosition = useCallback((x, y, width = 375, height = 520) => {
+    const margin = window.innerWidth <= 640 ? 12 : 16;
+    const maxX = Math.max(margin, window.innerWidth - width - margin);
+    const maxY = Math.max(margin, window.innerHeight - height - margin);
+    return {
+      x: Math.min(Math.max(margin, x), maxX),
+      y: Math.min(Math.max(margin, y), maxY),
     };
   }, []);
 
   // Tự động điều chỉnh toạ độ khi người dùng thay đổi kích thước cửa sổ trình duyệt
   useEffect(() => {
     const handleResize = () => {
+      const { width, height } = getActiveBounds();
       setPosition((prev) => {
         if (!prev) return null;
-        return clampPosition(prev.x, prev.y, isMinimized ? 260 : 380, isMinimized ? 48 : 520);
+        return clampPosition(prev.x, prev.y, width, height);
       });
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [clampPosition, isMinimized]);
+  }, [clampPosition, getActiveBounds]);
 
   // Đồng bộ tin nhắn hội thoại và Polling cập nhật tin nhắn mới mỗi 4s khi đang mở chat
   useEffect(() => {
@@ -142,33 +163,34 @@ export const SupportChatWidget = () => {
     }
   }, [messages, isOpen, isMinimized]);
 
-  // Quản lý kéo thả thông qua Pointer Events chuẩn công nghiệp
-  const startDrag = (e, currentWidth, currentHeight) => {
-    // Không kích hoạt kéo thả nếu người dùng click vào nút con (close, minimize, input, button)
-    if (e.target.closest('button, input, textarea, a, .support-faq-chip')) return;
+  // Quản lý kéo thả thông qua Pointer Events (áp dụng cho cả bong bóng đóng, dock thu gọn và header mở rộng)
+  const startDrag = (e, fallbackWidth = 185, fallbackHeight = 48) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-    e.preventDefault();
-    const clientX = e.clientX;
-    const clientY = e.clientY;
+    // Bỏ qua các phần tử tương tác con bên trong (ví dụ nút thu nhỏ/đóng trong pill hoặc header),
+    // nhưng vẫn cho phép kéo trực tiếp chính nút bong bóng khi đóng (e.currentTarget).
+    const interactive = e.target.closest('button, input, textarea, a, .support-faq-chip');
+    if (interactive && interactive !== e.currentTarget) return;
 
-    let initX = position?.x;
-    let initY = position?.y;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dragWidth = rect.width || fallbackWidth;
+    const dragHeight = rect.height || fallbackHeight;
 
-    if (initX == null || initY == null) {
-      // Tính toạ độ hiện tại trên màn hình nếu đang dùng vị trí CSS mặc định
-      const rect = e.currentTarget.getBoundingClientRect();
-      initX = rect.left;
-      initY = rect.top;
-    }
+    const currentClamped = position
+      ? clampPosition(position.x, position.y, dragWidth, dragHeight)
+      : { x: rect.left, y: rect.top };
 
     dragRef.current = {
       isDragging: true,
-      startX: clientX,
-      startY: clientY,
-      elemStartX: initX,
-      elemStartY: initY,
+      startX: e.clientX,
+      startY: e.clientY,
+      elemStartX: currentClamped.x,
+      elemStartY: currentClamped.y,
+      width: dragWidth,
+      height: dragHeight,
       hasMoved: false,
     };
+    justDraggedRef.current = false;
 
     const onPointerMove = (moveEvent) => {
       if (!dragRef.current.isDragging) return;
@@ -182,18 +204,23 @@ export const SupportChatWidget = () => {
       if (dragRef.current.hasMoved) {
         const nextX = dragRef.current.elemStartX + dx;
         const nextY = dragRef.current.elemStartY + dy;
-        const clamped = clampPosition(nextX, nextY, currentWidth, currentHeight);
+        const clamped = clampPosition(nextX, nextY, dragRef.current.width, dragRef.current.height);
         setPosition(clamped);
       }
     };
 
-    const onPointerUp = () => {
+    const onPointerEnd = () => {
       if (!dragRef.current.isDragging) return;
       dragRef.current.isDragging = false;
       window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointerup', onPointerEnd);
+      window.removeEventListener('pointercancel', onPointerEnd);
 
       if (dragRef.current.hasMoved) {
+        justDraggedRef.current = true;
+        setTimeout(() => {
+          justDraggedRef.current = false;
+        }, 250);
         setPosition((currentPos) => {
           if (currentPos) {
             try {
@@ -206,7 +233,8 @@ export const SupportChatWidget = () => {
     };
 
     window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointerup', onPointerEnd);
+    window.addEventListener('pointercancel', onPointerEnd);
   };
 
   if (isStaff) return null;
@@ -247,11 +275,16 @@ export const SupportChatWidget = () => {
     ]);
   };
 
-  // Tính style toạ độ tuỳ biến nếu đã kéo thả
-  const positionStyle = position ? {
+  // Tính style toạ độ tuỳ biến nếu đã kéo thả, luôn clamp theo kích thước chế độ hiện tại
+  const activeBounds = getActiveBounds();
+  const displayPos = position
+    ? clampPosition(position.x, position.y, activeBounds.width, activeBounds.height)
+    : null;
+
+  const positionStyle = displayPos ? {
     position: 'fixed',
-    left: `${position.x}px`,
-    top: `${position.y}px`,
+    left: `${displayPos.x}px`,
+    top: `${displayPos.y}px`,
     right: 'auto',
     bottom: 'auto',
   } : {};
@@ -264,10 +297,13 @@ export const SupportChatWidget = () => {
           type="button"
           className="support-chat-bubble-btn animate-fade-in draggable-support-element"
           style={positionStyle}
-          onPointerDown={(e) => startDrag(e, 180, 50)}
+          onPointerDown={(e) => startDrag(e, 185, 48)}
           onClick={(e) => {
-            if (dragRef.current.hasMoved) {
+            if (dragRef.current.hasMoved || justDraggedRef.current) {
+              e.preventDefault();
               e.stopPropagation();
+              dragRef.current.hasMoved = false;
+              justDraggedRef.current = false;
               return;
             }
             setIsOpen(true);
@@ -298,8 +334,11 @@ export const SupportChatWidget = () => {
           <div
             className="minimized-pill-body"
             onClick={(e) => {
-              if (dragRef.current.hasMoved) {
+              if (dragRef.current.hasMoved || justDraggedRef.current) {
+                e.preventDefault();
                 e.stopPropagation();
+                dragRef.current.hasMoved = false;
+                justDraggedRef.current = false;
                 return;
               }
               setIsMinimized(false);

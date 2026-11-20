@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useRegister } from '../hooks/useRegister';
 import CaniLogo from '../../../components/common/CaniLogo';
 import '../auth.css';
@@ -339,7 +340,7 @@ export const RegisterForm = () => {
           Bạn là <strong>Nhân sự sự kiện (Worker)</strong>? Hãy tải ứng dụng <strong>CANi Mobile (Android APK)</strong> trên điện thoại để nhận ca làm linh hoạt.
         </div>
         <div style={{ marginTop: '0.5rem' }}>
-          Đã có tài khoản? <a href="/login">Đăng nhập tại đây</a>
+          Đã có tài khoản? <Link to="/login">Đăng nhập tại đây</Link>
         </div>
       </div>
     </div>

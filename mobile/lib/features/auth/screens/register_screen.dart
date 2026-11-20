@@ -352,32 +352,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => _agreeTerms = !_agreeTerms),
-            child: Text.rich(
-              TextSpan(
-                text: 'Tôi đồng ý với ',
-                style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
-                children: const [
-                  TextSpan(
-                    text: 'Điều khoản dịch vụ',
-                    style: TextStyle(
-                      color: Color(0xFF0077FF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextSpan(text: ' & '),
-                  TextSpan(
-                    text: 'Chính sách bảo mật',
-                    style: TextStyle(
-                      color: Color(0xFF0077FF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextSpan(text: ' của CANi'),
-                ],
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => setState(() => _agreeTerms = !_agreeTerms),
+                child: const Text(
+                  'Tôi đồng ý với ',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
+                ),
               ),
-            ),
+              InkWell(
+                onTap: () => TermsOfServiceDialog.show(context),
+                child: const Text(
+                  'Điều khoản dịch vụ & Chính sách bảo mật',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF0077FF),
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _agreeTerms = !_agreeTerms),
+                child: const Text(
+                  ' của CANi',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
+                ),
+              ),
+            ],
           ),
         ),
       ],

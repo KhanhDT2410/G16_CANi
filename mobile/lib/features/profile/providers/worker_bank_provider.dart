@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/profile/models/worker_bank_model.dart';
 
 class WorkerBankState {
@@ -37,14 +38,25 @@ class WorkerBankNotifier extends StateNotifier<WorkerBankState> {
   final Ref _ref;
   static const _storage = FlutterSecureStorage();
 
+  String _bankStorageKey(String field, String? userId) {
+    final safeUser = (userId != null && userId.isNotEmpty) ? userId : 'guest';
+    return 'cani_worker_bank_${safeUser}_$field';
+  }
+
   Future<void> loadBankAccount() async {
+    final userId = _ref.read(authStateProvider).user?.id;
+    if (userId == null || userId.isEmpty) {
+      state = const WorkerBankState(isLoading: false);
+      return;
+    }
+
     state = state.copyWith(isLoading: true, errorMessage: null);
 
-    // 1. Nạp nhanh từ bộ nhớ an toàn (SecureStorage) để hiển thị không độ trễ
+    // 1. Nạp nhanh từ bộ nhớ an toàn theo từng userId
     try {
-      final savedBank = await _storage.read(key: 'cani_worker_bank_code');
-      final savedAccount = await _storage.read(key: 'cani_worker_bank_account');
-      final savedName = await _storage.read(key: 'cani_worker_bank_owner');
+      final savedBank = await _storage.read(key: _bankStorageKey('code', userId));
+      final savedAccount = await _storage.read(key: _bankStorageKey('account', userId));
+      final savedName = await _storage.read(key: _bankStorageKey('owner', userId));
       if (savedAccount != null && savedAccount.isNotEmpty) {
         state = state.copyWith(
           bankAccount: WorkerBankModel(
@@ -72,13 +84,13 @@ class WorkerBankNotifier extends StateNotifier<WorkerBankState> {
           state = state.copyWith(bankAccount: model, isLoading: false);
 
           if (model.bankCode != null) {
-            await _storage.write(key: 'cani_worker_bank_code', value: model.bankCode!);
+            await _storage.write(key: _bankStorageKey('code', userId), value: model.bankCode!);
           }
           if (model.bankAccountNumber != null) {
-            await _storage.write(key: 'cani_worker_bank_account', value: model.bankAccountNumber!);
+            await _storage.write(key: _bankStorageKey('account', userId), value: model.bankAccountNumber!);
           }
           if (model.bankAccountName != null) {
-            await _storage.write(key: 'cani_worker_bank_owner', value: model.bankAccountName!);
+            await _storage.write(key: _bankStorageKey('owner', userId), value: model.bankAccountName!);
           }
           return;
         }

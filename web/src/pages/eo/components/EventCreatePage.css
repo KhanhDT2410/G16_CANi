@@ -557,6 +557,10 @@
     padding: 1rem;
   }
 
+  .ecw-header-top {
+    align-items: flex-start;
+  }
+
   .ecw-stepper {
     grid-template-columns: 1fr;
     gap: 0.5rem;
@@ -564,5 +568,15 @@
 
   .ecw-main-card {
     padding: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .ecw-page-container {
+    padding-bottom: 1.5rem;
+  }
+
+  .ecw-summary-kpis {
+    grid-template-columns: 1fr;
   }
 }

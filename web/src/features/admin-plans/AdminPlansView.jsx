@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../../services/api';
 import { showToast } from '../../components/common/Toast';
+import { showConfirm } from '../../components/common/PromptModal';
 import PlanCard from './components/PlanCard';
 import PlanFormModal from './components/PlanFormModal';
 import './AdminPlans.css';
@@ -68,7 +69,13 @@ export default function AdminPlansView() {
   };
 
   const handleDeletePlan = async (plan) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa gói "${plan.planName}" không? Lưu ý: Không thể xóa nếu đã có Ban tổ chức đăng ký sử dụng.`)) {
+    const confirmed = await showConfirm({
+      title: 'Xóa gói dịch vụ',
+      description: `Bạn có chắc chắn muốn xóa gói "${plan.planName}" không? Lưu ý: Không thể xóa nếu đã có Ban tổ chức đăng ký sử dụng.`,
+      type: 'danger',
+      confirmText: 'Xóa gói',
+    });
+    if (!confirmed) {
       return;
     }
 

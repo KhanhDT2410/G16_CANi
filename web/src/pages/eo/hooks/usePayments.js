@@ -41,6 +41,8 @@ const DEMO_PAYMENTS = [
 export function usePayments() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const [paymentForm, setPaymentForm] = useState({
     assignmentId: '',
@@ -56,6 +58,8 @@ export function usePayments() {
 
   const fetchShiftPayments = useCallback(async (shiftId) => {
     if (!shiftId) return;
+    setLoading(true);
+    setError(null);
     try {
       const data = await eoService.getShiftPayments(shiftId);
       if (Array.isArray(data) && data.length > 0) {
@@ -65,12 +69,16 @@ export function usePayments() {
       } else {
         setPayments([]);
       }
-    } catch (error) {
+    } catch (err) {
       if (import.meta.env.VITE_DEMO === 'true') {
         setPayments(DEMO_PAYMENTS);
       } else {
-        showToast(error.response?.data?.message || 'Không thể tải danh sách thanh toán', 'error');
+        const msg = err.response?.data?.message || 'Không thể tải danh sách thanh toán';
+        setError(msg);
+        showToast(msg, 'error');
       }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -130,6 +138,8 @@ export function usePayments() {
 
   return {
     payments,
+    loading,
+    error,
     setPayments,
     fetchShiftPayments,
     showPaymentModal,
@@ -142,4 +152,6 @@ export function usePayments() {
     handleOpenPaymentDeclarationFromAttendance,
   };
 }
+
+export default usePayments;
 

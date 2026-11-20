@@ -48,15 +48,19 @@ class ProfileTrustSkillStrip extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      'TÍN NHIỆM & KỸ NĂNG',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: t.muted,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
+                    Flexible(
+                      child: Text(
+                        'TÍN NHIỆM & KỸ NĂNG',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: t.muted,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                      ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
@@ -109,21 +113,31 @@ class ProfileTrustSkillStrip extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '$totalSp SP',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(color: t.text, fontWeight: FontWeight.w600),
-                              ),
-                              if (onTap != null)
-                                Text(
-                                  'Trung tâm kỹ năng',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: t.accent,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                              Flexible(
+                                child: Text(
+                                  '$totalSp SP',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(color: t.text, fontWeight: FontWeight.w600),
                                 ),
+                              ),
+                              if (onTap != null) ...[
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    'Trung tâm kỹ năng',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: t.accent,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -136,7 +150,9 @@ class ProfileTrustSkillStrip extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Cần ${nextThreshold - totalSp} SP để lên $nextTierLabel',
+                            totalSp >= nextThreshold
+                                ? 'Đã đạt mốc tối đa $nextTierLabel ($totalSp SP)'
+                                : 'Cần ${nextThreshold - totalSp} SP để lên $nextTierLabel',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.muted),
                           ),
                         ],

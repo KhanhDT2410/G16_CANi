@@ -64,9 +64,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
     if (widget.selectedShift != null && widget.selectedShift?.shiftId != oldWidget.selectedShift?.shiftId) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _fitSelectedRoute());
     } else if (oldWidget.userLat != widget.userLat || oldWidget.userLng != widget.userLng) {
-      // Khi GPS cập nhật vị trí mới từ thiết bị và chưa chọn ca nào -> lia camera về vị trí thật
+      // Khi GPS cập nhật vị trí mới từ thiết bị và chưa chọn ca nào -> chỉ lia camera, không gọi lại GPS loop
       if (widget.selectedShift == null) {
-        _recenter();
+        _mapController.move(LatLng(widget.userLat, widget.userLng), 13.0);
       }
     }
   }

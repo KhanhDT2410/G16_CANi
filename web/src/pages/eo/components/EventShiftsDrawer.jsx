@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
 import { eoService } from '../../../services/eoService';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import { getDynamicShiftStatus } from '../utils/eventHelpers';
@@ -28,14 +29,13 @@ const EventShiftsDrawer = ({
   const [selectedShiftForPanel, setSelectedShiftForPanel] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
 
-  const shifts = event?.shifts || [];
-
   // Phân loại & sắp xếp: Ca đang hoạt động lên đầu, Ca nháp xuống dưới; Ca đã hủy tách riêng
   const { activeAndDraftShifts, cancelledShifts } = useMemo(() => {
+    const list = event?.shifts || [];
     const activeDraft = [];
     const cancelled = [];
 
-    shifts.forEach((s) => {
+    list.forEach((s) => {
       if (s.status === 'CANCELLED') {
         cancelled.push(s);
       } else {
@@ -51,7 +51,16 @@ const EventShiftsDrawer = ({
     });
 
     return { activeAndDraftShifts: activeDraft, cancelledShifts: cancelled };
-  }, [shifts]);
+  }, [event?.shifts]);
+
+  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
+  const skillNameMap = useMemo(() => {
+    const m = {};
+    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
+      if (sk && sk.skillId) m[sk.skillId] = sk.name;
+    });
+    return m;
+  }, [skillTaxonomy]);
 
   if (!event) return null;
 
@@ -63,15 +72,6 @@ const EventShiftsDrawer = ({
       return fallback;
     }
   };
-
-  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
-  const skillNameMap = useMemo(() => {
-    const m = {};
-    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
-      if (sk && sk.skillId) m[sk.skillId] = sk.name;
-    });
-    return m;
-  }, [skillTaxonomy]);
 
   const hasCustomArrival = (shift) =>
     shift.arrivalTime && shift.startTime &&
@@ -207,10 +207,15 @@ const EventShiftsDrawer = ({
                 type="button"
                 onClick={async () => {
                   const enable = !shift.emergency;
-                  const confirmMsg = enable
-                    ? `Kích hoạt điều phối khẩn cấp cho ca "${shift.jobType}"? Nhân sự trên Radar sẽ được tự do nhận ca ngay.`
-                    : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
-                  if (!window.confirm(confirmMsg)) return;
+                  const confirmed = await showConfirm({
+                    title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
+                    description: enable
+                      ? `Kích hoạt điều phối khẩn cấp cho ca "${shift.jobType}"? Nhân sự trên Radar trong bán kính 15km sẽ được tự do nhận ca ngay.`
+                      : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
+                    type: enable ? 'warning' : 'info',
+                    confirmText: enable ? 'Kích hoạt' : 'Tắt chế độ',
+                  });
+                  if (!confirmed) return;
                   try {
                     if (enable) {
                       await eoService.enableEmergencyDispatch(shift.shiftId, 15);

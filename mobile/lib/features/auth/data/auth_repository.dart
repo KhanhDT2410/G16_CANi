@@ -224,8 +224,13 @@ class AuthRepository {
       final authProvider = await _storage.read(key: _authProviderKey);
       final user = await _api.getMe();
       return user.copyWith(authProvider: authProvider);
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        await clearSession();
+      }
+      return null;
     } catch (_) {
-      await clearSession();
       return null;
     }
   }
@@ -239,8 +244,13 @@ class AuthRepository {
 
   Future<void> clearSession() async {
     AuthInterceptor.inMemoryToken = null;
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _refreshTokenKey);
-    await _storage.delete(key: _authProviderKey);
+    await Future.wait([
+      _storage.delete(key: _tokenKey),
+      _storage.delete(key: _refreshTokenKey),
+      _storage.delete(key: _authProviderKey),
+      _storage.delete(key: 'cani_worker_bank_code'),
+      _storage.delete(key: 'cani_worker_bank_account'),
+      _storage.delete(key: 'cani_worker_bank_owner'),
+    ]);
   }
 }

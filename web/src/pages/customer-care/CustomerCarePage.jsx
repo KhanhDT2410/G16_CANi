@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { DisputeCenterView } from '../../features/disputes';
 import { SupportTicketsCenterView } from '../../features/support-tickets';
 import { FaqView } from '../../features/faqs';
@@ -47,12 +47,30 @@ export const CustomerCarePage = () => {
       setActiveTab('tickets');
       setTicketFilter('CHAT');
     };
+    const handleSwitchTab = (e) => {
+      const tab = e.detail?.tab;
+      if (tab === 'support' || tab === 'tickets') {
+        setActiveTab('tickets');
+      } else if (tab === 'disputes') {
+        setActiveTab('disputes');
+      } else if (tab === 'appeals') {
+        setActiveTab('appeals');
+      } else if (tab === 'noshows') {
+        setActiveTab('noshows');
+      } else if (tab === 'faqs') {
+        setActiveTab('faqs');
+      }
+    };
     if (window.__cani_pending_chat) {
       setActiveTab('tickets');
       setTicketFilter('CHAT');
     }
     window.addEventListener('cani_open_staff_chat', handleOpenStaffChat);
-    return () => window.removeEventListener('cani_open_staff_chat', handleOpenStaffChat);
+    window.addEventListener('cani_switch_tab', handleSwitchTab);
+    return () => {
+      window.removeEventListener('cani_open_staff_chat', handleOpenStaffChat);
+      window.removeEventListener('cani_switch_tab', handleSwitchTab);
+    };
   }, []);
 
   const handleToggleCollapse = () => {

@@ -161,6 +161,19 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // UC-83: EO báo cáo nhân sự chưa hoàn thành đủ công việc trong ca
+  reportIncompleteWork: async (assignmentId, payload) => {
+    const body = typeof payload === 'string'
+      ? { reason: payload }
+      : {
+          reason: payload?.reason || payload?.description || '',
+          proofUrls: payload?.proofUrls || [],
+          incompleteChecklistItems: payload?.incompleteChecklistItems || [],
+        };
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/report-incomplete`, body);
+    return response.data?.data;
+  },
+
   // UC-18: Cập nhật ca làm việc
   updateShift: async (shiftId, shiftData) => {
     const response = await apiClient.put(`/v1/eo/events/shifts/${shiftId}`, shiftData);

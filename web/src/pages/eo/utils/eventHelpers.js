@@ -165,7 +165,7 @@ export function getShiftStaffingAlerts(shifts = []) {
     const confirmed = Number(s.confirmedWorkers || 0);
     const required = Math.max(1, Number(s.requiredWorkers || 1));
     if (confirmed >= required) return false; // Đã đủ người
-    if (Boolean(s.emergency)) return true; // Đang bật emergency
+    if (s.emergency) return true; // Đang bật emergency
     if (start && !isNaN(start.getTime()) && now >= start) return true; // Đang diễn ra mà thiếu người
     if (start && !isNaN(start.getTime()) && (start.getTime() - now.getTime()) <= 4 * 3600 * 1000) return true; // Sát giờ < 4h
     return false;

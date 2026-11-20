@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
 import { getAddressFromCoordinates, getCoordinatesFromAddress } from '../utils/geoUtils';
 import {
   DEFAULT_NEW_EVENT,
@@ -131,7 +132,13 @@ export function useEvents() {
       showToast('Chỉ được phép xóa bản nháp sự kiện. Sự kiện đã tạo hoặc đang hoạt động chỉ có thể Hủy kèm lý do.', 'error');
       return;
     }
-    if (!window.confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN bản nháp sự kiện "${event.name}"? Thao tác này không thể hoàn tác.`)) {
+    const confirmed = await showConfirm({
+      title: 'Xóa vĩnh viễn bản nháp sự kiện',
+      description: `Bạn có chắc chắn muốn XÓA VĨNH VIỄN bản nháp sự kiện "${event.name}"? Thao tác này không thể hoàn tác.`,
+      type: 'danger',
+      confirmText: 'Xóa vĩnh viễn',
+    });
+    if (!confirmed) {
       return;
     }
     try {
@@ -248,3 +255,6 @@ export function useEvents() {
     handleExecutePublish,
   };
 }
+
+export default useEvents;
+

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -41,6 +42,13 @@ class FcmService {
       await LocalNotificationService.initialize(
         onNotificationTapped: (response) {
           if (response.payload != null && onNotificationNavigate != null) {
+            try {
+              final decoded = jsonDecode(response.payload!);
+              if (decoded is Map<String, dynamic>) {
+                onNotificationNavigate(decoded);
+                return;
+              }
+            } catch (_) {}
             onNotificationNavigate({'payload': response.payload});
           }
         },
@@ -70,7 +78,7 @@ class FcmService {
             id: message.hashCode,
             title: noti.title ?? 'CANi - Lời mời việc làm',
             body: noti.body ?? 'Bạn có thông báo mới từ hệ thống CANi',
-            payload: message.data.toString(),
+            payload: jsonEncode(message.data),
           );
         }
       });

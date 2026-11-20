@@ -9,7 +9,7 @@ import 'package:cani/features/help_center/screens/create_ticket_screen.dart';
 class MyTicketsScreen extends ConsumerWidget {
   const MyTicketsScreen({super.key});
 
-  void _showTicketDetail(BuildContext context, WidgetRef ref, SupportTicketModel ticket) {
+  static void showDetailModal(BuildContext context, String ticketId) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -17,8 +17,12 @@ class MyTicketsScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _TicketDetailModal(ticketId: ticket.id),
+      builder: (_) => _TicketDetailModal(ticketId: ticketId),
     );
+  }
+
+  void _showTicketDetail(BuildContext context, WidgetRef ref, SupportTicketModel ticket) {
+    showDetailModal(context, ticket.id);
   }
 
   @override

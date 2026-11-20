@@ -32,7 +32,8 @@ void main() async {
       debugPrint('[Notification Navigate] Navigating from notification data: $data');
       if (!container.read(authStateProvider).isAuthenticated) return;
 
-      final type = data['type'] ?? data['payload']?['type'];
+      final rawPayload = data['payload'];
+      final type = data['type'] ?? (rawPayload is Map ? rawPayload['type'] : null);
       final isProposal = type == 'NEW_PROPOSAL' || type == 'EMERGENCY_PROPOSAL' || type == 'PROPOSAL';
 
       rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);

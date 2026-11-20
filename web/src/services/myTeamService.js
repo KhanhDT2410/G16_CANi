@@ -1,12 +1,20 @@
 import { apiClient } from './api';
 
 export const myTeamService = {
-  // Lấy danh sách thợ quen
+  // Lấy danh sách thợ quen đã lưu
   getMyTeam: async (search = '', favoritedOnly = false) => {
     const params = {};
     if (search && search.trim()) params.search = search.trim();
     if (favoritedOnly) params.favoritedOnly = true;
     const response = await apiClient.get('/v1/eo/my-team', { params });
+    return response.data?.data || [];
+  },
+
+  // Lấy danh sách nhân sự đã từng làm việc cùng trong các sự kiện
+  getPastCollaborators: async (search = '') => {
+    const params = {};
+    if (search && search.trim()) params.search = search.trim();
+    const response = await apiClient.get('/v1/eo/my-team/collaborators', { params });
     return response.data?.data || [];
   },
 

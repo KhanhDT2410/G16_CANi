@@ -8,9 +8,9 @@ export const blockListService = {
   },
 
   // Chặn một người dùng (Event Organizer hoặc Worker)
-  blockUser: async (blockedId, reason = '') => {
+  blockUser: async (blockedUserId, reason = '') => {
     const response = await apiClient.post('/v1/blocks', {
-      blockedId,
+      blockedUserId,
       reason,
     });
     return response.data?.data;

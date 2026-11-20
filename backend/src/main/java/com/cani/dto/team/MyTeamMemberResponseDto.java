@@ -18,6 +18,7 @@ public class MyTeamMemberResponseDto {
 
     private UUID eoWorkerId;
     private UUID workerId;
+    private UUID userId;
     private String fullName;
     private String phone;
     private String email;
@@ -29,9 +30,11 @@ public class MyTeamMemberResponseDto {
     private BigDecimal completionRate;
     private BigDecimal avgRatingGiven;
     private Instant lastWorkedAt;
+    private String lastJobType;
     private String internalNote;
     private Boolean isFavorited;
     private Boolean isBlacklisted;
+    private Boolean isSavedInMyTeam;
     private Boolean isOnline;
     private Instant addedAt;
 }

@@ -41,7 +41,22 @@ public class EoMyTeamController {
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<MyTeamMemberResponseDto> members = myTeamService.getMyTeam(userId, search, favoritedOnly);
-        return ResponseEntity.ok(ApiResponse.ok(members, "Lấy danh sách My Team thành công"));
+        return ResponseEntity.ok(ApiResponse.ok(members, "Lấy danh sách nhân sự quen thuộc thành công"));
+    }
+
+    /**
+     * Lấy danh sách nhân sự đã từng cộng tác trong các sự kiện trước đó của Ban tổ chức
+     */
+    @Operation(summary = "Danh sách nhân sự đã từng làm việc cùng", description = "Tự động tổng hợp danh sách nhân sự từng tham gia các ca làm của Ban tổ chức.")
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/collaborators")
+    public ResponseEntity<ApiResponse<List<MyTeamMemberResponseDto>>> getPastCollaborators(
+            @RequestParam(required = false) String search,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<MyTeamMemberResponseDto> collaborators = myTeamService.getPastCollaborators(userId, search);
+        return ResponseEntity.ok(ApiResponse.ok(collaborators, "Lấy danh sách nhân sự đã từng cộng tác thành công"));
     }
 
     /**

@@ -92,14 +92,14 @@ export default function EventDetailModal({
 
   const handleToggleEmergency = async (shift, enable) => {
     const confirmMsg = enable
-      ? `Bạn có chắc chắn muốn BẬT điều phối khẩn cấp (Emergency Dispatch) cho ca "${shift.jobType}"?\n\n- Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự xung quanh.\n- Cho phép nhân sự tự do bấm nhận ca trên Radar mà không cần chờ Matching.\n- Bán kính tìm kiếm mở rộng tối đa 15km.`
+      ? `Bạn có chắc chắn muốn BẬT điều phối khẩn cấp cho ca "${shift.jobType}"?\n\n- Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự xung quanh.\n- Cho phép nhân sự chủ động nhận ca trực tiếp trên bản đồ.\n- Bán kính tìm kiếm mở rộng tối đa 15km.`
       : `Bạn có chắc chắn muốn TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
     if (!window.confirm(confirmMsg)) return;
 
     try {
       if (enable) {
         await eoService.enableEmergencyDispatch(shift.shiftId, 15);
-        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}"! Nhân sự có thể nhận ca ngay trên Radar.`, 'success');
+        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}".`, 'success');
       } else {
         await eoService.disableEmergencyDispatch(shift.shiftId);
         showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
@@ -466,7 +466,7 @@ export default function EventDetailModal({
               <span className="info-label">Chế độ tuyển dụng</span>
               <span className="info-value">
                 <span className="mode-badge-pill">
-                  {event.mode === 'INVITE' || event.mode === 'INVITE_ONLY' ? 'Mời trực tiếp (Link / QR)' : 'Điều phối tự động (Matching)'}
+                  {event.mode === 'INVITE' || event.mode === 'INVITE_ONLY' ? 'Mời trực tiếp (Liên kết / Mã QR)' : 'Điều phối tự động'}
                 </span>
               </span>
             </div>
@@ -495,7 +495,7 @@ export default function EventDetailModal({
               className={`detail-kpi-card ${hasStaffingShortage ? 'highlight-alert' : 'highlight-green'}`}
               style={hasStaffingShortage ? { backgroundColor: '#fff1f2', borderColor: '#fecdd3' } : undefined}
             >
-              <span className="kpi-label">{hasStaffingShortage ? '⚠️ Nhân sự chốt ca (Thiếu)' : 'Nhân sự đã chốt ca'}</span>
+              <span className="kpi-label">{hasStaffingShortage ? 'Nhân sự chốt ca (Thiếu)' : 'Nhân sự đã chốt ca'}</span>
               <span className="kpi-value" style={hasStaffingShortage ? { color: '#e11d48' } : undefined}>
                 {totalConfirmed} / {totalRequired}
               </span>
@@ -576,7 +576,6 @@ export default function EventDetailModal({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    <span style={{ fontSize: '1.6rem' }}>🚨</span>
                     <div>
                       <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#be123c' }}>
                         CẢNH BÁO THIẾU HỤT NHÂN SỰ ({staffingAlerts.length} ca làm đang hoặc sắp diễn ra thiếu người)
@@ -585,7 +584,7 @@ export default function EventDetailModal({
                         {staffingAlerts
                           .map((s) => `"${s.jobType}" (thiếu ${Math.max(0, (s.requiredWorkers || 1) - (s.confirmedWorkers || 0))} người)`)
                           .join(', ')}
-                        . Hãy bấm <strong>"🚨 Bật Khẩn Cấp"</strong> tại ca để mở rộng bán kính và cho phép nhân sự nhận ca tự do trên Radar!
+                        . Hãy bấm <strong>"Bật Khẩn Cấp"</strong> tại ca để mở rộng phạm vi và cho phép nhân sự nhận ca trực tiếp trên bản đồ.
                       </div>
                     </div>
                   </div>
@@ -740,7 +739,7 @@ export default function EventDetailModal({
                                       : 'Bật điều phối khẩn cấp: Cho phép ứng tuyển tự do trên Radar và mở rộng bán kính 15km'
                                   }
                                 >
-                                  {shift.emergency ? '🛑 Tắt Khẩn Cấp' : '🚨 Bật Khẩn Cấp'}
+                                  {shift.emergency ? 'Tắt Khẩn Cấp' : 'Bật Khẩn Cấp'}
                                 </button>
                               )}
 
@@ -791,7 +790,7 @@ export default function EventDetailModal({
                                 }}
                                 title="Mở trang quản lý chi tiết riêng cho ca làm việc này"
                               >
-                                📊 Quản Lý Ca & Nhân Sự →
+                                Quản Lý Ca & Nhân Sự
                               </button>
                             </div>
                           </div>

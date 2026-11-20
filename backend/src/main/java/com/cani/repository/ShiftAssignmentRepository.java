@@ -58,4 +58,17 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             @Param("status") AssignmentStatus status,
             @Param("thresholdTime") Instant thresholdTime
     );
+
+    @Query("SELECT sa FROM ShiftAssignment sa " +
+           "JOIN FETCH sa.worker w " +
+           "JOIN FETCH w.user u " +
+           "JOIN FETCH sa.shift s " +
+           "JOIN FETCH s.event e " +
+           "WHERE e.eventOrganizer.eoId = :eoId " +
+           "AND sa.status IN :statuses " +
+           "ORDER BY sa.createdAt DESC")
+    List<ShiftAssignment> findCollaboratedWorkersByEoId(
+            @Param("eoId") UUID eoId,
+            @Param("statuses") List<AssignmentStatus> statuses
+    );
 }

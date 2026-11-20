@@ -52,6 +52,87 @@ public class MyTeamService {
     }
 
     /**
+     * Lấy danh sách nhân sự ĐÃ TỪNG CỘNG TÁC trong các sự kiện của Event Organizer
+     * Tự động tổng hợp từ lịch sử phân công (ShiftAssignment), kèm trạng thái đã lưu vào danh sách quen thuộc hay chưa
+     */
+    @Transactional(readOnly = true)
+    public List<MyTeamMemberResponseDto> getPastCollaborators(UUID eoUserId, String search) {
+        EventOrganizer eo = getEventOrganizerByUserId(eoUserId);
+
+        List<com.cani.entity.enums.AssignmentStatus> statuses = List.of(
+                com.cani.entity.enums.AssignmentStatus.CONFIRMED,
+                com.cani.entity.enums.AssignmentStatus.CHECKED_IN,
+                com.cani.entity.enums.AssignmentStatus.COMPLETED
+        );
+        List<com.cani.entity.ShiftAssignment> assignments = shiftAssignmentRepository.findCollaboratedWorkersByEoId(eo.getEoId(), statuses);
+
+        // Bản đồ các nhân sự đã lưu vào eo_workers
+        java.util.Map<UUID, EoWorker> savedMap = eoWorkerRepository.findMyTeamMembers(eo.getEoId(), null, false)
+                .stream()
+                .filter(ew -> ew.getWorker() != null)
+                .collect(Collectors.toMap(ew -> ew.getWorker().getWorkerId(), ew -> ew, (a, b) -> a));
+
+        // Nhóm các ca theo workerId
+        java.util.Map<UUID, List<com.cani.entity.ShiftAssignment>> byWorker = assignments.stream()
+                .filter(sa -> sa.getWorker() != null)
+                .collect(Collectors.groupingBy(sa -> sa.getWorker().getWorkerId(), java.util.LinkedHashMap::new, Collectors.toList()));
+
+        String q = (search != null && !search.isBlank()) ? search.trim().toLowerCase() : null;
+        List<MyTeamMemberResponseDto> result = new java.util.ArrayList<>();
+
+        for (java.util.Map.Entry<UUID, List<com.cani.entity.ShiftAssignment>> entry : byWorker.entrySet()) {
+            UUID workerId = entry.getKey();
+            List<com.cani.entity.ShiftAssignment> workerAssignments = entry.getValue();
+            com.cani.entity.ShiftAssignment latest = workerAssignments.get(0);
+            Worker w = latest.getWorker();
+            User u = w != null ? w.getUser() : null;
+
+            String fullName = w != null ? w.getFullName() : (u != null ? u.getFullName() : "");
+            String phone = u != null ? u.getPhone() : "";
+
+            if (q != null) {
+                boolean matchName = fullName != null && fullName.toLowerCase().contains(q);
+                boolean matchPhone = phone != null && phone.toLowerCase().contains(q);
+                if (!matchName && !matchPhone) continue;
+            }
+
+            EoWorker savedEoWorker = savedMap.get(workerId);
+            if (savedEoWorker != null && Boolean.TRUE.equals(savedEoWorker.getIsBlacklisted())) {
+                continue;
+            }
+
+            java.time.Instant lastWorked = latest.getShift() != null ? latest.getShift().getStartTime() : latest.getCreatedAt();
+            String lastJob = latest.getShift() != null ? latest.getShift().getJobType() : "";
+
+            result.add(MyTeamMemberResponseDto.builder()
+                    .eoWorkerId(savedEoWorker != null ? savedEoWorker.getEoWorkerId() : null)
+                    .workerId(workerId)
+                    .userId(u != null ? u.getUserId() : null)
+                    .fullName(fullName)
+                    .phone(phone)
+                    .email(u != null ? u.getEmail() : null)
+                    .avatarUrl(u != null ? u.getAvatarUrl() : null)
+                    .skillTier(w != null ? w.getSkillTier() : null)
+                    .reliabilityScore(w != null ? w.getReliabilityScore() : null)
+                    .ratingAvg(w != null ? w.getRatingAvg() : null)
+                    .totalShiftsTogether(workerAssignments.size())
+                    .completionRate(savedEoWorker != null ? savedEoWorker.getCompletionRate() : BigDecimal.valueOf(100))
+                    .avgRatingGiven(savedEoWorker != null ? savedEoWorker.getAvgRatingGiven() : BigDecimal.ZERO)
+                    .lastWorkedAt(lastWorked)
+                    .lastJobType(lastJob)
+                    .internalNote(savedEoWorker != null ? savedEoWorker.getInternalNote() : null)
+                    .isFavorited(savedEoWorker != null && Boolean.TRUE.equals(savedEoWorker.getIsFavorited()))
+                    .isBlacklisted(false)
+                    .isSavedInMyTeam(savedEoWorker != null)
+                    .isOnline(w != null ? w.getIsOnline() : false)
+                    .addedAt(savedEoWorker != null ? savedEoWorker.getCreatedAt() : latest.getCreatedAt())
+                    .build());
+        }
+
+        return result;
+    }
+
+    /**
      * Lấy chi tiết thông tin 1 thành viên trong My Team
      */
     @Transactional(readOnly = true)
@@ -231,6 +312,7 @@ public class MyTeamService {
         return MyTeamMemberResponseDto.builder()
                 .eoWorkerId(ew.getEoWorkerId())
                 .workerId(w != null ? w.getWorkerId() : null)
+                .userId(u != null ? u.getUserId() : null)
                 .fullName(w != null ? w.getFullName() : (u != null ? u.getFullName() : null))
                 .phone(u != null ? u.getPhone() : null)
                 .email(u != null ? u.getEmail() : null)
@@ -245,6 +327,7 @@ public class MyTeamService {
                 .internalNote(ew.getInternalNote())
                 .isFavorited(ew.getIsFavorited())
                 .isBlacklisted(ew.getIsBlacklisted())
+                .isSavedInMyTeam(true)
                 .isOnline(w != null ? w.getIsOnline() : false)
                 .addedAt(ew.getCreatedAt())
                 .build();

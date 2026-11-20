@@ -153,3 +153,5 @@ export function usePayments() {
   };
 }
 
+export default usePayments;
+

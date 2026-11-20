@@ -255,3 +255,6 @@ export function useEvents() {
     handleExecutePublish,
   };
 }
+
+export default useEvents;
+

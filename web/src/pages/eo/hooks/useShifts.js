@@ -399,3 +399,6 @@ export function useShifts({ onReloadEvents }) {
     handleOpenAttendance,
   };
 }
+
+export default useShifts;
+

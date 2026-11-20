@@ -36,7 +36,7 @@ export const HeaderUserMenu = ({
           type="button"
           className="header-help-btn"
           title="Trung tâm trợ giúp"
-          onClick={() => window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail: { tab: 'settings' } }))}
+          onClick={() => window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail: { tab: 'support' } }))}
         >
           <HelpIcon />
         </button>

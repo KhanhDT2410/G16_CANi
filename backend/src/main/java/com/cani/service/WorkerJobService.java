@@ -1425,7 +1425,7 @@ public class WorkerJobService {
                 && ev.getEventOrganizer().getUser().getUserId() != null) {
             try {
                 UUID eoUserId = ev.getEventOrganizer().getUser().getUserId();
-                Map<String, Object> metadata = new HashMap<>();
+                Map<String, String> metadata = new HashMap<>();
                 metadata.put("eventId", ev.getEventId().toString());
                 metadata.put("shiftId", shift.getShiftId().toString());
                 if (assignmentId != null) {

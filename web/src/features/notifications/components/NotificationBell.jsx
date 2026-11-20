@@ -66,6 +66,9 @@ export const NotificationBell = ({ className = '' }) => {
     closeDropdown();
 
     // Điều hướng nghiệp vụ tương ứng (Deep Link)
+    const metaShiftId = item.metadata?.shiftId;
+    const metaEventId = item.metadata?.eventId;
+
     if (item.referenceType === 'SUPPORT_TICKET') {
       window.dispatchEvent(
         new CustomEvent('cani_switch_tab', { detail: { tab: 'support', ticketId: item.referenceId } })
@@ -74,9 +77,15 @@ export const NotificationBell = ({ className = '' }) => {
       window.dispatchEvent(
         new CustomEvent('cani_switch_tab', { detail: { tab: 'disputes', disputeId: item.referenceId } })
       );
-    } else if (item.referenceType === 'SHIFT' || item.referenceType === 'ASSIGNMENT') {
+    } else if (item.referenceType === 'SHIFT' || item.referenceType === 'ASSIGNMENT' || metaShiftId) {
       window.dispatchEvent(
-        new CustomEvent('cani_switch_tab', { detail: { tab: 'events', shiftId: item.referenceId } })
+        new CustomEvent('cani_switch_tab', {
+          detail: {
+            tab: 'events',
+            shiftId: metaShiftId || (item.referenceType === 'SHIFT' ? item.referenceId : null),
+            eventId: metaEventId || null,
+          },
+        })
       );
     } else if (item.referenceType === 'PAYMENT') {
       window.dispatchEvent(

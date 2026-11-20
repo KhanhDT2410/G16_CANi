@@ -9,7 +9,7 @@ export const NotificationItem = ({ notification, onSelect }) => {
 
   const typeConfig = NOTIFICATION_TYPE_CONFIG[type] || {
     label: 'Thông báo',
-    icon: '🔔',
+    icon: 'TB',
     badgeClass: 'notif-type-system',
   };
 

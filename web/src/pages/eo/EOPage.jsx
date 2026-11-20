@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../features/auth';
 import { showToast } from '../../components/common/Toast';
@@ -60,10 +60,16 @@ export default function EOPage() {
     });
   };
 
-  // Lắng nghe sự kiện chuyển tab từ Navbar (Header Avatar click)
+  // Lắng nghe sự kiện chuyển tab từ Navbar hoặc Chuông thông báo (Deep Link)
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
   useEffect(() => {
     const handleSwitch = (e) => {
       const targetTab = e.detail?.tab;
+      const targetShiftId = e.detail?.shiftId;
+      const targetEventId = e.detail?.eventId;
+
       if (targetTab) {
         if (targetTab === 'recruitment') {
           setActiveTab('events');
@@ -76,6 +82,20 @@ export default function EOPage() {
           setActiveTab(targetTab);
           setActiveNav(targetTab);
         }
+
+        // Deep-link trực tiếp vào trang quản lý ca từ thông báo
+        const currentEvents = eventsRef.current;
+        if (targetTab === 'events' && targetShiftId && Array.isArray(currentEvents?.events)) {
+          const foundEvent =
+            (targetEventId && currentEvents.events.find((ev) => ev.eventId === targetEventId)) ||
+            currentEvents.events.find((ev) => (ev.shifts || []).some((sh) => sh.shiftId === targetShiftId));
+          if (foundEvent) {
+            setDetailEvent(foundEvent);
+            setWorkspaceShiftId(targetShiftId);
+            currentEvents.loadEvents?.();
+          }
+        }
+
         try {
           setSearchParams({ tab: targetTab }, { replace: true });
         } catch (err) {

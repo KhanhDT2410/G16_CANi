@@ -383,6 +383,16 @@ public class WorkerJobService {
         assignment.setStatus(AssignmentStatus.CHECKED_IN);
         shiftAssignmentRepository.save(assignment);
 
+        String timeTag = isOnTime ? "Đúng giờ" : "Trễ giờ";
+        String evName = (shift != null && shift.getEvent() != null) ? shift.getEvent().getName() : "Sự kiện";
+        sendEoShiftNotification(
+                shift,
+                "Nhân sự đã vào ca",
+                worker.getFullName() + " vừa điểm danh vào ca \"" + (shift != null ? shift.getJobType() : "") + "\" (" + evName + ") - " + timeTag + ".",
+                com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                assignmentId
+        );
+
         String msg = isOnTime
                 ? "Điểm danh Check-in thành công! Bạn đã có mặt đúng giờ."
                 : "Điểm danh Check-in thành công (Ghi nhận có mặt muộn).";
@@ -464,6 +474,16 @@ public class WorkerJobService {
                 skillProgressionService.recordCompletedShift(worker, assignment.getShift());
             }
         }
+
+        Shift completedShift = assignment.getShift();
+        String evName = (completedShift != null && completedShift.getEvent() != null) ? completedShift.getEvent().getName() : "Sự kiện";
+        sendEoShiftNotification(
+                completedShift,
+                "Nhân sự đã kết ca",
+                worker.getFullName() + " đã hoàn thành và kết ca \"" + (completedShift != null ? completedShift.getJobType() : "") + "\" (" + evName + "). Tổng giờ làm: " + hoursWorked + " giờ.",
+                com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                assignmentId
+        );
 
         return AttendanceCheckResponseDto.builder()
                 .assignmentId(assignmentId)
@@ -893,6 +913,16 @@ public class WorkerJobService {
             } catch (Exception e) {
                 log.warn("Không thể kích hoạt dispatch tìm người thay thế: {}", e.getMessage());
             }
+
+            String evName = (event != null) ? event.getName() : "Sự kiện";
+            String reasonText = (reason != null && !reason.isBlank()) ? reason : "Không nêu lý do";
+            sendEoShiftNotification(
+                    shift,
+                    "Cảnh báo: Nhân sự hủy ca",
+                    worker.getFullName() + " vừa hủy nhận ca \"" + shift.getJobType() + "\" (" + evName + "). Lý do: " + reasonText,
+                    com.cani.entity.enums.NotificationType.REMINDER,
+                    assignmentId
+            );
         }
 
         log.info("Worker {} đã hủy ca {} (Bị trừ {} điểm uy tín, điểm mới: {})",
@@ -957,6 +987,11 @@ public class WorkerJobService {
 
         Map<String, ChecklistProgressDto> progressMap = parseChecklistProgress(assignment.getChecklistProgress());
 
+        Set<String> previouslyCompletedIds = progressMap.entrySet().stream()
+                .filter(e -> e.getValue() != null && Boolean.TRUE.equals(e.getValue().getIsCompleted()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+
         if (request != null && request.getItems() != null) {
             Instant now = Instant.now();
             for (ShiftChecklistItemDto incoming : request.getItems()) {
@@ -992,6 +1027,9 @@ public class WorkerJobService {
             throw new BadRequestException("Không thể lưu tiến độ checklist: " + e.getMessage());
         }
 
+        List<String> newlyCompletedLabels = new ArrayList<>();
+        int completedCount = 0;
+
         // Trả về danh sách template đã merge với tiến độ mới nhất của chính worker này
         for (ShiftChecklistItemDto item : templateItems) {
             ChecklistProgressDto prog = progressMap.get(item.getId());
@@ -1000,11 +1038,40 @@ public class WorkerJobService {
                 item.setCompletedAt(prog.getCompletedAt());
                 item.setEvidenceImageUrl(prog.getEvidenceImageUrl());
                 item.setEvidenceSubmittedAt(prog.getEvidenceSubmittedAt());
+                completedCount++;
+                if (!previouslyCompletedIds.contains(item.getId())) {
+                    String titleLabel = item.getTitle() != null ? item.getTitle() : item.getId();
+                    newlyCompletedLabels.add(titleLabel);
+                }
             } else {
                 item.setIsCompleted(false);
                 item.setCompletedAt(null);
                 item.setEvidenceImageUrl(null);
                 item.setEvidenceSubmittedAt(null);
+            }
+        }
+
+        if (!newlyCompletedLabels.isEmpty() && shift != null) {
+            String evName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện";
+            if (!templateItems.isEmpty() && completedCount >= templateItems.size()) {
+                sendEoShiftNotification(
+                        shift,
+                        "Hoàn thành toàn bộ đầu việc",
+                        worker.getFullName() + " đã hoàn thành 100% (" + completedCount + "/" + templateItems.size()
+                                + ") đầu việc trong ca \"" + shift.getJobType() + "\" (" + evName + "). Bạn có thể duyệt công và khai báo trả lương.",
+                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                        assignmentId
+                );
+            } else {
+                String completedTasksText = String.join(", ", newlyCompletedLabels);
+                sendEoShiftNotification(
+                        shift,
+                        "Cập nhật tiến độ công việc",
+                        worker.getFullName() + " vừa hoàn thành đầu việc \"" + completedTasksText + "\" (" + completedCount + "/"
+                                + Math.max(1, templateItems.size()) + ") trong ca \"" + shift.getJobType() + "\" (" + evName + ").",
+                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                        assignmentId
+                );
             }
         }
 
@@ -1339,23 +1406,42 @@ public class WorkerJobService {
     }
 
     private void notifyEoWorkerAcceptedShift(Shift shift, Worker worker, ShiftAssignment assignment) {
-        if (notificationService == null || shift == null || worker == null || assignment == null) return;
+        if (shift == null || worker == null || assignment == null) return;
+        Event ev = shift.getEvent();
+        String evName = ev != null ? ev.getName() : "Sự kiện";
+        sendEoShiftNotification(
+                shift,
+                "Nhân sự nhận ca làm việc",
+                worker.getFullName() + " đã tham gia ca \"" + shift.getJobType() + "\" trong sự kiện \"" + evName + "\".",
+                com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                assignment.getAssignmentId()
+        );
+    }
+
+    private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId) {
+        if (notificationService == null || shift == null) return;
         Event ev = shift.getEvent();
         if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
                 && ev.getEventOrganizer().getUser().getUserId() != null) {
             try {
                 UUID eoUserId = ev.getEventOrganizer().getUser().getUserId();
+                Map<String, Object> metadata = new HashMap<>();
+                metadata.put("eventId", ev.getEventId().toString());
+                metadata.put("shiftId", shift.getShiftId().toString());
+                if (assignmentId != null) {
+                    metadata.put("assignmentId", assignmentId.toString());
+                }
                 notificationService.createAndSend(
                         eoUserId,
-                        "Worker nhận ca làm việc",
-                        worker.getFullName() + " đã nhận ca \"" + shift.getJobType() + "\" – " + ev.getName(),
-                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
-                        "ASSIGNMENT",
-                        assignment.getAssignmentId(),
-                        Map.of("assignmentId", assignment.getAssignmentId().toString())
+                        title,
+                        body,
+                        type,
+                        "SHIFT",
+                        shift.getShiftId(),
+                        metadata
                 );
             } catch (Exception ex) {
-                log.warn("Không thể gửi thông báo cho EO khi Worker nhận ca {}: {}", shift.getShiftId(), ex.getMessage());
+                log.warn("Không thể gửi thông báo cho EO về ca {}: {}", shift.getShiftId(), ex.getMessage());
             }
         }
     }

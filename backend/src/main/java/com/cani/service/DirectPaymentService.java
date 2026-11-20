@@ -214,6 +214,51 @@ public class DirectPaymentService {
 
         log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, normalizedConfirmStatus, assignmentId);
 
+        if (notificationService != null && assignmentRepository != null) {
+            assignmentRepository.findById(assignmentId).ifPresent(sa -> {
+                Shift shift = sa.getShift();
+                Event ev = shift != null ? shift.getEvent() : null;
+                if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
+                        && ev.getEventOrganizer().getUser().getUserId() != null) {
+                    try {
+                        UUID eoUserId = ev.getEventOrganizer().getUser().getUserId();
+                        String workerName = sa.getWorker() != null ? sa.getWorker().getFullName() : "Nhân sự";
+                        String title;
+                        String body;
+                        NotificationType nType;
+                        if ("RECEIVED_FULL".equals(normalizedConfirmStatus)) {
+                            title = "Nhân sự xác nhận đã nhận đủ thù lao";
+                            body = workerName + " đã xác nhận nhận đủ tiền công cho ca \"" + shift.getJobType() + "\" (" + ev.getName() + ").";
+                            nType = NotificationType.PAYMENT;
+                        } else if ("RECEIVED_PARTIAL".equals(normalizedConfirmStatus)) {
+                            title = "Nhân sự báo mới nhận một phần thù lao";
+                            body = workerName + " phản hồi mới nhận một phần thù lao ca \"" + shift.getJobType() + "\" (" + ev.getName() + "). Vui lòng kiểm tra lại.";
+                            nType = NotificationType.PAYMENT;
+                        } else {
+                            title = "Khiếu nại chưa nhận được thù lao";
+                            body = workerName + " báo chưa nhận được thù lao ca \"" + shift.getJobType() + "\" (" + ev.getName() + "). Hệ thống đã mở hồ sơ tranh chấp.";
+                            nType = NotificationType.DISPUTE;
+                        }
+                        notificationService.createAndSend(
+                                eoUserId,
+                                title,
+                                body,
+                                nType,
+                                "SHIFT",
+                                shift.getShiftId(),
+                                Map.of(
+                                        "eventId", ev.getEventId().toString(),
+                                        "shiftId", shift.getShiftId().toString(),
+                                        "assignmentId", assignmentId.toString()
+                                )
+                        );
+                    } catch (Exception ex) {
+                        log.warn("Không thể gửi thông báo xác nhận thanh toán cho EO: {}", ex.getMessage());
+                    }
+                }
+            });
+        }
+
         return mapToDto(saved);
     }
 

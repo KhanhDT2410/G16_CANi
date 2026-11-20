@@ -40,6 +40,9 @@ public class InviteService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private WorkerGroupMembershipRepository workerGroupMembershipRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private NotificationService notificationService;
+
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -204,6 +207,30 @@ public class InviteService {
         int currentConfirmed = shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0;
         shift.setConfirmedWorkers(currentConfirmed + 1);
         shiftRepository.save(shift);
+
+        if (notificationService != null && shift.getEvent() != null
+                && shift.getEvent().getEventOrganizer() != null
+                && shift.getEvent().getEventOrganizer().getUser() != null
+                && shift.getEvent().getEventOrganizer().getUser().getUserId() != null) {
+            try {
+                UUID eoUserId = shift.getEvent().getEventOrganizer().getUser().getUserId();
+                notificationService.createAndSend(
+                        eoUserId,
+                        "Nhân sự nhận ca qua mã mời",
+                        worker.getFullName() + " đã tham gia ca \"" + shift.getJobType() + "\" trong sự kiện \"" + shift.getEvent().getName() + "\" (qua mã mời).",
+                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                        "SHIFT",
+                        shift.getShiftId(),
+                        java.util.Map.of(
+                                "eventId", shift.getEvent().getEventId().toString(),
+                                "shiftId", shift.getShiftId().toString(),
+                                "assignmentId", savedAssignment.getAssignmentId().toString()
+                        )
+                );
+            } catch (Exception ex) {
+                log.warn("Không thể gửi thông báo cho EO khi Worker join qua mã mời: {}", ex.getMessage());
+            }
+        }
 
         log.info("Worker {} đã tham gia thành công ca {} qua mã mời {}", worker.getWorkerId(), shift.getShiftId(), cleanCode);
 

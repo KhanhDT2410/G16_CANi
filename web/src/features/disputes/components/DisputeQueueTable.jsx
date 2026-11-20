@@ -1,6 +1,14 @@
 import { DISPUTE_STATUS_CONFIG, DISPUTE_TYPE_LABELS } from '../types/dispute.constants';
 
-const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide, onTransfer }) => {
+const DisputeQueueTable = ({
+  queue,
+  loading,
+  onSelect,
+  onAssign,
+  onDecide,
+  onTransfer,
+  isArbitrator = true,
+}) => {
   if (loading) {
     return <div className="dispute-empty">Đang tải dữ liệu hàng đợi...</div>;
   }
@@ -8,7 +16,11 @@ const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide, onTra
   if (!queue || queue.length === 0) {
     return (
       <div className="dispute-empty">
-        <p>Hiện không có đơn khiếu nại nào đang mở trong hàng đợi CSKH.</p>
+        <p>
+          {isArbitrator
+            ? 'Hiện không có đơn khiếu nại nào đang mở trong hàng đợi CSKH.'
+            : 'Bạn chưa có đơn tranh chấp hoặc khiếu nại nào.'}
+        </p>
       </div>
     );
   }
@@ -78,7 +90,7 @@ const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide, onTra
                     >
                       Mở đối thoại
                     </button>
-                    {item.status === 'OPEN' && (
+                    {isArbitrator && item.status === 'OPEN' && (
                       <button
                         type="button"
                         className="btn-quick-fill"
@@ -88,7 +100,7 @@ const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide, onTra
                         Nhận xử lý
                       </button>
                     )}
-                    {(item.status === 'OPEN' || item.status === 'INVESTIGATING') && (
+                    {isArbitrator && (item.status === 'OPEN' || item.status === 'INVESTIGATING') && (
                       <button
                         type="button"
                         className="btn-quick-fill"
@@ -99,7 +111,7 @@ const DisputeQueueTable = ({ queue, loading, onSelect, onAssign, onDecide, onTra
                         Chuyển
                       </button>
                     )}
-                    {(item.status === 'INVESTIGATING' || item.status === 'ESCALATED') && (
+                    {isArbitrator && (item.status === 'INVESTIGATING' || item.status === 'ESCALATED') && (
                       <button
                         type="button"
                         className="btn-quick-fill"

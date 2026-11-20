@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
-import { WAGE_RECOMMENDATIONS_MAP, calculateShiftRiskAnalysis } from '../hooks/useShifts';
+import { calculateShiftRiskAnalysis } from '../hooks/useShifts';
+import { validateJobType } from '../utils/shiftValidation';
+import WageBenchmarkBox from './WageBenchmarkBox';
 import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
+import './EventCreatePage.css';
 
 /**
  * ShiftCreateModal
@@ -16,13 +19,13 @@ const ShiftCreateModal = ({
   newShift,
   setNewShift,
   roles,
-  wageRecommendationsMap = {},
   onRoleChange,
   shiftDurationHours = 4,
   calculateShiftTotal,
   skillTaxonomy = [],
 }) => {
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [jobTypeError, setJobTypeError] = useState(null);
   const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
   const [shiftPackageWage, setShiftPackageWage] = useState(
     Math.round(Number(newShift?.hourlyWage || 50000) * Math.max(0.5, Number(shiftDurationHours || 4)))
@@ -76,14 +79,20 @@ const ShiftCreateModal = ({
     }));
   };
 
-  const recMap = Object.keys(wageRecommendationsMap).length > 0 ? wageRecommendationsMap : WAGE_RECOMMENDATIONS_MAP;
-  const rawRec = recMap[newShift.jobType] || { min: 40000, max: 60000, defaultWage: 45000, recommended: 45000 };
-  const wageRec = {
-    min: Number(rawRec.min || 40000),
-    max: Number(rawRec.max || 60000),
-    recommended: Number(rawRec.recommended || rawRec.defaultWage || 45000),
-  };
   const riskInfo = calculateShiftRiskAnalysis(newShift);
+  const wageRec = riskInfo.recommendation;
+
+  const handleFormSubmit = (e) => {
+    const err = validateJobType(newShift.jobType);
+    if (err) {
+      e.preventDefault();
+      setJobTypeError(err);
+      showToast(err, 'error');
+      return;
+    }
+    setJobTypeError(null);
+    onSubmit?.(e);
+  };
 
   return (
     <div className="eo-modal-overlay">
@@ -101,18 +110,25 @@ const ShiftCreateModal = ({
           </button>
         </div>
 
-        <form onSubmit={onSubmit}>
+        <form onSubmit={handleFormSubmit}>
           <div className="eo-form-group">
             <label>Vị Trí / Vai Trò Cần Tuyển *</label>
             <input
               type="text"
               list="create-shift-roles-list"
               className="eo-form-input"
+              style={{
+                borderColor: jobTypeError ? '#ef4444' : undefined,
+                boxShadow: jobTypeError ? '0 0 0 1px #ef4444' : undefined,
+              }}
               placeholder="Nhập vị trí hoặc chọn gợi ý (VD: Phục vụ bàn, Lễ tân, MC, Kỹ thuật...)"
               value={newShift.jobType}
-              onChange={(e) =>
-                onRoleChange ? onRoleChange(e.target.value) : setNewShift({ ...newShift, jobType: e.target.value })
-              }
+              onChange={(e) => {
+                const val = e.target.value;
+                onRoleChange ? onRoleChange(val) : setNewShift({ ...newShift, jobType: val });
+                if (jobTypeError) setJobTypeError(null);
+              }}
+              onBlur={() => setJobTypeError(validateJobType(newShift.jobType))}
               required
             />
             <datalist id="create-shift-roles-list">
@@ -120,6 +136,7 @@ const ShiftCreateModal = ({
                 <option key={role} value={role} />
               ))}
             </datalist>
+            {jobTypeError && <div className="ecw-field-error">{jobTypeError}</div>}
           </div>
 
           {/* Hình ảnh minh họa ca làm / Đồng phục - Nằm trong 1 div riêng cho ảnh to rõ */}
@@ -395,89 +412,19 @@ const ShiftCreateModal = ({
             </div>
           </div>
 
-          {/* GỢI Ý MỨC LƯƠNG THỊ TRƯỜNG & CẢNH BÁO KHÓ TÌM NHÂN SỰ */}
+          {/* GỢI Ý MỨC LƯƠNG THỊ TRƯỜNG CÓ DẪN CHỨNG & CẢNH BÁO KHÓ TÌM NHÂN SỰ */}
           <div style={{ marginBottom: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            <div
-              style={{
-                padding: '0.65rem 0.9rem',
-                borderRadius: '0.5rem',
-                backgroundColor: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '0.5rem',
+            <WageBenchmarkBox
+              jobType={newShift.jobType}
+              jobTypeError={jobTypeError}
+              hourlyWage={newShift.hourlyWage}
+              startTime={newShift.startTime}
+              endTime={newShift.endTime}
+              onSelectWage={(chosenWage) => {
+                setNewShift({ ...newShift, hourlyWage: chosenWage });
+                setShiftPackageWage(Math.round(chosenWage * safeHours));
               }}
-            >
-              <div style={{ fontSize: '0.8rem', color: '#1e3a8a' }}>
-                <strong>Gợi ý mức lương:</strong>{' '}
-                Khung thị trường <strong>{((wageRec && wageRec.min) || 40000).toLocaleString()}đ - {((wageRec && wageRec.max) || 60000).toLocaleString()}đ/giờ</strong>{' '}
-                (Khuyên dùng: <strong>{((wageRec && wageRec.recommended) || 45000).toLocaleString()}đ/giờ</strong>)
-              </div>
-              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const minVal = (wageRec && wageRec.min) || 40000;
-                    setNewShift({ ...newShift, hourlyWage: minVal });
-                    setShiftPackageWage(Math.round(minVal * safeHours));
-                  }}
-                  style={{
-                    fontSize: '0.73rem',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '0.35rem',
-                    border: '1px solid #93c5fd',
-                    backgroundColor: Number(newShift.hourlyWage) === wageRec.min ? '#2563eb' : '#ffffff',
-                    color: Number(newShift.hourlyWage) === wageRec.min ? '#ffffff' : '#1d4ed8',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Sàn: {((wageRec && wageRec.min) || 40000).toLocaleString()}đ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const recVal = (wageRec && wageRec.recommended) || 45000;
-                    setNewShift({ ...newShift, hourlyWage: recVal });
-                    setShiftPackageWage(Math.round(recVal * safeHours));
-                  }}
-                  style={{
-                    fontSize: '0.73rem',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '0.35rem',
-                    border: '1px solid #2563eb',
-                    backgroundColor: Number(newShift.hourlyWage) === wageRec.recommended ? '#2563eb' : '#dbeafe',
-                    color: Number(newShift.hourlyWage) === wageRec.recommended ? '#ffffff' : '#1e40af',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Khuyên dùng: {((wageRec && wageRec.recommended) || 45000).toLocaleString()}đ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const maxVal = (wageRec && wageRec.max) || 60000;
-                    setNewShift({ ...newShift, hourlyWage: maxVal });
-                    setShiftPackageWage(Math.round(maxVal * safeHours));
-                  }}
-                  style={{
-                    fontSize: '0.73rem',
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '0.35rem',
-                    border: '1px solid #93c5fd',
-                    backgroundColor: Number(newShift.hourlyWage) === wageRec.max ? '#2563eb' : '#ffffff',
-                    color: Number(newShift.hourlyWage) === wageRec.max ? '#ffffff' : '#1d4ed8',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Thu hút nhanh: {((wageRec && wageRec.max) || 60000).toLocaleString()}đ
-                </button>
-              </div>
-            </div>
+            />
 
             <div
               style={{

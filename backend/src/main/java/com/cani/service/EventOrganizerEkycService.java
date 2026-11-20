@@ -295,16 +295,26 @@ public class EventOrganizerEkycService {
             }
         }
 
-        // Tính số sự kiện thực tế đã chạy/tổ chức và đánh giá thực tế từ DB
+        // Tính số sự kiện thực tế đã chạy/tổ chức, tổng sự kiện tạo và nhân sự đã chốt từ DB
         int actualEventsCount = eo.getTotalEventsCompleted() != null ? eo.getTotalEventsCompleted() : 0;
+        int totalEventsCreated = 0;
+        int totalConfirmedWorkers = 0;
         if (eventRepository != null) {
-            long realCount = eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId())
-                    .stream()
+            List<com.cani.entity.Event> eoEvents = eventRepository
+                    .findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId());
+            totalEventsCreated = (int) eoEvents.stream()
+                    .filter(ev -> ev.getStatus() != com.cani.entity.enums.EventStatus.CANCELLED)
+                    .count();
+            long realCount = eoEvents.stream()
                     .filter(ev -> ev.getStatus() != null
                             && ev.getStatus() != com.cani.entity.enums.EventStatus.DRAFT
                             && ev.getStatus() != com.cani.entity.enums.EventStatus.CANCELLED)
                     .count();
             actualEventsCount = (int) Math.max(actualEventsCount, realCount);
+            totalConfirmedWorkers = eoEvents.stream()
+                    .filter(ev -> ev.getStatus() != com.cani.entity.enums.EventStatus.CANCELLED)
+                    .mapToInt(ev -> ev.getTotalConfirmedWorkers() != null ? ev.getTotalConfirmedWorkers() : 0)
+                    .sum();
         }
 
         BigDecimal actualRatingAvg = eo.getRatingAvg() != null ? eo.getRatingAvg() : BigDecimal.ZERO;
@@ -337,6 +347,8 @@ public class EventOrganizerEkycService {
                 .ratingAvg(actualRatingAvg)
                 .ratingCount(actualRatingCount)
                 .totalEventsCompleted(actualEventsCount)
+                .totalEventsCreated(totalEventsCreated)
+                .totalConfirmedWorkers(totalConfirmedWorkers)
                 .businessLicenseUrl(businessLicenseUrl)
                 .businessVerificationStatus(businessVerificationStatus)
                 .build();

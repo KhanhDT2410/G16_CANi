@@ -25,6 +25,8 @@ const MainLayout = () => {
     }
   });
 
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
   const [headerSearch, setHeaderSearch] = useState(() => {
     try {
       return new URLSearchParams(location.search).get('q') || '';
@@ -32,6 +34,15 @@ const MainLayout = () => {
       return '';
     }
   });
+
+  useEffect(() => {
+    try {
+      const qParam = new URLSearchParams(location.search).get('q');
+      if (qParam !== null && qParam !== headerSearch) {
+        setHeaderSearch(qParam);
+      }
+    } catch { /* ignore */ }
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -42,9 +53,19 @@ const MainLayout = () => {
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter') {
       window.dispatchEvent(new CustomEvent('cani_global_search', { detail: { query: headerSearch } }));
-      if (!location.pathname.startsWith('/eo')) {
-        navigate(`/eo?q=${encodeURIComponent(headerSearch)}`);
+      const nextParams = new URLSearchParams(location.search);
+      if (headerSearch.trim()) {
+        nextParams.set('q', headerSearch.trim());
+      } else {
+        nextParams.delete('q');
       }
+      const nextQs = nextParams.toString();
+      if (!location.pathname.startsWith('/eo')) {
+        navigate(`/eo${nextQs ? `?${nextQs}` : ''}`);
+      } else {
+        navigate(`/eo${nextQs ? `?${nextQs}` : ''}`, { replace: true });
+      }
+      setMobileSearchOpen(false);
     }
   };
 
@@ -54,17 +75,37 @@ const MainLayout = () => {
   };
 
   useEffect(() => {
+    try {
+      setUserAvatar(localStorage.getItem('cani_eo_avatar') || user?.avatarUrl || null);
+    } catch {
+      setUserAvatar(user?.avatarUrl || null);
+    }
+  }, [user?.userId, user?.avatarUrl]);
+
+  useEffect(() => {
     const handleAvatarUpdate = (e) => {
-      const newAvatar = e.detail?.avatarUrl || localStorage.getItem('cani_eo_avatar');
-      setUserAvatar(newAvatar);
+      try {
+        const newAvatar = e.detail?.avatarUrl ?? localStorage.getItem('cani_eo_avatar') ?? null;
+        setUserAvatar(newAvatar);
+      } catch {
+        setUserAvatar(e.detail?.avatarUrl ?? null);
+      }
     };
     window.addEventListener('cani_avatar_updated', handleAvatarUpdate);
     return () => window.removeEventListener('cani_avatar_updated', handleAvatarUpdate);
   }, []);
 
   const handleLogout = async () => {
+    setUserAvatar(null);
     await logout();
     navigate('/login');
+  };
+
+  const handleHelpClick = () => {
+    if (!location.pathname.startsWith('/eo')) {
+      navigate('/eo?tab=support');
+    }
+    window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail: { tab: 'support' } }));
   };
 
   const handleUserBlockClick = () => {
@@ -135,6 +176,17 @@ const MainLayout = () => {
         )}
 
         <div className="main-header-right">
+          {!isStaff && (
+            <button
+              type="button"
+              className="header-mobile-search-btn"
+              title="Tìm kiếm sự kiện"
+              aria-label="Mở thanh tìm kiếm"
+              onClick={() => setMobileSearchOpen((prev) => !prev)}
+            >
+              <SearchIcon />
+            </button>
+          )}
           <HeaderUserMenu
             isAuthenticated={isAuthenticated}
             user={user}
@@ -142,10 +194,38 @@ const MainLayout = () => {
             isAdmin={isAdmin}
             isCustomerCare={isCustomerCare}
             onUserBlockClick={handleUserBlockClick}
+            onHelpClick={handleHelpClick}
             onLogout={handleLogout}
           />
         </div>
       </header>
+
+      {!isStaff && mobileSearchOpen && (
+        <div className="mobile-search-drawer">
+          <div className="header-search-box mobile-search-input-wrap">
+            <SearchIcon />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sự kiện, nhân sự, địa điểm..."
+              className="header-search-input"
+              value={headerSearch}
+              onChange={handleSearchChange}
+              onKeyDown={handleSearchKeyDown}
+              autoFocus
+            />
+            {headerSearch && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="header-search-clear-btn"
+                title="Xóa tìm kiếm"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <main className="main-content">
         <Outlet />

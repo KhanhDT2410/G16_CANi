@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { wageMatrixApi } from '../api/wageMatrixApi';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
 
 export const useWageMatrix = () => {
   const [items, setItems] = useState([]);
@@ -146,7 +147,13 @@ export const useWageMatrix = () => {
   };
 
   const handleDelete = async (matrixId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa vĩnh viễn mức thù lao này khỏi hệ thống?')) {
+    const confirmed = await showConfirm({
+      title: 'Xóa biểu thù lao',
+      description: 'Bạn có chắc chắn muốn xóa vĩnh viễn mức thù lao này khỏi hệ thống?',
+      type: 'danger',
+      confirmText: 'Xóa vĩnh viễn',
+    });
+    if (!confirmed) {
       return;
     }
     try {

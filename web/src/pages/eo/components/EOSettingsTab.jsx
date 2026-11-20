@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
 import { blockListService } from '../../../services/blockListService';
 
 /**
@@ -28,7 +29,13 @@ export default function EOSettingsTab() {
   }, []);
 
   const handleUnblock = async (blockedUserId, name) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn bỏ chặn "${name || 'nhân sự này'}" không?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Bỏ chặn nhân sự',
+      description: `Bạn có chắc chắn muốn bỏ chặn "${name || 'nhân sự này'}" không?`,
+      type: 'info',
+      confirmText: 'Bỏ chặn',
+    });
+    if (!confirmed) return;
     try {
       await blockListService.unblockUser(blockedUserId);
       showToast('Đã bỏ chặn nhân sự thành công.', 'success');

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
 import {
   ROLES,
   WAGE_RECOMMENDATIONS_MAP,
@@ -316,7 +317,13 @@ export function useShifts({ onReloadEvents }) {
   };
 
   const handleCancelShift = async (shift) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn HỦY ca "${shift.jobType}"?`)) {
+    const confirmed = await showConfirm({
+      title: 'Hủy ca làm việc',
+      description: `Bạn có chắc chắn muốn HỦY ca "${shift.jobType}"?`,
+      type: 'danger',
+      confirmText: 'Hủy ca',
+    });
+    if (!confirmed) {
       return;
     }
     try {

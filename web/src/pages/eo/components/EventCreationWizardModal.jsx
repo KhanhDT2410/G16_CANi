@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
 import {
   ROLES,
   WAGE_RECOMMENDATIONS_MAP,
@@ -619,7 +620,13 @@ const EventCreationWizardModal = ({
   };
 
   const handleDeleteShift = async (shiftId, index) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa ca làm việc này khỏi sự kiện?')) return;
+    const confirmed = await showConfirm({
+      title: 'Xóa ca làm việc',
+      description: 'Bạn có chắc chắn muốn xóa ca làm việc này khỏi sự kiện?',
+      type: 'danger',
+      confirmText: 'Xóa ca',
+    });
+    if (!confirmed) return;
     try {
       if (shiftId) {
         await eoService.cancelShift(shiftId, 'Ban tổ chức xóa ca');

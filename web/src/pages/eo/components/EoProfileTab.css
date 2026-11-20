@@ -260,7 +260,7 @@
 /* 4. FORM ELEMENTS */
 .profile-form-grid-2 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 1.25rem;
   width: 100%;
   max-width: 100%;
@@ -528,6 +528,13 @@
   .profile-hero-card {
     flex-direction: column;
     align-items: flex-start;
+    padding: 1.35rem;
+    gap: 1.1rem;
+  }
+
+  .profile-hero-left {
+    flex: 1 1 100%;
+    gap: 1rem;
   }
 
   .profile-hero-right {
@@ -541,6 +548,31 @@
 
   .profile-form-group.span-2 {
     grid-column: span 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .profile-hero-card {
+    padding: 1.15rem;
+    border-radius: 1rem;
+  }
+
+  .profile-avatar-wrapper,
+  .profile-avatar-img,
+  .profile-avatar-fallback {
+    width: 72px;
+    height: 72px;
+    font-size: 1.75rem;
+  }
+
+  .profile-subnav-btn {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.82rem;
+  }
+
+  .profile-card {
+    padding: 1.15rem;
+    border-radius: 1rem;
   }
 }
 

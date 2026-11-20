@@ -195,3 +195,18 @@
   background: linear-gradient(135deg, #d97706, #b45309);
   transform: translateY(-1px);
 }
+
+.cani-modal-btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.cani-modal-validation-hint {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #b45309;
+  text-align: right;
+}

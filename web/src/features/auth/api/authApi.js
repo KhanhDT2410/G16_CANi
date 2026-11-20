@@ -102,6 +102,7 @@ export const authApi = {
       localStorage.removeItem('cani_token');
       localStorage.removeItem('cani_refresh_token');
       localStorage.removeItem('cani_user');
+      localStorage.removeItem('cani_eo_avatar');
     }
   },
 

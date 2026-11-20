@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import { getDynamicShiftStatus } from '../utils/eventHelpers';
 import RateWorkerModal from './RateWorkerModal';
 import { WorkerProfileModal } from './worker-profile';
@@ -180,10 +181,15 @@ export default function ShiftWorkspacePage({
   };
 
   const handleToggleEmergency = async (enable) => {
-    const confirmMsg = enable
-      ? `Bật điều phối khẩn cấp cho ca "${shift.jobType}"?\n\n- Phát thông báo khẩn cấp đến nhân sự xung quanh (bán kính 15km).\n- Cho phép nhân sự nhận ca trực tiếp trên bản đồ.`
-      : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
-    if (!window.confirm(confirmMsg)) return;
+    const confirmed = await showConfirm({
+      title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
+      description: enable
+        ? 'Phát thông báo khẩn cấp đến nhân sự xung quanh (bán kính 15km) và cho phép nhận ca trực tiếp trên bản đồ.'
+        : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
+      type: enable ? 'warning' : 'info',
+      confirmText: enable ? 'Bật khẩn cấp' : 'Tắt chế độ',
+    });
+    if (!confirmed) return;
     try {
       if (enable) {
         await eoService.enableEmergencyDispatch(shift.shiftId, 15);
@@ -212,18 +218,20 @@ export default function ShiftWorkspacePage({
   };
 
   const handleReportIncomplete = async (item) => {
-    const reason = window.prompt(
-      `Báo cáo nhân sự "${item.workerName}" chưa hoàn thành công việc?\n\nNhập lý do cụ thể (tối thiểu 5 ký tự) để mở hồ sơ khiếu nại:`,
-      'Chưa hoàn thành đủ các đầu việc trong danh mục công việc'
-    );
-    if (!reason || reason.trim().length < 5) {
-      if (reason !== null) showToast('Vui lòng nhập lý do rõ ràng ít nhất 5 ký tự.', 'warning');
-      return;
-    }
+    const reason = await showPrompt({
+      title: `Báo cáo chưa hoàn thành công việc`,
+      description: `Nhân sự: ${item.workerName}. Vui lòng mô tả chi tiết (tối thiểu 20 ký tự) để CSKH đối soát và xử lý.`,
+      type: 'warning',
+      confirmText: 'Gửi báo cáo',
+      inputLabel: 'Lý do báo cáo',
+      initialValue: 'Chưa hoàn thành đủ các đầu việc trong danh mục công việc được giao',
+      isMultiline: true,
+      minLength: 20,
+    });
+    if (reason === null) return;
     try {
       await eoService.reportIncompleteWork(item.assignmentId, {
-        title: `Báo cáo chưa hoàn thành công việc - ${shift.jobType}`,
-        description: reason.trim(),
+        reason: reason.trim(),
       });
       showToast(`Đã gửi báo cáo đối với "${item.workerName}".`, 'success');
       loadAttendance();
@@ -237,10 +245,16 @@ export default function ShiftWorkspacePage({
       showToast('Không tìm thấy mã tài khoản để chặn.', 'error');
       return;
     }
-    const reason = window.prompt(
-      `Chặn nhân sự "${worker.workerName}" khỏi các sự kiện tương lai?\nNhập lý do chặn:`,
-      'Không tuân thủ quy định ca làm'
-    );
+    const reason = await showPrompt({
+      title: `Chặn nhân sự "${worker.workerName}"`,
+      description: 'Nhân sự này sẽ không thể nhìn thấy hoặc nhận ca trong các sự kiện tương lai của bạn.',
+      type: 'danger',
+      confirmText: 'Xác nhận chặn',
+      inputLabel: 'Lý do chặn',
+      initialValue: 'Không tuân thủ quy định ca làm',
+      isMultiline: true,
+      allowEmpty: true,
+    });
     if (reason === null) return;
     try {
       await blockListService.blockUser(worker.userId, reason);

@@ -28,7 +28,9 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('cani_token');
+      localStorage.removeItem('cani_refresh_token');
       localStorage.removeItem('cani_user');
+      localStorage.removeItem('cani_eo_avatar');
       const pathname = window.location.pathname;
       const isPublicPath =
         pathname === '/' ||

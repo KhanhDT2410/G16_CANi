@@ -4,6 +4,7 @@ import MainLayout from './layouts/MainLayout';
 import RequireRole from './features/auth/components/RequireRole';
 import { AuthProvider } from './features/auth';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import { PromptDialogHost } from './components/common/PromptModal';
 
 const EOPage = lazy(() => import('./pages/eo/EOPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
@@ -94,6 +95,7 @@ function App() {
         </Suspense>
         </AuthProvider>
       </BrowserRouter>
+      <PromptDialogHost />
     </ErrorBoundary>
   );
 }

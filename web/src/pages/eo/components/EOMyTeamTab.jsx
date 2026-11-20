@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { myTeamService } from '../../../services/myTeamService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 
@@ -98,7 +99,13 @@ export default function EOMyTeamTab() {
   };
 
   const handleRemoveMember = async (worker) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn bỏ lưu "${worker.fullName}" khỏi danh sách quen thuộc?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Bỏ lưu nhân sự quen thuộc',
+      description: `Bạn có chắc chắn muốn bỏ lưu "${worker.fullName}" khỏi danh sách quen thuộc?`,
+      type: 'warning',
+      confirmText: 'Bỏ lưu',
+    });
+    if (!confirmed) return;
     try {
       await myTeamService.removeWorkerFromMyTeam(worker.workerId);
       setTeam((prev) => prev.filter((w) => w.workerId !== worker.workerId));
@@ -110,10 +117,16 @@ export default function EOMyTeamTab() {
   };
 
   const handleBlockWorker = async (worker) => {
-    const reason = window.prompt(
-      `Bạn có chắc muốn chặn "${worker.fullName}" không?\n\nNgười này sẽ không thể nhìn thấy hoặc nhận bất kỳ ca làm nào của bạn nữa.\nNhập lý do chặn:`,
-      'Không đạt yêu cầu công việc'
-    );
+    const reason = await showPrompt({
+      title: `Chặn nhân sự "${worker.fullName}"`,
+      description: 'Người này sẽ không thể nhìn thấy hoặc nhận bất kỳ ca làm nào của bạn nữa.',
+      type: 'danger',
+      confirmText: 'Xác nhận chặn',
+      inputLabel: 'Lý do chặn',
+      initialValue: 'Không đạt yêu cầu công việc',
+      isMultiline: true,
+      allowEmpty: true,
+    });
     if (reason === null) return;
 
     try {

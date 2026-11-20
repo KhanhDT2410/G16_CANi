@@ -3,6 +3,7 @@ import { eoService } from '../../../services/eoService';
 import { useAuth } from '../../../features/auth';
 import { authApi } from '../../../features/auth/api/authApi';
 import { showToast } from '../../../components/common/Toast';
+import EOSettingsTab from './EOSettingsTab';
 import './EoProfileTab.css';
 import '../EoEkycTab.css';
 
@@ -30,11 +31,10 @@ export default function EoProfileTab() {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
 
-  const [activeSection, setActiveSection] = useState('PROFILE'); // 'PROFILE' | 'EKYC' | 'SECURITY'
+  const [activeSection, setActiveSection] = useState('PROFILE'); // 'PROFILE' | 'EKYC' | 'SECURITY' | 'BLOCKLIST'
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [submittingEkyc, setSubmittingEkyc] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
   const [isBusinessEntity, setIsBusinessEntity] = useState(false);
 
   // Ẩn / Hiện thông tin nhạy cảm
@@ -49,8 +49,7 @@ export default function EoProfileTab() {
     setShowSensitive((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
-  // State Bảo mật & Đổi mật khẩu qua OTP (hỗ trợ tài khoản Google / Quên mật khẩu)
-  const [securityMode, setSecurityMode] = useState('CURRENT_PASSWORD'); // 'CURRENT_PASSWORD' | 'EMAIL_OTP'
+  // State Bảo mật & Đổi mật khẩu qua Email OTP
   const [otpStep, setOtpStep] = useState(1);
   const [otpCode, setOtpCode] = useState('');
   const [otpNewPassword, setOtpNewPassword] = useState('');
@@ -111,12 +110,7 @@ export default function EoProfileTab() {
     businessLicenseImage: null,
   });
 
-  // Form Đổi Mật Khẩu
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  // Kiểm tra dữ liệu ban đầu khi mở Tab Hồ sơ
 
   // Tải dữ liệu từ Backend
   const loadData = async () => {
@@ -288,27 +282,7 @@ export default function EoProfileTab() {
     }
   };
 
-  // Đổi mật khẩu
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    if (passwordForm.newPassword.length < 8) {
-      showToast('Mật khẩu mới phải có ít nhất 8 ký tự', 'error');
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showToast('Mật khẩu xác nhận không khớp', 'error');
-      return;
-    }
-
-    setChangingPassword(true);
-    setTimeout(() => {
-      setChangingPassword(false);
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      showToast('Đã đổi mật khẩu tài khoản thành công!', 'success');
-    }, 800);
-  };
-
-  // Gửi mã OTP khôi phục / thiết lập mật khẩu qua Email (Dành cho Google OAuth / Quên mật khẩu)
+  // Gửi mã OTP đổi / đặt lại mật khẩu qua Email
   const handleSendOtp = async () => {
     const targetEmail = profile.email || user?.email;
     if (!targetEmail) {
@@ -573,6 +547,18 @@ export default function EoProfileTab() {
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
           3. Bảo Mật & Mật Khẩu
+        </button>
+
+        <button
+          type="button"
+          className={`profile-subnav-btn ${activeSection === 'BLOCKLIST' ? 'active' : ''}`}
+          onClick={() => setActiveSection('BLOCKLIST')}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+          </svg>
+          4. Danh Sách Chặn
         </button>
       </nav>
 
@@ -1027,142 +1013,39 @@ export default function EoProfileTab() {
         </div>
       )}
 
-      {/* SECTION 3: BẢO MẬT & MẬT KHẨU */}
+      {/* SECTION 3: BẢO MẬT & MẬT KHẨU (CHỈ ĐỔI QUA EMAIL OTP) */}
       {activeSection === 'SECURITY' && (
         <div className="profile-card">
           <div className="profile-card-header">
             <div className="profile-card-header-left">
               <h3>Bảo Mật Tài Khoản & Mật Khẩu</h3>
-              <p>Quản lý mật khẩu đăng nhập cổng portal và phiên làm việc bảo mật của ban tổ chức.</p>
+              <p>Thiết lập hoặc đổi mật khẩu mới thông qua mã xác thực OTP gửi về địa chỉ email của bạn.</p>
             </div>
           </div>
 
-          {/* Bộ chọn phương thức đổi / thiết lập mật khẩu */}
-          <div className="security-mode-tabs">
-            <button
-              type="button"
-              className={`security-tab-btn ${securityMode === 'CURRENT_PASSWORD' ? 'active' : ''}`}
-              onClick={() => setSecurityMode('CURRENT_PASSWORD')}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              Đổi Mật Khẩu (Bằng Mật Khẩu Hiện Tại)
-            </button>
-            <button
-              type="button"
-              className={`security-tab-btn ${securityMode === 'EMAIL_OTP' ? 'active' : ''}`}
-              onClick={() => setSecurityMode('EMAIL_OTP')}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                <polyline points="22,6 12,13 2,6"></polyline>
-              </svg>
-              Thiết Lập / Đặt Lại Qua Email OTP (Dành Cho Google OAuth)
-            </button>
-          </div>
+          <div>
+            <div style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '0.875rem',
+              padding: '1.25rem',
+              marginBottom: '1.5rem',
+            }}>
+              <div style={{ fontWeight: 700, fontSize: '0.925rem', color: '#1e40af', marginBottom: '0.35rem' }}>
+                Đổi hoặc thiết lập mật khẩu qua mã xác thực Email OTP
+              </div>
+              <p style={{ margin: 0, fontSize: '0.825rem', color: '#1e3a8a', lineHeight: 1.5 }}>
+                Hệ thống sẽ gửi mã xác thực gồm 6 chữ số đến email đăng ký để đảm bảo an toàn khi thay đổi mật khẩu cho cả tài khoản thường và tài khoản Google.
+              </p>
+            </div>
 
-          {securityMode === 'CURRENT_PASSWORD' ? (
-            <form onSubmit={handleChangePassword}>
+            <form onSubmit={handleConfirmOtpReset}>
               <div className="profile-form-grid-2">
                 <div className="profile-form-group span-2">
-                  <label>Mật Khẩu Hiện Tại *</label>
-                  <input
-                    type="password"
-                    required
-                    className="profile-input"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                    placeholder="Nhập mật khẩu hiện tại"
-                  />
-                  <div style={{ marginTop: '0.45rem', fontSize: '0.8rem', color: '#64748b' }}>
-                    Đăng nhập bằng Google hoặc không nhớ mật khẩu cũ?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setSecurityMode('EMAIL_OTP')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#2563eb',
-                        fontWeight: 600,
-                        padding: 0,
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                      }}
-                    >
-                      Bấm vào đây để nhận mã OTP qua Email
-                    </button>
-                  </div>
-                </div>
-
-                <div className="profile-form-group">
-                  <label>Mật Khẩu Mới *</label>
-                  <input
-                    type="password"
-                    required
-                    className="profile-input"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    placeholder="Tối thiểu 8 ký tự"
-                  />
-                </div>
-
-                <div className="profile-form-group">
-                  <label>Nhập Lại Mật Khẩu Mới *</label>
-                  <input
-                    type="password"
-                    required
-                    className="profile-input"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    placeholder="Xác nhận lại mật khẩu mới"
-                  />
-                </div>
-              </div>
-
-              <div style={{ margin: '1rem 0', fontSize: '0.825rem', color: '#64748b' }}>
-                Mật khẩu an toàn nên bao gồm cả chữ hoa, chữ thường, số và ký tự đặc biệt để bảo vệ tài khoản khỏi xâm nhập trái phép.
-              </div>
-
-              <div className="profile-actions-bar">
-                <button
-                  type="submit"
-                  disabled={changingPassword}
-                  className="profile-btn-primary"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                  </svg>
-                  {changingPassword ? 'Đang cập nhật...' : 'Cập Nhật Mật Khẩu'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div>
-              <div style={{
-                backgroundColor: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '0.875rem',
-                padding: '1.25rem',
-                marginBottom: '1.5rem',
-              }}>
-                <div style={{ fontWeight: 700, fontSize: '0.925rem', color: '#1e40af', marginBottom: '0.35rem' }}>
-                  Thiết lập mật khẩu trực tiếp qua mã OTP Email
-                </div>
-                <p style={{ margin: 0, fontSize: '0.825rem', color: '#1e3a8a', lineHeight: 1.5 }}>
-                  Dành riêng cho bạn nếu đăng nhập bằng Google hoặc không có mật khẩu cũ. Hệ thống CANi sẽ gửi mã OTP gồm 6 chữ số đến email để xác minh quyền sở hữu tài khoản mà không cần mật khẩu hiện tại.
-                </p>
-              </div>
-
-              <form onSubmit={handleConfirmOtpReset}>
-                <div className="profile-form-grid-2">
-                  <div className="profile-form-group span-2">
-                    <label>Địa Chỉ Email Nhận Mã OTP</label>
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input
-                        type="text"
+                  <label>Địa Chỉ Email Nhận Mã OTP</label>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
                         disabled
                         className="profile-input"
                         style={{ backgroundColor: '#f1f5f9', color: '#334155', flex: '1 1 240px' }}
@@ -1259,9 +1142,13 @@ export default function EoProfileTab() {
                   )}
                 </div>
               </form>
-            </div>
-          )}
+          </div>
         </div>
+      )}
+
+      {/* SECTION 4: DANH SÁCH CHẶN */}
+      {activeSection === 'BLOCKLIST' && (
+        <EOSettingsTab />
       )}
 
           </div>

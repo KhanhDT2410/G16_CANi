@@ -15,7 +15,6 @@ import EOEventsTab from './components/EOEventsTab';
 import EOPaymentsTab from './components/EOPaymentsTab';
 import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoProfileTab from './components/EoProfileTab';
-import EOSettingsTab from './components/EOSettingsTab';
 import EOMyTeamTab from './components/EOMyTeamTab';
 import EOModals from './components/EOModals';
 import EventDetailModal from './components/EventDetailModal';
@@ -594,10 +593,6 @@ export default function EOPage() {
             <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
               <SupportTicketsCenterView />
             </div>
-          )}
-
-          {activeTab === 'settings' && (
-            <EOSettingsTab onNavigateToSubscription={() => switchTab('subscription')} />
           )}
         </main>
 

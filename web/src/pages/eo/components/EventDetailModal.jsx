@@ -3,7 +3,7 @@ import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import { getDynamicEventStatus, getDynamicShiftStatus } from '../utils/eventHelpers';
+import { getDynamicEventStatus, getDynamicShiftStatus, getShiftStaffingAlerts } from '../utils/eventHelpers';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import './EventDetailModal.css';
@@ -89,6 +89,27 @@ export default function EventDetailModal({
     }
   };
 
+  const handleToggleEmergency = async (shift, enable) => {
+    const confirmMsg = enable
+      ? `Bạn có chắc chắn muốn BẬT điều phối khẩn cấp (Emergency Dispatch) cho ca "${shift.jobType}"?\n\n- Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự xung quanh.\n- Cho phép nhân sự tự do bấm nhận ca trên Radar mà không cần chờ Matching.\n- Bán kính tìm kiếm mở rộng tối đa 15km.`
+      : `Bạn có chắc chắn muốn TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      if (enable) {
+        await eoService.enableEmergencyDispatch(shift.shiftId, 15);
+        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}"! Nhân sự có thể nhận ca ngay trên Radar.`, 'success');
+      } else {
+        await eoService.disableEmergencyDispatch(shift.shiftId);
+        showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
+      }
+      onReloadEvents?.();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Lỗi thao tác điều phối khẩn cấp';
+      showToast(msg, 'error');
+    }
+  };
+
   if (!isOpen) return null;
   if (!event) {
     if (asPage) {
@@ -120,6 +141,8 @@ export default function EventDetailModal({
   const totalRequired = event.totalRequiredWorkers || shifts.reduce((s, sh) => s + (sh.requiredWorkers || 0), 0);
   const totalConfirmed = event.totalConfirmedWorkers || shifts.reduce((s, sh) => s + (sh.confirmedWorkers || 0), 0);
   const fillRate = totalRequired > 0 ? Math.round((totalConfirmed / totalRequired) * 100) : 0;
+  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts), [shifts]);
+  const hasStaffingShortage = staffingAlerts.length > 0 || (totalRequired > 0 && fillRate < 50);
   const totalCost = event.totalEstimatedCost || shifts.reduce((s, sh) => {
     const hours = sh.startTime && sh.endTime ? Math.max(0.5, (new Date(sh.endTime) - new Date(sh.startTime)) / 3600000) : 4;
     return s + (hours * (sh.requiredWorkers || 1) * (sh.hourlyWage || 50000) + (sh.allowance || 0));
@@ -467,10 +490,17 @@ export default function EventDetailModal({
               <span className="kpi-value">{totalRequired}</span>
               <span className="kpi-sub">vị trí</span>
             </div>
-            <div className="detail-kpi-card highlight-green">
-              <span className="kpi-label">Nhân sự đã chốt ca</span>
-              <span className="kpi-value">{totalConfirmed}</span>
-              <span className="kpi-sub">đạt {fillRate}%</span>
+            <div
+              className={`detail-kpi-card ${hasStaffingShortage ? 'highlight-alert' : 'highlight-green'}`}
+              style={hasStaffingShortage ? { backgroundColor: '#fff1f2', borderColor: '#fecdd3' } : undefined}
+            >
+              <span className="kpi-label">{hasStaffingShortage ? '⚠️ Nhân sự chốt ca (Thiếu)' : 'Nhân sự đã chốt ca'}</span>
+              <span className="kpi-value" style={hasStaffingShortage ? { color: '#e11d48' } : undefined}>
+                {totalConfirmed} / {totalRequired}
+              </span>
+              <span className="kpi-sub" style={hasStaffingShortage ? { color: '#be123c', fontWeight: 700 } : undefined}>
+                {hasStaffingShortage ? `Thiếu ${Math.max(0, totalRequired - totalConfirmed)} người (${fillRate}%)` : `đạt ${fillRate}%`}
+              </span>
             </div>
             <div className="detail-kpi-card">
               <span className="kpi-label">Dự toán chi phí</span>
@@ -524,6 +554,40 @@ export default function EventDetailModal({
                   + Thêm ca làm việc
                 </button>
               </div>
+
+              {/* Banner cảnh báo thiếu hụt nhân sự khẩn cấp */}
+              {staffingAlerts.length > 0 && (
+                <div
+                  style={{
+                    marginBottom: '1.15rem',
+                    padding: '0.9rem 1.15rem',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(90deg, #fff1f2 0%, #fff7ed 100%)',
+                    border: '1.5px solid #fda4af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    flexWrap: 'wrap',
+                    boxShadow: '0 2px 8px rgba(225, 29, 72, 0.08)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <span style={{ fontSize: '1.6rem' }}>🚨</span>
+                    <div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#be123c' }}>
+                        CẢNH BÁO THIẾU HỤT NHÂN SỰ ({staffingAlerts.length} ca làm đang hoặc sắp diễn ra thiếu người)
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#881337', marginTop: 3 }}>
+                        {staffingAlerts
+                          .map((s) => `"${s.jobType}" (thiếu ${Math.max(0, (s.requiredWorkers || 1) - (s.confirmedWorkers || 0))} người)`)
+                          .join(', ')}
+                        . Hãy bấm <strong>"🚨 Bật Khẩn Cấp"</strong> tại ca để mở rộng bán kính và cho phép nhân sự nhận ca tự do trên Radar!
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {shifts.length === 0 ? (
                 <div className="detail-empty-shifts">
@@ -649,6 +713,34 @@ export default function EventDetailModal({
 
                             {/* Thao tác ca */}
                             <div className="shift-card-actions">
+                              {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleEmergency(shift, !shift.emergency)}
+                                  style={{
+                                    background: shift.emergency ? '#fef2f2' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                                    color: shift.emergency ? '#b91c1c' : '#ffffff',
+                                    border: shift.emergency ? '1.5px solid #f87171' : 'none',
+                                    borderRadius: '8px',
+                                    padding: '0.4rem 0.85rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    boxShadow: shift.emergency ? 'none' : '0 2px 6px rgba(225, 29, 72, 0.25)',
+                                  }}
+                                  title={
+                                    shift.emergency
+                                      ? 'Nhấn để tắt điều phối khẩn cấp'
+                                      : 'Bật điều phối khẩn cấp: Cho phép ứng tuyển tự do trên Radar và mở rộng bán kính 15km'
+                                  }
+                                >
+                                  {shift.emergency ? '🛑 Tắt Khẩn Cấp' : '🚨 Bật Khẩn Cấp'}
+                                </button>
+                              )}
+
                               <button
                                 type="button"
                                 className="btn-shift-action purple"

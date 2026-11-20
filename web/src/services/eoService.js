@@ -385,6 +385,20 @@ export const eoService = {
     }
   },
 
+  // Bật điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
+  enableEmergencyDispatch: async (shiftId, radiusKm = 15) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, null, {
+      params: { radiusKm },
+    });
+    return response.data?.data;
+  },
+
+  // Tắt điều phối khẩn cấp cho ca làm việc
+  disableEmergencyDispatch: async (shiftId) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch/off`);
+    return response.data?.data;
+  },
+
   // Tải ảnh sự kiện hoặc ca làm việc trực tiếp từ máy tính lên
   uploadImage: async (file) => {
     const formData = new FormData();

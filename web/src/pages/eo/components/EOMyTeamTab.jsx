@@ -444,6 +444,33 @@ export default function EOMyTeamTab() {
                       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
                         <button
                           type="button"
+                          onClick={() => {
+                            const targetUserId = w.userId || w.workerId;
+                            window.dispatchEvent(
+                              new CustomEvent('cani_open_direct_chat', {
+                                detail: { targetUserId },
+                              })
+                            );
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            padding: '0.35rem 0.65rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                          }}
+                          title="Mở khung nhắn tin trực tiếp với nhân sự này"
+                        >
+                          💬 Nhắn Tin
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => workerProfile.openProfile(w.workerId)}
                           className="eo-btn-secondary"
                           style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 600 }}
@@ -566,6 +593,33 @@ export default function EOMyTeamTab() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.6rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetUserId = c.userId || c.workerId;
+                          window.dispatchEvent(
+                            new CustomEvent('cani_open_direct_chat', {
+                              detail: { targetUserId },
+                            })
+                          );
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.38rem 0.75rem',
+                          fontSize: '0.76rem',
+                          fontWeight: 600,
+                          background: '#eff6ff',
+                          color: '#2563eb',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                        }}
+                        title="Mở khung nhắn tin trực tiếp với nhân sự này"
+                      >
+                        💬 Nhắn Tin
+                      </button>
                       <button
                         type="button"
                         onClick={() => workerProfile.openProfile(c.workerId)}

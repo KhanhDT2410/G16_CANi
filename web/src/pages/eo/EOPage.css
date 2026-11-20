@@ -40,8 +40,10 @@
 .eo-dashboard-layout.tab-analytics,
 .eo-dashboard-layout.tab-payments,
 .eo-dashboard-layout.tab-recruitment,
+.eo-dashboard-layout.tab-messages,
+.eo-dashboard-layout.tab-my-team,
 .eo-dashboard-layout.tab-disputes,
-.eo-dashboard-layout.tab-my-team {
+.eo-dashboard-layout:not(.tab-overview) {
   grid-template-columns: 240px minmax(0, 1fr);
 }
 
@@ -54,8 +56,10 @@
 .eo-dashboard-layout.sidebar-collapsed.tab-analytics,
 .eo-dashboard-layout.sidebar-collapsed.tab-payments,
 .eo-dashboard-layout.sidebar-collapsed.tab-recruitment,
+.eo-dashboard-layout.sidebar-collapsed.tab-messages,
+.eo-dashboard-layout.sidebar-collapsed.tab-my-team,
 .eo-dashboard-layout.sidebar-collapsed.tab-disputes,
-.eo-dashboard-layout.sidebar-collapsed.tab-my-team {
+.eo-dashboard-layout.sidebar-collapsed:not(.tab-overview) {
   grid-template-columns: 74px minmax(0, 1fr);
 }
 

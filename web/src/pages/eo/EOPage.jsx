@@ -15,6 +15,8 @@ import EOModals from './components/EOModals';
 import EkycRequiredModal from './components/EkycRequiredModal';
 import { eoService } from '../../services/eoService';
 import { DEFAULT_NEW_EVENT } from './utils/eventHelpers';
+import { useDirectChat, DirectMessengerDock } from '../../features/direct-chat';
+import EOMessagesTab from './components/EOMessagesTab';
 import './EOPage.css';
 
 // Lazy-load các tab & workspace nặng để giữ bundle ban đầu gọn nhẹ dưới 500 kB
@@ -51,6 +53,7 @@ export default function EOPage() {
   const events = useEvents();
   const shifts = useShifts({ onReloadEvents: events.loadEvents });
   const payments = usePayments();
+  const directChat = useDirectChat();
 
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('overview');
@@ -163,7 +166,7 @@ export default function EOPage() {
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
-    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'support'].includes(tabParam)) {
+    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'messages', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
@@ -278,6 +281,8 @@ export default function EOPage() {
       target = 'profile';
     } else if (navKey === 'my-team') {
       target = 'my-team';
+    } else if (navKey === 'messages') {
+      target = 'messages';
     } else if (navKey === 'support') {
       target = 'support';
     }
@@ -344,6 +349,7 @@ export default function EOPage() {
           onEventSubTabClick={handleEventSubTabChange}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={toggleSidebarCollapse}
+          unreadMessagesCount={directChat.counts.unread}
         />
 
         <main className="eo-main-stream">
@@ -657,6 +663,22 @@ export default function EOPage() {
             </Suspense>
           )}
 
+          {activeTab === 'messages' && (
+            <EOMessagesTab
+              directChatState={directChat}
+              onOpenShiftDetail={(shiftId) => {
+                const foundEvent = events.events?.find((e) =>
+                  Array.isArray(e.shifts) && e.shifts.some((s) => s.shiftId === shiftId)
+                );
+                if (foundEvent) {
+                  handleOpenEventDetailPage(foundEvent, 'SHIFTS');
+                } else {
+                  handleNavClick('events');
+                }
+              }}
+            />
+          )}
+
           {(activeTab === 'profile' || activeTab === 'ekyc') && (
             <Suspense fallback={<EOTabFallback />}>
               <EoProfileTab />
@@ -738,6 +760,21 @@ export default function EOPage() {
         onNavigateToEkyc={() => switchTab('profile')}
         ekycStatus={ekycStatus}
       />
+      {/* Pop-up Messenger Dock trao đổi trực tiếp với Worker */}
+      {directChat.activeChat && (
+        <DirectMessengerDock
+          activeChat={directChat.activeChat}
+          onClose={() => directChat.setActiveChat(null)}
+          onOpenShiftDetail={(shiftId) => {
+            const foundEvent = events.events?.find((e) =>
+              Array.isArray(e.shifts) && e.shifts.some((s) => s.shiftId === shiftId)
+            );
+            if (foundEvent) {
+              handleOpenEventDetailPage(foundEvent, 'SHIFTS');
+            }
+          }}
+        />
+      )}
     </div >
   );
 }

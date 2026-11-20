@@ -293,21 +293,18 @@ const EventShiftsDrawer = ({
               <button
                 type="button"
                 onClick={() => {
-                  const shiftCode = 'SH-' + (shift.shiftId ? String(shift.shiftId).replace(/-/g, '').substring(0, 6).toUpperCase() : '0000');
                   window.dispatchEvent(
-                    new CustomEvent('cani_open_chat_shift', {
+                    new CustomEvent('cani_open_direct_chat', {
                       detail: {
                         shiftId: shift.shiftId,
-                        shiftCode,
-                        shiftName: `${event.name || 'Sự kiện'} - ${shift.jobType}`,
                       },
                     })
                   );
                 }}
                 style={{
-                  background: '#f0fdf4',
-                  color: '#15803d',
-                  border: '1px solid #bbf7d0',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  border: '1px solid #bfdbfe',
                   borderRadius: 6,
                   padding: '6px 10px',
                   fontSize: '0.8rem',
@@ -317,9 +314,9 @@ const EventShiftsDrawer = ({
                   alignItems: 'center',
                   gap: 4,
                 }}
-                title="Mở khung chat kết nối CSKH hỗ trợ trực tiếp ca này"
+                title="Mở khung trao đổi tin nhắn trực tiếp với nhân sự trong ca"
               >
-                💬 Hỗ Trợ
+                💬 Chat Ca
               </button>
             )}
 

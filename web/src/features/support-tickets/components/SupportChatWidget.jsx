@@ -117,22 +117,20 @@ export const SupportChatWidget = () => {
         if (!isMounted || !res?.messages) return;
 
         setMessages((prev) => {
-          const apiMessages = res.messages.map((m) => {
-            const isFromOther =
-              m.senderRole === 'CUSTOMER_CARE' ||
-              m.senderRole === 'ADMIN' ||
-              (user?.userId && m.senderId && String(m.senderId) !== String(user.userId)) ||
-              (user?.role && m.senderRole && m.senderRole !== user.role);
+          // Chuẩn hóa kênh Hỗ trợ: Chỉ lấy tin nhắn của chính người dùng và phản hồi từ CSKH / Admin
+          const supportOnlyMessages = (res.messages || []).filter((m) => {
+            const isFromStaff = m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN';
+            const isFromMe = (user?.userId && m.senderId && String(m.senderId) === String(user.userId)) ||
+                             (m.senderRole && user?.role && m.senderRole === user.role && m.senderRole !== 'WORKER');
+            return isFromStaff || isFromMe;
+          });
+
+          const apiMessages = supportOnlyMessages.map((m) => {
+            const isFromStaff = m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN';
             return {
               id: m.id,
-              isBot: isFromOther,
-              senderLabel: isFromOther
-                ? (m.senderRole === 'WORKER'
-                    ? `👷 Nhân sự: ${m.senderName || 'Worker'}`
-                    : (m.senderRole === 'EVENT_ORGANIZER'
-                        ? `🏢 BTC: ${m.senderName || 'EO'}`
-                        : `🎧 ${m.senderName || 'CSKH CANi'}`))
-                : null,
+              isBot: isFromStaff,
+              senderLabel: isFromStaff ? `🎧 ${m.senderName || 'CSKH CANi'}` : null,
               shiftCode: m.shiftCode,
               text: m.messageText,
               time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),

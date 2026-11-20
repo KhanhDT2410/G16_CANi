@@ -122,6 +122,32 @@ export const WorkerProfileModal = ({
                 📞 Gọi {profile.phone}
               </a>
             )}
+            {profile && (
+              <button
+                type="button"
+                onClick={() => {
+                  const targetUserId = profile.userId || profile.workerId;
+                  window.dispatchEvent(
+                    new CustomEvent('cani_open_direct_chat', {
+                      detail: { targetUserId },
+                    })
+                  );
+                }}
+                className="eo-btn-primary"
+                style={{
+                  fontSize: '0.825rem',
+                  padding: '0.45rem 0.85rem',
+                  background: '#2563eb',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  cursor: 'pointer',
+                }}
+                title="Mở khung chat trực tiếp với nhân sự này"
+              >
+                💬 Nhắn Tin
+              </button>
+            )}
             {profile && !profile.isMyTeamMember && onAddToMyTeam && (
               <button
                 type="button"

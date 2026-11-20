@@ -584,7 +584,31 @@ export default function ShiftQrAndAttendancePanel({
                         </td>
 
                         <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const targetUserId = item.userId || item.workerId;
+                                window.dispatchEvent(
+                                  new CustomEvent('cani_open_direct_chat', {
+                                    detail: { targetUserId, shiftId: shift.shiftId },
+                                  })
+                                );
+                              }}
+                              style={{
+                                background: '#eff6ff',
+                                color: '#2563eb',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: 6,
+                                padding: '5px 8px',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                              title="Nhắn tin với nhân sự này"
+                            >
+                              💬
+                            </button>
                             {!item.eoVerified && (isCheckedIn || isCompleted) && (
                               <button
                                 type="button"

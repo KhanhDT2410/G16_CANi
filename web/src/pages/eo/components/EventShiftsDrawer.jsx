@@ -14,6 +14,7 @@ import { getDynamicShiftStatus } from '../utils/eventHelpers';
 const EventShiftsDrawer = ({
   event,
   onOpenDetail,
+  onOpenShiftWorkspace,
   onAddShift,
   onOpenQr,
   onOpenInvite,
@@ -155,6 +156,29 @@ const EventShiftsDrawer = ({
 
           {/* Thao tác trên từng ca */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {shift.status !== 'CANCELLED' && onOpenShiftWorkspace && (
+              <button
+                type="button"
+                onClick={() => onOpenShiftWorkspace(shift, event)}
+                style={{
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '6px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+                title="Mở trang quản lý riêng của ca làm việc này"
+              >
+                📊 Quản lý ca →
+              </button>
+            )}
+
             {shift.status !== 'CANCELLED' && (
               <button
                 type="button"

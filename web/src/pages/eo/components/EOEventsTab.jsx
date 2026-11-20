@@ -23,6 +23,7 @@ export default function EOEventsTab({
   activeSubTab = 'list',
   onSubTabChange,
   onOpenEventDetail,
+  onOpenShiftWorkspace,
   onDeleteEvent,
   onOpenCreateEvent,
   onOpenAddShift,
@@ -714,6 +715,7 @@ export default function EOEventsTab({
                             <EventShiftsDrawer
                               event={evt}
                               onOpenDetail={onOpenEventDetail}
+                              onOpenShiftWorkspace={onOpenShiftWorkspace}
                               onAddShift={onOpenAddShift}
                               onOpenQr={onOpenQr}
                               onOpenInvite={onOpenInvite}

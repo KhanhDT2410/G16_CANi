@@ -150,7 +150,6 @@ export const FaqImageUploader = ({ imageUrl, onImageChange, disabled }) => {
             </div>
           ) : (
             <div className="faq-dropzone-content">
-              <span className="faq-dropzone-icon">📷</span>
               <p className="faq-dropzone-title">
                 Kéo thả ảnh vào đây hoặc <strong>bấm để chọn từ máy tính</strong>
               </p>

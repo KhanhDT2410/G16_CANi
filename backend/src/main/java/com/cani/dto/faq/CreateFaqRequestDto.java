@@ -1,6 +1,7 @@
 package com.cani.dto.faq;
 
 import com.cani.entity.enums.FaqCategory;
+import com.cani.entity.enums.FaqTargetRole;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -15,6 +16,10 @@ public class CreateFaqRequestDto {
 
     @NotNull(message = "Danh mục câu hỏi không được để trống")
     private FaqCategory category;
+
+    @NotNull(message = "Đối tượng áp dụng không được để trống")
+    @Builder.Default
+    private FaqTargetRole targetRole = FaqTargetRole.ALL;
 
     @NotBlank(message = "Câu hỏi không được để trống")
     @Size(min = 10, max = 500, message = "Câu hỏi phải có từ 10 đến 500 ký tự")

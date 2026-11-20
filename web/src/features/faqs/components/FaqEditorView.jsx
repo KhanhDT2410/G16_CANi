@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG } from '../types/faq.constants';
+import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG, FAQ_TARGET_ROLE, FAQ_TARGET_ROLE_CONFIG } from '../types/faq.constants';
 import FaqRichTextEditor from './FaqRichTextEditor';
 import FaqThumbnailPicker from './FaqThumbnailPicker';
 
@@ -11,6 +11,7 @@ export const FaqEditorView = ({ faq, onBack, onSubmit, loading }) => {
   const isEditMode = Boolean(faq?.id);
 
   const [category, setCategory] = useState(FAQ_CATEGORY.ACCOUNT);
+  const [targetRole, setTargetRole] = useState(FAQ_TARGET_ROLE.ALL);
   const [question, setQuestion] = useState('');
   const [summary, setSummary] = useState('');
   const [answer, setAnswer] = useState('');
@@ -21,6 +22,7 @@ export const FaqEditorView = ({ faq, onBack, onSubmit, loading }) => {
 
   useEffect(() => {
     setCategory(faq?.category || FAQ_CATEGORY.ACCOUNT);
+    setTargetRole(faq?.targetRole || FAQ_TARGET_ROLE.ALL);
     setQuestion(faq?.question || '');
     setSummary(faq?.summary || '');
     setAnswer(faq?.answer || '');
@@ -52,6 +54,7 @@ export const FaqEditorView = ({ faq, onBack, onSubmit, loading }) => {
     setErrorMsg('');
     onSubmit({
       category,
+      targetRole,
       question: trimmedQuestion,
       summary: trimmedSummary,
       answer: trimmedAnswer,
@@ -84,13 +87,23 @@ export const FaqEditorView = ({ faq, onBack, onSubmit, loading }) => {
       {errorMsg && <div className="faq-error-banner">{errorMsg}</div>}
 
       <div className="faq-editor-card">
-        <div className="faq-form-field">
-          <label className="faq-field-label">Danh mục phân loại <span className="req">*</span></label>
-          <select className="faq-form-input" value={category} onChange={(e) => setCategory(e.target.value)} disabled={loading}>
-            {Object.keys(FAQ_CATEGORY).map((k) => (
-              <option key={k} value={k}>{FAQ_CATEGORY_CONFIG[k]?.label}</option>
-            ))}
-          </select>
+        <div className="faq-form-row">
+          <div className="faq-form-field flex-1">
+            <label className="faq-field-label">Danh mục phân loại <span className="req">*</span></label>
+            <select className="faq-form-input" value={category} onChange={(e) => setCategory(e.target.value)} disabled={loading}>
+              {Object.keys(FAQ_CATEGORY).map((k) => (
+                <option key={k} value={k}>{FAQ_CATEGORY_CONFIG[k]?.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="faq-form-field flex-1">
+            <label className="faq-field-label">Đối tượng áp dụng <span className="req">*</span></label>
+            <select className="faq-form-input" value={targetRole} onChange={(e) => setTargetRole(e.target.value)} disabled={loading}>
+              {Object.keys(FAQ_TARGET_ROLE).map((k) => (
+                <option key={k} value={k}>{FAQ_TARGET_ROLE_CONFIG[k]?.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="faq-form-field">

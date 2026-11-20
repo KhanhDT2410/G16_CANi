@@ -2,6 +2,7 @@ package com.cani.dto.faq;
 
 import com.cani.entity.enums.FaqCategory;
 import com.cani.entity.enums.FaqStatus;
+import com.cani.entity.enums.FaqTargetRole;
 import lombok.*;
 
 import java.time.Instant;
@@ -16,6 +17,7 @@ public class FaqResponseDto {
 
     private UUID id;
     private FaqCategory category;
+    private FaqTargetRole targetRole;
     private String question;
     private String summary;
     private String answer;

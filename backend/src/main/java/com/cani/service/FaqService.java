@@ -6,6 +6,7 @@ import com.cani.entity.Faq;
 import com.cani.entity.User;
 import com.cani.entity.enums.FaqCategory;
 import com.cani.entity.enums.FaqStatus;
+import com.cani.entity.enums.FaqTargetRole;
 import com.cani.entity.enums.TicketCategory;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,13 +49,29 @@ public class FaqService {
     // ------------------------------------------------------------------
 
     public List<FaqPublicResponseDto> getPublicFaqs(FaqCategory category) {
-        List<Faq> faqs;
-        if (category != null) {
-            faqs = faqRepository.findByStatusAndCategoryOrderByViewCountDescPublishedAtDesc(FaqStatus.PUBLISHED, category);
-        } else {
-            faqs = faqRepository.findByStatusOrderByViewCountDescPublishedAtDesc(FaqStatus.PUBLISHED);
-        }
-        return faqs.stream().map(this::toPublicResponseDto).toList();
+        return getPublicFaqs(category, null);
+    }
+
+    public List<FaqPublicResponseDto> getPublicFaqs(FaqCategory category, FaqTargetRole targetRole) {
+        Specification<Faq> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("status"), FaqStatus.PUBLISHED));
+            if (category != null) {
+                predicates.add(cb.equal(root.get("category"), category));
+            }
+            if (targetRole != null) {
+                if (targetRole == FaqTargetRole.WORKER) {
+                    predicates.add(root.get("targetRole").in(FaqTargetRole.WORKER, FaqTargetRole.ALL));
+                } else if (targetRole == FaqTargetRole.EVENT_ORGANIZER) {
+                    predicates.add(root.get("targetRole").in(FaqTargetRole.EVENT_ORGANIZER, FaqTargetRole.ALL));
+                } else {
+                    predicates.add(cb.equal(root.get("targetRole"), FaqTargetRole.ALL));
+                }
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        Sort sort = Sort.by(Sort.Direction.DESC, "viewCount").and(Sort.by(Sort.Direction.DESC, "publishedAt"));
+        return faqRepository.findAll(spec, sort).stream().map(this::toPublicResponseDto).toList();
     }
 
     @Transactional
@@ -72,6 +90,10 @@ public class FaqService {
     // ------------------------------------------------------------------
 
     public Page<FaqResponseDto> getAllFaqs(FaqStatus status, FaqCategory category, Pageable pageable) {
+        return getAllFaqs(status, category, null, pageable);
+    }
+
+    public Page<FaqResponseDto> getAllFaqs(FaqStatus status, FaqCategory category, FaqTargetRole targetRole, Pageable pageable) {
         Specification<Faq> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null) {
@@ -79,6 +101,9 @@ public class FaqService {
             }
             if (category != null) {
                 predicates.add(cb.equal(root.get("category"), category));
+            }
+            if (targetRole != null) {
+                predicates.add(cb.equal(root.get("targetRole"), targetRole));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -94,8 +119,10 @@ public class FaqService {
 
     @Transactional
     public FaqResponseDto createFaq(UUID authorId, CreateFaqRequestDto req) {
+        FaqTargetRole targetRole = req.getTargetRole() != null ? req.getTargetRole() : FaqTargetRole.ALL;
         Faq faq = Faq.builder()
                 .category(req.getCategory())
+                .targetRole(targetRole)
                 .question(req.getQuestion().trim())
                 .summary(req.getSummary() != null && !req.getSummary().isBlank() ? req.getSummary().trim() : null)
                 .answer(req.getAnswer().trim())
@@ -109,7 +136,11 @@ public class FaqService {
 
         Faq saved = faqRepository.save(faq);
         recordAudit(authorId, "CREATE_FAQ", saved, null,
-                Map.of("category", saved.getCategory().name(), "question", saved.getQuestion()));
+                Map.of(
+                        "category", saved.getCategory().name(),
+                        "targetRole", saved.getTargetRole().name(),
+                        "question", saved.getQuestion()
+                ));
 
         return toResponseDto(saved);
     }
@@ -125,10 +156,12 @@ public class FaqService {
 
         Map<String, String> oldValues = Map.of(
                 "category", faq.getCategory().name(),
+                "targetRole", faq.getTargetRole() != null ? faq.getTargetRole().name() : "ALL",
                 "question", faq.getQuestion()
         );
 
         faq.setCategory(req.getCategory());
+        faq.setTargetRole(req.getTargetRole() != null ? req.getTargetRole() : FaqTargetRole.ALL);
         faq.setQuestion(req.getQuestion().trim());
         faq.setSummary(req.getSummary() != null && !req.getSummary().isBlank() ? req.getSummary().trim() : null);
         faq.setAnswer(req.getAnswer().trim());
@@ -138,7 +171,11 @@ public class FaqService {
 
         Faq saved = faqRepository.save(faq);
         recordAudit(actorId, "UPDATE_FAQ", saved, oldValues,
-                Map.of("category", saved.getCategory().name(), "question", saved.getQuestion()));
+                Map.of(
+                        "category", saved.getCategory().name(),
+                        "targetRole", saved.getTargetRole().name(),
+                        "question", saved.getQuestion()
+                ));
 
         return toResponseDto(saved);
     }
@@ -207,6 +244,17 @@ public class FaqService {
             }
         }
 
+        Map<FaqTargetRole, Long> viewsByTargetRole = new EnumMap<>(FaqTargetRole.class);
+        for (FaqTargetRole tr : FaqTargetRole.values()) {
+            viewsByTargetRole.put(tr, 0L);
+        }
+        for (Faq f : allFaqs) {
+            FaqTargetRole tr = f.getTargetRole() != null ? f.getTargetRole() : FaqTargetRole.ALL;
+            if (f.getViewCount() != null) {
+                viewsByTargetRole.put(tr, viewsByTargetRole.get(tr) + f.getViewCount());
+            }
+        }
+
         List<FaqResponseDto> topFaqs = faqRepository.findTop5ByOrderByViewCountDesc()
                 .stream()
                 .map(this::toResponseDto)
@@ -241,6 +289,7 @@ public class FaqService {
         return FaqAnalyticsDto.builder()
                 .totalViews(totalViews)
                 .viewsByCategory(viewsByCategory)
+                .viewsByTargetRole(viewsByTargetRole)
                 .topFaqs(topFaqs)
                 .ticketDeflectionRate(deflectionRate)
                 .calculationFormula(formula)
@@ -284,6 +333,7 @@ public class FaqService {
         return FaqResponseDto.builder()
                 .id(faq.getId())
                 .category(faq.getCategory())
+                .targetRole(faq.getTargetRole() != null ? faq.getTargetRole() : FaqTargetRole.ALL)
                 .question(faq.getQuestion())
                 .summary(faq.getSummary())
                 .answer(faq.getAnswer())
@@ -305,6 +355,7 @@ public class FaqService {
         return FaqPublicResponseDto.builder()
                 .id(faq.getId())
                 .category(faq.getCategory())
+                .targetRole(faq.getTargetRole() != null ? faq.getTargetRole() : FaqTargetRole.ALL)
                 .question(faq.getQuestion())
                 .summary(faq.getSummary())
                 .answer(faq.getAnswer())

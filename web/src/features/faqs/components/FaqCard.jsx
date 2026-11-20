@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import DOMPurify from 'dompurify';
-import { FAQ_CATEGORY_CONFIG, FAQ_STATUS_CONFIG } from '../types/faq.constants';
+import { FAQ_CATEGORY_CONFIG, FAQ_STATUS_CONFIG, FAQ_TARGET_ROLE_CONFIG } from '../types/faq.constants';
 
 /**
  * Thẻ hiển thị câu hỏi thường gặp dạng Accordion (Admin & Staff View - ADM-08).
@@ -12,6 +12,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
 
   const catConfig = FAQ_CATEGORY_CONFIG[faq.category] || { label: faq.category, badgeClass: '' };
   const statusConfig = FAQ_STATUS_CONFIG[faq.status] || { label: faq.status, badgeClass: '' };
+  const roleConfig = FAQ_TARGET_ROLE_CONFIG[faq.targetRole] || FAQ_TARGET_ROLE_CONFIG.ALL;
 
   const isArchived = faq.status === 'ARCHIVED';
   const isDraft = faq.status === 'DRAFT';
@@ -35,12 +36,15 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
               <span className={`faq-category-badge ${catConfig.badgeClass}`}>
                 {catConfig.label}
               </span>
+              <span className={`faq-role-badge ${roleConfig.badgeClass}`} title={`Dành cho: ${roleConfig.label}`}>
+                {roleConfig.shortLabel}
+              </span>
               <span className={`faq-status-badge ${statusConfig.badgeClass}`}>
                 {statusConfig.label}
               </span>
               {hasAttachment && (
                 <span className="faq-has-attachment-badge" title="Có ảnh hoặc tệp đính kèm">
-                  📎 Đính kèm
+                  Đính kèm
                 </span>
               )}
             </div>
@@ -106,7 +110,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
             <div className="faq-attachments-container">
               {faq.imageUrl && (
                 <div className="faq-attachment-card">
-                  <span className="faq-attachment-title">🖼️ Hình ảnh minh họa:</span>
+                  <span className="faq-attachment-title">Hình ảnh minh họa:</span>
                   <div className="faq-image-wrapper">
                     <img
                       src={faq.imageUrl}
@@ -122,7 +126,7 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
                       rel="noopener noreferrer"
                       className="faq-view-image-link"
                     >
-                      Mở ảnh kích thước đầy đủ ↗
+                      Mở ảnh kích thước đầy đủ
                     </a>
                   </div>
                 </div>
@@ -130,14 +134,14 @@ export const FaqCard = ({ faq, onEdit, onPublish, onArchive, isActionLoading }) 
 
               {faq.attachmentUrl && (
                 <div className="faq-attachment-card">
-                  <span className="faq-attachment-title">📎 Tài liệu đính kèm:</span>
+                  <span className="faq-attachment-title">Tài liệu đính kèm:</span>
                   <a
                     href={faq.attachmentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="faq-attachment-file-btn"
                   >
-                    📄 {faq.attachmentName || 'Tải tệp đính kèm hướng dẫn'} ↗
+                    {faq.attachmentName || 'Tải tệp đính kèm hướng dẫn'}
                   </a>
                 </div>
               )}

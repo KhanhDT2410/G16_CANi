@@ -8,6 +8,7 @@ import com.cani.entity.Faq;
 import com.cani.entity.User;
 import com.cani.entity.enums.FaqCategory;
 import com.cani.entity.enums.FaqStatus;
+import com.cani.entity.enums.FaqTargetRole;
 import com.cani.entity.enums.TicketCategory;
 import com.cani.entity.enums.UserRole;
 import com.cani.exception.BadRequestException;
@@ -33,6 +34,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
@@ -80,6 +82,7 @@ class FaqServiceTest {
         sampleFaq = Faq.builder()
                 .id(faqId)
                 .category(FaqCategory.ACCOUNT)
+                .targetRole(FaqTargetRole.ALL)
                 .question("Làm thế nào để thay đổi số điện thoại?")
                 .answer("Bạn hãy truy cập vào mục Hồ sơ cá nhân và chọn Chỉnh sửa số điện thoại.")
                 .status(FaqStatus.DRAFT)
@@ -95,6 +98,7 @@ class FaqServiceTest {
     void createFaq_Success() {
         CreateFaqRequestDto req = CreateFaqRequestDto.builder()
                 .category(FaqCategory.ACCOUNT)
+                .targetRole(FaqTargetRole.WORKER)
                 .question("Làm thế nào để thay đổi số điện thoại?")
                 .answer("Bạn hãy truy cập vào mục Hồ sơ cá nhân và chọn Chỉnh sửa số điện thoại.")
                 .build();
@@ -112,6 +116,7 @@ class FaqServiceTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(faqId);
+        assertThat(result.getTargetRole()).isEqualTo(FaqTargetRole.WORKER);
         assertThat(result.getStatus()).isEqualTo(FaqStatus.DRAFT);
         assertThat(result.getViewCount()).isEqualTo(0);
         assertThat(result.getAuthorName()).isEqualTo("Nguyễn Admin");
@@ -127,6 +132,7 @@ class FaqServiceTest {
     void createFaq_QuestionTooShort_ValidationFails() {
         CreateFaqRequestDto req = CreateFaqRequestDto.builder()
                 .category(FaqCategory.ACCOUNT)
+                .targetRole(FaqTargetRole.ALL)
                 .question("Ngắn")
                 .answer("Câu trả lời hợp lệ có độ dài lớn hơn hai mươi ký tự.")
                 .build();
@@ -143,6 +149,7 @@ class FaqServiceTest {
     void createFaq_AnswerTooShort_ValidationFails() {
         CreateFaqRequestDto req = CreateFaqRequestDto.builder()
                 .category(FaqCategory.SHIFT)
+                .targetRole(FaqTargetRole.ALL)
                 .question("Câu hỏi hợp lệ có độ dài vừa đủ?")
                 .answer("Quá ngắn")
                 .build();
@@ -210,6 +217,7 @@ class FaqServiceTest {
 
         UpdateFaqRequestDto req = UpdateFaqRequestDto.builder()
                 .category(FaqCategory.DISPUTE)
+                .targetRole(FaqTargetRole.WORKER)
                 .question("Câu hỏi cập nhật mới đủ dài?")
                 .answer("Nội dung câu trả lời cập nhật hợp lệ trên hai mươi ký tự.")
                 .build();
@@ -221,10 +229,12 @@ class FaqServiceTest {
 
     @Test
     @DisplayName("8. getPublicFaqs chỉ trả về FAQ có trạng thái PUBLISHED, sắp xếp theo lượt xem giảm dần")
+    @SuppressWarnings("unchecked")
     void getPublicFaqs_OnlyPublished() {
         Faq published1 = Faq.builder()
                 .id(UUID.randomUUID())
                 .category(FaqCategory.ACCOUNT)
+                .targetRole(FaqTargetRole.ALL)
                 .question("Câu hỏi 1 đã publish?")
                 .answer("Câu trả lời 1 hợp lệ đủ dài để hiển thị trên help center.")
                 .status(FaqStatus.PUBLISHED)
@@ -234,13 +244,14 @@ class FaqServiceTest {
         Faq published2 = Faq.builder()
                 .id(UUID.randomUUID())
                 .category(FaqCategory.ACCOUNT)
+                .targetRole(FaqTargetRole.WORKER)
                 .question("Câu hỏi 2 đã publish?")
                 .answer("Câu trả lời 2 hợp lệ đủ dài để hiển thị trên help center.")
                 .status(FaqStatus.PUBLISHED)
                 .viewCount(50)
                 .build();
 
-        when(faqRepository.findByStatusOrderByViewCountDescPublishedAtDesc(FaqStatus.PUBLISHED))
+        when(faqRepository.findAll(any(Specification.class), any(Sort.class)))
                 .thenReturn(List.of(published1, published2));
 
         List<FaqPublicResponseDto> result = faqService.getPublicFaqs(null);
@@ -270,6 +281,7 @@ class FaqServiceTest {
         Faq f1 = Faq.builder()
                 .id(UUID.randomUUID())
                 .category(FaqCategory.ACCOUNT)
+                .targetRole(FaqTargetRole.WORKER)
                 .status(FaqStatus.PUBLISHED)
                 .viewCount(20)
                 .build();
@@ -277,6 +289,7 @@ class FaqServiceTest {
         Faq f2 = Faq.builder()
                 .id(UUID.randomUUID())
                 .category(FaqCategory.PAYMENT)
+                .targetRole(FaqTargetRole.ALL)
                 .status(FaqStatus.PUBLISHED)
                 .viewCount(30)
                 .build();
@@ -294,6 +307,9 @@ class FaqServiceTest {
         assertThat(analytics.getTotalViews()).isEqualTo(50L);
         assertThat(analytics.getViewsByCategory().get(FaqCategory.ACCOUNT)).isEqualTo(20L);
         assertThat(analytics.getViewsByCategory().get(FaqCategory.PAYMENT)).isEqualTo(30L);
+        assertThat(analytics.getViewsByTargetRole()).isNotNull();
+        assertThat(analytics.getViewsByTargetRole().get(FaqTargetRole.WORKER)).isEqualTo(20L);
+        assertThat(analytics.getViewsByTargetRole().get(FaqTargetRole.ALL)).isEqualTo(30L);
         assertThat(analytics.getTopFaqs()).hasSize(2);
         assertThat(analytics.getTicketDeflectionRate()).isEqualTo(50.0);
         assertThat(analytics.getCalculationFormula()).contains("deflectionRate =");
@@ -307,7 +323,7 @@ class FaqServiceTest {
         Page<Faq> page = new PageImpl<>(List.of(sampleFaq));
         when(faqRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
 
-        Page<FaqResponseDto> result = faqService.getAllFaqs(FaqStatus.DRAFT, FaqCategory.ACCOUNT, pageable);
+        Page<FaqResponseDto> result = faqService.getAllFaqs(FaqStatus.DRAFT, FaqCategory.ACCOUNT, FaqTargetRole.ALL, pageable);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getId()).isEqualTo(faqId);
@@ -318,6 +334,7 @@ class FaqServiceTest {
     void createAndUpdateFaq_WithAttachments_Success() {
         CreateFaqRequestDto req = CreateFaqRequestDto.builder()
                 .category(FaqCategory.SHIFT)
+                .targetRole(FaqTargetRole.WORKER)
                 .question("Hướng dẫn quét mã QR check-in ca làm việc?")
                 .answer("Người lao động mở ứng dụng, chọn mục Điểm danh và quét mã QR tại bàn tiếp đón của sự kiện.")
                 .imageUrl("https://cani.vn/assets/qr-guide.png")
@@ -371,6 +388,43 @@ class FaqServiceTest {
         assertThatThrownBy(() -> faqService.uploadFaqImage(mockFile))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Chỉ chấp nhận các định dạng ảnh");
+    }
+
+    @Test
+    @DisplayName("15. getPublicFaqs với targetRole WORKER tìm kiếm FAQ theo đúng đối tượng áp dụng")
+    @SuppressWarnings("unchecked")
+    void getPublicFaqs_WithTargetRole_ReturnsMatchingFaqs() {
+        Faq workerFaq = Faq.builder()
+                .id(UUID.randomUUID())
+                .category(FaqCategory.ACCOUNT)
+                .targetRole(FaqTargetRole.WORKER)
+                .question("Hướng dẫn xác thực tài khoản Worker?")
+                .answer("Tải CCCD 2 mặt và quay video khuôn mặt.")
+                .status(FaqStatus.PUBLISHED)
+                .viewCount(40)
+                .build();
+
+        when(faqRepository.findAll(any(Specification.class), any(Sort.class)))
+                .thenReturn(List.of(workerFaq));
+
+        List<FaqPublicResponseDto> result = faqService.getPublicFaqs(FaqCategory.ACCOUNT, FaqTargetRole.WORKER);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getTargetRole()).isEqualTo(FaqTargetRole.WORKER);
+    }
+
+    @Test
+    @DisplayName("16. getAllFaqs với targetRole lọc chính xác đối tượng cho hàng đợi quản trị")
+    @SuppressWarnings("unchecked")
+    void getAllFaqs_WithTargetRole_FiltersCorrectly() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Faq> page = new PageImpl<>(List.of(sampleFaq));
+        when(faqRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+
+        Page<FaqResponseDto> result = faqService.getAllFaqs(null, null, FaqTargetRole.EVENT_ORGANIZER, pageable);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        verify(faqRepository).findAll(any(Specification.class), eq(pageable));
     }
 }
 

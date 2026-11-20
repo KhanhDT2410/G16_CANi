@@ -89,31 +89,31 @@ export const FaqRichTextEditor = ({ value, onChange, placeholder, disabled }) =>
           <em>I</em>
         </button>
         <button type="button" title="Chèn liên kết (Link)" onClick={handleInsertLink} disabled={disabled}>
-          🔗
+          Link
         </button>
         <button type="button" title="Danh sách chấm (Bullet list)" onClick={() => exec('insertUnorderedList')} disabled={disabled}>
-          •≡
+          List
         </button>
         <button type="button" title="Danh sách số (Numbered list)" onClick={() => exec('insertOrderedList')} disabled={disabled}>
-          1≡
+          1.
         </button>
         <button type="button" title="Chèn bảng (Table)" onClick={handleInsertTable} disabled={disabled}>
-          ▦
+          Bảng
         </button>
         <button type="button" title="Trích dẫn (Quote)" onClick={handleBlockquote} disabled={disabled}>
-          ❝
+          Quote
         </button>
         <button type="button" title="Chèn ảnh (Image)" onClick={handleInsertImage} disabled={disabled}>
-          🖼
+          Ảnh
         </button>
 
         <span className="faq-toolbar-divider" />
 
         <button type="button" title="Hoàn tác (Undo)" onClick={() => exec('undo')} disabled={disabled}>
-          ↺
+          Undo
         </button>
         <button type="button" title="Làm lại (Redo)" onClick={() => exec('redo')} disabled={disabled}>
-          ↻
+          Redo
         </button>
       </div>
 

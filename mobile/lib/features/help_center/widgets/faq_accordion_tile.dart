@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:cani/core/constants/api_constants.dart';
 import 'package:cani/features/help_center/models/help_center_models.dart';
 
 class FaqAccordionTile extends StatefulWidget {
@@ -108,6 +109,19 @@ class _FaqAccordionTileState extends State<FaqAccordionTile> {
                 height: 1.5,
               ),
             ),
+            if (widget.faq.imageUrl != null && widget.faq.imageUrl!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  widget.faq.imageUrl!.startsWith('http')
+                      ? widget.faq.imageUrl!
+                      : '${ApiConstants.baseUrl}${widget.faq.imageUrl!}',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                ),
+              ),
+            ],
           ],
         ),
       ),

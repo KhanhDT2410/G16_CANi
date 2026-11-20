@@ -3,19 +3,25 @@ import 'package:flutter/material.dart';
 class FaqItemModel {
   final String id;
   final String category; // ACCOUNT, SHIFT, PAYMENT, DISPUTE
+  final String? targetRole; // WORKER, ALL, EVENT_ORGANIZER
   final String question;
   final String? summary;
   final String answer;
   final String? imageUrl;
+  final String? attachmentUrl;
+  final String? attachmentName;
   final int viewCount;
 
   const FaqItemModel({
     required this.id,
     required this.category,
+    this.targetRole,
     required this.question,
     this.summary,
     required this.answer,
     this.imageUrl,
+    this.attachmentUrl,
+    this.attachmentName,
     this.viewCount = 0,
   });
 
@@ -23,10 +29,13 @@ class FaqItemModel {
     return FaqItemModel(
       id: json['id']?.toString() ?? '',
       category: json['category']?.toString() ?? 'ACCOUNT',
+      targetRole: json['targetRole']?.toString(),
       question: json['question']?.toString() ?? '',
       summary: json['summary']?.toString(),
       answer: json['answer']?.toString() ?? '',
       imageUrl: json['imageUrl']?.toString(),
+      attachmentUrl: json['attachmentUrl']?.toString(),
+      attachmentName: json['attachmentName']?.toString(),
       viewCount: json['viewCount'] is int ? json['viewCount'] as int : 0,
     );
   }

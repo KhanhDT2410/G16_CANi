@@ -1,48 +1,57 @@
 import { useState, useMemo } from 'react';
 import DOMPurify from 'dompurify';
-import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG } from '../types/faq.constants';
+import {
+  FAQ_CATEGORY, FAQ_CATEGORY_CONFIG,
+  FAQ_TARGET_ROLE, FAQ_TARGET_ROLE_CONFIG,
+} from '../types/faq.constants';
+import './Faq.css';
 
 /**
  * Danh sách Câu hỏi thường gặp dành cho người dùng công khai (Help Center - UC-110b).
- * Tự động ghi nhận lượt xem khi người dùng bấm xem chi tiết câu trả lời.
+ * Hỗ trợ tham số lockedRole để khóa theo vai trò nội bộ (EO / Worker) ẩn bộ lọc role.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
-export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
+export const FaqPublicList = ({
+  publicFaqs = [],
+  onReadFaq,
+  loading,
+  lockedRole = null,
+  title,
+  subtitle,
+}) => {
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [internalTargetRole, setInternalTargetRole] = useState(lockedRole || 'ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+
+  const activeTargetRole = lockedRole || internalTargetRole;
 
   const handleToggle = (faq) => {
     if (expandedId === faq.id) {
       setExpandedId(null);
     } else {
       setExpandedId(faq.id);
-      if (onReadFaq) {
-        onReadFaq(faq.id);
-      }
+      if (onReadFaq) onReadFaq(faq.id);
     }
   };
 
   const filteredFaqs = useMemo(() => {
     return publicFaqs.filter((item) => {
-      if (activeCategory !== 'ALL' && item.category !== activeCategory) {
-        return false;
-      }
+      if (activeCategory !== 'ALL' && item.category !== activeCategory) return false;
+      if (activeTargetRole !== 'ALL' && item.targetRole !== 'ALL' && item.targetRole !== activeTargetRole) return false;
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
-        const qMatch = item.question?.toLowerCase().includes(term);
-        const aMatch = item.answer?.toLowerCase().includes(term);
-        if (!qMatch && !aMatch) return false;
+        return item.question?.toLowerCase().includes(term) || item.answer?.toLowerCase().includes(term);
       }
       return true;
     });
-  }, [publicFaqs, activeCategory, searchTerm]);
+  }, [publicFaqs, activeCategory, activeTargetRole, searchTerm]);
 
   return (
     <div className="faq-public-container">
       <div className="faq-public-hero">
-        <h2>Trung Tâm Trợ Giúp & Câu Hỏi Thường Gặp (Help Center)</h2>
-        <p>Tìm kiếm câu trả lời nhanh chóng cho các thắc mắc về tài khoản, ca làm việc, thù lao và khiếu nại</p>
+        <h2>{title || 'Trung Tâm Trợ Giúp & Câu Hỏi Thường Gặp (Help Center)'}</h2>
+        <p>{subtitle || 'Tìm kiếm câu trả lời nhanh chóng cho các thắc mắc về tài khoản, ca làm việc, thù lao và khiếu nại'}</p>
         <div className="faq-search-box">
           <input
             type="text"
@@ -58,13 +67,35 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
         </div>
       </div>
 
+      {!lockedRole && (
+        <div className="faq-public-roles">
+          <button
+            type="button"
+            className={`faq-cat-pill ${activeTargetRole === 'ALL' ? 'active' : ''}`}
+            onClick={() => setInternalTargetRole('ALL')}
+          >
+            Tất cả vai trò
+          </button>
+          {Object.keys(FAQ_TARGET_ROLE).filter((k) => k !== 'ALL').map((roleKey) => (
+            <button
+              key={roleKey}
+              type="button"
+              className={`faq-cat-pill ${activeTargetRole === roleKey ? 'active' : ''}`}
+              onClick={() => setInternalTargetRole(roleKey)}
+            >
+              {FAQ_TARGET_ROLE_CONFIG[roleKey]?.shortLabel}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="faq-public-categories">
         <button
           type="button"
           className={`faq-cat-pill ${activeCategory === 'ALL' ? 'active' : ''}`}
           onClick={() => setActiveCategory('ALL')}
         >
-          Tất cả ({publicFaqs.length})
+          Tất cả danh mục ({publicFaqs.length})
         </button>
         {Object.keys(FAQ_CATEGORY).map((catKey) => {
           const cfg = FAQ_CATEGORY_CONFIG[catKey];
@@ -92,6 +123,7 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
         ) : (
           filteredFaqs.map((faq) => {
             const isExpanded = expandedId === faq.id;
+            const rConfig = FAQ_TARGET_ROLE_CONFIG[faq.targetRole];
             return (
               <div key={faq.id} className={`faq-accordion-item ${isExpanded ? 'open' : ''}`}>
                 <button
@@ -101,6 +133,11 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                 >
                   <div className="faq-acc-title">
                     <span className="faq-acc-question">{faq.question}</span>
+                    {rConfig && !lockedRole && faq.targetRole !== 'ALL' && (
+                      <span className={`faq-role-badge ${rConfig.badgeClass}`}>
+                        {rConfig.shortLabel}
+                      </span>
+                    )}
                   </div>
                   <div className="faq-acc-meta">
                     <span className="faq-chevron">{isExpanded ? 'Thu gọn' : 'Chi tiết'}</span>
@@ -122,7 +159,7 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                       <div className="faq-attachments-container">
                         {faq.imageUrl && (
                           <div className="faq-attachment-card">
-                            <span className="faq-attachment-title">🖼️ Hình ảnh minh họa:</span>
+                            <span className="faq-attachment-title">Hình ảnh minh họa:</span>
                             <div className="faq-image-wrapper">
                               <img
                                 src={faq.imageUrl}
@@ -136,21 +173,21 @@ export const FaqPublicList = ({ publicFaqs = [], onReadFaq, loading }) => {
                                 rel="noopener noreferrer"
                                 className="faq-view-image-link"
                               >
-                                Xem ảnh kích thước đầy đủ ↗
+                                Xem ảnh kích thước đầy đủ
                               </a>
                             </div>
                           </div>
                         )}
                         {faq.attachmentUrl && (
                           <div className="faq-attachment-card">
-                            <span className="faq-attachment-title">📎 Tài liệu đính kèm:</span>
+                            <span className="faq-attachment-title">Tài liệu đính kèm:</span>
                             <a
                               href={faq.attachmentUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="faq-attachment-file-btn"
                             >
-                              📄 {faq.attachmentName || 'Tải tệp đính kèm'} ↗
+                              {faq.attachmentName || 'Tải tệp đính kèm'}
                             </a>
                           </div>
                         )}

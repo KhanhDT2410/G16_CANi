@@ -6,7 +6,7 @@ import { showToast } from '../../../components/common/Toast';
  * Custom Hook quản lý dữ liệu và hành vi cho phân hệ FAQ (UC-110).
  * Quy tắc: Không mock fallback khi gọi API quản trị.
  */
-export const useFaqs = (mode = 'admin') => {
+export const useFaqs = (mode = 'admin', initialTargetRole = null) => {
   const [faqs, setFaqs] = useState([]);
   const [publicFaqs, setPublicFaqs] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -23,6 +23,7 @@ export const useFaqs = (mode = 'admin') => {
       const params = {};
       if (filters.status && filters.status !== 'ALL') params.status = filters.status;
       if (filters.category && filters.category !== 'ALL') params.category = filters.category;
+      if (filters.targetRole && filters.targetRole !== 'ALL') params.targetRole = filters.targetRole;
       params.size = filters.size || 100;
       const data = await faqApi.getFaqs(params);
       setFaqs(data?.content || []);
@@ -36,12 +37,13 @@ export const useFaqs = (mode = 'admin') => {
   }, []);
 
   // Tải danh sách FAQ công khai (Help Center)
-  const loadPublicFaqs = useCallback(async (category = null) => {
+  const loadPublicFaqs = useCallback(async (category = null, targetRole = null) => {
     setLoading(true);
     setError(null);
     try {
       const catParam = category && category !== 'ALL' ? category : null;
-      const data = await faqApi.getPublicFaqs(catParam);
+      const roleParam = targetRole && targetRole !== 'ALL' ? targetRole : null;
+      const data = await faqApi.getPublicFaqs(catParam, roleParam);
       setPublicFaqs(data || []);
     } catch (err) {
       const msg = err.response?.data?.message || 'Không thể tải trung tâm trợ giúp FAQ';
@@ -158,9 +160,9 @@ export const useFaqs = (mode = 'admin') => {
       loadFaqs();
       loadAnalytics();
     } else if (mode === 'public') {
-      loadPublicFaqs();
+      loadPublicFaqs(null, initialTargetRole);
     }
-  }, [mode, loadFaqs, loadAnalytics, loadPublicFaqs]);
+  }, [mode, loadFaqs, loadAnalytics, loadPublicFaqs, initialTargetRole]);
 
   return {
     faqs,

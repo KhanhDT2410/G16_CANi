@@ -29,9 +29,7 @@ const EventCreationWizardModal = lazy(() => import('./components/EventCreationWi
 const EventDetailModal = lazy(() => import('./components/EventDetailModal'));
 const ShiftWorkspacePage = lazy(() => import('./components/ShiftWorkspacePage'));
 const SettlementVoucherModal = lazy(() => import('./components/SettlementVoucherModal'));
-const SupportTicketsCenterView = lazy(() =>
-  import('../../features/support-tickets').then((m) => ({ default: m.SupportTicketsCenterView }))
-);
+const EOSupportTab = lazy(() => import('./components/EOSupportTab'));
 const DisputeCenterView = lazy(() =>
   import('../../features/disputes').then((m) => ({ default: m.DisputeCenterView }))
 );
@@ -685,11 +683,11 @@ export default function EOPage() {
             </Suspense>
           )}
 
-          {/* Hỗ trợ kỹ thuật & Phiếu yêu cầu (UC-105 / UC-106) */}
+          {/* Trung tâm Trợ giúp & Câu hỏi thường gặp FAQ (SRS UC-105 / UC-110) */}
           {activeTab === 'support' && (
             <Suspense fallback={<EOTabFallback />}>
               <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
-                <SupportTicketsCenterView />
+                <EOSupportTab />
               </div>
             </Suspense>
           )}

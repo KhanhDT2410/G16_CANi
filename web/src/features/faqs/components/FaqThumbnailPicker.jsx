@@ -79,7 +79,7 @@ export const FaqThumbnailPicker = ({ imageUrl, onImageChange, disabled }) => {
               disabled={disabled}
               title="Xóa ảnh"
             >
-              ✕ Xóa ảnh
+              Xóa ảnh
             </button>
           </div>
         )}

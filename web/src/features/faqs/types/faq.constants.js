@@ -28,3 +28,27 @@ export const FAQ_STATUS_CONFIG = {
   ARCHIVED: { label: 'Đã lưu trữ', badgeClass: 'faq-status-archived' },
 };
 
+export const FAQ_TARGET_ROLE = {
+  ALL: 'ALL',
+  WORKER: 'WORKER',
+  EVENT_ORGANIZER: 'EVENT_ORGANIZER',
+};
+
+export const FAQ_TARGET_ROLE_CONFIG = {
+  ALL: {
+    label: 'Tất cả đối tượng',
+    shortLabel: 'Tất cả',
+    badgeClass: 'faq-role-badge-all',
+  },
+  WORKER: {
+    label: 'Người tìm việc (Worker)',
+    shortLabel: 'Worker',
+    badgeClass: 'faq-role-badge-worker',
+  },
+  EVENT_ORGANIZER: {
+    label: 'Nhà tổ chức sự kiện (Organizer)',
+    shortLabel: 'Nhà tổ chức',
+    badgeClass: 'faq-role-badge-eo',
+  },
+};
+

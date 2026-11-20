@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG, FAQ_STATUS_CONFIG } from '../types/faq.constants';
+import {
+  FAQ_CATEGORY, FAQ_CATEGORY_CONFIG,
+  FAQ_STATUS_CONFIG,
+  FAQ_TARGET_ROLE, FAQ_TARGET_ROLE_CONFIG,
+} from '../types/faq.constants';
 import FaqImageUploader from './FaqImageUploader';
 
 /**
@@ -13,6 +17,7 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
   const currentStatus = initialFaq?.status;
 
   const [category, setCategory] = useState(FAQ_CATEGORY.ACCOUNT);
+  const [targetRole, setTargetRole] = useState(FAQ_TARGET_ROLE.ALL);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -22,6 +27,7 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
 
   useEffect(() => {
     setCategory(initialFaq?.category || FAQ_CATEGORY.ACCOUNT);
+    setTargetRole(initialFaq?.targetRole || FAQ_TARGET_ROLE.ALL);
     setQuestion(initialFaq?.question || '');
     setAnswer(initialFaq?.answer || '');
     setImageUrl(initialFaq?.imageUrl || '');
@@ -44,6 +50,7 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
     setErrorMsg('');
     onSubmit({
       category,
+      targetRole,
       question: trimmedQuestion,
       answer: trimmedAnswer,
       imageUrl: imageUrl.trim() || null,
@@ -71,13 +78,23 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
           <div className="faq-modal-body">
             {errorMsg && <div className="faq-error-banner">{errorMsg}</div>}
 
-            <div className="faq-form-group">
-              <label htmlFor="faq-category">Danh mục phân loại <span className="req">*</span></label>
-              <select id="faq-category" value={category} onChange={(e) => setCategory(e.target.value)} disabled={loading}>
-                {Object.keys(FAQ_CATEGORY).map((catKey) => (
-                  <option key={catKey} value={catKey}>{FAQ_CATEGORY_CONFIG[catKey]?.label}</option>
-                ))}
-              </select>
+            <div className="faq-form-row">
+              <div className="faq-form-group flex-1">
+                <label htmlFor="faq-category">Danh mục <span className="req">*</span></label>
+                <select id="faq-category" value={category} onChange={(e) => setCategory(e.target.value)} disabled={loading}>
+                  {Object.keys(FAQ_CATEGORY).map((k) => (
+                    <option key={k} value={k}>{FAQ_CATEGORY_CONFIG[k]?.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="faq-form-group flex-1">
+                <label htmlFor="faq-target-role">Đối tượng <span className="req">*</span></label>
+                <select id="faq-target-role" value={targetRole} onChange={(e) => setTargetRole(e.target.value)} disabled={loading}>
+                  {Object.keys(FAQ_TARGET_ROLE).map((k) => (
+                    <option key={k} value={k}>{FAQ_TARGET_ROLE_CONFIG[k]?.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="faq-form-group">
@@ -133,40 +150,17 @@ export const FaqEditorModal = ({ isOpen, onClose, onSubmit, initialFaq, loading 
           </div>
 
           <div className="faq-modal-footer">
-            <button
-              type="button"
-              className="faq-btn-secondary"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Hủy
-            </button>
-
+            <button type="button" className="faq-btn-secondary" onClick={onClose} disabled={loading}>Hủy</button>
             {isEditMode && currentStatus === 'PUBLISHED' ? (
-              <button
-                type="button"
-                className="faq-btn-primary"
-                onClick={(e) => handleAction(e, false)}
-                disabled={loading}
-              >
+              <button type="button" className="faq-btn-primary" onClick={(e) => handleAction(e, false)} disabled={loading}>
                 {loading ? 'Đang lưu...' : 'Lưu Thay Đổi'}
               </button>
             ) : (
               <>
-                <button
-                  type="button"
-                  className="faq-btn-secondary"
-                  onClick={(e) => handleAction(e, false)}
-                  disabled={loading}
-                >
+                <button type="button" className="faq-btn-secondary" onClick={(e) => handleAction(e, false)} disabled={loading}>
                   {loading ? 'Đang lưu...' : 'Lưu Bản Nháp'}
                 </button>
-                <button
-                  type="button"
-                  className="faq-btn-primary"
-                  onClick={(e) => handleAction(e, true)}
-                  disabled={loading}
-                >
+                <button type="button" className="faq-btn-primary" onClick={(e) => handleAction(e, true)} disabled={loading}>
                   {loading ? 'Đang lưu & xuất bản...' : 'Xuất Bản Ngay'}
                 </button>
               </>

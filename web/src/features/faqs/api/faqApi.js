@@ -7,8 +7,10 @@ export const faqApi = {
   // === Public Endpoints (Help Center cho mọi người dùng) ===
 
   /** UC-110b: Danh sách FAQ công khai đã xuất bản */
-  getPublicFaqs: async (category) => {
-    const params = category ? { category } : {};
+  getPublicFaqs: async (category, targetRole) => {
+    const params = {};
+    if (category) params.category = category;
+    if (targetRole) params.targetRole = targetRole;
     const response = await apiClient.get('/v1/faqs', { params });
     return response.data?.data;
   },

@@ -80,7 +80,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
   if (isEmergency) {
     return {
       code: 'EMERGENCY',
-      label: `🚨 Điều phối khẩn cấp (Thiếu ${Math.max(0, required - confirmed)} NS)`,
+      label: `Điều phối khẩn cấp (Thiếu ${Math.max(0, required - confirmed)} nhân sự)`,
       colorClass: 'red',
       bg: '#fef2f2',
       color: '#b91c1c',
@@ -98,7 +98,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
     if (confirmed < required) {
       return {
         code: 'UNDERSTAFFED_IN_PROGRESS',
-        label: `⚠️ Đang diễn ra • Thiếu ${required - confirmed} nhân sự!`,
+        label: `Đang diễn ra - Thiếu ${required - confirmed} nhân sự`,
         colorClass: 'red',
         bg: '#fff1f2',
         color: '#e11d48',
@@ -108,7 +108,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
     }
     return {
       code: 'IN_PROGRESS',
-      label: '● Đang diễn ra (Đủ nhân sự)',
+      label: 'Đang diễn ra (Đủ nhân sự)',
       colorClass: 'green',
       bg: '#ecfdf5',
       color: '#059669',
@@ -120,7 +120,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
   if (confirmed >= required) {
     return {
       code: 'FULL_WAITING',
-      label: 'Đủ nhân sự • Chờ diễn ra',
+      label: 'Đủ nhân sự - Chờ diễn ra',
       colorClass: 'purple',
       bg: '#f0fdf4',
       color: '#15803d',
@@ -133,7 +133,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
     const hoursLeft = Math.max(0, Math.round((start.getTime() - now.getTime()) / 3600000));
     return {
       code: 'URGENT_STARTING_SOON',
-      label: `⏰ Sắp diễn ra (~${hoursLeft}h) • Cần gấp ${required - confirmed} người`,
+      label: `Sắp diễn ra (~${hoursLeft} giờ) - Cần gấp ${required - confirmed} người`,
       colorClass: 'amber',
       bg: '#fffbeb',
       color: '#b45309',

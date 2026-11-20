@@ -10,9 +10,9 @@ import { useWorkerProfile } from '../hooks/useWorkerProfile';
 
 /**
  * ShiftWorkspacePage
- * Trang quản lý độc lập & toàn diện cho MỘT Ca làm việc (Shift) cụ thể.
- * - Giải phóng 100% chiều rộng màn hình cho Quản lý nhân sự, Tiến độ Checklist chi tiết và Thanh toán.
- * - Mã QR Điểm danh (Check-in / Check-out) được tách thành nút/Modal chuyên dụng chiếu đầu & cuối ca.
+ * Trang quản lý độc lập cho một ca làm việc cụ thể.
+ * - Dành toàn bộ chiều rộng màn hình cho quản lý nhân sự, tiến độ từng đầu việc và thanh toán.
+ * - Mã QR điểm danh được tách thành hộp thoại chiếu riêng cho đầu ca và cuối ca.
  */
 export default function ShiftWorkspacePage({
   shift,
@@ -20,7 +20,6 @@ export default function ShiftWorkspacePage({
   onSelectShift,
   onBackToEvent,
   onEditShift,
-  onCancelShift,
   onOpenInvite,
   onReloadEvents,
   onOpenPaymentDeclaration,
@@ -34,7 +33,7 @@ export default function ShiftWorkspacePage({
   const [searchWorker, setSearchWorker] = useState('');
   const workerProfile = useWorkerProfile();
 
-  // State cho Modal Mã QR Điểm Danh (chỉ bật đầu/cuối ca)
+  // Trạng thái hộp thoại Mã QR Điểm Danh (chỉ bật đầu ca hoặc cuối ca)
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrMode, setQrMode] = useState('CHECKIN'); // 'CHECKIN' | 'CHECKOUT'
   const ROTATE_INTERVAL = 20;
@@ -42,7 +41,7 @@ export default function ShiftWorkspacePage({
   const [refreshNonce, setRefreshNonce] = useState(Date.now());
   const [serverQrData, setServerQrData] = useState(null);
 
-  // State xem ảnh (biên lai thanh toán hoặc ảnh check-out)
+  // Xem ảnh biên lai hoặc minh chứng công việc
   const [previewImage, setPreviewImage] = useState(null);
 
   const loadAttendance = useCallback(async () => {
@@ -65,14 +64,13 @@ export default function ShiftWorkspacePage({
     }
   }, [shift?.shiftId, loadAttendance]);
 
-  // Lấy mã QR động khi mở Modal QR
   const fetchLiveQr = useCallback(async () => {
     if (!shift?.shiftId || !showQrModal) return;
     try {
       const data = await eoService.getShiftQr(shift.shiftId);
       if (data) setServerQrData(data);
     } catch (err) {
-      console.warn('Không thể lấy mã QR từ server:', err);
+      console.warn('Không thể lấy mã QR từ máy chủ:', err);
     }
   }, [shift?.shiftId, showQrModal]);
 
@@ -96,7 +94,6 @@ export default function ShiftWorkspacePage({
     return () => clearInterval(timer);
   }, [showQrModal, shift?.shiftId]);
 
-  // Parse checklist chuẩn của ca
   const shiftChecklistTasks = useMemo(() => {
     if (!shift?.checklist) return [];
     try {
@@ -114,7 +111,6 @@ export default function ShiftWorkspacePage({
     return [];
   }, [shift?.checklist]);
 
-  // Parse tiến độ checklist của từng worker
   const parseWorkerChecklistStatus = (rawProgress) => {
     if (!rawProgress) return {};
     try {
@@ -140,7 +136,6 @@ export default function ShiftWorkspacePage({
     return {};
   };
 
-  // Map skillId -> tên kỹ năng
   const skillNames = useMemo(() => {
     if (!Array.isArray(shift?.requiredSkills) || shift.requiredSkills.length === 0) return [];
     const m = {};
@@ -158,7 +153,6 @@ export default function ShiftWorkspacePage({
   const fillRate = Math.round((shiftConfirmed / shiftRequired) * 100);
   const isShortage = dynStatus.isCritical || dynStatus.isEmergency || dynStatus.isUrgent || shiftConfirmed < shiftRequired;
 
-  // Các chỉ số thống kê của riêng ca
   const checkedInCount = attendanceList.filter((a) => a.assignmentStatus === 'CHECKED_IN' || a.checkinTime != null).length;
   const completedCount = attendanceList.filter((a) => a.assignmentStatus === 'COMPLETED' || a.checkoutTime != null).length;
   const checklistDoneCount = attendanceList.filter((a) => Boolean(a.isChecklistCompleted)).length;
@@ -187,13 +181,13 @@ export default function ShiftWorkspacePage({
 
   const handleToggleEmergency = async (enable) => {
     const confirmMsg = enable
-      ? `BẬT điều phối khẩn cấp (Emergency Dispatch) cho ca "${shift.jobType}"?\n\n- Phát thông báo đẩy khẩn cấp đến nhân sự xung quanh (bán kính 15km).\n- Mở khóa cho phép nhân sự nhận ca trực tiếp trên Radar.`
-      : `TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
+      ? `Bật điều phối khẩn cấp cho ca "${shift.jobType}"?\n\n- Phát thông báo khẩn cấp đến nhân sự xung quanh (bán kính 15km).\n- Cho phép nhân sự nhận ca trực tiếp trên bản đồ.`
+      : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
     if (!window.confirm(confirmMsg)) return;
     try {
       if (enable) {
         await eoService.enableEmergencyDispatch(shift.shiftId, 15);
-        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}"!`, 'success');
+        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}".`, 'success');
       } else {
         await eoService.disableEmergencyDispatch(shift.shiftId);
         showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
@@ -208,7 +202,7 @@ export default function ShiftWorkspacePage({
     setVerifyingId(assignmentId);
     try {
       await eoService.verifyAttendance(assignmentId);
-      showToast('Đã xác nhận hoàn thành ca và duyệt công cho nhân sự!', 'success');
+      showToast('Đã xác nhận hoàn thành ca và duyệt công cho nhân sự.', 'success');
       await Promise.allSettled([loadAttendance(), onReloadEvents ? Promise.resolve(onReloadEvents()) : Promise.resolve()]);
     } catch (e) {
       showToast('Không thể duyệt công: ' + (e.response?.data?.message || e.message), 'error');
@@ -219,8 +213,8 @@ export default function ShiftWorkspacePage({
 
   const handleReportIncomplete = async (item) => {
     const reason = window.prompt(
-      `Báo cáo nhân sự "${item.workerName}" chưa hoàn thành công việc / vi phạm ca?\n\nNhập lý do cụ thể (tối thiểu 5 ký tự) để mở hồ sơ tranh chấp:`,
-      'Chưa hoàn thành đủ các đầu việc trong checklist ca'
+      `Báo cáo nhân sự "${item.workerName}" chưa hoàn thành công việc?\n\nNhập lý do cụ thể (tối thiểu 5 ký tự) để mở hồ sơ khiếu nại:`,
+      'Chưa hoàn thành đủ các đầu việc trong danh mục công việc'
     );
     if (!reason || reason.trim().length < 5) {
       if (reason !== null) showToast('Vui lòng nhập lý do rõ ràng ít nhất 5 ký tự.', 'warning');
@@ -231,7 +225,7 @@ export default function ShiftWorkspacePage({
         title: `Báo cáo chưa hoàn thành công việc - ${shift.jobType}`,
         description: reason.trim(),
       });
-      showToast(`Đã gửi báo cáo chưa hoàn thành đối với "${item.workerName}".`, 'success');
+      showToast(`Đã gửi báo cáo đối với "${item.workerName}".`, 'success');
       loadAttendance();
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi gửi báo cáo', 'error');
@@ -239,8 +233,14 @@ export default function ShiftWorkspacePage({
   };
 
   const handleBlockWorker = async (worker) => {
-    if (!worker?.userId) return;
-    const reason = window.prompt(`Chặn nhân sự "${worker.workerName}" khỏi các sự kiện tương lai? Nhập lý do:`, 'Không tuân thủ quy định ca làm');
+    if (!worker?.userId) {
+      showToast('Không tìm thấy mã tài khoản để chặn.', 'error');
+      return;
+    }
+    const reason = window.prompt(
+      `Chặn nhân sự "${worker.workerName}" khỏi các sự kiện tương lai?\nNhập lý do chặn:`,
+      'Không tuân thủ quy định ca làm'
+    );
     if (reason === null) return;
     try {
       await blockListService.blockUser(worker.userId, reason);
@@ -255,7 +255,7 @@ export default function ShiftWorkspacePage({
     setSubmittingReview(true);
     try {
       await eoService.rateWorker(reviewData.assignmentId, reviewData);
-      showToast('Đã gửi đánh giá nhân sự thành công!', 'success');
+      showToast('Đã gửi đánh giá nhân sự thành công.', 'success');
       setSelectedForReview(null);
       loadAttendance();
     } catch (e) {
@@ -265,7 +265,6 @@ export default function ShiftWorkspacePage({
     }
   };
 
-  // QR variables
   const isCheckin = qrMode === 'CHECKIN';
   const qrAccent = isCheckin ? '#2563eb' : '#0d9488';
   const epochSeconds = Math.floor(refreshNonce / 1000);
@@ -279,7 +278,7 @@ export default function ShiftWorkspacePage({
   return (
     <div className="shift-workspace-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      {/* 1. THANH ĐIỀU HƯỚNG BREADCRUMB & CHUYỂN CA NHANH */}
+      {/* 1. THANH ĐIỀU HƯỚNG & CÔNG CỤ CA */}
       <div
         style={{
           display: 'flex',
@@ -307,12 +306,9 @@ export default function ShiftWorkspacePage({
               fontSize: '0.85rem',
               fontWeight: 700,
               cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
             }}
           >
-            ← Quay lại sự kiện "{event.name}"
+            Quay lại sự kiện "{event.name}"
           </button>
 
           {allShifts.length > 1 && onSelectShift && (
@@ -361,14 +357,10 @@ export default function ShiftWorkspacePage({
               fontSize: '0.84rem',
               fontWeight: 800,
               cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
             }}
-            title="Mở mã QR to để nhân sự quét vào ca (đầu ca) hoặc tan ca (cuối ca)"
+            title="Mở mã QR to để nhân sự quét vào ca hoặc kết ca"
           >
-            📱 Chiếu Mã QR Điểm Danh
+            Chiếu Mã QR Điểm Danh
           </button>
 
           {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
@@ -384,12 +376,9 @@ export default function ShiftWorkspacePage({
                 fontSize: '0.84rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
               }}
             >
-              {shift.emergency ? '🛑 Tắt Khẩn Cấp' : '🚨 Bật Khẩn Cấp'}
+              {shift.emergency ? 'Tắt Khẩn Cấp' : 'Bật Khẩn Cấp'}
             </button>
           )}
 
@@ -408,7 +397,7 @@ export default function ShiftWorkspacePage({
                 cursor: 'pointer',
               }}
             >
-              🔗 Mã Mời
+              Mã Mời
             </button>
           )}
 
@@ -427,13 +416,13 @@ export default function ShiftWorkspacePage({
                 cursor: 'pointer',
               }}
             >
-              ✏️ Sửa Ca
+              Sửa Ca
             </button>
           )}
         </div>
       </div>
 
-      {/* 2. HEADER THÔNG TIN CA & TRẠNG THÁI THỜI GIAN THỰC */}
+      {/* 2. THÔNG TIN CHUNG CỦA CA */}
       <div
         className="eo-widget-card"
         style={{
@@ -462,20 +451,20 @@ export default function ShiftWorkspacePage({
                 fontWeight: 800,
               }}
             >
-              ● {dynStatus.label}
+              {dynStatus.label}
             </span>
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.85rem', color: '#475569', marginBottom: '0.5rem' }}>
             <span>
-              🕒 Khung giờ: <strong>{formatTime(shift.startTime)} - {formatTime(shift.endTime)}</strong>
+              Khung giờ: <strong>{formatTime(shift.startTime)} - {formatTime(shift.endTime)}</strong>
             </span>
             <span>
-              💰 Thù lao: <strong style={{ color: '#059669' }}>{new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/giờ</strong>
+              Thù lao: <strong style={{ color: '#059669' }}>{new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/giờ</strong>
               {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)} đ phụ cấp)`}
             </span>
             {shift.dressCode && (
-              <span>👔 Đồng phục: <strong>{shift.dressCode}</strong></span>
+              <span>Đồng phục: <strong>{shift.dressCode}</strong></span>
             )}
           </div>
 
@@ -519,11 +508,11 @@ export default function ShiftWorkspacePage({
             cursor: 'pointer',
           }}
         >
-          🔄 Cập nhật số liệu
+          Cập nhật số liệu
         </button>
       </div>
 
-      {/* 3. CÁC THẺ CHỈ SỐ TIẾN ĐỘ CỦA RIÊNG CA NÀY */}
+      {/* 3. CHỈ SỐ TIẾN ĐỘ CỦA RIÊNG CA */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>
         <div
           className="eo-widget-card"
@@ -534,7 +523,7 @@ export default function ShiftWorkspacePage({
           }}
         >
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: isShortage ? '#be123c' : '#15803d', textTransform: 'uppercase' }}>
-            {isShortage ? '⚠️ Tuyển Dụng (Thiếu người)' : '✅ Tuyển Dụng Ca'}
+            {isShortage ? 'Tuyển Dụng (Thiếu người)' : 'Tuyển Dụng Ca'}
           </div>
           <div style={{ fontSize: '1.5rem', fontWeight: 800, color: isShortage ? '#e11d48' : '#166534', margin: '0.25rem 0' }}>
             {shiftConfirmed} / {shiftRequired} <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>người ({fillRate}%)</span>
@@ -558,13 +547,13 @@ export default function ShiftWorkspacePage({
 
         <div className="eo-widget-card" style={{ padding: '1rem 1.25rem' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-            Tiến Độ Checklist ({shiftChecklistTasks.length} việc)
+            Hoàn Thành Đầu Việc ({shiftChecklistTasks.length} việc)
           </div>
           <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4f46e5', margin: '0.25rem 0' }}>
             {checklistDoneCount} / {attendanceList.length}
           </div>
           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            Nhân sự hoàn thành 100% đầu việc
+            Nhân sự đã hoàn thành toàn bộ công việc
           </div>
         </div>
 
@@ -576,12 +565,12 @@ export default function ShiftWorkspacePage({
             {paidCount} <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>đã trả đủ</span>
           </div>
           <div style={{ fontSize: '0.75rem', color: pendingPayCount > 0 ? '#d97706' : '#64748b', fontWeight: 600 }}>
-            {pendingPayCount} chờ Worker xác nhận
+            {pendingPayCount} chờ nhân sự xác nhận
           </div>
         </div>
       </div>
 
-      {/* 4. BẢNG QUẢN LÝ NHÂN SỰ & TIẾN ĐỘ CHI TIẾT TRONG CA (100% FULL WIDTH) */}
+      {/* 4. BẢNG QUẢN LÝ NHÂN SỰ TRONG CA */}
       <div className="eo-widget-card" style={{ padding: '1.35rem 1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
@@ -589,7 +578,7 @@ export default function ShiftWorkspacePage({
               Nhân Sự & Tiến Độ Công Việc Trong Ca ({attendanceList.length})
             </h3>
             <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-              Theo dõi thời gian vào/ra, tiến độ từng đầu việc trong checklist và thanh toán VietQR của riêng ca này
+              Theo dõi thời gian vào/ra, tiến độ từng đầu việc và thanh toán của riêng ca làm việc này
             </p>
           </div>
 
@@ -597,7 +586,7 @@ export default function ShiftWorkspacePage({
             type="text"
             value={searchWorker}
             onChange={(e) => setSearchWorker(e.target.value)}
-            placeholder="Tìm theo tên hoặc SĐT nhân sự..."
+            placeholder="Tìm theo tên hoặc số điện thoại..."
             style={{
               padding: '0.45rem 0.85rem',
               borderRadius: '8px',
@@ -618,7 +607,7 @@ export default function ShiftWorkspacePage({
               Chưa có nhân sự nào trong ca "{shift.jobType}"
             </h4>
             <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
-              Bạn có thể bật Điều phối khẩn cấp (Emergency Dispatch) hoặc gửi Mã Mời trực tiếp để nhanh chóng lấp đầy ca!
+              Bạn có thể bật điều phối khẩn cấp hoặc gửi mã mời trực tiếp để nhanh chóng lấp đầy ca.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               {!shift.emergency && shift.status !== 'COMPLETED' && shift.status !== 'CANCELLED' && (
@@ -636,7 +625,7 @@ export default function ShiftWorkspacePage({
                     cursor: 'pointer',
                   }}
                 >
-                  🚨 Bật Điều Phối Khẩn Cấp Ngay
+                  Bật Điều Phối Khẩn Cấp Ngay
                 </button>
               )}
               {onOpenInvite && (
@@ -654,7 +643,7 @@ export default function ShiftWorkspacePage({
                     cursor: 'pointer',
                   }}
                 >
-                  🔗 Lấy Link / Mã Mời
+                  Lấy Liên Kết / Mã Mời
                 </button>
               )}
             </div>
@@ -667,7 +656,7 @@ export default function ShiftWorkspacePage({
                   <th style={{ padding: '12px 14px' }}>Nhân Sự & Uy Tín</th>
                   <th style={{ padding: '12px 14px' }}>Trạng Thái Điểm Danh</th>
                   <th style={{ padding: '12px 14px' }}>Thời Gian Vào / Ra</th>
-                  <th style={{ padding: '12px 14px', minWidth: '220px' }}>Tiến Độ Checklist Công Việc</th>
+                  <th style={{ padding: '12px 14px', minWidth: '220px' }}>Tiến Độ Đầu Việc</th>
                   <th style={{ padding: '12px 14px' }}>Thanh Toán & Bằng Chứng</th>
                   <th style={{ padding: '12px 14px', textAlign: 'right' }}>Thao Tác</th>
                 </tr>
@@ -701,7 +690,7 @@ export default function ShiftWorkspacePage({
                         </button>
                         <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>{item.workerPhone}</div>
                         <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 4, fontWeight: 600 }}>
-                          ⭐ {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100} RS
+                          Đánh giá: {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
                         </div>
                       </td>
 
@@ -709,17 +698,17 @@ export default function ShiftWorkspacePage({
                       <td style={{ padding: '14px' }}>
                         {isCheckedIn && (
                           <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            Đã Check-in {item.isOnTime ? '(Đúng giờ)' : '(Trễ)'}
+                            Đã vào ca {item.isOnTime ? '(Đúng giờ)' : '(Trễ giờ)'}
                           </span>
                         )}
                         {isCompleted && (
                           <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            Đã Hoàn Thành
+                            Đã hoàn thành
                           </span>
                         )}
                         {!isCheckedIn && !isCompleted && (
                           <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            Chờ Đến Ca
+                            Chờ đến ca
                           </span>
                         )}
                       </td>
@@ -735,7 +724,7 @@ export default function ShiftWorkspacePage({
                         )}
                       </td>
 
-                      {/* 4. Tiến độ Checklist chi tiết */}
+                      {/* 4. Tiến độ đầu việc */}
                       <td style={{ padding: '14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                           <span
@@ -748,16 +737,18 @@ export default function ShiftWorkspacePage({
                               fontSize: '0.75rem',
                             }}
                           >
-                            {item.isChecklistCompleted ? '✅ Xong 100%' : (item.checklistProgress || 'Chưa cập nhật')}
+                            {item.isChecklistCompleted ? 'Đã xong 100%' : (item.checklistProgress || 'Chưa cập nhật')}
                           </span>
                         </div>
                         {shiftChecklistTasks.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             {shiftChecklistTasks.map((t) => {
                               const isTaskDone = Boolean(workerProgressMap[t.id] || workerProgressMap[t.label] || item.isChecklistCompleted);
                               return (
-                                <div key={t.id} style={{ fontSize: '0.74rem', color: isTaskDone ? '#047857' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <span>{isTaskDone ? '☑' : '☐'}</span>
+                                <div key={t.id} style={{ fontSize: '0.74rem', color: isTaskDone ? '#047857' : '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontWeight: 700, color: isTaskDone ? '#059669' : '#94a3b8' }}>
+                                    {isTaskDone ? '[Xong]' : '[Chưa]'}
+                                  </span>
                                   <span style={{ textDecoration: isTaskDone ? 'line-through' : 'none' }}>{t.label}</span>
                                 </div>
                               );
@@ -766,17 +757,17 @@ export default function ShiftWorkspacePage({
                         )}
                       </td>
 
-                      {/* 5. Thanh toán & QR Worker */}
+                      {/* 5. Thanh toán & QR */}
                       <td style={{ padding: '14px' }}>
                         {item.paymentStatus === 'CONFIRMED_FULL' && (
                           <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: 8, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            ✅ Đã quyết toán
+                            Đã quyết toán
                           </span>
                         )}
                         {item.paymentStatus === 'DECLARED_PENDING_WORKER' && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                             <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 6, fontWeight: 700, fontSize: '0.74rem' }}>
-                              ⏳ Chờ Worker xác nhận
+                              Chờ nhân sự xác nhận
                             </span>
                             {item.paymentProofUrl && (
                               <button
@@ -784,14 +775,14 @@ export default function ShiftWorkspacePage({
                                 onClick={() => setPreviewImage({ url: item.paymentProofUrl, title: `Biên lai trả lương cho ${item.workerName}` })}
                                 style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
                               >
-                                📄 Xem biên lai đã chuyển
+                                Xem biên lai đã chuyển
                               </button>
                             )}
                           </div>
                         )}
                         {item.paymentStatus === 'DISPUTED' && (
                           <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', borderRadius: 8, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            🚨 Đang tranh chấp
+                            Đang tranh chấp
                           </span>
                         )}
                         {(!item.paymentStatus || item.paymentStatus === 'NOT_DECLARED') && (
@@ -808,14 +799,13 @@ export default function ShiftWorkspacePage({
                                 fontSize: '0.78rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
-                                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
                               }}
                             >
-                              💳 Trả lương & QR
+                              Trả lương & QR
                             </button>
                           ) : (
                             <span
-                              title="Chỉ mở khai báo trả lương sau khi nhân sự hoàn thành 100% checklist công việc"
+                              title="Chỉ mở khai báo trả lương sau khi nhân sự hoàn thành 100% đầu việc"
                               style={{
                                 background: '#f8fafc',
                                 color: '#64748b',
@@ -827,7 +817,7 @@ export default function ShiftWorkspacePage({
                                 display: 'inline-block',
                               }}
                             >
-                              🔒 Chờ xong checklist
+                              Chờ xong việc
                             </span>
                           )
                         )}
@@ -842,7 +832,7 @@ export default function ShiftWorkspacePage({
                               onClick={() => setPreviewImage({ url: item.proofImageUrl, title: `Ảnh minh chứng công việc - ${item.workerName}` })}
                               style={{ background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                             >
-                              📷 Ảnh ca
+                              Ảnh ca
                             </button>
                           )}
 
@@ -862,7 +852,7 @@ export default function ShiftWorkspacePage({
                                 cursor: 'pointer',
                               }}
                             >
-                              {verifyingId === item.assignmentId ? 'Đang duyệt...' : '✓ Duyệt công'}
+                              {verifyingId === item.assignmentId ? 'Đang duyệt...' : 'Duyệt công'}
                             </button>
                           )}
 
@@ -872,13 +862,13 @@ export default function ShiftWorkspacePage({
                               onClick={() => setSelectedForReview(item)}
                               style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d', borderRadius: 6, padding: '4px 9px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
                             >
-                              ⭐ Đánh giá
+                              Đánh giá
                             </button>
                           )}
 
                           {item.eoConfirmed && item.hasReviewedWorker && (
                             <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 700, padding: '4px' }}>
-                              ✓ Đã duyệt & Đánh giá
+                              Đã duyệt & đánh giá
                             </span>
                           )}
 
@@ -894,7 +884,7 @@ export default function ShiftWorkspacePage({
                             }}
                             style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                           >
-                            💬 Chat
+                            Nhắn tin
                           </button>
 
                           {!item.eoConfirmed && (isCheckedIn || isCompleted) && (
@@ -903,7 +893,7 @@ export default function ShiftWorkspacePage({
                               onClick={() => handleReportIncomplete(item)}
                               style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                             >
-                              ⚠️ Báo lỗi
+                              Báo lỗi
                             </button>
                           )}
 
@@ -912,7 +902,7 @@ export default function ShiftWorkspacePage({
                             onClick={() => handleBlockWorker(item)}
                             style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                           >
-                            🚫 Chặn
+                            Chặn
                           </button>
                         </div>
                       </td>
@@ -925,7 +915,7 @@ export default function ShiftWorkspacePage({
         )}
       </div>
 
-      {/* MODAL MÃ QR ĐIỂM DANH CHUYÊN DỤNG (CHỈ BẬT ĐẦU/CUỐI CA) */}
+      {/* HỘP THOẠI MÃ QR ĐIỂM DANH */}
       {showQrModal && (
         <div
           className="eo-modal-overlay"
@@ -970,7 +960,6 @@ export default function ShiftWorkspacePage({
               </button>
             </div>
 
-            {/* Tab chọn Check-in / Check-out */}
             <div style={{ display: 'flex', background: '#f1f5f9', padding: 4, borderRadius: 10, marginBottom: '1rem' }}>
               <button
                 type="button"
@@ -987,7 +976,7 @@ export default function ShiftWorkspacePage({
                   color: isCheckin ? '#ffffff' : '#475569',
                 }}
               >
-                Check-in (Đầu ca)
+                Điểm danh vào ca (Đầu ca)
               </button>
               <button
                 type="button"
@@ -1004,7 +993,7 @@ export default function ShiftWorkspacePage({
                   color: !isCheckin ? '#ffffff' : '#475569',
                 }}
               >
-                Check-out (Cuối ca)
+                Điểm danh kết ca (Cuối ca)
               </button>
             </div>
 
@@ -1020,7 +1009,7 @@ export default function ShiftWorkspacePage({
                 }}
                 style={{ background: 'none', border: 'none', color: qrAccent, fontWeight: 700, cursor: 'pointer' }}
               >
-                🔄 Đổi mã ngay
+                Đổi mã ngay
               </button>
             </div>
 
@@ -1042,13 +1031,13 @@ export default function ShiftWorkspacePage({
             </div>
 
             <div style={{ marginTop: '1rem', padding: '0.65rem', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', fontSize: '0.76rem', color: '#166534' }}>
-              🛡️ <strong>Bảo mật HMAC-SHA256:</strong> Mã QR xoay vòng mỗi 20 giây để chống gian lận điểm danh từ xa hoặc chụp ảnh gửi lại.
+              <strong>Bảo mật:</strong> Mã QR xoay vòng mỗi 20 giây để chống gian lận điểm danh từ xa hoặc chụp ảnh gửi lại.
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL XEM ẢNH PHÓNG TO (BIÊN LAI / MINH CHỨNG) */}
+      {/* HỘP THOẠI XEM ẢNH PHÓNG TO */}
       {previewImage && (
         <div
           style={{
@@ -1081,7 +1070,6 @@ export default function ShiftWorkspacePage({
         </div>
       )}
 
-      {/* MODAL ĐÁNH GIÁ WORKER */}
       <RateWorkerModal
         isOpen={Boolean(selectedForReview)}
         worker={selectedForReview}
@@ -1090,7 +1078,6 @@ export default function ShiftWorkspacePage({
         onSubmit={handleSubmitReview}
       />
 
-      {/* MODAL XEM HỒ SƠ CHI TIẾT WORKER */}
       <WorkerProfileModal
         isOpen={workerProfile.isOpen}
         loading={workerProfile.loading}

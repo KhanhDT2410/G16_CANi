@@ -175,7 +175,7 @@ const EventShiftsDrawer = ({
                 }}
                 title="Mở trang quản lý riêng của ca làm việc này"
               >
-                📊 Quản lý ca →
+                Quản lý ca
               </button>
             )}
 
@@ -196,9 +196,9 @@ const EventShiftsDrawer = ({
                   alignItems: 'center',
                   gap: 5,
                 }}
-                title="Mở bảng Điểm danh & Mã QR trực tiếp ngay bên dưới"
+                title="Mở bảng điểm danh & mã QR trực tiếp ngay bên dưới"
               >
-                <span>{isPanelOpen ? '▾ Đóng Điểm Danh & QR' : '▸ Điểm Danh & Mã QR'}</span>
+                <span>{isPanelOpen ? 'Đóng Điểm Danh & QR' : 'Điểm Danh & Mã QR'}</span>
               </button>
             )}
 
@@ -208,7 +208,7 @@ const EventShiftsDrawer = ({
                 onClick={async () => {
                   const enable = !shift.emergency;
                   const confirmMsg = enable
-                    ? `Kích hoạt điều phối khẩn cấp (Emergency Dispatch) cho ca "${shift.jobType}"? Nhân sự trên Radar sẽ được tự do nhận ca ngay.`
+                    ? `Kích hoạt điều phối khẩn cấp cho ca "${shift.jobType}"? Nhân sự trên Radar sẽ được tự do nhận ca ngay.`
                     : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`;
                   if (!window.confirm(confirmMsg)) return;
                   try {
@@ -240,7 +240,7 @@ const EventShiftsDrawer = ({
                 }}
                 title={shift.emergency ? 'Tắt điều phối khẩn cấp' : 'Bật điều phối khẩn cấp cho ca này'}
               >
-                {shift.emergency ? '🛑 Tắt Khẩn Cấp' : '🚨 Khẩn Cấp'}
+                {shift.emergency ? 'Tắt Khẩn Cấp' : 'Khẩn Cấp'}
               </button>
             )}
 

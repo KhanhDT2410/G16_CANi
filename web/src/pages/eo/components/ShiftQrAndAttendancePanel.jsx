@@ -561,11 +561,11 @@ export default function ShiftQrAndAttendancePanel({
                                   boxShadow: '0 1px 3px rgba(16, 185, 129, 0.25)',
                                 }}
                               >
-                                💳 Trả lương & QR
+                                Trả lương & QR
                               </button>
                             ) : (
                               <span
-                                title="Chỉ mở khai báo trả lương sau khi nhân sự đã hoàn thành 100% checklist công việc"
+                                title="Chỉ mở khai báo trả lương sau khi nhân sự đã hoàn thành 100% đầu việc"
                                 style={{
                                   background: '#fef3c7',
                                   color: '#92400e',
@@ -577,7 +577,7 @@ export default function ShiftQrAndAttendancePanel({
                                   display: 'inline-block',
                                 }}
                               >
-                                ⏳ Chờ xong việc
+                                Chờ xong việc
                               </span>
                             )
                           )}

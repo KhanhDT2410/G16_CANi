@@ -110,8 +110,17 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
                     child: CircularProgressIndicator(color: Color(0xFF0D9488)),
                   )
                 : state.myGroups.isEmpty
-                    ? _buildEmptyState(context)
+                    ? LayoutBuilder(
+                        builder: (context, constraints) => SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                            child: _buildEmptyState(context),
+                          ),
+                        ),
+                      )
                     : ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
                         itemCount: state.myGroups.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -128,8 +137,17 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
               await ref.read(workerGroupsProvider.notifier).loadMyPendingInvites();
             },
             child: state.pendingInvites.isEmpty
-                ? _buildEmptyInvitesState()
+                ? LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: _buildEmptyInvitesState(),
+                      ),
+                    ),
+                  )
                 : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
                     itemCount: state.pendingInvites.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -441,11 +459,15 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
               children: [
                 const Icon(Icons.people_outline_rounded, size: 16, color: Color(0xFF64748B)),
                 const SizedBox(width: 4),
-                Text(
-                  '${group.memberCount} thành viên',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                Flexible(
+                  child: Text(
+                    '${group.memberCount} thành viên',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 const Icon(Icons.star_rounded, size: 16, color: Colors.amber),
                 const SizedBox(width: 2),
                 Text(
@@ -456,7 +478,7 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
                     color: Color(0xFF334155),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 const Icon(Icons.shield_outlined, size: 15, color: Color(0xFF0D9488)),
                 const SizedBox(width: 3),
                 Text(

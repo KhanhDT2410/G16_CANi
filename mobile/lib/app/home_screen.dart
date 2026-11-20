@@ -55,9 +55,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final authState = ref.watch(authStateProvider);
     final currentIndex = ref.watch(homeTabIndexProvider);
-    final assignments = ref.watch(assignmentsListProvider).asData?.value ?? const <ShiftAssignmentItem>[];
-    final activeAssignmentsCount =
-        assignments.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).length;
 
     if (authState.isLoading) {
       return const Scaffold(
@@ -70,6 +67,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!authState.isAuthenticated) {
       return const IntroScreen();
     }
+
+    final assignments = ref.watch(assignmentsListProvider).asData?.value ?? const <ShiftAssignmentItem>[];
+    final activeAssignmentsCount =
+        assignments.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).length;
 
     return Scaffold(
       body: IndexedStack(

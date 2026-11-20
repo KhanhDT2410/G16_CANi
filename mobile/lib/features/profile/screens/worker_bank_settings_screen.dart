@@ -39,12 +39,18 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
     super.dispose();
   }
 
+  String _bankStorageKey(String field, String? userId) {
+    final safeUser = (userId != null && userId.isNotEmpty) ? userId : 'guest';
+    return 'cani_worker_bank_${safeUser}_$field';
+  }
+
   Future<void> _loadSavedBankInfo() async {
     try {
       final user = ref.read(authStateProvider).user;
-      final savedBank = await _storage.read(key: 'cani_worker_bank_code');
-      final savedAccount = await _storage.read(key: 'cani_worker_bank_account');
-      final savedName = await _storage.read(key: 'cani_worker_bank_owner');
+      final userId = user?.id;
+      final savedBank = await _storage.read(key: _bankStorageKey('code', userId));
+      final savedAccount = await _storage.read(key: _bankStorageKey('account', userId));
+      final savedName = await _storage.read(key: _bankStorageKey('owner', userId));
 
       if (mounted) {
         setState(() {
@@ -84,11 +90,11 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
               }
             });
 
-            // Đồng bộ ngược vào cache thiết bị
+            // Đồng bộ ngược vào cache thiết bị theo từng userId
             await Future.wait([
-              if (serverBank != null) _storage.write(key: 'cani_worker_bank_code', value: serverBank),
-              _storage.write(key: 'cani_worker_bank_account', value: serverAccount),
-              if (serverName != null) _storage.write(key: 'cani_worker_bank_owner', value: serverName),
+              if (serverBank != null) _storage.write(key: _bankStorageKey('code', userId), value: serverBank),
+              _storage.write(key: _bankStorageKey('account', userId), value: serverAccount),
+              if (serverName != null) _storage.write(key: _bankStorageKey('owner', userId), value: serverName),
             ]);
           }
         }
@@ -106,6 +112,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
+    final userId = ref.read(authStateProvider).user?.id;
     final bankCode = _selectedBankCode;
     final accountNum = _accountNumberCtrl.text.trim();
     final accountName = _accountNameCtrl.text.trim().toUpperCase();
@@ -122,11 +129,11 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
         },
       );
 
-      // 2. Lưu vào FlutterSecureStorage của thiết bị để dùng offline & hiển thị tức thì
+      // 2. Lưu vào FlutterSecureStorage gắn theo userId
       await Future.wait([
-        _storage.write(key: 'cani_worker_bank_code', value: bankCode),
-        _storage.write(key: 'cani_worker_bank_account', value: accountNum),
-        _storage.write(key: 'cani_worker_bank_owner', value: accountName),
+        _storage.write(key: _bankStorageKey('code', userId), value: bankCode),
+        _storage.write(key: _bankStorageKey('account', userId), value: accountNum),
+        _storage.write(key: _bankStorageKey('owner', userId), value: accountName),
       ]);
 
       ref.read(workerBankProvider.notifier).loadBankAccount();

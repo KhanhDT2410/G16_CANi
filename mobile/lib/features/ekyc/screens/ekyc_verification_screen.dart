@@ -533,7 +533,9 @@ class _EkycVerificationScreenState
           Text(
             item.isApproved
                 ? 'Chúc mừng! Hồ sơ của bạn đã được AI phê duyệt thành công.'
-                : 'Định danh chưa đạt chuẩn nhận diện, vui lòng chụp lại ảnh.',
+                : (item.isPending
+                    ? 'Hồ sơ của bạn đã được tiếp nhận và đang chờ Bộ phận CSKH thẩm định.'
+                    : 'Định danh chưa đạt chuẩn nhận diện, vui lòng chụp lại ảnh.'),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,

@@ -45,6 +45,14 @@ class SkillVerificationRepository {
     }
   }
 
+  DioMediaType _mediaTypeForFile(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) return DioMediaType('application', 'pdf');
+    if (lower.endsWith('.png')) return DioMediaType('image', 'png');
+    if (lower.endsWith('.webp')) return DioMediaType('image', 'webp');
+    return DioMediaType('image', 'jpeg');
+  }
+
   Future<SkillVerificationResult> submitVerification({
     required Uint8List fileBytes,
     required String fileName,
@@ -56,7 +64,7 @@ class SkillVerificationRepository {
         'file': MultipartFile.fromBytes(
           fileBytes,
           filename: fileName,
-          contentType: DioMediaType('image', 'jpeg'),
+          contentType: _mediaTypeForFile(fileName),
         ),
         if (skillId != null && skillId.isNotEmpty) 'skillId': skillId,
         if (notes != null && notes.isNotEmpty) 'notes': notes,

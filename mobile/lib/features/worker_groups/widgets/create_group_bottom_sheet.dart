@@ -253,9 +253,15 @@ class _CreateGroupBottomSheetState
                           }).toList(),
                           onChanged: (val) {
                             if (val != null) {
+                              const maxOptions = [5, 10, 15, 20, 30, 50];
                               setState(() {
                                 _minSize = val;
-                                if (_maxSize < _minSize) _maxSize = _minSize + 5;
+                                if (_maxSize < _minSize) {
+                                  _maxSize = maxOptions.firstWhere(
+                                    (o) => o >= _minSize,
+                                    orElse: () => 50,
+                                  );
+                                }
                               });
                             }
                           },
@@ -287,7 +293,9 @@ class _CreateGroupBottomSheetState
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
                           ),
-                          items: [5, 10, 15, 20, 30, 50].map((count) {
+                          items: [5, 10, 15, 20, 30, 50]
+                              .where((count) => count >= _minSize)
+                              .map((count) {
                             return DropdownMenuItem(
                               value: count,
                               child: Text('$count người'),

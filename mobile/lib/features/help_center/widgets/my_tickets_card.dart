@@ -43,12 +43,16 @@ class MyTicketsCard extends ConsumerWidget {
             children: [
               const Icon(Icons.confirmation_number_outlined, color: Color(0xFF0066FF), size: 18),
               const SizedBox(width: 8),
-              const Text(
-                'Yêu cầu hỗ trợ của tôi',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
+              const Flexible(
+                child: Text(
+                  'Yêu cầu hỗ trợ của tôi',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
               ),
               if (pendingCount > 0) ...[

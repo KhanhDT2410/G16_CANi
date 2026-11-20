@@ -32,7 +32,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -216,6 +218,7 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
         validateShiftWithinEvent(event, dto.getStartTime(), dto.getEndTime());
+        validateShiftJobType(dto.getJobType());
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -294,6 +297,7 @@ public class EoEventService {
         }
 
         List<ShiftResponseDto> results = new ArrayList<>();
+        validateShiftJobType(dto.getJobType());
         for (CreateBulkShiftsRequestDto.TimeSlotItem slot : dto.getTimeSlots()) {
             validateShiftWithinEvent(event, slot.getStartTime(), slot.getEndTime());
             BigDecimal shiftCost = calculateShiftTotalCost(slot.getStartTime(), slot.getEndTime(), dto.getHourlyWage(), workers, allowance);
@@ -353,6 +357,7 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
         validateShiftWithinEvent(shift.getEvent(), dto.getStartTime(), dto.getEndTime());
+        validateShiftJobType(dto.getJobType());
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -817,6 +822,52 @@ public class EoEventService {
             if (event.getEndTime() != null && endTime.isAfter(event.getEndTime())) {
                 throw new BadRequestException("Thời gian kết thúc ca làm việc không được muộn hơn thời gian kết thúc của sự kiện.");
             }
+        }
+    }
+
+    private void validateShiftJobType(String rawJobType) {
+        String trimmed = rawJobType != null ? rawJobType.trim() : "";
+        if (trimmed.isEmpty()) {
+            throw new BadRequestException("Vui lòng nhập tên vị trí / vai trò cần tuyển.");
+        }
+        if (trimmed.length() > 80) {
+            throw new BadRequestException("Tên vị trí công việc không được vượt quá 80 ký tự.");
+        }
+        if (!trimmed.matches("^[\\p{L}\\p{N}\\s,./()&+-]+$")) {
+            throw new BadRequestException("Tên vị trí chỉ được chứa chữ cái, chữ số, khoảng trắng và các dấu , . - / ( ) & +.");
+        }
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        Set<String> allowedAcronyms = Set.of("mc", "pg", "pb", "dj", "pr", "it", "av", "led", "vip", "f&b", "fnb", "qc", "qa", "cskh", "ctv", "hr", "pa", "pm");
+        String[] tokens = lower.split("[\\s,./()&+-]+");
+        boolean hasValidLetterToken = false;
+        String vowelRegex = ".*[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ].*";
+
+        if (trimmed.length() < 3 && !allowedAcronyms.contains(lower)) {
+            throw new BadRequestException("Tên vị trí quá ngắn (tối thiểu 3 ký tự, trừ viết tắt hợp lệ như MC, PG, DJ).");
+        }
+        if (trimmed.matches(".*(.)\\1{3,}.*")) {
+            throw new BadRequestException("Tên vị trí chứa ký tự lặp bất thường.");
+        }
+        if (lower.matches(".*(asdasd|sdasd|ádasd|adasd|sdfsdf|dfghj|fghjk|ghjkl|qwerty|zxcvb|sdfh|asdf).*")) {
+            throw new BadRequestException("Tên vị trí không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
+        }
+        for (String token : tokens) {
+            if (token.isEmpty()) continue;
+            if (token.matches("^\\d+$")) continue;
+            if (allowedAcronyms.contains(token)) {
+                hasValidLetterToken = true;
+                continue;
+            }
+            if (token.matches(".*\\p{L}.*")) {
+                hasValidLetterToken = true;
+            }
+            String lettersOnly = token.replaceAll("[^\\p{L}]", "");
+            if (lettersOnly.length() >= 3 && !lettersOnly.matches(vowelRegex)) {
+                throw new BadRequestException("Tên vị trí chứa từ vô nghĩa hoặc sai định dạng (không có nguyên âm).");
+            }
+        }
+        if (!hasValidLetterToken) {
+            throw new BadRequestException("Tên vị trí phải chứa từ khóa mô tả công việc hợp lệ (không thể chỉ nhập số).");
         }
     }
 

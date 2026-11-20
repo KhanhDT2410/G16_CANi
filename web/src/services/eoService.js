@@ -69,6 +69,18 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // UC-14: Đề xuất mức thù lao thị trường kèm dẫn chứng pháp lý & dữ liệu nội bộ CANi
+  getWageRecommendation: async ({ shiftId = null, city, jobType, startTime, endTime }) => {
+    const response = await apiClient.post('/v1/wage-recommendations', {
+      shiftId,
+      city,
+      jobType,
+      startTime,
+      endTime,
+    });
+    return response.data?.data || null;
+  },
+
   // Xuất bản sự kiện & kích hoạt Matching Engine (Non-Escrow)
   publishEvent: async (eventId) => {
     const response = await apiClient.post(`/v1/eo/events/${eventId}/publish`);

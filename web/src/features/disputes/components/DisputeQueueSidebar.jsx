@@ -17,26 +17,29 @@ export const DisputeQueueSidebar = ({
   riskCount,
   searchTerm,
   setSearchTerm,
+  showScopeSwitcher = true,
 }) => {
   return (
     <div className="dispute-queue-sidebar">
-      {/* Scope Switcher: Toàn bộ / Của tôi */}
-      <div className="sidebar-scope-tabs">
-        <button
-          type="button"
-          className={`scope-tab-btn ${queueScope === 'ALL' ? 'active' : ''}`}
-          onClick={() => setQueueScope('ALL')}
-        >
-          Toàn bộ ({totalCount})
-        </button>
-        <button
-          type="button"
-          className={`scope-tab-btn ${queueScope === 'MINE' ? 'active' : ''}`}
-          onClick={() => setQueueScope('MINE')}
-        >
-          Giao tôi ({myCount})
-        </button>
-      </div>
+      {/* Scope Switcher: Toàn bộ / Của tôi (chỉ hiển thị cho CSKH & Admin) */}
+      {showScopeSwitcher && (
+        <div className="sidebar-scope-tabs">
+          <button
+            type="button"
+            className={`scope-tab-btn ${queueScope === 'ALL' ? 'active' : ''}`}
+            onClick={() => setQueueScope('ALL')}
+          >
+            Toàn bộ ({totalCount})
+          </button>
+          <button
+            type="button"
+            className={`scope-tab-btn ${queueScope === 'MINE' ? 'active' : ''}`}
+            onClick={() => setQueueScope('MINE')}
+          >
+            Giao tôi ({myCount})
+          </button>
+        </div>
+      )}
 
       {/* Search Input */}
       <div className="sidebar-search-box">

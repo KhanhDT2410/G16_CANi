@@ -29,4 +29,16 @@ public class WageRecommendationResponseDto {
     private String explanation;
     private UUID matchedRowId;
     private Integer fallbackLevel;
+
+    // Dẫn chứng pháp lý, dữ liệu nội bộ CANi & hệ số điều chỉnh minh bạch
+    private BigDecimal legalFloorWage;
+    private String legalRegionLabel;
+    private String legalReference;
+    private Integer platformSampleCount;
+    private BigDecimal platformAvgWage;
+    private BigDecimal platformMinWage;
+    private BigDecimal platformMaxWage;
+    private Boolean catalogMatched;
+    private String benchmarkSource;
+    private java.util.List<String> evidenceFactors;
 }

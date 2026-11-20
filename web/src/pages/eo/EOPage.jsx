@@ -17,11 +17,13 @@ import EOSubscriptionTab from './components/EOSubscriptionTab';
 import EoProfileTab from './components/EoProfileTab';
 import EOMyTeamTab from './components/EOMyTeamTab';
 import EOModals from './components/EOModals';
+import EventCreationWizardModal from './components/EventCreationWizardModal';
 import EventDetailModal from './components/EventDetailModal';
 import ShiftWorkspacePage from './components/ShiftWorkspacePage';
 import SettlementVoucherModal from './components/SettlementVoucherModal';
 import EkycRequiredModal from './components/EkycRequiredModal';
 import { eoService } from '../../services/eoService';
+import { DEFAULT_NEW_EVENT } from './utils/eventHelpers';
 
 import { SupportTicketsCenterView } from '../../features/support-tickets';
 import { DisputeCenterView } from '../../features/disputes';
@@ -144,7 +146,7 @@ export default function EOPage() {
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
-    } else if (tabParam && ['events', 'payments', 'subscription', 'profile', 'my-team', 'settings', 'support'].includes(tabParam)) {
+    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
@@ -221,7 +223,13 @@ export default function EOPage() {
       setShowEkycModal(true);
       return;
     }
-    events.setShowEventModal(true);
+    events.setNewEvent({ ...DEFAULT_NEW_EVENT });
+    setDetailEvent(null);
+    setWorkspaceShiftId(null);
+    setActiveTab('events');
+    setActiveNav('events');
+    setActiveEventSubTab('create');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNavClick = (navKey) => {
@@ -239,6 +247,8 @@ export default function EOPage() {
       setActiveEventSubTab('recruitment');
     } else if (navKey === 'payments') {
       target = 'payments';
+    } else if (navKey === 'disputes') {
+      target = 'disputes';
     } else if (navKey === 'subscription') {
       target = 'subscription';
     } else if (navKey === 'profile' || navKey === 'ekyc') {
@@ -431,8 +441,30 @@ export default function EOPage() {
             </>
           )}
 
-          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN, CHI TIẾT SỰ KIỆN HOẶC TRANG QUẢN LÝ TỪNG CA */}
+          {/* TRANG RIÊNG: TẠO SỰ KIỆN, QUẢN LÝ SỰ KIỆN, CHI TIẾT SỰ KIỆN HOẶC TRANG QUẢN LÝ TỪNG CA */}
           {activeTab === 'events' && (() => {
+            if (activeEventSubTab === 'create') {
+              return (
+                <EventCreationWizardModal
+                  isOpen={true}
+                  asPage={true}
+                  onClose={() => handleEventSubTabChange('list')}
+                  onSuccess={events.loadEvents}
+                  onEventCreated={async (createdEvt) => {
+                    const refreshed = await events.loadEvents();
+                    const list = Array.isArray(refreshed) ? refreshed : events.events;
+                    const found = list.find((e) => e.eventId === createdEvt?.eventId) || createdEvt;
+                    handleOpenEventDetailPage(found);
+                  }}
+                  newEvent={events.newEvent}
+                  setNewEvent={events.setNewEvent}
+                  locating={events.locating}
+                  onGetCurrentLocation={events.handleGetCurrentLocation}
+                  skillTaxonomy={shifts.skillTaxonomy}
+                />
+              );
+            }
+
             const resolvedEvent =
               detailEvent ||
               (activeEventSubTab === 'detail' && Array.isArray(events.events)
@@ -635,12 +667,6 @@ export default function EOPage() {
         setInviteModal={setInviteModal}
         disputeModal={disputeModal}
         setDisputeModal={setDisputeModal}
-        onEventCreated={async (createdEvt) => {
-          const refreshed = await events.loadEvents();
-          const list = Array.isArray(refreshed) ? refreshed : events.events;
-          const found = list.find((e) => e.eventId === createdEvt?.eventId) || createdEvt;
-          handleOpenEventDetailPage(found);
-        }}
       />
 
       {/* Modal Xuất Phiếu Chi Thù Lao & Quyết Toán Kế Toán (Mẫu 02-TT / NĐ 52/2024/NĐ-CP) */}

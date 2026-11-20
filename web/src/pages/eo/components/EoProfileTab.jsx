@@ -36,12 +36,10 @@ export default function EoProfileTab() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [submittingEkyc, setSubmittingEkyc] = useState(false);
 
-  // Ẩn / Hiện thông tin nhạy cảm
+  // Ẩn / Hiện thông tin nhạy cảm trên thẻ Header
   const [showSensitive, setShowSensitive] = useState({
     email: false,
     phone: false,
-    formPhone: false,
-    formEmail: false,
   });
 
   const toggleSensitive = (field) => {
@@ -82,11 +80,11 @@ export default function EoProfileTab() {
     fullName: user?.fullName || user?.username || '',
     phone: user?.phone || '',
     email: user?.email || '',
-    industry: '',
-    bio: '',
     ratingAvg: 0,
     ratingCount: 0,
     totalEventsCompleted: 0,
+    totalEventsCreated: 0,
+    totalConfirmedWorkers: 0,
   });
 
   // Trạng thái eKYC
@@ -105,28 +103,56 @@ export default function EoProfileTab() {
     selfieImage: null,
   });
 
-  // Tải dữ liệu từ Backend
+  // Tải dữ liệu từ Backend (kết hợp đối soát từ getMyEvents để chỉ số luôn chuẩn)
   const loadData = async () => {
     setLoading(true);
     try {
-      const [profileRes, ekycRes] = await Promise.allSettled([
+      const [profileRes, ekycRes, eventsRes] = await Promise.allSettled([
         eoService.getEoProfile(),
         eoService.getEkycStatus(),
+        eoService.getMyEvents(),
       ]);
 
-      if (profileRes.status === 'fulfilled' && profileRes.value) {
-        setProfile((prev) => ({
-          ...prev,
-          companyName: profileRes.value.companyName || prev.companyName,
-          address: profileRes.value.address || prev.address,
-          fullName: profileRes.value.fullName || prev.fullName,
-          phone: profileRes.value.phone || prev.phone,
-          email: profileRes.value.email || prev.email,
-          ratingAvg: profileRes.value.ratingAvg ?? prev.ratingAvg,
-          ratingCount: profileRes.value.ratingCount ?? prev.ratingCount,
-          totalEventsCompleted: profileRes.value.totalEventsCompleted ?? prev.totalEventsCompleted,
-        }));
-      }
+      const rawEvents =
+        eventsRes.status === 'fulfilled' && Array.isArray(eventsRes.value)
+          ? eventsRes.value
+          : [];
+      const activeNonCancelledEvents = rawEvents.filter((ev) => ev?.status !== 'CANCELLED');
+      const livePublishedCount = activeNonCancelledEvents.filter(
+        (ev) => ev?.status && ev.status !== 'DRAFT'
+      ).length;
+      const liveConfirmedWorkers = activeNonCancelledEvents.reduce((sum, ev) => {
+        const shiftSum = Array.isArray(ev?.shifts)
+          ? ev.shifts
+              .filter((s) => s?.status !== 'CANCELLED')
+              .reduce((acc, s) => acc + Number(s?.confirmedWorkers || 0), 0)
+          : 0;
+        return sum + Math.max(Number(ev?.totalConfirmedWorkers || 0), shiftSum);
+      }, 0);
+
+      const pVal = profileRes.status === 'fulfilled' ? profileRes.value : null;
+      setProfile((prev) => ({
+        ...prev,
+        companyName: pVal?.companyName || prev.companyName,
+        address: pVal?.address || prev.address,
+        fullName: pVal?.fullName || prev.fullName,
+        phone: pVal?.phone || prev.phone,
+        email: pVal?.email || prev.email,
+        ratingAvg: pVal?.ratingAvg ?? prev.ratingAvg,
+        ratingCount: pVal?.ratingCount ?? prev.ratingCount,
+        totalEventsCompleted: Math.max(
+          Number(pVal?.totalEventsCompleted || 0),
+          livePublishedCount
+        ),
+        totalEventsCreated: Math.max(
+          Number(pVal?.totalEventsCreated || 0),
+          activeNonCancelledEvents.length
+        ),
+        totalConfirmedWorkers: Math.max(
+          Number(pVal?.totalConfirmedWorkers || 0),
+          liveConfirmedWorkers
+        ),
+      }));
 
       if (ekycRes.status === 'fulfilled' && ekycRes.value) {
         setEkycData(ekycRes.value);
@@ -320,7 +346,6 @@ export default function EoProfileTab() {
       setOtpNewPassword('');
       setOtpConfirmPassword('');
       setOtpStep(1);
-      setSecurityMode('CURRENT_PASSWORD');
     } catch (err) {
       showToast(err.message || 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.', 'error');
     } finally {
@@ -341,34 +366,45 @@ export default function EoProfileTab() {
   return (
     <div className="eo-profile-container animate-fade-in-up">
       {/* 1. HERO PROFILE CARD */}
-      <div className="profile-hero-card">
+      <div className="profile-hero-card is-upgraded">
         <div className="profile-hero-left">
-          <div className="profile-avatar-wrapper">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" className="profile-avatar-img" />
-            ) : (
-              <div className="profile-avatar-fallback">
-                {(profile.fullName || user?.username || 'D').charAt(0).toUpperCase()}
-              </div>
+          <div className="profile-avatar-col">
+            <div className="profile-avatar-wrapper">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="profile-avatar-img" />
+              ) : (
+                <div className="profile-avatar-fallback">
+                  {(profile.fullName || user?.username || 'D').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleAvatarFileSelect}
+              />
+              <button
+                type="button"
+                className="profile-avatar-upload-btn"
+                title="Thay đổi ảnh đại diện"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+              </button>
+            </div>
+            {avatarUrl && (
+              <button
+                type="button"
+                className="profile-avatar-remove-btn"
+                onClick={handleRemoveAvatar}
+              >
+                Xóa ảnh
+              </button>
             )}
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleAvatarFileSelect}
-            />
-            <button
-              type="button"
-              className="profile-avatar-upload-btn"
-              title="Thay đổi ảnh đại diện"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-              </svg>
-            </button>
           </div>
 
           <div className="profile-hero-info">
@@ -459,26 +495,6 @@ export default function EoProfileTab() {
                 )}
               </span>
             </div>
-
-            {avatarUrl && (
-              <div style={{ marginTop: '0.25rem' }}>
-                <button
-                  type="button"
-                  onClick={handleRemoveAvatar}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#ef4444',
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    padding: 0,
-                    textDecoration: 'underline',
-                  }}
-                >
-                  Xóa ảnh đại diện tùy chỉnh
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -486,15 +502,36 @@ export default function EoProfileTab() {
           <div className="profile-stat-box">
             <div className="profile-stat-value">{profile.totalEventsCompleted ?? 0}</div>
             <div className="profile-stat-label">Sự kiện đã tổ chức</div>
+            {profile.totalEventsCreated > (profile.totalEventsCompleted ?? 0) && (
+              <div className="profile-stat-sub">
+                {profile.totalEventsCreated} tổng tạo (gồm nháp)
+              </div>
+            )}
           </div>
+
           <div className="profile-stat-box">
-            <div className="profile-stat-value" style={{ color: '#16a34a', fontSize: profile.ratingCount > 0 ? undefined : '1rem' }}>
+            <div className="profile-stat-value">{profile.totalConfirmedWorkers ?? 0}</div>
+            <div className="profile-stat-label">Nhân sự đã chốt ca</div>
+          </div>
+
+          <div className="profile-stat-box">
+            <div
+              className={`profile-stat-value ${
+                profile.ratingCount > 0 || ekycStatus === 'APPROVED' ? 'is-verified' : ''
+              }`}
+            >
               {profile.ratingCount > 0 && Number(profile.ratingAvg) > 0
                 ? `${Number(profile.ratingAvg).toFixed(1)} / 5.0`
-                : 'Chưa có'}
+                : ekycStatus === 'APPROVED'
+                ? 'Đã xác thực'
+                : 'Chưa đánh giá'}
             </div>
             <div className="profile-stat-label">
-              {profile.ratingCount > 0 ? `Đánh giá (${profile.ratingCount} lượt)` : 'Độ uy tín tuyển dụng'}
+              {profile.ratingCount > 0
+                ? `Đánh giá (${profile.ratingCount} lượt)`
+                : ekycStatus === 'APPROVED'
+                ? 'Uy tín eKYC • Chưa có sao'
+                : 'Độ uy tín tuyển dụng'}
             </div>
           </div>
         </div>
@@ -553,156 +590,154 @@ export default function EoProfileTab() {
 
       {/* 3. NỘI DUNG TỪNG PHÂN HỆ */}
 
-      {/* SECTION 1: THÔNG TIN NHÀ TỔ CHỨC */}
-      {activeSection === 'PROFILE' && (
-        <div className="profile-card">
-          <div className="profile-card-header">
-            <div className="profile-card-header-left">
-              <h3>Hồ Sơ Nhà Tổ Chức Sự Kiện</h3>
-              <p>Thông tin thương hiệu chính thức xuất hiện trên trang tuyển dụng và bảng phân công nhân sự.</p>
+      {/* SECTION 1: THÔNG TIN NHÀ TỔ CHỨC (GỌN GÀNG, TÍCH XANH TRỰC TIẾP TRÊN TỪNG MỤC) */}
+      {activeSection === 'PROFILE' && (() => {
+        const checks = [
+          { label: 'Đơn vị & Đại diện', done: Boolean(profile.companyName?.trim() && profile.fullName?.trim()) },
+          { label: 'Hotline', done: Boolean(profile.phone?.trim()) },
+          { label: 'Địa chỉ', done: Boolean(profile.address?.trim()) },
+          { label: 'eKYC', done: ekycStatus === 'APPROVED' },
+          { label: 'Sự kiện', done: (profile.totalEventsCompleted ?? 0) > 0 },
+        ];
+        const doneCount = checks.filter((c) => c.done).length;
+        const pct = Math.round((doneCount / checks.length) * 100);
+
+        const GreenTick = () => (
+          <span className="profile-field-check" title="Đã hoàn thiện">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </span>
+        );
+
+        return (
+          <div className="profile-card">
+            <div className="profile-card-header">
+              <div className="profile-card-header-left">
+                <h3>Hồ Sơ Nhà Tổ Chức Sự Kiện</h3>
+                <p>Thông tin thương hiệu chính thức xuất hiện trên trang tuyển dụng và bảng phân công nhân sự.</p>
+              </div>
+
+              <div className="profile-completeness-compact">
+                <div className="profile-completeness-head">
+                  <span>Hoàn thiện hồ sơ</span>
+                  <span className="profile-completeness-pct">{pct}%</span>
+                </div>
+                <div className="profile-progress-track">
+                  <div className="profile-progress-fill" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
             </div>
-          </div>
 
-          <form onSubmit={handleSaveProfile}>
-            <div className="profile-form-grid-2">
-              <div className="profile-form-group">
-                <label>Tên Đơn Vị / Ban Tổ Chức Sự Kiện *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={profile.companyName}
-                  onChange={(e) => handleProfileFieldChange('companyName', e.target.value)}
-                  placeholder="VD: Ban Tổ Chức Festival hoặc Tên Đơn Vị"
-                />
-              </div>
+            <div className="profile-completeness-tags">
+              {checks.map((item, idx) => (
+                <span key={idx} className={`profile-status-tag ${item.done ? 'is-done' : ''}`}>
+                  {item.done && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                  <span>{item.label}</span>
+                </span>
+              ))}
+            </div>
 
-              <div className="profile-form-group">
-                <label>Họ & Tên Trưởng Ban / Người Đại Diện *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={profile.fullName}
-                  onChange={(e) => handleProfileFieldChange('fullName', e.target.value)}
-                  placeholder="VD: Nguyễn Văn A"
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Số Điện Thoại Hotline / Zalo Điều Phối *</label>
-                <div className="profile-input-wrapper">
+            <form onSubmit={handleSaveProfile}>
+              <div className="profile-form-grid-2">
+                <div className="profile-form-group">
+                  <label className="profile-field-label-row">
+                    <span>Tên Đơn Vị / Ban Tổ Chức Sự Kiện *</span>
+                    {profile.companyName?.trim() && <GreenTick />}
+                  </label>
                   <input
-                    type={showSensitive.formPhone ? 'text' : 'password'}
+                    type="text"
+                    required
+                    className="profile-input"
+                    value={profile.companyName}
+                    onChange={(e) => handleProfileFieldChange('companyName', e.target.value)}
+                    placeholder="VD: Ban Tổ Chức Festival hoặc Tên Đơn Vị"
+                  />
+                </div>
+
+                <div className="profile-form-group">
+                  <label className="profile-field-label-row">
+                    <span>Họ &amp; Tên Trưởng Ban / Người Đại Diện *</span>
+                    {profile.fullName?.trim() && <GreenTick />}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="profile-input"
+                    value={profile.fullName}
+                    onChange={(e) => handleProfileFieldChange('fullName', e.target.value)}
+                    placeholder="VD: Nguyễn Văn A"
+                  />
+                </div>
+
+                <div className="profile-form-group">
+                  <label className="profile-field-label-row">
+                    <span>Số Điện Thoại Hotline / Zalo Điều Phối *</span>
+                    {profile.phone?.trim() && <GreenTick />}
+                  </label>
+                  <input
+                    type="tel"
                     required
                     className="profile-input"
                     value={profile.phone}
                     onChange={(e) => handleProfileFieldChange('phone', e.target.value)}
                     placeholder="VD: 0901234567"
                   />
-                  <button
-                    type="button"
-                    className="profile-input-eye-btn"
-                    onClick={() => toggleSensitive('formPhone')}
-                    title={showSensitive.formPhone ? 'Ẩn số điện thoại' : 'Hiện số điện thoại'}
-                  >
-                    {showSensitive.formPhone ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                        <line x1="1" y1="1" x2="23" y2="23"></line>
-                      </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                      </svg>
-                    )}
-                  </button>
                 </div>
-              </div>
 
-              <div className="profile-form-group">
-                <label>Email Nhận Báo Cáo & Hóa Đơn VAT (Tùy chọn)</label>
-                <div className="profile-input-wrapper">
+                <div className="profile-form-group">
+                  <label className="profile-field-label-row">
+                    <span>Email Tài Khoản &amp; Nhận Thông Báo</span>
+                    {profile.email?.trim() && <GreenTick />}
+                  </label>
                   <input
-                    type={showSensitive.formEmail ? 'text' : 'password'}
+                    type="email"
+                    readOnly
                     className="profile-input"
+                    style={{ backgroundColor: '#f8fafc', color: '#475569' }}
                     value={profile.email}
-                    onChange={(e) => handleProfileFieldChange('email', e.target.value)}
-                    placeholder="VD: contact@cani.vn"
+                    title="Email gắn với tài khoản đăng nhập và nhận mã OTP bảo mật"
                   />
-                  <button
-                    type="button"
-                    className="profile-input-eye-btn"
-                    onClick={() => toggleSensitive('formEmail')}
-                    title={showSensitive.formEmail ? 'Ẩn email' : 'Hiện email'}
-                  >
-                    {showSensitive.formEmail ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                        <line x1="1" y1="1" x2="23" y2="23"></line>
-                      </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                      </svg>
-                    )}
-                  </button>
+                </div>
+
+                <div className="profile-form-group span-2">
+                  <label className="profile-field-label-row">
+                    <span>Địa Chỉ Liên Hệ / Văn Phòng *</span>
+                    {profile.address?.trim() && <GreenTick />}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="profile-input"
+                    value={profile.address}
+                    onChange={(e) => handleProfileFieldChange('address', e.target.value)}
+                    placeholder="VD: Số 123 Đường Cầu Giấy, Hà Nội"
+                  />
                 </div>
               </div>
 
-              <div className="profile-form-group">
-                <label>Lĩnh Vực Hoạt Động Sự Kiện</label>
-                <input
-                  type="text"
-                  className="profile-input"
-                  value={profile.industry}
-                  onChange={(e) => handleProfileFieldChange('industry', e.target.value)}
-                  placeholder="VD: Festival âm nhạc, Sự kiện MICE, Hội chợ triển lãm"
-                />
+              <div className="profile-actions-bar">
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="profile-btn-primary"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                  {savingProfile ? 'Đang lưu...' : 'Lưu Thay Đổi Hồ Sơ'}
+                </button>
               </div>
-
-              <div className="profile-form-group span-2">
-                <label>Địa Chỉ Liên Hệ / Văn Phòng *</label>
-                <input
-                  type="text"
-                  required
-                  className="profile-input"
-                  value={profile.address}
-                  onChange={(e) => handleProfileFieldChange('address', e.target.value)}
-                  placeholder="VD: Số 123 Đường Cầu Giấy, Hà Nội"
-                />
-              </div>
-
-              <div className="profile-form-group span-2">
-                <label>Giới Thiệu Đơn Vị (Bio)</label>
-                <textarea
-                  className="profile-textarea"
-                  value={profile.bio}
-                  onChange={(e) => handleProfileFieldChange('bio', e.target.value)}
-                  placeholder="Mô tả ngắn về năng lực tổ chức sự kiện của bạn giúp nhân sự tin tưởng..."
-                />
-              </div>
-            </div>
-
-            <div className="profile-actions-bar">
-              <button
-                type="submit"
-                disabled={savingProfile}
-                className="profile-btn-primary"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                  <polyline points="7 3 7 8 15 8"></polyline>
-                </svg>
-                {savingProfile ? 'Đang lưu...' : 'Lưu Thay Đổi Hồ Sơ'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            </form>
+          </div>
+        );
+      })()}
 
       {/* SECTION 2: ĐỊNH DANH eKYC NHÀ TỔ CHỨC */}
       {activeSection === 'EKYC' && (

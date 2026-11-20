@@ -20,8 +20,8 @@ export const DisputeCenterView = () => {
   const isArbitrator = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
 
   const {
-    queue, myQueue, ccStaff, loading,
-    loadQueue, loadCcStaff, loadDisputeDetail,
+    queue, myQueue, myDisputes, ccStaff, loading,
+    loadQueue, loadMyDisputes, loadCcStaff, loadDisputeDetail,
     createDispute, addEvidence, assignDispute,
     issueDecision, escalateDispute,
   } = useDisputes(isArbitrator ? 'queue' : 'my');
@@ -35,8 +35,13 @@ export const DisputeCenterView = () => {
   const [queueFilter, setQueueFilter] = useState('ALL');
   const [queueScope, setQueueScope] = useState('ALL');
 
-  const scopedList = queueScope === 'MINE' ? myQueue : queue;
-  const riskCount = useMemo(() => queue.filter((item) => item.slaAtRisk).length, [queue]);
+  const scopedList = !isArbitrator
+    ? myDisputes
+    : queueScope === 'MINE'
+    ? myQueue
+    : queue;
+  const riskCount = useMemo(() => scopedList.filter((item) => item.slaAtRisk).length, [scopedList]);
+  const handleRefreshDisputes = () => (isArbitrator ? loadQueue() : loadMyDisputes());
 
   const filteredQueue = useMemo(() => {
     let list = scopedList;
@@ -113,9 +118,18 @@ export const DisputeCenterView = () => {
               Bảng hàng đợi
             </button>
           </div>
-          <button type="button" className="dispute-btn-secondary" onClick={() => loadQueue()}>
+          <button type="button" className="dispute-btn-secondary" onClick={handleRefreshDisputes}>
             Làm mới
           </button>
+          {!isArbitrator && (
+            <button
+              type="button"
+              className="dispute-btn-primary"
+              onClick={() => setModalType('create')}
+            >
+              + Gửi khiếu nại mới
+            </button>
+          )}
         </div>
       </div>
 
@@ -130,11 +144,12 @@ export const DisputeCenterView = () => {
             setQueueFilter={setQueueFilter}
             queueScope={queueScope}
             setQueueScope={setQueueScope}
-            totalCount={queue.length}
-            myCount={myQueue.length}
+            totalCount={scopedList.length}
+            myCount={isArbitrator ? myQueue.length : myDisputes.length}
             riskCount={riskCount}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
+            showScopeSwitcher={isArbitrator}
           />
           <div className="dispute-split-workspace">
             {currentDispute ? (
@@ -165,6 +180,7 @@ export const DisputeCenterView = () => {
         <DisputeQueueTable
           queue={filteredQueue}
           loading={loading}
+          isArbitrator={isArbitrator}
           onSelect={(id) => {
             handleSelectDispute(id);
             setViewMode('SPLIT');

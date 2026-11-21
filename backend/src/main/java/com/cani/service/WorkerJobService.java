@@ -5,7 +5,6 @@ import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentSource;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.AttendanceStatus;
-import com.cani.entity.enums.MembershipStatus;
 import com.cani.entity.enums.PaymentStatus;
 import com.cani.entity.enums.ProposalStatus;
 import com.cani.entity.enums.ShiftStatus;
@@ -194,7 +193,8 @@ public class WorkerJobService {
                 .status(AssignmentStatus.CONFIRMED)
                 .eoConfirmed(false)
                 .build();
-        attachGroupInfoIfPresent(assignment, worker);
+        attachGroupInfoIfPresent(assignment, worker,
+                proposal.getSource() == AssignmentSource.GROUP ? proposal.getGroupId() : null);
         assignment = shiftAssignmentRepository.save(assignment);
 
         // Tạo bản ghi theo dõi thanh toán trực tiếp (Non-Escrow)
@@ -684,7 +684,7 @@ public class WorkerJobService {
                 .status(AssignmentStatus.CONFIRMED)
                 .eoConfirmed(false)
                 .build();
-        attachGroupInfoIfPresent(assignment, worker);
+        // Ứng tuyển cá nhân (DIRECT) không gán group info
         assignment = shiftAssignmentRepository.save(assignment);
 
         directPaymentService.createInitialPayment(assignment);
@@ -1668,17 +1668,19 @@ public class WorkerJobService {
         return scannedShiftId;
     }
 
-    private void attachGroupInfoIfPresent(ShiftAssignment assignment, Worker worker) {
-        if (workerGroupMembershipRepository == null || worker == null || assignment == null) return;
+    /**
+     * Chỉ gán group info khi groupId được truyền (assignment source=GROUP);
+     * assignment cá nhân truyền null để không làm ô nhiễm thống kê nhóm.
+     */
+    private void attachGroupInfoIfPresent(ShiftAssignment assignment, Worker worker, UUID groupId) {
+        if (groupId == null || workerGroupMembershipRepository == null || worker == null || assignment == null) return;
         try {
-            List<WorkerGroupMembership> activeMemberships = workerGroupMembershipRepository
-                    .findByWorker_WorkerIdAndStatus(worker.getWorkerId(), MembershipStatus.ACTIVE);
-            if (!activeMemberships.isEmpty()) {
-                WorkerGroupMembership m = activeMemberships.get(0);
-                if (m.getWorkerGroup() != null) {
-                    assignment.setGroupId(m.getWorkerGroup().getGroupId());
-                    assignment.setIsGroupLeader(worker.getWorkerId().equals(m.getWorkerGroup().getLeaderWorkerId()));
-                }
+            WorkerGroupMembership m = workerGroupMembershipRepository
+                    .findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, worker.getWorkerId())
+                    .orElse(null);
+            assignment.setGroupId(groupId);
+            if (m != null) {
+                assignment.setIsGroupLeader(m.getRoleInGroup() == com.cani.entity.enums.GroupRole.LEADER);
             }
         } catch (Exception ex) {
             log.warn("Không thể gán group info cho assignment: {}", ex.getMessage());

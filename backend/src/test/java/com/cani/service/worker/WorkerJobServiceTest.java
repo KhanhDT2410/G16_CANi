@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -76,6 +77,9 @@ class WorkerJobServiceTest {
 
     @Mock
     private PaymentRepository paymentRepository;
+
+    @Mock
+    private WorkerGroupMembershipRepository workerGroupMembershipRepository;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper()
@@ -1588,6 +1592,109 @@ class WorkerJobServiceTest {
         assertThatThrownBy(() -> workerJobService.getAssignmentHistory(userId, null, pageable))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Không tìm thấy thông tin Worker");
+    }
+
+    // =========================================================================
+    // P10. Group info attachment - chỉ gán khi source=GROUP
+    // =========================================================================
+    private WorkerGroup groupFixture(UUID groupId) {
+        return WorkerGroup.builder()
+                .groupId(groupId)
+                .name("Đội An Ninh")
+                .leaderWorkerId(worker.getWorkerId())
+                .build();
+    }
+
+    private WorkerGroupMembership membershipFixture(WorkerGroup group, GroupRole role) {
+        return WorkerGroupMembership.builder()
+                .membershipId(UUID.randomUUID())
+                .workerGroup(group)
+                .worker(worker)
+                .roleInGroup(role)
+                .status(MembershipStatus.ACTIVE)
+                .build();
+    }
+
+    private DispatchProposal proposalFixture(UUID proposalId, AssignmentSource source, UUID groupId) {
+        return DispatchProposal.builder()
+                .proposalId(proposalId)
+                .shift(activeShift)
+                .worker(worker)
+                .source(source)
+                .groupId(groupId)
+                .status(ProposalStatus.PENDING)
+                .expiresAt(Instant.now().plus(2, ChronoUnit.HOURS))
+                .build();
+    }
+
+    private void mockAcceptFlow(UUID proposalId, AssignmentSource source, UUID groupId) {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(proposalId))
+                .thenReturn(Optional.of(proposalFixture(proposalId, source, groupId)));
+        when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any())).thenReturn(List.of());
+        when(shiftRepository.incrementConfirmedWorkersAtomic(activeShift.getShiftId())).thenReturn(1);
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> {
+            ShiftAssignment sa = i.getArgument(0);
+            sa.setAssignmentId(UUID.randomUUID());
+            return sa;
+        });
+    }
+
+    @Test
+    @DisplayName("P10 - acceptProposal() - Normal: Proposal source=GROUP gán groupId + isGroupLeader=false (role MEMBER)")
+    void acceptProposal_GroupSource_AttachesGroupIdAndLeaderFlagPerRole() {
+        UUID groupId = UUID.randomUUID();
+        UUID proposalId = UUID.randomUUID();
+        WorkerGroup group = groupFixture(groupId);
+
+        mockAcceptFlow(proposalId, AssignmentSource.GROUP, groupId);
+        when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, worker.getWorkerId()))
+                .thenReturn(Optional.of(membershipFixture(group, GroupRole.MEMBER)));
+
+        workerJobService.acceptProposal(userId, proposalId);
+
+        ArgumentCaptor<ShiftAssignment> captor = ArgumentCaptor.forClass(ShiftAssignment.class);
+        verify(shiftAssignmentRepository).save(captor.capture());
+        ShiftAssignment saved = captor.getValue();
+        assertThat(saved.getGroupId()).isEqualTo(groupId);
+        assertThat(saved.getIsGroupLeader()).isFalse();
+    }
+
+    @Test
+    @DisplayName("P10 - acceptProposal() - Normal: Proposal source=GROUP, role=LEADER gán isGroupLeader=true")
+    void acceptProposal_GroupSource_LeaderRoleSetsIsGroupLeaderTrue() {
+        UUID groupId = UUID.randomUUID();
+        UUID proposalId = UUID.randomUUID();
+        WorkerGroup group = groupFixture(groupId);
+
+        mockAcceptFlow(proposalId, AssignmentSource.GROUP, groupId);
+        when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, worker.getWorkerId()))
+                .thenReturn(Optional.of(membershipFixture(group, GroupRole.LEADER)));
+
+        workerJobService.acceptProposal(userId, proposalId);
+
+        ArgumentCaptor<ShiftAssignment> captor = ArgumentCaptor.forClass(ShiftAssignment.class);
+        verify(shiftAssignmentRepository).save(captor.capture());
+        ShiftAssignment saved = captor.getValue();
+        assertThat(saved.getGroupId()).isEqualTo(groupId);
+        assertThat(saved.getIsGroupLeader()).isTrue();
+    }
+
+    @Test
+    @DisplayName("P10 - acceptProposal() - Regression: Proposal cá nhân source=MATCHING không gán groupId, không dò membership")
+    void acceptProposal_MatchingSource_KeepsGroupIdNullAndDoesNotGuessGroup() {
+        UUID proposalId = UUID.randomUUID();
+        mockAcceptFlow(proposalId, AssignmentSource.MATCHING, null);
+
+        workerJobService.acceptProposal(userId, proposalId);
+
+        ArgumentCaptor<ShiftAssignment> captor = ArgumentCaptor.forClass(ShiftAssignment.class);
+        verify(shiftAssignmentRepository).save(captor.capture());
+        ShiftAssignment saved = captor.getValue();
+        assertThat(saved.getGroupId()).isNull();
+        assertThat(saved.getIsGroupLeader()).isFalse();
+        verify(workerGroupMembershipRepository, never()).findByWorker_WorkerIdAndStatus(any(), any());
+        verify(workerGroupMembershipRepository, never()).findByWorkerGroup_GroupIdAndWorker_WorkerId(any(), any());
     }
 
 }

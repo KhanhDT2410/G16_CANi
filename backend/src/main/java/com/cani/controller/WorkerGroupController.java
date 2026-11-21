@@ -187,4 +187,70 @@ public class WorkerGroupController {
         workerGroupService.removeMember(userId, id, workerId);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã cập nhật trạng thái thành viên nhóm"));
     }
+
+    /**
+     * Task 3: Xem danh sách đề xuất ca làm việc gửi cho nhóm (chỉ Leader hoặc ADMIN)
+     */
+    @Operation(summary = "Đề xuất ca cho nhóm", description = "Lấy danh sách đề xuất ca (PENDING + EXPIRED 24h qua) gửi đến nhóm, chỉ Trưởng nhóm hoặc Admin.")
+    @PreAuthorize("hasAnyRole('WORKER','ADMIN')")
+    @GetMapping("/{id}/group-proposals")
+    public ResponseEntity<ApiResponse<List<GroupProposalResponseDto>>> listGroupProposals(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<GroupProposalResponseDto> list = workerGroupService.listGroupProposals(userId, id);
+        return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách đề xuất ca cho nhóm thành công"));
+    }
+
+    /**
+     * Task 3: Re-check thành viên đủ điều kiện của một đề xuất ca (chỉ Leader hoặc ADMIN)
+     */
+    @Operation(summary = "Thành viên đủ điều kiện", description = "Re-check (không tạo data) trạng thái đủ điều kiện từng thành viên ACTIVE cho một đề xuất ca.")
+    @PreAuthorize("hasAnyRole('WORKER','ADMIN')")
+    @GetMapping("/{id}/group-proposals/eligible")
+    public ResponseEntity<ApiResponse<GroupProposalResponseDto>> getGroupProposalEligible(
+            @PathVariable UUID id,
+            @RequestParam UUID proposalId,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        GroupProposalResponseDto dto = workerGroupService.getEligibleMembers(userId, id, proposalId);
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Lấy danh sách thành viên đủ điều kiện thành công"));
+    }
+
+    /**
+     * Task 3: Leader chấp nhận đề xuất ca cho nhóm (toàn bộ hoặc không, giữ slot atomic)
+     */
+    @Operation(summary = "Chấp nhận đề xuất ca cho nhóm", description = "Trưởng nhóm chọn thành viên nhận ca; k×(gán ca + thanh toán + counter + FCM), rollback toàn bộ nếu thất bại.")
+    @PreAuthorize("hasAnyRole('WORKER','ADMIN')")
+    @PostMapping("/{id}/group-proposals/{proposalId}/accept")
+    public ResponseEntity<ApiResponse<AcceptGroupProposalResponseDto>> acceptGroupProposal(
+            @PathVariable UUID id,
+            @PathVariable UUID proposalId,
+            @Valid @RequestBody GroupProposalAcceptRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        AcceptGroupProposalResponseDto dto = workerGroupService.acceptGroupProposal(
+                userId, id, proposalId, request.getMemberWorkerIds());
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Đội của bạn đã nhận ca làm việc thành công!"));
+    }
+
+    /**
+     * Task 3: Leader từ chối đề xuất ca cho nhóm (re-dispatch slot còn thiếu)
+     */
+    @Operation(summary = "Từ chối đề xuất ca cho nhóm", description = "Trưởng nhóm từ chối đề xuất ca; hệ thống sẽ dispatch lại slot còn thiếu cho các kênh khác.")
+    @PreAuthorize("hasAnyRole('WORKER','ADMIN')")
+    @PostMapping("/{id}/group-proposals/{proposalId}/reject")
+    public ResponseEntity<ApiResponse<Void>> rejectGroupProposal(
+            @PathVariable UUID id,
+            @PathVariable UUID proposalId,
+            @Valid @RequestBody GroupProposalRejectRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        workerGroupService.rejectGroupProposal(userId, id, proposalId, request.getReason());
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã từ chối đề xuất ca cho nhóm"));
+    }
 }

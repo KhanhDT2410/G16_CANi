@@ -756,17 +756,25 @@ public class MatchingDispatchService {
      * Tiêu chí thành viên đủ điều kiện nhận proposal kênh group.
      * Giống passHardFilter nhưng BỎ kiểm tra isOnline (leader tự cử thành viên) và blocklist per-member.
      */
-    private boolean isGroupChannelMemberEligible(Worker worker, Shift shift) {
+    boolean isGroupChannelMemberEligible(Worker worker, Shift shift) {
+        return groupMemberEligibilityReason(worker, shift) == null;
+    }
+
+    /**
+     * Kênh group: trả code lý do thành viên KHÔNG đủ điều kiện; null = đủ điều kiện.
+     * Dùng chung: dispatch group (Task 2) và re-check khi leader accept (Task 3).
+     */
+    public String groupMemberEligibilityReason(Worker worker, Shift shift) {
         if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
-            return false;
+            return "KYC_UNAPPROVED";
         }
         if (worker.getUser() == null || worker.getUser().getStatus() != UserStatus.ACTIVE) {
-            return false;
+            return "USER_INACTIVE";
         }
         int minRs = shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0
                 ? shift.getMinReliabilityScore() : MIN_RELIABILITY_SCORE;
         if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
-            return false;
+            return "LOW_RELIABILITY";
         }
         if (shift.getMinExperienceLevel() != null) {
             int requiredShifts = switch (shift.getMinExperienceLevel()) {
@@ -777,7 +785,7 @@ public class MatchingDispatchService {
             };
             int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
             if (completed < requiredShifts) {
-                return false;
+                return "LOW_EXPERIENCE";
             }
         }
         if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
@@ -792,7 +800,7 @@ public class MatchingDispatchService {
                                 .map(ws -> ws.getSkill().getSkillId())
                                 .collect(Collectors.toSet());
                 if (!haveSkillIds.containsAll(requiredSkillIds)) {
-                    return false;
+                    return "MISSING_SKILLS";
                 }
             }
         }
@@ -804,17 +812,17 @@ public class MatchingDispatchService {
         List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
                 worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
         if (!conflicts.isEmpty()) {
-            return false;
+            return "SHIFT_CONFLICT";
         }
         if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0) {
             if (shift.getHourlyWage() != null && shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
-                return false;
+                return "WAGE_BELOW_MIN";
             }
         }
         if (!isShiftCoveredByAvailability(worker, shift)) {
-            return false;
+            return "UNAVAILABLE";
         }
-        return true;
+        return null;
     }
 
     private double getConfigDouble(String key, double defaultValue) {

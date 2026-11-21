@@ -166,6 +166,8 @@ class WorkerJobServiceTest {
                         .declaredAmount(BigDecimal.valueOf(150000))
                         .build()
         ));
+
+        org.springframework.test.util.ReflectionTestUtils.setField(workerJobService, "workerGroupMembershipRepository", workerGroupMembershipRepository);
     }
 
     // =========================================================================

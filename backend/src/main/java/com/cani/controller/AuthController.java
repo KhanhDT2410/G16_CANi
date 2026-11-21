@@ -55,6 +55,18 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(response, "Lấy thông tin người dùng thành công"));
     }
 
+    @PutMapping("/me")
+    public ResponseEntity<ApiResponse<UserDto>> updateBasicProfile(
+            @Valid @RequestBody UpdateBasicProfileRequest request,
+            Authentication authentication
+    ) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new BadRequestException("Phiên đăng nhập không hợp lệ");
+        }
+        UserDto response = authService.updateBasicProfile(user.getUserId(), request);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Bổ sung thông tin tài khoản thành công"));
+    }
+
     @PostMapping("/verify-otp")
     public ResponseEntity<ApiResponse<Void>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
         authService.verifyOtp(request);

@@ -77,6 +77,21 @@ class AuthApi {
     return UserDto.fromJson(data);
   }
 
+  Future<UserDto> updateBasicProfile({
+    required String fullName,
+    required String phone,
+  }) async {
+    final response = await _dio.put<Map<String, Object?>>(
+      '/auth/me',
+      data: {
+        'fullName': fullName.trim(),
+        'phone': phone.trim(),
+      },
+    );
+    final data = (response.data?['data'] as Map<String, Object?>?) ?? <String, Object?>{};
+    return UserDto.fromJson(data);
+  }
+
   Future<void> verifyOtp(String email, String token) async {
     await _dio.post<void>(
       '/auth/verify-otp',

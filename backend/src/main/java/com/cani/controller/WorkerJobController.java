@@ -369,6 +369,23 @@ public class WorkerJobController {
     }
 
     /**
+     * Nộp hoặc cập nhật ảnh bằng chứng nghiệm thu ca làm trước khi EO duyệt công
+     * PUT /api/v1/workers/assignments/{assignmentId}/proof
+     */
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PutMapping("/assignments/{assignmentId}/proof")
+    public ResponseEntity<ApiResponse<Void>> submitAssignmentProof(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @RequestBody java.util.Map<String, String> body,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        String proofImageUrl = body != null ? body.get("proofImageUrl") : null;
+        workerJobService.submitAssignmentProof(userId, assignmentId, proofImageUrl);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã cập nhật ảnh bằng chứng nghiệm thu ca làm!"));
+    }
+
+    /**
      * Tải ảnh bằng chứng nghiệm thu hoàn thành ca làm việc lên máy chủ
      * POST /api/v1/workers/upload-proof
      */

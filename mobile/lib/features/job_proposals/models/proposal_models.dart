@@ -74,6 +74,7 @@ class ShiftAssignmentItem {
   final double hourlyWage;
   final double totalPay;
   final String status;
+  final bool eoConfirmed;
   final String paymentStatus; // NOT_DECLARED, DECLARED_PENDING_WORKER, CONFIRMED_FULL, CONFIRMED_PARTIAL, DISPUTED
   final double declaredAmount;
   final String? paymentMethod;
@@ -107,6 +108,7 @@ class ShiftAssignmentItem {
     required this.hourlyWage,
     required this.totalPay,
     required this.status,
+    this.eoConfirmed = false,
     required this.paymentStatus,
     required this.declaredAmount,
     this.paymentMethod,
@@ -142,6 +144,7 @@ class ShiftAssignmentItem {
       hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
       totalPay: (json['totalPay'] is num) ? (json['totalPay'] as num).toDouble() : 0.0,
       status: json['status'] ?? 'CONFIRMED',
+      eoConfirmed: json['eoConfirmed'] == true,
       paymentStatus: json['paymentStatus'] ?? 'NOT_DECLARED',
       declaredAmount: (json['declaredAmount'] is num) ? (json['declaredAmount'] as num).toDouble() : 0.0,
       paymentMethod: json['paymentMethod'],
@@ -326,7 +329,7 @@ class ShiftChecklistItem {
     this.completedAt,
     this.evidenceImageUrl,
     this.evidenceSubmittedAt,
-    this.isRequiredEvidence = true,
+    this.isRequiredEvidence = false,
   });
 
   factory ShiftChecklistItem.fromJson(Map<String, dynamic> json) {
@@ -338,7 +341,7 @@ class ShiftChecklistItem {
       completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt'].toString())?.toLocal() : null,
       evidenceImageUrl: json['evidenceImageUrl'],
       evidenceSubmittedAt: json['evidenceSubmittedAt'] != null ? DateTime.tryParse(json['evidenceSubmittedAt'].toString())?.toLocal() : null,
-      isRequiredEvidence: json['isRequiredEvidence'] ?? true,
+      isRequiredEvidence: json['isRequiredEvidence'] ?? json['requiresEvidence'] ?? false,
     );
   }
 

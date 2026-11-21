@@ -28,6 +28,7 @@ class GroupEligibleMemberModel {
 class GroupProposalModel {
   final String proposalId;
   final String? groupId;
+  final String? shiftId;
   final String? eventName;
   final String? jobType;
   final DateTime? startTime;
@@ -47,6 +48,7 @@ class GroupProposalModel {
   const GroupProposalModel({
     required this.proposalId,
     this.groupId,
+    this.shiftId,
     this.eventName,
     this.jobType,
     this.startTime,
@@ -69,6 +71,7 @@ class GroupProposalModel {
     return GroupProposalModel(
       proposalId: json['proposalId']?.toString() ?? '',
       groupId: json['groupId']?.toString(),
+      shiftId: json['shiftId']?.toString(),
       eventName: json['eventName']?.toString(),
       jobType: json['jobType']?.toString(),
       startTime: json['startTime'] != null

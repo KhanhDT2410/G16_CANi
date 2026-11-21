@@ -153,7 +153,7 @@ class _GroupProposalMemberSheetState
           const SizedBox(height: 12),
           Row(
             children: [
-              if (eligibleMembers.isNotEmpty)
+              if (eligibleMembers.isNotEmpty && maxSlots > 0)
                 OutlinedButton.icon(
                   onPressed: () {
                     final all = eligibleMembers

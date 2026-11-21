@@ -138,11 +138,14 @@ class _WorkerGroupDetailScreenState
   // ==================== Task 7: Lời mời ca cho đội (chỉ leader) ====================
 
   bool _isCurrentUserLeader(WorkerGroupsState state) {
-    final userId = ref.watch(authStateProvider).user?.id;
-    if (userId == null) return false;
-    return state.currentGroupMembers.any(
-          (m) => m.userId == userId && m.isLeader,
-        );
+    final authUser = ref.watch(authStateProvider).user;
+    if (authUser == null) return false;
+    // Compare workerId: find current user's workerId from group members, then check if they're leader
+    final myMembership = state.currentGroupMembers
+        .where((m) => m.userId == authUser.id)
+        .firstOrNull;
+    if (myMembership == null) return false;
+    return myMembership.isLeader;
   }
 
   void _rejectProposal(GroupProposalModel proposal) {

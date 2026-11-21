@@ -31,6 +31,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -235,34 +236,32 @@ public class MatchingDispatchService {
     @Scheduled(cron = "0 */5 * * * *")
     @Transactional
     public void expireStalePendingProposals() {
-        List<DispatchProposal> pending = dispatchProposalRepository.findByStatus(ProposalStatus.PENDING);
         Instant now = Instant.now();
-        List<DispatchProposal> stale = pending.stream()
-                .filter(p -> shouldExpirePendingProposal(p, now))
-                .toList();
+        // Time rule: bounded DB query, không quét cả bảng PENDING.
+        List<DispatchProposal> stale = new ArrayList<>(
+                dispatchProposalRepository.findByStatusAndExpiresAtBefore(ProposalStatus.PENDING, now));
+        // Orphan rule: group PENDING trong 24h, leader hiện tại khác worker đã lưu (batch load groups).
+        List<DispatchProposal> groupRecent = dispatchProposalRepository
+                .findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(
+                        ProposalStatus.PENDING, now.minus(24, TimeUnit.HOURS));
+        Map<UUID, WorkerGroup> groups = workerGroupRepository
+                .findAllById(groupRecent.stream().map(DispatchProposal::getGroupId).distinct().toList())
+                .stream().collect(Collectors.toMap(WorkerGroup::getGroupId, g -> g));
+        stale.addAll(groupRecent.stream()
+                .filter(p -> p.getExpiresAt() == null || !p.getExpiresAt().isBefore(now))
+                .filter(p -> p.getWorker() != null)
+                .filter(p -> {
+                    WorkerGroup group = groups.get(p.getGroupId());
+                    return group != null
+                            && !p.getWorker().getWorkerId().equals(group.getLeaderWorkerId());
+                })
+                .toList());
         if (stale.isEmpty()) {
             return;
         }
         stale.forEach(p -> p.setStatus(ProposalStatus.EXPIRED));
         dispatchProposalRepository.saveAll(stale);
         log.info("Đã chuyển {} proposal PENDING hết hạn/đội trưởng đã thay đổi sang EXPIRED.", stale.size());
-    }
-
-    /**
-     * Hết hạn theo thời gian (mọi proposal) HOẶC proposal group mà leader hiện tại khác
-     * worker đã lưu trong proposal (leader đã chuyển nhượng) -> EXPIRED.
-     */
-    private boolean shouldExpirePendingProposal(DispatchProposal p, Instant now) {
-        if (p.getExpiresAt() != null && p.getExpiresAt().isBefore(now)) {
-            return true;
-        }
-        if (p.getGroupId() == null) {
-            return false;
-        }
-        WorkerGroup group = workerGroupRepository.findById(p.getGroupId()).orElse(null);
-        return group != null
-                && p.getWorker() != null
-                && !p.getWorker().getWorkerId().equals(group.getLeaderWorkerId());
     }
 
     /**

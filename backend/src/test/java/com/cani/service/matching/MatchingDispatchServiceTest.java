@@ -880,27 +880,34 @@ class MatchingDispatchServiceTest {
                     .isActive(true)
                     .build();
 
+            Instant now = Instant.now();
             DispatchProposal orphaned = DispatchProposal.builder()
                     .shift(sampleShift)
                     .worker(oldLeader)
                     .groupId(g.getGroupId())
                     .status(ProposalStatus.PENDING)
-                    .expiresAt(Instant.now().plus(Duration.ofHours(1)))
+                    .createdAt(now)
+                    .expiresAt(now.plus(Duration.ofHours(1)))
                     .build();
             DispatchProposal individual = DispatchProposal.builder()
                     .shift(sampleShift)
                     .worker(onlineWorker)
                     .status(ProposalStatus.PENDING)
-                    .expiresAt(Instant.now().plus(Duration.ofHours(1)))
+                    .createdAt(now)
+                    .expiresAt(now.plus(Duration.ofHours(1)))
                     .build();
 
-            when(dispatchProposalRepository.findByStatus(ProposalStatus.PENDING)).thenReturn(List.of(orphaned, individual));
-            when(workerGroupRepository.findById(g.getGroupId())).thenReturn(Optional.of(g));
+            when(dispatchProposalRepository.findByStatusAndExpiresAtBefore(ProposalStatus.PENDING, any(Instant.class)))
+                    .thenReturn(List.of());
+            when(dispatchProposalRepository.findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(ProposalStatus.PENDING, any(Instant.class)))
+                    .thenReturn(List.of(orphaned));
+            when(workerGroupRepository.findAllById(List.of(g.getGroupId()))).thenReturn(List.of(g));
 
             matchingDispatchService.expireStalePendingProposals();
 
             assertEquals(ProposalStatus.EXPIRED, orphaned.getStatus());
             assertEquals(ProposalStatus.PENDING, individual.getStatus());
+            verify(dispatchProposalRepository).saveAll(List.of(orphaned));
         }
 
         @Test
@@ -914,16 +921,21 @@ class MatchingDispatchServiceTest {
                     .isActive(true)
                     .build();
 
+            Instant now = Instant.now();
             DispatchProposal valid = DispatchProposal.builder()
                     .shift(sampleShift)
                     .worker(leader)
                     .groupId(g.getGroupId())
                     .status(ProposalStatus.PENDING)
-                    .expiresAt(Instant.now().plus(Duration.ofHours(1)))
+                    .createdAt(now)
+                    .expiresAt(now.plus(Duration.ofHours(1)))
                     .build();
 
-            when(dispatchProposalRepository.findByStatus(ProposalStatus.PENDING)).thenReturn(List.of(valid));
-            when(workerGroupRepository.findById(g.getGroupId())).thenReturn(Optional.of(g));
+            when(dispatchProposalRepository.findByStatusAndExpiresAtBefore(ProposalStatus.PENDING, any(Instant.class)))
+                    .thenReturn(List.of());
+            when(dispatchProposalRepository.findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(ProposalStatus.PENDING, any(Instant.class)))
+                    .thenReturn(List.of(valid));
+            when(workerGroupRepository.findAllById(List.of(g.getGroupId()))).thenReturn(List.of(g));
 
             matchingDispatchService.expireStalePendingProposals();
 

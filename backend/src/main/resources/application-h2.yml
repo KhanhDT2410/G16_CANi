@@ -35,7 +35,8 @@ cani:
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      sandbox-fallback-enabled: ${GEMINI_SANDBOX_FALLBACK:false}
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
   subscription:

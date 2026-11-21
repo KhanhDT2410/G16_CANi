@@ -41,12 +41,18 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import org.springframework.context.annotation.Import;
 import com.cani.config.SecurityConfig;
+import com.cani.entity.enums.AdminReviewDecision;
+import com.cani.exception.AppException;
+import com.cani.service.skill.DocumentAccessTokenService;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -54,7 +60,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = {AuthController.class, SkillVerificationController.class})
-@Import({SecurityConfig.class, UserAuthorityFilter.class, RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class})
+@Import({
+        SecurityConfig.class,
+        UserAuthorityFilter.class,
+        RestAuthenticationEntryPoint.class,
+        RestAccessDeniedHandler.class,
+        DocumentAccessTokenService.class
+})
 class SkillVerificationFlowTest {
 
     @Autowired
@@ -62,6 +74,9 @@ class SkillVerificationFlowTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private DocumentAccessTokenService documentAccessTokenService;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -394,5 +409,93 @@ class SkillVerificationFlowTest {
                 .andExpect(jsonPath("$.message").value("Admin đã phê duyệt kỹ năng và cộng +25 SP_verify"))
                 .andExpect(jsonPath("$.data.status").value("APPROVED"))
                 .andExpect(jsonPath("$.data.spAwarded").value(25));
+    }
+
+    @Test
+    @DisplayName("Step 8 (Security V2): Unauthenticated request to /documents/{filename} without signed URL returns 401 Unauthorized")
+    void step8_documentDownload_Unauthenticated_Returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/workers/skills/documents/cert_private123.jpg"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Step 9 (Security V2): Expired or tampered signed URL returns 401 Unauthorized")
+    void step9_documentDownload_ExpiredSignedUrl_Returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/workers/skills/documents/cert_private123.jpg")
+                        .param("expires", "1000000")
+                        .param("sig", "invalid-or-expired-signature"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Step 10 (Security V2): Valid short-lived HMAC signed URL serves document (200 OK)")
+    void step10_documentDownload_ValidSignedUrl_Returns200() throws Exception {
+        String filename = "cert_signed123.jpg";
+        String signedUrl = documentAccessTokenService.generateSignedDocumentUrl(filename);
+
+        when(verificationService.loadAuthorizedCertificateDocument(eq(filename), eq(null), anyString(), anyString()))
+                .thenReturn(new ByteArrayResource(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}) {
+                    @Override
+                    public String getFilename() {
+                        return filename;
+                    }
+                });
+
+        mockMvc.perform(get(signedUrl))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "private, no-store"));
+    }
+
+    @Test
+    @DisplayName("Step 11 (Security V2): Worker accessing another worker's certificate document returns 403 Forbidden")
+    void step11_documentDownload_OtherWorker_Returns403() throws Exception {
+        String filename = "cert_other_worker.jpg";
+        when(verificationService.loadAuthorizedCertificateDocument(eq(filename), eq(workerUser), eq(null), eq(null)))
+                .thenThrow(new AppException("Bạn không có quyền truy cập tài liệu chứng chỉ này", HttpStatus.FORBIDDEN));
+
+        mockMvc.perform(get("/api/v1/workers/skills/documents/" + filename)
+                        .with(authentication(createAuthToken(workerUser))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Step 12 (Security V2): Worker cannot call Admin retry or queue endpoints (403 Forbidden)")
+    void step12_adminRetryAndQueue_ForbiddenForWorker() throws Exception {
+        UUID verificationId = UUID.randomUUID();
+        mockMvc.perform(get("/api/v1/workers/skills/admin/queue")
+                        .with(authentication(createAuthToken(workerUser))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/retry")
+                        .with(csrf())
+                        .with(authentication(createAuthToken(workerUser))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Step 13 (Admin V2): Admin requests additional document via decision=NEEDS_MORE_INFO")
+    void step13_adminReview_NeedsMoreInfo_Success() throws Exception {
+        UUID verificationId = UUID.randomUUID();
+        SkillVerificationResponseDto moreInfoDto = SkillVerificationResponseDto.builder()
+                .id(verificationId)
+                .workerId(workerId)
+                .status(SkillVerificationStatus.NEEDS_MORE_INFO)
+                .spAwarded(0)
+                .reviewNotes("Ảnh mờ phần dấu mộc, vui lòng chụp lại")
+                .build();
+
+        when(verificationService.adminReview(
+                eq(verificationId), eq(adminUser.getUserId()), eq(AdminReviewDecision.NEEDS_MORE_INFO),
+                eq("Ảnh mờ phần dấu mộc, vui lòng chụp lại")))
+                .thenReturn(moreInfoDto);
+
+        mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
+                        .param("decision", "NEEDS_MORE_INFO")
+                        .param("reviewNotes", "Ảnh mờ phần dấu mộc, vui lòng chụp lại")
+                        .with(csrf())
+                        .with(authentication(createAuthToken(adminUser))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("NEEDS_MORE_INFO"))
+                .andExpect(jsonPath("$.data.spAwarded").value(0));
     }
 }

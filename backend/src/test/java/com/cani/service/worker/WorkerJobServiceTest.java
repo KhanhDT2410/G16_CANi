@@ -445,6 +445,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC016 - checkinAssignment() - Normal: Quét mã QR hợp lệ, điểm danh đúng giờ thành công")
     void checkinAssignment_Success_OnTimeCheckin() {
+        activeShift.setStartTime(Instant.now().minus(5, ChronoUnit.MINUTES));
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
@@ -569,6 +570,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC019c - checkinAssignment() - Abnormal: Khoảng cách GPS vượt quá 200m ném BadRequestException")
     void checkinAssignment_Abnormal_DistanceGreaterThan200mThrowsBadRequestException() {
+        activeShift.setStartTime(Instant.now().minus(5, ChronoUnit.MINUTES));
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
@@ -1095,6 +1097,7 @@ class WorkerJobServiceTest {
         activeShift.setChecklist("[\"Nhiệm vụ 1\", \"Nhiệm vụ 2\"]");
         ShiftAssignment sa = ShiftAssignment.builder()
                 .assignmentId(assignmentId).shift(activeShift).worker(worker)
+                .status(AssignmentStatus.CHECKED_IN)
                 .checklistProgress("{\"chk_1\":{\"isCompleted\":true}}").build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));

@@ -431,7 +431,7 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .institution("Trường Cao đẳng Du lịch Sài Gòn")
                                                 .issueDate("15/06/2025")
                                                 .extractedSkills(
-                                                                "[\"Lễ tân / Check-in\", \"Giao tiếp tiếng Anh sự kiện\"]")
+                                                                "[{\"skillName\":\"Nghiệp vụ Lễ tân Sự kiện\",\"taxonomyRole\":\"Lễ tân / Check-in\",\"confidenceScore\":0.95,\"evidenceSnippet\":\"Hoàn thành khóa đào tạo Nghiệp vụ Lễ tân Sự kiện\"}]")
                                                 .hasSealOrSignature(true)
                                                 .overallConfidence(new BigDecimal("0.92"))
                                                 .routingDecision(RoutingDecision.AUTO_APPROVE)
@@ -450,7 +450,8 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .recipientName("NGUYỄN VĂN AN")
                                                 .institution("Trung tâm Đào tạo Pha chế Á Âu")
                                                 .issueDate("10/09/2025")
-                                                .extractedSkills("[\"Pha chế (Bartender/Barista)\"]")
+                                                .extractedSkills(
+                                                                "[{\"skillName\":\"Pha chế Barista Chuyên nghiệp\",\"taxonomyRole\":\"Pha chế (Bartender/Barista)\",\"confidenceScore\":0.82,\"evidenceSnippet\":\"Giấy chứng nhận Khóa học Pha chế Barista\"}]")
                                                 .hasSealOrSignature(true)
                                                 .overallConfidence(new BigDecimal("0.78"))
                                                 .routingDecision(RoutingDecision.ADMIN_REVIEW)

@@ -16,4 +16,6 @@ public interface WorkerSkillRepository extends JpaRepository<WorkerSkill, UUID> 
     List<WorkerSkill> findByWorker_WorkerId(UUID workerId);
 
     Optional<WorkerSkill> findByWorker_WorkerIdAndSkill_SkillId(UUID workerId, UUID skillId);
+
+    List<WorkerSkill> findByEvidenceRequestId(UUID evidenceRequestId);
 }

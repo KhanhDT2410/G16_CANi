@@ -41,6 +41,9 @@ public class SkillProgressionService {
     public static final int SP_RATING_FOUR_STARS = 5;
     public static final int PLATFORM_PROVEN_MIN_SHIFTS = 3;
     public static final BigDecimal PLATFORM_PROVEN_MIN_AVG_RATING = new BigDecimal("4.50");
+    public static final double PLATFORM_PROVEN_MIN_COMPLETION_RATE = 0.85;
+    public static final int PLATFORM_PROVEN_MIN_RELIABILITY_SCORE = 70;
+    public static final double PLATFORM_PROVEN_MAX_NOSHOW_RATE = 0.05;
     private static final BigDecimal DEFAULT_RATING = new BigDecimal("5.00");
 
     private final WorkerSkillPointRepository workerSkillPointRepository;
@@ -130,11 +133,57 @@ public class SkillProgressionService {
         wsp.setAvgRating(updated);
     }
 
+    /**
+     * Ghi nhận lượt hủy ca theo kỹ năng để tính chính xác tỷ lệ hoàn thành ca (Practical Skill Validation V2).
+     */
+    @Transactional
+    public void recordCancelledShift(Worker worker, Shift shift) {
+        if (worker == null || shift == null) {
+            return;
+        }
+        Map<String, Skill> targets = resolveTargetJobTypes(shift);
+        for (String jobType : targets.keySet()) {
+            WorkerSkillPoint wsp = findOrCreateSkillPoint(worker, jobType);
+            int cancelled = (wsp.getTotalShiftsCancelled() != null ? wsp.getTotalShiftsCancelled() : 0) + 1;
+            wsp.setTotalShiftsCancelled(cancelled);
+            workerSkillPointRepository.save(wsp);
+        }
+    }
+
     private void tryPromoteToPlatformProven(Worker worker, Skill matchedSkill, String jobType, WorkerSkillPoint wsp) {
         int completed = wsp.getTotalShiftsCompleted() != null ? wsp.getTotalShiftsCompleted() : 0;
+        int cancelled = wsp.getTotalShiftsCancelled() != null ? wsp.getTotalShiftsCancelled() : 0;
         BigDecimal avgRating = wsp.getAvgRating() != null ? wsp.getAvgRating() : BigDecimal.ZERO;
 
         if (completed < PLATFORM_PROVEN_MIN_SHIFTS || avgRating.compareTo(PLATFORM_PROVEN_MIN_AVG_RATING) < 0) {
+            return;
+        }
+
+        // Practical Validation V2: kiểm tra tỷ lệ hoàn thành ca, điểm uy tín và tỷ lệ No-Show
+        // Không nâng lên Tier 3 chỉ vì có đánh giá 5 sao nếu Worker thường xuyên hủy ca hoặc bỏ ca.
+        int totalAttempted = completed + Math.max(0, cancelled);
+        double completionRate = totalAttempted > 0 ? (double) completed / totalAttempted : 0.0;
+        if (completionRate < PLATFORM_PROVEN_MIN_COMPLETION_RATE) {
+            log.info("Worker {} chưa đủ tỷ lệ hoàn thành ca ({}) để lên PLATFORM_PROVEN cho '{}'",
+                    worker.getWorkerId(), String.format("%.2f", completionRate), jobType);
+            return;
+        }
+
+        int reliability = worker.getReliabilityScore() != null ? worker.getReliabilityScore() : 100;
+        if (reliability < PLATFORM_PROVEN_MIN_RELIABILITY_SCORE) {
+            log.info("Worker {} chưa đủ điểm uy tín ({}) để lên PLATFORM_PROVEN cho '{}'",
+                    worker.getWorkerId(), reliability, jobType);
+            return;
+        }
+
+        int totalNoShows = worker.getTotalNoshows() != null ? worker.getTotalNoshows() : 0;
+        int overallCompleted = Math.max(completed, worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0);
+        double noShowRate = (overallCompleted + totalNoShows) > 0
+                ? (double) totalNoShows / (overallCompleted + totalNoShows)
+                : 0.0;
+        if (noShowRate > PLATFORM_PROVEN_MAX_NOSHOW_RATE) {
+            log.info("Worker {} có tỷ lệ No-Show cao ({}) nên chưa đủ điều kiện PLATFORM_PROVEN cho '{}'",
+                    worker.getWorkerId(), String.format("%.2f", noShowRate), jobType);
             return;
         }
 

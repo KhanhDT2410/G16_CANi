@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Cấu hình kết nối Vision AI phục vụ thẩm định chứng chỉ, bằng cấp nghề nghiệp (Skill Verification).
+ * Cấu hình kết nối Vision AI phục vụ thẩm định chứng chỉ, bằng cấp nghề nghiệp (Skill Verification V2).
  */
 @Configuration
 @ConfigurationProperties(prefix = "cani.ai.gemini")
@@ -20,9 +20,9 @@ public class SkillVisionAiProperties {
     private String apiKey;
 
     /**
-     * Tên mô hình Vision AI
+     * Tên mô hình Vision AI (cấu hình qua GEMINI_MODEL, mặc định gemini-2.5-flash).
      */
-    private String model = "gemini-1.5-flash";
+    private String model = "gemini-2.5-flash";
 
     /**
      * Endpoint API
@@ -33,4 +33,10 @@ public class SkillVisionAiProperties {
      * Thời gian timeout tính bằng mili-giây
      */
     private int timeoutMs = 20000;
+
+    /**
+     * Chỉ bật trong môi trường sandbox/demo được cấu hình tường minh.
+     * Mặc định FALSE (Fail-Closed trên production: tuyệt đối không tự bịa dữ liệu hay AUTO_APPROVE).
+     */
+    private boolean sandboxFallbackEnabled = false;
 }

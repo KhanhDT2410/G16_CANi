@@ -135,4 +135,61 @@ class SkillProgressionServiceTest {
         assertEquals(SkillTier.BRONZE, existingPoint.getTier());
         assertEquals(SkillTier.BRONZE, worker.getSkillTier());
     }
+
+    @Test
+    @DisplayName("Practical Validation V2: Không nâng cấp Tier 3 PLATFORM_PROVEN nếu tỷ lệ hủy ca cao (< 85% hoàn thành)")
+    void recordShiftRating_highCancellationRate_blocksPlatformProven() {
+        WorkerSkillPoint existingPoint = WorkerSkillPoint.builder()
+                .worker(worker)
+                .jobType("Phục vụ bàn")
+                .spVerify(0)
+                .spExperience(60)
+                .spRating(30)
+                .totalSp(90)
+                .tier(SkillTier.STARTER)
+                .totalShiftsCompleted(3)
+                .totalShiftsCancelled(3) // 50% completion rate < 85%
+                .avgRating(new BigDecimal("5.00"))
+                .build();
+
+        when(skillRepository.findAllById(any())).thenReturn(List.of(skill));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(worker.getWorkerId(), "Phục vụ bàn"))
+                .thenReturn(Optional.of(existingPoint));
+        when(workerSkillPointRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        skillProgressionService.recordShiftRating(worker, shift, 5);
+
+        verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
+        assertEquals(0, existingPoint.getSpVerify());
+    }
+
+    @Test
+    @DisplayName("Practical Validation V2: Không nâng cấp Tier 3 PLATFORM_PROVEN nếu điểm uy tín thấp hoặc có No-Show")
+    void recordShiftRating_lowReliabilityOrNoShow_blocksPlatformProven() {
+        worker.setReliabilityScore(55);
+        worker.setTotalNoshows(2);
+
+        WorkerSkillPoint existingPoint = WorkerSkillPoint.builder()
+                .worker(worker)
+                .jobType("Phục vụ bàn")
+                .spVerify(0)
+                .spExperience(60)
+                .spRating(30)
+                .totalSp(90)
+                .tier(SkillTier.STARTER)
+                .totalShiftsCompleted(3)
+                .totalShiftsCancelled(0)
+                .avgRating(new BigDecimal("5.00"))
+                .build();
+
+        when(skillRepository.findAllById(any())).thenReturn(List.of(skill));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(worker.getWorkerId(), "Phục vụ bàn"))
+                .thenReturn(Optional.of(existingPoint));
+        when(workerSkillPointRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        skillProgressionService.recordShiftRating(worker, shift, 5);
+
+        verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
+        assertEquals(0, existingPoint.getSpVerify());
+    }
 }

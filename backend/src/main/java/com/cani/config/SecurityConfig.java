@@ -3,15 +3,22 @@ package com.cani.config;
 import com.cani.security.RestAccessDeniedHandler;
 import com.cani.security.RestAuthenticationEntryPoint;
 import com.cani.security.UserAuthorityFilter;
+import com.cani.service.skill.DocumentAccessTokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -29,6 +36,7 @@ public class SecurityConfig {
     private final UserAuthorityFilter userAuthorityFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final ObjectProvider<DocumentAccessTokenService> documentAccessTokenServiceProvider;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -51,9 +59,34 @@ public class SecurityConfig {
                     "/api/v1/workers/skills/tiers/config",
                     "/api/v1/eo/subscriptions/payos-webhook",
                     "/api/v1/eo/events/images/**",
-                    "/api/v1/workers/proof/**",
-                    "/api/v1/workers/skills/documents/**"
+                    "/api/v1/workers/proof/**"
                 ).permitAll()
+                // Tài liệu chứng chỉ cá nhân (PII): TUYỆT ĐỐI KHÔNG permitAll.
+                // Chỉ cho phép user đã đăng nhập (kiểm tra ownership tại Controller/Service)
+                // HOẶC Signed URL HMAC-SHA256 còn hiệu lực cho đúng filename.
+                .requestMatchers(HttpMethod.GET, "/api/v1/workers/skills/documents/**")
+                    .access((authenticationSupplier, context) -> {
+                        Authentication authentication = authenticationSupplier.get();
+                        boolean authenticated = authentication != null
+                                && authentication.isAuthenticated()
+                                && !(authentication instanceof AnonymousAuthenticationToken);
+                        if (authenticated) {
+                            return new AuthorizationDecision(true);
+                        }
+                        DocumentAccessTokenService tokenService = documentAccessTokenServiceProvider.getIfAvailable();
+                        if (tokenService == null) {
+                            return new AuthorizationDecision(false);
+                        }
+                        HttpServletRequest request = context.getRequest();
+                        String uri = request.getRequestURI();
+                        String filename = tokenService.extractFilename(uri);
+                        boolean validSigned = tokenService.isValidSignature(
+                                filename,
+                                request.getParameter("expires"),
+                                request.getParameter("sig")
+                        );
+                        return new AuthorizationDecision(validSigned);
+                    })
                 // Thẩm định chứng chỉ kỹ năng (UC-47): Customer Care cùng quyền kiểm duyệt với Admin
                 .requestMatchers("/api/v1/workers/skills/admin/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Module tranh chấp (UC-99/100/102/109): Customer Care cùng quyền với Admin

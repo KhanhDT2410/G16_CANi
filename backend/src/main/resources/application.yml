@@ -83,9 +83,15 @@ cani:
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-3.8-flash}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
       url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
       timeout-ms: 20000
+      sandbox-fallback-enabled: ${GEMINI_SANDBOX_FALLBACK:false}
+  security:
+    document-signing-secret: ${DOCUMENT_SIGNING_SECRET:}
+    document-url-ttl-seconds: ${DOCUMENT_URL_TTL_SECONDS:300}
+  storage:
+    certificate-dir: ${CERTIFICATE_STORAGE_DIR:uploads/certificates}
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
     strict: ${EKYC_STRICT:false}

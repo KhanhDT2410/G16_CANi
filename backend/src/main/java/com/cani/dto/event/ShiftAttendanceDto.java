@@ -1,5 +1,6 @@
 package com.cani.dto.event;
 
+import com.cani.entity.enums.AssignmentSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -51,4 +52,10 @@ public class ShiftAttendanceDto {
     private String bankAccountNumber;
     private String bankAccountName;
     private String vietQrUrl;
+
+    // Nguồn fill ca: MATCHING, DIRECT, BULK, GROUP
+    private AssignmentSource source;
+
+    // ID nhóm nếu fill qua nhóm (source = GROUP)
+    private UUID groupId;
 }

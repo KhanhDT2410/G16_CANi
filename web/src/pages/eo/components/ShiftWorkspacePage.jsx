@@ -709,6 +709,33 @@ export default function ShiftWorkspacePage({
                         <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 4, fontWeight: 600 }}>
                           Đánh giá: {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
                         </div>
+                        {item.source && (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              marginTop: 6,
+                              padding: '2px 8px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              borderRadius: '999px',
+                              backgroundColor: '#F0FDFA',
+                              border: '1px solid #CCFBF1',
+                              color: '#0D9488',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.3px',
+                            }}
+                          >
+                            {(() => {
+                              switch (item.source) {
+                                case 'GROUP': return 'Nhóm';
+                                case 'MATCHING': return 'Hệ thống';
+                                case 'DIRECT': return 'Trực tiếp';
+                                case 'BULK': return 'Hàng loạt';
+                                default: return item.source;
+                              }
+                            })()}
+                          </span>
+                        )}
                       </td>
 
                       {/* 2. Trạng thái */}

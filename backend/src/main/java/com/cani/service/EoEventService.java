@@ -1172,6 +1172,8 @@ public class EoEventService {
                 .bankAccountNumber(bankAccountNumber)
                 .bankAccountName(bankAccountName)
                 .vietQrUrl(vietQrUrl)
+                .source(sa.getSource())
+                .groupId(sa.getGroupId())
                 .build();
     }
 

@@ -120,7 +120,7 @@ String groupEligibilityReasonLabel(String? reasonCode) {
     case 'UNAVAILABLE':
       return 'Không rảnh khung giờ này';
     default:
-      return reasonCode?.isNotEmpty == true ? reasonCode : 'Không đủ điều kiện';
+      return (reasonCode != null && reasonCode.isNotEmpty) ? reasonCode : 'Không đủ điều kiện';
   }
 }
 

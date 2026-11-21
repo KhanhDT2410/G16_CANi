@@ -897,9 +897,9 @@ class MatchingDispatchServiceTest {
                     .expiresAt(now.plus(Duration.ofHours(1)))
                     .build();
 
-            when(dispatchProposalRepository.findByStatusAndExpiresAtBefore(ProposalStatus.PENDING, any(Instant.class)))
+            when(dispatchProposalRepository.findByStatusAndExpiresAtBefore(eq(ProposalStatus.PENDING), any(Instant.class)))
                     .thenReturn(List.of());
-            when(dispatchProposalRepository.findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(ProposalStatus.PENDING, any(Instant.class)))
+            when(dispatchProposalRepository.findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(eq(ProposalStatus.PENDING), any(Instant.class)))
                     .thenReturn(List.of(orphaned));
             when(workerGroupRepository.findAllById(List.of(g.getGroupId()))).thenReturn(List.of(g));
 
@@ -931,9 +931,9 @@ class MatchingDispatchServiceTest {
                     .expiresAt(now.plus(Duration.ofHours(1)))
                     .build();
 
-            when(dispatchProposalRepository.findByStatusAndExpiresAtBefore(ProposalStatus.PENDING, any(Instant.class)))
+            when(dispatchProposalRepository.findByStatusAndExpiresAtBefore(eq(ProposalStatus.PENDING), any(Instant.class)))
                     .thenReturn(List.of());
-            when(dispatchProposalRepository.findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(ProposalStatus.PENDING, any(Instant.class)))
+            when(dispatchProposalRepository.findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(eq(ProposalStatus.PENDING), any(Instant.class)))
                     .thenReturn(List.of(valid));
             when(workerGroupRepository.findAllById(List.of(g.getGroupId()))).thenReturn(List.of(g));
 

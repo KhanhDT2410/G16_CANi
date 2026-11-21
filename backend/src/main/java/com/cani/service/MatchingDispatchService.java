@@ -243,7 +243,7 @@ public class MatchingDispatchService {
         // Orphan rule: group PENDING trong 24h, leader hiện tại khác worker đã lưu (batch load groups).
         List<DispatchProposal> groupRecent = dispatchProposalRepository
                 .findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(
-                        ProposalStatus.PENDING, now.minus(24, TimeUnit.HOURS));
+                        ProposalStatus.PENDING, now.minus(Duration.ofHours(24)));
         Map<UUID, WorkerGroup> groups = workerGroupRepository
                 .findAllById(groupRecent.stream().map(DispatchProposal::getGroupId).distinct().toList())
                 .stream().collect(Collectors.toMap(WorkerGroup::getGroupId, g -> g));

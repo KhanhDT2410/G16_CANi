@@ -429,7 +429,6 @@ public class EventOrganizerEkycService {
     /**
      * Cập nhật thông tin hồ sơ của EO
      */
-     */
     @Transactional
     public EoProfileDto updateEoProfile(UUID userId, EoProfileDto dto) {
         EventOrganizer eo = getOrCreateEo(userId);

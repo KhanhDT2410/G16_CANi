@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/features/auth/auth.dart';
+import 'package:cani/features/worker_groups/models/group_proposal_models.dart';
 import 'package:cani/features/worker_groups/models/worker_group_models.dart';
 import 'package:cani/features/worker_groups/providers/worker_group_provider.dart';
+import 'package:cani/features/worker_groups/widgets/group_proposal_member_sheet.dart';
 
 class WorkerGroupDetailScreen extends ConsumerStatefulWidget {
   final WorkerGroupModel group;
@@ -20,9 +23,9 @@ class _WorkerGroupDetailScreenState
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref
-          .read(workerGroupsProvider.notifier)
-          .loadGroupMembers(widget.group.groupId);
+      final notifier = ref.read(workerGroupsProvider.notifier);
+      notifier.loadGroupMembers(widget.group.groupId);
+      notifier.loadGroupProposals(widget.group.groupId);
     });
   }
 
@@ -128,6 +131,457 @@ class _WorkerGroupDetailScreenState
             child: const Text('Gửi lời mời'),
           ),
         ],
+      ),
+    );
+  }
+
+  // ==================== Task 7: Lời mời ca cho đội (chỉ leader) ====================
+
+  bool _isCurrentUserLeader(WorkerGroupsState state) {
+    final userId = ref.watch(authStateProvider).user?.id;
+    if (userId == null) return false;
+    return state.currentGroupMembers.any(
+          (m) => m.userId == userId && m.isLeader,
+        );
+  }
+
+  void _rejectProposal(GroupProposalModel proposal) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Từ chối lời mời ca',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: reasonController,
+          decoration: InputDecoration(
+            hintText: 'Lý do (tùy chọn)',
+            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 10),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child:
+                const Text('Hủy', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              Navigator.of(ctx).pop();
+              final success = await ref
+                  .read(workerGroupsProvider.notifier)
+                  .rejectGroupProposal(
+                    widget.group.groupId,
+                    proposal.proposalId,
+                    reason,
+                  );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success
+                        ? 'Đã từ chối lời mời ca'
+                        : 'Từ chối thất bại. Vui lòng thử lại!'),
+                    backgroundColor:
+                        success ? const Color(0xFF0D9488) : Colors.redAccent,
+                  ),
+                );
+              }
+            },
+            child: const Text('Từ chối'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProposalCard(GroupProposalModel p) {
+    final isPending = p.status.toUpperCase() == 'PENDING';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (p.emergency) ...[
+                const Text('🚨 GẤP ',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 4),
+              ],
+              Expanded(
+                child: Text(
+                  p.eventName?.isNotEmpty == true
+                      ? p.eventName!
+                      : (p.jobType ?? 'Lời mời ca'),
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (p.jobType != null &&
+              p.eventName?.isNotEmpty == true &&
+              p.jobType != p.eventName)
+            Text(
+              p.jobType!,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDFA),
+                  border: Border.all(color: const Color(0xFFCCFBF1)),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  'Còn ${p.remainingWorkers ?? 0} slot',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0D9488),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDFA),
+                  border: Border.all(color: const Color(0xFFCCFBF1)),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  '${p.eligibleCount ?? 0} thành viên đủ điều kiện',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F766E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.schedule_rounded,
+                  size: 14, color: Color(0xFF94A3B8)),
+              const SizedBox(width: 4),
+              Text(
+                '${formatHm(p.startTime)} - ${formatHm(p.endTime)}'
+                '${p.startTime != null ? ' (${p.startTime!.day}/${p.startTime!.month})' : ''}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.attach_money_rounded,
+                  size: 14, color: Color(0xFF94A3B8)),
+              const SizedBox(width: 4),
+              Text(
+                p.hourlyWage != null
+                    ? '${formatWage(p.hourlyWage)} đ/giờ'
+                    : 'Thỏa thuận lương',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+          if (p.expiresAt != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.hourglass_bottom_rounded,
+                    size: 14, color: Color(0xFF94A3B8)),
+                const SizedBox(width: 4),
+                Text(
+                  p.status.toUpperCase() == 'EXPIRED'
+                      ? 'Đã hết hạn'
+                      : 'Hết hạn: ${formatHm(p.expiresAt)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (isPending) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _rejectProposal(p),
+                    icon: const Icon(Icons.close_rounded, size: 15),
+                    label:
+                        const Text('Từ chối', style: TextStyle(fontSize: 12.5)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => GroupProposalMemberSheet(
+                        groupId: widget.group.groupId,
+                        proposal: p,
+                      ),
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text(
+                      'Xác nhận cho đội',
+                      style: TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProposalsSection(WorkerGroupsState state) {
+    final header = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Lời mời ca cho đội (${state.groupProposals.length})',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded,
+              color: Color(0xFF0D9488), size: 18),
+          tooltip: 'Tải lại',
+          onPressed: () => ref
+              .read(workerGroupsProvider.notifier)
+              .loadGroupProposals(widget.group.groupId),
+        ),
+      ],
+    );
+
+    if (state.isProposalLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header,
+          const SizedBox(height: 8),
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child:
+                  CircularProgressIndicator(color: Color(0xFF0D9488)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (state.groupProposals.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.event_busy_rounded,
+                size: 32, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 6),
+            const Text(
+              'Chưa có lời mời ca nào cho đội',
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        const SizedBox(height: 8),
+        ...state.groupProposals.map((p) => _buildProposalCard(p)).toList(),
+      ],
+    );
+  }
+
+  void _showTransferLeaderSheet() {
+    final state = ref.read(workerGroupsProvider);
+    if (state.currentGroupMembers.isEmpty) return;
+    final currentLeader = state.currentGroupMembers.firstWhere(
+          (m) => m.isLeader,
+          orElse: () => state.currentGroupMembers.first,
+        );
+    final candidates = state.currentGroupMembers
+        .where((m) => m.status.toUpperCase() == 'ACTIVE')
+        .where((m) => m.workerId != currentLeader.workerId)
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Chuyển giao đội trưởng',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Chọn thành viên tiếp quản (đề xuất ca đang chờ sẽ hết hạn)',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            if (candidates.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Không có thành viên ACTIVE nào khác',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                ),
+              )
+            else
+              ...candidates.map(
+                (m) => ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: const Color(0xFFCCFBF1),
+                    child: Text(
+                      m.fullName.isNotEmpty ? m.fullName[0].toUpperCase() : 'W',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0D9488),
+                      ),
+                    ),
+                  ),
+                  title: Text(m.fullName,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    m.roleTitle ?? 'Thành viên',
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  onTap: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.of(context).pop();
+                    final success = await ref
+                        .read(workerGroupsProvider.notifier)
+                        .transferLeader(widget.group.groupId, m.workerId);
+                    if (success) {
+                      await ref
+                          .read(workerGroupsProvider.notifier)
+                          .loadGroupMembers(widget.group.groupId);
+                    }
+                    if (mounted) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(success
+                              ? 'Đã chuyển giao đội trưởng cho ${m.fullName}'
+                              : 'Chuyển giao thất bại. Vui lòng thử lại!'),
+                          backgroundColor: success
+                              ? const Color(0xFF0D9488)
+                              : Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -324,6 +778,31 @@ class _WorkerGroupDetailScreenState
               ),
 
               const SizedBox(height: 20),
+
+              // Task 7: Section lời mời ca + chuyển giao đội trưởng (chỉ leader)
+              if (_isCurrentUserLeader(state)) ...[
+                OutlinedButton.icon(
+                  onPressed: _showTransferLeaderSheet,
+                  icon: const Icon(Icons.account_balance_rounded, size: 15),
+                  label: const Text(
+                    'Chuyển giao đội trưởng',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0D9488),
+                    side: const BorderSide(color: Color(0xFFCCFBF1)),
+                    backgroundColor: const Color(0xFFF0FDFA),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildProposalsSection(state),
+                const SizedBox(height: 12),
+              ],
 
               // Title Thành viên
               Row(

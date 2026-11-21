@@ -632,7 +632,7 @@ public class MatchingDispatchService {
                 }
             }
 
-            // ponytail: no-show cooldown filter (group.getLastNoShowAt()) lands in Task 4.
+            // ponytail: no-show cooldown filter lands in Task 4 (WorkerGroup.lastNoShowAt)
             if (!dispatchProposalRepository
                     .findByShift_ShiftIdAndGroupIdAndStatusIn(shiftId, group.getGroupId(), ACTIVE_PROPOSAL_STATUSES).isEmpty()) {
                 continue;

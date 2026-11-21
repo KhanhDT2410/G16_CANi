@@ -95,7 +95,7 @@ const DisputeDetailModal = ({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {dispute.evidences.map((ev) => {
-                  const isImg = ev.fileType === 'IMAGE' || (typeof ev.fileUrl === 'string' && (ev.fileUrl.match(/\.(jpeg|jpg|png|webp|gif)/i) || ev.fileUrl.includes('/images/')));
+                  const isImg = !ev.fileType || ev.fileType === 'IMAGE' || (typeof ev.fileUrl === 'string' && (ev.fileUrl.match(/\.(jpeg|jpg|png|webp|gif|svg)/i) || ev.fileUrl.includes('image') || ev.fileUrl.includes('storage') || ev.fileUrl.startsWith('data:image')));
                   return (
                     <div key={ev.id} className="evidence-chip" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.4rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' }}>

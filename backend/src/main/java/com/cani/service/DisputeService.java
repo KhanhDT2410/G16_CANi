@@ -594,7 +594,7 @@ public class DisputeService {
 
     private DisputeDetailResponseDto toDetailDto(Dispute dispute) {
         List<DisputeDetailResponseDto.EvidenceDto> evidences =
-                evidenceRepository.findByDisputeIdOrderByCreatedAtAsc(dispute.getDisputeId()).stream()
+                new ArrayList<>(evidenceRepository.findByDisputeIdOrderByCreatedAtAsc(dispute.getDisputeId()).stream()
                         .map(e -> DisputeDetailResponseDto.EvidenceDto.builder()
                                 .id(e.getEvidenceId())
                                 .party(e.getParty())
@@ -603,7 +603,18 @@ public class DisputeService {
                                 .label(e.getLabel())
                                 .createdAt(e.getCreatedAt())
                                 .build())
-                        .toList();
+                        .toList());
+
+        // Đảm bảo nếu bằng chứng được lưu ở cột evidence của đơn thì Admin vẫn xem được đầy đủ
+        if (evidences.isEmpty() && dispute.getEvidence() != null && !dispute.getEvidence().isBlank()) {
+            evidences.add(DisputeDetailResponseDto.EvidenceDto.builder()
+                    .party(dispute.getComplainantId())
+                    .fileType(DisputeEvidenceType.IMAGE)
+                    .fileUrl(dispute.getEvidence().trim())
+                    .label("Ảnh minh chứng kèm theo đơn")
+                    .createdAt(dispute.getCreatedAt())
+                    .build());
+        }
 
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())

@@ -1,0 +1,441 @@
+﻿2.4 Dispute &amp; Escalation Handling (BF-05)21
+9. Reputation &amp; Disputes (FE-08)129
+9.3 UC-71: Submit Dispute131
+9.4 UC-72: Handle Dispute132
+15. Worker Verification &amp; Dispute Resolution (FE-14)145
+1.19 SCR-19: Dispute Management174
+1.20 SCR-20: Dispute Details175
+2.22 SCR-71: Submit Dispute234
+2.23 SCR-72: Dispute Details (EO)235
+2.24 SCR-73: Dispute Response236
+3.33 SCR-109: My Disputes291
+3.34 SCR-110: Dispute Details292
+3.35 SCR-111: Submit Dispute293
+An operational platform specialist acting as a tier-2 customer support agent and formal dispute arbitrator. Customer Care oversees manual identity verification (eKYC review), investigates attendance disputes, adjudicates wage disagreements between EOs and Workers, and authorizes penalty adjustments or escrow refunds.
+Dispute
+A dynamic, multi-factor numerical reputation index (initial baseline: 100 points, range: 0–100) quantifying a Worker's historical dependability on CANi. RS decreases upon late cancellations, no-shows, and dispute penalties, and increases through successful, highly rated shift completions. Dropping below 20 points suspends dispatch eligibility.
+Contractually enforced operational benchmarks defining maximum allowable response and resolution times across CANi support workflows (e.g., dispute adjudication within 24 hours, urgent replacement dispatch initiated within 5 minutes).
+An unauthorized mid-shift abandonment where a checked-in Worker leaves the event premises prior to the scheduled shift conclusion without EO or Supervisor approval, resulting in total wage forfeiture for unworked hours, dispute logging, and severe RS deductions.
+  3. Customer Care (Support Specialist): Operational personnel responsible for reviewing identity verification credentials (eKYC review, CCCD validation), investigating shift incident reports, mediating attendance and wage disputes between Organizers and Workers, and adjudicating penalty appeals. They access the support console on the Admin Web Portal under dedicated Customer Care permissions.
+  8. Email Dispatch Service (SendGrid / SMTP Gateway): Asynchronous transactional mailing provider transmitting account verification OTPs, contractual assignment confirmation summaries, and official dispute resolution notices.
+2.2 Dispute Resolution &amp; Payment Settlement (BF-02)
+Trigger:The process starts when the Worker submits a dispute with supporting evidence regarding a payment or event-related issue. 
+End condition: The process ends when Customer Care reviews the evidence and reaches a decision, the dispute status is updated to RESOLVED, and the payment is settled accordingly. If the Worker wins, the payment is released to the Worker; otherwise, the Event Organizer receives a refund 
+Delivers transactional, operational, and urgent event push/in-app notifications including dispatch proposals, shift reminders, QR check-in alerts, escrow balance changes, and dispute outcomes.
+Submitted by Worker · Approved by Organizer · Disputed in Incident
+id (UUID [PK]), assignment_id (UUID [FK]), base_amount (DECIMAL(10,2)), bonus_penalty (DECIMAL(10,2)), final_amount (DECIMAL(10,2)), payment_method (ENUM(ESCROW, CASH_ON_SITE)), status (ENUM(PENDING, PROCESSING, PAID, DISPUTED, REFUNDED)), transaction_code (VARCHAR(50)), paid_at (TIMESTAMP), cash_confirmed_by (UUID)
+PENDING (awaiting post-shift audit) · PROCESSING (escrow disbursement in transit) · PAID (settled to worker wallet) · DISPUTED (funds frozen pending arbitration) · REFUNDED (returned to EO)
+Entity: Dispute &amp; Incident
+Manages formal breach-of-contract incidents (No-Show, mid-shift walkout, wage disputes, harassment), evidence files, investigation workflows, and administrative arbitration.
+id (UUID [PK]), assignment_id (UUID [FK]), reported_by (UUID [FK]), reported_to (UUID [FK]), issue_type (ENUM(NO_SHOW, MID_WALKOUT, WAGE_DISPUTE, POLICY_VIOLATION)), description (TEXT), evidence_url (VARCHAR(255)), status (ENUM(OPEN, INVESTIGATING, RESOLVED, DISMISSED)), response_text (TEXT), resolution_note (TEXT), handled_by (UUID [Admin/Customer Care]), resolved_at (TIMESTAMP), penalty_applied (DECIMAL(10,2))
+Immutable financial audit ledger recording every balance modification in the escrow system, including deposits, wage reservations, completed payouts, and dispute refunds.
+Early check-out &amp; dispute resolution decree
+Full system access. Manages users, roles/permissions (RBAC), system parameters, reviews Level-3 verification, issues final dispute decisions, monitors System Dashboard and Audit Log. 
+Reviews verification requests, handles Level-1 dispute resolution, manages support tickets and FAQ, reviews EO registrations, processes RS Penalty Appeals. 
+Authenticated user configures notification preferences, including which event types trigger alerts (Shift proposals, Assignment updates, Payment confirmations, Dispute notifications) and the delivery channel (in-app, email). Users can enable or disable individual notification categories while retaining mandatory system alerts.
+Event Organizer archives a Completed or Cancelled event to move it out of the active event list. Archived events remain accessible for historical reference, reporting, and dispute resolution. Data including Assignments, Attendance, and Payment records is preserved in full after archiving.
+Worker applies for Tier 3 (Platform-Proven) verification status for a specific role. The system automatically grants this status when the Worker has completed at least 3 Assignments for that role on CANi with an average Rating ≥ 4.5/5.0 and no active Disputes. No manual application is required; the system evaluates eligibility continuously.
+Worker or Event Organizer views the full detail page of a specific Assignment, including role description, Shift schedule, venue address, EO/Worker contact summary, Checklist items, Attendance records (Check-in/Check-out timestamps), and Payment Status. Dispute and Appeal history related to this Assignment is also accessible from this view.
+Worker marks Checklist items as completed during the Shift, optionally attaching required evidence (photo or note). Event Organizer or Supervisor can also update item status and leave review notes. Checklist completion data is preserved independently of Assignment Status and used during the work completion confirmation and Dispute resolution processes.
+Worker submits photographic or documentary evidence of work completed during a Shift, linked to specific Checklist items or as general work proof. Submitted evidence is timestamped and stored with the Assignment record. Evidence is used by the Event Organizer during completion review and is available to Customer Care in the event of a Dispute.
+Event Organizer reviews Worker Attendance records and Checklist completion, then confirms or disputes completion for each Assignment. Confirmation changes Assignment Status to COMPLETED and triggers the payment recording flow. If the EO does not respond within 72 hours, the system automatically sets status to COMPLETED_PENDING_CONFIRMATION but does not auto-confirm payment.
+Event Organizer reports that a Worker's Assignment was not completed as required by submitting a report with specific reasons, evidence (photos, video, incomplete Checklist items), and the claimed deficiency. The system transitions the Assignment to DISPUTED status and opens a Dispute case for Customer Care review without automatically penalizing the Worker.
+Event Organizer declares payment by entering the amount paid, payment method, transaction reference, and uploading evidence (bank transfer receipt or cash receipt). The system changes Payment Status to DECLARED_PENDING_WORKER and notifies the Worker. Worker confirms receipt (CONFIRMED_FULL, CONFIRMED_PARTIAL) or raises a dispute. System never auto-confirms payment on timeout.
+Worker or Event Organizer views the payment history for all Assignments, showing per-Assignment payment status: NOT_DECLARED, DECLARED_PENDING_WORKER, CONFIRMED_FULL, CONFIRMED_PARTIAL, DISPUTED, or UNVERIFIED. EOs see total payroll per event; Workers see per-shift earnings. Payment records are preserved for at least the platform's data retention period.
+FE-11 Dispute &amp; Resolution
+UC-96
+Submit Dispute
+FE-11 Dispute &amp; Resolution
+Worker or Event Organizer submits a Dispute against the other party regarding work completion quality, payment discrepancy, No-show, or conduct violation. The submitting party provides a dispute category, description, and initial evidence. The Assignment is set to DISPUTED status, pausing any pending payment confirmation, and the case enters the Customer Care queue.
+UC-97
+View Dispute Details
+FE-11 Dispute &amp; Resolution
+Involved parties (Worker, EO, Customer Care, Admin) view the full Dispute record, including the original complaint, submitted evidence from both sides, QR Attendance logs, Checklist completion records, and any communications logged on the platform. The current resolution status and assigned CC agent are also displayed.
+UC-98
+FE-11 Dispute &amp; Resolution
+Worker or Event Organizer uploads supporting evidence for an active Dispute, including images, videos, document scans, or transaction records. Uploaded evidence is timestamped and linked to the specific Dispute case. Both parties may upload evidence within the defined submission window. Evidence labels distinguish party-submitted documents from system-generated logs.
+UC-99
+FE-11 Dispute &amp; Resolution
+Customer Care agent accepts a Dispute from the queue and begins investigation by reviewing QR Attendance timestamps, system logs, Checklist data, and evidence submitted by both parties. CC may request additional information from either party within a defined response window. Investigation findings are recorded in the Dispute record before a decision is issued.
+UC-100
+FE-11 Dispute &amp; Resolution
+UC-101
+FE-11 Dispute &amp; Resolution
+Worker or Event Organizer escalates a CC-issued Dispute decision to Admin level within 7 days of receiving the outcome. The escalation request must include the reason for disagreement and any new evidence not previously submitted. Admin is notified of the escalation and the case is transferred to the Admin review queue with full Dispute history.
+UC-102
+FE-11 Dispute &amp; Resolution
+Admin reviews an escalated Dispute, examining all evidence, CC investigation notes, and new information provided during escalation. Admin issues a final binding decision that overrides the CC ruling, selecting from: uphold CC decision, reverse in favor of either party, or maintain UNVERIFIED status. The final decision is logged and communicated to all parties.
+UC-103
+FE-11 Dispute &amp; Resolution
+System or Admin applies Reliability Score penalties to the party found at fault in a resolved Dispute, according to the platform's published penalty schedule. Penalties may include RS point deductions, temporary feature restrictions, or account suspension depending on severity and recurrence. The penalty is logged in the account's audit history.
+UC-104
+View Dispute History
+FE-11 Dispute &amp; Resolution
+Worker, Event Organizer, or Admin views the historical log of all Disputes involving their account, including Dispute category, submitted date, resolution status, outcome, and any applied penalties. Admin can search and filter all platform Disputes by actor, date range, category, and resolution outcome for reporting and quality monitoring.
+Worker or Event Organizer submits a support request for issues not covered by the Dispute process, such as account access problems, billing queries, or platform usage questions. The submitter selects a category, provides a description, and optionally attaches screenshots. The system auto-assigns the ticket to a CC agent based on category and generates a tracking reference number.
+Manage Dispute Queue
+Customer Care agent views and manages the queue of open Disputes, filtering by category (payment, work quality, conduct), priority, age, and assigned agent. CC can self-assign cases, transfer cases to colleagues, set response deadlines, and escalate overdue cases. Queue metrics including average resolution time are displayed for performance monitoring.
+Admin or Customer Care agent creates, edits, archives, or publishes FAQ articles organized by category (Account, Shift, Payment, Dispute). Published FAQs are surfaced in the platform's help center accessible to all users. Analytics on FAQ view counts and ticket deflection rates are available to identify gaps in self-service content.
+Admin views the operational system dashboard displaying key platform metrics: active Events, total Assignments by status, Dispute queue size, Reliability Score distribution across Workers, Matching Engine performance indicators, and platform revenue summary. Real-time alerts for anomalies such as high no-show rates or RS threshold breaches are displayed prominently.
+Admin creates, reads, updates, or deactivates user accounts for all roles (Worker, Event Organizer, Customer Care, Admin). Admin can force-reset passwords, change account status, update role assignments, and view full account history including login events, Dispute records, and RS history. All modifications are logged in the system audit trail.
+System sends platform notifications to users via configured delivery channels (in-app and email) based on trigger events such as Shift proposal received, Assignment status change, Payment declaration, Dispute update, and RS change. Notification content is templated per event type and respects each user's notification preference settings configured in UC-13.
+System provides a shared file upload service used across platform features (profile photo, portfolio, verification documents, payment evidence, Dispute attachments). The service validates file type (PDF, DOCX, JPG, PNG), file size limits, and virus scan before storing. Failed validations return descriptive error messages to the uploading user with guidance for resubmission.
+Platform provides a unified search service enabling keyword-based and filter-based lookup across entities: Events (by name, date, status), Workers (by name, skill, Tier), Disputes (by ID, actor, status), and Support Tickets (by reference, category). Search results are role-scoped so users only see records they are permitted to access per RBAC configuration.
+Dispute &amp; Resolution
+Submit Dispute
+Dispute &amp; Resolution
+View Dispute Details
+Dispute &amp; Resolution
+Dispute &amp; Resolution
+Investigate Dispute (CC)
+Dispute &amp; Resolution
+Issue Dispute Decision (CC)
+Dispute &amp; Resolution
+Dispute &amp; Resolution
+Dispute &amp; Resolution
+Dispute &amp; Resolution
+View Dispute History
+Manage Dispute Queue
+⁹  Dispute escalation: Level 1 = Customer Care investigates and issues decision. Within 7 days of that decision, either party (EO or Worker) may escalate to Admin (Level 2). Admin decision is final and cannot be further appealed.
+Full Assignment page: Attendance records, Checklist status, Evidence gallery, Payment Status summary. Actions: Confirm Completion (UC-82), Report Incomplete (UC-83), approve Early Checkout (UC-84), Cancel Assignment (UC-89). Dispute link. (covers UC-63, UC-82, UC-83, UC-84, UC-85, UC-88, UC-89)
+Submit Dispute
+Dispute submission form: category, description (min 50 chars), evidence upload (multi-file). Submittable by EO. (covers UC-96, UC-98)
+Dispute Details
+Single dispute page with role-adaptive UI. EO/Worker: view status, evidence, timeline. Customer Care: investigation notes, Add Decision, Request Info buttons (UC-99, UC-100). EO/Worker: Escalate to Admin button (UC-101). Admin: Final Decision panel (UC-102). RS Penalty applied automatically on decision (UC-103). (covers UC-97, UC-99, UC-100, UC-101, UC-102, UC-103, UC-104)
+Dispute Queue
+Customer Care queue of open/investigating disputes, sorted by priority &amp; age. Self-assign, transfer, set deadline. Queue metrics sidebar. (covers UC-109)
+Real-time KPI dashboard: active events, assignments by status, open disputes, RS distribution, DAU, Matching Engine throughput. Alerts banner for anomalies. (covers UC-111)
+List of Worker's Assignments sorted by Shift date. Status filter chips: Upcoming, Completed, Cancelled, Disputed. (covers UC-62, UC-64)
+Full Assignment page: Shift info, EO contact, Attendance record, Checklist progress (tap to open UC-79), Payment Status section, Evidence upload (UC-81), Cancel Assignment button (UC-89), Dispute link. (covers UC-63, UC-81, UC-89)
+Shows EO's declared payment (amount, method, reference, receipt image). Worker actions: Confirm Full Receipt, Confirm Partial, or Dispute. Payment history list below. Note: no wallet, no transfer via app. (covers UC-86, UC-87)
+Submit Dispute (Worker)
+Dispute form: category, description, evidence upload. Submittable by Worker from Assignment Details or Payment Status. (covers UC-96, UC-98)
+Dispute Status (Worker View)
+Read-only dispute timeline with CC decision, RS impact, Escalate to Admin button (within 7-day window). Dispute history list. (covers UC-97, UC-101, UC-104)
+BR-63: rs penalty transparency
+No active Disputes linked to those Assignments.
+2. System checks: completed Assignments &gt;= 3 AND avg Rating &gt;= 4.5 AND no active Disputes.
+BR-59: cc jurisdiction &amp; escalation path
+BR-63: rs penalty transparency
+6. System displays any linked Dispute case (read-only link).
+7. User may initiate actions: Check-in/out (UC-77), Submit Evidence (UC-81), Confirm Payment (UC-86), or Submit Dispute (UC-96).
+As a Worker, I want to upload evidence of my work during a Shift so that the Event Organizer can verify completion and the evidence supports dispute resolution.
+As an Event Organizer, I want to report that a Worker did not complete their work as required so that the issue is recorded and a Dispute can be opened.
+5. System creates a Dispute record linked to this Assignment.
+6. System sets Assignment Status to DISPUTED.
+7. System notifies Worker of the dispute and their right to respond (UC-117).
+8. System routes the Dispute to Customer Care queue (UC-99).
+Dispute record created.
+Assignment Status=DISPUTED.
+As an Event Organizer, I want to declare payment, and as a Worker, I want to confirm or dispute receipt, so that payment status is accurately recorded on CANi.
+6. Worker views payment declaration and selects: Confirm Full Receipt (-&gt;CONFIRMED_FULL), Confirm Partial Receipt (-&gt;CONFIRMED_PARTIAL), or Dispute (-&gt;DISPUTED).
+8. If DISPUTED: System opens Dispute record (UC-96).
+DISPUTED: Dispute case opened.
+4. System applies RS penalty (if applicable) via UC-103.
+BR-63: rs penalty transparency
+BR-63: rs penalty transparency
+BR-68: admin override capability
+BR-68: admin override capability
+BR-59: cc jurisdiction &amp; escalation path
+11. FE-11 Dispute &amp; Resolution
+11.1 UC-96: Submit Dispute
+UC-96
+Submit Dispute
+FE-11 Dispute &amp; Resolution
+As a Worker or Event Organizer, I want to submit a Dispute against the other party so that the issue is formally documented and reviewed by Customer Care.
+A completed or disputed Assignment exists.
+No prior Dispute for the same issue is already open.
+1. User navigates to Assignment Detail (UC-63) and clicks 'Submit Dispute'.
+2. User selects dispute category: Payment Dispute, Work Quality, Attendance, Conduct Violation, or Other.
+4. User uploads initial evidence (optional at this stage; can be added later via UC-98).
+5. User clicks 'Submit Dispute'.
+6. System creates a Dispute record with status=OPEN.
+7. System sets Assignment Payment Status to DISPUTED (if payment-related).
+9. System displays Dispute case number to submitter MSG143.
+Step 5b: Duplicate dispute already open -&gt; System displays MSG144.
+BR-52: dispute eligibility &amp; window
+BR-56: dispute evidence retention
+Dispute record created with status OPEN.
+Assignment Payment Status set to DISPUTED.
+11.2 UC-97: View Dispute Details
+UC-97
+View Dispute Details
+FE-11 Dispute &amp; Resolution
+As an involved party, I want to view the full details of a Dispute case so that I understand the current status, evidence submitted, and next steps.
+User is authenticated and has access to the Dispute.
+1. User navigates to Dispute &gt; Case [ID] or via Assignment Detail link.
+2. System displays: Dispute ID, category, status, submitting party, date, and description.
+3. System displays all submitted evidence by both parties (UC-98), labeled by party.
+BR-52: dispute eligibility &amp; window
+BR-56: dispute evidence retention
+BR-63: rs penalty transparency
+User reviewed Dispute status and evidence.
+11.3 UC-98: Upload Evidence
+UC-98
+FE-11 Dispute &amp; Resolution
+As a party in a Dispute, I want to upload supporting evidence so that Customer Care has a complete picture when making a decision.
+User is a party in an open Dispute.
+1. User navigates to Dispute Detail (UC-97) and clicks 'Add Evidence'.
+6. System stores evidence with: party ID, timestamp, file reference, and Dispute link.
+Step 5a: Dispute is CLOSED or RESOLVED -&gt; System displays MSG145.
+BR-56: dispute evidence retention
+Evidence stored and linked to Dispute.
+11.4 UC-99: CC Receives &amp; Investigates
+UC-99
+FE-11 Dispute &amp; Resolution
+As a Customer Care agent, I want to accept and investigate a Dispute by reviewing all evidence and logs so that I can issue a fair and informed resolution decision.
+A Dispute is in the CC queue with status OPEN.
+1. CC agent opens the Dispute Queue (UC-109) and selects an unassigned Dispute.
+2. CC self-assigns the Dispute. System updates status to INVESTIGATING.
+5. CC records investigation notes in the Dispute record.
+6. When investigation complete, CC proceeds to issue a decision (UC-100).
+BR-53: dispute investigation sla
+BR-57: dispute queue priority
+BR-59: cc jurisdiction &amp; escalation path
+Dispute assigned to CC and status=INVESTIGATING.
+11.5 UC-100: CC Issues Decision
+UC-100
+FE-11 Dispute &amp; Resolution
+As a Customer Care agent, I want to issue a Dispute resolution decision so that the case is formally closed or escalated.
+CC has completed investigation (UC-99).
+Dispute status is INVESTIGATING.
+1. CC navigates to the Dispute and clicks 'Issue Decision'.
+5. System updates Dispute status to RESOLVED or UNVERIFIED.
+6. System applies any RS penalties per the decision (UC-103).
+BR-53: dispute investigation sla
+BR-55: dispute rs penalty
+BR-59: cc jurisdiction &amp; escalation path
+Dispute status=RESOLVED or UNVERIFIED.
+11.6 UC-101: Escalate to Admin
+UC-101
+FE-11 Dispute &amp; Resolution
+As a party in a Dispute, I want to escalate a CC decision to Admin if I disagree with the outcome so that the case receives a final binding review.
+CC has issued a Dispute decision (UC-100).
+1. User navigates to Dispute Detail (UC-97) and clicks 'Escalate to Admin'.
+3. User enters reasoning and optionally uploads new evidence (UC-98).
+5. System creates an Escalation record linked to the Dispute.
+6. System updates Dispute status to ESCALATED.
+BR-54: dispute escalation right
+BR-59: cc jurisdiction &amp; escalation path
+Dispute status=ESCALATED.
+11.7 UC-102: Admin Reviews &amp; Decision
+UC-102
+FE-11 Dispute &amp; Resolution
+As an Admin, I want to review an escalated Dispute and issue a final binding decision so that the case is definitively resolved.
+Dispute status is ESCALATED.
+2. Admin reviews: full Dispute history, CC investigation notes, CC decision, both parties' evidence, escalation reason, and any new evidence.
+6. System updates Dispute status to FINAL_RESOLVED.
+7. System applies any RS adjustments per Admin decision (UC-103).
+BR-54: dispute escalation right
+BR-68: admin override capability
+Dispute status=FINAL_RESOLVED.
+11.8 UC-103: Apply RS Penalty
+UC-103
+FE-11 Dispute &amp; Resolution
+As a System service or Admin, I apply Reliability Score penalties to the party found at fault in a Dispute so that the reputation system reflects actual behaviour.
+A Dispute has been resolved with a clear finding of fault (UC-100 or UC-102).
+1. System receives a Dispute resolution decision with designated at-fault party.
+4. System records the penalty in account RS history with: Dispute ID, deduction amount, date, and authority.
+BR-55: dispute rs penalty
+11.9 UC-104: View Dispute History
+UC-104
+View Dispute History
+FE-11 Dispute &amp; Resolution
+As a user, I want to view the history of Disputes involving my account so that I can monitor past cases and outcomes.
+1. User navigates to Disputes &gt; History.
+2. System retrieves Disputes scoped to the user's account.
+3. System displays list with: Dispute ID, category, submission date, parties, and final status.
+5. User taps a row to view full Dispute Details (UC-97).
+6. Admin view includes all platform Disputes with full search capability.
+Step 2a: No Dispute history -&gt; System displays MSG149.
+BR-56: dispute evidence retention
+BR-63: rs penalty transparency
+User reviewed Dispute history.
+As a platform user, I want to submit a support ticket so that Customer Care can help me resolve an issue not covered by the Dispute process.
+BR-58: support ticket sla
+BR-58: support ticket sla
+BR-59: cc jurisdiction &amp; escalation path
+12.5 UC-109: Manage Dispute Queue
+Manage Dispute Queue
+As a Customer Care agent, I want to manage the Dispute queue so that cases are handled efficiently and within SLA.
+At least one Dispute is in the queue.
+1. CC navigates to Dispute Queue.
+2. System displays open Disputes sorted by priority (urgency, age, category).
+4. CC self-assigns an unassigned Dispute or transfers an assigned one.
+AF-01 (Transfer Case): CC transfers a Dispute to another CC agent. System updates assignment and notifies receiving agent.
+BR-57: dispute queue priority
+BR-59: cc jurisdiction &amp; escalation path
+Disputes assigned and prioritized.
+BR-59: cc jurisdiction &amp; escalation path
+2. System displays: active Events, total Assignments by status, open Dispute count, RS distribution, daily active users, and Matching Engine throughput.
+BR-68: admin override capability
+1. A notification trigger event occurs (Assignment confirmed, proposal received, payment declared, Dispute decision, RS change, etc.).
+A file upload has been initiated from any feature (profile avatar, portfolio, verification, payment evidence, Dispute attachments).
+As an authenticated user, I want to search across platform entities so that I can quickly find Events, Workers, Disputes, or Tickets relevant to my role.
+2. User optionally applies entity type filters: Events, Workers, Disputes, Support Tickets.
+View support metrics and access verification, disputes, appeals, no-show cases and support activities.
+• User tracks customer care workload metrics (eKYC queue, open disputes, penalty appeals, no-shows).• User inspects SLA Priority Queue sorted by nearest deadline.• User claims urgent disputes or eKYC verification requests.• User monitors real-time resolution speed against SLA targets.
+Displays counts of pending eKYC, open disputes, appeals, and no-show violations.
+Categorizes cases into Tranh chấp, Xác minh CCCD, or Kháng cáo.
+• User reviews notifications categorized by domain (eKYC, Disputes, Escrow, Operations).• User clicks category tabs to filter relevant notification items.• User clicks notification link to jump directly to the target record.• User clicks 'Đánh Dấu Tất Cả Đã Đọc' to clear unread notification counter.
+Filters between All, eKYC, Disputes, Escrow, and System alerts.
+Deep link redirecting directly to the relevant inspection or dispute screen.
+1.19 SCR-19: Dispute Management
+View and manage disputes; Customer Care handles behavior issues and escalates financial issues to Finance.
+Figure 3.19: Wireframe Mockup of Screen #19 (Dispute Management)
+• User reviews active dispute claims between workers and organizers.• User filters disputes by category (Unpaid overtime, Scope mismatch, Conduct).• User monitors dispute resolution SLA timers to prevent service breaches.• User clicks 'Thụ Lý Ngay' to open dispute mediation adjudication file (SCR-20).
+Dispute Search Bar
+Searches dispute case code, event name, or worker name.
+Dispute Category Filter
+Disputes Data Table
+Lists dispute ID, shift name, complainant, respondent, issue, and amount.
+1.20 SCR-20: Dispute Details
+Review a dispute and its evidence, record handling decisions, or escalate financial issues.
+Figure 3.20: Wireframe Mockup of Screen #20 (Dispute Details)
+• User examines dispute summary, shift wage locked in escrow, and contested overtime amount.• User reviews worker testimony and attached Zalo message screenshots.• User reviews organizer response and audits system QR check-in/out attendance logs.• User renders formal customer care ruling: disburse overtime from escrow or dismiss claim.
+Dispute Summary Card
+Applies escrow fund release and closes dispute case permanently.
+Issue category (Payment, Shift Attendance, Penalty Dispute) and priority level (CRITICAL, HIGH, NORMAL).
+Linked entity code such as Shift #SH-XXXX, Transaction #TX-XXXX, or Dispute #DSP-XXXX.
+Penalty &amp; Dispute History
+Narrative description of critical pending incidents, high-risk disputes, and unresolved calls.
+•  Cross-checks withdrawal against active dispute holds or fraud anomaly flags before disbursement.
+Dispute Hold Verification
+Confirms zero active dispute holds (Khong co phong toa).
+View financial disputes and cases escalated to Finance, as grouped in the supplied Screen Flow.
+•  Finance specialist monitors unresolved disputes escalated from Customer Care involving salary deductions or escrow disputes.
+•  Filters monetary arbitration cases by claim category, disputed amount, priority level, and SLA deadline.
+•  Opens individual financial dispute files to conduct binding monetary arbitration and fund settlement.
+Dispute Type Filter
+Dispute Case ID
+Disputed Sum
+Total monetary value under dispute escrow lock in VND.
+•  Executes binding payout settlement, releases escrow lock, and closes dispute escalation ticket.
+Official arbitration explanation cited in dispute resolution notice.
+•  Investigates accounts flagged for rapid consecutive withdrawals or suspicious dispute claim ratios.
+Category: Abnormal Withdrawals, Escrow Imbalance, High Dispute Ratio.
+• Reviews aggregated operational metrics across shifts, including shift fill rate, on-time QR check-in rate, no-show rate, and dispute incident rate.
+Dispute Rate
+• Filters audit records by staff role (Admin, Customer Care, Finance) or action category (Account Management, Profile Verification, Payout Approval, Dispute Arbitration).
+View and filter assigned workers; access ratings, payment status, disputes and permitted assignment cancellation.
+2.22 SCR-71: Submit Dispute
+Submit a dispute concerning an assignment or Worker, with a description and supporting evidence.
+Figure 3.71: Wireframe Mockup of Screen #71 (Submit Dispute)
+• User opens and reviews the Submit Dispute interface.
+Submit Dispute Identifier
+Primary input or control configured for Submit Dispute.
+2.23 SCR-72: Dispute Details (EO)
+View an EO-related dispute, evidence, handling status and resolution, including disputes submitted by either party.
+Figure 3.72: Wireframe Mockup of Screen #72 (Dispute Details (EO))
+• User opens and reviews the Dispute Details (EO) interface.
+Dispute Details (EO) Identifier
+Primary input or control configured for Dispute Details (EO).
+2.24 SCR-73: Dispute Response
+Provide a response and supporting evidence for a dispute involving the EO.
+Figure 3.73: Wireframe Mockup of Screen #73 (Dispute Response)
+• User opens and reviews the Dispute Response interface.
+Dispute Response Identifier
+Primary input or control configured for Dispute Response.
+• Worker accesses Identity Verification from Worker Profile (SCR-85) to submit citizen identity details and photo documentation for Customer Care (Customer Care) verification, serving as legal baseline for dispute resolution (UC-71, UC-72).
+• Reviews notice stating that documents will be verified by Customer Care agents to protect worker rights during assignment disputes.
+Dispute Policy Banner
+Explains that identity verification documents are used by Customer Care to resolve work disputes (UC-71/UC-72).
+Uploads front side photo of citizen ID card. Max 5MB JPG/PNG (BR-57).
+Uploads back side photo of citizen ID card showing barcode/chip. Max 5MB JPG/PNG (BR-57).
+Percentage of completed shifts where organizer approved payout without dispute (99.2%).
+• Reads policy banner explaining the platform Exclusion Engine (BR-68) that automatically suppresses matching proposals and direct invitations from blacklisted organizers.
+Informs worker that blocked organizers cannot send proposals or direct shift invites (BR-68).
+Recorded rationale for blocking (e.g., wage dispute, disrespectful coordination, out-of-scope tasks).
+3.33 SCR-109: My Disputes
+View list of disputes
+Figure 3.109: Wireframe Mockup of Screen #109 (My Disputes)
+• Worker opens My Disputes and reviews the summary of submitted disputes by status (in progress, needs more evidence, resolved) and the 48-hour handling SLA.
+• Reviews each dispute card (code, status, shift, organizer, issue, disputed amount and response deadline).
+• Taps &quot;Xem chi tiết &amp; Chat Customer Care&quot; to open Dispute Details (SCR-110) and follow Customer Care handling (UC-72).
+• Taps &quot;Gửi Khiếu Nại Mới&quot; (or +) to open Submit Dispute (SCR-111), or &quot;Quy Trình SLA&quot; to read the dispute handling process.
+Dispute Summary Card
+Total disputes submitted (e.g., 3 vụ việc), the &quot;SLA xử lý: 48h&quot; badge and counts by status: Đang thụ lý, Cần bổ sung, Đã giải quyết, each with the amount or points at stake.
+Submit New Dispute Button
+&quot;Gửi Khiếu Nại Mới&quot; – opens Submit Dispute (SCR-111). The &quot;+&quot; icon in the header does the same.
+&quot;Quy Trình SLA&quot; – shows how disputes are received, investigated and resolved and the time limits.
+Tất cả, Đang xử lý and Cần bổ sung (and Đã giải quyết), each with the number of disputes.
+Dispute Code
+Unique dispute reference (e.g., DSP-2026-0891).
+Dispute Status Badge
+Shift title, Event Organizer and shift date the dispute relates to.
+Dispute reason (e.g., &quot;Chưa tính thù lao làm thêm (OT)&quot;).
+Disputed Amount
+Amount under dispute in VND (e.g., Tranh chấp: 120,000đ).
+&quot;Xem chi tiết &amp; Chat Customer Care →&quot; – opens Dispute Details (SCR-110).
+3.34 SCR-110: Dispute Details
+View dispute details
+Figure 3.110: Wireframe Mockup of Screen #110 (Dispute Details)
+• Worker opens a dispute and reviews its code, status, shift, organizer, issue and disputed amount.
+• Saves or shares the dispute record with the icon in the header and returns to My Disputes with the back button.
+Dispute Code
+Unique dispute reference (e.g., DSP-2026-0891).
+Dispute Status Badge
+Dispute reason (e.g., &quot;Thù lao làm thêm giờ (OT)&quot;).
+Disputed Amount
+Amount under dispute in VND (e.g., Tranh chấp: 120,000đ).
+&quot;+ Phản hồi&quot; – opens a reply box to add a message or evidence. Disabled once the dispute is closed.
+Downloads or shares the dispute record.
+Prototype-only control to preview mockup states (1. Đang thụ lý, 2. Cần minh chứng, 3. Đã hòa giải). Previews each dispute state. Not part of the production UI.
+3.35 SCR-111: Submit Dispute
+Submit new dispute
+Figure 3.111: Wireframe Mockup of Screen #111 (Submit Dispute)
+• Worker reads the worker protection notice (disputes are handled directly by Customer Care within 48 hours and the organizer's escrow stays held while a case is open).
+• Selects the shift to dispute from the recent shifts list; each item shows the time left to dispute.
+• Chooses the dispute category (Thiếu giờ / OT, Lỗi chấm công, Hủy ca muộn, Khác / Tranh chấp).
+• Submits the dispute; the system validates the required fields and evidence (BR-64) and notifies Customer Care for mediation.
+Explains that disputes go directly to Customer Care with a 48-hour SLA and that the organizer's escrow stays held for fair settlement.
+Disputed Shift
+Shift the dispute concerns: title, event/organizer, date and time, and the remaining time to dispute (e.g., &quot;Còn 36h&quot;). Shifts outside the dispute window or cancelled can be marked accordingly. Exactly one shift must be selected.
+Dispute Category
+Thiếu giờ / OT, Lỗi chấm công, Hủy ca muộn, Khác / Tranh chấp. Exactly one must be chosen.
+Submit Dispute Button
+Validates all required fields and evidence, creates the dispute with a unique code and sends it to Customer Care.
+Outbound email service used to send 6-digit email verification OTP codes, password reset links, and formal dispute resolution decisions.
+• Customer &amp; Organizer Web Portal: Developed using modern responsive web design principles to support desktop and tablet viewports (optimal resolution 1920x1080, minimum supported resolution 1024x768). The interface provides intuitive dashboard navigation, real-time event staffing meters, drag-and-drop shift creation, interactive wage sliders, and dispute evidence viewers. Compatible with Google Chrome 110+, Microsoft Edge 110+, Mozilla Firefox 115+, and Apple Safari 16+.
+• System Administration &amp; Customer Care (Customer Care) Portal: Dedicated web console providing role-segregated controls for dispute arbitration, dynamic pricing rule configuration, soft-hold override controls, and audit log inspection.
+  - SendGrid SMTP Service: Encrypted SMTP/STARTTLS mail relay service for account verification OTP codes, password recovery tokens, and formal dispute resolution notices.
+Server-side authorization verifies role permissions on every request. Organizers can only inspect and manage their own events; Workers can only access their dispatched shifts and personal wallet; Customer Care can only mediate assigned disputes; Platform Admin has system-wide access. Insecure Direct Object References (IDOR) are prohibited.
+All monetary transactions (deposits, escrow locks, payouts, refunds, dispute arbitrations) are recorded in an immutable, append-only double-entry bookkeeping ledger with cryptographic checksums.
+This section compiles the comprehensive catalog of business rules governing the operations, state transitions, matching logic, financial transactions, attendance integrity, and dispute resolutions across the CANi platform. Each rule is assigned a unique identifier (BR-01 through BR-265) and directly referenced within the Use Case Specifications in Part II to ensure full requirements traceability.
+Workers may submit evidence (photos, notes) per assignment. Maximum 10 files, each ≤ 20 MB. Accepted formats: JPG, PNG, PDF, MP4. Evidence is linked to assignment and visible to EO, CC, and Admin in dispute cases.
+Payment is settled directly between EO and Worker outside the platform. Platform records payment status only: EO declares amount, method, reference, and optional receipt upload. Worker confirms or disputes. CANi does not hold, transfer, or intermediate any funds.
+Payment state: NOT_DECLARED → DECLARED_PENDING_WORKER → (CONFIRMED_FULL | CONFIRMED_PARTIAL | DISPUTED | UNVERIFIED). CONFIRMED_FULL is terminal. DISPUTED triggers Dispute Resolution. UNVERIFIED requires CC intervention.
+BR-52
+Dispute Eligibility &amp; Window
+Disputes may be raised by EO or Worker within 14 days of shift completion. Minimum description: 50 characters. Evidence upload required for Worker-initiated payment disputes. Disputes after 14 days are rejected.
+BR-53
+Dispute Investigation SLA
+CC must acknowledge a new dispute within 1 business day. Decision must be rendered within 7 business days. Unresolved disputes auto-escalate to Admin and are flagged in Customer Care Console.
+BR-54
+Dispute Escalation Right
+BR-55
+Dispute RS Penalty
+Where a dispute ruling finds a worker at fault, −10 RS points is automatically applied upon CC or Admin issuing the decision. CC/Admin may waive the penalty with written justification.
+BR-56
+Dispute Evidence Retention
+All dispute evidence is retained for 36 months from dispute closure. Parties may not delete submitted evidence. CC/Admin may seal evidence in cases involving legal proceedings.
+BR-57
+Dispute Queue Priority
+Disputes ordered by: (1) Escalation-to-Admin flag (highest priority); (2) SLA risk (&lt;1 day remaining); (3) Submission date (oldest first). CC agents may self-assign disputes.
+BR-58
+Tickets classified: High (payment, safety, account lock) — first response within 4 hours; Medium (verification, dispute-adjacent) — within 1 business day; Low (general queries) — within 3 business days. SLA breach triggers auto-escalation to CC Team Lead.
+BR-59
+CC has jurisdiction over Level 1 dispute decisions, verification approvals, EO account approval, no-show overrides, and ticket handling. Final binding decisions, RS lock/unlock, and user banning escalate to Admin.
+RS deductions: No-show = −25; Late cancellation (&lt;6h) = −15; Cancellation (6–24h) = −5; Dispute ruling against worker = −10. Recovery: +2 RS per completed shift with rating ≥ 4.0 stars. RS floor is 0, ceiling is 100.
+BR-63
+Workers earn +5 SP_experience per completed shift where rating ≥ 3.0 stars. No SP_experience for incomplete, disputed, or cancelled assignments.
+BR-68
+Admin may override any system-generated RS penalty, account lock, or dispute decision with written justification. All overrides are audit-logged and immutable. Admin cannot modify or delete audit log entries.
+Dispute ticket submitted
+Yêu cầu khiếu nại #{ticket_id} đã được tạo. Bộ phận Customer Care sẽ tiếp nhận và xử lý trong vòng 48 giờ.
+Dispute evidence required
+Vui lòng tải lên ít nhất một hình ảnh hoặc tài liệu bằng chứng để chứng minh khiếu nại.
+Dispute arbitrated
+Yêu cầu khiếu nại #{ticket_id} đã được phân xử và quyết toán tiền ký quỹ.
+Đơn khiếu nại điểm phạt đã được gửi thành công. Customer Care sẽ xem xét trong vòng 24 giờ.
+• E-Commerce Platform Governance (Decree 52/2013/ND-CP &amp; Decree 85/2021/ND-CP): As an on-demand intermediary connecting event organizers with freelance workforce, CANi enforces transparent service fee schedules (12% organizer fee, 0% worker fee), electronic contract confirmations, immutable financial ledgers, and formal dispute mediation protocols.

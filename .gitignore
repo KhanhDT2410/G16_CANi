@@ -111,3 +111,5 @@ web_backup_*/
 uploads/
 backend/uploads/
 
+.superpowers/
+/superpowers-progress.md

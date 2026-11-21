@@ -1,7 +1,9 @@
 package com.cani.service;
 
 import com.cani.entity.*;
+import com.cani.entity.enums.AssignmentSource;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.MembershipStatus;
 import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.ProposalStatus;
 import com.cani.entity.enums.ShiftStatus;
@@ -9,6 +11,8 @@ import com.cani.entity.enums.UserStatus;
 import com.cani.repository.DispatchProposalRepository;
 import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.repository.ShiftRepository;
+import com.cani.repository.WorkerGroupMembershipRepository;
+import com.cani.repository.WorkerGroupRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.Builder;
 import lombok.Data;
@@ -38,6 +42,8 @@ public class MatchingDispatchService {
     private final ShiftRepository shiftRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final DispatchProposalRepository dispatchProposalRepository;
+    private final WorkerGroupRepository workerGroupRepository;
+    private final WorkerGroupMembershipRepository workerGroupMembershipRepository;
 
     @Autowired(required = false)
     private NotificationService notificationService;
@@ -70,6 +76,14 @@ public class MatchingDispatchService {
         private double distanceKm;
         private double finalScore;
         private String scoreBreakdownJson;
+    }
+
+    private record GroupCandidate(
+            WorkerGroup group,
+            Worker leader,
+            List<Worker> eligible,
+            double score,
+            double distanceKm) {
     }
 
     /**
@@ -205,6 +219,8 @@ public class MatchingDispatchService {
                             + "Tổng worker đã xét: {}",
                     shiftId, allWorkers.size());
         }
+
+        createdCount += dispatchGroupsForShift(shiftId, false);
 
         log.info("Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên, đã gửi {} đề xuất (Proposals).",
                 shiftId, matchedCandidates.size(), createdCount);
@@ -550,8 +566,255 @@ public class MatchingDispatchService {
             }
         }
 
+        createdCount += dispatchGroupsForShift(shiftId, true);
+
         log.info("Emergency Dispatch hoàn tất: Đã gửi {} đề xuất khẩn cấp cho ca {}", createdCount, shiftId);
         return createdCount;
+    }
+
+    /**
+     * Kênh Group Dispatch: gửi 1 lời mời cho tối đa 5 đội (Group) có thành viên đủ điều kiện.
+     * Proposal gán worker = leader nhóm; FCM gửi leader để cử 1 đến [claimableSlots] thành viên.
+     */
+    @Transactional
+    public int dispatchGroupsForShift(UUID shiftId, boolean emergency) {
+        Shift shift = shiftRepository.findById(shiftId).orElse(null);
+        if (shift == null || shift.getStatus() != ShiftStatus.ACTIVE) {
+            return 0;
+        }
+        int remaining = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : 0;
+        if (remaining <= 0) {
+            log.info("Ca làm việc {} đã đủ nhân sự, bỏ qua kênh group dispatch.", shiftId);
+            return 0;
+        }
+
+        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+
+        // shortcut: cap 50 group, dùng query rank DB khi group > hàng nghìn.
+        List<WorkerGroup> candidateGroups = workerGroupRepository.findAll().stream()
+                .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
+                .limit(50)
+                .toList();
+        if (candidateGroups.isEmpty()) {
+            return 0;
+        }
+
+        // Batch tải membership ACTIVE của các group -> map groupId -> members
+        List<WorkerGroupMembership> memberships = workerGroupMembershipRepository
+                .findByWorkerGroup_GroupIdInAndStatus(candidateGroups.stream().map(WorkerGroup::getGroupId).toList(), MembershipStatus.ACTIVE);
+        Map<UUID, List<WorkerGroupMembership>> membershipsByGroup = memberships.stream()
+                .filter(m -> m.getWorkerGroup() != null && m.getWorker() != null)
+                .collect(Collectors.groupingBy(m -> m.getWorkerGroup().getGroupId()));
+
+        List<GroupCandidate> groupCandidates = new ArrayList<>();
+        for (WorkerGroup group : candidateGroups) {
+            List<WorkerGroupMembership> groupMemberships = membershipsByGroup.getOrDefault(group.getGroupId(), Collections.emptyList());
+            if (groupMemberships.isEmpty()) {
+                continue;
+            }
+
+            // Leader phải tồn tại & user ACTIVE
+            if (group.getLeaderWorkerId() == null) {
+                continue;
+            }
+            Worker leader = workerRepository.findById(group.getLeaderWorkerId()).orElse(null);
+            if (leader == null || leader.getUser() == null || leader.getUser().getStatus() != UserStatus.ACTIVE) {
+                continue;
+            }
+
+            // Chặn leader nếu đã chặn EO (cùng cách gọi passHardFilter)
+            if (blockListService != null && shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null) {
+                EventOrganizer eo = shift.getEvent().getEventOrganizer();
+                if (eo.getUser() != null && leader.getUser() != null
+                        && blockListService.isEitherBlocked(eo.getUser().getUserId(), leader.getUser().getUserId())) {
+                    continue;
+                }
+            }
+
+            // ponytail: no-show cooldown filter (group.getLastNoShowAt()) lands in Task 4.
+            if (!dispatchProposalRepository
+                    .findByShift_ShiftIdAndGroupIdAndStatusIn(shiftId, group.getGroupId(), ACTIVE_PROPOSAL_STATUSES).isEmpty()) {
+                continue;
+            }
+
+            // Member đủ điều kiện (không xét isOnline — leader cử cả thành viên offline)
+            List<Worker> eligible = groupMemberships.stream()
+                    .map(WorkerGroupMembership::getWorker)
+                    .filter(w -> isGroupChannelMemberEligible(w, shift))
+                    .toList();
+            int claimableSlots = Math.min(eligible.size(), remaining);
+            if (eligible.isEmpty() || claimableSlots == 0) {
+                continue;
+            }
+
+            // Khoảng cách: TB Haversine các member eligible; thiếu tọa độ -> 0.0 (cùng chính sách kênh cá nhân)
+            double distanceKm = 0.0;
+            int computed = 0;
+            for (Worker w : eligible) {
+                double d = calculateDistance(targetLat, targetLng, w.getBaseLat(), w.getBaseLng());
+                if (d != Double.MAX_VALUE) {
+                    distanceKm += d;
+                    computed++;
+                }
+            }
+            if (computed > 0) {
+                distanceKm /= computed;
+            }
+
+            double groupScore = 0.35 * Math.max(0.0, 100.0 - (distanceKm / MAX_DISTANCE_KM) * 100.0)
+                    + 0.25 * Math.min(100.0, ((group.getAvgRating() != null ? group.getAvgRating().doubleValue() : 5.0) / 5.0) * 100.0)
+                    + 0.2 * Math.min(100.0, eligible.stream()
+                        .mapToDouble(w -> (double) (w.getTotalShiftsCompleted() != null ? w.getTotalShiftsCompleted() : 0))
+                        .average().orElse(0.0) / 10.0 * 100.0)
+                    + 0.1 * Math.min(100.0, group.getReliabilityScore() != null ? group.getReliabilityScore() : 80.0);
+
+            // Bonus +10: ít nhất 1 member có skill verified nằm trong requiredSkills của ca
+            if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
+                Set<UUID> reqIds = Arrays.stream(shift.getRequiredSkills()).filter(Objects::nonNull).collect(Collectors.toSet());
+                boolean verified = eligible.stream().anyMatch(w -> {
+                    List<WorkerSkill> skills = workerSkillRepository.findByWorker_WorkerId(w.getWorkerId());
+                    return skills != null && skills.stream().anyMatch(ws -> ws.getSkill() != null
+                            && reqIds.contains(ws.getSkill().getSkillId())
+                            && ws.getVerificationTier() != null
+                            && ws.getVerificationTier() != com.cani.entity.enums.VerificationTier.SELF_DECLARED);
+                });
+                if (verified) {
+                    groupScore += 10.0;
+                }
+            }
+
+            groupCandidates.add(new GroupCandidate(group, leader, eligible, groupScore, distanceKm));
+        }
+
+        if (groupCandidates.isEmpty()) {
+            return 0;
+        }
+
+        groupCandidates.sort(Comparator.comparingDouble(GroupCandidate::score).reversed());
+        List<GroupCandidate> topGroups = groupCandidates.stream().limit(5).toList();
+
+        Instant expiresAt = emergency
+                ? Instant.now().plus(Duration.ofMinutes(30))
+                : Instant.now().plus(Duration.ofHours(DEFAULT_TIMEOUT_HOURS));
+
+        int createdCount = 0;
+        for (GroupCandidate candidate : topGroups) {
+            List<Worker> eligible = candidate.eligible();
+            int claimableSlots = Math.min(eligible.size(), remaining);
+
+            String breakdownJson = String.format(
+                    Locale.US,
+                    "{\"groupId\":\"%s\",\"groupName\":\"%s\",\"distanceKm\":%.2f,\"eligibleMemberWorkerIds\":[%s],\"eligibleCount\":%d,\"claimableSlots\":%d,\"finalScore\":%.2f}",
+                    candidate.group().getGroupId(),
+                    candidate.group().getName(),
+                    candidate.distanceKm(),
+                    eligible.stream().map(w -> "\"" + w.getWorkerId() + "\"").collect(Collectors.joining(",")),
+                    eligible.size(),
+                    claimableSlots,
+                    candidate.score()
+            );
+
+            DispatchProposal proposal = DispatchProposal.builder()
+                    .shift(shift)
+                    .worker(candidate.leader())
+                    .groupId(candidate.group().getGroupId())
+                    .matchScore(BigDecimal.valueOf(candidate.score()).setScale(2, RoundingMode.HALF_UP))
+                    .scoreBreakdown(breakdownJson)
+                    .status(ProposalStatus.PENDING)
+                    .expiresAt(expiresAt)
+                    .source(AssignmentSource.GROUP)
+                    .build();
+
+            DispatchProposal savedProposal = dispatchProposalRepository.save(proposal);
+            createdCount++;
+
+            if (notificationService != null && candidate.leader().getUser() != null && candidate.leader().getUser().getUserId() != null) {
+                try {
+                    String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
+                    notificationService.createAndSend(
+                            candidate.leader().getUser().getUserId(),
+                            (emergency ? "🚨 GẤP " : "") + "Lời mời ca cho đội " + candidate.group().getName(),
+                            "Cử 1 đến " + claimableSlots + " thành viên — ca " + shift.getJobType() + " tại " + eventName + ", thù lao " + shift.getHourlyWage() + " đ/giờ.",
+                            NotificationType.PROPOSAL,
+                            "PROPOSAL",
+                            savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shiftId,
+                            Map.of("shiftId", shiftId.toString(), "type", emergency ? "EMERGENCY_GROUP_PROPOSAL" : "GROUP_PROPOSAL")
+                    );
+                } catch (Exception ex) {
+                    log.warn("Không thể gửi thông báo FCM cho đội {}: {}", candidate.group().getName(), ex.getMessage());
+                }
+            }
+        }
+
+        log.info("Group Dispatch hoàn tất cho ca {}: Xét {} group, đã gửi {} đề xuất group.",
+                shiftId, candidateGroups.size(), createdCount);
+        return createdCount;
+    }
+
+    /**
+     * Tiêu chí thành viên đủ điều kiện nhận proposal kênh group.
+     * Giống passHardFilter nhưng BỎ kiểm tra isOnline (leader tự cử thành viên) và blocklist per-member.
+     */
+    private boolean isGroupChannelMemberEligible(Worker worker, Shift shift) {
+        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
+            return false;
+        }
+        if (worker.getUser() == null || worker.getUser().getStatus() != UserStatus.ACTIVE) {
+            return false;
+        }
+        int minRs = shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0
+                ? shift.getMinReliabilityScore() : MIN_RELIABILITY_SCORE;
+        if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
+            return false;
+        }
+        if (shift.getMinExperienceLevel() != null) {
+            int requiredShifts = switch (shift.getMinExperienceLevel()) {
+                case INTERMEDIATE -> 3;
+                case ADVANCED -> 5;
+                case EXPERT -> 10;
+                default -> 0;
+            };
+            int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
+            if (completed < requiredShifts) {
+                return false;
+            }
+        }
+        if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
+            Set<UUID> requiredSkillIds = Arrays.stream(shift.getRequiredSkills())
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!requiredSkillIds.isEmpty()) {
+                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
+                Set<UUID> haveSkillIds = workerSkills == null ? Collections.emptySet() :
+                        workerSkills.stream()
+                                .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
+                                .map(ws -> ws.getSkill().getSkillId())
+                                .collect(Collectors.toSet());
+                if (!haveSkillIds.containsAll(requiredSkillIds)) {
+                    return false;
+                }
+            }
+        }
+        List<AssignmentStatus> activeStatuses = List.of(
+                AssignmentStatus.CONFIRMED,
+                AssignmentStatus.CHECKED_IN,
+                AssignmentStatus.PENDING
+        );
+        List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
+                worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
+        if (!conflicts.isEmpty()) {
+            return false;
+        }
+        if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0) {
+            if (shift.getHourlyWage() != null && shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
+                return false;
+            }
+        }
+        if (!isShiftCoveredByAvailability(worker, shift)) {
+            return false;
+        }
+        return true;
     }
 
     private double getConfigDouble(String key, double defaultValue) {

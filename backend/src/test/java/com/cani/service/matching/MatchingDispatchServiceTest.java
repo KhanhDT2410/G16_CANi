@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -58,6 +59,12 @@ class MatchingDispatchServiceTest {
 
     @Mock
     private com.cani.repository.WorkerAvailabilityRepository workerAvailabilityRepository;
+
+    @Mock
+    private com.cani.repository.WorkerGroupRepository workerGroupRepository;
+
+    @Mock
+    private com.cani.repository.WorkerGroupMembershipRepository workerGroupMembershipRepository;
 
     @InjectMocks
     private MatchingDispatchService matchingDispatchService;
@@ -654,6 +661,218 @@ class MatchingDispatchServiceTest {
             // Assert
             assertEquals(2, count);
             verify(dispatchProposalRepository, times(2)).save(any(DispatchProposal.class));
+        }
+    }
+
+    // =========================================================================
+    // 5. Group Dispatch Channel: dispatchGroupsForShift (kênh group song song kênh cá nhân)
+    // =========================================================================
+    @Nested
+    @DisplayName("5. Group Dispatch Channel: dispatchGroupsForShift")
+    class GroupDispatchChannelTests {
+
+        private record Fixture(WorkerGroup group, Worker leader, Worker member) {
+        }
+
+        private Worker groupWorker(String name, KycStatus kyc, Boolean online, int reliabilityScore) {
+            return Worker.builder()
+                    .workerId(UUID.randomUUID())
+                    .user(User.builder().userId(UUID.randomUUID()).role(UserRole.WORKER).status(UserStatus.ACTIVE).build())
+                    .fullName(name)
+                    .kycStatus(kyc)
+                    .isOnline(online)
+                    .reliabilityScore(reliabilityScore)
+                    .totalShiftsCompleted(5)
+                    .build();
+        }
+
+        private WorkerGroupMembership membership(WorkerGroup group, Worker worker) {
+            return WorkerGroupMembership.builder()
+                    .workerGroup(group)
+                    .worker(worker)
+                    .status(MembershipStatus.ACTIVE)
+                    .build();
+        }
+
+        /** Group có leader + 1 member đủ điều kiện (stub sẵn findById leader). */
+        private Fixture eligibleGroup(String name) {
+            Worker leader = groupWorker("Leader " + name, KycStatus.APPROVED, true, 90);
+            Worker member = groupWorker("Member " + name, KycStatus.APPROVED, true, 85);
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name(name)
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            return new Fixture(group, leader, member);
+        }
+
+        @Test
+        @DisplayName("GROUP001: 3 group (2 có member eligible, 1 toàn member không đạt) -> đúng 2 proposal, gán leader, nguồn GROUP, gửi FCM leader")
+        void dispatch_groups_creates_one_proposal_per_eligible_group_top5() {
+            Fixture g1 = eligibleGroup("Đội Lễ Tân");
+            Fixture g2 = eligibleGroup("Đội Hậu Cần");
+
+            Worker leader3 = groupWorker("Leader Đội Trống", KycStatus.APPROVED, true, 90);
+            Worker badMember = groupWorker("Chưa eKYC", KycStatus.PENDING, true, 90);
+            WorkerGroup g3 = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Trống")
+                    .leaderWorkerId(leader3.getWorkerId())
+                    .isActive(true)
+                    .build();
+            when(workerRepository.findById(leader3.getWorkerId())).thenReturn(Optional.of(leader3));
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(g1.group(), g2.group(), g3));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(List.of(membership(g1.group(), g1.member()), membership(g2.group(), g2.member()), membership(g3, badMember)));
+            when(dispatchProposalRepository.save(any(DispatchProposal.class))).thenAnswer(inv -> {
+                DispatchProposal p = inv.getArgument(0);
+                p.setProposalId(UUID.randomUUID());
+                return p;
+            });
+
+            // Act
+            Instant before = Instant.now();
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            // Assert: đúng 2 proposal cho 2 group có member eligible
+            assertEquals(2, count);
+            ArgumentCaptor<DispatchProposal> captor = ArgumentCaptor.forClass(DispatchProposal.class);
+            verify(dispatchProposalRepository, times(2)).save(captor.capture());
+
+            Map<UUID, DispatchProposal> byGroup = new HashMap<>();
+            for (DispatchProposal p : captor.getAllValues()) {
+                byGroup.put(p.getGroupId(), p);
+                assertEquals(ProposalStatus.PENDING, p.getStatus());
+                assertEquals(AssignmentSource.GROUP, p.getSource());
+                assertNotNull(p.getGroupId());
+                assertTrue(p.getExpiresAt().isAfter(before));
+                assertTrue(p.getExpiresAt().isBefore(before.plus(Duration.ofMinutes(61))));
+                assertTrue(p.getScoreBreakdown().contains("eligibleMemberWorkerIds"));
+            }
+            DispatchProposal p1 = byGroup.get(g1.group().getGroupId());
+            DispatchProposal p2 = byGroup.get(g2.group().getGroupId());
+            assertNotNull(p1);
+            assertNotNull(p2);
+            assertEquals(g1.leader(), p1.getWorker());
+            assertEquals(g2.leader(), p2.getWorker());
+            assertTrue(p1.getScoreBreakdown().contains(g1.member().getWorkerId().toString()));
+
+            // FCM gửi leader
+            verify(notificationService).createAndSend(
+                    eq(g1.leader().getUser().getUserId()),
+                    contains("Lời mời ca cho đội"),
+                    anyString(),
+                    eq(NotificationType.PROPOSAL),
+                    eq("PROPOSAL"),
+                    any(),
+                    anyMap());
+            verify(notificationService).createAndSend(
+                    eq(g2.leader().getUser().getUserId()),
+                    contains("Lời mời ca cho đội"),
+                    anyString(),
+                    eq(NotificationType.PROPOSAL),
+                    eq("PROPOSAL"),
+                    any(),
+                    anyMap());
+        }
+
+        @Test
+        @DisplayName("GROUP002: Group 4 member nhưng tất cả không đủ điều kiện -> 0 proposal, không exception")
+        void dispatch_groups_skips_group_with_zero_eligible_members() {
+            Worker leader = groupWorker("Leader", KycStatus.APPROVED, true, 90);
+            Worker m1 = groupWorker("Chưa eKYC", KycStatus.PENDING, true, 90);
+            Worker m2 = groupWorker("Uy tín thấp", KycStatus.APPROVED, true, 40);
+            Worker m3 = groupWorker("Account khóa", KycStatus.APPROVED, true, 90);
+            m3.getUser().setStatus(UserStatus.LOCKED);
+            Worker m4 = groupWorker("Trùng lịch", KycStatus.APPROVED, true, 90);
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội 4 Người")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(List.of(membership(group, m1), membership(group, m2), membership(group, m3), membership(group, m4)));
+            when(shiftAssignmentRepository.findConflictingAssignments(eq(m4.getWorkerId()), any(), any(), anyList()))
+                    .thenReturn(List.of(ShiftAssignment.builder().assignmentId(UUID.randomUUID()).status(AssignmentStatus.CONFIRMED).build()));
+
+            // Act & Assert: không ném exception, 0 proposal
+            assertEquals(0, matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false));
+            verify(dispatchProposalRepository, never()).save(any(DispatchProposal.class));
+        }
+
+        @Test
+        @DisplayName("GROUP003: Member isOnline=false nhưng đủ điều kiện khác -> vẫn được tính eligible (kênh group không xét isOnline)")
+        void dispatch_groups_ignores_is_online() {
+            Worker leader = groupWorker("Leader", KycStatus.APPROVED, true, 90);
+            Worker offlineMember = groupWorker("Member Offline", KycStatus.APPROVED, false, 88);
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Offline")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(List.of(membership(group, offlineMember)));
+            when(dispatchProposalRepository.save(any(DispatchProposal.class))).thenAnswer(inv -> {
+                DispatchProposal p = inv.getArgument(0);
+                p.setProposalId(UUID.randomUUID());
+                return p;
+            });
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(1, count);
+            ArgumentCaptor<DispatchProposal> captor = ArgumentCaptor.forClass(DispatchProposal.class);
+            verify(dispatchProposalRepository).save(captor.capture());
+            assertTrue(captor.getValue().getScoreBreakdown().contains(offlineMember.getWorkerId().toString()));
+        }
+
+        @Test
+        @DisplayName("GROUP004: emergency=true -> proposal hết hạn ~30 phút (không phải 1 giờ), tiêu đề có tiền tố 🚨 GẤP")
+        void dispatch_groups_emergency_expiry_30min() {
+            Fixture g = eligibleGroup("Đội Gấp");
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(g.group()));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(List.of(membership(g.group(), g.member())));
+            when(dispatchProposalRepository.save(any(DispatchProposal.class))).thenAnswer(inv -> {
+                DispatchProposal p = inv.getArgument(0);
+                p.setProposalId(UUID.randomUUID());
+                return p;
+            });
+
+            Instant before = Instant.now();
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), true);
+
+            assertEquals(1, count);
+            ArgumentCaptor<DispatchProposal> captor = ArgumentCaptor.forClass(DispatchProposal.class);
+            verify(dispatchProposalRepository).save(captor.capture());
+            Instant expiresAt = captor.getValue().getExpiresAt();
+            assertTrue(expiresAt.isAfter(before.plus(Duration.ofMinutes(30)).minusSeconds(5)),
+                    "expiresAt phải >= now + 30 phút");
+            assertTrue(expiresAt.isBefore(before.plus(Duration.ofMinutes(31))),
+                    "expiresAt phải <= now + 31 phút");
+            verify(notificationService).createAndSend(
+                    eq(g.leader().getUser().getUserId()),
+                    startsWith("🚨 GẤP"),
+                    anyString(),
+                    eq(NotificationType.PROPOSAL),
+                    eq("PROPOSAL"),
+                    any(),
+                    anyMap());
         }
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,8 @@ public interface WorkerGroupMembershipRepository extends JpaRepository<WorkerGro
     List<WorkerGroupMembership> findByGroupIdWithWorkerDetails(@Param("groupId") UUID groupId);
 
     List<WorkerGroupMembership> findByWorkerGroup_GroupIdAndStatus(UUID groupId, MembershipStatus status);
+
+    List<WorkerGroupMembership> findByWorkerGroup_GroupIdInAndStatus(Collection<UUID> groupIds, MembershipStatus status);
 
     List<WorkerGroupMembership> findByWorker_WorkerIdAndStatus(UUID workerId, MembershipStatus status);
 

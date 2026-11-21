@@ -123,7 +123,8 @@ public class Dispute {
     /**
      * BR-55: đánh dấu đã khấu trừ −10 RS cho worker (tránh trừ 2 lần khi CC và Admin đều ra quyết định WORKER_FAULT).
      */
-    @Column(name = "rs_penalty_applied")
+    @Column(name = "rs_penalty_applied", nullable = false)
+    @Builder.Default
     private Boolean rsPenaltyApplied = false;
 
     @CreationTimestamp

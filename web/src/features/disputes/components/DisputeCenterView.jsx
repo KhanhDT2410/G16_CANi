@@ -4,7 +4,7 @@ import { useDisputes } from '../hooks/useDisputes';
 import DisputeQueueSidebar from './DisputeQueueSidebar';
 import DisputeConversationWorkspace from './DisputeConversationWorkspace';
 import DisputeQueueTable from './DisputeQueueTable';
-import CreateDisputeModal from './CreateDisputeModal';
+import CreateDisputeWizard from './CreateDisputeWizard';
 import DisputeDecisionModal from './DisputeDecisionModal';
 import EscalateModal from './EscalateModal';
 import TransferDisputeModal from './TransferDisputeModal';
@@ -88,6 +88,17 @@ export const DisputeCenterView = () => {
   const openDecision = (d) => { setModalDispute(d); setModalType('decision'); };
   const openEscalate = (d) => { setModalDispute(d); setModalType('escalate'); };
   const openTransfer = (d) => { setModalDispute(d); setModalType('transfer'); loadCcStaff(); };
+
+  if (modalType === 'create') {
+    return (
+      <div className="disputes-container">
+        <CreateDisputeWizard
+          onCancel={() => setModalType(null)}
+          onSubmit={createDispute}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="disputes-container">
@@ -191,7 +202,6 @@ export const DisputeCenterView = () => {
         />
       )}
 
-      {modalType === 'create' && <CreateDisputeModal onClose={() => setModalType(null)} onSubmit={createDispute} />}
       {modalType === 'decision' && modalDispute && (
         <DisputeDecisionModal dispute={modalDispute} onClose={() => setModalType(null)} onSubmit={issueDecision} />
       )}

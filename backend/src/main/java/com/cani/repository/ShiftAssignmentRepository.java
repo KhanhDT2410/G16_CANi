@@ -71,4 +71,26 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             @Param("eoId") UUID eoId,
             @Param("statuses") List<AssignmentStatus> statuses
     );
+
+    @Query("SELECT sa FROM ShiftAssignment sa " +
+           "JOIN FETCH sa.worker w " +
+           "LEFT JOIN FETCH w.user wu " +
+           "JOIN FETCH sa.shift s " +
+           "JOIN FETCH s.event e " +
+           "JOIN FETCH e.eventOrganizer eo " +
+           "LEFT JOIN FETCH eo.user eu " +
+           "WHERE eo.eoId = :eoId " +
+           "ORDER BY s.startTime DESC")
+    List<ShiftAssignment> findAllWithDetailsByEoId(@Param("eoId") UUID eoId);
+
+    @Query("SELECT sa FROM ShiftAssignment sa " +
+           "JOIN FETCH sa.worker w " +
+           "LEFT JOIN FETCH w.user wu " +
+           "JOIN FETCH sa.shift s " +
+           "JOIN FETCH s.event e " +
+           "JOIN FETCH e.eventOrganizer eo " +
+           "LEFT JOIN FETCH eo.user eu " +
+           "WHERE w.workerId = :workerId " +
+           "ORDER BY s.startTime DESC")
+    List<ShiftAssignment> findAllWithDetailsByWorkerId(@Param("workerId") UUID workerId);
 }

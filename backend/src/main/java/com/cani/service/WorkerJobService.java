@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -86,6 +87,9 @@ public class WorkerJobService {
 
     @Autowired(required = false)
     private jakarta.persistence.EntityManager entityManager;
+
+    @Autowired(required = false)
+    private EventOrganizerRepository eventOrganizerRepository;
 
     /**
      * Bật / tắt trạng thái "Bắt đầu kiếm việc" (Online status)
@@ -1179,8 +1183,15 @@ public class WorkerJobService {
     public ReviewResponseDto createReview(UUID userId, UUID assignmentId, CreateReviewRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
-        if (assignment.getStatus() != AssignmentStatus.COMPLETED) {
+        Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId);
+        boolean hasCheckedOut = (attOpt.isPresent() && attOpt.get().getCheckoutTime() != null)
+                || assignment.getStatus() == AssignmentStatus.COMPLETED;
+        if (!hasCheckedOut) {
             throw new BadRequestException("Chỉ có thể đánh giá Ban tổ chức sau khi đã hoàn thành và kết ca.");
+        }
+        if (assignment.getStatus() != AssignmentStatus.COMPLETED) {
+            assignment.setStatus(AssignmentStatus.COMPLETED);
+            shiftAssignmentRepository.save(assignment);
         }
 
         // getWorkerOrThrow tra cứu theo userId nên userId chính là reviewer — tránh NPE worker.getUser()
@@ -1211,6 +1222,19 @@ public class WorkerJobService {
                 .build();
 
         review = reviewRepository.save(review);
+
+        // Cập nhật điểm đánh giá trung bình cho Event Organizer
+        if (eventOrganizerRepository != null) {
+            int currentCount = eo.getRatingCount() != null ? eo.getRatingCount() : 0;
+            BigDecimal currentAvg = eo.getRatingAvg() != null ? eo.getRatingAvg() : BigDecimal.valueOf(5.0);
+            BigDecimal totalScore = currentAvg.multiply(BigDecimal.valueOf(currentCount))
+                    .add(BigDecimal.valueOf(request.getRating()));
+            int newCount = currentCount + 1;
+            eo.setRatingCount(newCount);
+            eo.setRatingAvg(totalScore.divide(BigDecimal.valueOf(newCount), 2, RoundingMode.HALF_UP));
+            eventOrganizerRepository.save(eo);
+        }
+
         log.info("Worker {} đã đánh giá EO {} cho ca {} (Số sao: {})", userId, revieweeId, assignmentId, request.getRating());
 
         return mapToReviewResponseDto(review);

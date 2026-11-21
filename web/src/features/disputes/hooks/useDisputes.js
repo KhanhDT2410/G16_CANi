@@ -88,8 +88,11 @@ export const useDisputes = (initialTab = 'queue') => {
     try {
       const result = await disputeApi.createDispute(payload);
       showToast('Đã nộp đơn tranh chấp thành công đến bộ phận CSKH', 'success');
-      loadMyDisputes();
-      loadQueue();
+      await loadMyDisputes();
+      // Chỉ tải hàng đợi nếu là Arbitrator (Admin / Customer Care) để tránh lỗi 403 cho EO / Worker
+      if (initialTab === 'queue' || activeTab === 'queue') {
+        loadQueue();
+      }
       return result;
     } catch (err) {
       const msg = err.response?.data?.message || 'Lỗi khi gửi đơn tranh chấp';

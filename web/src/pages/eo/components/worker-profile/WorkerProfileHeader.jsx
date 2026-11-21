@@ -63,7 +63,7 @@ export const WorkerProfileHeader = ({ profile }) => {
                 borderRadius: 4,
                 border: '1px solid #bfdbfe',
               }}>
-                {isFavorited ? '★ Thợ quen yêu thích' : '✓ Trong My Team'}
+                {isFavorited ? '★ Nhân sự yêu thích' : '✓ Nhân sự quen thuộc'}
               </span>
             )}
           </div>

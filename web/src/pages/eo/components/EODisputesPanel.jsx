@@ -5,7 +5,7 @@ import {
   DisputeDetailModal,
   AddEvidenceModal,
   EscalateModal,
-  CreateDisputeModal,
+  CreateDisputeWizard,
   DISPUTE_STATUS_CONFIG,
   DISPUTE_TYPE_LABELS,
 } from '../../../features/disputes';
@@ -52,6 +52,17 @@ export default function EODisputesPanel() {
     }
     return myDisputes;
   }, [myDisputes, filterRole, currentUserId]);
+
+  if (showCreate) {
+    return (
+      <div className="animate-fade-in" style={{ padding: '0.25rem 0' }}>
+        <CreateDisputeWizard
+          onCancel={() => setShowCreate(false)}
+          onSubmit={createDispute}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in" style={{ padding: '0.25rem 0' }}>
@@ -271,13 +282,6 @@ export default function EODisputesPanel() {
           dispute={escalateTarget}
           onClose={() => setEscalateTarget(null)}
           onSubmit={escalateDispute}
-        />
-      )}
-
-      {showCreate && (
-        <CreateDisputeModal
-          onClose={() => setShowCreate(false)}
-          onSubmit={createDispute}
         />
       )}
     </div>

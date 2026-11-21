@@ -24,6 +24,12 @@ export const disputeApi = {
     return response.data?.data;
   },
 
+  /** Danh sách ca phân công để chọn khi nộp đơn tranh chấp */
+  getMyAssignments: async () => {
+    const response = await apiClient.get('/v1/disputes/my-assignments');
+    return response.data?.data || [];
+  },
+
   /** UC-98: Nạp bổ sung bằng chứng */
   addEvidence: async (id, payload) => {
     const response = await apiClient.post(`/v1/disputes/${id}/evidence`, payload);

@@ -83,6 +83,20 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   }
 
   Future<void> _openQrScanner(ShiftAssignmentItem a, bool isCheckin) async {
+    if (isCheckin) {
+      final gate = a.arrivalTime ?? a.startTime;
+      if (DateTime.now().isBefore(gate)) {
+        final gateStr =
+            '${gate.hour.toString().padLeft(2, '0')}:${gate.minute.toString().padLeft(2, '0')} ${gate.day.toString().padLeft(2, '0')}/${gate.month.toString().padLeft(2, '0')}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Chưa đến giờ điểm danh ca làm (Mở lúc $gateStr). Vui lòng quay lại đúng giờ!'),
+            backgroundColor: Theme.of(context).cani.warning,
+          ),
+        );
+        return;
+      }
+    }
     final success = await Navigator.push<bool>(
       context,
       MaterialPageRoute(

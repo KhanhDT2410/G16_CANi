@@ -250,7 +250,7 @@ class MyTeamServiceTest {
             // Act & Assert
             BadRequestException ex = assertThrows(BadRequestException.class,
                     () -> myTeamService.addWorkerToMyTeam(eoUserId, request));
-            assertTrue(ex.getMessage().contains("đã có trong danh sách My Team"));
+            assertTrue(ex.getMessage().contains("đã có trong danh sách nhân sự quen thuộc"));
             verify(eoWorkerRepository, never()).save(any());
         }
 

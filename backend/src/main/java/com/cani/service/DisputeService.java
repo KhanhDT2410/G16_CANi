@@ -97,8 +97,9 @@ public class DisputeService {
                 .type(request.getType())
                 .title(request.getTitle())
                 .description(request.getDescription())
-                .evidence(request.getEvidence())
+                .evidence(normalizeEvidenceJson(request.getEvidence()))
                 .status(DisputeStatus.OPEN)
+                .rsPenaltyApplied(false)
                 .slaDeadline(Instant.now().plus(Duration.ofDays(CC_DECISION_SLA_DAYS)))
                 .build();
         dispute = disputeRepository.save(dispute);
@@ -131,6 +132,60 @@ public class DisputeService {
         log.info("User {} tạo tranh chấp {} (loại {}, ca {})", requesterId, dispute.getDisputeId(),
                 request.getType(), assignment.getAssignmentId());
         return toDetailDto(dispute);
+    }
+
+    /**
+     * Lấy danh sách ca phân công của Worker hoặc EO hiện tại để chọn khi tạo tranh chấp.
+     */
+    public List<DisputeEligibleAssignmentDto> getEligibleAssignmentsForDispute(UUID requesterId) {
+        User user = currentUserOrThrow(requesterId);
+        List<ShiftAssignment> assignments = new ArrayList<>();
+
+        if (user.getRole() == UserRole.EVENT_ORGANIZER) {
+            eventOrganizerRepository.findByUser_UserId(requesterId)
+                    .ifPresent(eo -> assignments.addAll(shiftAssignmentRepository.findAllWithDetailsByEoId(eo.getEoId())));
+        } else if (user.getRole() == UserRole.WORKER) {
+            workerRepository.findByUser_UserId(requesterId)
+                    .ifPresent(w -> assignments.addAll(shiftAssignmentRepository.findAllWithDetailsByWorkerId(w.getWorkerId())));
+        }
+
+        return assignments.stream()
+                .filter(sa -> sa.getStatus() != AssignmentStatus.PENDING)
+                .limit(50)
+                .map(sa -> {
+                    Shift shift = sa.getShift();
+                    Event event = shift != null ? shift.getEvent() : null;
+                    String counterpartyName;
+                    String counterpartyPhone = null;
+
+                    if (user.getRole() == UserRole.EVENT_ORGANIZER) {
+                        Worker w = sa.getWorker();
+                        User wu = w != null ? w.getUser() : null;
+                        counterpartyName = w != null && w.getFullName() != null
+                                ? w.getFullName()
+                                : (wu != null ? wu.getFullName() : "Nhân sự");
+                        counterpartyPhone = wu != null ? wu.getPhone() : null;
+                    } else {
+                        EventOrganizer eo = event != null ? event.getEventOrganizer() : null;
+                        User eu = eo != null ? eo.getUser() : null;
+                        counterpartyName = eo != null && eo.getCompanyName() != null
+                                ? eo.getCompanyName()
+                                : (eu != null ? eu.getFullName() : "Ban Tổ Chức");
+                        counterpartyPhone = eu != null ? eu.getPhone() : null;
+                    }
+
+                    return DisputeEligibleAssignmentDto.builder()
+                            .assignmentId(sa.getAssignmentId())
+                            .eventName(event != null ? event.getName() : "Sự kiện")
+                            .jobType(shift != null ? shift.getJobType() : "Ca làm")
+                            .counterpartyName(counterpartyName)
+                            .counterpartyPhone(counterpartyPhone)
+                            .startTime(shift != null ? shift.getStartTime() : sa.getCreatedAt())
+                            .endTime(shift != null ? shift.getEndTime() : null)
+                            .status(sa.getStatus() != null ? sa.getStatus().name() : null)
+                            .build();
+                })
+                .toList();
     }
 
     // =========================================================================
@@ -537,15 +592,35 @@ public class DisputeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tranh chấp", "id", disputeId));
     }
 
+    private String normalizeEvidenceJson(String rawEvidence) {
+        if (rawEvidence == null || rawEvidence.isBlank()) {
+            return null;
+        }
+        String trimmed = rawEvidence.trim();
+        if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+            return trimmed;
+        }
+        try {
+            return objectMapper.writeValueAsString(List.of(trimmed));
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
     private void saveNotification(User user, String title, String body, Dispute dispute) {
-        notificationRepository.save(Notification.builder()
-                .user(user)
-                .title(title)
-                .body(body)
-                .type(NotificationType.DISPUTE)
-                .referenceType("DISPUTE")
-                .referenceId(dispute.getDisputeId())
-                .build());
+        try {
+            notificationRepository.save(Notification.builder()
+                    .user(user)
+                    .title(title)
+                    .body(body)
+                    .type(NotificationType.DISPUTE)
+                    .referenceType("DISPUTE")
+                    .referenceId(dispute.getDisputeId())
+                    .build());
+        } catch (Exception ex) {
+            log.warn("Không thể lưu thông báo tranh chấp {}: {}",
+                    dispute != null ? dispute.getDisputeId() : null, ex.getMessage());
+        }
     }
 
     private void notifyDisputeParties(Dispute dispute, PartyRef parties, String title, String body) {
@@ -557,14 +632,23 @@ public class DisputeService {
         if (userId == null) {
             return;
         }
-        userRepository.findById(userId).ifPresent(u -> saveNotification(u, title, body, dispute));
+        try {
+            userRepository.findById(userId).ifPresent(u -> saveNotification(u, title, body, dispute));
+        } catch (Exception ex) {
+            log.warn("Không thể thông báo tới user {}: {}", userId, ex.getMessage());
+        }
     }
 
     private void notifyCcTeam(Dispute dispute) {
-        userRepository.findByRole(UserRole.CUSTOMER_CARE).forEach(cc ->
-                saveNotification(cc, "Có tranh chấp mới trong hàng đợi",
-                        "Tranh chấp " + dispute.getDisputeId() + " (" + dispute.getType() + ") đang chờ phân công.",
-                        dispute));
+        try {
+            userRepository.findByRole(UserRole.CUSTOMER_CARE).forEach(cc ->
+                    saveNotification(cc, "Có tranh chấp mới trong hàng đợi",
+                            "Tranh chấp " + dispute.getDisputeId() + " (" + dispute.getType() + ") đang chờ phân công.",
+                            dispute));
+        } catch (Exception ex) {
+            log.warn("Không thể thông báo đội CSKH về tranh chấp {}: {}",
+                    dispute != null ? dispute.getDisputeId() : null, ex.getMessage());
+        }
     }
 
     // ------------------------------------------------------------------
@@ -616,11 +700,76 @@ public class DisputeService {
                     .build());
         }
 
+        String eventName = null;
+        String jobType = null;
+        Instant shiftStartTime = null;
+        Instant shiftEndTime = null;
+        String shiftLocation = null;
+
+        if (dispute.getAssignmentId() != null) {
+            ShiftAssignment assignment = shiftAssignmentRepository.findById(dispute.getAssignmentId()).orElse(null);
+            if (assignment != null && assignment.getShift() != null) {
+                Shift shift = assignment.getShift();
+                jobType = shift.getJobType();
+                shiftStartTime = shift.getStartTime();
+                shiftEndTime = shift.getEndTime();
+                shiftLocation = shift.getLocationAddress();
+                if (shift.getEvent() != null) {
+                    eventName = shift.getEvent().getName();
+                }
+            }
+        }
+
+        String complainantName = null;
+        String complainantRole = null;
+        String complainantPhone = null;
+        if (dispute.getComplainantId() != null) {
+            User complainant = userRepository.findById(dispute.getComplainantId()).orElse(null);
+            if (complainant != null) {
+                complainantName = complainant.getFullName();
+                complainantRole = complainant.getRole() != null ? complainant.getRole().name() : null;
+                complainantPhone = complainant.getPhone();
+            }
+        }
+
+        String respondentName = null;
+        String respondentRole = null;
+        String respondentPhone = null;
+        if (dispute.getRespondentId() != null) {
+            User respondent = userRepository.findById(dispute.getRespondentId()).orElse(null);
+            if (respondent != null) {
+                respondentName = respondent.getFullName();
+                respondentRole = respondent.getRole() != null ? respondent.getRole().name() : null;
+                respondentPhone = respondent.getPhone();
+            }
+        }
+
+        String assignedToName = null;
+        if (dispute.getAssignedTo() != null) {
+            User assignedUser = userRepository.findById(dispute.getAssignedTo()).orElse(null);
+            if (assignedUser != null) {
+                assignedToName = assignedUser.getFullName();
+            }
+        }
+
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())
                 .assignmentId(dispute.getAssignmentId())
                 .complainantId(dispute.getComplainantId())
                 .respondentId(dispute.getRespondentId())
+                .assignedTo(dispute.getAssignedTo())
+                .assignedToName(assignedToName)
+                .complainantName(complainantName)
+                .complainantRole(complainantRole)
+                .complainantPhone(complainantPhone)
+                .respondentName(respondentName)
+                .respondentRole(respondentRole)
+                .respondentPhone(respondentPhone)
+                .eventName(eventName)
+                .jobType(jobType)
+                .shiftStartTime(shiftStartTime)
+                .shiftEndTime(shiftEndTime)
+                .shiftLocation(shiftLocation)
                 .type(dispute.getType())
                 .title(dispute.getTitle())
                 .description(dispute.getDescription())

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'package:cani/features/help_center/screens/help_center_screen.dart';
 import 'package:cani/features/job_proposals/screens/my_disputes_screen.dart';
+import 'package:cani/features/profile/screens/worker_work_history_screen.dart';
 import 'package:cani/features/profile/widgets/profile_tokens.dart';
 import 'package:cani/features/skill_verification/screens/worker_settings_screen.dart';
 import 'package:cani/features/worker_groups/screens/worker_groups_screen.dart';
@@ -42,7 +43,21 @@ class ProfileSettingsBlock extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // 1. TIÊU CHÍ TÌM VIỆC & LỊCH RẢNH NHẬN CA (WorkerSettingsScreen)
+          // 1. LỊCH SỬ LÀM VIỆC (WorkerWorkHistoryScreen)
+          _ClickableRow(
+            icon: Icons.work_history_rounded,
+            label: 'Lịch sử làm việc',
+            subtitle: 'Xem các ca đã hoàn thành, thu nhập và đánh giá từ BTC',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WorkerWorkHistoryScreen()),
+              );
+            },
+          ),
+
+          Divider(height: 16, color: t.border.withValues(alpha: 0.5)),
+
+          // 2. TIÊU CHÍ TÌM VIỆC & LỊCH RẢNH NHẬN CA (WorkerSettingsScreen)
           _ClickableRow(
             icon: Icons.tune_rounded,
             label: 'Tiêu chí tìm việc & Lịch nhận ca',

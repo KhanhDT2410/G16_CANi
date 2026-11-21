@@ -9,6 +9,7 @@ import { useWorkerProfile } from '../hooks/useWorkerProfile';
 export default function EOMyTeamTab() {
   const [team, setTeam] = useState([]);
   const [collaborators, setCollaborators] = useState([]);
+  const [systemWorkers, setSystemWorkers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [favoritedOnly, setFavoritedOnly] = useState(false);
@@ -26,16 +27,21 @@ export default function EOMyTeamTab() {
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      const [teamData, collabData] = await Promise.all([
+      const trimmed = search.trim();
+      const [teamData, collabData, searchData] = await Promise.all([
         myTeamService.getMyTeam(search, favoritedOnly),
         myTeamService.getPastCollaborators(search),
+        trimmed.length >= 2 ? myTeamService.searchWorkers(trimmed) : Promise.resolve([]),
       ]);
       setTeam(Array.isArray(teamData) ? teamData : []);
       setCollaborators(Array.isArray(collabData) ? collabData : []);
+      setSystemWorkers(Array.isArray(searchData) ? searchData : []);
     } catch (err) {
       console.warn('Lỗi tải danh sách nhân sự quen thuộc:', err);
       setTeam([]);
       setCollaborators([]);
+      setSystemWorkers([]);
+      showToast(err.response?.data?.message || 'Không tải được danh sách nhân sự quen thuộc', 'error');
     } finally {
       setLoading(false);
     }
@@ -152,12 +158,21 @@ export default function EOMyTeamTab() {
     setSubmittingAdd(true);
     try {
       await myTeamService.addWorkerToMyTeam(addForm);
-      showToast('Đã thêm nhân sự vào danh sách quen thuộc.', 'success');
+      showToast('Đã lưu nhân sự vào danh sách nhân sự quen thuộc.', 'success');
       setShowAddModal(false);
       setAddForm({ phone: '', internalNote: '', isFavorited: true });
-      fetchAllData();
+      setSearch('');
+      setFavoritedOnly(false);
+      await fetchAllData();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Không tìm thấy nhân sự hoặc có lỗi xảy ra', 'error');
+      const msg = err.response?.data?.message || 'Không tìm thấy nhân sự hoặc có lỗi xảy ra';
+      showToast(msg, 'error');
+      if (msg.includes('đã có trong danh sách')) {
+        setShowAddModal(false);
+        setSearch('');
+        setFavoritedOnly(false);
+        await fetchAllData();
+      }
     } finally {
       setSubmittingAdd(false);
     }
@@ -658,6 +673,107 @@ export default function EOMyTeamTab() {
               </div>
             )}
           </div>
+
+          {/* KHU VỰC 3: KẾT QUẢ TÌM KIẾM NHÂN SỰ TRÊN HỆ THỐNG (Khi người dùng nhập từ khóa) */}
+          {search.trim().length >= 2 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.5rem' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                  Kết quả tìm kiếm nhân sự trên CANi ({systemWorkers.length})
+                </h4>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                  Tìm kiếm theo tên, số điện thoại hoặc email trên toàn hệ thống để lưu vào Nhân Sự Quen Thuộc.
+                </p>
+              </div>
+
+              {systemWorkers.length === 0 ? (
+                <div
+                  style={{
+                    padding: '1.35rem',
+                    textAlign: 'center',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    color: '#64748b',
+                    fontSize: '0.84rem',
+                  }}
+                >
+                  Không tìm thấy nhân sự nào khớp với từ khóa &quot;{search.trim()}&quot;.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '1rem' }}>
+                  {systemWorkers.map((w) => {
+                    const alreadySaved = w.isSavedInMyTeam || savedWorkerIds.has(w.workerId);
+                    return (
+                      <div
+                        key={`sys-${w.workerId}`}
+                        className="eo-widget-card"
+                        style={{
+                          padding: '1.15rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem',
+                          border: '1px solid #dbeafe',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                          <div>
+                            <h4
+                              onClick={() => workerProfile.openProfile(w.workerId)}
+                              style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0066FF', cursor: 'pointer' }}
+                            >
+                              {w.fullName}
+                            </h4>
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>
+                              SĐT: <strong>{w.phone || 'Chưa cập nhật'}</strong>
+                            </div>
+                          </div>
+                          <span
+                            style={{
+                              background: alreadySaved ? '#f0fdf4' : '#eff6ff',
+                              color: alreadySaved ? '#047857' : '#1d4ed8',
+                              border: alreadySaved ? '1px solid #bbf7d0' : '1px solid #bfdbfe',
+                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {alreadySaved ? 'Đã lưu' : formatTierLabel(w.skillTier)}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.78rem', color: '#475569', background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '8px' }}>
+                          Uy tín: <strong>{w.reliabilityScore ?? 100}/100</strong> • Đánh giá: <strong>{w.ratingAvg ?? 5.0}</strong>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.6rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => workerProfile.openProfile(w.workerId)}
+                            className="eo-btn-secondary"
+                            style={{ padding: '0.38rem 0.75rem', fontSize: '0.76rem', fontWeight: 600 }}
+                          >
+                            Xem Hồ Sơ
+                          </button>
+                          {!alreadySaved && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickSaveCollaborator(w)}
+                              className="eo-btn-primary"
+                              style={{ padding: '0.38rem 0.85rem', fontSize: '0.76rem', fontWeight: 700 }}
+                            >
+                              Lưu vào đội
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 

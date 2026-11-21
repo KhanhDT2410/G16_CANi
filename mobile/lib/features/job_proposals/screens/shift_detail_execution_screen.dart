@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/proposal_repository.dart';
@@ -35,7 +33,6 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   int? _uploadingTaskIndex;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _checklistSectionKey = GlobalKey();
-  final GlobalKey _proofSectionKey = GlobalKey();
   final GlobalKey _paymentSectionKey = GlobalKey();
   final ValueNotifier<List<ShiftChecklistItem>> _checklistNotifier = ValueNotifier([]);
   final ValueNotifier<int?> _uploadingIndexNotifier = ValueNotifier(null);
@@ -82,10 +79,8 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   bool _isLoadingGps = true;
   String? _gpsError;
 
-  // Proof of work image
-  File? _proofImageFile;
+  // Overall proof URL synced from checklist task photos if needed at checkout
   String? _uploadedProofUrl;
-  bool _isUploadingProof = false;
   bool _isConfirmingPayment = false;
 
   bool get _isCompleted =>
@@ -96,23 +91,21 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       !_isCompleted &&
       (_assignment.status == 'CHECKED_IN' || _assignment.checkinTime != null);
 
+  DateTime get _earliestCheckinTime => _assignment.arrivalTime ?? _assignment.startTime;
+
+  bool get _isBeforeCheckinWindow =>
+      !_isCheckedIn && !_isCompleted && DateTime.now().isBefore(_earliestCheckinTime);
+
   bool get _isPaymentConfirmed =>
       (_assignment.workerConfirmStatus != null && _assignment.workerConfirmStatus!.isNotEmpty) ||
       _assignment.paymentStatus == 'CONFIRMED_FULL' ||
       _assignment.paymentStatus == 'CONFIRMED_PARTIAL' ||
       _assignment.paymentStatus == 'DISPUTED';
 
-  bool get _hasOverallProof =>
-      (_uploadedProofUrl != null && _uploadedProofUrl!.isNotEmpty) || _proofImageFile != null;
-
   bool get _isWorkReadyForEoConfirm {
-    final allTasksDone = _checklistItems.every((t) =>
+    return _checklistItems.every((t) =>
         t.isCompleted &&
         (!t.isRequiredEvidence || (t.evidenceImageUrl != null && t.evidenceImageUrl!.isNotEmpty)));
-    final hasAnyTaskPhoto = _checklistItems.any(
-      (t) => t.evidenceImageUrl != null && t.evidenceImageUrl!.isNotEmpty,
-    );
-    return allTasksDone && (_hasOverallProof || hasAnyTaskPhoto);
   }
 
   // Countdown timer
@@ -347,52 +340,16 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     }
   }
 
-  Future<({Uint8List? bytes, String? fileName, String? filePath})?> _chooseOrCaptureImage() async {
-    final cani = Theme.of(context).cani;
-    final source = await showModalBottomSheet<String>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.camera_alt_rounded, color: cani.brand),
-                title: const Text('Chụp ảnh trực tiếp bằng Camera', style: TextStyle(fontWeight: FontWeight.w600)),
-                onTap: () => Navigator.of(ctx).pop('camera'),
-              ),
-              ListTile(
-                leading: Icon(Icons.photo_library_rounded, color: cani.brand),
-                title: const Text('Chọn ảnh từ Thư viện thiết bị', style: TextStyle(fontWeight: FontWeight.w600)),
-                onTap: () => Navigator.of(ctx).pop('gallery'),
-              ),
-            ],
-          ),
-        ),
+  /// Chỉ cho phép chụp ảnh trực tiếp từ Camera trong app, tuyệt đối không chọn từ thư viện ảnh.
+  Future<({Uint8List? bytes, String? fileName})?> _captureImageFromCamera() async {
+    if (!mounted) return null;
+    final scanResult = await Navigator.of(context).push<CardScanResult>(
+      MaterialPageRoute(
+        builder: (_) => const CardScannerScreen(scanType: ScanType.workProof),
       ),
     );
-
-    if (source == null || !mounted) return null;
-
-    if (source == 'camera') {
-      final scanResult = await Navigator.of(context).push<CardScanResult>(
-        MaterialPageRoute(
-          builder: (_) => const CardScannerScreen(scanType: ScanType.workProof),
-        ),
-      );
-      if (scanResult == null) return null;
-      return (bytes: scanResult.bytes, fileName: scanResult.fileName, filePath: null);
-    } else {
-      final files = await FilePicker.pickFiles(type: FileType.image);
-      if (files.isNotEmpty && files.first.path != null) {
-        return (bytes: null, fileName: files.first.name, filePath: files.first.path!);
-      }
-      return null;
-    }
+    if (scanResult == null) return null;
+    return (bytes: scanResult.bytes, fileName: scanResult.fileName);
   }
 
   Future<void> _captureEvidenceForTask(int index) async {
@@ -408,17 +365,18 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     }
     final item = _checklistItems[index];
     try {
-      final picked = await _chooseOrCaptureImage();
+      final captured = await _captureImageFromCamera();
 
-      if (picked != null && (picked.filePath != null || picked.bytes != null)) {
+      if (captured != null && captured.bytes != null) {
         setState(() => _uploadingTaskIndex = index);
         _uploadingIndexNotifier.value = index;
 
-        // Upload ảnh lên backend
+        // Upload ảnh chụp camera trực tiếp lên backend
         final repo = ref.read(proposalRepositoryProvider);
-        final uploadedUrl = picked.bytes != null
-            ? await repo.uploadProofBytes(picked.bytes!, picked.fileName ?? 'task_proof.jpg')
-            : await repo.uploadProofImage(picked.filePath!);
+        final uploadedUrl = await repo.uploadProofBytes(
+          captured.bytes!,
+          captured.fileName ?? 'task_proof.jpg',
+        );
 
         if (!mounted) return;
 
@@ -583,6 +541,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       MaterialPageRoute(
         builder: (_) => ShiftChecklistFullScreen(
           title: '${_assignment.jobType} • ${_assignment.eventName}',
+          canInteract: _isCheckedIn,
           itemsNotifier: _checklistNotifier,
           uploadingIndexNotifier: _uploadingIndexNotifier,
           onToggleItem: _toggleChecklistItem,
@@ -591,53 +550,6 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         ),
       ),
     );
-  }
-
-  Future<void> _pickProofImage() async {
-    final cani = Theme.of(context).cani;
-    try {
-      final picked = await _chooseOrCaptureImage();
-
-      if (picked != null && (picked.filePath != null || picked.bytes != null)) {
-        if (picked.filePath != null) {
-          setState(() {
-            _proofImageFile = File(picked.filePath!);
-          });
-        }
-
-        // Tự động upload ảnh lên máy chủ và đồng bộ ngay xuống AttendanceLog để EO kiểm tra
-        setState(() => _isUploadingProof = true);
-        final repo = ref.read(proposalRepositoryProvider);
-        final url = picked.bytes != null
-            ? await repo.uploadProofBytes(picked.bytes!, picked.fileName ?? 'proof.jpg')
-            : await repo.uploadProofImage(picked.filePath!);
-        if (_isCheckedIn || _isCompleted) {
-          await repo.submitAssignmentProof(_assignment.assignmentId, url);
-        }
-        if (mounted) {
-          setState(() {
-            _uploadedProofUrl = url;
-            _isUploadingProof = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Đã nộp ảnh bằng chứng nghiệm thu cho BTC kiểm tra!'),
-              backgroundColor: Color(0xFF16A34A),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isUploadingProof = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Không thể chọn ảnh: $e'),
-              backgroundColor: cani.danger,
-            ),
-          );
-      }
-    }
   }
 
   Future<void> _openGoogleMapsNavigation() async {
@@ -786,6 +698,18 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     }
 
     if (!_isCheckedIn) {
+      if (_isBeforeCheckinWindow) {
+        final gate = _earliestCheckinTime;
+        final gateStr =
+            '${gate.hour.toString().padLeft(2, '0')}:${gate.minute.toString().padLeft(2, '0')} ${gate.day.toString().padLeft(2, '0')}/${gate.month.toString().padLeft(2, '0')}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Chưa đến giờ điểm danh ca làm (Mở lúc $gateStr). Vui lòng quay lại đúng giờ!'),
+            backgroundColor: cani.warning,
+          ),
+        );
+        return;
+      }
       // Bước 1: Check-in vào ca
       final success = await Navigator.push<bool>(
         context,
@@ -803,34 +727,24 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       return;
     }
 
-    // Đang trong ca: kiểm tra đúng trình tự (1) Checklist & Ảnh -> (2) EO Duyệt -> (3) Thanh toán & Xác nhận -> (4) Check-out -> (5) Rating
+    // Đang trong ca: kiểm tra đúng trình tự (1) Checklist & Ảnh task -> (2) EO Duyệt -> (3) Thanh toán & Xác nhận -> (4) Check-out -> (5) Rating
     if (!_isWorkReadyForEoConfirm) {
       final incompleteTasks = _checklistItems.where((i) => !i.isCompleted).toList();
       final missingPhotoTasks = _checklistItems
           .where((i) => i.isRequiredEvidence && (i.evidenceImageUrl == null || i.evidenceImageUrl!.isEmpty))
           .toList();
 
-      if (incompleteTasks.isNotEmpty || missingPhotoTasks.isNotEmpty) {
-        _scrollToSection(_checklistSectionKey);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              incompleteTasks.isNotEmpty
-                  ? 'Hãy hoàn thành ${incompleteTasks.length} đầu việc còn lại trước khi gửi BTC duyệt công!'
-                  : 'Còn ${missingPhotoTasks.length} đầu việc yêu cầu chụp ảnh nghiệm thu!',
-            ),
-            backgroundColor: cani.warning,
+      _scrollToSection(_checklistSectionKey);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            missingPhotoTasks.isNotEmpty
+                ? 'Còn ${missingPhotoTasks.length} đầu việc yêu cầu chụp ảnh nghiệm thu tại chỗ!'
+                : 'Hãy hoàn thành ${incompleteTasks.length} đầu việc còn lại trước khi gửi BTC duyệt công!',
           ),
-        );
-      } else {
-        _scrollToSection(_proofSectionKey);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Hãy chụp/tải ảnh bằng chứng nghiệm thu ca làm để gửi Ban tổ chức xác nhận!'),
-            backgroundColor: cani.warning,
-          ),
-        );
-      }
+          backgroundColor: cani.warning,
+        ),
+      );
       return;
     }
 
@@ -883,28 +797,6 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       );
       if (firstWithPhoto.evidenceImageUrl != null && firstWithPhoto.evidenceImageUrl!.isNotEmpty) {
         proofUrl = firstWithPhoto.evidenceImageUrl;
-      }
-    }
-
-    if ((proofUrl == null || proofUrl.isEmpty) && _proofImageFile != null) {
-      setState(() => _isUploadingProof = true);
-      try {
-        proofUrl = await ref
-            .read(proposalRepositoryProvider)
-            .uploadProofImage(_proofImageFile!.path);
-        _uploadedProofUrl = proofUrl;
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isUploadingProof = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi upload ảnh bằng chứng: $e'), backgroundColor: Colors.red),
-          );
-          return;
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _isUploadingProof = false);
-        }
       }
     }
 
@@ -1232,7 +1124,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     ),
                   ),
 
-                  // 5. Checklist Công việc Chi tiết (Module hóa gọn nhẹ + Mở rộng toàn màn hình)
+                  // 5. Checklist Công việc Chi tiết (Chỉ cho tương tác khi đã Check-in vào ca)
                   KeyedSubtree(
                     key: _checklistSectionKey,
                     child: ShiftChecklistSection(
@@ -1240,7 +1132,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                       isLoading: _isLoadingChecklist,
                       isSaving: _isSavingChecklist,
                       errorMessage: _checklistError,
-                      canInteract: isCheckedIn || isCompleted,
+                      canInteract: isCheckedIn,
                       uploadingTaskIndex: _uploadingTaskIndex,
                       onRetryLoad: _loadChecklist,
                       onToggleItem: _toggleChecklistItem,
@@ -1250,187 +1142,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     ),
                   ),
 
-                  // 6. Bằng chứng nghiệm thu ca làm (Proof of Work Image)
-                  Container(
-                    key: _proofSectionKey,
-                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.camera_alt_outlined, size: 20, color: cani.brand),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Bằng chứng nghiệm thu ca làm',
-                              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
-                            ),
-                            const Spacer(),
-                            if (_uploadedProofUrl != null || _proofImageFile != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Đã đính kèm ảnh',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Chụp ảnh hiện trường sau khi hoàn tất công việc (khu vực sạch sẽ, sản phẩm đã bàn giao, trang phục đúng chuẩn...) để nộp cho Ban tổ chức khi Check-out.',
-                          style: TextStyle(fontSize: 12, color: cani.textMuted, height: 1.35),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Preview Image hoặc Nút Chụp
-                        if (_proofImageFile != null || _uploadedProofUrl != null)
-                          Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: _proofImageFile != null
-                                    ? Image.file(
-                                        _proofImageFile!,
-                                        height: 170,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : buildResolvedImageWidget(
-                                        _uploadedProofUrl!,
-                                        height: 170,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                        errorText: 'Không thể tải ảnh nghiệm thu',
-                                      ),
-                              ),
-                              if (_isUploadingProof)
-                                Container(
-                                  height: 170,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black54,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Center(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        CircularProgressIndicator(color: Colors.white),
-                                        SizedBox(height: 8),
-                                        Text('Đang tải ảnh lên...', style: TextStyle(color: Colors.white, fontSize: 12)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Row(
-                                  children: [
-                                    InkWell(
-                                      onTap: _pickProofImage,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black87,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: const Row(
-                                          children: [
-                                            Icon(Icons.cached, size: 14, color: Colors.white),
-                                            SizedBox(width: 4),
-                                            Text('Đổi ảnh', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          _proofImageFile = null;
-                                          _uploadedProofUrl = null;
-                                        });
-                                        if (_isCheckedIn || _isCompleted) {
-                                          ref.read(proposalRepositoryProvider).submitAssignmentProof(_assignment.assignmentId, '');
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.red,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.close, size: 14, color: Colors.white),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          )
-                        else
-                          InkWell(
-                            onTap: _pickProofImage,
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              height: 110,
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: cani.brand.withValues(alpha: 0.35),
-                                  style: BorderStyle.solid,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: cani.brand.withValues(alpha: 0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(Icons.add_a_photo, color: cani.brand, size: 24),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Chụp hoặc tải ảnh bằng chứng nghiệm thu',
-                                      style: TextStyle(
-                                        color: cani.brand,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // 6b. Xác nhận Thanh toán Thù lao (Hard Gate trước Check-out)
+                  // 6. Xác nhận Thanh toán Thù lao (Hard Gate trước Check-out)
                   if (isCheckedIn || isCompleted)
                     Container(
                       key: _paymentSectionKey,
@@ -1702,9 +1414,17 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           ? 'ĐÃ HOÀN THÀNH & ĐÁNH GIÁ CA LÀM'
           : 'ĐÁNH GIÁ BAN TỔ CHỨC (RATING)';
     } else if (!isCheckedIn) {
-      bgColor = cani.brand;
-      iconData = Icons.qr_code_scanner_rounded;
-      label = 'QUÉT QR CHECK-IN (VÀO CA)';
+      if (_isBeforeCheckinWindow) {
+        final gate = _earliestCheckinTime;
+        final gateTime = '${gate.hour.toString().padLeft(2, '0')}:${gate.minute.toString().padLeft(2, '0')}';
+        bgColor = const Color(0xFF64748B);
+        iconData = Icons.lock_clock_rounded;
+        label = 'CHƯA ĐẾN GIỜ CHECK-IN (MỞ LÚC $gateTime)';
+      } else {
+        bgColor = cani.brand;
+        iconData = Icons.qr_code_scanner_rounded;
+        label = 'QUÉT QR CHECK-IN (VÀO CA)';
+      }
     } else if (!_isWorkReadyForEoConfirm) {
       bgColor = const Color(0xFF0284C7);
       iconData = Icons.checklist_rounded;

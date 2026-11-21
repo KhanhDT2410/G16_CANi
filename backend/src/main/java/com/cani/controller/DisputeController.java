@@ -69,6 +69,18 @@ public class DisputeController {
     }
 
     /**
+     * Danh sách ca làm việc liên quan để hiển thị trong dropdown tạo tranh chấp.
+     * GET /api/v1/disputes/my-assignments
+     */
+    @GetMapping("/my-assignments")
+    public ResponseEntity<ApiResponse<List<DisputeEligibleAssignmentDto>>> getMyEligibleAssignments(
+            Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<DisputeEligibleAssignmentDto> response = disputeService.getEligibleAssignmentsForDispute(userId);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Lấy danh sách ca làm việc thành công"));
+    }
+
+    /**
      * UC-98: Nạp bằng chứng (bên liên quan).
      * POST /api/v1/disputes/{id}/evidence
      */

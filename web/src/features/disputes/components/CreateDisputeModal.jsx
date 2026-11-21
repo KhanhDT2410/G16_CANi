@@ -2,10 +2,16 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { showToast } from '../../../components/common/Toast';
 import { eoService } from '../../../services/eoService';
+import { disputeApi } from '../api/disputeApi';
 import { DISPUTE_TYPES, DISPUTE_TYPE_LABELS } from '../types/dispute.constants';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CreateDisputeModal = ({ onClose, onSubmit }) => {
   const [assignmentId, setAssignmentId] = useState('');
+  const [assignments, setAssignments] = useState([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const [manualIdMode, setManualIdMode] = useState(false);
   const [type, setType] = useState(DISPUTE_TYPES.PAYMENT);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -16,7 +22,31 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    let mounted = true;
+    disputeApi
+      .getMyAssignments()
+      .then((list) => {
+        if (!mounted) return;
+        const safeList = Array.isArray(list) ? list : [];
+        setAssignments(safeList);
+        if (safeList.length === 1 && safeList[0].assignmentId) {
+          setAssignmentId(String(safeList[0].assignmentId));
+        } else if (safeList.length === 0) {
+          setManualIdMode(true);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setAssignments([]);
+          setManualIdMode(true);
+        }
+      })
+      .finally(() => {
+        if (mounted) setLoadingAssignments(false);
+      });
+
     return () => {
+      mounted = false;
       document.body.style.overflow = prev;
     };
   }, []);
@@ -43,8 +73,13 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!assignmentId.trim()) {
-      showToast('Vui lòng nhập ID ca làm việc (Assignment ID)', 'warning');
+    const trimmedId = assignmentId.trim();
+    if (!trimmedId) {
+      showToast('Vui lòng chọn ca làm việc hoặc nhập Mã ca làm việc (Assignment ID)', 'warning');
+      return;
+    }
+    if (!UUID_REGEX.test(trimmedId)) {
+      showToast('Mã Ca Làm Việc phải là chuỗi UUID hợp lệ hoặc chọn trực tiếp từ danh sách bên trên', 'warning');
       return;
     }
     if (!title.trim()) {
@@ -59,7 +94,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
     setSubmitting(true);
     try {
       await onSubmit({
-        assignmentId: assignmentId.trim(),
+        assignmentId: trimmedId,
         type,
         title: title.trim(),
         description: description.trim(),
@@ -88,15 +123,72 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
             </div>
 
             <div className="dispute-field-group">
-              <label>Mã Ca Làm Việc (Assignment ID) *</label>
-              <input
-                type="text"
-                className="dispute-input"
-                placeholder="Ví dụ: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
-                value={assignmentId}
-                onChange={(e) => setAssignmentId(e.target.value)}
-                required
-              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <label style={{ margin: 0 }}>Ca Làm Việc Liên Quan *</label>
+                {assignments.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setManualIdMode((v) => !v)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#2563eb',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    {manualIdMode ? 'Chọn từ danh sách ca' : 'Nhập mã UUID thủ công'}
+                  </button>
+                )}
+              </div>
+
+              {loadingAssignments ? (
+                <div style={{ fontSize: '0.84rem', color: '#64748b', padding: '0.5rem 0' }}>
+                  Đang tải danh sách ca làm việc của bạn...
+                </div>
+              ) : !manualIdMode && assignments.length > 0 ? (
+                <select
+                  className="dispute-select"
+                  value={assignmentId}
+                  onChange={(e) => setAssignmentId(e.target.value)}
+                  required
+                >
+                  <option value="">-- Chọn ca làm việc muốn khiếu nại --</option>
+                  {assignments.map((a) => {
+                    const timeStr = a.startTime
+                      ? new Date(a.startTime).toLocaleDateString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                        })
+                      : '';
+                    return (
+                      <option key={a.assignmentId} value={a.assignmentId}>
+                        {a.eventName} · {a.jobType} · {a.counterpartyName}
+                        {timeStr ? ` (${timeStr})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    className="dispute-input"
+                    placeholder="Ví dụ: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                    value={assignmentId}
+                    onChange={(e) => setAssignmentId(e.target.value)}
+                    required
+                  />
+                  {assignments.length === 0 && (
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 4 }}>
+                      Chưa ghi nhận ca phân công nào trong tài khoản của bạn. Bạn có thể dán mã Assignment ID (UUID) nếu có.
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="dispute-field-group">

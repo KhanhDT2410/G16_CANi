@@ -208,6 +208,7 @@ class ShiftChecklistSection extends StatelessWidget {
               itemBuilder: (ctx, idx) => ChecklistTaskTile(
                 index: idx,
                 item: items[idx],
+                canInteract: canInteract,
                 isUploading: uploadingTaskIndex == idx,
                 onToggle: () => onToggleItem(idx),
                 onCaptureEvidence: () => onCaptureEvidence(idx),
@@ -226,6 +227,7 @@ class ShiftChecklistSection extends StatelessWidget {
 class ChecklistTaskTile extends StatelessWidget {
   final int index;
   final ShiftChecklistItem item;
+  final bool canInteract;
   final bool isUploading;
   final VoidCallback onToggle;
   final VoidCallback onCaptureEvidence;
@@ -235,6 +237,7 @@ class ChecklistTaskTile extends StatelessWidget {
     super.key,
     required this.index,
     required this.item,
+    this.canInteract = true,
     required this.isUploading,
     required this.onToggle,
     required this.onCaptureEvidence,
@@ -266,7 +269,7 @@ class ChecklistTaskTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: onToggle,
+            onTap: canInteract ? onToggle : null,
             borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
@@ -335,15 +338,6 @@ class ChecklistTaskTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (!needsPhotoBar)
-                    IconButton(
-                      onPressed: onCaptureEvidence,
-                      tooltip: 'Đính kèm ảnh minh chứng (tùy chọn)',
-                      icon: Icon(Icons.add_a_photo_outlined, size: 18, color: cani.textMuted),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -424,15 +418,16 @@ class ChecklistTaskTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                    TextButton.icon(
-                      onPressed: onCaptureEvidence,
-                      icon: const Icon(Icons.refresh, size: 14),
-                      label: const Text('Chụp lại', style: TextStyle(fontSize: 11)),
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                    if (canInteract)
+                      TextButton.icon(
+                        onPressed: onCaptureEvidence,
+                        icon: const Icon(Icons.camera_alt_outlined, size: 14),
+                        label: const Text('Chụp lại', style: TextStyle(fontSize: 11)),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
                       ),
-                    ),
                   ] else if (isUploading) ...[
                     const SizedBox(
                       width: 16,
@@ -449,12 +444,14 @@ class ChecklistTaskTile extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'BTC yêu cầu ảnh nghiệm thu',
+                        canInteract
+                            ? 'Bắt buộc chụp ảnh tại chỗ để hoàn tất'
+                            : 'Chụp ảnh bằng chứng khi vào ca',
                         style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontStyle: FontStyle.italic),
                       ),
                     ),
                     ElevatedButton.icon(
-                      onPressed: onCaptureEvidence,
+                      onPressed: canInteract ? onCaptureEvidence : null,
                       icon: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
                       label: const Text(
                         'Chụp ảnh',
@@ -462,6 +459,7 @@ class ChecklistTaskTile extends StatelessWidget {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: cani.brand,
+                        disabledBackgroundColor: const Color(0xFF94A3B8),
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -481,6 +479,7 @@ class ChecklistTaskTile extends StatelessWidget {
 /// Màn hình mở rộng toàn màn hình khi ca làm có nhiều đầu việc cần tập trung xử lý.
 class ShiftChecklistFullScreen extends StatelessWidget {
   final String title;
+  final bool canInteract;
   final ValueNotifier<List<ShiftChecklistItem>> itemsNotifier;
   final ValueNotifier<int?> uploadingIndexNotifier;
   final Future<void> Function(int index) onToggleItem;
@@ -490,6 +489,7 @@ class ShiftChecklistFullScreen extends StatelessWidget {
   const ShiftChecklistFullScreen({
     super.key,
     required this.title,
+    this.canInteract = true,
     required this.itemsNotifier,
     required this.uploadingIndexNotifier,
     required this.onToggleItem,
@@ -563,6 +563,7 @@ class ShiftChecklistFullScreen extends StatelessWidget {
                       itemBuilder: (ctx, idx) => ChecklistTaskTile(
                         index: idx,
                         item: items[idx],
+                        canInteract: canInteract,
                         isUploading: uploadingIdx == idx,
                         onToggle: () => onToggleItem(idx),
                         onCaptureEvidence: () => onCaptureEvidence(idx),

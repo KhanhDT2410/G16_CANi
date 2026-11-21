@@ -362,6 +362,36 @@ public class AuthService {
     }
 
     @Transactional
+    public UserDto updateBasicProfile(UUID userId, UpdateBasicProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "id", userId));
+
+        String cleanName = request.getFullName().trim();
+        String cleanPhone = request.getPhone().trim();
+
+        if (!cleanPhone.isBlank()) {
+            userRepository.findByPhone(cleanPhone).ifPresent(existingUser -> {
+                if (!existingUser.getUserId().equals(userId)) {
+                    throw new BadRequestException("Số điện thoại này đã được sử dụng bởi một tài khoản khác trong hệ thống. Vui lòng kiểm tra lại hoặc sử dụng số khác.");
+                }
+            });
+        }
+
+        user.setFullName(cleanName);
+        user.setPhone(cleanPhone);
+        User saved = userRepository.save(user);
+
+        if (saved.getRole() == UserRole.WORKER) {
+            workerRepository.findByUser_UserId(userId).ifPresent(w -> {
+                w.setFullName(cleanName);
+                workerRepository.save(w);
+            });
+        }
+
+        return toUserDto(saved);
+    }
+
+    @Transactional
     public void verifyOtp(VerifyOtpRequest request) {
         emailOtpService.verifyOtp(request.getEmail(), request.getToken(), "REGISTER");
         userRepository.findByEmail(request.getEmail()).ifPresent(u -> {

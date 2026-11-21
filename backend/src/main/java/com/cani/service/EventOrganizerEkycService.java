@@ -470,7 +470,13 @@ public class EventOrganizerEkycService {
                 userChanged = true;
             }
             if (dto.getPhone() != null && !dto.getPhone().isBlank()) {
-                u.setPhone(dto.getPhone().trim());
+                String cleanPhone = dto.getPhone().trim();
+                userRepository.findByPhone(cleanPhone).ifPresent(existingUser -> {
+                    if (!existingUser.getUserId().equals(u.getUserId())) {
+                        throw new BadRequestException("Số điện thoại này đã được sử dụng bởi một tài khoản khác trong hệ thống. Vui lòng kiểm tra lại hoặc sử dụng số khác.");
+                    }
+                });
+                u.setPhone(cleanPhone);
                 userChanged = true;
             }
             if (userChanged) {

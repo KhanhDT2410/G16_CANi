@@ -808,7 +808,7 @@ export default function ShiftWorkspacePage({
                           </span>
                         )}
                         {(!item.paymentStatus || item.paymentStatus === 'NOT_DECLARED') && (
-                          item.isChecklistCompleted ? (
+                          item.eoConfirmed ? (
                             <button
                               type="button"
                               onClick={() => onOpenPaymentDeclaration?.(item)}
@@ -827,19 +827,23 @@ export default function ShiftWorkspacePage({
                             </button>
                           ) : (
                             <span
-                              title="Chỉ mở khai báo trả lương sau khi nhân sự hoàn thành 100% đầu việc"
+                              title={
+                                item.isChecklistCompleted
+                                  ? 'Vui lòng kiểm tra bằng chứng và bấm Duyệt công trước khi khai báo trả lương'
+                                  : 'Nhân sự cần hoàn tất đầu việc và được Duyệt công trước khi trả lương'
+                              }
                               style={{
-                                background: '#f8fafc',
-                                color: '#64748b',
-                                border: '1px solid #cbd5e1',
+                                background: item.isChecklistCompleted ? '#eff6ff' : '#f8fafc',
+                                color: item.isChecklistCompleted ? '#1d4ed8' : '#64748b',
+                                border: `1px solid ${item.isChecklistCompleted ? '#bfdbfe' : '#cbd5e1'}`,
                                 borderRadius: 6,
                                 padding: '4px 8px',
                                 fontSize: '0.73rem',
-                                fontWeight: 600,
+                                fontWeight: 700,
                                 display: 'inline-block',
                               }}
                             >
-                              Chờ xong việc
+                              {item.isChecklistCompleted ? 'Chờ duyệt công' : 'Chờ xong việc'}
                             </span>
                           )
                         )}
@@ -878,7 +882,13 @@ export default function ShiftWorkspacePage({
                             </button>
                           )}
 
-                          {item.eoConfirmed && !item.hasReviewedWorker && (
+                          {item.eoConfirmed && !isCompleted && (
+                            <span style={{ color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: '0.73rem', fontWeight: 700, padding: '4px 8px' }}>
+                              Đã duyệt • Chờ kết ca
+                            </span>
+                          )}
+
+                          {item.eoConfirmed && isCompleted && !item.hasReviewedWorker && (
                             <button
                               type="button"
                               onClick={() => setSelectedForReview(item)}
@@ -888,7 +898,7 @@ export default function ShiftWorkspacePage({
                             </button>
                           )}
 
-                          {item.eoConfirmed && item.hasReviewedWorker && (
+                          {item.eoConfirmed && isCompleted && item.hasReviewedWorker && (
                             <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 700, padding: '4px' }}>
                               Đã duyệt & đánh giá
                             </span>

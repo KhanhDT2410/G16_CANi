@@ -115,6 +115,12 @@ public class DirectPaymentService {
             throw new IllegalStateException("Bạn không có quyền khai báo thanh toán cho phân công này");
         }
 
+        if (assignment.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN
+                && !Boolean.TRUE.equals(assignment.getEoConfirmed())) {
+            throw new com.cani.exception.BadRequestException(
+                    "Vui lòng bấm Duyệt công (xác nhận hoàn thành công việc) cho nhân sự trước khi khai báo thanh toán.");
+        }
+
         payment.setDeclaredAmount(dto.getDeclaredAmount());
         payment.setPaymentMethod(dto.getPaymentMethod());
         payment.setExternalRef(dto.getExternalRef());

@@ -11,6 +11,7 @@ const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
+const CompleteProfilePage = lazy(() => import('./pages/auth/CompleteProfilePage'));
 const CustomerCarePage = lazy(() => import('./pages/customer-care/CustomerCarePage'));
 const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
 const SupportPage = lazy(() => import('./pages/support/SupportPage'));
@@ -54,6 +55,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/complete-profile" element={<CompleteProfilePage />} />
             <Route element={<MainLayout />}>
               <Route
                 path="eo"

@@ -70,6 +70,31 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Bạn không có quyền truy cập tài nguyên này"));
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex) {
+        log.warn("Database constraint violation: {}", ex.getMessage());
+        String rawMsg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+        Throwable rootCause = ex.getRootCause();
+        if (rootCause != null && rootCause.getMessage() != null) {
+            rawMsg += " " + rootCause.getMessage().toLowerCase();
+        }
+
+        String friendlyMessage;
+        if (rawMsg.contains("users_phone_key") || rawMsg.contains("phone")) {
+            friendlyMessage = "Số điện thoại này đã được sử dụng bởi một tài khoản khác trong hệ thống. Vui lòng sử dụng số điện thoại khác.";
+        } else if (rawMsg.contains("users_email_key") || rawMsg.contains("email")) {
+            friendlyMessage = "Địa chỉ email này đã được sử dụng bởi một tài khoản khác trong hệ thống.";
+        } else if (rawMsg.contains("users_username_key") || rawMsg.contains("username")) {
+            friendlyMessage = "Tên tài khoản này đã tồn tại trong hệ thống. Vui lòng chọn tên khác.";
+        } else {
+            friendlyMessage = "Dữ liệu gửi lên vi phạm ràng buộc toàn vẹn của hệ thống (dữ liệu có thể đã tồn tại). Vui lòng kiểm tra lại.";
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(friendlyMessage));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
         log.error("Unhandled exception occurred: ", ex);

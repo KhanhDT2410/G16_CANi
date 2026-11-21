@@ -90,7 +90,6 @@ export default function EoProfileTab() {
 
   // Trạng thái eKYC
   const [ekycData, setEkycData] = useState(null);
-  const [cccdNumber, setCccdNumber] = useState('');
 
   const [files, setFiles] = useState({
     frontImage: null,
@@ -253,21 +252,12 @@ export default function EoProfileTab() {
       return;
     }
 
-    const cleanedCccd = (cccdNumber || '').replace(/\D/g, '');
-    if (cleanedCccd && cleanedCccd.length !== 12) {
-      showToast('Số CCCD phải bao gồm đúng 12 chữ số', 'error');
-      return;
-    }
-
     setSubmittingEkyc(true);
     try {
       const formData = new FormData();
       formData.append('frontImage', files.frontImage);
       formData.append('backImage', files.backImage);
       formData.append('selfieImage', files.selfieImage);
-      if (cleanedCccd) {
-        formData.append('cccdNumber', cleanedCccd);
-      }
       if (profile.fullName?.trim()) {
         formData.append('representativeName', profile.fullName.trim());
       }
@@ -867,21 +857,6 @@ export default function EoProfileTab() {
               )}
 
               <form onSubmit={handleSubmitEkyc}>
-                <div className="profile-form-group" style={{ marginBottom: '1rem', maxWidth: '420px' }}>
-                  <label>Số Căn Cước Công Dân (12 chữ số trên thẻ) *</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={12}
-                    inputMode="numeric"
-                    className="profile-input"
-                    value={cccdNumber}
-                    onChange={(e) => setCccdNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
-                    placeholder="Nhập đúng 12 chữ số CCCD để đối chiếu chống trùng lặp"
-                    disabled={submittingEkyc}
-                  />
-                </div>
-
                 <p style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', margin: '0 0 0.75rem' }}>
                   Tải lên hồ sơ xác thực định danh (CCCD & Ảnh chân dung đại diện):
                 </p>

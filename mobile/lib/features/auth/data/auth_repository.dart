@@ -235,6 +235,20 @@ class AuthRepository {
     }
   }
 
+  Future<UserDto> updateBasicProfile({
+    required String fullName,
+    required String phone,
+  }) async {
+    try {
+      return await _api.updateBasicProfile(fullName: fullName, phone: phone);
+    } on DioException catch (e) {
+      final message = (e.response?.data is Map)
+          ? (e.response?.data as Map)['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Không thể cập nhật thông tin tài khoản. Vui lòng thử lại.');
+    }
+  }
+
   Future<void> logout() async {
     try {
       await Supabase.instance.client.auth.signOut();

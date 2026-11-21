@@ -6,11 +6,11 @@ import '../auth.css';
 
 export const RegisterForm = () => {
   const {
+    step,
     formData,
     fieldErrors,
     isLoading,
     isSendingOtp,
-    otpSent,
     countdown,
     errorMessage,
     successMessage,
@@ -18,6 +18,8 @@ export const RegisterForm = () => {
     showConfirmPassword,
     handleChange,
     handleSendOtp,
+    handleProceedToStep2,
+    handleBackToStep1,
     handleGoogleLogin,
     handleSubmit,
     toggleShowPassword,
@@ -26,7 +28,7 @@ export const RegisterForm = () => {
 
   return (
     <div className="auth-card auth-card-wide">
-      <div className="auth-header">
+      <div className="auth-header" style={{ marginBottom: '1.25rem' }}>
         <CaniLogo variant="full" height={52} className="auth-logo-center" />
         <h2 className="auth-title" style={{ marginTop: '0.85rem' }}>Đăng Ký Nhà Tổ Chức</h2>
         <p className="auth-subtitle">
@@ -34,65 +36,21 @@ export const RegisterForm = () => {
         </p>
       </div>
 
-      <div className="worker-perks-box" style={{ backgroundColor: '#fefce8', borderColor: '#fde047', color: '#854d0e', marginBottom: '1.25rem' }}>
-        <div className="worker-perks-title" style={{ color: '#a16207', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          <span>Quy định tạo sự kiện & tuyển dụng:</span>
+      {/* Thanh chỉ báo quy trình 2 bước */}
+      <div className="register-stepper">
+        <div className={`register-step ${step === 1 ? 'active' : 'done'}`}>
+          <span className="register-step-badge">{step > 1 ? '✓' : '1'}</span>
+          <span className="register-step-label">Điền thông tin</span>
         </div>
-        <div style={{ fontSize: '0.825rem', marginTop: '0.25rem' }}>
-          Sau khi đăng ký tài khoản thành công, bạn cần <strong>hoàn tất định danh eKYC</strong> thì mới có thể tạo sự kiện và tuyển chọn nhân sự.
+        <div className={`register-step-line ${step === 2 ? 'done' : ''}`} />
+        <div className={`register-step ${step === 2 ? 'active' : ''}`}>
+          <span className="register-step-badge">2</span>
+          <span className="register-step-label">Xác thực OTP</span>
         </div>
-      </div>
-
-      {/* Đăng ký nhanh bằng Google */}
-      <button
-        type="button"
-        className="btn-demo"
-        onClick={handleGoogleLogin}
-        disabled={isLoading || isSendingOtp}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.75rem',
-          backgroundColor: '#ffffff',
-          color: '#374151',
-          border: '1px solid #d1d5db',
-          fontWeight: 600,
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-          padding: '0.75rem 1rem',
-          borderRadius: '0.5rem',
-          width: '100%',
-          cursor: 'pointer',
-          marginBottom: '1rem',
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18">
-          <path
-            fill="#4285F4"
-            d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"
-          />
-          <path
-            fill="#34A853"
-            d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
-          />
-          <path
-            fill="#FBBC05"
-            d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"
-          />
-          <path
-            fill="#EA4335"
-            d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"
-          />
-        </svg>
-        Đăng ký bằng Google (Dành cho EO)
-      </button>
-
-      <div className="auth-divider" style={{ margin: '1rem 0' }}>
-        <span>Hoặc đăng ký bằng Email & Xác thực OTP 1 màn hình</span>
       </div>
 
       {errorMessage && (
-        <div className="auth-error-banner" role="alert">
+        <div className="auth-error-banner" role="alert" style={{ marginBottom: '1rem' }}>
           {errorMessage}
         </div>
       )}
@@ -103,53 +61,113 @@ export const RegisterForm = () => {
         </div>
       )}
 
-      <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        {/* Họ và tên người tổ chức */}
-        <div className="form-group">
-          <label className="form-label" htmlFor="fullName">
-            Họ và tên người tổ chức sự kiện *
-          </label>
-          <input
-            id="fullName"
-            name="fullName"
-            type="text"
-            className={`form-input ${fieldErrors.fullName ? 'input-error' : ''}`}
-            placeholder="Nguyễn Văn A"
-            value={formData.fullName}
-            onChange={handleChange}
-            autoComplete="name"
-            disabled={isLoading}
-            required
-          />
-          {fieldErrors.fullName && (
-            <div className="field-error-text">{fieldErrors.fullName}</div>
-          )}
-        </div>
+      {step === 1 ? (
+        <>
+          <div
+            className="worker-perks-box"
+            style={{ backgroundColor: '#fefce8', borderColor: '#fde047', color: '#854d0e', marginBottom: '1.15rem' }}
+          >
+            <div className="worker-perks-title" style={{ color: '#a16207' }}>
+              <span>Quy định tạo sự kiện & tuyển dụng:</span>
+            </div>
+            <div style={{ fontSize: '0.825rem', marginTop: '0.15rem' }}>
+              Sau khi đăng ký, bạn cần <strong>hoàn tất định danh eKYC</strong> để tạo sự kiện và tuyển dụng nhân sự.
+            </div>
+          </div>
 
-        {/* Tên đơn vị / thương hiệu tổ chức */}
-        <div className="form-group">
-          <label className="form-label" htmlFor="companyName">
-            Tên đơn vị / nhóm tổ chức sự kiện (Tùy chọn)
-          </label>
-          <input
-            id="companyName"
-            name="companyName"
-            type="text"
-            className="form-input"
-            placeholder="CLB Sự Kiện Trẻ / Nhóm điều phối tự do..."
-            value={formData.companyName}
-            onChange={handleChange}
-            disabled={isLoading}
-          />
-        </div>
+          {/* Đăng ký nhanh bằng Google */}
+          <button
+            type="button"
+            className="btn-demo"
+            onClick={handleGoogleLogin}
+            disabled={isLoading || isSendingOtp}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+              backgroundColor: '#ffffff',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              fontWeight: 600,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              padding: '0.75rem 1rem',
+              borderRadius: '0.5rem',
+              width: '100%',
+              cursor: 'pointer',
+              marginBottom: '1rem',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <path
+                fill="#4285F4"
+                d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"
+              />
+              <path
+                fill="#34A853"
+                d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"
+              />
+              <path
+                fill="#EA4335"
+                d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"
+              />
+            </svg>
+            Đăng ký nhanh bằng Google (Dành cho EO)
+          </button>
 
-        {/* Flow 1 màn hình: Email & Ô nhập mã xác thực OTP từ Email */}
-        <div className="form-row">
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label" htmlFor="email">
-              Địa chỉ Email liên hệ *
-            </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="auth-divider" style={{ margin: '1rem 0' }}>
+            <span>Hoặc điền thông tin đăng ký qua Email</span>
+          </div>
+
+          <form className="auth-form" onSubmit={handleProceedToStep2} noValidate>
+            {/* Họ và tên */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="fullName">
+                Họ và tên người tổ chức sự kiện *
+              </label>
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                className={`form-input ${fieldErrors.fullName ? 'input-error' : ''}`}
+                placeholder="Nguyễn Văn A"
+                value={formData.fullName}
+                onChange={handleChange}
+                autoComplete="name"
+                disabled={isSendingOtp}
+                required
+              />
+              {fieldErrors.fullName && (
+                <div className="field-error-text">⚠️ {fieldErrors.fullName}</div>
+              )}
+            </div>
+
+            {/* Tên đơn vị / nhóm tổ chức */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="companyName">
+                Tên đơn vị / nhóm tổ chức sự kiện (Tùy chọn)
+              </label>
+              <input
+                id="companyName"
+                name="companyName"
+                type="text"
+                className="form-input"
+                placeholder="CLB Sự Kiện Trẻ / Nhóm điều phối tự do..."
+                value={formData.companyName}
+                onChange={handleChange}
+                disabled={isSendingOtp}
+              />
+            </div>
+
+            {/* Email liên hệ (Full width thoáng rõ) */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="email">
+                Địa chỉ Email liên hệ *
+              </label>
               <input
                 id="email"
                 name="email"
@@ -159,181 +177,206 @@ export const RegisterForm = () => {
                 value={formData.email}
                 onChange={handleChange}
                 autoComplete="email"
-                disabled={isLoading}
+                disabled={isSendingOtp}
                 required
               />
-              <button
-                type="button"
-                onClick={handleSendOtp}
-                disabled={isLoading || isSendingOtp || countdown > 0}
-                style={{
-                  whiteSpace: 'nowrap',
-                  padding: '0 0.85rem',
-                  backgroundColor: countdown > 0 ? '#9ca3af' : '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                  cursor: countdown > 0 ? 'not-allowed' : 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-              >
-                {isSendingOtp ? 'Đang gửi...' : countdown > 0 ? `Gửi lại (${countdown}s)` : 'Gửi mã OTP'}
-              </button>
+              {fieldErrors.email ? (
+                <div className="field-error-text">⚠️ {fieldErrors.email}</div>
+              ) : (
+                <div className="field-hint-text">
+                  Hệ thống sẽ gửi mã OTP 6 chữ số về email này ở bước tiếp theo.
+                </div>
+              )}
             </div>
-            {fieldErrors.email && (
-              <div className="field-error-text">⚠️ {fieldErrors.email}</div>
-            )}
+
+            {/* Số điện thoại */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="phone">
+                Số điện thoại liên hệ *
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                className={`form-input ${fieldErrors.phone ? 'input-error' : ''}`}
+                placeholder="0912345678"
+                value={formData.phone}
+                onChange={handleChange}
+                autoComplete="tel"
+                disabled={isSendingOtp}
+                required
+              />
+              {fieldErrors.phone && (
+                <div className="field-error-text">⚠️ {fieldErrors.phone}</div>
+              )}
+            </div>
+
+            {/* Mật khẩu */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="password">
+                Mật khẩu đăng nhập *
+              </label>
+              <div className="input-wrapper">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  className={`form-input ${fieldErrors.password ? 'input-error' : ''}`}
+                  placeholder="Tối thiểu 8 ký tự, có 1 chữ in hoa (A-Z)"
+                  value={formData.password}
+                  onChange={handleChange}
+                  autoComplete="new-password"
+                  disabled={isSendingOtp}
+                  required
+                />
+                <button
+                  type="button"
+                  className="toggle-password-btn"
+                  onClick={toggleShowPassword}
+                  tabIndex={-1}
+                >
+                  {showPassword ? 'Ẩn' : 'Hiện'}
+                </button>
+              </div>
+              {fieldErrors.password ? (
+                <div className="field-error-text">⚠️ {fieldErrors.password}</div>
+              ) : (
+                <div className="field-hint-text">
+                  Mật khẩu bắt buộc có tối thiểu 8 ký tự và chứa ít nhất 1 chữ cái in hoa (A-Z).
+                </div>
+              )}
+            </div>
+
+            {/* Xác nhận lại mật khẩu */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="confirmPassword">
+                Xác nhận lại mật khẩu *
+              </label>
+              <div className="input-wrapper">
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className={`form-input ${fieldErrors.confirmPassword ? 'input-error' : ''}`}
+                  placeholder="Nhập lại chính xác mật khẩu đã tạo ở trên"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  autoComplete="new-password"
+                  disabled={isSendingOtp}
+                  required
+                />
+                <button
+                  type="button"
+                  className="toggle-password-btn"
+                  onClick={toggleShowConfirmPassword}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? 'Ẩn' : 'Hiện'}
+                </button>
+              </div>
+              {fieldErrors.confirmPassword ? (
+                <div className="field-error-text">⚠️ {fieldErrors.confirmPassword}</div>
+              ) : (
+                <div className="field-hint-text">
+                  Nhập lại mật khẩu để đảm bảo bạn không gõ nhầm ký tự.
+                </div>
+              )}
+            </div>
+
+            <button type="submit" className="btn-submit" disabled={isSendingOtp}>
+              {isSendingOtp ? (
+                <>
+                  <span className="spinner" />
+                  Đang gửi mã OTP xác thực...
+                </>
+              ) : (
+                'Tiếp tục & Gửi mã OTP →'
+              )}
+            </button>
+          </form>
+        </>
+      ) : (
+        /* BƯỚC 2: XÁC THỰC MÃ OTP EMAIL */
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
+          <div className="otp-step-summary">
+            <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>
+              Kiểm tra hộp thư Email của bạn
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.45 }}>
+              Mã xác thực 6 chữ số đã được gửi tới{' '}
+              <strong style={{ color: '#2563eb' }}>{formData.email}</strong>. Vui lòng nhập mã bên dưới để hoàn tất đăng ký.
+            </div>
           </div>
 
-          <div className="form-group" style={{ flex: 1 }}>
-            <label className="form-label" htmlFor="otpCode">
+          <div className="form-group">
+            <label className="form-label" htmlFor="otpCode" style={{ textAlign: 'center' }}>
               Mã xác thực OTP (6 chữ số) *
             </label>
             <input
               id="otpCode"
               name="otpCode"
               type="text"
+              inputMode="numeric"
               maxLength={6}
-              className={`form-input ${fieldErrors.otpCode ? 'input-error' : ''}`}
-              placeholder="123456"
+              autoFocus
+              className={`form-input otp-input-large ${fieldErrors.otpCode ? 'input-error' : ''}`}
+              placeholder="● ● ● ● ● ●"
               value={formData.otpCode}
               onChange={handleChange}
               disabled={isLoading}
-              style={{
-                letterSpacing: '0.25em',
-                fontWeight: 700,
-                textAlign: 'center',
-                backgroundColor: otpSent ? '#f0fdf4' : '#ffffff',
-                borderColor: fieldErrors.otpCode ? '#ef4444' : (otpSent ? '#22c55e' : '#d1d5db'),
-              }}
               required
             />
             {fieldErrors.otpCode && (
-              <div className="field-error-text">⚠️ {fieldErrors.otpCode}</div>
+              <div className="field-error-text" style={{ justifyContent: 'center' }}>
+                ⚠️ {fieldErrors.otpCode}
+              </div>
             )}
           </div>
-        </div>
 
-        {otpSent && (
-          <div className="otp-feedback-box">
-            <span>✉️</span>
-            <span>
-              Mã xác thực 6 số đã được gửi tới <strong>{formData.email}</strong>. Vui lòng kiểm tra hộp thư đến (hoặc thư rác/Spam) và nhập 6 chữ số vào ô trên.
-            </span>
-          </div>
-        )}
-
-        {/* Số điện thoại liên hệ */}
-        <div className="form-group">
-          <label className="form-label" htmlFor="phone">
-            Số điện thoại liên hệ *
-          </label>
-          <input
-            id="phone"
-            name="phone"
-            type="tel"
-            className={`form-input ${fieldErrors.phone ? 'input-error' : ''}`}
-            placeholder="0912345678"
-            value={formData.phone}
-            onChange={handleChange}
-            autoComplete="tel"
-            disabled={isLoading}
-            required
-          />
-          {fieldErrors.phone && (
-            <div className="field-error-text">⚠️ {fieldErrors.phone}</div>
-          )}
-        </div>
-
-        {/* DÒNG RIÊNG BIỆT 1: MẬT KHẨU */}
-        <div className="form-group">
-          <label className="form-label" htmlFor="password">
-            Mật khẩu đăng nhập *
-          </label>
-          <div className="input-wrapper">
-            <input
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              className={`form-input ${fieldErrors.password ? 'input-error' : ''}`}
-              placeholder="Tối thiểu 8 ký tự, có 1 chữ in hoa (A-Z)"
-              value={formData.password}
-              onChange={handleChange}
-              autoComplete="new-password"
-              disabled={isLoading}
-              required
-            />
+          <div className="otp-resend-row">
+            <span>Bạn chưa nhận được mã?</span>
             <button
               type="button"
-              className="toggle-password-btn"
-              onClick={toggleShowPassword}
-              tabIndex={-1}
+              className="otp-resend-btn"
+              onClick={handleSendOtp}
+              disabled={isLoading || isSendingOtp || countdown > 0}
             >
-              {showPassword ? 'Ẩn' : 'Hiện'}
+              {isSendingOtp
+                ? 'Đang gửi lại...'
+                : countdown > 0
+                ? `Gửi lại sau ${countdown}s`
+                : 'Gửi lại mã OTP'}
             </button>
           </div>
-          {fieldErrors.password ? (
-            <div className="field-error-text">
-              <span>⚠️</span> {fieldErrors.password}
-            </div>
-          ) : (
-            <div className="field-hint-text">
-              Mật khẩu bắt buộc có tối thiểu 8 ký tự và chứa ít nhất 1 chữ cái in hoa (A-Z).
-            </div>
-          )}
-        </div>
 
-        {/* DÒNG RIÊNG BIỆT 2: NHẬP LẠI MẬT KHẨU */}
-        <div className="form-group">
-          <label className="form-label" htmlFor="confirmPassword">
-            Xác nhận lại mật khẩu *
-          </label>
-          <div className="input-wrapper">
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type={showConfirmPassword ? 'text' : 'password'}
-              className={`form-input ${fieldErrors.confirmPassword ? 'input-error' : ''}`}
-              placeholder="Nhập lại chính xác mật khẩu đã tạo ở trên"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              autoComplete="new-password"
-              disabled={isLoading}
-              required
-            />
+          <div className="register-step2-actions">
             <button
               type="button"
-              className="toggle-password-btn"
-              onClick={toggleShowConfirmPassword}
-              tabIndex={-1}
+              className="btn-demo"
+              onClick={handleBackToStep1}
+              disabled={isLoading}
+              style={{ padding: '0.8rem 1rem', fontWeight: 600 }}
             >
-              {showConfirmPassword ? 'Ẩn' : 'Hiện'}
+              ← Sửa thông tin
+            </button>
+            <button
+              type="submit"
+              className="btn-submit"
+              disabled={isLoading}
+              style={{ flex: 2 }}
+            >
+              {isLoading ? (
+                <>
+                  <span className="spinner" />
+                  Đang tạo tài khoản...
+                </>
+              ) : (
+                'Xác nhận OTP & Đăng ký'
+              )}
             </button>
           </div>
-          {fieldErrors.confirmPassword ? (
-            <div className="field-error-text">
-              <span>⚠️</span> {fieldErrors.confirmPassword}
-            </div>
-          ) : (
-            <div className="field-hint-text">
-              Nhập lại mật khẩu để đảm bảo bạn không gõ nhầm ký tự.
-            </div>
-          )}
-        </div>
-
-        <button type="submit" className="btn-submit" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <span className="spinner" />
-              Đang xác thực OTP & Tạo tài khoản Nhà Tổ Chức...
-            </>
-          ) : (
-            'Đăng Ký Tài Khoản Nhà Tổ Chức'
-          )}
-        </button>
-      </form>
+        </form>
+      )}
 
       <div className="auth-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #f3f4f6' }}>
         <div>

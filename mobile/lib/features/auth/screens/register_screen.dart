@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/screens/complete_profile_screen.dart';
 import 'package:cani/features/auth/screens/login_screen.dart';
 import 'package:cani/features/auth/screens/verify_email_screen.dart';
 import 'package:cani/features/auth/widgets/auth_error_banner.dart';
@@ -57,13 +58,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         await TermsOfServiceDialog.markAccepted(user.id);
       }
       if (!mounted) return;
-      _showToast('Đăng ký qua Google thành công! Bắt đầu định danh CCCD.', isError: false);
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const EkycVerificationScreen(isOnboarding: true),
-        ),
-        (route) => false,
-      );
+      final needsProfile = user == null ||
+          (user.phone?.trim().isEmpty ?? true) ||
+          user.fullName.trim().isEmpty;
+      if (needsProfile) {
+        _showToast('Đăng ký qua Google thành công! Vui lòng bổ sung số điện thoại liên hệ.', isError: false);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const CompleteProfileScreen(nextToEkycOnboarding: true),
+          ),
+          (route) => false,
+        );
+      } else {
+        _showToast('Đăng ký qua Google thành công! Bắt đầu định danh CCCD.', isError: false);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const EkycVerificationScreen(isOnboarding: true),
+          ),
+          (route) => false,
+        );
+      }
     }
   }
 

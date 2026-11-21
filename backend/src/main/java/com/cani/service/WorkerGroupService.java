@@ -786,6 +786,68 @@ public class WorkerGroupService {
         }
     }
 
+    // ============================= TASK 5: Transfer group leadership =============================
+
+    /**
+     * Chuyển giao Trưởng nhóm (1 transaction): đổi atomic cả 3 nguồn sự thật
+     * (group.leaderWorkerId, role membership cũ, role membership mới) + hết hạn
+     * toàn bộ đề xuất ca PENDING của nhóm + FCM cho leader mới
+     */
+    @Transactional
+    public void transferLeader(UUID callerUserId, UUID groupId, UUID newLeaderWorkerId) {
+        if (newLeaderWorkerId == null) {
+            throw new BadRequestException("Vui lòng chỉ định người tiếp quản Trưởng nhóm");
+        }
+        checkGroupLeaderPermission(callerUserId, groupId);
+        WorkerGroup group = getGroupOrThrow(groupId);
+
+        if (newLeaderWorkerId.equals(group.getLeaderWorkerId())) {
+            throw new BadRequestException("Người này đã là Trưởng nhóm của đội");
+        }
+
+        WorkerGroupMembership newLeaderMembership = membershipRepository
+                .findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, newLeaderWorkerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Thành viên", "workerId", newLeaderWorkerId));
+        if (newLeaderMembership.getStatus() != MembershipStatus.ACTIVE) {
+            throw new BadRequestException("Người tiếp quản phải là thành viên ACTIVE của nhóm");
+        }
+
+        // ATOMIC: 3 nguồn sự thật đổi cùng transaction — nếu một nguồn lệch,
+        // kênh dispatch (role membership) và endpoint accept (leaderWorkerId) sẽ mâu thuẫn
+        UUID oldLeaderWorkerId = group.getLeaderWorkerId();
+        WorkerGroupMembership oldLeaderMembership = oldLeaderWorkerId != null
+                ? membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, oldLeaderWorkerId).orElse(null)
+                : null;
+        if (oldLeaderMembership != null && oldLeaderMembership.getRoleInGroup() == GroupRole.LEADER) {
+            oldLeaderMembership.setRoleInGroup(GroupRole.MEMBER);
+            oldLeaderMembership.setRoleTitle("Thành viên");
+            membershipRepository.save(oldLeaderMembership);
+        }
+        newLeaderMembership.setRoleInGroup(GroupRole.LEADER);
+        newLeaderMembership.setRoleTitle("Trưởng nhóm");
+        membershipRepository.save(newLeaderMembership);
+
+        group.setLeaderWorkerId(newLeaderWorkerId);
+        workerGroupRepository.save(group);
+
+        List<DispatchProposal> pendingProposals = dispatchProposalRepository.findByGroupIdAndStatus(
+                groupId, ProposalStatus.PENDING);
+        pendingProposals.forEach(p -> {
+            p.setStatus(ProposalStatus.EXPIRED);
+            p.setRespondedAt(Instant.now());
+        });
+        dispatchProposalRepository.saveAll(pendingProposals);
+
+        Worker newLeader = newLeaderMembership.getWorker();
+        if (newLeader != null && newLeader.getUser() != null) {
+            sendSafe(newLeader.getUser().getUserId(),
+                    "Chuyển giao đội trưởng",
+                    "Bạn đã được chỉ định làm đội trưởng của đội " + group.getName()
+                            + ". Các lời mời ca trước đó đã hết hạn.");
+        }
+        log.info("Chuyển giao Trưởng nhóm {} -> {} cho nhóm {}", oldLeaderWorkerId, newLeaderWorkerId, groupId);
+    }
+
     private Worker getWorkerByUserId(UUID userId) {
         return workerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new BadRequestException("Tài khoản chưa được kích hoạt hồ sơ Worker"));

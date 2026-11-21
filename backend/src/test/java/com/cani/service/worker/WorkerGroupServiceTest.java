@@ -715,4 +715,105 @@ class WorkerGroupServiceTest {
                 () -> workerGroupService.listGroupProposals(memberUserId, groupId));
         assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
     }
+
+    // ============================= TASK 5: Transfer group leadership =============================
+
+    @Test
+    @DisplayName("T5-1 - transferLeader() - Normal: role swap (3 sources) atomic + PENDING proposals EXPIRED + FCM leader mới")
+    void transfer_leader_swaps_roles_and_expires_old_proposals() {
+        WorkerGroupMembership newLeaderMs = WorkerGroupMembership.builder()
+                .workerGroup(mockGroup)
+                .worker(memberWorker)
+                .roleInGroup(GroupRole.MEMBER)
+                .status(MembershipStatus.ACTIVE)
+                .build();
+        WorkerGroupMembership oldLeaderMs = WorkerGroupMembership.builder()
+                .workerGroup(mockGroup)
+                .worker(leaderWorker)
+                .roleInGroup(GroupRole.LEADER)
+                .status(MembershipStatus.ACTIVE)
+                .build();
+        DispatchProposal pendingProposal = DispatchProposal.builder()
+                .proposalId(UUID.randomUUID())
+                .groupId(groupId)
+                .source(AssignmentSource.GROUP)
+                .status(ProposalStatus.PENDING)
+                .build();
+
+        when(userRepository.findById(leaderUserId)).thenReturn(Optional.of(
+                User.builder().userId(leaderUserId).role(UserRole.WORKER).build()));
+        when(workerRepository.findByUser_UserId(leaderUserId)).thenReturn(Optional.of(leaderWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, memberWorkerId))
+                .thenReturn(Optional.of(newLeaderMs));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, leaderWorkerId))
+                .thenReturn(Optional.of(oldLeaderMs));
+        when(workerGroupRepository.save(mockGroup)).thenReturn(mockGroup);
+        when(dispatchProposalRepository.findByGroupIdAndStatus(groupId, ProposalStatus.PENDING))
+                .thenReturn(List.of(pendingProposal));
+
+        workerGroupService.transferLeader(leaderUserId, groupId, memberWorkerId);
+
+        // 3 sources of truth đổi atomic trong 1 transaction
+        assertEquals(GroupRole.MEMBER, oldLeaderMs.getRoleInGroup());
+        assertEquals(GroupRole.LEADER, newLeaderMs.getRoleInGroup());
+        assertEquals(memberWorkerId, mockGroup.getLeaderWorkerId());
+        // PENDING proposals → EXPIRED
+        assertEquals(ProposalStatus.EXPIRED, pendingProposal.getStatus());
+        assertNotNull(pendingProposal.getRespondedAt());
+        verify(dispatchProposalRepository).saveAll(List.of(pendingProposal));
+        // FCM cho user của leader mới
+        verify(notificationService).createAndSend(eq(memberUserId), eq("Chuyển giao đội trưởng"), anyString(),
+                eq(NotificationType.GROUP), eq("SHIFT"), isNull(), isNull());
+    }
+
+    @Test
+    @DisplayName("T5-2 - transferLeader() - Abnormal: người tiếp quản không phải membership ACTIVE → 400")
+    void transfer_leader_new_member_must_be_active() {
+        WorkerGroupMembership pendingMs = WorkerGroupMembership.builder()
+                .workerGroup(mockGroup)
+                .worker(memberWorker)
+                .roleInGroup(GroupRole.MEMBER)
+                .status(MembershipStatus.PENDING)
+                .build();
+
+        when(userRepository.findById(leaderUserId)).thenReturn(Optional.of(
+                User.builder().userId(leaderUserId).role(UserRole.WORKER).build()));
+        when(workerRepository.findByUser_UserId(leaderUserId)).thenReturn(Optional.of(leaderWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, memberWorkerId))
+                .thenReturn(Optional.of(pendingMs));
+
+        assertThrows(BadRequestException.class,
+                () -> workerGroupService.transferLeader(leaderUserId, groupId, memberWorkerId));
+        verify(membershipRepository, never()).save(any());
+        verify(workerGroupRepository, never()).save(any(WorkerGroup.class));
+    }
+
+    @Test
+    @DisplayName("T5-3 - transferLeader() - Security: caller là MEMBER (không ADMIN) → 403")
+    void transfer_leader_by_non_leader_rejects() {
+        when(userRepository.findById(memberUserId)).thenReturn(Optional.of(
+                User.builder().userId(memberUserId).role(UserRole.WORKER).build()));
+        when(workerRepository.findByUser_UserId(memberUserId)).thenReturn(Optional.of(memberWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> workerGroupService.transferLeader(memberUserId, groupId, memberWorkerId));
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+        verify(membershipRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("T5-4 - transferLeader() - Abnormal: newLeader == leader hiện tại → 400")
+    void transfer_leader_to_self_or_current_leader_rejects() {
+        when(userRepository.findById(leaderUserId)).thenReturn(Optional.of(
+                User.builder().userId(leaderUserId).role(UserRole.WORKER).build()));
+        when(workerRepository.findByUser_UserId(leaderUserId)).thenReturn(Optional.of(leaderWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+
+        assertThrows(BadRequestException.class,
+                () -> workerGroupService.transferLeader(leaderUserId, groupId, leaderWorkerId));
+        verify(membershipRepository, never()).save(any());
+    }
 }

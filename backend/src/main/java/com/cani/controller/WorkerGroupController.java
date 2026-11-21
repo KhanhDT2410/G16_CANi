@@ -253,4 +253,20 @@ public class WorkerGroupController {
         workerGroupService.rejectGroupProposal(userId, id, proposalId, request.getReason());
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã từ chối đề xuất ca cho nhóm"));
     }
+
+    /**
+     * Task 5: Chuyển giao Trưởng nhóm cho một thành viên ACTIVE khác (leader hiện tại hoặc ADMIN)
+     */
+    @Operation(summary = "Chuyển giao Trưởng nhóm", description = "Trưởng nhóm (hoặc Quản trị viên) chuyển quyền Trưởng nhóm sang một thành viên ACTIVE khác; các đề xuất ca PENDING của nhóm bị hết hạn.")
+    @PreAuthorize("hasAnyRole('WORKER','ADMIN')")
+    @PostMapping("/{id}/transfer-leader")
+    public ResponseEntity<ApiResponse<Void>> transferLeader(
+            @PathVariable UUID id,
+            @Valid @RequestBody TransferLeaderRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        workerGroupService.transferLeader(userId, id, request.getNewLeaderWorkerId());
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã chuyển giao Trưởng nhóm thành công"));
+    }
 }

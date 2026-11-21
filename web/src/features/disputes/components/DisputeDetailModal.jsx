@@ -61,11 +61,23 @@ const DisputeDetailModal = ({
             )}
           </div>
 
-          <div style={{ padding: '0.85rem', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            <div><strong>Ca làm việc:</strong> <code>{dispute.assignmentId}</code></div>
-            <div><strong>Người phụ trách:</strong> <code>{dispute.assignedTo || 'Chưa gán'}</code></div>
-            <div><strong>Bên khiếu nại:</strong> <code>{dispute.complainantId}</code></div>
-            <div><strong>Bên bị đơn:</strong> <code>{dispute.respondentId}</code></div>
+          <div style={{ padding: '0.85rem', background: 'var(--color-bg-subtle)', borderRadius: 'var(--radius-md)', fontSize: '0.84rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+            <div>
+              <strong style={{ color: '#64748b', fontSize: '0.78rem', display: 'block', marginBottom: '2px' }}>Ca làm việc:</strong>
+              <span style={{ fontWeight: 600 }}>{dispute.eventName ? `${dispute.eventName} · ${dispute.jobType || ''}` : (dispute.jobType || `Ca #${dispute.assignmentId ? dispute.assignmentId.slice(0, 8).toUpperCase() : 'N/A'}`)}</span>
+            </div>
+            <div>
+              <strong style={{ color: '#64748b', fontSize: '0.78rem', display: 'block', marginBottom: '2px' }}>Chuyên viên CSKH:</strong>
+              <span>{dispute.assignedToName || 'Đang chờ phân công'}</span>
+            </div>
+            <div>
+              <strong style={{ color: '#64748b', fontSize: '0.78rem', display: 'block', marginBottom: '2px' }}>Bên khiếu nại:</strong>
+              <span>{dispute.complainantName || 'Người gửi đơn'} {dispute.complainantRole ? `(${dispute.complainantRole === 'EVENT_ORGANIZER' ? 'Nhà tổ chức' : 'Nhân sự'})` : ''}</span>
+            </div>
+            <div>
+              <strong style={{ color: '#64748b', fontSize: '0.78rem', display: 'block', marginBottom: '2px' }}>Đối tác liên quan:</strong>
+              <span>{dispute.respondentName || 'Đối tác trong ca'} {dispute.respondentRole ? `(${dispute.respondentRole === 'EVENT_ORGANIZER' ? 'Nhà tổ chức' : 'Nhân sự'})` : ''}</span>
+            </div>
           </div>
 
           <div className="dispute-field-group">

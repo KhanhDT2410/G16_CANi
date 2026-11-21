@@ -1868,5 +1868,98 @@
   }
 }
 
+/* ==========================================================================
+   HỒ SƠ VỤ VIỆC TỐI ƯU UX (Clean, Non-Hardcoded, No-UUIDs)
+   ========================================================================== */
+.sidebar-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.case-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-family: monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.case-ref-chip:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+.case-ref-chip .copy-hint {
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #0284c7;
+}
+
+.sidebar-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.sidebar-parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.party-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.party-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.party-role-tag {
+  font-size: 0.68rem;
+  color: #475569;
+  background: #e2e8f0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.badge-unassigned {
+  display: inline-block;
+  font-size: 0.75rem;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+
 
 

@@ -689,11 +689,76 @@ public class DisputeService {
                                 .build())
                         .toList();
 
+        String eventName = null;
+        String jobType = null;
+        Instant shiftStartTime = null;
+        Instant shiftEndTime = null;
+        String shiftLocation = null;
+
+        if (dispute.getAssignmentId() != null) {
+            ShiftAssignment assignment = shiftAssignmentRepository.findById(dispute.getAssignmentId()).orElse(null);
+            if (assignment != null && assignment.getShift() != null) {
+                Shift shift = assignment.getShift();
+                jobType = shift.getJobType();
+                shiftStartTime = shift.getStartTime();
+                shiftEndTime = shift.getEndTime();
+                shiftLocation = shift.getLocationAddress();
+                if (shift.getEvent() != null) {
+                    eventName = shift.getEvent().getName();
+                }
+            }
+        }
+
+        String complainantName = null;
+        String complainantRole = null;
+        String complainantPhone = null;
+        if (dispute.getComplainantId() != null) {
+            User complainant = userRepository.findById(dispute.getComplainantId()).orElse(null);
+            if (complainant != null) {
+                complainantName = complainant.getFullName();
+                complainantRole = complainant.getRole() != null ? complainant.getRole().name() : null;
+                complainantPhone = complainant.getPhone();
+            }
+        }
+
+        String respondentName = null;
+        String respondentRole = null;
+        String respondentPhone = null;
+        if (dispute.getRespondentId() != null) {
+            User respondent = userRepository.findById(dispute.getRespondentId()).orElse(null);
+            if (respondent != null) {
+                respondentName = respondent.getFullName();
+                respondentRole = respondent.getRole() != null ? respondent.getRole().name() : null;
+                respondentPhone = respondent.getPhone();
+            }
+        }
+
+        String assignedToName = null;
+        if (dispute.getAssignedTo() != null) {
+            User assignedUser = userRepository.findById(dispute.getAssignedTo()).orElse(null);
+            if (assignedUser != null) {
+                assignedToName = assignedUser.getFullName();
+            }
+        }
+
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())
                 .assignmentId(dispute.getAssignmentId())
                 .complainantId(dispute.getComplainantId())
                 .respondentId(dispute.getRespondentId())
+                .assignedTo(dispute.getAssignedTo())
+                .assignedToName(assignedToName)
+                .complainantName(complainantName)
+                .complainantRole(complainantRole)
+                .complainantPhone(complainantPhone)
+                .respondentName(respondentName)
+                .respondentRole(respondentRole)
+                .respondentPhone(respondentPhone)
+                .eventName(eventName)
+                .jobType(jobType)
+                .shiftStartTime(shiftStartTime)
+                .shiftEndTime(shiftEndTime)
+                .shiftLocation(shiftLocation)
                 .type(dispute.getType())
                 .title(dispute.getTitle())
                 .description(dispute.getDescription())

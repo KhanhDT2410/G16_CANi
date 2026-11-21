@@ -38,6 +38,8 @@ export const KYC_STATUS_LABELS = {
 
 export const SKILL_STATUS_LABELS = {
   APPROVED: { label: 'Đã duyệt', badgeClass: 'badge-status-active' },
+  SELF_DECLARED: { label: 'Đã tự khai báo', badgeClass: 'badge-status-pending' },
+  PENDING_REVIEW: { label: 'Chờ duyệt', badgeClass: 'badge-status-pending' },
   REJECTED: { label: 'Bị từ chối', badgeClass: 'badge-status-locked' },
   NOT_FOUND: { label: 'Chưa kê khai', badgeClass: 'badge-status-pending' },
 };

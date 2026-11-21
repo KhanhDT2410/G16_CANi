@@ -73,10 +73,7 @@ class HelpCenterScreen extends ConsumerWidget {
                 }
               },
               onSelectTicket: (ticket) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
-                );
+                MyTicketsScreen.showDetailModal(context, ticket.id);
               },
             ),
             const SizedBox(height: 18),

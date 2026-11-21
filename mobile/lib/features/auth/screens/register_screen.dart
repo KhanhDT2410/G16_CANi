@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/auth/screens/complete_profile_screen.dart';
 import 'package:cani/features/auth/screens/login_screen.dart';
 import 'package:cani/features/auth/screens/verify_email_screen.dart';
 import 'package:cani/features/auth/widgets/auth_error_banner.dart';
@@ -57,13 +58,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         await TermsOfServiceDialog.markAccepted(user.id);
       }
       if (!mounted) return;
-      _showToast('Đăng ký qua Google thành công! Bắt đầu định danh CCCD.', isError: false);
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const EkycVerificationScreen(isOnboarding: true),
-        ),
-        (route) => false,
-      );
+      final needsProfile = user == null ||
+          (user.phone?.trim().isEmpty ?? true) ||
+          user.fullName.trim().isEmpty;
+      if (needsProfile) {
+        _showToast('Đăng ký qua Google thành công! Vui lòng bổ sung số điện thoại liên hệ.', isError: false);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const CompleteProfileScreen(nextToEkycOnboarding: true),
+          ),
+          (route) => false,
+        );
+      } else {
+        _showToast('Đăng ký qua Google thành công! Bắt đầu định danh CCCD.', isError: false);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const EkycVerificationScreen(isOnboarding: true),
+          ),
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -352,32 +366,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => _agreeTerms = !_agreeTerms),
-            child: Text.rich(
-              TextSpan(
-                text: 'Tôi đồng ý với ',
-                style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
-                children: const [
-                  TextSpan(
-                    text: 'Điều khoản dịch vụ',
-                    style: TextStyle(
-                      color: Color(0xFF0077FF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextSpan(text: ' & '),
-                  TextSpan(
-                    text: 'Chính sách bảo mật',
-                    style: TextStyle(
-                      color: Color(0xFF0077FF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextSpan(text: ' của CANi'),
-                ],
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () => setState(() => _agreeTerms = !_agreeTerms),
+                child: const Text(
+                  'Tôi đồng ý với ',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
+                ),
               ),
-            ),
+              InkWell(
+                onTap: () => TermsOfServiceDialog.show(context),
+                child: const Text(
+                  'Điều khoản dịch vụ & Chính sách bảo mật',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF0077FF),
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _agreeTerms = !_agreeTerms),
+                child: const Text(
+                  ' của CANi',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
+                ),
+              ),
+            ],
           ),
         ),
       ],

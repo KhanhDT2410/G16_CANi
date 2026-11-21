@@ -1,4 +1,6 @@
 import { useRef, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth';
 import { useNotifications } from '../hooks/useNotifications';
 import NotificationDropdown from './NotificationDropdown';
 import { BellIcon } from '../../../layouts/components/HeaderIcons';
@@ -11,6 +13,9 @@ import './Notification.css';
  */
 export const NotificationBell = ({ className = '' }) => {
   const containerRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const {
     notifications,
     rawNotifications,
@@ -65,23 +70,56 @@ export const NotificationBell = ({ className = '' }) => {
     }
     closeDropdown();
 
-    // Điều hướng nghiệp vụ tương ứng (Deep Link)
+    const metaShiftId = item.metadata?.shiftId;
+    const metaEventId = item.metadata?.eventId;
+    let detail = null;
+
     if (item.referenceType === 'SUPPORT_TICKET') {
-      window.dispatchEvent(
-        new CustomEvent('cani_switch_tab', { detail: { tab: 'support', ticketId: item.referenceId } })
-      );
+      detail = { tab: 'support', ticketId: item.referenceId };
     } else if (item.referenceType === 'DISPUTE') {
-      window.dispatchEvent(
-        new CustomEvent('cani_switch_tab', { detail: { tab: 'disputes', disputeId: item.referenceId } })
-      );
-    } else if (item.referenceType === 'SHIFT' || item.referenceType === 'ASSIGNMENT') {
-      window.dispatchEvent(
-        new CustomEvent('cani_switch_tab', { detail: { tab: 'events', shiftId: item.referenceId } })
-      );
+      detail = { tab: 'disputes', disputeId: item.referenceId };
+    } else if (item.referenceType === 'SHIFT' || item.referenceType === 'ASSIGNMENT' || metaShiftId) {
+      detail = {
+        tab: 'events',
+        shiftId: metaShiftId || (item.referenceType === 'SHIFT' ? item.referenceId : null),
+        eventId: metaEventId || null,
+      };
     } else if (item.referenceType === 'PAYMENT') {
-      window.dispatchEvent(
-        new CustomEvent('cani_switch_tab', { detail: { tab: 'payments' } })
-      );
+      detail = { tab: 'payments' };
+    }
+
+    if (!detail) return;
+
+    const dispatchTabSwitch = () => {
+      window.dispatchEvent(new CustomEvent('cani_switch_tab', { detail }));
+    };
+
+    const role = user?.role;
+    if (role === 'ADMIN') {
+      if (!location.pathname.startsWith('/admin')) {
+        navigate('/admin');
+        setTimeout(dispatchTabSwitch, 80);
+      } else {
+        dispatchTabSwitch();
+      }
+      return;
+    }
+
+    if (role === 'CUSTOMER_CARE') {
+      if (!location.pathname.startsWith('/customer-care')) {
+        navigate('/customer-care');
+        setTimeout(dispatchTabSwitch, 80);
+      } else {
+        dispatchTabSwitch();
+      }
+      return;
+    }
+
+    if (!location.pathname.startsWith('/eo')) {
+      navigate(`/eo?tab=${encodeURIComponent(detail.tab)}`);
+      setTimeout(dispatchTabSwitch, 80);
+    } else {
+      dispatchTabSwitch();
     }
   };
 

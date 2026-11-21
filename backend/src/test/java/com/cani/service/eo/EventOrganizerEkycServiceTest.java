@@ -255,4 +255,48 @@ class EventOrganizerEkycServiceTest {
                 assertEquals(VerificationStatus.REJECTED, eo.getVerificationStatus());
                 verify(eventOrganizerRepository, times(1)).save(eo);
         }
+
+        @Test
+        @DisplayName("Cập nhật thông tin profile thất bại và ném BadRequestException tiếng Việt khi số điện thoại bị trùng với tài khoản khác")
+        void updateEoProfile_DuplicatePhone_ThrowsBadRequestException() {
+                when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+
+                User otherUser = User.builder()
+                                .userId(UUID.randomUUID())
+                                .phone("0328396095")
+                                .fullName("Người Dùng Khác")
+                                .build();
+                when(userRepository.findByPhone("0328396095")).thenReturn(Optional.of(otherUser));
+
+                com.cani.dto.ekyc.EoProfileDto dto = com.cani.dto.ekyc.EoProfileDto.builder()
+                                .phone("0328396095")
+                                .fullName("Tên Mới")
+                                .companyName("Công Ty Mới")
+                                .build();
+
+                BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                                eventOrganizerEkycService.updateEoProfile(user.getUserId(), dto));
+
+                assertTrue(ex.getMessage().contains("Số điện thoại này đã được sử dụng bởi một tài khoản khác"));
+                verify(userRepository, never()).save(any(User.class));
+        }
+
+        @Test
+        @DisplayName("Cập nhật thông tin profile thành công khi số điện thoại thuộc về chính user hiện tại")
+        void updateEoProfile_SameUserPhone_Success() {
+                user.setPhone("0328396095");
+                when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+                when(userRepository.findByPhone("0328396095")).thenReturn(Optional.of(user));
+
+                com.cani.dto.ekyc.EoProfileDto dto = com.cani.dto.ekyc.EoProfileDto.builder()
+                                .phone("0328396095")
+                                .fullName("Tên Mới")
+                                .companyName("Công Ty Mới")
+                                .build();
+
+                com.cani.dto.ekyc.EoProfileDto updated = eventOrganizerEkycService.updateEoProfile(user.getUserId(), dto);
+                assertNotNull(updated);
+                assertEquals("0328396095", user.getPhone());
+                verify(userRepository, times(1)).save(user);
+        }
 }

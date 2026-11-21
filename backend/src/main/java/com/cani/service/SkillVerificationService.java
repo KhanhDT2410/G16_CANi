@@ -16,6 +16,8 @@ import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpStatus;
 import com.cani.repository.SkillRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
@@ -31,6 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.net.MalformedURLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -42,6 +48,9 @@ import java.util.stream.Collectors;
 public class SkillVerificationService {
 
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final String CERT_UPLOAD_DIR = "uploads/certificates";
+    private static final String DEFAULT_UNSPECIFIED_JOB_TYPE = "Chưa xác định";
+    private static final Set<String> ALLOWED_CERT_EXTS = Set.of("jpg", "jpeg", "png", "webp", "pdf", "txt");
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -100,13 +109,15 @@ public class SkillVerificationService {
                 : (worker.getUser() != null ? worker.getUser().getFullName() : "");
         String filename = file != null ? file.getOriginalFilename() : "";
 
-        // 1. Call Vision AI OUTSIDE of database transaction
+        // 1. Lưu tệp chứng chỉ & gọi Vision AI OUTSIDE of database transaction
+        String documentUrl = saveCertificateDocument(fileBytes, filename, contentType);
+
         SkillVerificationAiResultDto aiResult = skillVisionAiClient.verifyDocument(
                 fileBytes, contentType, taxonomyNames
         );
 
         // 2. Persist verification result and update SP/tiers inside short @Transactional method
-        return persistVerificationResult(workerId, requestedSkill, file, aiResult, notes, activeSkills);
+        return persistVerificationResult(workerId, requestedSkill, file, documentUrl, aiResult, notes, activeSkills);
     }
 
     /**
@@ -117,6 +128,19 @@ public class SkillVerificationService {
             UUID workerId,
             Skill requestedSkill,
             MultipartFile file,
+            SkillVerificationAiResultDto aiResult,
+            String notes,
+            List<Skill> activeSkills
+    ) {
+        return persistVerificationResult(workerId, requestedSkill, file, null, aiResult, notes, activeSkills);
+    }
+
+    @Transactional
+    public SkillVerificationResponseDto persistVerificationResult(
+            UUID workerId,
+            Skill requestedSkill,
+            MultipartFile file,
+            String documentUrl,
             SkillVerificationAiResultDto aiResult,
             String notes,
             List<Skill> activeSkills
@@ -192,10 +216,13 @@ public class SkillVerificationService {
             log.warn("Failed to serialize extracted skills to JSON: {}", e.getMessage());
         }
 
+        Skill resolvedSkill = resolveLinkedSkill(requestedSkill, approvedSkills, aiResult, activeSkills);
+
         SkillVerificationRequest entity = SkillVerificationRequest.builder()
                 .worker(worker)
-                .skill(requestedSkill != null ? requestedSkill : (!approvedSkills.isEmpty() ? approvedSkills.get(0) : null))
+                .skill(resolvedSkill)
                 .jobType(resolvedJobType)
+                .documentUrl(documentUrl)
                 .documentName(file != null ? file.getOriginalFilename() : "document")
                 .documentType(file != null ? file.getContentType() : "application/octet-stream")
                 .recipientName(aiResult.getRecipientName())
@@ -546,6 +573,80 @@ public class SkillVerificationService {
                 ));
     }
 
+    private Skill resolveLinkedSkill(
+            Skill requestedSkill,
+            List<Skill> approvedSkills,
+            SkillVerificationAiResultDto aiResult,
+            List<Skill> activeSkills
+    ) {
+        if (requestedSkill != null) {
+            return requestedSkill;
+        }
+        if (approvedSkills != null && !approvedSkills.isEmpty()) {
+            return approvedSkills.get(0);
+        }
+        if (aiResult != null && aiResult.getExtractedSkills() != null && activeSkills != null) {
+            Map<String, Skill> byName = activeSkills.stream()
+                    .filter(s -> s.getName() != null)
+                    .collect(Collectors.toMap(s -> s.getName().toLowerCase(), s -> s, (a, b) -> a));
+            for (ExtractedSkillDto ext : aiResult.getExtractedSkills()) {
+                if (ext.getTaxonomyRole() != null) {
+                    Skill matched = byName.get(ext.getTaxonomyRole().trim().toLowerCase());
+                    if (matched != null) {
+                        return matched;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private String saveCertificateDocument(byte[] fileBytes, String originalFilename, String contentType) {
+        String ext = "jpg";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            String candidate = originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
+            if (ALLOWED_CERT_EXTS.contains(candidate)) {
+                ext = candidate;
+            }
+        } else if ("application/pdf".equalsIgnoreCase(contentType)) {
+            ext = "pdf";
+        } else if ("image/png".equalsIgnoreCase(contentType)) {
+            ext = "png";
+        }
+        String savedFilename = "cert_" + UUID.randomUUID().toString().replace("-", "") + "." + ext;
+        try {
+            Path uploadPath = Paths.get(CERT_UPLOAD_DIR);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+            Path targetPath = uploadPath.resolve(savedFilename).normalize();
+            Files.write(targetPath, fileBytes);
+        } catch (Exception e) {
+            log.warn("Không thể ghi tệp chứng chỉ ra đĩa ({}), vẫn gán URL tham chiếu: {}", savedFilename, e.getMessage());
+        }
+        return "/api/v1/workers/skills/documents/" + savedFilename;
+    }
+
+    public Resource loadCertificateDocument(String filename) {
+        if (filename == null || filename.isBlank() || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            throw new BadRequestException("Tên tệp tài liệu không hợp lệ.");
+        }
+        try {
+            Path basePath = Paths.get(CERT_UPLOAD_DIR).toAbsolutePath().normalize();
+            Path filePath = basePath.resolve(filename).normalize();
+            if (!filePath.startsWith(basePath)) {
+                throw new BadRequestException("Đường dẫn tệp không hợp lệ.");
+            }
+            Resource resource = new UrlResource(filePath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            }
+            throw new ResourceNotFoundException("Không tìm thấy tài liệu chứng chỉ: " + filename);
+        } catch (MalformedURLException e) {
+            throw new ResourceNotFoundException("Đường dẫn tài liệu không hợp lệ: " + filename);
+        }
+    }
+
     private String resolveJobType(SkillVerificationAiResultDto aiResult, Skill requestedSkill) {
         if (requestedSkill != null && requestedSkill.getName() != null) {
             return requestedSkill.getName();
@@ -556,7 +657,7 @@ public class SkillVerificationService {
                 return role;
             }
         }
-        return "Phục vụ bàn";
+        return DEFAULT_UNSPECIFIED_JOB_TYPE;
     }
 
     private WorkerSkillResponseDto mapToWorkerSkillDto(WorkerSkill ws) {
@@ -627,6 +728,41 @@ public class SkillVerificationService {
     @Transactional(readOnly = true)
     public List<Skill> getTaxonomy() {
         return skillRepository.findByIsActiveTrue();
+    }
+
+    /**
+     * Create or retrieve a custom skill by name (case-insensitive) (BR-16 dynamic extension).
+     * Cho phép EO/Worker nhập tay kỹ năng mới tự do mà không bị giới hạn trong danh mục tĩnh,
+     * đồng thời chuẩn hóa lưu trữ trong CSDL và cấp UUID để hệ thống matching hoạt động chính xác.
+     */
+    @Transactional
+    public Skill getOrCreateCustomSkill(String rawName, String rawCategory) {
+        if (rawName == null || rawName.trim().isEmpty()) {
+            throw new BadRequestException("Tên kỹ năng không được để trống.");
+        }
+        String trimmedName = rawName.trim();
+        if (trimmedName.length() > 100) {
+            throw new BadRequestException("Tên kỹ năng không được vượt quá 100 ký tự.");
+        }
+
+        // Kiểm tra xem kỹ năng đã tồn tại hay chưa (không phân biệt chữ hoa chữ thường)
+        Optional<Skill> existing = skillRepository.findByNameIgnoreCase(trimmedName);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        String category = (rawCategory != null && !rawCategory.trim().isEmpty())
+                ? rawCategory.trim()
+                : "Tự chọn";
+
+        Skill newSkill = Skill.builder()
+                .name(trimmedName)
+                .category(category)
+                .description("Kỹ năng bổ sung do người dùng nhập")
+                .isActive(true)
+                .build();
+
+        return skillRepository.save(newSkill);
     }
 
     /**

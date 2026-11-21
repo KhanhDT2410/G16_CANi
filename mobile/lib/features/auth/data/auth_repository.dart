@@ -224,9 +224,28 @@ class AuthRepository {
       final authProvider = await _storage.read(key: _authProviderKey);
       final user = await _api.getMe();
       return user.copyWith(authProvider: authProvider);
-    } catch (_) {
-      await clearSession();
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        await clearSession();
+      }
       return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<UserDto> updateBasicProfile({
+    required String fullName,
+    required String phone,
+  }) async {
+    try {
+      return await _api.updateBasicProfile(fullName: fullName, phone: phone);
+    } on DioException catch (e) {
+      final message = (e.response?.data is Map)
+          ? (e.response?.data as Map)['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Không thể cập nhật thông tin tài khoản. Vui lòng thử lại.');
     }
   }
 
@@ -239,8 +258,13 @@ class AuthRepository {
 
   Future<void> clearSession() async {
     AuthInterceptor.inMemoryToken = null;
-    await _storage.delete(key: _tokenKey);
-    await _storage.delete(key: _refreshTokenKey);
-    await _storage.delete(key: _authProviderKey);
+    await Future.wait([
+      _storage.delete(key: _tokenKey),
+      _storage.delete(key: _refreshTokenKey),
+      _storage.delete(key: _authProviderKey),
+      _storage.delete(key: 'cani_worker_bank_code'),
+      _storage.delete(key: 'cani_worker_bank_account'),
+      _storage.delete(key: 'cani_worker_bank_owner'),
+    ]);
   }
 }

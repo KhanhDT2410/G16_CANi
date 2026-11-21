@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { showPrompt } from '../../../components/common/PromptModal';
 
 /**
  * Trình soạn thảo Rich Text Editor với thanh công cụ định dạng (Paragraph, B, I, Link, Lists, Table, Quote, Image, Undo/Redo)
@@ -25,15 +26,25 @@ export const FaqRichTextEditor = ({ value, onChange, placeholder, disabled }) =>
     handleInput();
   };
 
-  const handleInsertLink = () => {
+  const handleInsertLink = async () => {
     if (disabled) return;
-    const url = window.prompt('Nhập đường dẫn URL liên kết:');
+    const url = await showPrompt({
+      title: 'Chèn liên kết URL',
+      description: 'Nhập đường dẫn liên kết (https://...) để gắn vào đoạn văn bản.',
+      inputLabel: 'Đường dẫn URL',
+      inputPlaceholder: 'https://...',
+    });
     if (url) exec('createLink', url);
   };
 
-  const handleInsertImage = () => {
+  const handleInsertImage = async () => {
     if (disabled) return;
-    const url = window.prompt('Nhập đường dẫn hình ảnh (URL):');
+    const url = await showPrompt({
+      title: 'Chèn hình ảnh',
+      description: 'Nhập đường dẫn URL của hình ảnh minh họa.',
+      inputLabel: 'Đường dẫn hình ảnh (URL)',
+      inputPlaceholder: 'https://.../image.png',
+    });
     if (url) exec('insertImage', url);
   };
 
@@ -78,31 +89,31 @@ export const FaqRichTextEditor = ({ value, onChange, placeholder, disabled }) =>
           <em>I</em>
         </button>
         <button type="button" title="Chèn liên kết (Link)" onClick={handleInsertLink} disabled={disabled}>
-          🔗
+          Link
         </button>
         <button type="button" title="Danh sách chấm (Bullet list)" onClick={() => exec('insertUnorderedList')} disabled={disabled}>
-          •≡
+          List
         </button>
         <button type="button" title="Danh sách số (Numbered list)" onClick={() => exec('insertOrderedList')} disabled={disabled}>
-          1≡
+          1.
         </button>
         <button type="button" title="Chèn bảng (Table)" onClick={handleInsertTable} disabled={disabled}>
-          ▦
+          Bảng
         </button>
         <button type="button" title="Trích dẫn (Quote)" onClick={handleBlockquote} disabled={disabled}>
-          ❝
+          Quote
         </button>
         <button type="button" title="Chèn ảnh (Image)" onClick={handleInsertImage} disabled={disabled}>
-          🖼
+          Ảnh
         </button>
 
         <span className="faq-toolbar-divider" />
 
         <button type="button" title="Hoàn tác (Undo)" onClick={() => exec('undo')} disabled={disabled}>
-          ↺
+          Undo
         </button>
         <button type="button" title="Làm lại (Redo)" onClick={() => exec('redo')} disabled={disabled}>
-          ↻
+          Redo
         </button>
       </div>
 

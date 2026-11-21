@@ -47,23 +47,30 @@ class JobDetailBottomSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final cani = theme.cani;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           // Header kéo
           Center(
             child: Container(
@@ -196,9 +203,11 @@ class JobDetailBottomSheet extends StatelessWidget {
               children: [
                 Icon(Icons.access_time, size: 18, color: Colors.orange.shade700),
                 const SizedBox(width: 6),
-                Text(
-                  '${shift.startTime!.hour.toString().padLeft(2, '0')}:${shift.startTime!.minute.toString().padLeft(2, '0')} - ${shift.endTime!.hour.toString().padLeft(2, '0')}:${shift.endTime!.minute.toString().padLeft(2, '0')} (${shift.startTime!.day}/${shift.startTime!.month})',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                Expanded(
+                  child: Text(
+                    '${shift.startTime!.hour.toString().padLeft(2, '0')}:${shift.startTime!.minute.toString().padLeft(2, '0')} - ${shift.endTime!.hour.toString().padLeft(2, '0')}:${shift.endTime!.minute.toString().padLeft(2, '0')} (${shift.startTime!.day}/${shift.startTime!.month})',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
                 ),
               ],
             ),
@@ -213,9 +222,11 @@ class JobDetailBottomSheet extends StatelessWidget {
                 children: [
                   Icon(Icons.fact_check, size: 15, color: Colors.amber.shade800),
                   const SizedBox(width: 6),
-                  Text(
-                    'Mở điểm danh từ ${shift.arrivalTime!.hour.toString().padLeft(2, '0')}:${shift.arrivalTime!.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(fontSize: 12, color: Colors.amber.shade800, fontWeight: FontWeight.w600),
+                  Expanded(
+                    child: Text(
+                      'Mở điểm danh từ ${shift.arrivalTime!.hour.toString().padLeft(2, '0')}:${shift.arrivalTime!.minute.toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 12, color: Colors.amber.shade800, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),
@@ -260,47 +271,61 @@ class JobDetailBottomSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Column(
-                  children: [
-                    const Text('Mức Lương', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${(shift.hourlyWage).toStringAsFixed(0)} đ/h',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green.shade800,
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text('Mức Lương', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${(shift.hourlyWage).toStringAsFixed(0)} đ/h',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Container(height: 30, width: 1, color: Colors.grey.shade300),
-                Column(
-                  children: [
-                    const Text('Phụ Cấp', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '+${(shift.allowance).toStringAsFixed(0)} đ',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text('Phụ Cấp', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '+${(shift.allowance).toStringAsFixed(0)} đ',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Container(height: 30, width: 1, color: Colors.grey.shade300),
-                Column(
-                  children: [
-                    const Text('Còn Thiếu', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${shift.remainingWorkers}/${shift.requiredWorkers} người',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red.shade700,
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text('Còn Thiếu', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${shift.remainingWorkers}/${shift.requiredWorkers} người',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -392,14 +417,17 @@ class JobDetailBottomSheet extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                  ),
-                ),
+                                ],
+                              ),
+                            ),
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
+      ),
       ),
     );
   }

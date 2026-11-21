@@ -3,6 +3,7 @@ package com.cani.controller;
 import com.cani.dto.faq.FaqPublicResponseDto;
 import com.cani.dto.response.ApiResponse;
 import com.cani.entity.enums.FaqCategory;
+import com.cani.entity.enums.FaqTargetRole;
 import com.cani.service.FaqService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,9 +31,10 @@ public class FaqController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<FaqPublicResponseDto>>> getPublicFaqs(
-            @RequestParam(value = "category", required = false) FaqCategory category
+            @RequestParam(value = "category", required = false) FaqCategory category,
+            @RequestParam(value = "targetRole", required = false) FaqTargetRole targetRole
     ) {
-        List<FaqPublicResponseDto> result = faqService.getPublicFaqs(category);
+        List<FaqPublicResponseDto> result = faqService.getPublicFaqs(category, targetRole);
         return ResponseEntity.ok(ApiResponse.ok(result, "Lấy danh sách câu hỏi thường gặp thành công"));
     }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../features/auth';
 import { showToast } from '../../components/common/Toast';
@@ -11,21 +11,37 @@ import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
 import EOMetricsGrid from './components/EOMetricsGrid';
 import EOOverviewAnalytics from './components/EOOverviewAnalytics';
-import EOEventsTab from './components/EOEventsTab';
-import EOPaymentsTab from './components/EOPaymentsTab';
-import EOSubscriptionTab from './components/EOSubscriptionTab';
-import EoProfileTab from './components/EoProfileTab';
-import EOSettingsTab from './components/EOSettingsTab';
-import EOMyTeamTab from './components/EOMyTeamTab';
 import EOModals from './components/EOModals';
-import EventDetailModal from './components/EventDetailModal';
-import SettlementVoucherModal from './components/SettlementVoucherModal';
 import EkycRequiredModal from './components/EkycRequiredModal';
 import { eoService } from '../../services/eoService';
-
-import { SupportTicketsCenterView } from '../../features/support-tickets';
-import { DisputeCenterView } from '../../features/disputes';
+import { DEFAULT_NEW_EVENT } from './utils/eventHelpers';
+import { useDirectChat, DirectMessengerDock } from '../../features/direct-chat';
+import EOMessagesTab from './components/EOMessagesTab';
 import './EOPage.css';
+
+// Lazy-load các tab & workspace nặng để giữ bundle ban đầu gọn nhẹ dưới 500 kB
+const EOEventsTab = lazy(() => import('./components/EOEventsTab'));
+const EOPaymentsTab = lazy(() => import('./components/EOPaymentsTab'));
+const EOSubscriptionTab = lazy(() => import('./components/EOSubscriptionTab'));
+const EoProfileTab = lazy(() => import('./components/EoProfileTab'));
+const EOMyTeamTab = lazy(() => import('./components/EOMyTeamTab'));
+const EventCreationWizardModal = lazy(() => import('./components/EventCreationWizardModal'));
+const EventDetailModal = lazy(() => import('./components/EventDetailModal'));
+const ShiftWorkspacePage = lazy(() => import('./components/ShiftWorkspacePage'));
+const SettlementVoucherModal = lazy(() => import('./components/SettlementVoucherModal'));
+const EOSupportTab = lazy(() => import('./components/EOSupportTab'));
+const DisputeCenterView = lazy(() =>
+  import('../../features/disputes').then((m) => ({ default: m.DisputeCenterView }))
+);
+
+function EOTabFallback() {
+  return (
+    <div className="page-loading-fallback" style={{ minHeight: '280px' }}>
+      <div className="cani-spinner" />
+      <span>Đang tải khu vực làm việc...</span>
+    </div>
+  );
+}
 
 export default function EOPage() {
   const { user } = useAuth();
@@ -35,6 +51,7 @@ export default function EOPage() {
   const events = useEvents();
   const shifts = useShifts({ onReloadEvents: events.loadEvents });
   const payments = usePayments();
+  const directChat = useDirectChat();
 
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('overview');
@@ -59,10 +76,16 @@ export default function EOPage() {
     });
   };
 
-  // Lắng nghe sự kiện chuyển tab từ Navbar (Header Avatar click)
+  // Lắng nghe sự kiện chuyển tab từ Navbar hoặc Chuông thông báo (Deep Link)
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
   useEffect(() => {
     const handleSwitch = (e) => {
       const targetTab = e.detail?.tab;
+      const targetShiftId = e.detail?.shiftId;
+      const targetEventId = e.detail?.eventId;
+
       if (targetTab) {
         if (targetTab === 'recruitment') {
           setActiveTab('events');
@@ -71,10 +94,27 @@ export default function EOPage() {
         } else if (targetTab === 'analytics') {
           setActiveTab('overview');
           setActiveNav('overview');
+        } else if (targetTab === 'settings') {
+          setActiveTab('profile');
+          setActiveNav('profile');
         } else {
           setActiveTab(targetTab);
           setActiveNav(targetTab);
         }
+
+        // Deep-link trực tiếp vào trang quản lý ca từ thông báo
+        const currentEvents = eventsRef.current;
+        if (targetTab === 'events' && targetShiftId && Array.isArray(currentEvents?.events)) {
+          const foundEvent =
+            (targetEventId && currentEvents.events.find((ev) => ev.eventId === targetEventId)) ||
+            currentEvents.events.find((ev) => (ev.shifts || []).some((sh) => sh.shiftId === targetShiftId));
+          if (foundEvent) {
+            setDetailEvent(foundEvent);
+            setWorkspaceShiftId(targetShiftId);
+            currentEvents.loadEvents?.();
+          }
+        }
+
         try {
           setSearchParams({ tab: targetTab }, { replace: true });
         } catch (err) {
@@ -114,7 +154,7 @@ export default function EOPage() {
     ) {
       setActiveTab('subscription');
       setActiveNav('subscription');
-    } else if (tabParam === 'profile' || tabParam === 'ekyc') {
+    } else if (tabParam === 'profile' || tabParam === 'ekyc' || tabParam === 'settings') {
       setActiveTab('profile');
       setActiveNav('profile');
     } else if (tabParam === 'recruitment') {
@@ -124,7 +164,7 @@ export default function EOPage() {
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
-    } else if (tabParam && ['events', 'payments', 'subscription', 'profile', 'my-team', 'settings', 'support'].includes(tabParam)) {
+    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'messages', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     }
@@ -153,7 +193,8 @@ export default function EOPage() {
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState(null);
   const [detailInitialTab, setDetailInitialTab] = useState('SHIFTS');
-  const [ekycStatus, setEkycStatus] = useState('APPROVED');
+  const [workspaceShiftId, setWorkspaceShiftId] = useState(null);
+  const [ekycStatus, setEkycStatus] = useState(null);
   const [showEkycModal, setShowEkycModal] = useState(false);
 
   // Đồng bộ detailEvent khi danh sách events được tải lại (thêm ca, xuất bản, sửa sự kiện)
@@ -169,21 +210,24 @@ export default function EOPage() {
   const handleOpenEventDetailPage = (evt, initialTab = 'SHIFTS') => {
     if (!evt) return;
     setDetailEvent(evt);
+    setWorkspaceShiftId(null);
     setDetailInitialTab(initialTab);
     setActiveTab('events');
     setActiveNav('events');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Lấy trạng thái eKYC của Nhà tổ chức
+  // Lấy trạng thái eKYC của Nhà tổ chức (tránh bỏ sót xác thực khi API lỗi)
   const fetchEkycStatus = async () => {
     try {
       const res = await eoService.getEkycStatus();
-      if (res?.status) {
-        setEkycStatus(res.status);
-      }
+      const nextStatus = res?.status || 'NOT_SUBMITTED';
+      setEkycStatus(nextStatus);
+      return nextStatus;
     } catch (err) {
       console.warn('Lỗi kiểm tra eKYC status:', err);
+      setEkycStatus('NOT_SUBMITTED');
+      return 'NOT_SUBMITTED';
     }
   };
 
@@ -194,16 +238,27 @@ export default function EOPage() {
     return () => window.removeEventListener('cani_ekyc_updated', handleEkycUpdated);
   }, []);
 
-  const handleOpenCreateEvent = () => {
-    if (ekycStatus !== 'APPROVED') {
+  const handleOpenCreateEvent = async () => {
+    let resolvedStatus = ekycStatus;
+    if (!resolvedStatus) {
+      resolvedStatus = await fetchEkycStatus();
+    }
+    if (resolvedStatus !== 'APPROVED') {
       setShowEkycModal(true);
       return;
     }
-    events.setShowEventModal(true);
+    events.setNewEvent({ ...DEFAULT_NEW_EVENT });
+    setDetailEvent(null);
+    setWorkspaceShiftId(null);
+    setActiveTab('events');
+    setActiveNav('events');
+    setActiveEventSubTab('create');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNavClick = (navKey) => {
     setDetailEvent(null);
+    setWorkspaceShiftId(null);
     setActiveNav(navKey);
     let target = 'overview';
     if (navKey === 'overview' || navKey === 'analytics') {
@@ -216,16 +271,18 @@ export default function EOPage() {
       setActiveEventSubTab('recruitment');
     } else if (navKey === 'payments') {
       target = 'payments';
+    } else if (navKey === 'disputes') {
+      target = 'disputes';
     } else if (navKey === 'subscription') {
       target = 'subscription';
-    } else if (navKey === 'profile' || navKey === 'ekyc') {
+    } else if (navKey === 'profile' || navKey === 'ekyc' || navKey === 'settings') {
       target = 'profile';
     } else if (navKey === 'my-team') {
       target = 'my-team';
+    } else if (navKey === 'messages') {
+      target = 'messages';
     } else if (navKey === 'support') {
       target = 'support';
-    } else if (navKey === 'settings') {
-      target = 'settings';
     }
 
     setActiveTab(target);
@@ -290,6 +347,7 @@ export default function EOPage() {
           onEventSubTabClick={handleEventSubTabChange}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={toggleSidebarCollapse}
+          unreadMessagesCount={directChat.counts.unread}
         />
 
         <main className="eo-main-stream">
@@ -313,7 +371,7 @@ export default function EOPage() {
                 }}
               >
                 {/* 1. Phần chữ bên trái */}
-                <div className="eo-hero-banner-text" style={{ maxWidth: '60%', zIndex: 2 }}>
+                <div className="eo-hero-banner-text">
                   <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', marginBottom: '2px' }}>
                     Chào mừng trở lại,
                   </div>
@@ -408,46 +466,113 @@ export default function EOPage() {
             </>
           )}
 
-          {/* TRANG RIÊNG: QUẢN LÝ SỰ KIỆN HOẶC TRANG CHI TIẾT SỰ KIỆN */}
+          {/* TRANG RIÊNG: TẠO SỰ KIỆN, QUẢN LÝ SỰ KIỆN, CHI TIẾT SỰ KIỆN HOẶC TRANG QUẢN LÝ TỪNG CA */}
           {activeTab === 'events' && (
-            (detailEvent || activeEventSubTab === 'detail') ? (
-              <EventDetailModal
-                isOpen={true}
-                asPage={true}
-                initialTab={detailInitialTab}
-                allEvents={events.events}
-                onSelectEvent={(nextEvt) => setDetailEvent(nextEvt)}
-                onClose={() => {
-                  setDetailEvent(null);
-                  setDetailInitialTab('SHIFTS');
-                  handleEventSubTabChange('list');
-                }}
-                event={
-                  detailEvent ||
-                  (Array.isArray(events.events)
-                    ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0]
-                    : null)
-                }
-                onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
-                onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-                onOpenConfirmPublish={(evt) => {
-                  const shiftCount = evt.totalShifts || (Array.isArray(evt.shifts) ? evt.shifts.length : 0);
-                  if (!shiftCount) {
-                    showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi đăng tuyển!', 'warning');
-                    shifts.setSelectedEventId(evt.eventId);
-                    shifts.setShowShiftModal(true);
-                    return;
-                  }
-                  events.openConfirmPublish(evt);
-                }}
-                onOpenEditEvent={events.setEditingEvent}
-                onEditShift={shifts.setEditingShift}
-                onCancelShift={shifts.handleCancelShift}
-                onReloadEvents={events.loadEvents}
-                onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
-                skillTaxonomy={shifts.skillTaxonomy}
-              />
-            ) : (
+            <Suspense fallback={<EOTabFallback />}>
+              {(() => {
+            if (activeEventSubTab === 'create') {
+              return (
+                <EventCreationWizardModal
+                  isOpen={true}
+                  asPage={true}
+                  onClose={() => handleEventSubTabChange('list')}
+                  onSuccess={events.loadEvents}
+                  onEventCreated={async (createdEvt) => {
+                    const refreshed = await events.loadEvents();
+                    const list = Array.isArray(refreshed) ? refreshed : events.events;
+                    const found = list.find((e) => e.eventId === createdEvt?.eventId) || createdEvt;
+                    handleOpenEventDetailPage(found);
+                  }}
+                  newEvent={events.newEvent}
+                  setNewEvent={events.setNewEvent}
+                  locating={events.locating}
+                  onGetCurrentLocation={events.handleGetCurrentLocation}
+                  skillTaxonomy={shifts.skillTaxonomy}
+                />
+              );
+            }
+
+            const resolvedEvent =
+              detailEvent ||
+              (activeEventSubTab === 'detail' && Array.isArray(events.events)
+                ? events.events.find((e) => e.status !== 'CANCELLED') || events.events[0]
+                : null);
+
+            const workspaceShift =
+              workspaceShiftId && resolvedEvent
+                ? (resolvedEvent.shifts || []).find((s) => s.shiftId === workspaceShiftId)
+                : null;
+
+            if (workspaceShift && resolvedEvent) {
+              return (
+                <ShiftWorkspacePage
+                  shift={workspaceShift}
+                  event={resolvedEvent}
+                  onSelectShift={(nextShift) => {
+                    setWorkspaceShiftId(nextShift.shiftId);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onBackToEvent={() => {
+                    setWorkspaceShiftId(null);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onEditShift={shifts.setEditingShift}
+                  onCancelShift={shifts.handleCancelShift}
+                  onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+                  onReloadEvents={events.loadEvents}
+                  onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+                  skillTaxonomy={shifts.skillTaxonomy}
+                />
+              );
+            }
+
+            if (resolvedEvent || activeEventSubTab === 'detail') {
+              return (
+                <EventDetailModal
+                  isOpen={true}
+                  asPage={true}
+                  initialTab={detailInitialTab}
+                  allEvents={events.events}
+                  onSelectEvent={(nextEvt) => {
+                    setWorkspaceShiftId(null);
+                    setDetailEvent(nextEvt);
+                  }}
+                  onClose={() => {
+                    setDetailEvent(null);
+                    setWorkspaceShiftId(null);
+                    setDetailInitialTab('SHIFTS');
+                    handleEventSubTabChange('list');
+                  }}
+                  event={resolvedEvent}
+                  onOpenShiftWorkspace={(sh) => {
+                    if (sh?.shiftId) {
+                      setWorkspaceShiftId(sh.shiftId);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
+                  onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
+                  onOpenConfirmPublish={(evt) => {
+                    const shiftCount = evt.totalShifts || (Array.isArray(evt.shifts) ? evt.shifts.length : 0);
+                    if (!shiftCount) {
+                      showToast('Sự kiện này chưa có ca làm việc nào. Vui lòng thêm ca làm việc trước khi đăng tuyển!', 'warning');
+                      shifts.setSelectedEventId(evt.eventId);
+                      shifts.setShowShiftModal(true);
+                      return;
+                    }
+                    events.openConfirmPublish(evt);
+                  }}
+                  onOpenEditEvent={events.setEditingEvent}
+                  onEditShift={shifts.setEditingShift}
+                  onCancelShift={shifts.handleCancelShift}
+                  onReloadEvents={events.loadEvents}
+                  onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+                  skillTaxonomy={shifts.skillTaxonomy}
+                />
+              );
+            }
+
+            return (
               <EOEventsTab
                 loading={events.loading}
                 allEvents={events.events}
@@ -463,6 +588,11 @@ export default function EOPage() {
                 activeSubTab={activeEventSubTab}
                 onSubTabChange={handleEventSubTabChange}
                 onOpenEventDetail={handleOpenEventDetailPage}
+                onOpenShiftWorkspace={(sh, evt) => {
+                  if (evt) setDetailEvent(evt);
+                  if (sh?.shiftId) setWorkspaceShiftId(sh.shiftId);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 onDeleteEvent={events.handleDeleteEvent}
                 onOpenCreateEvent={handleOpenCreateEvent}
                 onOpenAddShift={(id) => { shifts.setSelectedEventId(id); shifts.setShowShiftModal(true); }}
@@ -488,44 +618,78 @@ export default function EOPage() {
                 onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
                 skillTaxonomy={shifts.skillTaxonomy}
               />
-            )
+            );
+          })()}
+            </Suspense>
           )}
 
           {activeTab === 'payments' && (
-            <EOPaymentsTab
-              payments={payments.payments}
-              onOpenPaymentModal={(p) => {
-                payments.setSelectedAssignment(p);
-                payments.setPaymentForm((prev) => ({ ...prev, assignmentId: p.assignmentId, declaredAmount: p.agreedAmount }));
-                payments.setShowPaymentModal(true);
-              }}
-              onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
-              onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
-            />
+            <Suspense fallback={<EOTabFallback />}>
+              <EOPaymentsTab
+                payments={payments.payments}
+                loading={payments.loading}
+                error={payments.error}
+                onOpenPaymentModal={(p) => {
+                  payments.setSelectedAssignment(p);
+                  payments.setPaymentForm((prev) => ({ ...prev, assignmentId: p.assignmentId, declaredAmount: p.agreedAmount }));
+                  payments.setShowPaymentModal(true);
+                }}
+                onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
+                onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
+              />
+            </Suspense>
           )}
 
-          {activeTab === 'subscription' && <EOSubscriptionTab />}
+          {activeTab === 'subscription' && (
+            <Suspense fallback={<EOTabFallback />}>
+              <EOSubscriptionTab />
+            </Suspense>
+          )}
 
           {/* Tranh chấp & Khiếu nại (Dispute Center - UC-96 -> UC-104) */}
           {activeTab === 'disputes' && (
-            <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
-              <DisputeCenterView />
-            </div>
+            <Suspense fallback={<EOTabFallback />}>
+              <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
+                <DisputeCenterView />
+              </div>
+            </Suspense>
           )}
 
-          {activeTab === 'my-team' && <EOMyTeamTab />}
+          {activeTab === 'my-team' && (
+            <Suspense fallback={<EOTabFallback />}>
+              <EOMyTeamTab />
+            </Suspense>
+          )}
 
-          {(activeTab === 'profile' || activeTab === 'ekyc') && <EoProfileTab />}
+          {activeTab === 'messages' && (
+            <EOMessagesTab
+              directChatState={directChat}
+              onOpenShiftDetail={(shiftId) => {
+                const foundEvent = events.events?.find((e) =>
+                  Array.isArray(e.shifts) && e.shifts.some((s) => s.shiftId === shiftId)
+                );
+                if (foundEvent) {
+                  handleOpenEventDetailPage(foundEvent, 'SHIFTS');
+                } else {
+                  handleNavClick('events');
+                }
+              }}
+            />
+          )}
 
-          {/* Hỗ trợ kỹ thuật & Phiếu yêu cầu (UC-105 / UC-106) */}
+          {(activeTab === 'profile' || activeTab === 'ekyc') && (
+            <Suspense fallback={<EOTabFallback />}>
+              <EoProfileTab />
+            </Suspense>
+          )}
+
+          {/* Trung tâm Trợ giúp & Câu hỏi thường gặp FAQ (SRS UC-105 / UC-110) */}
           {activeTab === 'support' && (
-            <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
-              <SupportTicketsCenterView />
-            </div>
-          )}
-
-          {activeTab === 'settings' && (
-            <EOSettingsTab onNavigateToSubscription={() => switchTab('subscription')} />
+            <Suspense fallback={<EOTabFallback />}>
+              <div className="animate-fade-in-up" style={{ marginTop: '0.5rem' }}>
+                <EOSupportTab />
+              </div>
+            </Suspense>
           )}
         </main>
 
@@ -568,27 +732,25 @@ export default function EOPage() {
         setInviteModal={setInviteModal}
         disputeModal={disputeModal}
         setDisputeModal={setDisputeModal}
-        onEventCreated={async (createdEvt) => {
-          const refreshed = await events.loadEvents();
-          const list = Array.isArray(refreshed) ? refreshed : events.events;
-          const found = list.find((e) => e.eventId === createdEvt?.eventId) || createdEvt;
-          handleOpenEventDetailPage(found);
-        }}
       />
 
       {/* Modal Xuất Phiếu Chi Thù Lao & Quyết Toán Kế Toán (Mẫu 02-TT / NĐ 52/2024/NĐ-CP) */}
-      <SettlementVoucherModal
-        isOpen={isVoucherModalOpen}
-        onClose={() => setIsVoucherModalOpen(false)}
-        events={events.events}
-        payments={payments.payments}
-        companyInfo={{
-          companyName: user?.companyName || user?.fullName || 'Đơn vị tổ chức sự kiện',
-          taxCode: user?.taxCode || 'Chưa cập nhật',
-          address: user?.address || 'Chưa cập nhật địa chỉ',
-          organizerName: user?.fullName || user?.username || 'Đại diện Ban Tổ Chức',
-        }}
-      />
+      {isVoucherModalOpen && (
+        <Suspense fallback={null}>
+          <SettlementVoucherModal
+            isOpen={isVoucherModalOpen}
+            onClose={() => setIsVoucherModalOpen(false)}
+            events={events.events}
+            payments={payments.payments}
+            companyInfo={{
+              companyName: user?.companyName || user?.fullName || 'Đơn vị tổ chức sự kiện',
+              taxCode: user?.taxCode || 'Chưa cập nhật',
+              address: user?.address || 'Chưa cập nhật địa chỉ',
+              organizerName: user?.fullName || user?.username || 'Đại diện Ban Tổ Chức',
+            }}
+          />
+        </Suspense>
+      )}
       {/* Modal Cảnh Báo Yêu Cầu eKYC Trước Khi Tạo Sự Kiện */}
       <EkycRequiredModal
         isOpen={showEkycModal}
@@ -596,6 +758,21 @@ export default function EOPage() {
         onNavigateToEkyc={() => switchTab('profile')}
         ekycStatus={ekycStatus}
       />
+      {/* Pop-up Messenger Dock trao đổi trực tiếp với Worker */}
+      {directChat.activeChat && (
+        <DirectMessengerDock
+          activeChat={directChat.activeChat}
+          onClose={() => directChat.setActiveChat(null)}
+          onOpenShiftDetail={(shiftId) => {
+            const foundEvent = events.events?.find((e) =>
+              Array.isArray(e.shifts) && e.shifts.some((s) => s.shiftId === shiftId)
+            );
+            if (foundEvent) {
+              handleOpenEventDetailPage(foundEvent, 'SHIFTS');
+            }
+          }}
+        />
+      )}
     </div >
   );
 }

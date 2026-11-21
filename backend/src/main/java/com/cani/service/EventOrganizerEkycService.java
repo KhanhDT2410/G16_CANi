@@ -5,8 +5,11 @@ import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
+import com.cani.dto.event.EoReviewResponseDto;
 import com.cani.entity.EventOrganizer;
 import com.cani.entity.EoEkycVerification;
+import com.cani.entity.Review;
+import com.cani.entity.ShiftAssignment;
 import com.cani.entity.User;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.VerificationStatus;
@@ -43,6 +46,15 @@ public class EventOrganizerEkycService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cani.repository.WorkerRepository workerRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.EventRepository eventRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.ReviewRepository reviewRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.ShiftAssignmentRepository shiftAssignmentRepository;
 
     @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
     private boolean ekycStrict;
@@ -267,6 +279,44 @@ public class EventOrganizerEkycService {
         EventOrganizer eo = getOrCreateEo(userId);
         User u = eo.getUser();
 
+        // Tính số sự kiện thực tế đã chạy/tổ chức, tổng sự kiện tạo và nhân sự đã chốt từ DB
+        int actualEventsCount = eo.getTotalEventsCompleted() != null ? eo.getTotalEventsCompleted() : 0;
+        int totalEventsCreated = 0;
+        int totalConfirmedWorkers = 0;
+        if (eventRepository != null) {
+            List<com.cani.entity.Event> eoEvents = eventRepository
+                    .findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId());
+            totalEventsCreated = (int) eoEvents.stream()
+                    .filter(ev -> ev.getStatus() != com.cani.entity.enums.EventStatus.CANCELLED)
+                    .count();
+            long realCount = eoEvents.stream()
+                    .filter(ev -> ev.getStatus() != null
+                            && ev.getStatus() != com.cani.entity.enums.EventStatus.DRAFT
+                            && ev.getStatus() != com.cani.entity.enums.EventStatus.CANCELLED)
+                    .count();
+            actualEventsCount = (int) Math.max(actualEventsCount, realCount);
+            totalConfirmedWorkers = eoEvents.stream()
+                    .filter(ev -> ev.getStatus() != com.cani.entity.enums.EventStatus.CANCELLED)
+                    .mapToInt(ev -> ev.getTotalConfirmedWorkers() != null ? ev.getTotalConfirmedWorkers() : 0)
+                    .sum();
+        }
+
+        BigDecimal actualRatingAvg = eo.getRatingAvg() != null ? eo.getRatingAvg() : BigDecimal.ZERO;
+        int actualRatingCount = eo.getRatingCount() != null ? eo.getRatingCount() : 0;
+        if (reviewRepository != null) {
+            UUID targetUserId = u != null ? u.getUserId() : userId;
+            List<com.cani.entity.Review> reviews = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(targetUserId);
+            if (reviews != null && !reviews.isEmpty()) {
+                actualRatingCount = reviews.size();
+                double avg = reviews.stream()
+                        .filter(r -> r.getRating() != null)
+                        .mapToInt(com.cani.entity.Review::getRating)
+                        .average()
+                        .orElse(0.0);
+                actualRatingAvg = BigDecimal.valueOf(avg).setScale(1, java.math.RoundingMode.HALF_UP);
+            }
+        }
+
         return EoProfileDto.builder()
                 .eoId(eo.getEoId())
                 .userId(u != null ? u.getUserId() : userId)
@@ -277,14 +327,108 @@ public class EventOrganizerEkycService {
                 .email(u != null ? u.getEmail() : null)
                 .verificationStatus(eo.getVerificationStatus() != null ? eo.getVerificationStatus().name() : "PENDING")
                 .verifiedAt(eo.getVerifiedAt())
-                .ratingAvg(eo.getRatingAvg())
-                .ratingCount(eo.getRatingCount())
-                .totalEventsCompleted(eo.getTotalEventsCompleted())
+                .ratingAvg(actualRatingAvg)
+                .ratingCount(actualRatingCount)
+                .totalEventsCompleted(actualEventsCount)
+                .totalEventsCreated(totalEventsCreated)
+                .totalConfirmedWorkers(totalConfirmedWorkers)
                 .build();
     }
 
     /**
+     * Lấy danh sách các lượt đánh giá & nhận xét từ Người lao động (Worker) dành cho Nhà tổ chức sự kiện.
+     */
+    @Transactional(readOnly = true)
+    public List<EoReviewResponseDto> getEoReviews(UUID userId) {
+        if (userId == null || reviewRepository == null) {
+            return List.of();
+        }
+
+        List<Review> reviews = new ArrayList<>(reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(userId));
+        eventOrganizerRepository.findByUser_UserId(userId).ifPresent(eo -> {
+            if (eo.getEoId() != null && !eo.getEoId().equals(userId)) {
+                List<Review> eoIdReviews = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(eo.getEoId());
+                if (eoIdReviews != null && !eoIdReviews.isEmpty()) {
+                    Set<UUID> existingIds = reviews.stream().map(Review::getReviewId).collect(Collectors.toSet());
+                    for (Review r : eoIdReviews) {
+                        if (existingIds.add(r.getReviewId())) {
+                            reviews.add(r);
+                        }
+                    }
+                }
+            }
+        });
+
+        if (reviews.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> reviewerIds = reviews.stream()
+                .map(Review::getReviewerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, User> userMap = userRepository.findAllById(reviewerIds).stream()
+                .collect(Collectors.toMap(User::getUserId, u -> u, (u1, u2) -> u1));
+
+        Set<UUID> assignmentIds = reviews.stream()
+                .map(Review::getAssignmentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, ShiftAssignment> assignmentMap = Collections.emptyMap();
+        if (shiftAssignmentRepository != null && !assignmentIds.isEmpty()) {
+            assignmentMap = shiftAssignmentRepository.findAllById(assignmentIds).stream()
+                    .collect(Collectors.toMap(ShiftAssignment::getAssignmentId, sa -> sa, (s1, s2) -> s1));
+        }
+
+        final Map<UUID, ShiftAssignment> finalAssignmentMap = assignmentMap;
+        return reviews.stream()
+                .sorted(Comparator.comparing(Review::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .map(r -> {
+                    User reviewer = userMap.get(r.getReviewerId());
+                    String workerName = (reviewer != null && reviewer.getFullName() != null && !reviewer.getFullName().isBlank())
+                            ? reviewer.getFullName()
+                            : "Nhân sự CANi";
+                    String workerAvatar = reviewer != null ? reviewer.getAvatarUrl() : null;
+
+                    String eventName = null;
+                    String shiftName = null;
+                    if (r.getAssignmentId() != null) {
+                        ShiftAssignment sa = finalAssignmentMap.get(r.getAssignmentId());
+                        if (sa != null && sa.getShift() != null) {
+                            shiftName = sa.getShift().getJobType();
+                            if (sa.getShift().getEvent() != null) {
+                                eventName = sa.getShift().getEvent().getName();
+                            }
+                        }
+                    }
+
+                    return EoReviewResponseDto.builder()
+                            .reviewId(r.getReviewId())
+                            .assignmentId(r.getAssignmentId())
+                            .eventName(eventName)
+                            .shiftName(shiftName)
+                            .reviewerWorkerId(r.getReviewerId())
+                            .reviewerWorkerName(workerName)
+                            .workerAvatarUrl(workerAvatar)
+                            .rating(r.getRating())
+                            .criteriaShiftClarity(r.getCriteriaShiftClarity())
+                            .criteriaTiming(r.getCriteriaTiming())
+                            .criteriaWorkEnvironment(r.getCriteriaWorkEnvironment())
+                            .criteriaSupport(r.getCriteriaSupport())
+                            .criteriaPaymentTiming(r.getCriteriaPaymentTiming())
+                            .comment(r.getComment())
+                            .tags(r.getTags())
+                            .createdAt(r.getCreatedAt())
+                            .build();
+                })
+                .toList();
+    }
+
+    /**
      * Cập nhật thông tin hồ sơ của EO
+     */
      */
     @Transactional
     public EoProfileDto updateEoProfile(UUID userId, EoProfileDto dto) {
@@ -303,7 +447,13 @@ public class EventOrganizerEkycService {
                 userChanged = true;
             }
             if (dto.getPhone() != null && !dto.getPhone().isBlank()) {
-                u.setPhone(dto.getPhone().trim());
+                String cleanPhone = dto.getPhone().trim();
+                userRepository.findByPhone(cleanPhone).ifPresent(existingUser -> {
+                    if (!existingUser.getUserId().equals(u.getUserId())) {
+                        throw new BadRequestException("Số điện thoại này đã được sử dụng bởi một tài khoản khác trong hệ thống. Vui lòng kiểm tra lại hoặc sử dụng số khác.");
+                    }
+                });
+                u.setPhone(cleanPhone);
                 userChanged = true;
             }
             if (userChanged) {

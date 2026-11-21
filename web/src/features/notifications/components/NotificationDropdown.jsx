@@ -66,7 +66,6 @@ export const NotificationDropdown = ({
           </div>
         ) : error ? (
           <div className="notif-empty-state notif-error-state">
-            <span className="notif-empty-icon">⚠️</span>
             <p className="notif-empty-title">{error}</p>
             {onRefresh && (
               <button type="button" className="notif-btn-retry" onClick={onRefresh}>
@@ -76,7 +75,6 @@ export const NotificationDropdown = ({
           </div>
         ) : notifications.length === 0 ? (
           <div className="notif-empty-state">
-            <span className="notif-empty-icon">🔔</span>
             <p className="notif-empty-title">
               {activeFilter === 'UNREAD'
                 ? 'Không có thông báo chưa đọc nào'

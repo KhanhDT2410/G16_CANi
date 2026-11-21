@@ -2,6 +2,7 @@ package com.cani.entity;
 
 import com.cani.entity.enums.FaqCategory;
 import com.cani.entity.enums.FaqStatus;
+import com.cani.entity.enums.FaqTargetRole;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -33,6 +34,12 @@ public class Faq {
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "category", nullable = false)
     private FaqCategory category;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "target_role", nullable = false)
+    @Builder.Default
+    private FaqTargetRole targetRole = FaqTargetRole.ALL;
 
     @Column(name = "question", nullable = false, length = 500)
     private String question;

@@ -5,6 +5,7 @@ import com.cani.dto.response.ApiResponse;
 import com.cani.entity.User;
 import com.cani.entity.enums.FaqCategory;
 import com.cani.entity.enums.FaqStatus;
+import com.cani.entity.enums.FaqTargetRole;
 import com.cani.service.FaqService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,9 +41,10 @@ public class AdminFaqController {
     public ResponseEntity<ApiResponse<Page<FaqResponseDto>>> getAllFaqs(
             @RequestParam(value = "status", required = false) FaqStatus status,
             @RequestParam(value = "category", required = false) FaqCategory category,
+            @RequestParam(value = "targetRole", required = false) FaqTargetRole targetRole,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        Page<FaqResponseDto> page = faqService.getAllFaqs(status, category, pageable);
+        Page<FaqResponseDto> page = faqService.getAllFaqs(status, category, targetRole, pageable);
         return ResponseEntity.ok(ApiResponse.ok(page, "Lấy danh sách quản lý FAQ thành công"));
     }
 

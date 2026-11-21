@@ -153,16 +153,17 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
         Expanded(
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: SkillHubColors.surface,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: SkillHubColors.borderSoft, width: 2),
               boxShadow: const [BoxShadow(color: Color(0x0A03045E), blurRadius: 12)],
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                 Container(
                   width: 64,
                   height: 64,
@@ -212,6 +213,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                 const SizedBox(height: 20),
                 DropdownButtonFormField<String>(
                   initialValue: _selectedSkillId,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Kỹ năng mục tiêu',
                     labelStyle: const TextStyle(fontSize: 12),
@@ -219,8 +221,8 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('AI tự động nhận diện từ tài liệu')),
-                    ...state.taxonomy.map((s) => DropdownMenuItem(value: s.skillId, child: Text(s.name))),
+                    const DropdownMenuItem(value: null, child: Text('AI tự động nhận diện từ tài liệu', overflow: TextOverflow.ellipsis)),
+                    ...state.taxonomy.map((s) => DropdownMenuItem(value: s.skillId, child: Text(s.name, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (val) => setState(() => _selectedSkillId = val),
                 ),
@@ -240,6 +242,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                   ),
                 ),
               ],
+            ),
             ),
           ),
         ),
@@ -356,6 +359,13 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
   Widget _buildStep3Result() {
     final result = ref.watch(skillVerificationProvider).lastResult;
     final isAutoApprove = result?.routingDecision == 'AUTO_APPROVE' || result?.status == 'APPROVED';
+    final isPendingReview = !isAutoApprove &&
+        (result?.status == 'PENDING_REVIEW' ||
+            result?.routingDecision == 'MANUAL_REVIEW' ||
+            result?.routingDecision == 'ADMIN_REVIEW');
+    final accentColor = isAutoApprove
+        ? Colors.green
+        : (isPendingReview ? const Color(0xFFD97706) : Colors.red);
 
     return Column(
       children: [
@@ -366,7 +376,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
             decoration: BoxDecoration(
               color: SkillHubColors.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isAutoApprove ? Colors.green : Colors.red, width: 1.5),
+              border: Border.all(color: accentColor, width: 1.5),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -375,23 +385,33 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     width: 58,
                     height: 58,
                     decoration: BoxDecoration(
-                      color: isAutoApprove ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                      color: isAutoApprove
+                          ? const Color(0xFFECFDF5)
+                          : (isPendingReview ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2)),
                       shape: BoxShape.circle,
-                      border: Border.all(color: isAutoApprove ? Colors.green : Colors.red, width: 2),
+                      border: Border.all(color: accentColor, width: 2),
                     ),
                     child: Icon(
-                      isAutoApprove ? Icons.check_circle_outline : Icons.cancel_outlined,
-                      color: isAutoApprove ? Colors.green : Colors.red,
+                      isAutoApprove
+                          ? Icons.check_circle_outline
+                          : (isPendingReview ? Icons.hourglass_top_rounded : Icons.cancel_outlined),
+                      color: accentColor,
                       size: 32,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    isAutoApprove ? 'Chứng chỉ hợp lệ - Đã duyệt ngay' : 'Chứng chỉ chưa đạt chuẩn nhận diện',
+                    isAutoApprove
+                        ? 'Chứng chỉ hợp lệ - Đã duyệt ngay'
+                        : (isPendingReview
+                            ? 'Hồ sơ đã tiếp nhận - Đang chờ CSKH duyệt'
+                            : 'Chứng chỉ chưa đạt chuẩn nhận diện'),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: isAutoApprove ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                      color: isAutoApprove
+                          ? const Color(0xFF047857)
+                          : (isPendingReview ? const Color(0xFFB45309) : const Color(0xFFB91C1C)),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -399,18 +419,26 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isAutoApprove ? const Color(0xFFE8F9FD) : const Color(0xFFFEE2E2),
+                      color: isAutoApprove
+                          ? const Color(0xFFE8F9FD)
+                          : (isPendingReview ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
                       borderRadius: BorderRadius.circular(99),
-                      border: Border.all(color: isAutoApprove ? SkillHubColors.ctaPrimary : Colors.redAccent),
+                      border: Border.all(
+                        color: isAutoApprove
+                            ? SkillHubColors.ctaPrimary
+                            : (isPendingReview ? const Color(0xFFF59E0B) : Colors.redAccent),
+                      ),
                     ),
                     child: Text(
                       isAutoApprove
-                          ? '+${result?.spAwarded ?? 25} SP đã cộng'
-                          : 'Chưa đủ điều kiện cấp SP',
+                          ? '+${result?.spAwarded ?? 0} SP đã cộng'
+                          : (isPendingReview ? 'Chờ thẩm định thủ công' : 'Chưa đủ điều kiện cấp SP'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: isAutoApprove ? SkillHubColors.ctaHover : const Color(0xFFDC2626),
+                        color: isAutoApprove
+                            ? SkillHubColors.ctaHover
+                            : (isPendingReview ? const Color(0xFF92400E) : const Color(0xFFDC2626)),
                       ),
                     ),
                   ),
@@ -421,20 +449,31 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
+                        color: isPendingReview ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFECACA)),
+                        border: Border.all(
+                          color: isPendingReview ? const Color(0xFFFDE68A) : const Color(0xFFFECACA),
+                        ),
                       ),
                       child: Text(
                         result.routingReason,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B), height: 1.4),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isPendingReview ? const Color(0xFF92400E) : const Color(0xFF991B1B),
+                          height: 1.4,
+                        ),
                       ),
                     ),
                   ],
-                  _buildResultRow('Kỹ năng nhận diện:', result?.skillName ?? 'Nghiệp vụ sự kiện'),
-                  _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Cơ sở đào tạo uy tín'),
-                  _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Khớp thông tin CCCD'),
-                  _buildResultRow('Độ tin cậy AI:', '${((result?.overallConfidence ?? 0.9) * 100).toStringAsFixed(0)}%'),
+                  _buildResultRow('Kỹ năng nhận diện:', result?.skillName ?? 'Chưa xác định'),
+                  _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Chưa xác định'),
+                  _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Chưa xác định'),
+                  _buildResultRow(
+                    'Độ tin cậy AI:',
+                    result?.overallConfidence != null
+                        ? '${(result!.overallConfidence * 100).toStringAsFixed(0)}%'
+                        : '—',
+                  ),
                 ],
               ),
             ),
@@ -515,9 +554,11 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
             children: [
               Icon(Icons.workspace_premium, size: 18, color: Colors.amber),
               SizedBox(width: 8),
-              Text(
-                'Đã kích hoạt ưu tiên ghép nối các ca sự kiện thù lao cao',
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SkillHubColors.textPrimary),
+              Flexible(
+                child: Text(
+                  'Đã kích hoạt ưu tiên ghép nối các ca sự kiện thù lao cao',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: SkillHubColors.textPrimary),
+                ),
               ),
             ],
           ),

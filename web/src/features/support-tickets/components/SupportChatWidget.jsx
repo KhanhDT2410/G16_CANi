@@ -53,37 +53,76 @@ export const SupportChatWidget = () => {
     return null; // null = dùng toạ độ CSS mặc định (góc dưới bên phải)
   });
 
-  const messagesEndRef = useRef(null);
+  const chatBodyRef = useRef(null);
+  const isAtBottomRef = useRef(true);
+  const prevMsgLengthRef = useRef(0);
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
+
+  const handleChatScroll = () => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 60;
+  };
+  const justDraggedRef = useRef(false);
   const dragRef = useRef({
     isDragging: false,
     startX: 0,
     startY: 0,
     elemStartX: 0,
     elemStartY: 0,
+    width: 185,
+    height: 48,
     hasMoved: false,
   });
 
-  // Clamp toạ độ an toàn trong khung hình
-  const clampPosition = useCallback((x, y, width = 380, height = 520) => {
-    const maxX = Math.max(16, window.innerWidth - width - 16);
-    const maxY = Math.max(16, window.innerHeight - height - 16);
+  // Tính kích thước dự kiến của widget theo chế độ hiển thị & viewport
+  const getActiveBounds = useCallback(() => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+    if (!isOpen) {
+      return { width: vw <= 640 ? 156 : 185, height: 48 };
+    }
+    if (isMinimized) {
+      return { width: Math.min(260, Math.max(180, vw - 24)), height: 48 };
+    }
     return {
-      x: Math.min(Math.max(16, x), maxX),
-      y: Math.min(Math.max(16, y), maxY),
+      width: Math.min(375, Math.max(280, vw - 24)),
+      height: Math.min(520, Math.max(360, vh - 32)),
+    };
+  }, [isOpen, isMinimized]);
+
+  // Clamp toạ độ an toàn trong khung hình
+  const clampPosition = useCallback((x, y, width = 375, height = 520) => {
+    const margin = window.innerWidth <= 640 ? 12 : 16;
+    const maxX = Math.max(margin, window.innerWidth - width - margin);
+    const maxY = Math.max(margin, window.innerHeight - height - margin);
+    return {
+      x: Math.min(Math.max(margin, x), maxX),
+      y: Math.min(Math.max(margin, y), maxY),
     };
   }, []);
 
   // Tự động điều chỉnh toạ độ khi người dùng thay đổi kích thước cửa sổ trình duyệt
   useEffect(() => {
     const handleResize = () => {
+      const { width, height } = getActiveBounds();
       setPosition((prev) => {
         if (!prev) return null;
-        return clampPosition(prev.x, prev.y, isMinimized ? 260 : 380, isMinimized ? 48 : 520);
+        return clampPosition(prev.x, prev.y, width, height);
       });
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [clampPosition, isMinimized]);
+  }, [clampPosition, getActiveBounds]);
 
   // Đồng bộ tin nhắn hội thoại và Polling cập nhật tin nhắn mới mỗi 4s khi đang mở chat
   useEffect(() => {
@@ -96,27 +135,34 @@ export const SupportChatWidget = () => {
         if (!isMounted || !res?.messages) return;
 
         setMessages((prev) => {
-          const apiMessages = res.messages.map((m) => {
-            const isFromOther =
-              m.senderRole === 'CUSTOMER_CARE' ||
-              m.senderRole === 'ADMIN' ||
-              (user?.userId && m.senderId && String(m.senderId) !== String(user.userId)) ||
-              (user?.role && m.senderRole && m.senderRole !== user.role);
+          // Chuẩn hóa kênh Hỗ trợ: Chỉ lấy tin nhắn của chính người dùng và phản hồi từ CSKH / Admin
+          const supportOnlyMessages = (res.messages || []).filter((m) => {
+            const isFromStaff = m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN';
+            const isFromMe = (user?.userId && m.senderId && String(m.senderId) === String(user.userId)) ||
+                             (m.senderRole && user?.role && m.senderRole === user.role && m.senderRole !== 'WORKER');
+            return isFromStaff || isFromMe;
+          });
+
+          const apiMessages = supportOnlyMessages.map((m) => {
+            const isFromStaff = m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN';
             return {
               id: m.id,
-              isBot: isFromOther,
-              senderLabel: isFromOther
-                ? (m.senderRole === 'WORKER'
-                    ? `👷 Nhân sự: ${m.senderName || 'Worker'}`
-                    : (m.senderRole === 'EVENT_ORGANIZER'
-                        ? `🏢 BTC: ${m.senderName || 'EO'}`
-                        : `🎧 ${m.senderName || 'CSKH CANi'}`))
-                : null,
+              isBot: isFromStaff,
+              senderLabel: isFromStaff ? `🎧 ${m.senderName || 'CSKH CANi'}` : null,
               shiftCode: m.shiftCode,
               text: m.messageText,
               time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
             };
           });
+
+          // Tránh set lại state gây re-render khi tin nhắn không đổi
+          if (
+            prev.length === apiMessages.length &&
+            prev[prev.length - 1]?.id === apiMessages[apiMessages.length - 1]?.id &&
+            prev[prev.length - 1]?.text === apiMessages[apiMessages.length - 1]?.text
+          ) {
+            return prev;
+          }
 
           // Nếu có tin nhắn mới từ CSKH khi đang thu nhỏ, tăng badge thông báo
           if (isMinimized && apiMessages.length > prev.length) {
@@ -135,40 +181,53 @@ export const SupportChatWidget = () => {
     };
   }, [user, isStaff, isOpen, isMinimized]);
 
-  // Tự động cuộn xuống tin nhắn mới nhất khi đang mở toàn phần
+  // Tự động cuộn cục bộ trong khung chat khi có tin nhắn mới hoặc vừa mở
   useEffect(() => {
     if (isOpen && !isMinimized) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (messages.length > prevMsgLengthRef.current) {
+        if (isAtBottomRef.current || prevMsgLengthRef.current <= 2) {
+          scrollToBottom(prevMsgLengthRef.current > 2);
+        }
+        prevMsgLengthRef.current = messages.length;
+      }
     }
-  }, [messages, isOpen, isMinimized]);
+  }, [messages, isOpen, isMinimized, scrollToBottom]);
 
-  // Quản lý kéo thả thông qua Pointer Events chuẩn công nghiệp
-  const startDrag = (e, currentWidth, currentHeight) => {
-    // Không kích hoạt kéo thả nếu người dùng click vào nút con (close, minimize, input, button)
-    if (e.target.closest('button, input, textarea, a, .support-faq-chip')) return;
-
-    e.preventDefault();
-    const clientX = e.clientX;
-    const clientY = e.clientY;
-
-    let initX = position?.x;
-    let initY = position?.y;
-
-    if (initX == null || initY == null) {
-      // Tính toạ độ hiện tại trên màn hình nếu đang dùng vị trí CSS mặc định
-      const rect = e.currentTarget.getBoundingClientRect();
-      initX = rect.left;
-      initY = rect.top;
+  useEffect(() => {
+    if (isOpen && !isMinimized) {
+      isAtBottomRef.current = true;
+      setTimeout(() => scrollToBottom(false), 50);
     }
+  }, [isOpen, isMinimized, scrollToBottom]);
+
+  // Quản lý kéo thả thông qua Pointer Events (áp dụng cho cả bong bóng đóng, dock thu gọn và header mở rộng)
+  const startDrag = (e, fallbackWidth = 185, fallbackHeight = 48) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    // Bỏ qua các phần tử tương tác con bên trong (ví dụ nút thu nhỏ/đóng trong pill hoặc header),
+    // nhưng vẫn cho phép kéo trực tiếp chính nút bong bóng khi đóng (e.currentTarget).
+    const interactive = e.target.closest('button, input, textarea, a, .support-faq-chip');
+    if (interactive && interactive !== e.currentTarget) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dragWidth = rect.width || fallbackWidth;
+    const dragHeight = rect.height || fallbackHeight;
+
+    const currentClamped = position
+      ? clampPosition(position.x, position.y, dragWidth, dragHeight)
+      : { x: rect.left, y: rect.top };
 
     dragRef.current = {
       isDragging: true,
-      startX: clientX,
-      startY: clientY,
-      elemStartX: initX,
-      elemStartY: initY,
+      startX: e.clientX,
+      startY: e.clientY,
+      elemStartX: currentClamped.x,
+      elemStartY: currentClamped.y,
+      width: dragWidth,
+      height: dragHeight,
       hasMoved: false,
     };
+    justDraggedRef.current = false;
 
     const onPointerMove = (moveEvent) => {
       if (!dragRef.current.isDragging) return;
@@ -182,18 +241,23 @@ export const SupportChatWidget = () => {
       if (dragRef.current.hasMoved) {
         const nextX = dragRef.current.elemStartX + dx;
         const nextY = dragRef.current.elemStartY + dy;
-        const clamped = clampPosition(nextX, nextY, currentWidth, currentHeight);
+        const clamped = clampPosition(nextX, nextY, dragRef.current.width, dragRef.current.height);
         setPosition(clamped);
       }
     };
 
-    const onPointerUp = () => {
+    const onPointerEnd = () => {
       if (!dragRef.current.isDragging) return;
       dragRef.current.isDragging = false;
       window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointerup', onPointerEnd);
+      window.removeEventListener('pointercancel', onPointerEnd);
 
       if (dragRef.current.hasMoved) {
+        justDraggedRef.current = true;
+        setTimeout(() => {
+          justDraggedRef.current = false;
+        }, 250);
         setPosition((currentPos) => {
           if (currentPos) {
             try {
@@ -206,7 +270,8 @@ export const SupportChatWidget = () => {
     };
 
     window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointerup', onPointerEnd);
+    window.addEventListener('pointercancel', onPointerEnd);
   };
 
   if (isStaff) return null;
@@ -225,6 +290,8 @@ export const SupportChatWidget = () => {
     setMessages((prev) => [...prev, userMsg]);
     if (!customText) setInputText('');
     setSending(true);
+    isAtBottomRef.current = true;
+    setTimeout(() => scrollToBottom(true), 50);
 
     try {
       if (user) {
@@ -245,13 +312,20 @@ export const SupportChatWidget = () => {
       { id: String(Date.now()), isBot: false, text: faq.q, time: now },
       { id: String(Date.now() + 1), isBot: true, text: faq.a, time: now },
     ]);
+    isAtBottomRef.current = true;
+    setTimeout(() => scrollToBottom(true), 50);
   };
 
-  // Tính style toạ độ tuỳ biến nếu đã kéo thả
-  const positionStyle = position ? {
+  // Tính style toạ độ tuỳ biến nếu đã kéo thả, luôn clamp theo kích thước chế độ hiện tại
+  const activeBounds = getActiveBounds();
+  const displayPos = position
+    ? clampPosition(position.x, position.y, activeBounds.width, activeBounds.height)
+    : null;
+
+  const positionStyle = displayPos ? {
     position: 'fixed',
-    left: `${position.x}px`,
-    top: `${position.y}px`,
+    left: `${displayPos.x}px`,
+    top: `${displayPos.y}px`,
     right: 'auto',
     bottom: 'auto',
   } : {};
@@ -264,10 +338,13 @@ export const SupportChatWidget = () => {
           type="button"
           className="support-chat-bubble-btn animate-fade-in draggable-support-element"
           style={positionStyle}
-          onPointerDown={(e) => startDrag(e, 180, 50)}
+          onPointerDown={(e) => startDrag(e, 185, 48)}
           onClick={(e) => {
-            if (dragRef.current.hasMoved) {
+            if (dragRef.current.hasMoved || justDraggedRef.current) {
+              e.preventDefault();
               e.stopPropagation();
+              dragRef.current.hasMoved = false;
+              justDraggedRef.current = false;
               return;
             }
             setIsOpen(true);
@@ -298,8 +375,11 @@ export const SupportChatWidget = () => {
           <div
             className="minimized-pill-body"
             onClick={(e) => {
-              if (dragRef.current.hasMoved) {
+              if (dragRef.current.hasMoved || justDraggedRef.current) {
+                e.preventDefault();
                 e.stopPropagation();
+                dragRef.current.hasMoved = false;
+                justDraggedRef.current = false;
                 return;
               }
               setIsMinimized(false);
@@ -382,7 +462,7 @@ export const SupportChatWidget = () => {
             </div>
           </div>
 
-          <div className="support-chat-body">
+          <div className="support-chat-body" ref={chatBodyRef} onScroll={handleChatScroll}>
             {messages.map((m) => (
               <div key={m.id} className={`support-msg ${m.isBot ? 'bot' : 'user'}`}>
                 {(m.senderLabel || m.shiftCode) && (
@@ -410,7 +490,6 @@ export const SupportChatWidget = () => {
                 ))}
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {activeShiftContext && (

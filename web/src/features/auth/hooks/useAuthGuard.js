@@ -20,6 +20,16 @@ export const useAuthGuard = (allowedRoles) => {
       else if (user.role === 'CUSTOMER_CARE') navigate('/customer-care', { replace: true });
       else if (user.role === 'EVENT_ORGANIZER') navigate('/eo', { replace: true });
       else navigate('/login', { replace: true });
+      return;
+    }
+
+    // Chặn tuyệt đối không cho EO thiếu thông tin liên hệ (như vừa login Google) truy cập trang chính
+    if (
+      user?.role === 'EVENT_ORGANIZER' &&
+      (!user.phone?.trim() || !user.fullName?.trim()) &&
+      location.pathname !== '/complete-profile'
+    ) {
+      navigate('/complete-profile', { replace: true });
     }
   }, [isAuthenticated, isLoading, user, allowedRoles, navigate, location.pathname]);
 

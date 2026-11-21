@@ -472,6 +472,21 @@ class ProposalRepository {
     }
   }
 
+  // Nộp hoặc cập nhật ảnh bằng chứng nghiệm thu ca làm cho EO kiểm tra trước khi duyệt công
+  Future<bool> submitAssignmentProof(String assignmentId, String? proofImageUrl, {String? token}) async {
+    try {
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.put(
+        '/v1/workers/assignments/$assignmentId/proof',
+        data: {'proofImageUrl': proofImageUrl ?? ''},
+        options: options,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Lưu ảnh bằng chứng nghiệm thu thất bại.'), e);
+    }
+  }
+
   // UC-69: Worker đánh giá Ban tổ chức sau ca làm việc
   Future<bool> submitReview({
     required String assignmentId,
@@ -546,48 +561,40 @@ class ProposalRepository {
     }
   }
 
-  // Chat trực tiếp trong Ca làm việc giữa Worker, EO (Ban tổ chức) và CSKH
+  // Chat trực tiếp trong Ca làm việc giữa Worker và EO (Ban tổ chức)
   Future<List<ShiftChatMessageItem>> fetchShiftChatMessages(String shiftId) async {
     try {
-      final response = await _dio.get('/v1/support/chat/my');
-      final myMessages = <ShiftChatMessageItem>[];
+      final response = await _dio.post('/v1/chat/shift/$shiftId');
       if (response.data != null && response.data['data'] != null) {
-        final rawList = response.data['data']['messages'];
-        if (rawList is List) {
-          for (final item in rawList) {
-            if (item is Map<String, dynamic>) {
-              final msg = ShiftChatMessageItem.fromJson(item);
-              if (msg.shiftId == null || msg.shiftId!.isEmpty || msg.shiftId == shiftId) {
-                myMessages.add(msg);
-              }
-            }
-          }
+        final data = response.data['data'] as Map<String, dynamic>;
+        final conv = data['conversation'] as Map<String, dynamic>?;
+        final rawMessages = data['messages'] as List<dynamic>?;
+        final convShiftCode = conv?['shiftCode']?.toString();
+        final convShiftName = conv?['shiftName']?.toString();
+
+        if (rawMessages != null) {
+          return rawMessages.map((item) {
+            final m = item as Map<String, dynamic>;
+            return ShiftChatMessageItem(
+              id: m['id']?.toString() ?? '',
+              senderId: m['senderId']?.toString() ?? '',
+              senderRole: m['senderRole']?.toString() ?? 'USER',
+              senderName: m['senderName']?.toString() ?? 'Người dùng',
+              messageText: m['messageText']?.toString() ?? '',
+              attachmentUrl: m['attachmentUrl']?.toString(),
+              shiftId: shiftId,
+              shiftCode: convShiftCode,
+              shiftName: convShiftName,
+              createdAt: m['createdAt'] != null
+                  ? (DateTime.tryParse(m['createdAt'].toString())?.toLocal() ?? DateTime.now())
+                  : DateTime.now(),
+            );
+          }).toList();
         }
       }
-
-      // Gộp thêm toàn bộ tin nhắn chung theo shiftId (từ phía EO hoặc CSKH gắn với ca này)
-      try {
-        final shiftRes = await _dio.get('/v1/support/chat/shift/$shiftId');
-        if (shiftRes.data != null && shiftRes.data['data'] is List) {
-          final seenIds = myMessages.map((m) => m.id).toSet();
-          for (final item in (shiftRes.data['data'] as List)) {
-            if (item is Map<String, dynamic>) {
-              final msg = ShiftChatMessageItem.fromJson(item);
-              if (!seenIds.contains(msg.id)) {
-                myMessages.add(msg);
-                seenIds.add(msg.id);
-              }
-            }
-          }
-        }
-      } catch (_) {
-        // Fallback nếu endpoint shift/{shiftId} chưa sẵn sàng
-      }
-
-      myMessages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      return myMessages;
-    } catch (e) {
-      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải tin nhắn ca làm việc.'), e);
+      return const [];
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -597,17 +604,41 @@ class ProposalRepository {
     String? attachmentUrl,
   }) async {
     try {
-      final response = await _dio.post(
-        '/v1/support/chat/send',
-        data: {
-          'messageText': messageText.trim(),
-          'shiftId': shiftId,
-          'attachmentUrl': ?attachmentUrl,
-        },
-      );
-      if (response.data != null && response.data['data'] is Map<String, dynamic>) {
-        return ShiftChatMessageItem.fromJson(response.data['data'] as Map<String, dynamic>);
+      final initRes = await _dio.post('/v1/chat/shift/$shiftId');
+      String? conversationId;
+      String? shiftCode;
+      String? shiftName;
+      if (initRes.data != null && initRes.data['data'] != null) {
+        final conv = initRes.data['data']['conversation'] as Map<String, dynamic>?;
+        conversationId = conv?['id']?.toString();
+        shiftCode = conv?['shiftCode']?.toString();
+        shiftName = conv?['shiftName']?.toString();
       }
+
+      if (conversationId != null) {
+        final res = await _dio.post(
+          '/v1/chat/conversations/$conversationId/messages',
+          data: {
+            'messageText': messageText.trim(),
+            'attachmentUrl': attachmentUrl,
+          },
+        );
+        if (res.data != null && res.data['data'] is Map<String, dynamic>) {
+          final m = res.data['data'] as Map<String, dynamic>;
+          return ShiftChatMessageItem(
+            id: m['id']?.toString() ?? '',
+            senderId: m['senderId']?.toString() ?? '',
+            senderRole: m['senderRole']?.toString() ?? 'WORKER',
+            senderName: m['senderName']?.toString() ?? 'Tôi',
+            messageText: m['messageText']?.toString() ?? messageText.trim(),
+            shiftId: shiftId,
+            shiftCode: shiftCode,
+            shiftName: shiftName,
+            createdAt: DateTime.now(),
+          );
+        }
+      }
+
       return ShiftChatMessageItem(
         id: 'local-${DateTime.now().millisecondsSinceEpoch}',
         senderId: '',

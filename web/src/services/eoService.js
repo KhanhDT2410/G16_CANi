@@ -69,6 +69,18 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // UC-14: Đề xuất mức thù lao thị trường kèm dẫn chứng pháp lý & dữ liệu nội bộ CANi
+  getWageRecommendation: async ({ shiftId = null, city, jobType, startTime, endTime }) => {
+    const response = await apiClient.post('/v1/wage-recommendations', {
+      shiftId,
+      city,
+      jobType,
+      startTime,
+      endTime,
+    });
+    return response.data?.data || null;
+  },
+
   // Xuất bản sự kiện & kích hoạt Matching Engine (Non-Escrow)
   publishEvent: async (eventId) => {
     const response = await apiClient.post(`/v1/eo/events/${eventId}/publish`);
@@ -149,6 +161,28 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // UC-83: EO báo cáo nhân sự chưa hoàn thành đủ công việc trong ca
+  reportIncompleteWork: async (assignmentId, payload) => {
+    const body = typeof payload === 'string'
+      ? { reason: payload }
+      : {
+          reason: payload?.reason || payload?.description || '',
+          proofUrls: payload?.proofUrls || [],
+          incompleteChecklistItems: payload?.incompleteChecklistItems || [],
+        };
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/report-incomplete`, body);
+    return response.data?.data;
+  },
+
+  // UC-88: EO báo cáo Worker vắng mặt không báo trước (No-show) & kích hoạt Emergency Dispatch
+  reportNoShow: async (assignmentId, payload) => {
+    const body = typeof payload === 'string'
+      ? { notes: payload }
+      : { notes: payload?.notes || '' };
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/no-show`, body);
+    return response.data?.data;
+  },
+
   // UC-18: Cập nhật ca làm việc
   updateShift: async (shiftId, shiftData) => {
     const response = await apiClient.put(`/v1/eo/events/shifts/${shiftId}`, shiftData);
@@ -164,6 +198,12 @@ export const eoService = {
       console.warn('Không tải được danh mục kỹ năng, bỏ qua requiredSkills:', error.message);
       return [];
     }
+  },
+
+  // BR-16: Tạo hoặc lấy kỹ năng nhập tay (Dynamic Custom Skill)
+  createCustomSkill: async (name, category = 'Tự chọn') => {
+    const response = await apiClient.post('/v1/workers/skills/custom', { name, category });
+    return response.data?.data;
   },
 
   // UC-19: Hủy ca làm việc
@@ -379,6 +419,20 @@ export const eoService = {
     }
   },
 
+  // Bật điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
+  enableEmergencyDispatch: async (shiftId, radiusKm = 15) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, null, {
+      params: { radiusKm },
+    });
+    return response.data?.data;
+  },
+
+  // Tắt điều phối khẩn cấp cho ca làm việc
+  disableEmergencyDispatch: async (shiftId) => {
+    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch/off`);
+    return response.data?.data;
+  },
+
   // Tải ảnh sự kiện hoặc ca làm việc trực tiếp từ máy tính lên
   uploadImage: async (file) => {
     const formData = new FormData();
@@ -412,5 +466,11 @@ export const eoService = {
   getEoPublicProfile: async (eoId) => {
     const response = await apiClient.get(`/v1/eo/${eoId}/public-profile`);
     return response.data?.data;
+  },
+
+  // Lấy danh sách đánh giá & nhận xét từ người lao động dành cho EO
+  getEoReviews: async () => {
+    const response = await apiClient.get('/v1/eo/reviews');
+    return response.data?.data || [];
   },
 };

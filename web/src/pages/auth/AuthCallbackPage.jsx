@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../features/auth/api/supabaseClient';
 import { authApi } from '../../features/auth/api/authApi';
 import { useAuth } from '../../features/auth';
+import { eoService } from '../../services/eoService';
 
 /**
  * Trang Đón Tiếp Callback OAuth Google (/auth/callback)
@@ -55,21 +56,37 @@ const AuthCallbackPage = () => {
         // Lưu thông tin phiên đăng nhập vào AuthContext & localStorage
         login(loginData.user, loginData.token, loginData.refreshToken);
 
+        setStatus('Đang kiểm tra thông tin hồ sơ tài khoản...');
+        let nextPath = '/eo';
+        if (loginData.user?.role === 'ADMIN') {
+          nextPath = '/admin';
+        } else if (loginData.user?.role === 'CUSTOMER_CARE') {
+          nextPath = '/customer-care';
+        } else {
+          // Bắt buộc kiểm tra hồ sơ EO: nếu thiếu SĐT, họ tên, tên đơn vị hoặc địa chỉ -> điều hướng vào trang bổ sung thông tin
+          let needsCompletion = !loginData.user?.phone?.trim() || !loginData.user?.fullName?.trim();
+          if (!needsCompletion) {
+            try {
+              const profile = await eoService.getEoProfile();
+              if (
+                !profile?.phone?.trim() ||
+                !profile?.fullName?.trim() ||
+                !profile?.companyName?.trim() ||
+                !profile?.address?.trim()
+              ) {
+                needsCompletion = true;
+              }
+            } catch {
+              needsCompletion = true;
+            }
+          }
+          nextPath = needsCompletion ? '/complete-profile' : '/eo';
+        }
+
         setStatus('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          switch (loginData.user?.role) {
-            case 'ADMIN':
-              navigate('/admin', { replace: true });
-              break;
-            case 'CUSTOMER_CARE':
-              navigate('/customer-care', { replace: true });
-              break;
-            case 'EVENT_ORGANIZER':
-            default:
-              navigate('/eo', { replace: true });
-              break;
-          }
-        }, 600);
+          navigate(nextPath, { replace: true });
+        }, 400);
       } catch (err) {
         console.error('Lỗi đồng bộ Google Auth:', err);
         setErrorMessage(err.message || 'Đăng nhập bằng Google thất bại. Vui lòng thử lại.');

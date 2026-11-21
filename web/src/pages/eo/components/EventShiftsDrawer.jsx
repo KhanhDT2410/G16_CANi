@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
+import { eoService } from '../../../services/eoService';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import { getDynamicShiftStatus } from '../utils/eventHelpers';
 
@@ -13,6 +15,7 @@ import { getDynamicShiftStatus } from '../utils/eventHelpers';
 const EventShiftsDrawer = ({
   event,
   onOpenDetail,
+  onOpenShiftWorkspace,
   onAddShift,
   onOpenQr,
   onOpenInvite,
@@ -26,14 +29,13 @@ const EventShiftsDrawer = ({
   const [selectedShiftForPanel, setSelectedShiftForPanel] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
 
-  const shifts = event?.shifts || [];
-
   // Phân loại & sắp xếp: Ca đang hoạt động lên đầu, Ca nháp xuống dưới; Ca đã hủy tách riêng
   const { activeAndDraftShifts, cancelledShifts } = useMemo(() => {
+    const list = event?.shifts || [];
     const activeDraft = [];
     const cancelled = [];
 
-    shifts.forEach((s) => {
+    list.forEach((s) => {
       if (s.status === 'CANCELLED') {
         cancelled.push(s);
       } else {
@@ -49,7 +51,16 @@ const EventShiftsDrawer = ({
     });
 
     return { activeAndDraftShifts: activeDraft, cancelledShifts: cancelled };
-  }, [shifts]);
+  }, [event?.shifts]);
+
+  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
+  const skillNameMap = useMemo(() => {
+    const m = {};
+    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
+      if (sk && sk.skillId) m[sk.skillId] = sk.name;
+    });
+    return m;
+  }, [skillTaxonomy]);
 
   if (!event) return null;
 
@@ -61,15 +72,6 @@ const EventShiftsDrawer = ({
       return fallback;
     }
   };
-
-  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
-  const skillNameMap = useMemo(() => {
-    const m = {};
-    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
-      if (sk && sk.skillId) m[sk.skillId] = sk.name;
-    });
-    return m;
-  }, [skillTaxonomy]);
 
   const hasCustomArrival = (shift) =>
     shift.arrivalTime && shift.startTime &&
@@ -154,6 +156,29 @@ const EventShiftsDrawer = ({
 
           {/* Thao tác trên từng ca */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {shift.status !== 'CANCELLED' && onOpenShiftWorkspace && (
+              <button
+                type="button"
+                onClick={() => onOpenShiftWorkspace(shift, event)}
+                style={{
+                  background: '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '6px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+                title="Mở trang quản lý riêng của ca làm việc này"
+              >
+                Quản lý ca
+              </button>
+            )}
+
             {shift.status !== 'CANCELLED' && (
               <button
                 type="button"
@@ -171,9 +196,56 @@ const EventShiftsDrawer = ({
                   alignItems: 'center',
                   gap: 5,
                 }}
-                title="Mở bảng Điểm danh & Mã QR trực tiếp ngay bên dưới"
+                title="Mở bảng điểm danh & mã QR trực tiếp ngay bên dưới"
               >
-                <span>{isPanelOpen ? '▾ Đóng Điểm Danh & QR' : '▸ Điểm Danh & Mã QR'}</span>
+                <span>{isPanelOpen ? 'Đóng Điểm Danh & QR' : 'Điểm Danh & Mã QR'}</span>
+              </button>
+            )}
+
+            {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const enable = !shift.emergency;
+                  const confirmed = await showConfirm({
+                    title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
+                    description: enable
+                      ? `Kích hoạt điều phối khẩn cấp cho ca "${shift.jobType}"? Nhân sự trên Radar trong bán kính 15km sẽ được tự do nhận ca ngay.`
+                      : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
+                    type: enable ? 'warning' : 'info',
+                    confirmText: enable ? 'Kích hoạt' : 'Tắt chế độ',
+                  });
+                  if (!confirmed) return;
+                  try {
+                    if (enable) {
+                      await eoService.enableEmergencyDispatch(shift.shiftId, 15);
+                      showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}"!`, 'success');
+                    } else {
+                      await eoService.disableEmergencyDispatch(shift.shiftId);
+                      showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
+                    }
+                    onReloadEvents?.();
+                  } catch (err) {
+                    showToast(err.response?.data?.message || err.message || 'Lỗi thao tác khẩn cấp', 'error');
+                  }
+                }}
+                style={{
+                  background: shift.emergency ? '#fef2f2' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                  color: shift.emergency ? '#b91c1c' : '#ffffff',
+                  border: shift.emergency ? '1px solid #f87171' : 'none',
+                  borderRadius: 6,
+                  padding: '6px 10px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  boxShadow: shift.emergency ? 'none' : '0 2px 6px rgba(225, 29, 72, 0.25)',
+                }}
+                title={shift.emergency ? 'Tắt điều phối khẩn cấp' : 'Bật điều phối khẩn cấp cho ca này'}
+              >
+                {shift.emergency ? 'Tắt Khẩn Cấp' : 'Khẩn Cấp'}
               </button>
             )}
 
@@ -221,21 +293,18 @@ const EventShiftsDrawer = ({
               <button
                 type="button"
                 onClick={() => {
-                  const shiftCode = 'SH-' + (shift.shiftId ? String(shift.shiftId).replace(/-/g, '').substring(0, 6).toUpperCase() : '0000');
                   window.dispatchEvent(
-                    new CustomEvent('cani_open_chat_shift', {
+                    new CustomEvent('cani_open_direct_chat', {
                       detail: {
                         shiftId: shift.shiftId,
-                        shiftCode,
-                        shiftName: `${event.name || 'Sự kiện'} - ${shift.jobType}`,
                       },
                     })
                   );
                 }}
                 style={{
-                  background: '#f0fdf4',
-                  color: '#15803d',
-                  border: '1px solid #bbf7d0',
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  border: '1px solid #bfdbfe',
                   borderRadius: 6,
                   padding: '6px 10px',
                   fontSize: '0.8rem',
@@ -245,9 +314,9 @@ const EventShiftsDrawer = ({
                   alignItems: 'center',
                   gap: 4,
                 }}
-                title="Mở khung chat kết nối CSKH hỗ trợ trực tiếp ca này"
+                title="Mở khung trao đổi tin nhắn trực tiếp với nhân sự trong ca"
               >
-                💬 Hỗ Trợ
+                💬 Chat Ca
               </button>
             )}
 

@@ -47,13 +47,27 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
         ? _reasonCtrl.text.trim()
         : _selectedQuickReason;
 
-    await ref
-        .read(proposalRepositoryProvider)
-        .cancelAssignment(widget.assignment.assignmentId, finalReason);
+    try {
+      await ref
+          .read(proposalRepositoryProvider)
+          .cancelAssignment(widget.assignment.assignmentId, finalReason);
 
-    if (mounted) {
-      setState(() => _isSubmitting = false);
-      Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể hủy ca lúc này: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 

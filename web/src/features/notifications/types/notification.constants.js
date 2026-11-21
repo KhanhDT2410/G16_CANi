@@ -4,52 +4,52 @@
 export const NOTIFICATION_TYPE_CONFIG = {
   PROPOSAL: {
     label: 'Lời mời nhận ca',
-    icon: '💼',
+    icon: 'CV',
     badgeClass: 'notif-type-proposal',
   },
   ASSIGNMENT: {
     label: 'Ca làm việc',
-    icon: '📋',
+    icon: 'CA',
     badgeClass: 'notif-type-assignment',
   },
   REMINDER: {
     label: 'Nhắc nhở ca làm',
-    icon: '⏰',
+    icon: 'NN',
     badgeClass: 'notif-type-reminder',
   },
   PAYMENT: {
     label: 'Thanh toán & Gói',
-    icon: '💳',
+    icon: 'TT',
     badgeClass: 'notif-type-payment',
   },
   DISPUTE: {
     label: 'Tranh chấp khiếu nại',
-    icon: '⚖️',
+    icon: 'TC',
     badgeClass: 'notif-type-dispute',
   },
   RATING: {
     label: 'Đánh giá & Uy tín',
-    icon: '⭐',
+    icon: 'DG',
     badgeClass: 'notif-type-rating',
   },
   SYSTEM: {
     label: 'Hệ thống',
-    icon: '🔔',
+    icon: 'HT',
     badgeClass: 'notif-type-system',
   },
   GROUP: {
     label: 'Nhóm nhân sự',
-    icon: '👥',
+    icon: 'NH',
     badgeClass: 'notif-type-group',
   },
   SUPPORT_TICKET: {
     label: 'Phiếu hỗ trợ',
-    icon: '🎫',
+    icon: 'PH',
     badgeClass: 'notif-type-ticket',
   },
   RS_APPEAL: {
-    label: 'Kháng cáo điểm RS',
-    icon: '🛡️',
+    label: 'Kháng cáo điểm uy tín',
+    icon: 'UT',
     badgeClass: 'notif-type-appeal',
   },
 };

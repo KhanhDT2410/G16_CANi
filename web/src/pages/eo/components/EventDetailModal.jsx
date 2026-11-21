@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import { getDynamicEventStatus, getDynamicShiftStatus } from '../utils/eventHelpers';
+import { getDynamicEventStatus, getDynamicShiftStatus, getShiftStaffingAlerts } from '../utils/eventHelpers';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import './EventDetailModal.css';
@@ -25,6 +26,7 @@ export default function EventDetailModal({
   onNavigateToRecruitment,
   onReloadEvents,
   onOpenPaymentDeclaration,
+  onOpenShiftWorkspace,
   skillTaxonomy = [],
 }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'SHIFTS'); // 'SHIFTS' | 'QR_ATTENDANCE' | 'WORKERS'
@@ -69,10 +71,16 @@ export default function EventDetailModal({
       showToast('Không tìm thấy thông tin tài khoản để chặn.', 'error');
       return;
     }
-    const reason = window.prompt(
-      `Bạn có chắc chắn muốn chặn nhân sự "${worker.workerName}" không?\n\nNgười này sẽ không thể nhận ca làm việc của bạn trong tương lai.\nNhập lý do chặn (tùy chọn):`,
-      'Không tuân thủ quy định ca làm'
-    );
+    const reason = await showPrompt({
+      title: `Chặn nhân sự "${worker.workerName}"`,
+      description: 'Người này sẽ không thể nhận ca làm việc của bạn trong tương lai.',
+      type: 'danger',
+      confirmText: 'Xác nhận chặn',
+      inputLabel: 'Lý do chặn (tùy chọn)',
+      initialValue: 'Không tuân thủ quy định ca làm',
+      isMultiline: true,
+      allowEmpty: true,
+    });
     if (reason === null) return;
 
     try {
@@ -88,6 +96,53 @@ export default function EventDetailModal({
       showToast(msg, 'error');
     }
   };
+
+  const handleToggleEmergency = async (shift, enable) => {
+    const confirmed = await showConfirm({
+      title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
+      description: enable
+        ? 'Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự trong bán kính tối đa 15km để chủ động nhận ca trực tiếp trên bản đồ.'
+        : `Bạn có chắc chắn muốn TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
+      type: enable ? 'warning' : 'info',
+      confirmText: enable ? 'Bật khẩn cấp' : 'Tắt chế độ',
+    });
+    if (!confirmed) return;
+
+    try {
+      if (enable) {
+        await eoService.enableEmergencyDispatch(shift.shiftId, 15);
+        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}".`, 'success');
+      } else {
+        await eoService.disableEmergencyDispatch(shift.shiftId);
+        showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
+      }
+      onReloadEvents?.();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Lỗi thao tác điều phối khẩn cấp';
+      showToast(msg, 'error');
+    }
+  };
+
+  const rawShifts = event?.shifts || [];
+  const activeAndDraftShifts = rawShifts
+    .filter((sh) => sh.status !== 'CANCELLED')
+    .sort((a, b) => {
+      const pA = a.status === 'ACTIVE' || a.status === 'OPEN' ? 1 : a.status === 'DRAFT' ? 2 : 1;
+      const pB = b.status === 'ACTIVE' || b.status === 'OPEN' ? 1 : b.status === 'DRAFT' ? 2 : 1;
+      return pA - pB;
+    });
+  const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
+  const shifts = activeAndDraftShifts;
+  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts), [shifts]);
+
+  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
+  const skillNameMap = useMemo(() => {
+    const m = {};
+    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
+      if (sk && sk.skillId) m[sk.skillId] = sk.name;
+    });
+    return m;
+  }, [skillTaxonomy]);
 
   if (!isOpen) return null;
   if (!event) {
@@ -107,19 +162,10 @@ export default function EventDetailModal({
     return null;
   }
 
-  const rawShifts = event.shifts || [];
-  const activeAndDraftShifts = rawShifts
-    .filter((sh) => sh.status !== 'CANCELLED')
-    .sort((a, b) => {
-      const pA = a.status === 'ACTIVE' || a.status === 'OPEN' ? 1 : a.status === 'DRAFT' ? 2 : 1;
-      const pB = b.status === 'ACTIVE' || b.status === 'OPEN' ? 1 : b.status === 'DRAFT' ? 2 : 1;
-      return pA - pB;
-    });
-  const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
-  const shifts = activeAndDraftShifts;
   const totalRequired = event.totalRequiredWorkers || shifts.reduce((s, sh) => s + (sh.requiredWorkers || 0), 0);
   const totalConfirmed = event.totalConfirmedWorkers || shifts.reduce((s, sh) => s + (sh.confirmedWorkers || 0), 0);
   const fillRate = totalRequired > 0 ? Math.round((totalConfirmed / totalRequired) * 100) : 0;
+  const hasStaffingShortage = staffingAlerts.length > 0 || (totalRequired > 0 && fillRate < 50);
   const totalCost = event.totalEstimatedCost || shifts.reduce((s, sh) => {
     const hours = sh.startTime && sh.endTime ? Math.max(0.5, (new Date(sh.endTime) - new Date(sh.startTime)) / 3600000) : 4;
     return s + (hours * (sh.requiredWorkers || 1) * (sh.hourlyWage || 50000) + (sh.allowance || 0));
@@ -133,15 +179,6 @@ export default function EventDetailModal({
       return fallback;
     }
   };
-
-  // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
-  const skillNameMap = useMemo(() => {
-    const m = {};
-    (Array.isArray(skillTaxonomy) ? skillTaxonomy : []).forEach((sk) => {
-      if (sk && sk.skillId) m[sk.skillId] = sk.name;
-    });
-    return m;
-  }, [skillTaxonomy]);
 
   const skillNames = (shift) =>
     Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0
@@ -442,7 +479,7 @@ export default function EventDetailModal({
               <span className="info-label">Chế độ tuyển dụng</span>
               <span className="info-value">
                 <span className="mode-badge-pill">
-                  {event.mode === 'INVITE' || event.mode === 'INVITE_ONLY' ? 'Mời trực tiếp (Link / QR)' : 'Điều phối tự động (Matching)'}
+                  {event.mode === 'INVITE' || event.mode === 'INVITE_ONLY' ? 'Mời trực tiếp (Liên kết / Mã QR)' : 'Điều phối tự động'}
                 </span>
               </span>
             </div>
@@ -467,10 +504,17 @@ export default function EventDetailModal({
               <span className="kpi-value">{totalRequired}</span>
               <span className="kpi-sub">vị trí</span>
             </div>
-            <div className="detail-kpi-card highlight-green">
-              <span className="kpi-label">Nhân sự đã chốt ca</span>
-              <span className="kpi-value">{totalConfirmed}</span>
-              <span className="kpi-sub">đạt {fillRate}%</span>
+            <div
+              className={`detail-kpi-card ${hasStaffingShortage ? 'highlight-alert' : 'highlight-green'}`}
+              style={hasStaffingShortage ? { backgroundColor: '#fff1f2', borderColor: '#fecdd3' } : undefined}
+            >
+              <span className="kpi-label">{hasStaffingShortage ? 'Nhân sự chốt ca (Thiếu)' : 'Nhân sự đã chốt ca'}</span>
+              <span className="kpi-value" style={hasStaffingShortage ? { color: '#e11d48' } : undefined}>
+                {totalConfirmed} / {totalRequired}
+              </span>
+              <span className="kpi-sub" style={hasStaffingShortage ? { color: '#be123c', fontWeight: 700 } : undefined}>
+                {hasStaffingShortage ? `Thiếu ${Math.max(0, totalRequired - totalConfirmed)} người (${fillRate}%)` : `đạt ${fillRate}%`}
+              </span>
             </div>
             <div className="detail-kpi-card">
               <span className="kpi-label">Dự toán chi phí</span>
@@ -490,19 +534,21 @@ export default function EventDetailModal({
             >
               Chi Tiết Ca Làm Việc ({shifts.length})
             </button>
-            <button
-              type="button"
-              className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
-              onClick={() => setActiveTab('QR_ATTENDANCE')}
-            >
-              Trạm Điểm Danh & Mã QR Ca
-            </button>
+            {!onOpenShiftWorkspace && (
+              <button
+                type="button"
+                className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
+                onClick={() => setActiveTab('QR_ATTENDANCE')}
+              >
+                Trạm Điểm Danh & Mã QR Ca
+              </button>
+            )}
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'WORKERS' ? 'active' : ''}`}
               onClick={() => setActiveTab('WORKERS')}
             >
-              Danh Sách Nhân Sự Sự Kiện ({eventWorkers.length || totalConfirmed})
+              Tổng Hợp Nhân Sự Sự Kiện ({eventWorkers.length || totalConfirmed})
             </button>
           </div>
 
@@ -524,6 +570,39 @@ export default function EventDetailModal({
                   + Thêm ca làm việc
                 </button>
               </div>
+
+              {/* Banner cảnh báo thiếu hụt nhân sự khẩn cấp */}
+              {staffingAlerts.length > 0 && (
+                <div
+                  style={{
+                    marginBottom: '1.15rem',
+                    padding: '0.9rem 1.15rem',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(90deg, #fff1f2 0%, #fff7ed 100%)',
+                    border: '1.5px solid #fda4af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    flexWrap: 'wrap',
+                    boxShadow: '0 2px 8px rgba(225, 29, 72, 0.08)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#be123c' }}>
+                        CẢNH BÁO THIẾU HỤT NHÂN SỰ ({staffingAlerts.length} ca làm đang hoặc sắp diễn ra thiếu người)
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#881337', marginTop: 3 }}>
+                        {staffingAlerts
+                          .map((s) => `"${s.jobType}" (thiếu ${Math.max(0, (s.requiredWorkers || 1) - (s.confirmedWorkers || 0))} người)`)
+                          .join(', ')}
+                        . Hãy bấm <strong>"Bật Khẩn Cấp"</strong> tại ca để mở rộng phạm vi và cho phép nhân sự nhận ca trực tiếp trên bản đồ.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {shifts.length === 0 ? (
                 <div className="detail-empty-shifts">
@@ -649,6 +728,34 @@ export default function EventDetailModal({
 
                             {/* Thao tác ca */}
                             <div className="shift-card-actions">
+                              {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleEmergency(shift, !shift.emergency)}
+                                  style={{
+                                    background: shift.emergency ? '#fef2f2' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                                    color: shift.emergency ? '#b91c1c' : '#ffffff',
+                                    border: shift.emergency ? '1.5px solid #f87171' : 'none',
+                                    borderRadius: '8px',
+                                    padding: '0.4rem 0.85rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    boxShadow: shift.emergency ? 'none' : '0 2px 6px rgba(225, 29, 72, 0.25)',
+                                  }}
+                                  title={
+                                    shift.emergency
+                                      ? 'Nhấn để tắt điều phối khẩn cấp'
+                                      : 'Bật điều phối khẩn cấp: Cho phép ứng tuyển tự do trên Radar và mở rộng bán kính 15km'
+                                  }
+                                >
+                                  {shift.emergency ? 'Tắt Khẩn Cấp' : 'Bật Khẩn Cấp'}
+                                </button>
+                              )}
+
                               <button
                                 type="button"
                                 className="btn-shift-action purple"
@@ -687,12 +794,16 @@ export default function EventDetailModal({
                                 type="button"
                                 className="btn-shift-action emerald"
                                 onClick={() => {
-                                  setActiveWorkspaceShiftId(shift.shiftId);
-                                  setActiveTab('QR_ATTENDANCE');
+                                  if (onOpenShiftWorkspace) {
+                                    onOpenShiftWorkspace(shift);
+                                  } else {
+                                    setActiveWorkspaceShiftId(shift.shiftId);
+                                    setActiveTab('QR_ATTENDANCE');
+                                  }
                                 }}
-                                title="Mở Trạm Điểm Danh & Mã QR của ca này"
+                                title="Mở trang quản lý chi tiết riêng cho ca làm việc này"
                               >
-                                Điểm Danh & Mã QR Ca Này →
+                                Quản Lý Ca & Nhân Sự
                               </button>
                             </div>
                           </div>

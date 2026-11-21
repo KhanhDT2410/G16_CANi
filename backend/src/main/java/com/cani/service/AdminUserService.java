@@ -16,10 +16,12 @@ import com.cani.repository.EventOrganizerRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
+import com.cani.repository.WorkerSkillRepository;
 import com.cani.repository.specification.UserSpecification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +47,9 @@ public class AdminUserService {
     private final SkillVerificationRequestRepository skillVerificationRequestRepository;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
+
+    @Autowired(required = false)
+    private WorkerSkillRepository workerSkillRepository;
 
     /**
      * Lấy danh sách người dùng có phân trang và bộ lọc linh hoạt (search, role,
@@ -273,10 +278,13 @@ public class AdminUserService {
         }
         List<SkillVerificationRequest> list = skillVerificationRequestRepository
                 .findByWorker_WorkerIdOrderByCreatedAtDesc(workerId);
-        if (list == null || list.isEmpty() || list.get(0).getStatus() == null) {
-            return "NOT_FOUND";
+        if (list != null && !list.isEmpty() && list.get(0).getStatus() != null) {
+            return list.get(0).getStatus().name();
         }
-        return list.get(0).getStatus().name();
+        if (workerSkillRepository != null && !workerSkillRepository.findByWorker_WorkerId(workerId).isEmpty()) {
+            return "SELF_DECLARED";
+        }
+        return "NOT_FOUND";
     }
 
     private EoProfileSummaryDto toEoProfileDto(EventOrganizer eo) {

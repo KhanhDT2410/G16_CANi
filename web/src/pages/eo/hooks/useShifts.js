@@ -1,30 +1,15 @@
 import { useState, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
+import {
+  ROLES,
+  WAGE_RECOMMENDATIONS_MAP,
+  validateJobType,
+  buildEvidenceWageBenchmark,
+} from '../utils/shiftValidation';
 
-export const ROLES = [
-  'Lễ tân / Check-in',
-  'Phục vụ bàn',
-  'Pha chế (Bartender/Barista)',
-  'Thu ngân',
-  'Điều phối sự kiện',
-  'Kỹ thuật âm thanh - ánh sáng',
-  'Bảo vệ / An ninh',
-  'Hậu cần / Setup sự kiện',
-  'PG / PB',
-];
-
-export const WAGE_RECOMMENDATIONS_MAP = {
-  'Lễ tân / Check-in': { min: 45000, max: 60000, defaultWage: 50000, recommended: 50000, note: 'Giao tiếp tốt, ngoại hình sáng' },
-  'Phục vụ bàn': { min: 35000, max: 50000, defaultWage: 40000, recommended: 40000, note: 'Nhanh nhẹn, cẩn thận' },
-  'Pha chế (Bartender/Barista)': { min: 60000, max: 85000, defaultWage: 70000, recommended: 70000, note: 'Có tay nghề pha chế' },
-  'Thu ngân': { min: 40000, max: 55000, defaultWage: 45000, recommended: 45000, note: 'Trung thực, tính toán chuẩn xác' },
-  'Điều phối sự kiện': { min: 70000, max: 100000, defaultWage: 80000, recommended: 80000, note: 'Kinh nghiệm quản lý nhóm' },
-  'Kỹ thuật âm thanh - ánh sáng': { min: 80000, max: 120000, defaultWage: 95000, recommended: 95000, note: 'Chuyên môn thiết bị sự kiện' },
-  'Bảo vệ / An ninh': { min: 40000, max: 55000, defaultWage: 45000, recommended: 45000, note: 'Thể lực tốt, giữ trật tự' },
-  'Hậu cần / Setup sự kiện': { min: 50000, max: 70000, defaultWage: 55000, recommended: 55000, note: 'Sức khỏe tốt, khuân vác, setup' },
-  'PG / PB': { min: 70000, max: 110000, defaultWage: 85000, recommended: 85000, note: 'Ngoại hình, giới thiệu sản phẩm' },
-};
+export { ROLES, WAGE_RECOMMENDATIONS_MAP };
 
 /**
  * Chuẩn hóa danh sách checklist về dạng mảng object { id, title, isRequiredEvidence }
@@ -84,19 +69,21 @@ export function serializeChecklistItems(items = []) {
 /**
  * Phân tích gợi ý mức lương & Đánh giá khả năng tìm nhân sự
  */
-export function calculateShiftRiskAnalysis(shift = {}) {
-  const role = shift.jobType || ROLES[0];
-  const baseRec = WAGE_RECOMMENDATIONS_MAP[role] || {
-    min: 40000,
-    max: 65000,
-    defaultWage: 50000,
-    recommended: 50000,
-    note: 'Mức thù lao tiêu chuẩn thị trường sự kiện',
-  };
+export function calculateShiftRiskAnalysis(shift = {}, venueAddress = '') {
+  const role = String(shift.jobType || ROLES[0]).trim();
+  const benchmark = buildEvidenceWageBenchmark({
+    jobType: role,
+    startTime: shift.startTime,
+    venueAddress: venueAddress || shift.locationAddress || '',
+  });
   const rec = {
-    ...baseRec,
-    recommended: baseRec.recommended || baseRec.defaultWage || 50000,
-    defaultWage: baseRec.defaultWage || baseRec.recommended || 50000,
+    min: benchmark.minWage,
+    max: benchmark.maxWage,
+    defaultWage: benchmark.suggestedWage,
+    recommended: benchmark.suggestedWage,
+    legalFloorWage: benchmark.legalFloorWage,
+    legalRegionLabel: benchmark.legalRegionLabel,
+    catalogMatched: benchmark.catalogMatched,
   };
 
   const wage = Math.max(0, Number(shift.hourlyWage || 0));
@@ -107,16 +94,22 @@ export function calculateShiftRiskAnalysis(shift = {}) {
 
   let riskScore = 20;
   const reasons = [];
+  const roleLabel = benchmark.catalogMatched ? `vị trí "${role}"` : 'khung tham chiếu chung ngành sự kiện';
 
-  if (wage < rec.min * 0.8) {
-    riskScore += 55;
+  if (wage < rec.legalFloorWage) {
+    riskScore += 60;
     reasons.push(
-      `Thù lao (${(wage || 0).toLocaleString()}đ/giờ) thấp hơn trên 20% so với mức sàn khuyến nghị (${((rec && rec.min) || 40000).toLocaleString()}đ/giờ) cho vị trí "${role}".`
+      `Thù lao (${(wage || 0).toLocaleString()}đ/giờ) đang thấp hơn sàn lương tối thiểu giờ ${rec.legalRegionLabel} (${rec.legalFloorWage.toLocaleString()}đ/giờ theo Nghị định 293/2025/NĐ-CP).`
+    );
+  } else if (wage < rec.min * 0.85) {
+    riskScore += 50;
+    reasons.push(
+      `Thù lao (${(wage || 0).toLocaleString()}đ/giờ) thấp hơn đáng kể so với mức sàn tham chiếu (${rec.min.toLocaleString()}đ/giờ) cho ${roleLabel}.`
     );
   } else if (wage < rec.min) {
-    riskScore += 35;
+    riskScore += 30;
     reasons.push(
-      `Thù lao (${(wage || 0).toLocaleString()}đ/giờ) đang thấp hơn mức tối thiểu đề xuất (${((rec && rec.min) || 40000).toLocaleString()}đ/giờ) của vị trí "${role}".`
+      `Thù lao (${(wage || 0).toLocaleString()}đ/giờ) thấp hơn mức tối thiểu đề xuất (${rec.min.toLocaleString()}đ/giờ) của ${roleLabel}.`
     );
   } else if (wage >= rec.max) {
     riskScore -= 10;
@@ -243,6 +236,11 @@ export function useShifts({ onReloadEvents }) {
   const handleAddShift = async (e) => {
     e.preventDefault();
     if (!selectedEventId) return;
+    const roleErr = validateJobType(newShift.jobType);
+    if (roleErr) {
+      showToast(roleErr, 'error');
+      return;
+    }
     if (Number(newShift.allowance || 0) < 0) {
       showToast('Phụ cấp thêm không được là số âm!', 'error');
       return;
@@ -319,7 +317,13 @@ export function useShifts({ onReloadEvents }) {
   };
 
   const handleCancelShift = async (shift) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn HỦY ca "${shift.jobType}"?`)) {
+    const confirmed = await showConfirm({
+      title: 'Hủy ca làm việc',
+      description: `Bạn có chắc chắn muốn HỦY ca "${shift.jobType}"?`,
+      type: 'danger',
+      confirmText: 'Hủy ca',
+    });
+    if (!confirmed) {
       return;
     }
     try {
@@ -395,3 +399,6 @@ export function useShifts({ onReloadEvents }) {
     handleOpenAttendance,
   };
 }
+
+export default useShifts;
+

@@ -372,4 +372,74 @@ class SkillVerificationServiceTest {
         assertEquals("Trường Saigontourist", all.get(0).getInstitution());
         assertTrue(all.get(0).getHasSealOrSignature());
     }
+
+    @Test
+    @DisplayName("Document URL & JobType Integrity: Populates documentUrl and avoids hardcoded 'Phục vụ bàn' on unselected rejection")
+    void testSubmitVerification_PopulatesDocumentUrlAndUnspecifiedJobType() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "random_cv.pdf", "application/pdf", "dummy pdf content".getBytes()
+        );
+        SkillVerificationAiResultDto rejectAi = SkillVerificationAiResultDto.builder()
+                .overallConfidence(0.20)
+                .routingDecision(RoutingDecision.REJECT)
+                .routingReason("Tài liệu tải lên là CV tự khai.")
+                .extractedSkills(List.of())
+                .build();
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findByIsActiveTrue()).thenReturn(List.of(mockSkill));
+        when(skillVisionAiClient.verifyDocument(any(), any(), any())).thenReturn(rejectAi);
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto response = verificationService.submitVerification(workerId, file, null, null);
+
+        assertNotNull(response.getDocumentUrl());
+        assertTrue(response.getDocumentUrl().startsWith("/api/v1/workers/skills/documents/cert_"));
+        assertTrue(response.getDocumentUrl().endsWith(".pdf"));
+        assertEquals("Chưa xác định", response.getJobType());
+    }
+
+    @Test
+    @DisplayName("getOrCreateCustomSkill: trả về kỹ năng đã tồn tại nếu trùng tên (không phân biệt hoa thường)")
+    void getOrCreateCustomSkill_WhenSkillExists_ReturnsExistingSkill() {
+        when(skillRepository.findByNameIgnoreCase("pha chế (bartender/barista)")).thenReturn(Optional.of(mockSkill));
+
+        Skill result = verificationService.getOrCreateCustomSkill("  pha chế (bartender/barista)  ", "Đồ uống");
+
+        assertEquals(mockSkill.getSkillId(), result.getSkillId());
+        assertEquals("Pha chế (Bartender/Barista)", result.getName());
+        verify(skillRepository, never()).save(any(Skill.class));
+    }
+
+    @Test
+    @DisplayName("getOrCreateCustomSkill: tạo mới kỹ năng và lưu vào DB nếu chưa tồn tại")
+    void getOrCreateCustomSkill_WhenSkillNotExists_CreatesAndReturnsNewSkill() {
+        when(skillRepository.findByNameIgnoreCase("Lái xe nâng")).thenReturn(Optional.empty());
+        when(skillRepository.save(any(Skill.class))).thenAnswer(i -> {
+            Skill s = i.getArgument(0);
+            s.setSkillId(UUID.randomUUID());
+            return s;
+        });
+
+        Skill result = verificationService.getOrCreateCustomSkill("Lái xe nâng", null);
+
+        assertNotNull(result.getSkillId());
+        assertEquals("Lái xe nâng", result.getName());
+        assertEquals("Tự chọn", result.getCategory());
+        assertTrue(result.getIsActive());
+        verify(skillRepository, times(1)).save(any(Skill.class));
+    }
+
+    @Test
+    @DisplayName("getOrCreateCustomSkill: quăng BadRequestException nếu tên kỹ năng rỗng")
+    void getOrCreateCustomSkill_WhenBlankName_ThrowsBadRequestException() {
+        assertThrows(com.cani.exception.BadRequestException.class, () ->
+                verificationService.getOrCreateCustomSkill("   ", null));
+        assertThrows(com.cani.exception.BadRequestException.class, () ->
+                verificationService.getOrCreateCustomSkill(null, null));
+    }
 }

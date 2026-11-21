@@ -250,7 +250,7 @@ const PaymentDeclarationModal = ({
               className="eo-btn-primary"
               style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', border: 'none' }}
             >
-              ✅ Xác Nhận Đã Chuyển Tiền
+              Xác Nhận Đã Chuyển Tiền
             </button>
           </div>
         </form>

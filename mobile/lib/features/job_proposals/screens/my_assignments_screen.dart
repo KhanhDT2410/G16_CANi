@@ -89,7 +89,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
         builder: (_) => AttendanceQrScannerScreen(assignment: a, isCheckin: isCheckin),
       ),
     );
-    if (success == true) {
+    if (success == true && mounted) {
       ref.invalidate(assignmentsListProvider);
       ref.invalidate(incomeSummaryProvider);
     }
@@ -102,25 +102,27 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Nhập Mã Mời Tham Gia Ca', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
-              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                hintText: 'CANI-XXXXXX',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.confirmation_number_outlined),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
+                style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  hintText: 'CANI-XXXXXX',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.confirmation_number_outlined),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
@@ -135,6 +137,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
         ],
       ),
     );
+    controller.dispose();
 
     if (result != null && result.isNotEmpty && mounted) {
       try {
@@ -178,7 +181,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       context,
       MaterialPageRoute(builder: (_) => ShiftDetailExecutionScreen(assignment: a)),
     );
-    if (updated == true) {
+    if (updated == true && mounted) {
       ref.invalidate(assignmentsListProvider);
       ref.invalidate(incomeSummaryProvider);
     }
@@ -189,16 +192,14 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       context: context,
       builder: (_) => CancelAssignmentDialog(assignment: a),
     );
-    if (cancelled == true) {
+    if (cancelled == true && mounted) {
       ref.invalidate(assignmentsListProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Đã hủy nhận ca làm việc. Hệ thống đang tìm người thay thế.'),
-            backgroundColor: Theme.of(context).cani.danger,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Đã hủy nhận ca làm việc. Hệ thống đang tìm người thay thế.'),
+          backgroundColor: Theme.of(context).cani.danger,
+        ),
+      );
     }
   }
 
@@ -208,6 +209,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       builder: (_) => RateEoDialog(assignment: a),
     );
     if (rated == true && mounted) {
+      ref.invalidate(assignmentsListProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Cảm ơn bạn đã gửi đánh giá cho Ban tổ chức!'),
@@ -352,8 +354,18 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                         )
                       : RefreshIndicator(
                           onRefresh: () async {
-                            ref.invalidate(assignmentsListProvider);
-                            ref.invalidate(incomeSummaryProvider);
+                            await Future.wait([
+                              () async {
+                                try {
+                                  final _ = await ref.refresh(assignmentsListProvider.future);
+                                } catch (_) {}
+                              }(),
+                              () async {
+                                try {
+                                  final _ = await ref.refresh(incomeSummaryProvider.future);
+                                } catch (_) {}
+                              }(),
+                            ]);
                           },
                           child: currentSubTab == 0
                               ? _buildActiveFeed(activeList, t)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/auth.dart';
+import 'package:cani/features/auth/screens/complete_profile_screen.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
@@ -55,9 +56,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final authState = ref.watch(authStateProvider);
     final currentIndex = ref.watch(homeTabIndexProvider);
-    final assignments = ref.watch(assignmentsListProvider).asData?.value ?? const <ShiftAssignmentItem>[];
-    final activeAssignmentsCount =
-        assignments.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).length;
 
     if (authState.isLoading) {
       return const Scaffold(
@@ -70,6 +68,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!authState.isAuthenticated) {
       return const IntroScreen();
     }
+
+    final currentUser = authState.user;
+    if (currentUser != null &&
+        ((currentUser.phone?.trim().isEmpty ?? true) || currentUser.fullName.trim().isEmpty)) {
+      return const CompleteProfileScreen();
+    }
+
+    final assignments = ref.watch(assignmentsListProvider).asData?.value ?? const <ShiftAssignmentItem>[];
+    final activeAssignmentsCount =
+        assignments.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).length;
 
     return Scaffold(
       body: IndexedStack(

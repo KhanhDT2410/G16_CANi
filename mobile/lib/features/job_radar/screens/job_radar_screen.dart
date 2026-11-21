@@ -33,9 +33,17 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     });
   }
 
+  String _greetingByHour() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Chào buổi sáng';
+    if (hour < 18) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
+  }
+
   Future<void> _acceptProposalOnHome(JobProposalItem item) async {
     try {
       await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
+      if (!mounted) return;
       ref.invalidate(proposalsListProvider);
       ref.invalidate(assignmentsListProvider);
       ref.invalidate(incomeSummaryProvider);
@@ -72,12 +80,11 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   Future<void> _rejectProposalOnHome(JobProposalItem item) async {
     try {
       await ref.read(proposalRepositoryProvider).rejectProposal(item.proposalId, 'Bận lịch cá nhân');
+      if (!mounted) return;
       ref.invalidate(proposalsListProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã bỏ qua lời mời làm việc này.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã bỏ qua lời mời làm việc này.')),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,24 +105,26 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Tham gia ca bằng Mã Mời', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
-              style: TextStyle(fontSize: 13, color: cani.textBody),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                hintText: 'CANI-XXXXXX',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.confirmation_number_outlined),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
+                style: TextStyle(fontSize: 13, color: cani.textBody),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  hintText: 'CANI-XXXXXX',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.confirmation_number_outlined),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
@@ -130,10 +139,12 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
         ],
       ),
     );
+    controller.dispose();
 
     if (result != null && result.isNotEmpty && mounted) {
       try {
         await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
+        if (!mounted) return;
         ref.invalidate(proposalsListProvider);
         ref.invalidate(assignmentsListProvider);
         ref.invalidate(incomeSummaryProvider);
@@ -181,7 +192,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     final userName = user?.fullName.isNotEmpty == true ? user!.fullName : 'Nhân Sự';
     final initialChar = userName.isNotEmpty ? userName[0].toUpperCase() : 'N';
     final totalSp = skillState.skillPoints.fold<int>(0, (sum, p) => sum + p.totalSp);
-    final currentTier = skillState.skillPoints.isNotEmpty ? skillState.skillPoints.first.tier : 'VÀNG';
+    final currentTier = skillState.skillPoints.isNotEmpty ? skillState.skillPoints.first.tier : 'STARTER';
 
     final selectedOrFirstShift = state.selectedShift ?? (state.nearbyShifts.isNotEmpty ? state.nearbyShifts.first : null);
 
@@ -253,7 +264,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                          Text(
-                           'Chào buổi sáng, $userName!',
+                           '${_greetingByHour()}, $userName!',
                            style: TextStyle(
                              fontWeight: FontWeight.w800,
                              fontSize: 15,
@@ -268,13 +279,17 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                           children: [
                              Icon(Icons.star, size: 12, color: cani.warning),
                             const SizedBox(width: 4),
-                            Text(
-                              'Hạng $currentTier · $totalSp SP',
-                              style: TextStyle(
-                                   fontSize: 11.5,
-                                   fontWeight: FontWeight.w600,
-                                   color: cani.textMuted,
-                                 ),
+                            Flexible(
+                              child: Text(
+                                'Hạng $currentTier · $totalSp SP',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                     fontSize: 11.5,
+                                     fontWeight: FontWeight.w600,
+                                     color: cani.textMuted,
+                                   ),
+                              ),
                             ),
                           ],
                         ),
@@ -628,21 +643,23 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: JobProposalInviteCard(
-                          proposal: item,
-                          onAccept: () => _acceptProposalOnHome(item),
-                          onReject: () => _rejectProposalOnHome(item),
-                        ),
-                      );
-                    },
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 220),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: JobProposalInviteCard(
+                            proposal: item,
+                            onAccept: () => _acceptProposalOnHome(item),
+                            onReject: () => _rejectProposalOnHome(item),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -752,29 +769,38 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '${shift.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ/h',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: cani.success),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: shift.emergency
-                              ? cani.dangerBg
-                              : (isDark ? cani.surface : const Color(0xFFF1F5F9)),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: shift.emergency
-                                ? const Color(0xFFFCA5A5)
-                                : (isDark ? cani.border : const Color(0xFFCBD5E1)),
-                          ),
-                        ),
+                      Flexible(
                         child: Text(
-                          shift.emergency ? '🚨 Khẩn cấp (Mở ứng tuyển)' : 'Chờ lời mời (Matching)',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: shift.emergency ? cani.danger : cani.textMuted,
+                          '${shift.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ/h',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: cani.success),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: shift.emergency
+                                ? cani.dangerBg
+                                : (isDark ? cani.surface : const Color(0xFFF1F5F9)),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: shift.emergency
+                                  ? const Color(0xFFFCA5A5)
+                                  : (isDark ? cani.border : const Color(0xFFCBD5E1)),
+                            ),
+                          ),
+                          child: Text(
+                            shift.emergency ? '🚨 Khẩn cấp (Mở ứng tuyển)' : 'Chờ lời mời (Matching)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: shift.emergency ? cani.danger : cani.textMuted,
+                            ),
                           ),
                         ),
                       ),

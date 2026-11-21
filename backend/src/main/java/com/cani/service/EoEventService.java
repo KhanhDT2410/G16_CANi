@@ -1,11 +1,13 @@
 package com.cani.service;
 
+import com.cani.dto.admin.noshow.NoShowResponseDto;
 import com.cani.dto.event.*;
 import com.cani.dto.worker.ShiftChecklistItemDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
+import com.cani.entity.enums.NoShowDetectedBy;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.VerificationStatus;
@@ -32,7 +34,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -76,6 +80,15 @@ public class EoEventService {
 
     @Autowired(required = false)
     private SubscriptionService subscriptionService;
+
+    @Autowired(required = false)
+    private SkillProgressionService skillProgressionService;
+
+    @Autowired(required = false)
+    private NoShowService noShowService;
+
+    @Autowired(required = false)
+    private NotificationService notificationService;
 
     /**
      * EO tạo Sự kiện mới (Trạng thái DRAFT)
@@ -213,6 +226,7 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
         validateShiftWithinEvent(event, dto.getStartTime(), dto.getEndTime());
+        validateShiftJobType(dto.getJobType());
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -291,6 +305,7 @@ public class EoEventService {
         }
 
         List<ShiftResponseDto> results = new ArrayList<>();
+        validateShiftJobType(dto.getJobType());
         for (CreateBulkShiftsRequestDto.TimeSlotItem slot : dto.getTimeSlots()) {
             validateShiftWithinEvent(event, slot.getStartTime(), slot.getEndTime());
             BigDecimal shiftCost = calculateShiftTotalCost(slot.getStartTime(), slot.getEndTime(), dto.getHourlyWage(), workers, allowance);
@@ -350,6 +365,7 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
         validateShiftWithinEvent(shift.getEvent(), dto.getStartTime(), dto.getEndTime());
+        validateShiftJobType(dto.getJobType());
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -478,26 +494,34 @@ public class EoEventService {
             throw new BadRequestException("Phân công việc này đã được duyệt hoàn thành trước đó.");
         }
 
+        Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId);
+        boolean isInShiftAwaitingCheckout = sa.getStatus() == AssignmentStatus.CHECKED_IN
+                && (attOpt.isEmpty() || attOpt.get().getCheckoutTime() == null);
         boolean wasAlreadyCompleted = (sa.getStatus() == AssignmentStatus.COMPLETED);
+
         sa.setEoConfirmed(true);
         sa.setEoConfirmedAt(Instant.now());
-        sa.setStatus(AssignmentStatus.COMPLETED);
+        if (!isInShiftAwaitingCheckout) {
+            sa.setStatus(AssignmentStatus.COMPLETED);
+        }
         sa = shiftAssignmentRepository.save(sa);
 
-        // Chỉ cộng thêm số ca hoàn thành nếu trước đó Worker chưa check-out tự động
+        // Chỉ cộng thêm số ca hoàn thành ngay nếu đã kết thúc / duyệt thủ công không qua checkout
         Worker worker = sa.getWorker();
-        if (worker != null && !wasAlreadyCompleted) {
+        if (worker != null && !isInShiftAwaitingCheckout && !wasAlreadyCompleted) {
             worker.setTotalShiftsCompleted((worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
             workerRepository.save(worker);
+            if (skillProgressionService != null) {
+                skillProgressionService.recordCompletedShift(worker, sa.getShift());
+            }
         }
 
-        log.info("EO {} đã duyệt hoàn thành ca cho Assignment {}", userId, assignmentId);
+        log.info("EO {} đã duyệt hoàn thành ca cho Assignment {} (inShiftAwaitingCheckout={})", userId, assignmentId, isInShiftAwaitingCheckout);
 
         Shift shift = sa.getShift();
         BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift);
 
         // WBS 246.0: Tính toán tiền công thực tế từ số giờ làm việc thực tế (Actual Hours & Payment)
-        Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId);
         BigDecimal actualAmount = agreedWage;
         if (attOpt.isPresent() && attOpt.get().getHoursWorked() != null && shift != null && shift.getHourlyWage() != null) {
             BigDecimal hourly = shift.getHourlyWage();
@@ -521,6 +545,24 @@ public class EoEventService {
         if (payment.getStatus() == com.cani.entity.enums.PaymentStatus.NOT_DECLARED) {
             payment.setAgreedAmount(actualAmount);
             paymentRepository.save(payment);
+        }
+
+        if (notificationService != null && worker != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
+            try {
+                String evName = (shift != null && shift.getEvent() != null) ? shift.getEvent().getName() : "Sự kiện";
+                String shiftTitle = shift != null ? shift.getJobType() : "ca làm việc";
+                notificationService.createAndSend(
+                        worker.getUser().getUserId(),
+                        "BTC đã duyệt công việc của bạn",
+                        "Ban tổ chức đã xác nhận nghiệm thu ca \"" + shiftTitle + "\" (" + evName + "). Đang chờ thanh toán thù lao.",
+                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                        "ASSIGNMENT",
+                        assignmentId,
+                        Map.of("assignmentId", assignmentId.toString(), "type", "EO_CONFIRMED")
+                );
+            } catch (Exception ex) {
+                log.warn("Không thể gửi thông báo duyệt công tới Worker: {}", ex.getMessage());
+            }
         }
 
         String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
@@ -576,6 +618,34 @@ public class EoEventService {
     }
 
     /**
+     * UC-88: EO báo cáo Worker vắng mặt không báo trước (Report No-Show)
+     * Kích hoạt chế tài phạt 25 RS, tự động khóa tài khoản nếu RS < 20 và kích hoạt Emergency Dispatch bù người.
+     */
+    @Transactional
+    public NoShowResponseDto reportNoShow(UUID userId, UUID assignmentId, ReportNoShowRequestDto request) {
+        EventOrganizer eo = getEoOrThrow(userId);
+        ShiftAssignment sa = getOwnedAssignmentOrThrow(assignmentId, eo.getEoId());
+
+        if (noShowService == null) {
+            throw new BadRequestException("Hệ thống xử lý vi phạm No-show đang tạm bảo trì");
+        }
+
+        Shift shift = sa.getShift();
+        if (shift != null && shift.getStartTime() != null) {
+            if (Instant.now().isBefore(shift.getStartTime())) {
+                throw new BadRequestException("Ca làm việc chưa đến giờ bắt đầu, chưa thể báo cáo vắng mặt (No-show).");
+            }
+        }
+
+        String notes = (request != null && request.getNotes() != null && !request.getNotes().trim().isEmpty())
+                ? request.getNotes().trim()
+                : "Nhà tổ chức sự kiện báo cáo nhân sự không có mặt khi ca làm việc bắt đầu.";
+
+        UUID eoUserId = resolveEoUserId(eo, userId);
+        return noShowService.markNoShow(assignmentId, NoShowDetectedBy.EVENT_ORGANIZER, eoUserId, notes);
+    }
+
+    /**
      * UC-69: EO đánh giá Worker sau ca làm việc (Rate Worker 1-5★)
      */
     @Transactional
@@ -614,6 +684,9 @@ public class EoEventService {
 
         review = reviewRepository.save(review);
         updateWorkerRatingAndReliability(worker, request.getRating());
+        if (skillProgressionService != null) {
+            skillProgressionService.recordShiftRating(worker, sa.getShift(), request.getRating());
+        }
 
         log.info("EO {} đã đánh giá {} sao cho Worker {} (Assignment: {})", eoUserId, request.getRating(), worker.getWorkerId(), assignmentId);
         return review;
@@ -808,6 +881,52 @@ public class EoEventService {
             if (event.getEndTime() != null && endTime.isAfter(event.getEndTime())) {
                 throw new BadRequestException("Thời gian kết thúc ca làm việc không được muộn hơn thời gian kết thúc của sự kiện.");
             }
+        }
+    }
+
+    private void validateShiftJobType(String rawJobType) {
+        String trimmed = rawJobType != null ? rawJobType.trim() : "";
+        if (trimmed.isEmpty()) {
+            throw new BadRequestException("Vui lòng nhập tên vị trí / vai trò cần tuyển.");
+        }
+        if (trimmed.length() > 80) {
+            throw new BadRequestException("Tên vị trí công việc không được vượt quá 80 ký tự.");
+        }
+        if (!trimmed.matches("^[\\p{L}\\p{N}\\s,./()&+-]+$")) {
+            throw new BadRequestException("Tên vị trí chỉ được chứa chữ cái, chữ số, khoảng trắng và các dấu , . - / ( ) & +.");
+        }
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        Set<String> allowedAcronyms = Set.of("mc", "pg", "pb", "dj", "pr", "it", "av", "led", "vip", "f&b", "fnb", "qc", "qa", "cskh", "ctv", "hr", "pa", "pm");
+        String[] tokens = lower.split("[\\s,./()&+-]+");
+        boolean hasValidLetterToken = false;
+        String vowelRegex = ".*[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ].*";
+
+        if (trimmed.length() < 3 && !allowedAcronyms.contains(lower)) {
+            throw new BadRequestException("Tên vị trí quá ngắn (tối thiểu 3 ký tự, trừ viết tắt hợp lệ như MC, PG, DJ).");
+        }
+        if (trimmed.matches(".*(.)\\1{3,}.*")) {
+            throw new BadRequestException("Tên vị trí chứa ký tự lặp bất thường.");
+        }
+        if (lower.matches(".*(asdasd|sdasd|ádasd|adasd|sdfsdf|dfghj|fghjk|ghjkl|qwerty|zxcvb|sdfh|asdf).*")) {
+            throw new BadRequestException("Tên vị trí không hợp lệ hoặc chứa chuỗi ký tự vô nghĩa.");
+        }
+        for (String token : tokens) {
+            if (token.isEmpty()) continue;
+            if (token.matches("^\\d+$")) continue;
+            if (allowedAcronyms.contains(token)) {
+                hasValidLetterToken = true;
+                continue;
+            }
+            if (token.matches(".*\\p{L}.*")) {
+                hasValidLetterToken = true;
+            }
+            String lettersOnly = token.replaceAll("[^\\p{L}]", "");
+            if (lettersOnly.length() >= 3 && !lettersOnly.matches(vowelRegex)) {
+                throw new BadRequestException("Tên vị trí chứa từ vô nghĩa hoặc sai định dạng (không có nguyên âm).");
+            }
+        }
+        if (!hasValidLetterToken) {
+            throw new BadRequestException("Tên vị trí phải chứa từ khóa mô tả công việc hợp lệ (không thể chỉ nhập số).");
         }
     }
 
@@ -1041,9 +1160,11 @@ public class EoEventService {
                 .eoConfirmedAt(sa.getEoConfirmedAt())
                 .hasReviewedWorker(reviewed)
                 .checklistProgress(checklistSummary)
+                .checklistRawProgress(sa.getChecklistProgress())
                 .isChecklistCompleted(checklistDone)
                 .proofImageUrl(attOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .paymentStatus(payOpt.map(p -> p.getStatus().name()).orElse(PAYMENT_NOT_DECLARED))
+                .paymentProofUrl(payOpt.map(Payment::getPaymentProofUrl).orElse(null))
                 .agreedWage(agreedWage)
                 .workerBio(worker != null ? worker.getBio() : null)
                 .yearsExperience(worker != null ? worker.getYearsExperience() : 0)
@@ -1072,6 +1193,24 @@ public class EoEventService {
             } catch (Exception ignored) {}
         }
 
+        EventStatus resolvedEventStatus = e.getStatus();
+        if (resolvedEventStatus != EventStatus.CANCELLED && resolvedEventStatus != EventStatus.DRAFT) {
+            Instant now = Instant.now();
+            boolean allShiftsCompleted = shifts != null && !shifts.isEmpty() && shifts.stream()
+                    .allMatch(s -> s.getStatus() == ShiftStatus.COMPLETED || s.getStatus() == ShiftStatus.CANCELLED);
+            if ((e.getEndTime() != null && now.isAfter(e.getEndTime())) || allShiftsCompleted) {
+                resolvedEventStatus = EventStatus.COMPLETED;
+                if (e.getStatus() != EventStatus.COMPLETED) {
+                    e.setStatus(EventStatus.COMPLETED);
+                }
+            } else if (e.getStartTime() != null && !now.isBefore(e.getStartTime())) {
+                resolvedEventStatus = EventStatus.ONGOING;
+                if (e.getStatus() == EventStatus.ACTIVE) {
+                    e.setStatus(EventStatus.ONGOING);
+                }
+            }
+        }
+
         return EventResponseDto.builder()
                 .eventId(e.getEventId())
                 .name(e.getName())
@@ -1084,7 +1223,7 @@ public class EoEventService {
                 .endTime(e.getEndTime())
                 .imageUrl(e.getImageUrl())
                 .mode(e.getMode())
-                .status(e.getStatus())
+                .status(resolvedEventStatus)
                 .readinessScore(e.getReadinessScore())
                 .totalShifts(e.getTotalShifts())
                 .totalRequiredWorkers(e.getTotalRequiredWorkers())
@@ -1167,6 +1306,22 @@ public class EoEventService {
     }
 
     private ShiftResponseDto mapToShiftResponseDto(Shift s) {
+        ShiftStatus resolvedStatus = s.getStatus();
+        if (resolvedStatus != ShiftStatus.CANCELLED && resolvedStatus != ShiftStatus.DRAFT) {
+            Instant now = Instant.now();
+            if (s.getEndTime() != null && now.isAfter(s.getEndTime())) {
+                resolvedStatus = ShiftStatus.COMPLETED;
+                if (s.getStatus() != ShiftStatus.COMPLETED) {
+                    s.setStatus(ShiftStatus.COMPLETED);
+                }
+            } else if (s.getStartTime() != null && !now.isBefore(s.getStartTime())) {
+                resolvedStatus = ShiftStatus.IN_PROGRESS;
+                if (s.getStatus() == ShiftStatus.ACTIVE || s.getStatus() == ShiftStatus.FULLY_STAFFED) {
+                    s.setStatus(ShiftStatus.IN_PROGRESS);
+                }
+            }
+        }
+
         return ShiftResponseDto.builder()
                 .shiftId(s.getShiftId())
                 .eventId(s.getEvent() != null ? s.getEvent().getEventId() : null)
@@ -1181,7 +1336,7 @@ public class EoEventService {
                 .hourlyWage(s.getHourlyWage())
                 .allowance(s.getAllowance())
                 .totalCost(s.getTotalCost())
-                .status(s.getStatus())
+                .status(resolvedStatus)
                 .riskScore(s.getRiskScore())
                 .locationAddress(s.getLocationAddress())
                 .locationLat(s.getLocationLat())
@@ -1192,6 +1347,7 @@ public class EoEventService {
                 .imageUrl(s.getImageUrl())
                 .checklist(s.getChecklist())
                 .requiredSkills(s.getRequiredSkills())
+                .emergency(Boolean.TRUE.equals(s.getEmergency()))
                 .build();
     }
 

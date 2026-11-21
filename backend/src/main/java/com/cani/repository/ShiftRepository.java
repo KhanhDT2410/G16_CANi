@@ -19,6 +19,12 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     List<Shift> findByStatus(ShiftStatus status);
     long countByStatus(ShiftStatus status);
 
+    @Query("SELECT s.hourlyWage FROM Shift s WHERE LOWER(TRIM(s.jobType)) = LOWER(TRIM(:jobType)) AND s.status <> :cancelledStatus AND s.hourlyWage IS NOT NULL")
+    List<java.math.BigDecimal> findHourlyWagesByJobTypeExcludingStatus(
+            @Param("jobType") String jobType,
+            @Param("cancelledStatus") ShiftStatus cancelledStatus
+    );
+
     @Modifying
     @Query("UPDATE Shift s SET s.confirmedWorkers = s.confirmedWorkers + 1, s.remainingWorkers = CASE WHEN (s.remainingWorkers > 0) THEN s.remainingWorkers - 1 ELSE 0 END, s.status = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN :fullStatus ELSE s.status END, s.emergency = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN false ELSE s.emergency END WHERE s.shiftId = :shiftId AND s.confirmedWorkers < s.requiredWorkers")
     int incrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId, @Param("fullStatus") ShiftStatus fullStatus);

@@ -103,6 +103,18 @@ public class DisputeService {
                 .build();
         dispute = disputeRepository.save(dispute);
 
+        // Lưu ảnh/bằng chứng ban đầu vào danh sách bằng chứng có cấu trúc
+        if (request.getEvidence() != null && !request.getEvidence().isBlank()) {
+            DisputeEvidence initialEvidence = DisputeEvidence.builder()
+                    .disputeId(dispute.getDisputeId())
+                    .party(requesterId)
+                    .fileType(DisputeEvidenceType.IMAGE)
+                    .fileUrl(request.getEvidence().trim())
+                    .label("Ảnh minh chứng kèm theo đơn")
+                    .build();
+            evidenceRepository.save(initialEvidence);
+        }
+
         // UC-96 bước 7: tranh chấp liên quan thanh toán → đặt payment về DISPUTED
         if (request.getType() == DisputeType.PAYMENT) {
             markPaymentDisputed(assignment.getAssignmentId());

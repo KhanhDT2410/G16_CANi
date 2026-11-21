@@ -1,9 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { showToast } from '../../../components/common/Toast';
 
 const EscalateModal = ({ dispute, onClose, onSubmit }) => {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,7 +32,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div className="dispute-modal-overlay" onClick={onClose}>
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
@@ -74,7 +83,8 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { showToast } from '../../../components/common/Toast';
 import {
   DISPUTE_OUTCOMES,
@@ -13,6 +14,14 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
   const [rationale, setRationale] = useState('');
   const [penaltyWaiverReason, setPenaltyWaiverReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const rationaleLen = rationale.trim().length;
   const isRationaleValid = rationaleLen >= 100 && rationaleLen <= 5000;
@@ -39,7 +48,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div className="dispute-modal-overlay" onClick={onClose}>
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
@@ -99,8 +108,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
               <input
                 type="text"
                 className="dispute-input"
-                maxLength={500}
-                placeholder="Ví dụ: Worker gặp sự cố bất khả kháng về sức khỏe có chứng từ..."
+                placeholder="Để trống nếu áp dụng trừ điểm theo quy định chuẩn..."
                 value={penaltyWaiverReason}
                 onChange={(e) => setPenaltyWaiverReason(e.target.value)}
               />
@@ -108,12 +116,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
           </div>
 
           <div className="dispute-modal-footer">
-            <button
-              type="button"
-              className="btn-cancel"
-              onClick={onClose}
-              disabled={submitting}
-            >
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={submitting}>
               Hủy
             </button>
             <button
@@ -121,12 +124,13 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
               className="btn-submit"
               disabled={submitting || !isRationaleValid}
             >
-              {submitting ? 'Đang lưu...' : isEscalated ? 'Ban hành phán quyết cuối' : 'Ghi nhận quyết định'}
+              {submitting ? 'Đang lưu...' : 'Ban hành quyết định'}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

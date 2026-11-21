@@ -94,9 +94,13 @@ class _ProfileIdentityHeaderState extends State<ProfileIdentityHeader> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Text(
-                            _showEmail ? user.email : _maskEmail(user.email),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.muted),
+                          Flexible(
+                            child: Text(
+                              _showEmail ? user.email : _maskEmail(user.email),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.muted),
+                            ),
                           ),
                           const SizedBox(width: 6),
                           InkWell(

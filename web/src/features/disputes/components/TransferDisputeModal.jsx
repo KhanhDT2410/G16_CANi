@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { showToast } from '../../../components/common/Toast';
 
-/**
- * Chuyển tranh chấp cho nhân sự Customer Care khác (UC-99, SCR-26).
- * Danh sách nhân sự lấy từ GET /v1/admin/disputes/customer-care-staff
- * (kèm số đơn đang giao để CC cân bằng tải).
- */
 const TransferDisputeModal = ({ dispute, staff = [], onClose, onSubmit }) => {
   const [targetCcUserId, setTargetCcUserId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   useEffect(() => {
     if (staff.length === 0) {
@@ -36,7 +40,7 @@ const TransferDisputeModal = ({ dispute, staff = [], onClose, onSubmit }) => {
 
   const selected = staff.find((s) => s.userId === targetCcUserId);
 
-  return (
+  return createPortal(
     <div className="dispute-modal-overlay" onClick={onClose}>
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
@@ -93,7 +97,8 @@ const TransferDisputeModal = ({ dispute, staff = [], onClose, onSubmit }) => {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

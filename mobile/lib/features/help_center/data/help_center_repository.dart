@@ -14,12 +14,17 @@ class HelpCenterRepository {
 
   HelpCenterRepository(this._dio);
 
-  /// Lấy danh sách câu hỏi thường gặp đã xuất bản (hỗ trợ lọc theo danh mục)
-  Future<List<FaqItemModel>> fetchFaqs({String? category}) async {
+  /// Lấy danh sách câu hỏi thường gặp đã xuất bản (mặc định chỉ lấy nhóm WORKER và chung)
+  Future<List<FaqItemModel>> fetchFaqs({String? category, String targetRole = 'WORKER'}) async {
     try {
+      final queryParams = <String, dynamic>{
+        'targetRole': targetRole,
+        if (category != null && category.isNotEmpty) 'category': category,
+      };
+
       final res = await _dio.get(
         '/v1/faqs',
-        queryParameters: category != null && category.isNotEmpty ? {'category': category} : null,
+        queryParameters: queryParams,
       );
 
       final body = res.data;

@@ -1,6 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useFaqs } from '../hooks/useFaqs';
-import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG, FAQ_STATUS, FAQ_STATUS_CONFIG } from '../types/faq.constants';
+import {
+  FAQ_CATEGORY, FAQ_CATEGORY_CONFIG,
+  FAQ_STATUS, FAQ_STATUS_CONFIG,
+  FAQ_TARGET_ROLE, FAQ_TARGET_ROLE_CONFIG,
+} from '../types/faq.constants';
 import FaqCard from './FaqCard';
 import FaqEditorView from './FaqEditorView';
 import './Faq.css';
@@ -12,44 +16,29 @@ import './Faq.css';
  */
 export const FaqView = () => {
   const {
-    faqs,
-    loading,
-    loadFaqs,
-    createFaq,
-    updateFaq,
-    publishFaq,
-    archiveFaq,
+    faqs, loading, loadFaqs,
+    createFaq, updateFaq, publishFaq, archiveFaq,
   } = useFaqs('admin');
 
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'editor'
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [activeTargetRole, setActiveTargetRole] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingFaq, setEditingFaq] = useState(null);
 
-  const handleOpenCreate = () => {
-    setEditingFaq(null);
-    setViewMode('editor');
-  };
-
-  const handleOpenEdit = (faq) => {
-    setEditingFaq(faq);
-    setViewMode('editor');
-  };
+  const handleOpenCreate = () => { setEditingFaq(null); setViewMode('editor'); };
+  const handleOpenEdit = (faq) => { setEditingFaq(faq); setViewMode('editor'); };
 
   const handleEditorSubmit = async (payload, shouldPublish = false) => {
     try {
       if (editingFaq?.id) {
         await updateFaq(editingFaq.id, payload);
-        if (shouldPublish && editingFaq.status !== 'PUBLISHED') {
-          await publishFaq(editingFaq.id);
-        }
+        if (shouldPublish && editingFaq.status !== 'PUBLISHED') await publishFaq(editingFaq.id);
       } else {
         const created = await createFaq(payload);
-        if (shouldPublish && created?.id) {
-          await publishFaq(created.id);
-        }
+        if (shouldPublish && created?.id) await publishFaq(created.id);
       }
       setViewMode('list');
       setEditingFaq(null);
@@ -62,6 +51,7 @@ export const FaqView = () => {
     const list = faqs.filter((f) => {
       if (activeStatus !== 'ALL' && f.status !== activeStatus) return false;
       if (activeCategory !== 'ALL' && f.category !== activeCategory) return false;
+      if (activeTargetRole !== 'ALL' && f.targetRole !== activeTargetRole) return false;
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const qMatch = f.question?.toLowerCase().includes(term);
@@ -76,19 +66,15 @@ export const FaqView = () => {
       if (sortBy === 'NEWEST') return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       if (sortBy === 'OLDEST') return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
       if (sortBy === 'TITLE_AZ') return (a.question || '').localeCompare(b.question || '', 'vi');
-      if (sortBy === 'TITLE_ZA') return (b.question || '').localeCompare(a.question || '', 'vi');
-      return 0;
+      return (b.question || '').localeCompare(a.question || '', 'vi');
     });
-  }, [faqs, activeStatus, activeCategory, searchTerm, sortBy]);
+  }, [faqs, activeStatus, activeCategory, activeTargetRole, searchTerm, sortBy]);
 
   if (viewMode === 'editor') {
     return (
       <FaqEditorView
         faq={editingFaq}
-        onBack={() => {
-          setViewMode('list');
-          setEditingFaq(null);
-        }}
+        onBack={() => { setViewMode('list'); setEditingFaq(null); }}
         onSubmit={handleEditorSubmit}
         loading={loading}
       />
@@ -136,6 +122,14 @@ export const FaqView = () => {
             <option value="ALL">Tất cả danh mục</option>
             {Object.keys(FAQ_CATEGORY).map((k) => (
               <option key={k} value={k}>{FAQ_CATEGORY_CONFIG[k].label}</option>
+            ))}
+          </select>
+
+          <label>Đối tượng:</label>
+          <select value={activeTargetRole} onChange={(e) => setActiveTargetRole(e.target.value)}>
+            <option value="ALL">Tất cả đối tượng</option>
+            {Object.keys(FAQ_TARGET_ROLE).map((k) => (
+              <option key={k} value={k}>{FAQ_TARGET_ROLE_CONFIG[k]?.label}</option>
             ))}
           </select>
 

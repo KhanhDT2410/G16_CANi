@@ -68,7 +68,11 @@ export const useLogin = () => {
           break;
         case 'EVENT_ORGANIZER':
         default:
-          navigate('/eo');
+          if (!data.user?.phone?.trim() || !data.user?.fullName?.trim()) {
+            navigate('/complete-profile');
+          } else {
+            navigate('/eo');
+          }
           break;
       }
     } catch (err) {

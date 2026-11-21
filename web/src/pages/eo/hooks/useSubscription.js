@@ -199,3 +199,5 @@ export function useSubscription() {
   };
 }
 
+export default useSubscription;
+

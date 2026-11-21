@@ -63,6 +63,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
   const end = shift.endTime ? new Date(shift.endTime) : null;
   const confirmed = Number(shift.confirmedWorkers || 0);
   const required = Math.max(1, Number(shift.requiredWorkers || 1));
+  const isEmergency = Boolean(shift.emergency);
 
   if (rawStatus === 'COMPLETED' || (end && !isNaN(end.getTime()) && now > end)) {
     return {
@@ -75,14 +76,39 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
     };
   }
 
+  // Nếu đang bật chế độ khẩn cấp (Emergency Dispatch)
+  if (isEmergency) {
+    return {
+      code: 'EMERGENCY',
+      label: `Điều phối khẩn cấp (Thiếu ${Math.max(0, required - confirmed)} nhân sự)`,
+      colorClass: 'red',
+      bg: '#fef2f2',
+      color: '#b91c1c',
+      border: '#ef4444',
+      isEmergency: true,
+    };
+  }
+
+  // Đang trong khung giờ ca làm việc (startTime <= now <= endTime)
   if (
     rawStatus === 'IN_PROGRESS' ||
     rawStatus === 'ONGOING' ||
     (start && !isNaN(start.getTime()) && now >= start && (!end || isNaN(end.getTime()) || now <= end))
   ) {
+    if (confirmed < required) {
+      return {
+        code: 'UNDERSTAFFED_IN_PROGRESS',
+        label: `Đang diễn ra - Thiếu ${required - confirmed} nhân sự`,
+        colorClass: 'red',
+        bg: '#fff1f2',
+        color: '#e11d48',
+        border: '#fda4af',
+        isCritical: true,
+      };
+    }
     return {
       code: 'IN_PROGRESS',
-      label: 'Đang diễn ra',
+      label: 'Đang diễn ra (Đủ nhân sự)',
       colorClass: 'green',
       bg: '#ecfdf5',
       color: '#059669',
@@ -94,11 +120,25 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
   if (confirmed >= required) {
     return {
       code: 'FULL_WAITING',
-      label: 'Đủ nhân sự • Chờ diễn ra',
+      label: 'Đủ nhân sự - Chờ diễn ra',
       colorClass: 'purple',
       bg: '#f0fdf4',
       color: '#15803d',
       border: '#bbf7d0',
+    };
+  }
+
+  // Sát giờ bắt đầu (còn dưới 4 giờ) mà chưa đủ người
+  if (start && !isNaN(start.getTime()) && (start.getTime() - now.getTime()) <= 4 * 3600 * 1000) {
+    const hoursLeft = Math.max(0, Math.round((start.getTime() - now.getTime()) / 3600000));
+    return {
+      code: 'URGENT_STARTING_SOON',
+      label: `Sắp diễn ra (~${hoursLeft} giờ) - Cần gấp ${required - confirmed} người`,
+      colorClass: 'amber',
+      bg: '#fffbeb',
+      color: '#b45309',
+      border: '#fde68a',
+      isUrgent: true,
     };
   }
 
@@ -110,6 +150,26 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
     color: '#1d4ed8',
     border: '#bfdbfe',
   };
+}
+
+/**
+ * Lọc danh sách các ca làm việc đang bị thiếu hụt nhân sự khẩn cấp hoặc sát giờ
+ */
+export function getShiftStaffingAlerts(shifts = []) {
+  const now = new Date();
+  return (shifts || []).filter((s) => {
+    if (!s || s.status === 'CANCELLED') return false;
+    const start = s.startTime ? new Date(s.startTime) : null;
+    const end = s.endTime ? new Date(s.endTime) : null;
+    if (end && !isNaN(end.getTime()) && now > end) return false; // Đã kết thúc
+    const confirmed = Number(s.confirmedWorkers || 0);
+    const required = Math.max(1, Number(s.requiredWorkers || 1));
+    if (confirmed >= required) return false; // Đã đủ người
+    if (s.emergency) return true; // Đang bật emergency
+    if (start && !isNaN(start.getTime()) && now >= start) return true; // Đang diễn ra mà thiếu người
+    if (start && !isNaN(start.getTime()) && (start.getTime() - now.getTime()) <= 4 * 3600 * 1000) return true; // Sát giờ < 4h
+    return false;
+  });
 }
 
 /**

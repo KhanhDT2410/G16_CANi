@@ -7,6 +7,13 @@ class EkycRepository {
 
   EkycRepository(this._dio);
 
+  DioMediaType _imageMediaType(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return DioMediaType('image', 'png');
+    if (lower.endsWith('.webp')) return DioMediaType('image', 'webp');
+    return DioMediaType('image', 'jpeg');
+  }
+
   Future<EkycVerificationItem> submitEkyc({
     required Uint8List frontBytes,
     required String frontFileName,
@@ -30,17 +37,17 @@ class EkycRepository {
         'frontImage': MultipartFile.fromBytes(
           frontBytes,
           filename: frontFileName,
-          contentType: DioMediaType('image', 'jpeg'),
+          contentType: _imageMediaType(frontFileName),
         ),
         'backImage': MultipartFile.fromBytes(
           backBytes,
           filename: backFileName,
-          contentType: DioMediaType('image', 'jpeg'),
+          contentType: _imageMediaType(backFileName),
         ),
         'selfieImage': MultipartFile.fromBytes(
           selfieBytes,
           filename: selfieFileName,
-          contentType: DioMediaType('image', 'jpeg'),
+          contentType: _imageMediaType(selfieFileName),
         ),
       };
       if (userId != null && userId.isNotEmpty) formDataMap['userId'] = userId;

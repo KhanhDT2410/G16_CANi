@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migration: V39__drop_tax_id_and_legacy_eo_columns.sql
+-- Migration: V41__drop_tax_id_and_legacy_eo_columns.sql
 -- Description: Chuyển đổi mô hình Event Organizer sang 100% Cá nhân (Individual-Only).
 --              - Xóa cột tax_id và cột chết verified_by trong bảng event_organizers.
 --              - Xóa cột business_license_url trong bảng eo_ekyc_verifications.

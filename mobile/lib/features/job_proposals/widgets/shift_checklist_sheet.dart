@@ -26,14 +26,28 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
   }
 
   Future<void> _loadChecklist() async {
-    final items = await ref
-        .read(proposalRepositoryProvider)
-        .fetchChecklist(widget.assignment.assignmentId);
-    if (mounted) {
-      setState(() {
-        _items = items;
-        _isLoading = false;
-      });
+    try {
+      final items = await ref
+          .read(proposalRepositoryProvider)
+          .fetchChecklist(widget.assignment.assignmentId);
+      if (mounted) {
+        setState(() {
+          _items = items;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể tải checklist công việc: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -49,18 +63,32 @@ class _ShiftChecklistSheetState extends ConsumerState<ShiftChecklistSheet> {
 
   Future<void> _saveChecklist() async {
     setState(() => _isSaving = true);
-    await ref
-        .read(proposalRepositoryProvider)
-        .updateChecklist(widget.assignment.assignmentId, _items);
-    if (mounted) {
-      setState(() => _isSaving = false);
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã cập nhật tiến độ Checklist công việc!'),
-          backgroundColor: Color(0xFF0D9488),
-        ),
-      );
+    try {
+      await ref
+          .read(proposalRepositoryProvider)
+          .updateChecklist(widget.assignment.assignmentId, _items);
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã cập nhật tiến độ Checklist công việc!'),
+            backgroundColor: Color(0xFF0D9488),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể lưu checklist: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

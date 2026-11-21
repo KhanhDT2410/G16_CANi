@@ -239,6 +239,34 @@
   color: #64748b;
 }
 
+.faq-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.faq-role-badge-all {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.faq-role-badge-worker {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.faq-role-badge-eo {
+  background: #fdf2f8;
+  color: #be185d;
+  border: 1px solid #fbcfe8;
+}
+
 .faq-views-badge {
   font-size: 0.78rem;
   color: #64748b;
@@ -606,6 +634,14 @@
   color: #94a3b8;
   cursor: pointer;
   font-size: 0.9rem;
+}
+
+.faq-public-roles {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .faq-public-categories {

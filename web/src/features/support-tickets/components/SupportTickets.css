@@ -1165,6 +1165,59 @@
   animation: pulse-soft 2s infinite ease-in-out;
 }
 
+@media (max-width: 768px) {
+  .tickets-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.9rem;
+    padding: 1rem 1.1rem;
+  }
+
+  .tickets-header-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .tickets-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .tickets-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+  }
+
+  .tickets-search-box,
+  .tickets-search-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ticket-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .staff-messenger-dock {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .tickets-stats-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 
 

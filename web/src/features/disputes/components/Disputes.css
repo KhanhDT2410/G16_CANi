@@ -193,28 +193,53 @@
 
 /* Dispute Modal */
 .dispute-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-  padding: 1.5rem;
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 999999 !important;
+  padding: 1rem !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
 }
 
 .dispute-modal {
-  background: var(--color-surface-card);
-  border-radius: var(--radius-xl);
-  width: 100%;
-  max-width: 680px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-modal);
-  border: 1px solid var(--color-border);
+  position: relative !important;
+  margin: auto !important;
+  background: var(--color-surface-card, #ffffff) !important;
+  border-radius: var(--radius-xl, 16px) !important;
+  width: 100% !important;
+  max-width: 620px !important;
+  max-height: calc(100vh - 2rem) !important;
+  max-height: calc(100dvh - 2rem) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35) !important;
+  border: 1px solid var(--color-border, #e2e8f0) !important;
   animation: modal-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box !important;
+}
+
+.dispute-modal form {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  margin: 0 !important;
 }
 
 @keyframes modal-pop {
@@ -223,6 +248,7 @@
 }
 
 .dispute-modal-header {
+  flex-shrink: 0;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
   display: flex;
@@ -257,21 +283,27 @@
 }
 
 .dispute-modal-body {
-  padding: 1.25rem 1.5rem;
-  overflow-y: auto;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding: 1.25rem 1.5rem !important;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  box-sizing: border-box;
 }
 
 .dispute-modal-footer {
+  flex-shrink: 0 !important;
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.75rem;
   background: var(--color-bg-subtle);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  box-sizing: border-box;
 }
 
 .dispute-field-group {
@@ -1255,6 +1287,58 @@
   font-size: 0.95rem;
   padding: 2rem;
   text-align: center;
+}
+
+@media (max-width: 768px) {
+  .disputes-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.9rem;
+    padding: 1rem 1.1rem;
+  }
+
+  .disputes-actions-group {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .disputes-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+  }
+
+  .disputes-tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.84rem;
+  }
+
+  .dispute-split-layout {
+    min-height: auto;
+    gap: 1rem;
+  }
+
+  .dispute-chat-header {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .dispute-modal-overlay {
+    padding: 0.75rem;
+  }
+
+  .dispute-modal {
+    max-height: 94vh;
+  }
+
+  .empty-workspace-state {
+    min-height: 240px;
+    padding: 1.35rem;
+  }
 }
 
 

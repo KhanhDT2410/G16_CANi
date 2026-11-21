@@ -58,6 +58,9 @@ public class DispatchProposal {
     @Builder.Default
     private AssignmentSource source = AssignmentSource.MATCHING;
 
+    @Column(name = "group_id")
+    private UUID groupId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

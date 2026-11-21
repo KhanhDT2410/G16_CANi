@@ -40,4 +40,11 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     default int decrementConfirmedWorkersAtomic(UUID shiftId) {
         return decrementConfirmedWorkersAtomic(shiftId, ShiftStatus.ACTIVE);
     }
+
+    @Modifying
+    @Query(value = "UPDATE shifts SET confirmed_workers = confirmed_workers + :n, "
+            + "remaining_workers = GREATEST(0, remaining_workers - :n) "
+            + "WHERE id = :shiftId AND confirmed_workers + :n <= required_workers",
+            nativeQuery = true)
+    int incrementConfirmedWorkersAtomicBy(@Param("shiftId") UUID shiftId, @Param("n") int n);
 }

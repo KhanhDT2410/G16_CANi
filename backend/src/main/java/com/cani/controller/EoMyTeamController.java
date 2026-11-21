@@ -60,6 +60,21 @@ public class EoMyTeamController {
     }
 
     /**
+     * Tìm kiếm nhân sự (Worker) trên toàn hệ thống theo tên, SĐT hoặc email
+     */
+    @Operation(summary = "Tìm kiếm Worker trên hệ thống", description = "Cho phép EO tìm theo tên/SĐT để mời hoặc thêm vào My Team.")
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/search-workers")
+    public ResponseEntity<ApiResponse<List<MyTeamMemberResponseDto>>> searchWorkers(
+            @RequestParam(required = false) String q,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<MyTeamMemberResponseDto> workers = myTeamService.searchWorkers(userId, q);
+        return ResponseEntity.ok(ApiResponse.ok(workers, "Tìm kiếm nhân sự thành công"));
+    }
+
+    /**
      * Xem chi tiết thông tin và lịch sử làm việc của một thành viên trong My Team
      */
     @Operation(summary = "Xem chi tiết thành viên My Team", description = "Xem chi tiết đánh giá, số ca đã làm chung và ghi chú của một Worker trong My Team.")
@@ -71,13 +86,13 @@ public class EoMyTeamController {
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         MyTeamMemberResponseDto detail = myTeamService.getMyTeamMemberDetail(userId, workerId);
-        return ResponseEntity.ok(ApiResponse.ok(detail, "Lấy thông tin chi tiết thành viên My Team thành công"));
+        return ResponseEntity.ok(ApiResponse.ok(detail, "Lấy thông tin chi tiết nhân sự quen thuộc thành công"));
     }
 
     /**
-     * UC-66: Thêm Worker vào My Team (qua workerId hoặc số điện thoại)
+     * UC-66: Thêm Worker vào danh sách Nhân sự quen thuộc (qua workerId hoặc số điện thoại)
      */
-    @Operation(summary = "Thêm Worker vào My Team", description = "Thêm một nhân sự vào danh sách My Team thông qua workerId hoặc số điện thoại.")
+    @Operation(summary = "Thêm Worker vào danh sách Nhân sự quen thuộc", description = "Thêm một nhân sự vào danh sách nhân sự quen thuộc thông qua workerId hoặc số điện thoại.")
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @PostMapping
     public ResponseEntity<ApiResponse<MyTeamMemberResponseDto>> addWorkerToMyTeam(
@@ -86,13 +101,13 @@ public class EoMyTeamController {
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         MyTeamMemberResponseDto added = myTeamService.addWorkerToMyTeam(userId, request);
-        return ResponseEntity.ok(ApiResponse.ok(added, "Thêm nhân sự vào My Team thành công"));
+        return ResponseEntity.ok(ApiResponse.ok(added, "Đã lưu nhân sự vào danh sách nhân sự quen thuộc"));
     }
 
     /**
-     * Cập nhật ghi chú nội bộ, gắn sao yêu thích hoặc đánh dấu blacklist cho thành viên My Team
+     * Cập nhật ghi chú nội bộ, gắn sao yêu thích hoặc đánh dấu blacklist cho thành viên quen thuộc
      */
-    @Operation(summary = "Cập nhật thông tin thành viên My Team", description = "Cập nhật ghi chú nội bộ, gắn cờ yêu thích hoặc cấm đối với thành viên trong My Team.")
+    @Operation(summary = "Cập nhật thông tin nhân sự quen thuộc", description = "Cập nhật ghi chú nội bộ, gắn cờ yêu thích hoặc chặn đối với nhân sự quen thuộc.")
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @PutMapping("/{workerId}")
     public ResponseEntity<ApiResponse<MyTeamMemberResponseDto>> updateMyTeamMember(
@@ -102,13 +117,13 @@ public class EoMyTeamController {
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         MyTeamMemberResponseDto updated = myTeamService.updateMyTeamMember(userId, workerId, request);
-        return ResponseEntity.ok(ApiResponse.ok(updated, "Cập nhật thành viên My Team thành công"));
+        return ResponseEntity.ok(ApiResponse.ok(updated, "Cập nhật thông tin nhân sự quen thuộc thành công"));
     }
 
     /**
-     * UC-67: Xóa Worker khỏi My Team (Silent removal)
+     * UC-67: Xóa Worker khỏi danh sách Nhân sự quen thuộc (Silent removal)
      */
-    @Operation(summary = "Xóa Worker khỏi My Team", description = "Xóa Worker khỏi My Team một cách êm dịu (Silent removal) không ảnh hưởng tới ca đang nhận của Worker.")
+    @Operation(summary = "Xóa Worker khỏi danh sách Nhân sự quen thuộc", description = "Bỏ lưu nhân sự một cách êm dịu không ảnh hưởng tới ca đang nhận.")
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
     @DeleteMapping("/{workerId}")
     public ResponseEntity<ApiResponse<Void>> removeWorkerFromMyTeam(
@@ -117,7 +132,7 @@ public class EoMyTeamController {
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         myTeamService.removeWorkerFromMyTeam(userId, workerId);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Đã xóa nhân sự khỏi danh sách My Team"));
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã bỏ lưu nhân sự khỏi danh sách nhân sự quen thuộc"));
     }
 
     /**

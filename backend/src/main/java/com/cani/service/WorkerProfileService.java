@@ -1,6 +1,7 @@
 package com.cani.service;
 
 import com.cani.dto.profile.EoPublicProfileResponseDto;
+import com.cani.dto.profile.UpdateWorkerProfileRequestDto;
 import com.cani.dto.profile.WorkerPublicProfileResponseDto;
 import com.cani.dto.profile.WorkerReviewSummaryDto;
 import com.cani.dto.profile.WorkerSkillProfileDto;
@@ -33,6 +34,53 @@ public class WorkerProfileService {
     private final ReviewRepository reviewRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final EoWorkerRepository eoWorkerRepository;
+
+    /**
+     * Lấy hồ sơ đầy đủ của chính Worker đang đăng nhập.
+     */
+    @Transactional(readOnly = true)
+    public WorkerPublicProfileResponseDto getMyProfile(UUID userId) {
+        return getWorkerProfileForEo(null, userId);
+    }
+
+    /**
+     * Cập nhật hồ sơ cá nhân của chính Worker đang đăng nhập.
+     */
+    @Transactional
+    public WorkerPublicProfileResponseDto updateMyProfile(UUID userId, UpdateWorkerProfileRequestDto request) {
+        Worker worker = workerRepository.findByUser_UserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ nhân sự (Worker)", "userId", userId));
+
+        User user = worker.getUser();
+        if (request != null) {
+            if (request.getFullName() != null && !request.getFullName().isBlank()) {
+                String trimmedName = request.getFullName().trim();
+                worker.setFullName(trimmedName);
+                if (user != null) {
+                    user.setFullName(trimmedName);
+                }
+            }
+            if (request.getBio() != null) {
+                worker.setBio(request.getBio().trim());
+            }
+            if (request.getYearsExperience() != null) {
+                worker.setYearsExperience(request.getYearsExperience());
+            }
+            if (request.getBaseAddress() != null) {
+                worker.setBaseAddress(request.getBaseAddress().trim());
+            }
+            if (request.getAvatarUrl() != null && user != null) {
+                user.setAvatarUrl(request.getAvatarUrl().trim());
+            }
+        }
+
+        if (user != null) {
+            userRepository.save(user);
+        }
+        workerRepository.save(worker);
+
+        return getWorkerProfileForEo(null, userId);
+    }
 
     /**
      * Lấy hồ sơ nghề nghiệp công khai của Worker cho Event Organizer hoặc Admin xem.

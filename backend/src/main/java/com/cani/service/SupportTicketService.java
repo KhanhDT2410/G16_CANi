@@ -472,28 +472,45 @@ public class SupportTicketService {
     }
 
     private void saveNotification(User user, String title, String body, SupportTicket ticket) {
-        notificationRepository.save(Notification.builder()
-                .user(user)
-                .title(title)
-                .body(body)
-                .type(NotificationType.SUPPORT_TICKET)
-                .referenceType("SUPPORT_TICKET")
-                .referenceId(ticket.getId())
-                .build());
+        try {
+            notificationRepository.save(Notification.builder()
+                    .user(user)
+                    .title(title)
+                    .body(body)
+                    .type(NotificationType.SUPPORT_TICKET)
+                    .referenceType("SUPPORT_TICKET")
+                    .referenceId(ticket.getId())
+                    .build());
+        } catch (Exception ex) {
+            // Thông báo phụ trợ không được làm rollback giao dịch tạo/phản hồi ticket
+            log.warn("Không thể lưu thông báo Support Ticket {} cho user {}: {}",
+                    ticket != null ? ticket.getId() : null,
+                    user != null ? user.getUserId() : null,
+                    ex.getMessage());
+        }
     }
 
     private void notifyUser(UUID userId, String title, String body, SupportTicket ticket) {
         if (userId == null) {
             return;
         }
-        userRepository.findById(userId).ifPresent(u -> saveNotification(u, title, body, ticket));
+        try {
+            userRepository.findById(userId).ifPresent(u -> saveNotification(u, title, body, ticket));
+        } catch (Exception ex) {
+            log.warn("Không thể gửi thông báo Support Ticket tới user {}: {}", userId, ex.getMessage());
+        }
     }
 
     private void notifyCcTeam(SupportTicket ticket) {
-        userRepository.findByRole(UserRole.CUSTOMER_CARE).forEach(cc ->
-                saveNotification(cc, "Có ticket hỗ trợ mới trong hàng đợi",
-                        "Ticket " + ticket.getReferenceNo() + " (" + ticket.getCategory() + ") cần tiếp nhận.",
-                        ticket));
+        try {
+            userRepository.findByRole(UserRole.CUSTOMER_CARE).forEach(cc ->
+                    saveNotification(cc, "Có ticket hỗ trợ mới trong hàng đợi",
+                            "Ticket " + ticket.getReferenceNo() + " (" + ticket.getCategory() + ") cần tiếp nhận.",
+                            ticket));
+        } catch (Exception ex) {
+            log.warn("Không thể thông báo tới đội CSKH cho ticket {}: {}",
+                    ticket != null ? ticket.getReferenceNo() : null, ex.getMessage());
+        }
     }
 
     private void recordAudit(UUID actorUserId, String action, SupportTicket ticket,

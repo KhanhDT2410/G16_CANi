@@ -18,6 +18,16 @@ export const myTeamService = {
     return response.data?.data || [];
   },
 
+  // Tìm kiếm nhân sự trên toàn hệ thống theo tên, SĐT hoặc email
+  searchWorkers: async (q = '') => {
+    const trimmed = q ? q.trim() : '';
+    if (trimmed.length < 2) return [];
+    const response = await apiClient.get('/v1/eo/my-team/search-workers', {
+      params: { q: trimmed },
+    });
+    return response.data?.data || [];
+  },
+
   // Chi tiết một thợ trong My Team
   getMyTeamMemberDetail: async (workerId) => {
     const response = await apiClient.get(`/v1/eo/my-team/${workerId}`);

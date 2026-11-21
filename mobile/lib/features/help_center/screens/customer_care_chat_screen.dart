@@ -19,10 +19,12 @@ class CustomerCareChatScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CustomerCareChatScreen> createState() => _CustomerCareChatScreenState();
+  ConsumerState<CustomerCareChatScreen> createState() =>
+      _CustomerCareChatScreenState();
 }
 
-class _CustomerCareChatScreenState extends ConsumerState<CustomerCareChatScreen> {
+class _CustomerCareChatScreenState
+    extends ConsumerState<CustomerCareChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _pollingTimer;
@@ -64,17 +66,19 @@ class _CustomerCareChatScreenState extends ConsumerState<CustomerCareChatScreen>
     if (presetText == null) _textController.clear();
 
     try {
-      await ref.read(helpCenterRepositoryProvider).sendSupportChatMessage(
-        messageText: text,
-        shiftId: widget.initialShiftId,
-      );
+      await ref
+          .read(helpCenterRepositoryProvider)
+          .sendSupportChatMessage(
+            messageText: text,
+            shiftId: widget.initialShiftId,
+          );
       ref.invalidate(supportChatMessagesProvider);
       _scrollToBottom();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể gửi tin nhắn: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không thể gửi tin nhắn: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -101,8 +105,15 @@ class _CustomerCareChatScreenState extends ConsumerState<CustomerCareChatScreen>
             Container(
               width: 36,
               height: 36,
-              decoration: const BoxDecoration(color: Color(0xFFDCFCE7), shape: BoxShape.circle),
-              child: const Icon(Icons.headset_mic_rounded, color: Color(0xFF16A34A), size: 20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFDCFCE7),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.headset_mic_rounded,
+                color: Color(0xFF16A34A),
+                size: 20,
+              ),
             ),
             const SizedBox(width: 10),
             const Column(
@@ -110,11 +121,19 @@ class _CustomerCareChatScreenState extends ConsumerState<CustomerCareChatScreen>
               children: [
                 Text(
                   'Hỗ Trợ Trực Tuyến CANi',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
                 Text(
                   'Đang trực tuyến - Sẵn sàng giải đáp',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF16A34A),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -134,11 +153,28 @@ class _CustomerCareChatScreenState extends ConsumerState<CustomerCareChatScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.forum_outlined, size: 48, color: Color(0xFF94A3B8)),
+                          Icon(
+                            Icons.forum_outlined,
+                            size: 48,
+                            color: Color(0xFF94A3B8),
+                          ),
                           SizedBox(height: 12),
-                          Text('Xin chào bạn!', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF334155))),
+                          Text(
+                            'Xin chào bạn!',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
                           SizedBox(height: 6),
-                          Text('Đội ngũ CSKH CANi luôn sẵn sàng hỗ trợ bạn.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          Text(
+                            'Đội ngũ CSKH CANi luôn sẵn sàng hỗ trợ bạn.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -149,14 +185,18 @@ class _CustomerCareChatScreenState extends ConsumerState<CustomerCareChatScreen>
                   controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   itemCount: messages.length,
-                  itemBuilder: (context, index) => SupportChatBubble(message: messages[index]),
+                  itemBuilder: (context, index) =>
+                      SupportChatBubble(message: messages[index]),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (err, _) => Center(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Text('Lỗi tải tin nhắn: $err', style: const TextStyle(color: Color(0xFFB91C1C))),
+                  child: Text(
+                    'Lỗi tải tin nhắn: $err',
+                    style: const TextStyle(color: Color(0xFFB91C1C)),
+                  ),
                 ),
               ),
             ),

@@ -1341,4 +1341,532 @@
   }
 }
 
+/* Inline Step-by-Step Dispute Wizard (Chuẩn CANi Design System) */
+.dispute-wizard-card {
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
+.dispute-wizard-card *,
+.dispute-wizard-card *::before,
+.dispute-wizard-card *::after {
+  box-sizing: border-box;
+}
+
+.dispute-wizard-header {
+  padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.dispute-wizard-back {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.dispute-wizard-back:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.dispute-wizard-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.dispute-wizard-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.86rem;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+/* Stepper */
+.dispute-stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 0.85rem 1.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.dispute-step-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.dispute-step-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.dispute-step-item.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.dispute-step-item.done {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.dispute-step-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.84rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  background: #e2e8f0;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.dispute-step-item.active .dispute-step-circle {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.dispute-step-item.done .dispute-step-circle {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.dispute-step-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dispute-step-short {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dispute-step-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dispute-step-item.active .dispute-step-name {
+  color: #1d4ed8;
+}
+
+.dispute-wizard-body {
+  padding: 1.75rem;
+}
+
+.dispute-field-label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.dispute-field-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+/* Assignment Grid & Cards */
+.dispute-assignment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 0.85rem;
+  max-height: 310px;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.dispute-assignment-card {
+  width: 100%;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 1rem 1.15rem;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: all 0.18s ease;
+  outline: none;
+}
+
+.dispute-assignment-card:hover {
+  border-color: #93c5fd;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.dispute-assignment-card.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1.5px #2563eb;
+}
+
+.dispute-assignment-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.dispute-assignment-event {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dispute-assignment-status {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.dispute-assignment-status.completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dispute-assignment-status.checked-in {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.dispute-assignment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.dispute-assignment-time {
+  font-size: 0.78rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Dispute Type Cards */
+.dispute-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 0.85rem;
+}
+
+.dispute-type-card {
+  width: 100%;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  padding: 1rem 1.15rem;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  outline: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dispute-type-card:hover {
+  border-color: #93c5fd;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.dispute-type-card.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1.5px #2563eb;
+}
+
+.dispute-type-card-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.dispute-type-card-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* Wizard Form Inputs */
+.dispute-wizard-input,
+.dispute-wizard-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dispute-wizard-input:focus,
+.dispute-wizard-textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.dispute-wizard-textarea {
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.5;
+}
+
+.dispute-char-counter {
+  text-align: right;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+
+.dispute-char-counter.valid {
+  color: #16a34a;
+}
+
+.dispute-char-counter.invalid {
+  color: #ea580c;
+}
+
+/* Upload Button in Wizard */
+.dispute-wizard-btn-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.15rem;
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.dispute-wizard-btn-upload:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Review Step */
+.dispute-review-card {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.5rem;
+  background: #f8fafc;
+}
+
+.dispute-review-heading {
+  margin: 0 0 1.25rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dispute-review-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dispute-review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dispute-review-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.dispute-review-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dispute-review-val {
+  font-size: 0.94rem;
+  color: #0f172a;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Wizard Footer & Isolated Buttons */
+.dispute-wizard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.15rem 1.75rem;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  gap: 1rem;
+}
+
+.dispute-wizard-btn-cancel {
+  padding: 0.65rem 1.35rem;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.dispute-wizard-btn-cancel:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.dispute-wizard-btn-submit {
+  width: auto !important; /* Đè hoàn toàn width: 100% của auth.css */
+  min-width: 150px;
+  padding: 0.7rem 1.6rem;
+  border: none;
+  background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-family: inherit;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+  transition: all 0.18s ease;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.dispute-wizard-btn-submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.38);
+  transform: translateY(-1px);
+}
+
+.dispute-wizard-btn-submit:disabled {
+  background: #94a3b8 !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+  transform: none !important;
+}
+
+@media (max-width: 768px) {
+  .dispute-stepper {
+    flex-direction: column;
+    padding: 0.85rem 1rem;
+  }
+  .dispute-wizard-body,
+  .dispute-wizard-header,
+  .dispute-wizard-footer {
+    padding: 1rem;
+  }
+  .dispute-wizard-footer {
+    flex-direction: column-reverse;
+  }
+  .dispute-wizard-btn-cancel,
+  .dispute-wizard-btn-submit {
+    width: 100% !important;
+  }
+}
+
+
 

@@ -283,16 +283,22 @@ public class WorkerJobController {
 
     /**
      * UC-53: Worker hủy ca làm việc đã nhận (Kèm trừ điểm uy tín theo quy định)
+     * Hỗ trợ nhận reason từ cả query param lẫn JSON body ({@code {"reason": "..."}}) để tương thích Mobile/Web.
      */
     @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
     @PostMapping("/assignments/{assignmentId}/cancel")
     public ResponseEntity<ApiResponse<Void>> cancelAssignment(
             @PathVariable("assignmentId") UUID assignmentId,
             @RequestParam(value = "reason", required = false) String reason,
+            @RequestBody(required = false) java.util.Map<String, Object> body,
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        workerJobService.cancelAssignment(userId, assignmentId, reason);
+        String resolvedReason = reason;
+        if ((resolvedReason == null || resolvedReason.isBlank()) && body != null && body.get("reason") != null) {
+            resolvedReason = body.get("reason").toString();
+        }
+        workerJobService.cancelAssignment(userId, assignmentId, resolvedReason);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã hủy nhận ca làm việc thành công. Điểm uy tín của bạn đã được cập nhật."));
     }
 

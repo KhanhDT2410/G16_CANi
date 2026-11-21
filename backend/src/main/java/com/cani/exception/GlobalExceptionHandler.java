@@ -87,7 +87,15 @@ public class GlobalExceptionHandler {
         } else if (rawMsg.contains("users_username_key") || rawMsg.contains("username")) {
             friendlyMessage = "Tên tài khoản này đã tồn tại trong hệ thống. Vui lòng chọn tên khác.";
         } else {
-            friendlyMessage = "Dữ liệu gửi lên vi phạm ràng buộc toàn vẹn của hệ thống (dữ liệu có thể đã tồn tại). Vui lòng kiểm tra lại.";
+            String detail = rootCause != null && rootCause.getMessage() != null
+                    ? rootCause.getMessage()
+                    : (ex.getMessage() != null ? ex.getMessage() : "");
+            if (detail.length() > 180) {
+                detail = detail.substring(0, 180) + "...";
+            }
+            friendlyMessage = detail.isBlank()
+                    ? "Dữ liệu gửi lên vi phạm ràng buộc toàn vẹn của hệ thống (dữ liệu có thể đã tồn tại). Vui lòng kiểm tra lại."
+                    : "Dữ liệu gửi lên không hợp lệ hoặc vi phạm ràng buộc hệ thống: " + detail;
         }
 
         return ResponseEntity

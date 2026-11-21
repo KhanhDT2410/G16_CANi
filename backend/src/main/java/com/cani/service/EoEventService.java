@@ -82,6 +82,9 @@ public class EoEventService {
     @Autowired(required = false)
     private SkillProgressionService skillProgressionService;
 
+    @Autowired(required = false)
+    private NotificationService notificationService;
+
     /**
      * EO tạo Sự kiện mới (Trạng thái DRAFT)
      */
@@ -486,15 +489,21 @@ public class EoEventService {
             throw new BadRequestException("Phân công việc này đã được duyệt hoàn thành trước đó.");
         }
 
+        Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId);
+        boolean isInShiftAwaitingCheckout = sa.getStatus() == AssignmentStatus.CHECKED_IN
+                && (attOpt.isEmpty() || attOpt.get().getCheckoutTime() == null);
         boolean wasAlreadyCompleted = (sa.getStatus() == AssignmentStatus.COMPLETED);
+
         sa.setEoConfirmed(true);
         sa.setEoConfirmedAt(Instant.now());
-        sa.setStatus(AssignmentStatus.COMPLETED);
+        if (!isInShiftAwaitingCheckout) {
+            sa.setStatus(AssignmentStatus.COMPLETED);
+        }
         sa = shiftAssignmentRepository.save(sa);
 
-        // Chỉ cộng thêm số ca hoàn thành nếu trước đó Worker chưa check-out tự động
+        // Chỉ cộng thêm số ca hoàn thành ngay nếu đã kết thúc / duyệt thủ công không qua checkout
         Worker worker = sa.getWorker();
-        if (worker != null && !wasAlreadyCompleted) {
+        if (worker != null && !isInShiftAwaitingCheckout && !wasAlreadyCompleted) {
             worker.setTotalShiftsCompleted((worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
             workerRepository.save(worker);
             if (skillProgressionService != null) {
@@ -502,13 +511,12 @@ public class EoEventService {
             }
         }
 
-        log.info("EO {} đã duyệt hoàn thành ca cho Assignment {}", userId, assignmentId);
+        log.info("EO {} đã duyệt hoàn thành ca cho Assignment {} (inShiftAwaitingCheckout={})", userId, assignmentId, isInShiftAwaitingCheckout);
 
         Shift shift = sa.getShift();
         BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift);
 
         // WBS 246.0: Tính toán tiền công thực tế từ số giờ làm việc thực tế (Actual Hours & Payment)
-        Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId);
         BigDecimal actualAmount = agreedWage;
         if (attOpt.isPresent() && attOpt.get().getHoursWorked() != null && shift != null && shift.getHourlyWage() != null) {
             BigDecimal hourly = shift.getHourlyWage();
@@ -532,6 +540,24 @@ public class EoEventService {
         if (payment.getStatus() == com.cani.entity.enums.PaymentStatus.NOT_DECLARED) {
             payment.setAgreedAmount(actualAmount);
             paymentRepository.save(payment);
+        }
+
+        if (notificationService != null && worker != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
+            try {
+                String evName = (shift != null && shift.getEvent() != null) ? shift.getEvent().getName() : "Sự kiện";
+                String shiftTitle = shift != null ? shift.getJobType() : "ca làm việc";
+                notificationService.createAndSend(
+                        worker.getUser().getUserId(),
+                        "BTC đã duyệt công việc của bạn",
+                        "Ban tổ chức đã xác nhận nghiệm thu ca \"" + shiftTitle + "\" (" + evName + "). Đang chờ thanh toán thù lao.",
+                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                        "ASSIGNMENT",
+                        assignmentId,
+                        Map.of("assignmentId", assignmentId.toString(), "type", "EO_CONFIRMED")
+                );
+            } catch (Exception ex) {
+                log.warn("Không thể gửi thông báo duyệt công tới Worker: {}", ex.getMessage());
+            }
         }
 
         String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());

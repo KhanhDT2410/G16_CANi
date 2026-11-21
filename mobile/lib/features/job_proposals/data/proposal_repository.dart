@@ -472,6 +472,21 @@ class ProposalRepository {
     }
   }
 
+  // Nộp hoặc cập nhật ảnh bằng chứng nghiệm thu ca làm cho EO kiểm tra trước khi duyệt công
+  Future<bool> submitAssignmentProof(String assignmentId, String? proofImageUrl, {String? token}) async {
+    try {
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.put(
+        '/v1/workers/assignments/$assignmentId/proof',
+        data: {'proofImageUrl': proofImageUrl ?? ''},
+        options: options,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Lưu ảnh bằng chứng nghiệm thu thất bại.'), e);
+    }
+  }
+
   // UC-69: Worker đánh giá Ban tổ chức sau ca làm việc
   Future<bool> submitReview({
     required String assignmentId,

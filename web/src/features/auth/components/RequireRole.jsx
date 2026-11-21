@@ -16,5 +16,9 @@ export default function RequireRole({ allowedRoles, children }) {
     return null;
   }
 
+  if (user?.role === 'EVENT_ORGANIZER' && (!user.phone?.trim() || !user.fullName?.trim())) {
+    return null;
+  }
+
   return children;
 }

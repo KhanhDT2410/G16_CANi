@@ -415,7 +415,8 @@ public class WorkerJobService {
     public AttendanceCheckResponseDto checkoutAssignment(UUID userId, UUID assignmentId, AttendanceCheckRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
-        if (assignment.getStatus() != AssignmentStatus.CHECKED_IN) {
+        if (assignment.getStatus() != AssignmentStatus.CHECKED_IN
+                && !(assignment.getStatus() == AssignmentStatus.COMPLETED && Boolean.TRUE.equals(assignment.getEoConfirmed()))) {
             throw new BadRequestException("Chỉ có thể check-out cho ca làm việc đang ở trạng thái CHECKED_IN (Trạng thái hiện tại: " + assignment.getStatus() + ")");
         }
         Payment payment = paymentRepository != null
@@ -970,6 +971,41 @@ public class WorkerJobService {
     }
 
     @Transactional
+    public void submitAssignmentProof(UUID userId, UUID assignmentId, String proofImageUrl) {
+        Worker worker = getWorkerOrThrow(userId);
+        ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
+        if (assignment.getStatus() != AssignmentStatus.CHECKED_IN
+                && assignment.getStatus() != AssignmentStatus.COMPLETED) {
+            throw new BadRequestException("Bạn cần check-in vào ca trước khi nộp ảnh bằng chứng nghiệm thu.");
+        }
+        AttendanceLog attendanceLog = attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)
+                .orElseThrow(() -> new BadRequestException("Chưa có dữ liệu điểm danh vào ca cho phân công này."));
+
+        String cleanUrl = proofImageUrl != null ? proofImageUrl.trim() : "";
+        if (cleanUrl.isEmpty()) {
+            attendanceLog.setProofImageUrl(null);
+            attendanceLog.setProofSubmittedAt(null);
+        } else {
+            attendanceLog.setProofImageUrl(cleanUrl);
+            attendanceLog.setProofSubmittedAt(Instant.now());
+        }
+        attendanceLogRepository.save(attendanceLog);
+
+        if (!cleanUrl.isEmpty()) {
+            Shift shift = assignment.getShift();
+            String evName = (shift != null && shift.getEvent() != null) ? shift.getEvent().getName() : "Sự kiện";
+            sendEoShiftNotification(
+                    shift,
+                    "Nhân sự đã nộp ảnh nghiệm thu ca làm",
+                    worker.getFullName() + " đã gửi ảnh nghiệm thu ca \""
+                            + (shift != null ? shift.getJobType() : "") + "\" (" + evName + "). Vui lòng kiểm tra và Duyệt công!",
+                    com.cani.entity.enums.NotificationType.ASSIGNMENT,
+                    assignmentId
+            );
+        }
+    }
+
+    @Transactional
     public List<ShiftChecklistItemDto> updateShiftChecklist(UUID userId, UUID assignmentId, UpdateChecklistRequestDto request) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
@@ -1094,17 +1130,19 @@ public class WorkerJobService {
                     result.add(ShiftChecklistItemDto.builder()
                             .id("chk_" + index)
                             .title(node.asText())
-                            .instruction("Thực hiện đầy đủ theo hướng dẫn của quản lý ca và chụp ảnh bằng chứng hoàn thành.")
-                            .isRequiredEvidence(true)
+                            .instruction(null)
+                            .isRequiredEvidence(false)
                             .isCompleted(false)
                             .build());
                     index++;
                 } else if (node.isObject()) {
                     String id = node.hasNonNull("id") ? node.get("id").asText() : ("chk_" + index);
                     String title = node.hasNonNull("title") ? node.get("title").asText() : "";
-                    String instruction = node.hasNonNull("instruction") ? node.get("instruction").asText()
-                            : "Thực hiện đầy đủ theo hướng dẫn của quản lý ca và chụp ảnh bằng chứng hoàn thành.";
-                    Boolean isRequired = node.hasNonNull("isRequiredEvidence") ? node.get("isRequiredEvidence").asBoolean() : true;
+                    String rawInstruction = node.hasNonNull("instruction") ? node.get("instruction").asText().trim() : "";
+                    String instruction = rawInstruction.isEmpty() ? null : rawInstruction;
+                    boolean isRequired = node.hasNonNull("isRequiredEvidence")
+                            ? node.get("isRequiredEvidence").asBoolean()
+                            : (node.hasNonNull("requiresEvidence") && node.get("requiresEvidence").asBoolean());
                     result.add(ShiftChecklistItemDto.builder()
                             .id(id)
                             .title(title)

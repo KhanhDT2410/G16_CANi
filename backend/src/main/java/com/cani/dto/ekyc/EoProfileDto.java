@@ -15,7 +15,6 @@ public class EoProfileDto {
     private UUID eoId;
     private UUID userId;
     private String companyName;
-    private String taxId;
     private String address;
     private String fullName;
     private String phone;
@@ -25,7 +24,4 @@ public class EoProfileDto {
     private BigDecimal ratingAvg;
     private Integer ratingCount;
     private Integer totalEventsCompleted;
-    private String businessLicenseUrl;
-    private String businessVerificationStatus;
 }
-

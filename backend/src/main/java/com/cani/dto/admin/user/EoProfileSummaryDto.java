@@ -18,7 +18,6 @@ public class EoProfileSummaryDto {
 
     private UUID eoId;
     private String companyName;
-    private String taxId;
     private String address;
     private VerificationStatus verificationStatus;
     private Instant verifiedAt;

@@ -80,6 +80,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         currentIndex: currentIndex,
         onTap: (index) {
           ref.read(homeTabIndexProvider.notifier).state = index;
+          if (index == 1) {
+            // Tự động làm mới danh sách ca làm để đồng bộ ngay ca vừa nhận
+            ref.invalidate(assignmentsListProvider);
+            ref.invalidate(incomeSummaryProvider);
+          }
         },
         items: [
           const BottomNavItem(

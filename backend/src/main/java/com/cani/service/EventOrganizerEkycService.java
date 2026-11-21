@@ -48,16 +48,15 @@ public class EventOrganizerEkycService {
     private boolean ekycStrict;
 
     /**
-     * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC doanh nghiệp
+     * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC cá nhân
      */
     @Transactional
     public EoEkycVerificationResultDto submitEkyc(
             UUID userId,
             MultipartFile frontFile,
             MultipartFile backFile,
-            MultipartFile selfieFile,
-            MultipartFile businessLicenseFile) {
-        return submitEkyc(userId, frontFile, backFile, selfieFile, businessLicenseFile, null);
+            MultipartFile selfieFile) {
+        return submitEkyc(userId, frontFile, backFile, selfieFile, (String) null);
     }
 
     @Transactional
@@ -66,14 +65,15 @@ public class EventOrganizerEkycService {
             MultipartFile frontFile,
             MultipartFile backFile,
             MultipartFile selfieFile,
-            MultipartFile businessLicenseFile,
             String confirmedCccd) {
 
         EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
-                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
+                            .orElseThrow(
+                                    () -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER
+                            && user.getRole() != UserRole.ADMIN) {
                         throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
                     }
                     return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
@@ -88,7 +88,8 @@ public class EventOrganizerEkycService {
             byte[] backBytes = backFile.getBytes();
             byte[] selfieBytes = selfieFile.getBytes();
 
-            // 1. Phân tích OCR và so khớp khuôn mặt qua EkycProvider (VNPT / Gemini Vision AI / Mock)
+            // 1. Phân tích OCR và so khớp khuôn mặt qua EkycProvider (VNPT / Gemini Vision
+            // AI / Mock)
             EkycIdentityResultDto result = ekycProvider.verifyIdentity(
                     frontBytes, frontFile.getContentType(),
                     backBytes, backFile.getContentType(),
@@ -107,16 +108,19 @@ public class EventOrganizerEkycService {
             }
             if (rawIdNumber == null || rawIdNumber.length() < 9) {
                 result.setRoutingDecision("REJECTED");
-                result.setRoutingReason("Không thể trích xuất số Căn cước công dân hợp lệ từ ảnh tải lên. Vui lòng chụp rõ nét mặt trước thẻ CCCD thật.");
+                result.setRoutingReason(
+                        "Không thể trích xuất số Căn cước công dân hợp lệ từ ảnh tải lên. Vui lòng chụp rõ nét mặt trước thẻ CCCD thật.");
             }
             if (result.getFullName() == null || result.getFullName().isBlank()) {
                 result.setRoutingDecision("REJECTED");
-                result.setRoutingReason("Không thể trích xuất họ và tên từ thẻ CCCD. Vui lòng chụp ảnh thẻ rõ ràng không bị bóng lóa.");
+                result.setRoutingReason(
+                        "Không thể trích xuất họ và tên từ thẻ CCCD. Vui lòng chụp ảnh thẻ rõ ràng không bị bóng lóa.");
             }
             String idHash = hashCccd(rawIdNumber);
             String maskedNumber = maskCccd(rawIdNumber);
 
-            // 3. Kiểm tra chống gian lận: 1 CCCD chỉ được phép định danh cho duy nhất 1 tài khoản trên toàn hệ thống
+            // 3. Kiểm tra chống gian lận: 1 CCCD chỉ được phép định danh cho duy nhất 1 tài
+            // khoản trên toàn hệ thống
             boolean isDuplicateCccd = false;
             if (idHash != null) {
                 if (eo.getEoId() != null) {
@@ -137,9 +141,11 @@ public class EventOrganizerEkycService {
             if (!isDuplicateCccd && workerRepository != null && rawIdNumber != null && rawIdNumber.length() >= 9) {
                 Set<String> candidateCccds = new HashSet<>();
                 candidateCccds.add(rawIdNumber);
-                if (maskedNumber != null) candidateCccds.add(maskedNumber);
+                if (maskedNumber != null)
+                    candidateCccds.add(maskedNumber);
                 if (rawIdNumber.length() >= 9) {
-                    candidateCccds.add(rawIdNumber.substring(0, 6) + "******" + rawIdNumber.substring(rawIdNumber.length() - 3));
+                    candidateCccds.add(
+                            rawIdNumber.substring(0, 6) + "******" + rawIdNumber.substring(rawIdNumber.length() - 3));
                 }
                 isDuplicateCccd = workerRepository.existsByCccdNumberIn(candidateCccds);
             }
@@ -162,7 +168,8 @@ public class EventOrganizerEkycService {
                 status = "PENDING_REVIEW";
                 decision = "MANUAL_REVIEW";
                 result.setRoutingDecision(decision);
-                result.setRoutingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
+                result.setRoutingReason(
+                        "Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.");
             } else if ("AUTO_APPROVED".equalsIgnoreCase(decision)) {
                 status = "APPROVED";
             } else if ("REJECTED".equalsIgnoreCase(decision)) {
@@ -171,27 +178,15 @@ public class EventOrganizerEkycService {
                 status = "PENDING_REVIEW";
             }
 
-            // Nếu đăng ký tư cách Hộ kinh doanh / Doanh nghiệp (có MST) hoặc có nộp GPKD, bắt buộc chuyển PENDING_REVIEW để Admin thẩm định
-            boolean isBusiness = (eo.getTaxId() != null && !eo.getTaxId().isBlank())
-                    || (businessLicenseFile != null && !businessLicenseFile.isEmpty());
-            if (isBusiness && !"REJECTED".equals(status)) {
-                decision = "MANUAL_REVIEW";
-                status = "PENDING_REVIEW";
-                result.setRoutingDecision("MANUAL_REVIEW");
-                result.setRoutingReason("Hồ sơ đăng ký Hộ kinh doanh đang chờ Admin kiểm tra và xác nhận tư cách pháp nhân.");
-            }
-
             // Mock link storage (Trong thực tế sẽ upload lên S3/Firebase/Supabase Storage)
             String frontUrl = "https://storage.cani.vn/ekyc/eo_front_" + UUID.randomUUID() + ".jpg";
             String backUrl = "https://storage.cani.vn/ekyc/eo_back_" + UUID.randomUUID() + ".jpg";
             String selfieUrl = "https://storage.cani.vn/ekyc/eo_selfie_" + UUID.randomUUID() + ".jpg";
-            String businessLicenseUrl = (businessLicenseFile != null && !businessLicenseFile.isEmpty())
-                    ? "https://storage.cani.vn/ekyc/eo_license_" + UUID.randomUUID() + ".jpg"
-                    : null;
 
             EoEkycVerification record = EoEkycVerification.builder()
                     .eventOrganizer(eo)
-                    .representativeName(result.getFullName() != null ? result.getFullName() : (eo.getUser() != null ? eo.getUser().getFullName() : null))
+                    .representativeName(result.getFullName() != null ? result.getFullName()
+                            : (eo.getUser() != null ? eo.getUser().getFullName() : null))
                     .cccdNumberMasked(maskedNumber)
                     .cccdNumberHash(idHash)
                     .dob(result.getDob())
@@ -204,7 +199,6 @@ public class EventOrganizerEkycService {
                     .frontImageUrl(frontUrl)
                     .backImageUrl(backUrl)
                     .selfieImageUrl(selfieUrl)
-                    .businessLicenseUrl(businessLicenseUrl)
                     .faceMatchScore(BigDecimal.valueOf(result.getFaceMatchScore()))
                     .ocrConfidence(BigDecimal.valueOf(result.getOcrConfidence()))
                     .fraudFlags(fraudFlags)
@@ -273,27 +267,10 @@ public class EventOrganizerEkycService {
         EventOrganizer eo = getOrCreateEo(userId);
         User u = eo.getUser();
 
-        EoEkycVerification latestVerification = eoEkycVerificationRepository
-                .findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId())
-                .orElse(null);
-
-        String businessLicenseUrl = latestVerification != null ? latestVerification.getBusinessLicenseUrl() : null;
-        String businessVerificationStatus = "NOT_REGISTERED";
-        if (eo.getTaxId() != null && !eo.getTaxId().isBlank()) {
-            if (eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED) {
-                businessVerificationStatus = "APPROVED";
-            } else if (eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.REJECTED) {
-                businessVerificationStatus = "REJECTED";
-            } else {
-                businessVerificationStatus = "PENDING_REVIEW";
-            }
-        }
-
         return EoProfileDto.builder()
                 .eoId(eo.getEoId())
                 .userId(u != null ? u.getUserId() : userId)
                 .companyName(eo.getCompanyName())
-                .taxId(eo.getTaxId())
                 .address(eo.getAddress())
                 .fullName(u != null ? u.getFullName() : null)
                 .phone(u != null ? u.getPhone() : null)
@@ -303,20 +280,19 @@ public class EventOrganizerEkycService {
                 .ratingAvg(eo.getRatingAvg())
                 .ratingCount(eo.getRatingCount())
                 .totalEventsCompleted(eo.getTotalEventsCompleted())
-                .businessLicenseUrl(businessLicenseUrl)
-                .businessVerificationStatus(businessVerificationStatus)
                 .build();
     }
 
     /**
-     * Cập nhật thông tin hồ sơ doanh nghiệp của EO
+     * Cập nhật thông tin hồ sơ của EO
      */
     @Transactional
     public EoProfileDto updateEoProfile(UUID userId, EoProfileDto dto) {
         EventOrganizer eo = getOrCreateEo(userId);
-        if (dto.getCompanyName() != null) eo.setCompanyName(dto.getCompanyName().trim());
-        if (dto.getTaxId() != null) eo.setTaxId(dto.getTaxId().trim());
-        if (dto.getAddress() != null) eo.setAddress(dto.getAddress().trim());
+        if (dto.getCompanyName() != null)
+            eo.setCompanyName(dto.getCompanyName().trim());
+        if (dto.getAddress() != null)
+            eo.setAddress(dto.getAddress().trim());
         eventOrganizerRepository.save(eo);
 
         User u = eo.getUser();
@@ -343,8 +319,10 @@ public class EventOrganizerEkycService {
         return eventOrganizerRepository.findByUser_UserId(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
-                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER && user.getRole() != UserRole.ADMIN) {
+                            .orElseThrow(
+                                    () -> new ResourceNotFoundException("Không tìm thấy thông tin User: " + userId));
+                    if (user.getRole() != null && user.getRole() != UserRole.EVENT_ORGANIZER
+                            && user.getRole() != UserRole.ADMIN) {
                         throw new BadRequestException("Tài khoản không phải là Nhà tổ chức sự kiện");
                     }
                     return eventOrganizerRepository.save(EventOrganizer.builder().user(user).build());
@@ -393,7 +371,8 @@ public class EventOrganizerEkycService {
                             record.getCccdNumberHash(), List.of("APPROVED"), eo.getUser().getUserId());
                 }
                 if (isDup) {
-                    throw new BadRequestException("Số CCCD này đã được phê duyệt cho một tài khoản khác trong hệ thống! Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
+                    throw new BadRequestException(
+                            "Số CCCD này đã được phê duyệt cho một tài khoản khác trong hệ thống! Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
                 }
             }
             record.setStatus("APPROVED");
@@ -414,7 +393,8 @@ public class EventOrganizerEkycService {
         eoEkycVerificationRepository.save(record);
         eventOrganizerRepository.save(eo);
 
-        log.info("Admin {} đã duyệt hồ sơ EO eKYC {} với trạng thái {}", adminUserId, verificationId, record.getStatus());
+        log.info("Admin {} đã duyệt hồ sơ EO eKYC {} với trạng thái {}", adminUserId, verificationId,
+                record.getStatus());
         return mapToDto(record);
     }
 
@@ -435,7 +415,6 @@ public class EventOrganizerEkycService {
                 .frontImageUrl(record.getFrontImageUrl())
                 .backImageUrl(record.getBackImageUrl())
                 .selfieImageUrl(record.getSelfieImageUrl())
-                .businessLicenseUrl(record.getBusinessLicenseUrl())
                 .faceMatchScore(record.getFaceMatchScore())
                 .ocrConfidence(record.getOcrConfidence())
                 .fraudFlags(record.getFraudFlags())
@@ -456,7 +435,8 @@ public class EventOrganizerEkycService {
         String contentType = file.getContentType();
         String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
         boolean validMime = contentType != null && contentType.startsWith("image/");
-        boolean validExt = fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png") || fileName.endsWith(".webp") || fileName.endsWith(".heic");
+        boolean validExt = fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png")
+                || fileName.endsWith(".webp") || fileName.endsWith(".heic");
         if (!validMime && !validExt) {
             throw new BadRequestException(fieldName + " phải là định dạng ảnh hợp lệ (JPEG, PNG, WEBP)");
         }
@@ -466,16 +446,19 @@ public class EventOrganizerEkycService {
     }
 
     private String hashCccd(String idNumber) {
-        if (idNumber == null || idNumber.isBlank()) return null;
+        if (idNumber == null || idNumber.isBlank())
+            return null;
         String clean = idNumber.replaceAll("\\D", "");
-        if (clean.isBlank()) clean = idNumber.trim();
+        if (clean.isBlank())
+            clean = idNumber.trim();
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] encodedhash = digest.digest(clean.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             for (byte b : encodedhash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1)
+                    hexString.append('0');
                 hexString.append(hex);
             }
             return hexString.toString();
@@ -485,9 +468,11 @@ public class EventOrganizerEkycService {
     }
 
     private String maskCccd(String idNumber) {
-        if (idNumber == null) return null;
+        if (idNumber == null)
+            return null;
         String clean = idNumber.replaceAll("\\D", "");
-        if (clean.length() < 6) return idNumber.trim();
+        if (clean.length() < 6)
+            return idNumber.trim();
         return clean.substring(0, 6) + "******" + (clean.length() > 9 ? clean.substring(clean.length() - 3) : "");
     }
 }

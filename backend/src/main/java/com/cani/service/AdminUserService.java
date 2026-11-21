@@ -47,7 +47,8 @@ public class AdminUserService {
     private final ObjectMapper objectMapper;
 
     /**
-     * Lấy danh sách người dùng có phân trang và bộ lọc linh hoạt (search, role, status).
+     * Lấy danh sách người dùng có phân trang và bộ lọc linh hoạt (search, role,
+     * status).
      */
     public PageResponse<UserSummaryResponseDto> getUsers(UserFilterRequest filter, Pageable pageable) {
         Pageable sanitizedPageable = sanitizePageable(pageable);
@@ -68,9 +69,10 @@ public class AdminUserService {
                 .map(User::getUserId)
                 .toList();
 
-        Map<UUID, Worker> workerByUserMap = workerUserIds.isEmpty() ? Map.of() :
-                workerRepository.findByUser_UserIdIn(workerUserIds).stream()
-                        .collect(Collectors.toMap(w -> w.getUser().getUserId(), w -> w, (existing, replacement) -> existing));
+        Map<UUID, Worker> workerByUserMap = workerUserIds.isEmpty() ? Map.of()
+                : workerRepository.findByUser_UserIdIn(workerUserIds).stream()
+                        .collect(Collectors.toMap(w -> w.getUser().getUserId(), w -> w,
+                                (existing, replacement) -> existing));
 
         List<UUID> workerIds = workerByUserMap.values().stream()
                 .map(Worker::getWorkerId)
@@ -80,27 +82,27 @@ public class AdminUserService {
         if (workerIds.isEmpty()) {
             latestSkillByWorkerMap = Map.of();
         } else {
-            List<SkillVerificationRequest> skillRequests = skillVerificationRequestRepository.findByWorker_WorkerIdIn(workerIds);
+            List<SkillVerificationRequest> skillRequests = skillVerificationRequestRepository
+                    .findByWorker_WorkerIdIn(workerIds);
             latestSkillByWorkerMap = skillRequests.stream()
                     .collect(Collectors.groupingBy(
                             req -> req.getWorker().getWorkerId(),
                             Collectors.collectingAndThen(
                                     Collectors.maxBy(Comparator.comparing(
                                             SkillVerificationRequest::getCreatedAt,
-                                            Comparator.nullsLast(Comparator.naturalOrder())
-                                    )),
+                                            Comparator.nullsLast(Comparator.naturalOrder()))),
                                     optReq -> optReq
                                             .map(req -> req.getStatus() != null ? req.getStatus().name() : "NOT_FOUND")
-                                            .orElse("NOT_FOUND")
-                            )
-                    ));
+                                            .orElse("NOT_FOUND"))));
         }
 
-        Map<UUID, EventOrganizer> eoByUserMap = eoUserIds.isEmpty() ? Map.of() :
-                eventOrganizerRepository.findByUser_UserIdIn(eoUserIds).stream()
-                        .collect(Collectors.toMap(eo -> eo.getUser().getUserId(), eo -> eo, (existing, replacement) -> existing));
+        Map<UUID, EventOrganizer> eoByUserMap = eoUserIds.isEmpty() ? Map.of()
+                : eventOrganizerRepository.findByUser_UserIdIn(eoUserIds).stream()
+                        .collect(Collectors.toMap(eo -> eo.getUser().getUserId(), eo -> eo,
+                                (existing, replacement) -> existing));
 
-        return PageResponse.from(userPage.map(user -> toSummaryDto(user, workerByUserMap, eoByUserMap, latestSkillByWorkerMap)));
+        return PageResponse
+                .from(userPage.map(user -> toSummaryDto(user, workerByUserMap, eoByUserMap, latestSkillByWorkerMap)));
     }
 
     /**
@@ -114,23 +116,22 @@ public class AdminUserService {
 
         // Nạp thông tin hồ sơ chuyên biệt tùy theo role
         if (user.getRole() == UserRole.WORKER) {
-            workerRepository.findByUser_UserId(userId).ifPresent(worker ->
-                    dto.setWorkerProfile(toWorkerProfileDto(worker))
-            );
+            workerRepository.findByUser_UserId(userId)
+                    .ifPresent(worker -> dto.setWorkerProfile(toWorkerProfileDto(worker)));
         } else if (user.getRole() == UserRole.EVENT_ORGANIZER) {
-            eventOrganizerRepository.findByUser_UserId(userId).ifPresent(eo ->
-                    dto.setEoProfile(toEoProfileDto(eo))
-            );
+            eventOrganizerRepository.findByUser_UserId(userId).ifPresent(eo -> dto.setEoProfile(toEoProfileDto(eo)));
         }
 
         return dto;
     }
 
     /**
-     * Cập nhật trạng thái người dùng (LOCKED, ACTIVE) kèm lý do và ghi nhận Audit Log.
+     * Cập nhật trạng thái người dùng (LOCKED, ACTIVE) kèm lý do và ghi nhận Audit
+     * Log.
      */
     @Transactional
-    public UserDetailResponseDto updateUserStatus(UUID targetUserId, UUID adminUserId, UpdateUserStatusRequestDto request) {
+    public UserDetailResponseDto updateUserStatus(UUID targetUserId, UUID adminUserId,
+            UpdateUserStatusRequestDto request) {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "id", targetUserId));
 
@@ -154,7 +155,8 @@ public class AdminUserService {
         return getUserById(targetUserId);
     }
 
-    private void recordStatusChangeAuditLog(UUID adminUserId, UUID targetUserId, UserStatus oldStatus, UserStatus newStatus, String reason) {
+    private void recordStatusChangeAuditLog(UUID adminUserId, UUID targetUserId, UserStatus oldStatus,
+            UserStatus newStatus, String reason) {
         try {
             String oldValJson = objectMapper.writeValueAsString(Map.of("status", oldStatus.name()));
             String newValJson = objectMapper.writeValueAsString(Map.of("status", newStatus.name(), "reason", reason));
@@ -190,8 +192,7 @@ public class AdminUserService {
             User user,
             Map<UUID, Worker> workerByUserMap,
             Map<UUID, EventOrganizer> eoByUserMap,
-            Map<UUID, String> latestSkillByWorkerMap
-    ) {
+            Map<UUID, String> latestSkillByWorkerMap) {
         String kycStatus = null;
         String skillStatus = null;
 
@@ -282,7 +283,6 @@ public class AdminUserService {
         return EoProfileSummaryDto.builder()
                 .eoId(eo.getEoId())
                 .companyName(eo.getCompanyName())
-                .taxId(eo.getTaxId())
                 .address(eo.getAddress())
                 .verificationStatus(eo.getVerificationStatus())
                 .verifiedAt(eo.getVerifiedAt())

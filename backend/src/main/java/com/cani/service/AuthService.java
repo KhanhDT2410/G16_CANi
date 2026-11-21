@@ -56,16 +56,19 @@ public class AuthService {
             throw new BadRequestException("Email này đã được sử dụng");
         }
 
-        if (request.getPhone() != null && !request.getPhone().isBlank() && userRepository.existsByPhone(request.getPhone())) {
+        if (request.getPhone() != null && !request.getPhone().isBlank()
+                && userRepository.existsByPhone(request.getPhone())) {
             throw new BadRequestException("Số điện thoại này đã được sử dụng");
         }
 
-        // 1. Xác định vai trò từ accountType (chỉ cho phép WORKER hoặc EVENT_ORGANIZER khi tự đăng ký)
+        // 1. Xác định vai trò từ accountType (chỉ cho phép WORKER hoặc EVENT_ORGANIZER
+        // khi tự đăng ký)
         UserRole assignedRole = request.getAccountType() == AccountType.EVENT_ORGANIZER
                 ? UserRole.EVENT_ORGANIZER
                 : UserRole.WORKER;
 
-        // 2. Tạo user trên Supabase GoTrue kèm metadata để Database Trigger xử lý đồng bộ ACID
+        // 2. Tạo user trên Supabase GoTrue kèm metadata để Database Trigger xử lý đồng
+        // bộ ACID
         SupabaseUser supabaseUser = null;
         try {
             supabaseUser = supabaseAuthClient.createUser(
@@ -74,8 +77,7 @@ public class AuthService {
                     request.getFullName(),
                     request.getPhone(),
                     assignedRole.name(),
-                    request.getCompanyName()
-            );
+                    request.getCompanyName());
         } catch (Exception e) {
             log.warn("Không thể tạo user qua Supabase GoTrue (fallback local registration): {}", e.getMessage());
         }
@@ -88,17 +90,17 @@ public class AuthService {
         User savedUser = userRepository.findById(userId)
                 .or(() -> userRepository.findByEmail(request.getEmail()))
                 .orElseGet(() -> {
-            User user = User.builder()
-                    .userId(userId)
-                    .email(request.getEmail())
-                    .phone(request.getPhone())
-                    .fullName(request.getFullName())
-                    .role(assignedRole)
-                    .status(UserStatus.ACTIVE)
-                    .emailVerified(true)
-                    .build();
-            return userRepository.save(user);
-        });
+                    User user = User.builder()
+                            .userId(userId)
+                            .email(request.getEmail())
+                            .phone(request.getPhone())
+                            .fullName(request.getFullName())
+                            .role(assignedRole)
+                            .status(UserStatus.ACTIVE)
+                            .emailVerified(true)
+                            .build();
+                    return userRepository.save(user);
+                });
 
         savedUser.setFullName(request.getFullName());
         if (request.getPhone() != null && !request.getPhone().isBlank()) {
@@ -109,7 +111,8 @@ public class AuthService {
 
         final User finalUser = savedUser;
 
-        // 4. Khởi tạo hoặc cập nhật profile con tương ứng với vai trò (tránh duplicate key)
+        // 4. Khởi tạo hoặc cập nhật profile con tương ứng với vai trò (tránh duplicate
+        // key)
         if (assignedRole == UserRole.EVENT_ORGANIZER) {
             EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(finalUser.getUserId())
                     .orElseGet(() -> EventOrganizer.builder()
@@ -117,11 +120,8 @@ public class AuthService {
                             .build());
             if (request.getCompanyName() != null && !request.getCompanyName().isBlank()) {
                 eo.setCompanyName(request.getCompanyName().trim());
-            } else if ("INDIVIDUAL".equalsIgnoreCase(request.getOrganizerType()) || eo.getCompanyName() == null) {
+            } else if (eo.getCompanyName() == null) {
                 eo.setCompanyName(request.getFullName().trim());
-            }
-            if (request.getTaxId() != null && !request.getTaxId().isBlank()) {
-                eo.setTaxId(request.getTaxId().trim());
             }
             eventOrganizerRepository.save(eo);
         } else {
@@ -147,8 +147,7 @@ public class AuthService {
                             "Vui lòng hoàn tất xác thực danh tính eKYC (CCCD) để mở khóa Job Radar và nhận các ca làm việc gần bạn.",
                             com.cani.entity.enums.NotificationType.SYSTEM,
                             "EKYC",
-                            finalUser.getUserId()
-                    );
+                            finalUser.getUserId());
                 } catch (Exception e) {
                     log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getMessage());
                 }
@@ -183,7 +182,8 @@ public class AuthService {
             refreshToken = session.getRefreshToken();
             expiresIn = session.getExpiresIn();
         } else if (environment.acceptsProfiles(Profiles.of("h2"))) {
-            // Xác thực mật khẩu seed ở profile H2 offline (theo tài liệu run.md: Password123!)
+            // Xác thực mật khẩu seed ở profile H2 offline (theo tài liệu run.md:
+            // Password123!)
             String expectedH2Password = "Password123!";
             if (request.getPassword() == null || !expectedH2Password.equals(request.getPassword().trim())) {
                 throw new BadRequestException("Email hoặc mật khẩu không chính xác");
@@ -197,7 +197,8 @@ public class AuthService {
             refreshToken = "dev-refresh-" + userId;
             expiresIn = 86400L;
         } else {
-            // ponytail: Supabase không thể đạt ở prod/dev-thẳng-Supabase → 503 thay vì dev-token (auth bypass).
+            // ponytail: Supabase không thể đạt ở prod/dev-thẳng-Supabase → 503 thay vì
+            // dev-token (auth bypass).
             log.error("Supabase GoTrue không khả dụng, không thể cấp token cho {}", email);
             throw new AppException("Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại sau.",
                     org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
@@ -243,81 +244,90 @@ public class AuthService {
             User user = userRepository.findById(finalUserId)
                     .or(() -> userRepository.findByEmail(email))
                     .orElseGet(() -> {
-                String fullName = email;
-                Map<String, Object> userMetadata = jwt.getClaim("user_metadata");
-                if (userMetadata != null && userMetadata.get("full_name") != null) {
-                    fullName = userMetadata.get("full_name").toString();
-                }
-
-                // Xác định vai trò ban đầu: Nếu từ Web gửi EVENT_ORGANIZER thì cấp quyền EO, ngược lại mặc định WORKER
-                UserRole initialRole = UserRole.WORKER;
-                if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())) {
-                    initialRole = UserRole.EVENT_ORGANIZER;
-                }
-
-                User newUser = User.builder()
-                        .userId(finalUserId)
-                        .email(email)
-                        .fullName(fullName)
-                        .role(initialRole)
-                        .status(UserStatus.ACTIVE)
-                        .emailVerified(true)
-                        .build();
-
-                User saved = userRepository.save(newUser);
-
-                if (initialRole == UserRole.EVENT_ORGANIZER) {
-                    EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(saved.getUserId())
-                            .orElseGet(() -> EventOrganizer.builder()
-                                    .user(saved)
-                                    .build());
-                    eventOrganizerRepository.save(eo);
-                } else {
-                    Worker worker = workerRepository.findByUser_UserId(saved.getUserId())
-                            .orElseGet(() -> Worker.builder()
-                                    .user(saved)
-                                    .fullName(saved.getFullName())
-                                    .ratingAvg(BigDecimal.valueOf(5.0))
-                                    .build());
-                    worker.setFullName(saved.getFullName());
-                    if (worker.getRatingCount() == null || worker.getRatingCount() == 0) {
-                        if (worker.getRatingAvg() == null || worker.getRatingAvg().compareTo(BigDecimal.ZERO) == 0) {
-                            worker.setRatingAvg(BigDecimal.valueOf(5.0));
+                        String fullName = email;
+                        Map<String, Object> userMetadata = jwt.getClaim("user_metadata");
+                        if (userMetadata != null && userMetadata.get("full_name") != null) {
+                            fullName = userMetadata.get("full_name").toString();
                         }
-                    }
-                    workerRepository.save(worker);
-                }
 
-                return saved;
-            });
+                        // Xác định vai trò ban đầu: Nếu từ Web gửi EVENT_ORGANIZER thì cấp quyền EO,
+                        // ngược lại mặc định WORKER
+                        UserRole initialRole = UserRole.WORKER;
+                        if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())) {
+                            initialRole = UserRole.EVENT_ORGANIZER;
+                        }
+
+                        User newUser = User.builder()
+                                .userId(finalUserId)
+                                .email(email)
+                                .fullName(fullName)
+                                .role(initialRole)
+                                .status(UserStatus.ACTIVE)
+                                .emailVerified(true)
+                                .build();
+
+                        User saved = userRepository.save(newUser);
+
+                        if (initialRole == UserRole.EVENT_ORGANIZER) {
+                            EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(saved.getUserId())
+                                    .orElseGet(() -> EventOrganizer.builder()
+                                            .user(saved)
+                                            .build());
+                            eventOrganizerRepository.save(eo);
+                        } else {
+                            Worker worker = workerRepository.findByUser_UserId(saved.getUserId())
+                                    .orElseGet(() -> Worker.builder()
+                                            .user(saved)
+                                            .fullName(saved.getFullName())
+                                            .ratingAvg(BigDecimal.valueOf(5.0))
+                                            .build());
+                            worker.setFullName(saved.getFullName());
+                            if (worker.getRatingCount() == null || worker.getRatingCount() == 0) {
+                                if (worker.getRatingAvg() == null
+                                        || worker.getRatingAvg().compareTo(BigDecimal.ZERO) == 0) {
+                                    worker.setRatingAvg(BigDecimal.valueOf(5.0));
+                                }
+                            }
+                            workerRepository.save(worker);
+                        }
+
+                        return saved;
+                    });
 
             // Nếu người dùng đăng nhập từ Web Portal với targetRole là EVENT_ORGANIZER
             // và tài khoản hiện tại đang ở vai trò WORKER:
-            // - Kiểm tra tài khoản có phải Worker thực thụ (đã có CCCD / đã hoàn thành ca làm) hay không.
-            // - Nếu là tài khoản mới / chưa có lịch sử làm việc (do trigger Supabase tự động gán WORKER):
-            //   Tiến hành chuyển đổi vai trò sang EVENT_ORGANIZER và xóa profile Worker rác.
+            // - Kiểm tra tài khoản có phải Worker thực thụ (đã có CCCD / đã hoàn thành ca
+            // làm) hay không.
+            // - Nếu là tài khoản mới / chưa có lịch sử làm việc (do trigger Supabase tự
+            // động gán WORKER):
+            // Tiến hành chuyển đổi vai trò sang EVENT_ORGANIZER và xóa profile Worker rác.
             if ("EVENT_ORGANIZER".equalsIgnoreCase(request.getTargetRole())
                     && user.getRole() == UserRole.WORKER
                     && !"worker@cani.vn".equalsIgnoreCase(user.getEmail())) {
 
                 Optional<Worker> workerOpt = workerRepository.findByUser_UserId(user.getUserId());
-                boolean isEstablishedWorker = workerOpt.map(w ->
-                        (w.getCccdNumber() != null && !w.getCccdNumber().isBlank()) ||
-                        (w.getTotalShiftsCompleted() != null && w.getTotalShiftsCompleted() > 0)
-                ).orElse(false);
+                boolean isEstablishedWorker = workerOpt
+                        .map(w -> (w.getCccdNumber() != null && !w.getCccdNumber().isBlank()) ||
+                                (w.getTotalShiftsCompleted() != null && w.getTotalShiftsCompleted() > 0))
+                        .orElse(false);
 
                 if (!isEstablishedWorker) {
-                    log.info("Cập nhật vai trò người dùng Google OAuth {} sang EVENT_ORGANIZER từ Web Portal", user.getEmail());
+                    log.info("Cập nhật vai trò người dùng Google OAuth {} sang EVENT_ORGANIZER từ Web Portal",
+                            user.getEmail());
                     user.setRole(UserRole.EVENT_ORGANIZER);
                     user = userRepository.save(user);
 
-                    // Xóa profile worker rác do trigger Supabase tự sinh (chỉ xóa khi chưa có dữ liệu thanh toán)
+                    // Xóa profile worker rác do trigger Supabase tự sinh (chỉ xóa khi chưa có dữ
+                    // liệu thanh toán)
                     workerOpt.ifPresent(w -> {
-                        boolean hasFinancialRecords = paymentRepository != null && paymentRepository.existsByWorker_WorkerId(w.getWorkerId());
+                        boolean hasFinancialRecords = paymentRepository != null
+                                && paymentRepository.existsByWorker_WorkerId(w.getWorkerId());
                         if (!hasFinancialRecords) {
                             workerRepository.delete(w);
                         } else {
-                            log.info("Worker {} đã có dữ liệu thanh toán (Payment), bảo toàn dữ liệu và không xóa khi nâng cấp lên EO", w.getWorkerId());
+                            log.info(
+                                    "Worker {} đã có dữ liệu thanh toán (Payment), bảo toàn dữ liệu và không xóa khi nâng cấp lên EO",
+                                    w.getWorkerId());
                         }
                     });
                 }
@@ -337,8 +347,7 @@ public class AuthService {
                                         .companyName(eoUser.getFullName() != null && !eoUser.getFullName().isBlank()
                                                 ? eoUser.getFullName()
                                                 : "Ban Tổ Chức")
-                                        .build()
-                        ));
+                                        .build()));
             }
 
             user.setLastLoginAt(Instant.now());

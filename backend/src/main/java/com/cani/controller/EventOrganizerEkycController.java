@@ -26,7 +26,7 @@ public class EventOrganizerEkycController {
     private final EventOrganizerEkycService eoEkycService;
 
     /**
-     * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC doanh nghiệp
+     * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC cá nhân
      */
     @PostMapping(value = "/eo/ekyc/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> submitEkyc(
@@ -39,13 +39,13 @@ public class EventOrganizerEkycController {
 
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.submitEkyc(
-                userId, frontImage, backImage, selfieImage, businessLicenseImage, cccdNumber);
+                userId, frontImage, backImage, selfieImage, cccdNumber);
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
-            message = "Định danh doanh nghiệp eKYC thành công! Đơn vị của bạn đã được chứng thực uy tín.";
+            message = "Định danh eKYC thành công! Bạn đã được chứng thực uy tín.";
         } else if ("PENDING_REVIEW".equals(result.getStatus())) {
-            message = "Hồ sơ eKYC doanh nghiệp đã được gửi và đang chờ Admin / CSKH thẩm định.";
+            message = "Hồ sơ eKYC đã được gửi và đang chờ Admin / CSKH thẩm định.";
         } else {
             message = "Định danh eKYC không thành công: " + result.getRoutingReason();
         }

@@ -109,10 +109,9 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
                     <span className="detail-section-subtitle">(Event Organizer)</span>
                   </div>
                   <div className="detail-grid">
-                    <DetailItem label="Tên công ty / Đơn vị" value={user.eoProfile.companyName} />
-                    <DetailItem label="Mã số thuế" value={user.eoProfile.taxId} />
+                    <DetailItem label="Tên đơn vị / Thương hiệu" value={user.eoProfile.companyName} />
                     <DetailItem label="Địa chỉ" value={user.eoProfile.address} />
-                    <DetailItem label="Kiểm duyệt doanh nghiệp" value={user.eoProfile.verificationStatus} />
+                    <DetailItem label="Trạng thái định danh (eKYC)" value={user.eoProfile.verificationStatus} />
                     <DetailItem label="Đánh giá trung bình" value={`${user.eoProfile.ratingAvg} (${user.eoProfile.ratingCount || 0} lượt)`} color="#d97706" />
                     <DetailItem label="Sự kiện đã hoàn tất" value={`${user.eoProfile.totalEventsCompleted} sự kiện`} />
                   </div>

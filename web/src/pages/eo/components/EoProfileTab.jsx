@@ -35,7 +35,6 @@ export default function EoProfileTab() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [submittingEkyc, setSubmittingEkyc] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [isBusinessEntity, setIsBusinessEntity] = useState(false);
 
   // Ẩn / Hiện thông tin nhạy cảm
   const [showSensitive, setShowSensitive] = useState({
@@ -80,7 +79,6 @@ export default function EoProfileTab() {
   // Hồ Sơ Nhà Tổ Chức - Khởi tạo từ thông tin người dùng thực tế
   const [profile, setProfile] = useState({
     companyName: '',
-    taxId: '',
     address: '',
     fullName: user?.fullName || user?.username || '',
     phone: user?.phone || '',
@@ -89,8 +87,6 @@ export default function EoProfileTab() {
     bio: '',
     ratingAvg: 0,
     totalEventsCompleted: 0,
-    businessLicenseUrl: '',
-    businessVerificationStatus: 'NOT_REGISTERED',
   });
 
   // Trạng thái eKYC
@@ -101,14 +97,12 @@ export default function EoProfileTab() {
     frontImage: null,
     backImage: null,
     selfieImage: null,
-    businessLicenseImage: null,
   });
 
   const [previews, setPreviews] = useState({
     frontImage: null,
     backImage: null,
     selfieImage: null,
-    businessLicenseImage: null,
   });
 
   // Form Đổi Mật Khẩu
@@ -128,20 +122,15 @@ export default function EoProfileTab() {
       ]);
 
       if (profileRes.status === 'fulfilled' && profileRes.value) {
-        const hasTax = Boolean(profileRes.value.taxId && profileRes.value.taxId.trim());
-        setIsBusinessEntity(hasTax);
         setProfile((prev) => ({
           ...prev,
           companyName: profileRes.value.companyName || prev.companyName,
-          taxId: profileRes.value.taxId || prev.taxId,
           address: profileRes.value.address || prev.address,
           fullName: profileRes.value.fullName || prev.fullName,
           phone: profileRes.value.phone || prev.phone,
           email: profileRes.value.email || prev.email,
           ratingAvg: profileRes.value.ratingAvg || prev.ratingAvg,
           totalEventsCompleted: profileRes.value.totalEventsCompleted ?? prev.totalEventsCompleted,
-          businessLicenseUrl: profileRes.value.businessLicenseUrl || '',
-          businessVerificationStatus: profileRes.value.businessVerificationStatus || (hasTax ? 'PENDING_REVIEW' : 'NOT_REGISTERED'),
         }));
       }
 
@@ -215,7 +204,6 @@ export default function EoProfileTab() {
         setProfile((prev) => ({
           ...prev,
           companyName: res.companyName || prev.companyName,
-          taxId: res.taxId || prev.taxId,
           address: res.address || prev.address,
           fullName: res.fullName || prev.fullName,
           phone: res.phone || prev.phone,
@@ -256,9 +244,6 @@ export default function EoProfileTab() {
       formData.append('frontImage', files.frontImage);
       formData.append('backImage', files.backImage);
       formData.append('selfieImage', files.selfieImage);
-      if (files.businessLicenseImage) {
-        formData.append('businessLicenseImage', files.businessLicenseImage);
-      }
       if (cleanedCccd) {
         formData.append('cccdNumber', cleanedCccd);
       }
@@ -589,75 +574,9 @@ export default function EoProfileTab() {
           </div>
 
           <form onSubmit={handleSaveProfile}>
-            {/* Toggle / Nút bấm Đăng Ký Hộ Kinh Doanh & Trạng thái Admin Duyệt */}
-            <div style={{
-              backgroundColor: isBusinessEntity ? '#eff6ff' : '#f8fafc',
-              border: isBusinessEntity ? '1.5px solid #3b82f6' : '1px dashed #cbd5e1',
-              borderRadius: '0.875rem',
-              padding: '1rem 1.25rem',
-              marginBottom: '1.25rem',
-              transition: 'all 0.2s',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer', margin: 0 }}>
-                  <input
-                    type="checkbox"
-                    checked={isBusinessEntity}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setIsBusinessEntity(checked);
-                      if (!checked) {
-                        handleProfileFieldChange('taxId', '');
-                      }
-                    }}
-                    style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer' }}
-                  />
-                  <span style={{ fontWeight: 700, fontSize: '0.925rem', color: isBusinessEntity ? '#1d4ed8' : '#334155' }}>
-                    Đăng ký tư cách Hộ kinh doanh / Doanh nghiệp (Có Mã Số Thuế)
-                  </span>
-                </label>
-
-                {/* Trạng thái xác nhận từ Admin */}
-                {isBusinessEntity ? (
-                  profile.businessVerificationStatus === 'APPROVED' ? (
-                    <span className="status-pill approved" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                      </svg>
-                      ĐÃ ĐƯỢC ADMIN XÁC NHẬN HỘ KINH DOANH
-                    </span>
-                  ) : profile.businessVerificationStatus === 'PENDING_REVIEW' ? (
-                    <span className="status-pill pending" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      ⏳ ĐÃ ĐĂNG KÝ MST - ĐANG CHỜ ADMIN XÁC NHẬN
-                    </span>
-                  ) : (
-                    <span className="status-pill none" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#b45309' }}>
-                      ⚠️ CHỜ ADMIN XÁC NHẬN TƯ CÁCH PHÁP NHÂN
-                    </span>
-                  )
-                ) : (
-                  <span style={{
-                    fontSize: '0.775rem',
-                    padding: '0.25rem 0.65rem',
-                    borderRadius: '9999px',
-                    fontWeight: 600,
-                    backgroundColor: '#e2e8f0',
-                    color: '#475569',
-                  }}>
-                    Mặc định: Cá nhân / Nhà tổ chức
-                  </span>
-                )}
-              </div>
-              <p style={{ margin: '0.4rem 0 0', fontSize: '0.825rem', color: '#64748b', lineHeight: 1.45 }}>
-                {isBusinessEntity
-                  ? 'Khi đăng ký Hộ kinh doanh / Doanh nghiệp, bạn cần điền đầy đủ Tên tổ chức và Mã số thuế để Ban Quản Trị (Admin) thẩm định và phê duyệt tư cách pháp nhân.'
-                  : 'Tài khoản cá nhân / ban tổ chức tự do không bắt buộc có Mã số thuế. Nếu bạn là Hộ kinh doanh hoặc Doanh nghiệp có MST, hãy tích vào ô trên để mở khóa ô điền Mã số thuế.'}
-              </p>
-            </div>
-
             <div className="profile-form-grid-2">
               <div className="profile-form-group">
-                <label>Tên Nhà Tổ Chức / Đơn Vị Sự Kiện *</label>
+                <label>Tên Thương Hiệu / Đơn Vị Sự Kiện *</label>
                 <input
                   type="text"
                   required
@@ -669,27 +588,7 @@ export default function EoProfileTab() {
               </div>
 
               <div className="profile-form-group">
-                <label>
-                  Mã Số Thuế (MST) / Số ĐKKD {isBusinessEntity ? '*' : ''}
-                </label>
-                <input
-                  type="text"
-                  required={isBusinessEntity}
-                  disabled={!isBusinessEntity}
-                  className="profile-input"
-                  style={{
-                    backgroundColor: !isBusinessEntity ? '#f1f5f9' : '#ffffff',
-                    cursor: !isBusinessEntity ? 'not-allowed' : 'text',
-                    color: !isBusinessEntity ? '#94a3b8' : 'inherit',
-                  }}
-                  value={profile.taxId}
-                  onChange={(e) => handleProfileFieldChange('taxId', e.target.value)}
-                  placeholder={isBusinessEntity ? "VD: 0109876543 hoặc 0312345678" : "Bấm nút đăng ký hộ kinh doanh phía trên để điền MST"}
-                />
-              </div>
-
-              <div className="profile-form-group">
-                <label>Họ & Tên Trưởng Ban / Người Đại Diện *</label>
+                <label>Họ & Tên Người Tổ Chức / Trưởng Ban *</label>
                 <input
                   type="text"
                   required
@@ -1264,7 +1163,7 @@ export default function EoProfileTab() {
         </div>
       )}
 
-          </div>
+    </div>
   );
 }
 

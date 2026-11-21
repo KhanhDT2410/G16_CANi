@@ -30,7 +30,6 @@ public class EoEkycVerificationResultDto {
     private String frontImageUrl;
     private String backImageUrl;
     private String selfieImageUrl;
-    private String businessLicenseUrl;
 
     private BigDecimal faceMatchScore;
     private BigDecimal ocrConfidence;

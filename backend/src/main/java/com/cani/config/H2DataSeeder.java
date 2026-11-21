@@ -171,8 +171,7 @@ public class H2DataSeeder implements CommandLineRunner {
 
                         eo = EventOrganizer.builder()
                                         .user(savedEoUser)
-                                        .companyName("Công ty TNHH Sự Kiện Sài Gòn Star")
-                                        .taxId("0312345678")
+                                        .companyName("Sự Kiện Sài Gòn Star")
                                         .address("123 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh")
                                         .verificationStatus(VerificationStatus.APPROVED)
                                         .verifiedAt(Instant.now().minus(30, ChronoUnit.DAYS))

@@ -36,250 +36,223 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class EventOrganizerEkycServiceTest {
 
-    @Mock
-    private EventOrganizerRepository eventOrganizerRepository;
+        @Mock
+        private EventOrganizerRepository eventOrganizerRepository;
 
-    @Mock
-    private EoEkycVerificationRepository eoEkycVerificationRepository;
+        @Mock
+        private EoEkycVerificationRepository eoEkycVerificationRepository;
 
-    @Mock
-    private UserRepository userRepository;
+        @Mock
+        private UserRepository userRepository;
 
-    @Mock
-    private EkycProvider ekycProvider;
+        @Mock
+        private EkycProvider ekycProvider;
 
-    @InjectMocks
-    private EventOrganizerEkycService eventOrganizerEkycService;
+        @InjectMocks
+        private EventOrganizerEkycService eventOrganizerEkycService;
 
-    private User user;
-    private EventOrganizer eo;
-    private MockMultipartFile frontFile;
-    private MockMultipartFile backFile;
-    private MockMultipartFile selfieFile;
+        private User user;
+        private EventOrganizer eo;
+        private MockMultipartFile frontFile;
+        private MockMultipartFile backFile;
+        private MockMultipartFile selfieFile;
 
-    @BeforeEach
-    void setUp() {
-        user = User.builder()
-                .userId(UUID.randomUUID())
-                .email("eo@cani.vn")
-                .fullName("Đại diện Doanh Nghiệp")
-                .build();
+        @BeforeEach
+        void setUp() {
+                user = User.builder()
+                                .userId(UUID.randomUUID())
+                                .email("eo@cani.vn")
+                                .fullName("Đại diện Doanh Nghiệp")
+                                .build();
 
-        eo = EventOrganizer.builder()
-                .eoId(UUID.randomUUID())
-                .user(user)
-                .companyName("Công ty TNHH Sự Kiện Sáng Tạo")
-                .verificationStatus(VerificationStatus.PENDING)
-                .build();
+                eo = EventOrganizer.builder()
+                                .eoId(UUID.randomUUID())
+                                .user(user)
+                                .companyName("Công ty TNHH Sự Kiện Sáng Tạo")
+                                .verificationStatus(VerificationStatus.PENDING)
+                                .build();
 
-        frontFile = new MockMultipartFile("front", "front.jpg", "image/jpeg", "front".getBytes());
-        backFile = new MockMultipartFile("back", "back.jpg", "image/jpeg", "back".getBytes());
-        selfieFile = new MockMultipartFile("selfie", "selfie.jpg", "image/jpeg", "selfie".getBytes());
-    }
+                frontFile = new MockMultipartFile("front", "front.jpg", "image/jpeg", "front".getBytes());
+                backFile = new MockMultipartFile("back", "back.jpg", "image/jpeg", "back".getBytes());
+                selfieFile = new MockMultipartFile("selfie", "selfie.jpg", "image/jpeg", "selfie".getBytes());
+        }
 
-    @Test
-    @DisplayName("Nộp eKYC doanh nghiệp thành công và tự động duyệt khi hồ sơ chuẩn")
-    void submitEkyc_AutoApproved_Success() {
-        when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+        @Test
+        @DisplayName("Nộp eKYC doanh nghiệp thành công và tự động duyệt khi hồ sơ chuẩn")
+        void submitEkyc_AutoApproved_Success() {
+                when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
 
-        EkycIdentityResultDto providerResult = EkycIdentityResultDto.builder()
-                .idNumber("001201012345")
-                .fullName("Đại diện Doanh Nghiệp")
-                .dob("01/01/1990")
-                .gender("Nam")
-                .nationality("Việt Nam")
-                .faceMatchScore(92.5)
-                .ocrConfidence(0.95)
-                .routingDecision("AUTO_APPROVED")
-                .routingReason("Đầy đủ giấy tờ và khớp khuôn mặt")
-                .build();
+                EkycIdentityResultDto providerResult = EkycIdentityResultDto.builder()
+                                .idNumber("001201012345")
+                                .fullName("Đại diện Doanh Nghiệp")
+                                .dob("01/01/1990")
+                                .gender("Nam")
+                                .nationality("Việt Nam")
+                                .faceMatchScore(92.5)
+                                .ocrConfidence(0.95)
+                                .routingDecision("AUTO_APPROVED")
+                                .routingReason("Đầy đủ giấy tờ và khớp khuôn mặt")
+                                .build();
 
-        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(providerResult);
-        when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any())).thenReturn(false);
-        when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
-                .thenAnswer(invocation -> {
-                    EoEkycVerification v = invocation.getArgument(0);
-                    v.setId(UUID.randomUUID());
-                    return v;
-                });
+                when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(providerResult);
+                when(eoEkycVerificationRepository
+                                .existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any()))
+                                .thenReturn(false);
+                when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
+                                .thenAnswer(invocation -> {
+                                        EoEkycVerification v = invocation.getArgument(0);
+                                        v.setId(UUID.randomUUID());
+                                        return v;
+                                });
 
-        EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
-                user.getUserId(), frontFile, backFile, selfieFile, null
-        );
+                EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
+                                user.getUserId(), frontFile, backFile, selfieFile);
 
-        assertNotNull(result);
-        assertEquals("APPROVED", result.getStatus());
-        assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
-        verify(eventOrganizerRepository, times(1)).save(eo);
-    }
+                assertNotNull(result);
+                assertEquals("APPROVED", result.getStatus());
+                assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
+                verify(eventOrganizerRepository, times(1)).save(eo);
+        }
 
-    @Test
-    @DisplayName("Nộp eKYC kèm Giấy phép ĐKKD Hộ kinh doanh luôn chuyển PENDING_REVIEW để Admin xác nhận")
-    void submitEkyc_WithBusinessLicense_AlwaysPendingReviewForAdminConfirmation() {
-        when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+        @Test
+        @DisplayName("Admin duyệt thủ công hồ sơ eKYC thành công")
+        void adminReviewEkyc_Approve_Success() {
+                UUID verificationId = UUID.randomUUID();
+                UUID adminId = UUID.randomUUID();
+                User admin = User.builder().userId(adminId).fullName("Admin Hệ Thống").build();
 
-        EkycIdentityResultDto providerResult = EkycIdentityResultDto.builder()
-                .idNumber("001201012345")
-                .fullName("Đại diện Hộ Kinh Doanh")
-                .routingDecision("AUTO_APPROVED")
-                .build();
-        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(providerResult);
-        when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
-                .thenAnswer(inv -> {
-                    EoEkycVerification v = inv.getArgument(0);
-                    v.setId(UUID.randomUUID());
-                    return v;
-                });
+                EoEkycVerification pending = EoEkycVerification.builder()
+                                .id(verificationId)
+                                .eventOrganizer(eo)
+                                .status("PENDING_REVIEW")
+                                .build();
 
-        MockMultipartFile licenseFile = new MockMultipartFile(
-                "businessLicenseImage", "license.jpg", "image/jpeg", "fake license content".getBytes()
-        );
+                when(eoEkycVerificationRepository.findById(verificationId)).thenReturn(Optional.of(pending));
+                when(userRepository.findById(adminId)).thenReturn(Optional.of(admin));
 
-        EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
-                user.getUserId(), frontFile, backFile, selfieFile, licenseFile
-        );
+                EkycAdminReviewRequestDto reviewRequest = EkycAdminReviewRequestDto.builder()
+                                .decision("APPROVED")
+                                .reviewNotes("Giấy tờ hợp lệ và rõ ràng")
+                                .build();
 
-        assertNotNull(result);
-        assertEquals("PENDING_REVIEW", result.getStatus());
-        assertEquals("MANUAL_REVIEW", result.getRoutingDecision());
-        assertTrue(result.getRoutingReason().contains("Admin"));
-    }
+                EoEkycVerificationResultDto result = eventOrganizerEkycService.adminReviewEkyc(adminId, verificationId,
+                                reviewRequest);
 
-    @Test
-    @DisplayName("Admin duyệt thủ công hồ sơ eKYC doanh nghiệp thành công")
-    void adminReviewEkyc_Approve_Success() {
-        UUID verificationId = UUID.randomUUID();
-        UUID adminId = UUID.randomUUID();
-        User admin = User.builder().userId(adminId).fullName("Admin Hệ Thống").build();
+                assertEquals("APPROVED", result.getStatus());
+                assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
+                verify(eoEkycVerificationRepository, times(1)).save(pending);
+                verify(eventOrganizerRepository, times(1)).save(eo);
+        }
 
-        EoEkycVerification pending = EoEkycVerification.builder()
-                .id(verificationId)
-                .eventOrganizer(eo)
-                .status("PENDING_REVIEW")
-                .build();
+        @Test
+        @DisplayName("Nộp eKYC doanh nghiệp qua Mock Provider và bật EKYC_STRICT=true thì chuyển PENDING_REVIEW")
+        void submitEkyc_MockProvider_StrictEnabled_ManualReview() {
+                ReflectionTestUtils.setField(eventOrganizerEkycService, "ekycStrict", true);
 
-        when(eoEkycVerificationRepository.findById(verificationId)).thenReturn(Optional.of(pending));
-        when(userRepository.findById(adminId)).thenReturn(Optional.of(admin));
+                when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
 
-        EkycAdminReviewRequestDto reviewRequest = EkycAdminReviewRequestDto.builder()
-                .decision("APPROVED")
-                .reviewNotes("Giấy tờ hợp lệ và rõ ràng")
-                .build();
+                EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
+                                .idNumber("001201012345")
+                                .fullName("MOCK NAME")
+                                .faceMatchScore(95.0)
+                                .ocrConfidence(0.98)
+                                .routingDecision("AUTO_APPROVED")
+                                .build();
 
-        EoEkycVerificationResultDto result = eventOrganizerEkycService.adminReviewEkyc(adminId, verificationId, reviewRequest);
+                when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
+                when(eoEkycVerificationRepository
+                                .existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any()))
+                                .thenReturn(false);
+                when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
+                                .thenAnswer(invocation -> {
+                                        EoEkycVerification v = invocation.getArgument(0);
+                                        v.setId(UUID.randomUUID());
+                                        return v;
+                                });
 
-        assertEquals("APPROVED", result.getStatus());
-        assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
-        verify(eoEkycVerificationRepository, times(1)).save(pending);
-        verify(eventOrganizerRepository, times(1)).save(eo);
-    }
+                EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
+                                user.getUserId(), frontFile, backFile, selfieFile);
 
-    @Test
-    @DisplayName("Nộp eKYC doanh nghiệp qua Mock Provider và bật EKYC_STRICT=true thì chuyển PENDING_REVIEW")
-    void submitEkyc_MockProvider_StrictEnabled_ManualReview() {
-        ReflectionTestUtils.setField(eventOrganizerEkycService, "ekycStrict", true);
+                assertNotNull(result);
+                assertEquals("PENDING_REVIEW", result.getStatus());
+                assertEquals("MANUAL_REVIEW", result.getRoutingDecision());
+                assertEquals("MOCK NAME", result.getRepresentativeName());
+                assertTrue(result.getCccdNumberMasked().startsWith("001201******"));
+                assertEquals(VerificationStatus.PENDING, eo.getVerificationStatus());
+        }
 
-        when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+        @Test
+        @DisplayName("Nộp eKYC doanh nghiệp qua Mock Provider và EKYC_STRICT=false thì tự động duyệt và đồng bộ tên user")
+        void submitEkyc_MockProvider_NotStrict_AutoApproved() {
+                ReflectionTestUtils.setField(eventOrganizerEkycService, "ekycStrict", false);
 
-        EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
-                .idNumber("001201012345")
-                .fullName("MOCK NAME")
-                .faceMatchScore(95.0)
-                .ocrConfidence(0.98)
-                .routingDecision("AUTO_APPROVED")
-                .build();
+                when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
 
-        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
-        when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any())).thenReturn(false);
-        when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
-                .thenAnswer(invocation -> {
-                    EoEkycVerification v = invocation.getArgument(0);
-                    v.setId(UUID.randomUUID());
-                    return v;
-                });
+                EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
+                                .idNumber("001201012345")
+                                .fullName("MOCK NAME")
+                                .faceMatchScore(95.0)
+                                .ocrConfidence(0.98)
+                                .routingDecision("AUTO_APPROVED")
+                                .build();
 
-        EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
-                user.getUserId(), frontFile, backFile, selfieFile, null
-        );
+                when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
+                when(eoEkycVerificationRepository
+                                .existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any()))
+                                .thenReturn(false);
+                when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
+                                .thenAnswer(invocation -> {
+                                        EoEkycVerification v = invocation.getArgument(0);
+                                        v.setId(UUID.randomUUID());
+                                        return v;
+                                });
 
-        assertNotNull(result);
-        assertEquals("PENDING_REVIEW", result.getStatus());
-        assertEquals("MANUAL_REVIEW", result.getRoutingDecision());
-        assertEquals("MOCK NAME", result.getRepresentativeName());
-        assertTrue(result.getCccdNumberMasked().startsWith("001201******"));
-        assertEquals(VerificationStatus.PENDING, eo.getVerificationStatus());
-    }
+                EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
+                                user.getUserId(), frontFile, backFile, selfieFile);
 
-    @Test
-    @DisplayName("Nộp eKYC doanh nghiệp qua Mock Provider và EKYC_STRICT=false thì tự động duyệt và đồng bộ tên user")
-    void submitEkyc_MockProvider_NotStrict_AutoApproved() {
-        ReflectionTestUtils.setField(eventOrganizerEkycService, "ekycStrict", false);
+                assertNotNull(result);
+                assertEquals("APPROVED", result.getStatus());
+                assertEquals("AUTO_APPROVED", result.getRoutingDecision());
+                assertEquals("MOCK NAME", result.getRepresentativeName());
+                assertTrue(result.getCccdNumberMasked().startsWith("001201******"));
+                assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
+                verify(eventOrganizerRepository, times(1)).save(eo);
+        }
 
-        when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
+        @Test
+        @DisplayName("Từ chối eKYC khi phát hiện số CCCD đã được tài khoản khác sử dụng")
+        void submitEkyc_DuplicateCccd_Rejected() {
+                when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
 
-        EkycIdentityResultDto mockResult = EkycIdentityResultDto.builder()
-                .idNumber("001201012345")
-                .fullName("MOCK NAME")
-                .faceMatchScore(95.0)
-                .ocrConfidence(0.98)
-                .routingDecision("AUTO_APPROVED")
-                .build();
+                EkycIdentityResultDto providerResult = EkycIdentityResultDto.builder()
+                                .idNumber("001201012345")
+                                .fullName("Đại diện Doanh Nghiệp")
+                                .dob("01/01/1990")
+                                .gender("Nam")
+                                .faceMatchScore(92.5)
+                                .ocrConfidence(0.95)
+                                .routingDecision("AUTO_APPROVED")
+                                .build();
 
-        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(mockResult);
-        when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any())).thenReturn(false);
-        when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
-                .thenAnswer(invocation -> {
-                    EoEkycVerification v = invocation.getArgument(0);
-                    v.setId(UUID.randomUUID());
-                    return v;
-                });
+                when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(providerResult);
+                when(eoEkycVerificationRepository
+                                .existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any()))
+                                .thenReturn(true);
+                when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
+                                .thenAnswer(invocation -> {
+                                        EoEkycVerification v = invocation.getArgument(0);
+                                        v.setId(UUID.randomUUID());
+                                        return v;
+                                });
 
-        EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
-                user.getUserId(), frontFile, backFile, selfieFile, null
-        );
+                EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
+                                user.getUserId(), frontFile, backFile, selfieFile);
 
-        assertNotNull(result);
-        assertEquals("APPROVED", result.getStatus());
-        assertEquals("AUTO_APPROVED", result.getRoutingDecision());
-        assertEquals("MOCK NAME", result.getRepresentativeName());
-        assertTrue(result.getCccdNumberMasked().startsWith("001201******"));
-        assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
-        verify(eventOrganizerRepository, times(1)).save(eo);
-    }
-
-    @Test
-    @DisplayName("Từ chối eKYC khi phát hiện số CCCD đã được tài khoản khác sử dụng")
-    void submitEkyc_DuplicateCccd_Rejected() {
-        when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
-
-        EkycIdentityResultDto providerResult = EkycIdentityResultDto.builder()
-                .idNumber("001201012345")
-                .fullName("Đại diện Doanh Nghiệp")
-                .dob("01/01/1990")
-                .gender("Nam")
-                .faceMatchScore(92.5)
-                .ocrConfidence(0.95)
-                .routingDecision("AUTO_APPROVED")
-                .build();
-
-        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(providerResult);
-        when(eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(anyString(), any(), any())).thenReturn(true);
-        when(eoEkycVerificationRepository.save(any(EoEkycVerification.class)))
-                .thenAnswer(invocation -> {
-                    EoEkycVerification v = invocation.getArgument(0);
-                    v.setId(UUID.randomUUID());
-                    return v;
-                });
-
-        EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
-                user.getUserId(), frontFile, backFile, selfieFile, null
-        );
-
-        assertNotNull(result);
-        assertEquals("REJECTED", result.getStatus());
-        assertEquals("REJECTED", result.getRoutingDecision());
-        assertTrue(result.getRoutingReason().contains("Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản"));
-        assertEquals(VerificationStatus.REJECTED, eo.getVerificationStatus());
-        verify(eventOrganizerRepository, times(1)).save(eo);
-    }
+                assertNotNull(result);
+                assertEquals("REJECTED", result.getStatus());
+                assertEquals("REJECTED", result.getRoutingDecision());
+                assertTrue(result.getRoutingReason().contains("Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản"));
+                assertEquals(VerificationStatus.REJECTED, eo.getVerificationStatus());
+                verify(eventOrganizerRepository, times(1)).save(eo);
+        }
 }

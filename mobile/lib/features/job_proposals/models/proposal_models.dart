@@ -129,36 +129,52 @@ class ShiftAssignmentItem {
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
     return ShiftAssignmentItem(
-      assignmentId: json['assignmentId'] ?? '',
-      shiftId: json['shiftId'] ?? '',
-      eventId: json['eventId'] ?? '',
-      eventName: json['eventName'] ?? 'Sự kiện',
-      venueAddress: json['venueAddress'] ?? '',
-      jobType: json['jobType'] ?? '',
-      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'])?.toLocal() ?? DateTime.now() : DateTime.now(),
-      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'])?.toLocal() ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
-      arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
-      requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
-      hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
-      totalPay: (json['totalPay'] is num) ? (json['totalPay'] as num).toDouble() : 0.0,
-      status: json['status'] ?? 'CONFIRMED',
-      paymentStatus: json['paymentStatus'] ?? 'NOT_DECLARED',
-      declaredAmount: (json['declaredAmount'] is num) ? (json['declaredAmount'] as num).toDouble() : 0.0,
-      paymentMethod: json['paymentMethod'],
-      venueLat: (json['venueLat'] is num) ? (json['venueLat'] as num).toDouble() : null,
-      venueLng: (json['venueLng'] is num) ? (json['venueLng'] as num).toDouble() : null,
-      attendanceStatus: json['attendanceStatus'],
-      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime'])?.toLocal() : null,
-      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime'])?.toLocal() : null,
-      hoursWorked: (json['hoursWorked'] is num) ? (json['hoursWorked'] as num).toDouble() : null,
+      assignmentId: json['assignmentId']?.toString() ?? '',
+      shiftId: json['shiftId']?.toString() ?? '',
+      eventId: json['eventId']?.toString() ?? '',
+      eventName: json['eventName']?.toString() ?? 'Sự kiện',
+      venueAddress: json['venueAddress']?.toString() ?? '',
+      jobType: json['jobType']?.toString() ?? '',
+      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'].toString())?.toLocal() ?? DateTime.now() : DateTime.now(),
+      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'].toString())?.toLocal() ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
+      arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'].toString())?.toLocal() : null,
+      requiredSkillNames: (json['requiredSkillNames'] is List)
+          ? (json['requiredSkillNames'] as List).map((e) => e.toString()).toList()
+          : const [],
+      hourlyWage: (json['hourlyWage'] is num)
+          ? (json['hourlyWage'] as num).toDouble()
+          : (double.tryParse(json['hourlyWage']?.toString() ?? '') ?? 0.0),
+      totalPay: (json['totalPay'] is num)
+          ? (json['totalPay'] as num).toDouble()
+          : (double.tryParse(json['totalPay']?.toString() ?? '') ?? 0.0),
+      status: json['status']?.toString() ?? 'CONFIRMED',
+      paymentStatus: json['paymentStatus']?.toString() ?? 'NOT_DECLARED',
+      declaredAmount: (json['declaredAmount'] is num)
+          ? (json['declaredAmount'] as num).toDouble()
+          : (double.tryParse(json['declaredAmount']?.toString() ?? '') ?? 0.0),
+      paymentMethod: json['paymentMethod']?.toString(),
+      venueLat: (json['venueLat'] is num)
+          ? (json['venueLat'] as num).toDouble()
+          : double.tryParse(json['venueLat']?.toString() ?? ''),
+      venueLng: (json['venueLng'] is num)
+          ? (json['venueLng'] as num).toDouble()
+          : double.tryParse(json['venueLng']?.toString() ?? ''),
+      attendanceStatus: json['attendanceStatus']?.toString(),
+      checkinTime: json['checkinTime'] != null ? DateTime.tryParse(json['checkinTime'].toString())?.toLocal() : null,
+      checkoutTime: json['checkoutTime'] != null ? DateTime.tryParse(json['checkoutTime'].toString())?.toLocal() : null,
+      hoursWorked: (json['hoursWorked'] is num)
+          ? (json['hoursWorked'] as num).toDouble()
+          : double.tryParse(json['hoursWorked']?.toString() ?? ''),
       imageUrl: json['imageUrl'] as String?,
       proofImageUrl: json['proofImageUrl'] as String?,
-      proofSubmittedAt: json['proofSubmittedAt'] != null ? DateTime.tryParse(json['proofSubmittedAt'])?.toLocal() : null,
+      proofSubmittedAt: json['proofSubmittedAt'] != null ? DateTime.tryParse(json['proofSubmittedAt'].toString())?.toLocal() : null,
       workerConfirmStatus: json['workerConfirmStatus'] as String?,
       paymentProofUrl: json['paymentProofUrl'] as String?,
-      eoRating: (json['eoRating'] is num) ? (json['eoRating'] as num).toInt() : null,
+      eoRating: (json['eoRating'] is num)
+          ? (json['eoRating'] as num).toInt()
+          : int.tryParse(json['eoRating']?.toString() ?? ''),
       eoReviewComment: json['eoReviewComment'] as String?,
-      eoReviewedAt: json['eoReviewedAt'] != null ? DateTime.tryParse(json['eoReviewedAt'])?.toLocal() : null,
+      eoReviewedAt: json['eoReviewedAt'] != null ? DateTime.tryParse(json['eoReviewedAt'].toString())?.toLocal() : null,
       hasWorkerReviewed: json['hasWorkerReviewed'] as bool?,
     );
   }

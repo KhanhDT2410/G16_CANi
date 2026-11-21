@@ -15,7 +15,7 @@ class RepositoryException implements Exception {
   const RepositoryException(this.message, [this.originalError]);
 
   @override
-  String toString() => message;
+  String toString() => originalError != null ? '$message ($originalError)' : message;
 }
 
 final proposalRepositoryProvider = Provider<ProposalRepository>((ref) {

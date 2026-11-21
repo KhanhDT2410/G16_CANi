@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/app/home_screen.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
@@ -36,12 +37,23 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     try {
       await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
       ref.invalidate(proposalsListProvider);
+      ref.invalidate(assignmentsListProvider);
+      ref.invalidate(incomeSummaryProvider);
+      ref.read(assignmentsSubTabProvider.notifier).state = 0;
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Nhận ca "${item.jobType}" thành công! Đã chuyển vào mục Việc của tôi.'),
+            content: Text('Nhận ca "${item.jobType}" thành công! Đã chuyển vào mục Ca làm.'),
             backgroundColor: Theme.of(context).cani.success,
+            action: SnackBarAction(
+              label: 'Xem ca',
+              textColor: Colors.white,
+              onPressed: () {
+                ref.read(homeTabIndexProvider.notifier).state = 1;
+                ref.read(assignmentsSubTabProvider.notifier).state = 0;
+              },
+            ),
           ),
         );
       }
@@ -123,11 +135,22 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
       try {
         await ref.read(proposalRepositoryProvider).joinViaInviteCode(result);
         ref.invalidate(proposalsListProvider);
+        ref.invalidate(assignmentsListProvider);
+        ref.invalidate(incomeSummaryProvider);
+        ref.read(assignmentsSubTabProvider.notifier).state = 0;
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Tham gia ca làm việc thành công! Đã thêm vào Việc của tôi.'),
+              content: const Text('Tham gia ca làm việc thành công! Đã thêm vào Ca làm.'),
               backgroundColor: Theme.of(context).cani.success,
+              action: SnackBarAction(
+                label: 'Xem ca',
+                textColor: Colors.white,
+                onPressed: () {
+                  ref.read(homeTabIndexProvider.notifier).state = 1;
+                  ref.read(assignmentsSubTabProvider.notifier).state = 0;
+                },
+              ),
             ),
           );
         }
@@ -801,11 +824,21 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
       ref.read(jobRadarProvider.notifier).scanNearbyShifts();
       ref.invalidate(proposalsListProvider);
       ref.invalidate(assignmentsListProvider);
+      ref.invalidate(incomeSummaryProvider);
+      ref.read(assignmentsSubTabProvider.notifier).state = 0;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Ứng tuyển thành công ca: ${shift.jobType} tại ${shift.eventName}!'),
             backgroundColor: Theme.of(context).cani.success,
+            action: SnackBarAction(
+              label: 'Xem ca',
+              textColor: Colors.white,
+              onPressed: () {
+                ref.read(homeTabIndexProvider.notifier).state = 1;
+                ref.read(assignmentsSubTabProvider.notifier).state = 0;
+              },
+            ),
           ),
         );
       }

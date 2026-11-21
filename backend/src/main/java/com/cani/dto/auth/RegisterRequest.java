@@ -26,23 +26,14 @@ public class RegisterRequest {
 
     @NotBlank(message = "Mật khẩu không được để trống")
     @Size(min = 8, message = "Mật khẩu phải có tối thiểu 8 ký tự")
-    @jakarta.validation.constraints.Pattern(
-        regexp = "^(?=.*[A-Z]).+$", 
-        message = "Mật khẩu phải chứa ít nhất 1 chữ cái in hoa (A-Z)"
-    )
+    @jakarta.validation.constraints.Pattern(regexp = "^(?=.*[A-Z]).+$", message = "Mật khẩu phải chứa ít nhất 1 chữ cái in hoa (A-Z)")
     private String password;
 
     @NotNull(message = "Loại tài khoản bắt buộc phải chọn")
     private AccountType accountType;
 
-    // Loại hình tổ chức: 'ENTERPRISE' (Doanh nghiệp) hoặc 'INDIVIDUAL' (Cá nhân tự do)
-    private String organizerType;
-
-    // Tên công ty/tổ chức (nếu đăng ký EVENT_ORGANIZER từ Web)
+    // Tên thương hiệu/đơn vị tổ chức (nếu đăng ký EVENT_ORGANIZER từ Web, tùy chọn)
     private String companyName;
-
-    // Mã số kinh doanh / Mã số thuế (dành cho Doanh nghiệp)
-    private String taxId;
 
     @NotBlank(message = "Mã xác thực OTP không được để trống")
     @Size(min = 6, max = 6, message = "Mã OTP phải gồm đúng 6 chữ số")

@@ -154,8 +154,7 @@ Authorization: Bearer <admin_jwt_token>
     "workerProfile": null,
     "eoProfile": {
       "eoId": "2c5a7e91-1123-4455-8899-aabbccddeeff",
-      "companyName": "Công ty TNHH Tổ chức Sự kiện EventPro",
-      "taxId": "0316789012",
+      "companyName": "Tổ chức Sự kiện EventPro",
       "address": "123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
       "verificationStatus": "APPROVED",
       "verifiedAt": "2026-10-16T14:30:00Z",

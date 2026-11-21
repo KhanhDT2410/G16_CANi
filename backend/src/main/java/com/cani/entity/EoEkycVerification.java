@@ -70,9 +70,6 @@ public class EoEkycVerification {
     @Column(name = "selfie_image_url", columnDefinition = "TEXT")
     private String selfieImageUrl;
 
-    @Column(name = "business_license_url", columnDefinition = "TEXT")
-    private String businessLicenseUrl;
-
     @Column(name = "face_match_score", precision = 5, scale = 2)
     @Builder.Default
     private BigDecimal faceMatchScore = BigDecimal.ZERO;

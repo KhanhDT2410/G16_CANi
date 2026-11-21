@@ -33,9 +33,6 @@ public class EventOrganizer {
     @Column(name = "company_name")
     private String companyName;
 
-    @Column(name = "tax_id", length = 50)
-    private String taxId;
-
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;
 
@@ -59,7 +56,6 @@ public class EventOrganizer {
     @Column(name = "total_events_completed")
     @Builder.Default
     private Integer totalEventsCompleted = 0;
-
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subscription_id")

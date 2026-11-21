@@ -147,6 +147,8 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
             ),
           );
           ref.invalidate(assignmentsListProvider);
+          ref.invalidate(incomeSummaryProvider);
+          ref.read(assignmentsSubTabProvider.notifier).state = 0;
         }
       } catch (err) {
         if (mounted) {
@@ -297,15 +299,73 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        ref.invalidate(assignmentsListProvider);
-                        ref.invalidate(incomeSummaryProvider);
-                      },
-                      child: currentSubTab == 0
-                          ? _buildActiveFeed(activeList, t)
-                          : _buildHistoryFeed(historyList, filteredHistory, incomeSummary, t, isDark),
-                    ),
+                  : (data.hasError && allList.isEmpty)
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.cloud_off_rounded, size: 52, color: t.danger),
+                                const SizedBox(height: 14),
+                                Text(
+                                  'Không thể tải danh sách ca làm',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: t.textMain),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Vui lòng kéo xuống để làm mới hoặc bấm nút thử lại bên dưới.',
+                                  style: TextStyle(fontSize: 13, color: t.textMuted),
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (data.error != null) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFEE2E2),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: t.danger.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Text(
+                                      '${data.error}',
+                                      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626)),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 4,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 16),
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    ref.invalidate(assignmentsListProvider);
+                                    ref.invalidate(incomeSummaryProvider);
+                                  },
+                                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                                  label: const Text('Thử lại ngay'),
+                                  style: FilledButton.styleFrom(backgroundColor: t.brand),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () async {
+                            ref.invalidate(assignmentsListProvider);
+                            ref.invalidate(incomeSummaryProvider);
+                          },
+                          child: currentSubTab == 0
+                              ? _buildActiveFeed(activeList, t)
+                              : _buildHistoryFeed(
+                                  historyList,
+                                  filteredHistory,
+                                  incomeSummary,
+                                  t,
+                                  isDark,
+                                  activeCount: activeList.length,
+                                ),
+                        ),
             ),
           ],
         ),
@@ -467,14 +527,15 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     List<ShiftAssignmentItem> filteredList,
     WorkerIncomeSummary summary,
     CaniTokens t,
-    bool isDark,
-  ) {
+    bool isDark, {
+    int activeCount = 0,
+  }) {
     if (rawHistory.isEmpty) {
       return ListView(
         padding: const EdgeInsets.only(bottom: 80),
         children: [
           HistoryKpiBar(summary: summary),
-          _buildZeroHistoryEmptyState(t, isDark),
+          _buildZeroHistoryEmptyState(t, isDark, activeCount: activeCount),
         ],
       );
     }
@@ -505,7 +566,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     );
   }
 
-  Widget _buildZeroHistoryEmptyState(CaniTokens t, bool isDark) {
+  Widget _buildZeroHistoryEmptyState(CaniTokens t, bool isDark, {int activeCount = 0}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
       child: Column(
@@ -542,19 +603,33 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          OutlinedButton.icon(
-            onPressed: () {
-              ref.read(assignmentsSubTabProvider.notifier).state = 0;
-            },
-            icon: const Icon(Icons.calendar_month_outlined, size: 16),
-            label: const Text('Xem ca sắp tới & đang làm', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: t.brand,
-              side: BorderSide(color: t.brand.withValues(alpha: 0.4)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          if (activeCount > 0)
+            FilledButton.icon(
+              onPressed: () {
+                ref.read(assignmentsSubTabProvider.notifier).state = 0;
+              },
+              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+              label: Text('Bạn có $activeCount ca sắp tới • Xem ngay', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              style: FilledButton.styleFrom(
+                backgroundColor: t.brand,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+              ),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: () {
+                ref.read(assignmentsSubTabProvider.notifier).state = 0;
+              },
+              icon: const Icon(Icons.calendar_month_outlined, size: 16),
+              label: const Text('Xem ca sắp tới & đang làm', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: t.brand,
+                side: BorderSide(color: t.brand.withValues(alpha: 0.4)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
             ),
-          ),
         ],
       ),
     );

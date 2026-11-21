@@ -53,258 +53,263 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AdminUserServiceTest {
 
-    @Mock
-    private UserRepository userRepository;
+        @Mock
+        private UserRepository userRepository;
 
-    @Mock
-    private WorkerRepository workerRepository;
+        @Mock
+        private WorkerRepository workerRepository;
 
-    @Mock
-    private EventOrganizerRepository eventOrganizerRepository;
+        @Mock
+        private EventOrganizerRepository eventOrganizerRepository;
 
-    @Mock
-    private SkillVerificationRequestRepository skillVerificationRequestRepository;
+        @Mock
+        private SkillVerificationRequestRepository skillVerificationRequestRepository;
 
-    @Mock
-    private AuditLogService auditLogService;
+        @Mock
+        private AuditLogService auditLogService;
 
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
+        @Spy
+        private ObjectMapper objectMapper = new ObjectMapper();
 
-    @InjectMocks
-    private AdminUserService adminUserService;
+        @InjectMocks
+        private AdminUserService adminUserService;
 
-    private User sampleWorkerUser;
-    private User sampleEoUser;
-    private Worker sampleWorker;
-    private EventOrganizer sampleEo;
-    private UUID workerUserId;
-    private UUID eoUserId;
-    private UUID adminUserId;
+        private User sampleWorkerUser;
+        private User sampleEoUser;
+        private Worker sampleWorker;
+        private EventOrganizer sampleEo;
+        private UUID workerUserId;
+        private UUID eoUserId;
+        private UUID adminUserId;
 
-    @BeforeEach
-    void setUp() {
-        workerUserId = UUID.randomUUID();
-        eoUserId = UUID.randomUUID();
-        adminUserId = UUID.randomUUID();
+        @BeforeEach
+        void setUp() {
+                workerUserId = UUID.randomUUID();
+                eoUserId = UUID.randomUUID();
+                adminUserId = UUID.randomUUID();
 
-        sampleWorkerUser = User.builder()
-                .userId(workerUserId)
-                .email("worker@example.com")
-                .phone("0901234567")
-                .fullName("Nguyen Van Worker")
-                .role(UserRole.WORKER)
-                .status(UserStatus.ACTIVE)
-                .emailVerified(true)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
+                sampleWorkerUser = User.builder()
+                                .userId(workerUserId)
+                                .email("worker@example.com")
+                                .phone("0901234567")
+                                .fullName("Nguyen Van Worker")
+                                .role(UserRole.WORKER)
+                                .status(UserStatus.ACTIVE)
+                                .emailVerified(true)
+                                .createdAt(Instant.now())
+                                .updatedAt(Instant.now())
+                                .build();
 
-        sampleWorker = Worker.builder()
-                .workerId(UUID.randomUUID())
-                .user(sampleWorkerUser)
-                .fullName("Nguyen Van Worker")
-                .cccdNumber("012345678901")
-                .kycStatus(KycStatus.APPROVED)
-                .reliabilityScore(98)
-                .ratingAvg(new BigDecimal("4.85"))
-                .ratingCount(15)
-                .totalShiftsCompleted(20)
-                .yearsExperience(2)
-                .build();
+                sampleWorker = Worker.builder()
+                                .workerId(UUID.randomUUID())
+                                .user(sampleWorkerUser)
+                                .fullName("Nguyen Van Worker")
+                                .cccdNumber("012345678901")
+                                .kycStatus(KycStatus.APPROVED)
+                                .reliabilityScore(98)
+                                .ratingAvg(new BigDecimal("4.85"))
+                                .ratingCount(15)
+                                .totalShiftsCompleted(20)
+                                .yearsExperience(2)
+                                .build();
 
-        sampleEoUser = User.builder()
-                .userId(eoUserId)
-                .email("eo@example.com")
-                .phone("0912345678")
-                .fullName("Tran Thi EO")
-                .role(UserRole.EVENT_ORGANIZER)
-                .status(UserStatus.ACTIVE)
-                .emailVerified(true)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
+                sampleEoUser = User.builder()
+                                .userId(eoUserId)
+                                .email("eo@example.com")
+                                .phone("0912345678")
+                                .fullName("Tran Thi EO")
+                                .role(UserRole.EVENT_ORGANIZER)
+                                .status(UserStatus.ACTIVE)
+                                .emailVerified(true)
+                                .createdAt(Instant.now())
+                                .updatedAt(Instant.now())
+                                .build();
 
-        sampleEo = EventOrganizer.builder()
-                .eoId(UUID.randomUUID())
-                .user(sampleEoUser)
-                .companyName("Event Corp")
-                .taxId("0312345678")
-                .address("123 Nguyen Hue, Q1, TP.HCM")
-                .verificationStatus(VerificationStatus.APPROVED)
-                .ratingAvg(new BigDecimal("4.90"))
-                .ratingCount(10)
-                .totalEventsCompleted(12)
-                .build();
-    }
+                sampleEo = EventOrganizer.builder()
+                                .eoId(UUID.randomUUID())
+                                .user(sampleEoUser)
+                                .companyName("Event Corp")
+                                .address("123 Nguyen Hue, Q1, TP.HCM")
+                                .verificationStatus(VerificationStatus.APPROVED)
+                                .ratingAvg(new BigDecimal("4.90"))
+                                .ratingCount(10)
+                                .totalEventsCompleted(12)
+                                .build();
+        }
 
-    @Test
-    @DisplayName("getUsers - Trả về danh sách người dùng phân trang thành công")
-    void testGetUsers_Success() {
-        Page<User> page = new PageImpl<>(List.of(sampleWorkerUser, sampleEoUser), PageRequest.of(0, 10), 2);
-        when(userRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
-        when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
-        when(eventOrganizerRepository.findByUser_UserIdIn(List.of(eoUserId))).thenReturn(List.of(sampleEo));
-        when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId()))).thenReturn(List.of());
+        @Test
+        @DisplayName("getUsers - Trả về danh sách người dùng phân trang thành công")
+        void testGetUsers_Success() {
+                Page<User> page = new PageImpl<>(List.of(sampleWorkerUser, sampleEoUser), PageRequest.of(0, 10), 2);
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+                when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
+                when(eventOrganizerRepository.findByUser_UserIdIn(List.of(eoUserId))).thenReturn(List.of(sampleEo));
+                when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId())))
+                                .thenReturn(List.of());
 
-        UserFilterRequest filter = UserFilterRequest.builder()
-                .search("Worker")
-                .role(UserRole.WORKER)
-                .status(UserStatus.ACTIVE)
-                .build();
+                UserFilterRequest filter = UserFilterRequest.builder()
+                                .search("Worker")
+                                .role(UserRole.WORKER)
+                                .status(UserStatus.ACTIVE)
+                                .build();
 
-        PageResponse<?> result = adminUserService.getUsers(filter, PageRequest.of(0, 10));
+                PageResponse<?> result = adminUserService.getUsers(filter, PageRequest.of(0, 10));
 
-        assertThat(result).isNotNull();
-        assertThat(result.getContent()).hasSize(2);
-        assertThat(result.getTotalElements()).isEqualTo(2);
-        assertThat(result.getPageNumber()).isZero();
-        verify(userRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
-    }
+                assertThat(result).isNotNull();
+                assertThat(result.getContent()).hasSize(2);
+                assertThat(result.getTotalElements()).isEqualTo(2);
+                assertThat(result.getPageNumber()).isZero();
+                verify(userRepository, times(1)).findAll(any(Specification.class), any(Pageable.class));
+        }
 
-    @Test
-    @DisplayName("getUsers - Worker đã eKYC APPROVED và skill APPROVED hiển thị đúng trạng thái")
-    void testGetUsers_WorkerWithApprovedKycAndApprovedSkill() {
-        SkillVerificationRequest approvedReq = SkillVerificationRequest.builder()
-                .id(UUID.randomUUID())
-                .worker(sampleWorker)
-                .status(SkillVerificationStatus.APPROVED)
-                .createdAt(Instant.now())
-                .build();
+        @Test
+        @DisplayName("getUsers - Worker đã eKYC APPROVED và skill APPROVED hiển thị đúng trạng thái")
+        void testGetUsers_WorkerWithApprovedKycAndApprovedSkill() {
+                SkillVerificationRequest approvedReq = SkillVerificationRequest.builder()
+                                .id(UUID.randomUUID())
+                                .worker(sampleWorker)
+                                .status(SkillVerificationStatus.APPROVED)
+                                .createdAt(Instant.now())
+                                .build();
 
-        when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(sampleWorkerUser), PageRequest.of(0, 10), 1));
-        when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
-        when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId())))
-                .thenReturn(List.of(approvedReq));
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of(sampleWorkerUser), PageRequest.of(0, 10), 1));
+                when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
+                when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId())))
+                                .thenReturn(List.of(approvedReq));
 
-        PageResponse<UserSummaryResponseDto> result = adminUserService.getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
+                PageResponse<UserSummaryResponseDto> result = adminUserService
+                                .getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
 
-        assertThat(result.getContent()).hasSize(1);
-        UserSummaryResponseDto workerDto = result.getContent().get(0);
-        assertThat(workerDto.getKycStatus()).isEqualTo("APPROVED");
-        assertThat(workerDto.getSkillStatus()).isEqualTo("APPROVED");
-    }
+                assertThat(result.getContent()).hasSize(1);
+                UserSummaryResponseDto workerDto = result.getContent().get(0);
+                assertThat(workerDto.getKycStatus()).isEqualTo("APPROVED");
+                assertThat(workerDto.getSkillStatus()).isEqualTo("APPROVED");
+        }
 
-    @Test
-    @DisplayName("getUsers - Worker chưa từng kê khai kỹ năng thì skillStatus trả về NOT_FOUND")
-    void testGetUsers_WorkerWithoutSkillDeclaration_ReturnsNotFound() {
-        when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(sampleWorkerUser), PageRequest.of(0, 10), 1));
-        when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
-        when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId())))
-                .thenReturn(List.of());
+        @Test
+        @DisplayName("getUsers - Worker chưa từng kê khai kỹ năng thì skillStatus trả về NOT_FOUND")
+        void testGetUsers_WorkerWithoutSkillDeclaration_ReturnsNotFound() {
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of(sampleWorkerUser), PageRequest.of(0, 10), 1));
+                when(workerRepository.findByUser_UserIdIn(List.of(workerUserId))).thenReturn(List.of(sampleWorker));
+                when(skillVerificationRequestRepository.findByWorker_WorkerIdIn(List.of(sampleWorker.getWorkerId())))
+                                .thenReturn(List.of());
 
-        PageResponse<UserSummaryResponseDto> result = adminUserService.getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
+                PageResponse<UserSummaryResponseDto> result = adminUserService
+                                .getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
 
-        assertThat(result.getContent()).hasSize(1);
-        UserSummaryResponseDto workerDto = result.getContent().get(0);
-        assertThat(workerDto.getKycStatus()).isEqualTo("APPROVED");
-        assertThat(workerDto.getSkillStatus()).isEqualTo("NOT_FOUND");
-    }
+                assertThat(result.getContent()).hasSize(1);
+                UserSummaryResponseDto workerDto = result.getContent().get(0);
+                assertThat(workerDto.getKycStatus()).isEqualTo("APPROVED");
+                assertThat(workerDto.getSkillStatus()).isEqualTo("NOT_FOUND");
+        }
 
-    @Test
-    @DisplayName("getUsers - Người dùng vai trò ADMIN thì kycStatus và skillStatus đều là null")
-    void testGetUsers_AdminRole_BothStatusesNull() {
-        User adminUser = User.builder()
-                .userId(adminUserId)
-                .email("admin@cani.vn")
-                .fullName("Platform Admin")
-                .role(UserRole.ADMIN)
-                .status(UserStatus.ACTIVE)
-                .build();
+        @Test
+        @DisplayName("getUsers - Người dùng vai trò ADMIN thì kycStatus và skillStatus đều là null")
+        void testGetUsers_AdminRole_BothStatusesNull() {
+                User adminUser = User.builder()
+                                .userId(adminUserId)
+                                .email("admin@cani.vn")
+                                .fullName("Platform Admin")
+                                .role(UserRole.ADMIN)
+                                .status(UserStatus.ACTIVE)
+                                .build();
 
-        when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(adminUser), PageRequest.of(0, 10), 1));
+                when(userRepository.findAll(any(Specification.class), any(Pageable.class)))
+                                .thenReturn(new PageImpl<>(List.of(adminUser), PageRequest.of(0, 10), 1));
 
-        PageResponse<UserSummaryResponseDto> result = adminUserService.getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
+                PageResponse<UserSummaryResponseDto> result = adminUserService
+                                .getUsers(UserFilterRequest.builder().build(), PageRequest.of(0, 10));
 
-        assertThat(result.getContent()).hasSize(1);
-        UserSummaryResponseDto adminDto = result.getContent().get(0);
-        assertThat(adminDto.getKycStatus()).isNull();
-        assertThat(adminDto.getSkillStatus()).isNull();
-    }
+                assertThat(result.getContent()).hasSize(1);
+                UserSummaryResponseDto adminDto = result.getContent().get(0);
+                assertThat(adminDto.getKycStatus()).isNull();
+                assertThat(adminDto.getSkillStatus()).isNull();
+        }
 
-    @Test
-    @DisplayName("getUserById - Trả về chi tiết người dùng Worker kèm thông tin Worker profile")
-    void testGetUserById_Worker_Success() {
-        when(userRepository.findById(workerUserId)).thenReturn(Optional.of(sampleWorkerUser));
-        when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(sampleWorker));
-        when(skillVerificationRequestRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(sampleWorker.getWorkerId()))
-                .thenReturn(List.of());
+        @Test
+        @DisplayName("getUserById - Trả về chi tiết người dùng Worker kèm thông tin Worker profile")
+        void testGetUserById_Worker_Success() {
+                when(userRepository.findById(workerUserId)).thenReturn(Optional.of(sampleWorkerUser));
+                when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(sampleWorker));
+                when(skillVerificationRequestRepository
+                                .findByWorker_WorkerIdOrderByCreatedAtDesc(sampleWorker.getWorkerId()))
+                                .thenReturn(List.of());
 
-        UserDetailResponseDto result = adminUserService.getUserById(workerUserId);
+                UserDetailResponseDto result = adminUserService.getUserById(workerUserId);
 
-        assertThat(result).isNotNull();
-        assertThat(result.getId()).isEqualTo(workerUserId);
-        assertThat(result.getFullName()).isEqualTo("Nguyen Van Worker");
-        assertThat(result.getWorkerProfile()).isNotNull();
-        assertThat(result.getWorkerProfile().getKycStatus()).isEqualTo(KycStatus.APPROVED);
-        assertThat(result.getWorkerProfile().getSkillStatus()).isEqualTo("NOT_FOUND");
-        assertThat(result.getWorkerProfile().getReliabilityScore()).isEqualTo(98);
-        assertThat(result.getEoProfile()).isNull();
-    }
+                assertThat(result).isNotNull();
+                assertThat(result.getId()).isEqualTo(workerUserId);
+                assertThat(result.getFullName()).isEqualTo("Nguyen Van Worker");
+                assertThat(result.getWorkerProfile()).isNotNull();
+                assertThat(result.getWorkerProfile().getKycStatus()).isEqualTo(KycStatus.APPROVED);
+                assertThat(result.getWorkerProfile().getSkillStatus()).isEqualTo("NOT_FOUND");
+                assertThat(result.getWorkerProfile().getReliabilityScore()).isEqualTo(98);
+                assertThat(result.getEoProfile()).isNull();
+        }
 
-    @Test
-    @DisplayName("getUserById - Trả về chi tiết người dùng EO kèm thông tin EO profile")
-    void testGetUserById_Eo_Success() {
-        when(userRepository.findById(eoUserId)).thenReturn(Optional.of(sampleEoUser));
-        when(eventOrganizerRepository.findByUser_UserId(eoUserId)).thenReturn(Optional.of(sampleEo));
+        @Test
+        @DisplayName("getUserById - Trả về chi tiết người dùng EO kèm thông tin EO profile")
+        void testGetUserById_Eo_Success() {
+                when(userRepository.findById(eoUserId)).thenReturn(Optional.of(sampleEoUser));
+                when(eventOrganizerRepository.findByUser_UserId(eoUserId)).thenReturn(Optional.of(sampleEo));
 
-        UserDetailResponseDto result = adminUserService.getUserById(eoUserId);
+                UserDetailResponseDto result = adminUserService.getUserById(eoUserId);
 
-        assertThat(result).isNotNull();
-        assertThat(result.getId()).isEqualTo(eoUserId);
-        assertThat(result.getFullName()).isEqualTo("Tran Thi EO");
-        assertThat(result.getEoProfile()).isNotNull();
-        assertThat(result.getEoProfile().getCompanyName()).isEqualTo("Event Corp");
-        assertThat(result.getWorkerProfile()).isNull();
-    }
+                assertThat(result).isNotNull();
+                assertThat(result.getId()).isEqualTo(eoUserId);
+                assertThat(result.getFullName()).isEqualTo("Tran Thi EO");
+                assertThat(result.getEoProfile()).isNotNull();
+                assertThat(result.getEoProfile().getCompanyName()).isEqualTo("Event Corp");
+                assertThat(result.getWorkerProfile()).isNull();
+        }
 
-    @Test
-    @DisplayName("getUserById - Ném lỗi ResourceNotFoundException khi không tìm thấy user")
-    void testGetUserById_NotFound() {
-        UUID nonExistentId = UUID.randomUUID();
-        when(userRepository.findById(nonExistentId)).thenReturn(Optional.empty());
+        @Test
+        @DisplayName("getUserById - Ném lỗi ResourceNotFoundException khi không tìm thấy user")
+        void testGetUserById_NotFound() {
+                UUID nonExistentId = UUID.randomUUID();
+                when(userRepository.findById(nonExistentId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> adminUserService.getUserById(nonExistentId))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
+                assertThatThrownBy(() -> adminUserService.getUserById(nonExistentId))
+                                .isInstanceOf(ResourceNotFoundException.class);
+        }
 
-    @Test
-    @DisplayName("updateUserStatus - Khóa tài khoản thành công và ghi AuditLog")
-    void testUpdateUserStatus_LockUser_Success() {
-        when(userRepository.findById(workerUserId)).thenReturn(Optional.of(sampleWorkerUser));
-        when(userRepository.save(any(User.class))).thenReturn(sampleWorkerUser);
+        @Test
+        @DisplayName("updateUserStatus - Khóa tài khoản thành công và ghi AuditLog")
+        void testUpdateUserStatus_LockUser_Success() {
+                when(userRepository.findById(workerUserId)).thenReturn(Optional.of(sampleWorkerUser));
+                when(userRepository.save(any(User.class))).thenReturn(sampleWorkerUser);
 
-        UpdateUserStatusRequestDto request = UpdateUserStatusRequestDto.builder()
-                .status(UserStatus.LOCKED)
-                .reason("Vi phạm chính sách bỏ ca nhiều lần")
-                .build();
+                UpdateUserStatusRequestDto request = UpdateUserStatusRequestDto.builder()
+                                .status(UserStatus.LOCKED)
+                                .reason("Vi phạm chính sách bỏ ca nhiều lần")
+                                .build();
 
-        UserDetailResponseDto result = adminUserService.updateUserStatus(workerUserId, adminUserId, request);
+                UserDetailResponseDto result = adminUserService.updateUserStatus(workerUserId, adminUserId, request);
 
-        assertThat(result).isNotNull();
-        assertThat(sampleWorkerUser.getStatus()).isEqualTo(UserStatus.LOCKED);
-        verify(userRepository, times(1)).save(sampleWorkerUser);
-        verify(auditLogService, times(1)).logAction(any(AuditLog.class));
-    }
+                assertThat(result).isNotNull();
+                assertThat(sampleWorkerUser.getStatus()).isEqualTo(UserStatus.LOCKED);
+                verify(userRepository, times(1)).save(sampleWorkerUser);
+                verify(auditLogService, times(1)).logAction(any(AuditLog.class));
+        }
 
-    @Test
-    @DisplayName("updateUserStatus - Ngăn Admin tự khóa tài khoản của chính mình")
-    void testUpdateUserStatus_SelfLock_ThrowsBadRequest() {
-        when(userRepository.findById(adminUserId)).thenReturn(Optional.of(sampleWorkerUser));
+        @Test
+        @DisplayName("updateUserStatus - Ngăn Admin tự khóa tài khoản của chính mình")
+        void testUpdateUserStatus_SelfLock_ThrowsBadRequest() {
+                when(userRepository.findById(adminUserId)).thenReturn(Optional.of(sampleWorkerUser));
 
-        UpdateUserStatusRequestDto request = UpdateUserStatusRequestDto.builder()
-                .status(UserStatus.LOCKED)
-                .reason("Tự khóa")
-                .build();
+                UpdateUserStatusRequestDto request = UpdateUserStatusRequestDto.builder()
+                                .status(UserStatus.LOCKED)
+                                .reason("Tự khóa")
+                                .build();
 
-        assertThatThrownBy(() -> adminUserService.updateUserStatus(adminUserId, adminUserId, request))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Quản trị viên không thể tự thay đổi trạng thái tài khoản của chính mình");
+                assertThatThrownBy(() -> adminUserService.updateUserStatus(adminUserId, adminUserId, request))
+                                .isInstanceOf(BadRequestException.class)
+                                .hasMessageContaining(
+                                                "Quản trị viên không thể tự thay đổi trạng thái tài khoản của chính mình");
 
-        verify(userRepository, never()).save(any());
-        verify(auditLogService, never()).logAction(any());
-    }
+                verify(userRepository, never()).save(any());
+                verify(auditLogService, never()).logAction(any());
+        }
 }

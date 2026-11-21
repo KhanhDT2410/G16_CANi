@@ -66,6 +66,7 @@ public class MatchingDispatchService {
 
     private static final double MAX_DISTANCE_KM = 15.0;
     private static final int MIN_RELIABILITY_SCORE = 60;
+    private static final int GROUP_NO_SHOW_COOLDOWN_MINUTES = 20;
     private static final int DEFAULT_TIMEOUT_HOURS = 1;
     private static final double EARTH_RADIUS_KM = 6371.0;
 
@@ -234,14 +235,34 @@ public class MatchingDispatchService {
     @Scheduled(cron = "0 */5 * * * *")
     @Transactional
     public void expireStalePendingProposals() {
-        List<DispatchProposal> stale = dispatchProposalRepository
-                .findByStatusAndExpiresAtBefore(ProposalStatus.PENDING, Instant.now());
+        List<DispatchProposal> pending = dispatchProposalRepository.findByStatus(ProposalStatus.PENDING);
+        Instant now = Instant.now();
+        List<DispatchProposal> stale = pending.stream()
+                .filter(p -> shouldExpirePendingProposal(p, now))
+                .toList();
         if (stale.isEmpty()) {
             return;
         }
         stale.forEach(p -> p.setStatus(ProposalStatus.EXPIRED));
         dispatchProposalRepository.saveAll(stale);
-        log.info("Đã chuyển {} proposal PENDING hết hạn sang EXPIRED.", stale.size());
+        log.info("Đã chuyển {} proposal PENDING hết hạn/đội trưởng đã thay đổi sang EXPIRED.", stale.size());
+    }
+
+    /**
+     * Hết hạn theo thời gian (mọi proposal) HOẶC proposal group mà leader hiện tại khác
+     * worker đã lưu trong proposal (leader đã chuyển nhượng) -> EXPIRED.
+     */
+    private boolean shouldExpirePendingProposal(DispatchProposal p, Instant now) {
+        if (p.getExpiresAt() != null && p.getExpiresAt().isBefore(now)) {
+            return true;
+        }
+        if (p.getGroupId() == null) {
+            return false;
+        }
+        WorkerGroup group = workerGroupRepository.findById(p.getGroupId()).orElse(null);
+        return group != null
+                && p.getWorker() != null
+                && !p.getWorker().getWorkerId().equals(group.getLeaderWorkerId());
     }
 
     /**
@@ -632,7 +653,12 @@ public class MatchingDispatchService {
                 }
             }
 
-            // ponytail: no-show cooldown filter lands in Task 4 (WorkerGroup.lastNoShowAt)
+            // No-show cooldown: group có thành viên no-show trong 20 phút qua -> tạm bỏ qua
+            if (group.getLastNoShowAt() != null
+                    && group.getLastNoShowAt().isAfter(Instant.now().minus(Duration.ofMinutes(GROUP_NO_SHOW_COOLDOWN_MINUTES)))) {
+                continue;
+            }
+
             if (!dispatchProposalRepository
                     .findByShift_ShiftIdAndGroupIdAndStatusIn(shiftId, group.getGroupId(), ACTIVE_PROPOSAL_STATUSES).isEmpty()) {
                 continue;

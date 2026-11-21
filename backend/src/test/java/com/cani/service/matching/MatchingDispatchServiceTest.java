@@ -841,6 +841,97 @@ class MatchingDispatchServiceTest {
         }
 
         @Test
+        @DisplayName("GROUP005: Group no-show trong 19 phút (cooldown 20p) bị loại; group no-show 21 phút trước đó vẫn được đề xuất")
+        void dispatch_groups_skips_group_in_no_show_cooldown_20min() {
+            Instant now = Instant.now();
+
+            Fixture hot = eligibleGroup("Đội Mới No-show");
+            hot.group().setLastNoShowAt(now.minus(Duration.ofMinutes(19)));
+            Fixture old = eligibleGroup("Đội Hết Cooldown");
+            old.group().setLastNoShowAt(now.minus(Duration.ofMinutes(21)));
+
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(hot.group(), old.group()));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(List.of(membership(hot.group(), hot.member()), membership(old.group(), old.member())));
+            when(dispatchProposalRepository.save(any(DispatchProposal.class))).thenAnswer(inv -> {
+                DispatchProposal p = inv.getArgument(0);
+                p.setProposalId(UUID.randomUUID());
+                return p;
+            });
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(1, count);
+            ArgumentCaptor<DispatchProposal> captor = ArgumentCaptor.forClass(DispatchProposal.class);
+            verify(dispatchProposalRepository, times(1)).save(captor.capture());
+            assertEquals(old.group().getGroupId(), captor.getValue().getGroupId());
+        }
+
+        @Test
+        @DisplayName("GROUP006: leader chuyển nhượng -> PENDING group proposal (chưa hết hạn thời gian) vẫn bị EXPIRED")
+        void expireStalePendingProposals_expires_orphaned_group_proposal_after_leader_transfer() {
+            Worker oldLeader = groupWorker("Leader Cũ", KycStatus.APPROVED, true, 90);
+            Worker newLeader = groupWorker("Leader Mới", KycStatus.APPROVED, true, 90);
+            WorkerGroup g = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Chuyển Nhượng")
+                    .leaderWorkerId(newLeader.getWorkerId())
+                    .isActive(true)
+                    .build();
+
+            DispatchProposal orphaned = DispatchProposal.builder()
+                    .shift(sampleShift)
+                    .worker(oldLeader)
+                    .groupId(g.getGroupId())
+                    .status(ProposalStatus.PENDING)
+                    .expiresAt(Instant.now().plus(Duration.ofHours(1)))
+                    .build();
+            DispatchProposal individual = DispatchProposal.builder()
+                    .shift(sampleShift)
+                    .worker(onlineWorker)
+                    .status(ProposalStatus.PENDING)
+                    .expiresAt(Instant.now().plus(Duration.ofHours(1)))
+                    .build();
+
+            when(dispatchProposalRepository.findByStatus(ProposalStatus.PENDING)).thenReturn(List.of(orphaned, individual));
+            when(workerGroupRepository.findById(g.getGroupId())).thenReturn(Optional.of(g));
+
+            matchingDispatchService.expireStalePendingProposals();
+
+            assertEquals(ProposalStatus.EXPIRED, orphaned.getStatus());
+            assertEquals(ProposalStatus.PENDING, individual.getStatus());
+        }
+
+        @Test
+        @DisplayName("GROUP007: proposal PENDING còn hạn, leader đúng với group hiện tại -> KHÔNG bị EXPIRED")
+        void expireStalePendingProposals_keeps_valid_group_proposal() {
+            Worker leader = groupWorker("Leader", KycStatus.APPROVED, true, 90);
+            WorkerGroup g = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Giữ Nguyên")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+
+            DispatchProposal valid = DispatchProposal.builder()
+                    .shift(sampleShift)
+                    .worker(leader)
+                    .groupId(g.getGroupId())
+                    .status(ProposalStatus.PENDING)
+                    .expiresAt(Instant.now().plus(Duration.ofHours(1)))
+                    .build();
+
+            when(dispatchProposalRepository.findByStatus(ProposalStatus.PENDING)).thenReturn(List.of(valid));
+            when(workerGroupRepository.findById(g.getGroupId())).thenReturn(Optional.of(g));
+
+            matchingDispatchService.expireStalePendingProposals();
+
+            assertEquals(ProposalStatus.PENDING, valid.getStatus());
+            verify(dispatchProposalRepository, never()).saveAll(anyList());
+        }
+
+        @Test
         @DisplayName("GROUP004: emergency=true -> proposal hết hạn ~30 phút (không phải 1 giờ), tiêu đề có tiền tố 🚨 GẤP")
         void dispatch_groups_emergency_expiry_30min() {
             Fixture g = eligibleGroup("Đội Gấp");

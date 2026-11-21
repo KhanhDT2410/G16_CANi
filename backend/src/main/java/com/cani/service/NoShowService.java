@@ -42,6 +42,7 @@ public class NoShowService {
     private final UserRepository userRepository;
     private final ReliabilityLogRepository reliabilityLogRepository;
     private final RsAppealRepository rsAppealRepository;
+    private final WorkerGroupRepository workerGroupRepository;
     private final MatchingDispatchService matchingDispatchService;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
@@ -78,6 +79,9 @@ public class NoShowService {
         // Cập nhật trạng thái assignment
         assignment.setStatus(AssignmentStatus.NO_SHOW);
         shiftAssignmentRepository.save(assignment);
+
+        // Nếu assignment thuộc 1 Group -> đánh dấu cooldown no-show của Group (20 phút)
+        markGroupNoShowCooldown(assignment.getGroupId());
 
         // Mở lại vị trí còn thiếu cho Shift và bật chế độ khẩn cấp (emergency)
         Shift shift = assignment.getShift();
@@ -185,6 +189,20 @@ public class NoShowService {
                 .build());
 
         return toResponseDto(savedRecord);
+    }
+
+    /**
+     * Đánh dấu cooldown no-show 20 phút cho Group (kênh group dispatch sẽ bỏ qua group này trong thời gian cooldown).
+     */
+    private void markGroupNoShowCooldown(UUID groupId) {
+        if (groupId == null) {
+            return;
+        }
+        workerGroupRepository.findById(groupId).ifPresent(group -> {
+            group.setLastNoShowAt(Instant.now());
+            workerGroupRepository.save(group);
+            log.info("Đội {} bị đánh dấu no-show, cooldown 20 phút khỏi kênh group dispatch.", group.getName());
+        });
     }
 
     /**

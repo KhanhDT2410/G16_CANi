@@ -62,6 +62,9 @@ class NoShowServiceTest {
     private RsAppealRepository rsAppealRepository;
 
     @Mock
+    private com.cani.repository.WorkerGroupRepository workerGroupRepository;
+
+    @Mock
     private MatchingDispatchService matchingDispatchService;
 
     @Mock
@@ -162,6 +165,28 @@ class NoShowServiceTest {
         verify(notificationService, atLeastOnce()).sendNotification(any(User.class), anyString(), anyString(), any(), anyString(), any());
         verify(matchingDispatchService).dispatchForShift(testShift.getShiftId());
         verify(auditLogService).logAction(any());
+    }
+
+    @Test
+    @DisplayName("No-show của member Group -> đánh dấu lastNoShowAt (cooldown 20p) lên WorkerGroup")
+    void markNoShow_setsGroupLastNoShowAt_whenAssignmentHasGroupId() {
+        UUID groupId = UUID.randomUUID();
+        testAssignment.setGroupId(groupId);
+        WorkerGroup group = WorkerGroup.builder().groupId(groupId).name("Đội Lễ Tân").build();
+        Instant before = Instant.now().minusSeconds(1);
+
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(testAssignment));
+        when(noShowRecordRepository.existsByShiftAssignment_AssignmentId(assignmentId)).thenReturn(false);
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)).thenReturn(Optional.empty());
+        when(reliabilityLogRepository.save(any(ReliabilityLog.class))).thenAnswer(i -> i.getArgument(0));
+        when(noShowRecordRepository.save(any(NoShowRecord.class))).thenAnswer(i -> i.getArgument(0));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
+
+        noShowService.markNoShow(assignmentId, NoShowDetectedBy.ADMIN, UUID.randomUUID(), "Vắng mặt ca group");
+
+        assertNotNull(group.getLastNoShowAt());
+        assertFalse(group.getLastNoShowAt().isBefore(before));
+        verify(workerGroupRepository).save(group);
     }
 
     @Test

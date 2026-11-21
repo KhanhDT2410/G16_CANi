@@ -65,6 +65,9 @@ public class WorkerGroup {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "last_no_show_at")
+    private Instant lastNoShowAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

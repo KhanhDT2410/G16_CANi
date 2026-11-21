@@ -19,6 +19,7 @@ public interface DispatchProposalRepository extends JpaRepository<DispatchPropos
     boolean existsByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(UUID shiftId, UUID workerId, List<ProposalStatus> statuses);
     List<DispatchProposal> findByStatusAndExpiresAtBefore(ProposalStatus status, Instant expiresAt);
+    List<DispatchProposal> findByStatus(ProposalStatus status);
     List<DispatchProposal> findByShift_ShiftIdAndGroupIdAndStatusIn(UUID shiftId, UUID groupId, List<ProposalStatus> statuses);
     List<DispatchProposal> findByGroupIdAndStatus(UUID groupId, ProposalStatus status);
 }

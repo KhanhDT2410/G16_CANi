@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { FaqPublicList, useFaqs } from '../../../features/faqs';
 import { SupportTicketsCenterView } from '../../../features/support-tickets';
+import EOSupportChatPanel from './EOSupportChatPanel';
+import EODisputesPanel from './EODisputesPanel';
 import './EOSupportTab.css';
 
 /**
  * Trung Tâm Trợ Giúp & Hỗ Trợ Kỹ Thuật dành cho Nhà tổ chức sự kiện (EO Support Workspace).
  * Khóa vai trò theo đối tượng EVENT_ORGANIZER (chỉ hiển thị câu hỏi của Nhà tổ chức & câu hỏi chung).
+ * Tích hợp 3 phân hệ: Câu hỏi thường gặp (FAQ), Phiếu hỗ trợ (Tickets), Chat trực tuyến CSKH 24/7.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export default function EOSupportTab() {
@@ -42,6 +45,32 @@ export default function EOSupportTab() {
           </span>
           Phiếu yêu cầu hỗ trợ (Tickets)
         </button>
+
+        <button
+          type="button"
+          className={`eo-support-tab-btn ${activeSubTab === 'chat' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('chat')}
+        >
+          <span className="eo-support-tab-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </span>
+          Chat trực tuyến CSKH
+        </button>
+
+        <button
+          type="button"
+          className={`eo-support-tab-btn ${activeSubTab === 'disputes' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('disputes')}
+        >
+          <span className="eo-support-tab-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </span>
+          Khiếu nại & Tranh chấp
+        </button>
       </div>
 
       <div className="eo-support-tab-content">
@@ -59,6 +88,18 @@ export default function EOSupportTab() {
         {activeSubTab === 'tickets' && (
           <div className="animate-fade-in-up">
             <SupportTicketsCenterView />
+          </div>
+        )}
+
+        {activeSubTab === 'chat' && (
+          <div className="animate-fade-in-up">
+            <EOSupportChatPanel />
+          </div>
+        )}
+
+        {activeSubTab === 'disputes' && (
+          <div className="animate-fade-in-up">
+            <EODisputesPanel />
           </div>
         )}
       </div>

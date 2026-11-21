@@ -13,9 +13,27 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
   const [inputText, setInputText] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
   const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef(null);
+  const chatBodyRef = useRef(null);
+  const isAtBottomRef = useRef(true);
+  const prevMsgLengthRef = useRef(0);
 
   const convId = activeChat?.id;
+
+  const scrollToBottom = (smooth = true) => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  };
+
+  const handleScroll = () => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 60;
+  };
 
   // Lấy tin nhắn và Polling cập nhật mỗi 3s
   useEffect(() => {
@@ -26,7 +44,16 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
       try {
         const res = await directChatApi.getConversationDetail(convId);
         if (isMounted && res?.messages) {
-          setMessages(res.messages);
+          setMessages((prev) => {
+            if (
+              prev.length === res.messages.length &&
+              prev[prev.length - 1]?.id === res.messages[res.messages.length - 1]?.id &&
+              prev[prev.length - 1]?.messageText === res.messages[res.messages.length - 1]?.messageText
+            ) {
+              return prev;
+            }
+            return res.messages;
+          });
         }
       } catch {
         /* Bỏ qua lỗi mạng */
@@ -43,9 +70,21 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
 
   useEffect(() => {
     if (!isMinimized) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (messages.length > prevMsgLengthRef.current) {
+        if (isAtBottomRef.current || prevMsgLengthRef.current === 0) {
+          scrollToBottom(prevMsgLengthRef.current > 0);
+        }
+        prevMsgLengthRef.current = messages.length;
+      }
     }
   }, [messages, isMinimized]);
+
+  useEffect(() => {
+    if (!isMinimized && activeChat) {
+      isAtBottomRef.current = true;
+      setTimeout(() => scrollToBottom(false), 50);
+    }
+  }, [isMinimized, activeChat]);
 
   if (!activeChat) return null;
 
@@ -65,6 +104,8 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
     setMessages((prev) => [...prev, optimisticMsg]);
     if (!customText) setInputText('');
     setSending(true);
+    isAtBottomRef.current = true;
+    setTimeout(() => scrollToBottom(true), 50);
 
     try {
       await directChatApi.sendMessage(convId, { messageText: textToSend });
@@ -103,7 +144,7 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
       {/* Body Tin nhắn (chỉ hiện khi không thu nhỏ) */}
       {!isMinimized && (
         <>
-          <div className="dock-messages-body">
+          <div className="dock-messages-body" ref={chatBodyRef} onScroll={handleScroll}>
             {activeChat.shiftCode && (
               <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '4px 8px', fontSize: '0.74rem', color: '#1d4ed8', textAlign: 'center' }}>
                 🏷️ Cuộc trò chuyện gắn với ca: <strong>{activeChat.shiftCode}</strong>
@@ -132,7 +173,7 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
               </div>
             )}
 
-            <div ref={messagesEndRef} />
+
           </div>
 
           <form className="dock-footer" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>

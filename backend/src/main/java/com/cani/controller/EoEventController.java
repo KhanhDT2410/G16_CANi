@@ -1,5 +1,6 @@
 package com.cani.controller;
 
+import com.cani.dto.admin.noshow.NoShowResponseDto;
 import com.cani.dto.event.*;
 import com.cani.dto.response.ApiResponse;
 import com.cani.entity.Review;
@@ -186,6 +187,21 @@ public class EoEventController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         com.cani.dto.dispute.DisputeDetailResponseDto dispute = eoEventService.reportIncompleteWork(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(dispute, "Đã gửi báo cáo công việc không đạt yêu cầu tới Bộ phận CSKH xử lý!"));
+    }
+
+    /**
+     * UC-88: EO báo cáo Worker vắng mặt không báo trước (Report No-Show)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @PostMapping("/assignments/{assignmentId}/no-show")
+    public ResponseEntity<ApiResponse<NoShowResponseDto>> reportNoShow(
+            @PathVariable("assignmentId") UUID assignmentId,
+            @Valid @RequestBody(required = false) ReportNoShowRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        NoShowResponseDto response = eoEventService.reportNoShow(userId, assignmentId, request);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Đã ghi nhận vắng mặt (No-show)! Hệ thống tự động kích hoạt điều phối khẩn cấp để tìm nhân sự thay thế cho sự kiện."));
     }
 
     /**

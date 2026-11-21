@@ -4,6 +4,7 @@ import { useAuth } from '../../../features/auth';
 import { authApi } from '../../../features/auth/api/authApi';
 import { showToast } from '../../../components/common/Toast';
 import EOSettingsTab from './EOSettingsTab';
+import EoReviewsSection from './EoReviewsSection';
 import './EoProfileTab.css';
 import '../EoEkycTab.css';
 
@@ -514,7 +515,12 @@ export default function EoProfileTab() {
             <div className="profile-stat-label">Nhân sự đã chốt ca</div>
           </div>
 
-          <div className="profile-stat-box">
+          <div
+            className="profile-stat-box"
+            onClick={() => setActiveSection('REVIEWS')}
+            style={{ cursor: 'pointer' }}
+            title="Nhấp để xem chi tiết nhận xét & đánh giá từ nhân sự"
+          >
             <div
               className={`profile-stat-value ${
                 profile.ratingCount > 0 || ekycStatus === 'APPROVED' ? 'is-verified' : ''
@@ -565,6 +571,17 @@ export default function EoProfileTab() {
 
         <button
           type="button"
+          className={`profile-subnav-btn ${activeSection === 'REVIEWS' ? 'active' : ''}`}
+          onClick={() => setActiveSection('REVIEWS')}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          3. Đánh Giá Từ Nhân Sự {profile.ratingCount > 0 ? `(${profile.ratingCount})` : ''}
+        </button>
+
+        <button
+          type="button"
           className={`profile-subnav-btn ${activeSection === 'SECURITY' ? 'active' : ''}`}
           onClick={() => setActiveSection('SECURITY')}
         >
@@ -572,7 +589,7 @@ export default function EoProfileTab() {
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
-          3. Bảo Mật & Mật Khẩu
+          4. Bảo Mật & Mật Khẩu
         </button>
 
         <button
@@ -584,7 +601,7 @@ export default function EoProfileTab() {
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
           </svg>
-          4. Danh Sách Chặn
+          5. Danh Sách Chặn
         </button>
       </nav>
 
@@ -951,7 +968,12 @@ export default function EoProfileTab() {
         </div>
       )}
 
-      {/* SECTION 3: BẢO MẬT & MẬT KHẨU (CHỈ ĐỔI QUA EMAIL OTP) */}
+      {/* SECTION 3: ĐÁNH GIÁ TỪ NHÂN SỰ */}
+      {activeSection === 'REVIEWS' && (
+        <EoReviewsSection />
+      )}
+
+      {/* SECTION 4: BẢO MẬT & MẬT KHẨU (CHỈ ĐỔI QUA EMAIL OTP) */}
       {activeSection === 'SECURITY' && (
         <div className="profile-card">
           <div className="profile-card-header">

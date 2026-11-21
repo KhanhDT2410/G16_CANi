@@ -6,6 +6,7 @@ import { showToast } from '../../../components/common/Toast';
 import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import { getDynamicShiftStatus } from '../utils/eventHelpers';
 import RateWorkerModal from './RateWorkerModal';
+import ReportNoShowModal from './ReportNoShowModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 
@@ -30,6 +31,7 @@ export default function ShiftWorkspacePage({
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
   const [selectedForReview, setSelectedForReview] = useState(null);
+  const [selectedForNoShow, setSelectedForNoShow] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [searchWorker, setSearchWorker] = useState('');
   const workerProfile = useWorkerProfile();
@@ -677,7 +679,8 @@ export default function ShiftWorkspacePage({
               </thead>
               <tbody>
                 {filteredWorkers.map((item) => {
-                  const isCheckedIn = item.assignmentStatus === 'CHECKED_IN';
+                  const isNoShow = item.assignmentStatus === 'NO_SHOW';
+                  const isCheckedIn = item.assignmentStatus === 'CHECKED_IN' || Boolean(item.checkinTime);
                   const isCompleted = item.assignmentStatus === 'COMPLETED' || item.checkoutTime != null;
                   const workerProgressMap = parseWorkerChecklistStatus(item.checklistRawProgress);
 
@@ -710,17 +713,22 @@ export default function ShiftWorkspacePage({
 
                       {/* 2. Trạng thái */}
                       <td style={{ padding: '14px' }}>
-                        {isCheckedIn && (
+                        {isNoShow && (
+                          <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
+                            ✕ Vắng mặt (No-Show)
+                          </span>
+                        )}
+                        {!isNoShow && isCheckedIn && (
                           <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
                             Đã vào ca {item.isOnTime ? '(Đúng giờ)' : '(Trễ giờ)'}
                           </span>
                         )}
-                        {isCompleted && (
+                        {!isNoShow && isCompleted && (
                           <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
                             Đã hoàn thành
                           </span>
                         )}
-                        {!isCheckedIn && !isCompleted && (
+                        {!isNoShow && !isCheckedIn && !isCompleted && (
                           <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
                             Chờ đến ca
                           </span>
@@ -911,6 +919,35 @@ export default function ShiftWorkspacePage({
                             </button>
                           )}
 
+                          {!isCheckedIn && !isCompleted && !isNoShow && item.assignmentStatus !== 'CANCELLED' && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedForNoShow(item)}
+                              style={{
+                                background: '#fff1f2',
+                                color: '#e11d48',
+                                border: '1px solid #fecdd3',
+                                borderRadius: 6,
+                                padding: '4px 9px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                              }}
+                              title="Báo cáo nhân sự không đến & Tự động tìm người thay thế"
+                            >
+                              <span>⚠️</span> Báo vắng
+                            </button>
+                          )}
+
+                          {isNoShow && (
+                            <span style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700, padding: '4px' }}>
+                              Đã phạt No-Show
+                            </span>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => handleBlockWorker(item)}
@@ -1090,6 +1127,19 @@ export default function ShiftWorkspacePage({
         isSubmitting={submittingReview}
         onClose={() => setSelectedForReview(null)}
         onSubmit={handleSubmitReview}
+      />
+
+      <ReportNoShowModal
+        isOpen={Boolean(selectedForNoShow)}
+        onClose={() => setSelectedForNoShow(null)}
+        assignment={selectedForNoShow}
+        shift={shift}
+        onSuccess={async () => {
+          await Promise.allSettled([
+            loadAttendance(),
+            onReloadEvents ? Promise.resolve(onReloadEvents()) : Promise.resolve(),
+          ]);
+        }}
       />
 
       <WorkerProfileModal

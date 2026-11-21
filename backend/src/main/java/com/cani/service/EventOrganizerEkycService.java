@@ -5,8 +5,11 @@ import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
+import com.cani.dto.event.EoReviewResponseDto;
 import com.cani.entity.EventOrganizer;
 import com.cani.entity.EoEkycVerification;
+import com.cani.entity.Review;
+import com.cani.entity.ShiftAssignment;
 import com.cani.entity.User;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.VerificationStatus;
@@ -49,6 +52,9 @@ public class EventOrganizerEkycService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.cani.repository.ReviewRepository reviewRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.ShiftAssignmentRepository shiftAssignmentRepository;
 
     @org.springframework.beans.factory.annotation.Value("${cani.ekyc.strict:false}")
     private boolean ekycStrict;
@@ -352,6 +358,97 @@ public class EventOrganizerEkycService {
                 .businessLicenseUrl(businessLicenseUrl)
                 .businessVerificationStatus(businessVerificationStatus)
                 .build();
+    }
+
+    /**
+     * Lấy danh sách các lượt đánh giá & nhận xét từ Người lao động (Worker) dành cho Nhà tổ chức sự kiện.
+     */
+    @Transactional(readOnly = true)
+    public List<EoReviewResponseDto> getEoReviews(UUID userId) {
+        if (userId == null || reviewRepository == null) {
+            return List.of();
+        }
+
+        List<Review> reviews = new ArrayList<>(reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(userId));
+        eventOrganizerRepository.findByUser_UserId(userId).ifPresent(eo -> {
+            if (eo.getEoId() != null && !eo.getEoId().equals(userId)) {
+                List<Review> eoIdReviews = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(eo.getEoId());
+                if (eoIdReviews != null && !eoIdReviews.isEmpty()) {
+                    Set<UUID> existingIds = reviews.stream().map(Review::getReviewId).collect(Collectors.toSet());
+                    for (Review r : eoIdReviews) {
+                        if (existingIds.add(r.getReviewId())) {
+                            reviews.add(r);
+                        }
+                    }
+                }
+            }
+        });
+
+        if (reviews.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> reviewerIds = reviews.stream()
+                .map(Review::getReviewerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, User> userMap = userRepository.findAllById(reviewerIds).stream()
+                .collect(Collectors.toMap(User::getUserId, u -> u, (u1, u2) -> u1));
+
+        Set<UUID> assignmentIds = reviews.stream()
+                .map(Review::getAssignmentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, ShiftAssignment> assignmentMap = Collections.emptyMap();
+        if (shiftAssignmentRepository != null && !assignmentIds.isEmpty()) {
+            assignmentMap = shiftAssignmentRepository.findAllById(assignmentIds).stream()
+                    .collect(Collectors.toMap(ShiftAssignment::getAssignmentId, sa -> sa, (s1, s2) -> s1));
+        }
+
+        final Map<UUID, ShiftAssignment> finalAssignmentMap = assignmentMap;
+        return reviews.stream()
+                .sorted(Comparator.comparing(Review::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .map(r -> {
+                    User reviewer = userMap.get(r.getReviewerId());
+                    String workerName = (reviewer != null && reviewer.getFullName() != null && !reviewer.getFullName().isBlank())
+                            ? reviewer.getFullName()
+                            : "Nhân sự CANi";
+                    String workerAvatar = reviewer != null ? reviewer.getAvatarUrl() : null;
+
+                    String eventName = null;
+                    String shiftName = null;
+                    if (r.getAssignmentId() != null) {
+                        ShiftAssignment sa = finalAssignmentMap.get(r.getAssignmentId());
+                        if (sa != null && sa.getShift() != null) {
+                            shiftName = sa.getShift().getJobType();
+                            if (sa.getShift().getEvent() != null) {
+                                eventName = sa.getShift().getEvent().getName();
+                            }
+                        }
+                    }
+
+                    return EoReviewResponseDto.builder()
+                            .reviewId(r.getReviewId())
+                            .assignmentId(r.getAssignmentId())
+                            .eventName(eventName)
+                            .shiftName(shiftName)
+                            .reviewerWorkerId(r.getReviewerId())
+                            .reviewerWorkerName(workerName)
+                            .workerAvatarUrl(workerAvatar)
+                            .rating(r.getRating())
+                            .criteriaShiftClarity(r.getCriteriaShiftClarity())
+                            .criteriaTiming(r.getCriteriaTiming())
+                            .criteriaWorkEnvironment(r.getCriteriaWorkEnvironment())
+                            .criteriaSupport(r.getCriteriaSupport())
+                            .criteriaPaymentTiming(r.getCriteriaPaymentTiming())
+                            .comment(r.getComment())
+                            .tags(r.getTags())
+                            .createdAt(r.getCreatedAt())
+                            .build();
+                })
+                .toList();
     }
 
     /**

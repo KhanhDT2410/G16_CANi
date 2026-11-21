@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import RateWorkerModal from './RateWorkerModal';
+import ReportNoShowModal from './ReportNoShowModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 
@@ -31,6 +32,7 @@ export default function ShiftQrAndAttendancePanel({
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
   const [selectedForReview, setSelectedForReview] = useState(null);
+  const [selectedForNoShow, setSelectedForNoShow] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [serverQrData, setServerQrData] = useState(null);
 
@@ -468,7 +470,8 @@ export default function ShiftQrAndAttendancePanel({
                 </thead>
                 <tbody>
                   {attendanceList.map((item) => {
-                    const isCheckedIn = item.assignmentStatus === 'CHECKED_IN';
+                    const isNoShow = item.assignmentStatus === 'NO_SHOW';
+                    const isCheckedIn = item.assignmentStatus === 'CHECKED_IN' || Boolean(item.checkinTime);
                     const isCompleted = item.assignmentStatus === 'COMPLETED' || item.checkoutTime != null;
 
                     return (
@@ -496,17 +499,22 @@ export default function ShiftQrAndAttendancePanel({
                         </td>
 
                         <td style={{ padding: '12px 14px' }}>
-                          {isCheckedIn && (
+                          {isNoShow && (
+                            <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem' }}>
+                              ✕ Vắng mặt (No-Show)
+                            </span>
+                          )}
+                          {!isNoShow && isCheckedIn && (
                             <span style={{ background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
                               Đã Check-in {item.isOnTime ? '(Đúng giờ)' : '(Trễ ca)'}
                             </span>
                           )}
-                          {isCompleted && (
+                          {!isNoShow && isCompleted && (
                             <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
                               Đã Hoàn Thành
                             </span>
                           )}
-                          {!isCheckedIn && !isCompleted && (
+                          {!isNoShow && !isCheckedIn && !isCompleted && (
                             <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
                               Chờ Đến Ca
                             </span>
@@ -629,9 +637,33 @@ export default function ShiftQrAndAttendancePanel({
                               </button>
                             )}
 
-                            {item.eoVerified && (
-                              <span style={{ color: '#059669', fontSize: '0.78rem', fontWeight: 700, alignSelf: 'center' }}>
-                                ✓ Đã duyệt
+                            {!isCheckedIn && !isCompleted && !isNoShow && item.assignmentStatus !== 'CANCELLED' && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedForNoShow(item)}
+                                style={{
+                                  background: '#fff1f2',
+                                  color: '#e11d48',
+                                  border: '1px solid #fecdd3',
+                                  borderRadius: 6,
+                                  padding: '5px 9px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                  transition: 'all 0.15s ease',
+                                }}
+                                title="Báo cáo nhân sự không đến & Kích hoạt tìm người thay thế khẩn cấp"
+                              >
+                                <span>⚠️</span> Báo Vắng Mặt
+                              </button>
+                            )}
+
+                            {isNoShow && (
+                              <span style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700, alignSelf: 'center' }}>
+                                Đã phạt No-Show
                               </span>
                             )}
 
@@ -671,6 +703,19 @@ export default function ShiftQrAndAttendancePanel({
         assignment={selectedForReview}
         submitting={submittingReview}
         onSubmit={handleSubmitReview}
+      />
+
+      <ReportNoShowModal
+        isOpen={Boolean(selectedForNoShow)}
+        onClose={() => setSelectedForNoShow(null)}
+        assignment={selectedForNoShow}
+        shift={shift}
+        onSuccess={async () => {
+          await Promise.allSettled([
+            loadAttendance(),
+            onReloadEvents ? Promise.resolve(onReloadEvents()) : Promise.resolve(),
+          ]);
+        }}
       />
 
       <WorkerProfileModal

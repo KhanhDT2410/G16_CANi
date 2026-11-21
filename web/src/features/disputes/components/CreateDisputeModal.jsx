@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { showToast } from '../../../components/common/Toast';
+import { eoService } from '../../../services/eoService';
 import { DISPUTE_TYPES, DISPUTE_TYPE_LABELS } from '../types/dispute.constants';
 
 const CreateDisputeModal = ({ onClose, onSubmit }) => {
@@ -7,7 +9,34 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
   const [type, setType] = useState(DISPUTE_TYPES.PAYMENT);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [evidenceUrl, setEvidenceUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await eoService.uploadImage(file);
+      if (url) {
+        setEvidenceUrl(url);
+        showToast('Tải ảnh minh chứng lên thành công', 'success');
+      }
+    } catch (err) {
+      showToast('Lỗi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const descLength = description.trim().length;
   const isDescValid = descLength >= 50 && descLength <= 3000;
@@ -34,6 +63,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
         type,
         title: title.trim(),
         description: description.trim(),
+        evidence: evidenceUrl.trim() || undefined,
       });
       onClose();
     } catch {
@@ -43,7 +73,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div className="dispute-modal-overlay" onClick={onClose}>
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
@@ -111,6 +141,39 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
                 {descLength} / 50 ký tự tối thiểu {isDescValid ? '(Đủ điều kiện)' : '(Chưa đủ)'}
               </div>
             </div>
+
+            <div className="dispute-field-group">
+              <label>Ảnh / Minh chứng đính kèm ban đầu (Tùy chọn)</label>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label className="btn-quick-fill" style={{ margin: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                  {uploading ? 'Đang tải ảnh...' : 'Chọn ảnh từ thiết bị'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                  />
+                </label>
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>hoặc dán đường dẫn ảnh</span>
+              </div>
+              <input
+                type="text"
+                className="dispute-input"
+                placeholder="https://... hoặc đường dẫn hình ảnh/biên lai"
+                value={evidenceUrl}
+                onChange={(e) => setEvidenceUrl(e.target.value)}
+              />
+              {evidenceUrl && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <img
+                    src={evidenceUrl}
+                    alt="Xem trước ảnh"
+                    style={{ maxHeight: 100, maxWidth: '100%', borderRadius: 6, border: '1px solid #cbd5e1', objectFit: 'cover' }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="dispute-modal-footer">
@@ -132,7 +195,8 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

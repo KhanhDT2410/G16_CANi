@@ -53,7 +53,25 @@ export const SupportChatWidget = () => {
     return null; // null = dùng toạ độ CSS mặc định (góc dưới bên phải)
   });
 
-  const messagesEndRef = useRef(null);
+  const chatBodyRef = useRef(null);
+  const isAtBottomRef = useRef(true);
+  const prevMsgLengthRef = useRef(0);
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, []);
+
+  const handleChatScroll = () => {
+    const el = chatBodyRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 60;
+  };
   const justDraggedRef = useRef(false);
   const dragRef = useRef({
     isDragging: false,
@@ -137,6 +155,15 @@ export const SupportChatWidget = () => {
             };
           });
 
+          // Tránh set lại state gây re-render khi tin nhắn không đổi
+          if (
+            prev.length === apiMessages.length &&
+            prev[prev.length - 1]?.id === apiMessages[apiMessages.length - 1]?.id &&
+            prev[prev.length - 1]?.text === apiMessages[apiMessages.length - 1]?.text
+          ) {
+            return prev;
+          }
+
           // Nếu có tin nhắn mới từ CSKH khi đang thu nhỏ, tăng badge thông báo
           if (isMinimized && apiMessages.length > prev.length) {
             setUnreadCount((c) => c + (apiMessages.length - prev.length));
@@ -154,12 +181,24 @@ export const SupportChatWidget = () => {
     };
   }, [user, isStaff, isOpen, isMinimized]);
 
-  // Tự động cuộn xuống tin nhắn mới nhất khi đang mở toàn phần
+  // Tự động cuộn cục bộ trong khung chat khi có tin nhắn mới hoặc vừa mở
   useEffect(() => {
     if (isOpen && !isMinimized) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (messages.length > prevMsgLengthRef.current) {
+        if (isAtBottomRef.current || prevMsgLengthRef.current <= 2) {
+          scrollToBottom(prevMsgLengthRef.current > 2);
+        }
+        prevMsgLengthRef.current = messages.length;
+      }
     }
-  }, [messages, isOpen, isMinimized]);
+  }, [messages, isOpen, isMinimized, scrollToBottom]);
+
+  useEffect(() => {
+    if (isOpen && !isMinimized) {
+      isAtBottomRef.current = true;
+      setTimeout(() => scrollToBottom(false), 50);
+    }
+  }, [isOpen, isMinimized, scrollToBottom]);
 
   // Quản lý kéo thả thông qua Pointer Events (áp dụng cho cả bong bóng đóng, dock thu gọn và header mở rộng)
   const startDrag = (e, fallbackWidth = 185, fallbackHeight = 48) => {
@@ -251,6 +290,8 @@ export const SupportChatWidget = () => {
     setMessages((prev) => [...prev, userMsg]);
     if (!customText) setInputText('');
     setSending(true);
+    isAtBottomRef.current = true;
+    setTimeout(() => scrollToBottom(true), 50);
 
     try {
       if (user) {
@@ -271,6 +312,8 @@ export const SupportChatWidget = () => {
       { id: String(Date.now()), isBot: false, text: faq.q, time: now },
       { id: String(Date.now() + 1), isBot: true, text: faq.a, time: now },
     ]);
+    isAtBottomRef.current = true;
+    setTimeout(() => scrollToBottom(true), 50);
   };
 
   // Tính style toạ độ tuỳ biến nếu đã kéo thả, luôn clamp theo kích thước chế độ hiện tại
@@ -419,7 +462,7 @@ export const SupportChatWidget = () => {
             </div>
           </div>
 
-          <div className="support-chat-body">
+          <div className="support-chat-body" ref={chatBodyRef} onScroll={handleChatScroll}>
             {messages.map((m) => (
               <div key={m.id} className={`support-msg ${m.isBot ? 'bot' : 'user'}`}>
                 {(m.senderLabel || m.shiftCode) && (
@@ -447,7 +490,6 @@ export const SupportChatWidget = () => {
                 ))}
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {activeShiftContext && (

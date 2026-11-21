@@ -3,9 +3,9 @@
 
 :root {
   /* Typography - Be Vietnam Pro chuẩn 100% dấu tiếng Việt không bị lệch/vỡ chữ */
-  --font-display: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-family: var(--font-body);
+  --font-display: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-body: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* Primary Brand Palette: Ocean Blue to Vibrant Cyan (#5B86E5 -> #36D1DC) */
   --color-primary-50: #eff6ff;
@@ -126,15 +126,19 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+html, body, button, input, select, textarea, optgroup, option {
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html {
-  font-family: var(--font-family);
   background-color: var(--color-bg-page);
   color: var(--color-text-main);
   scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -211,7 +215,7 @@ button:active {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -231,7 +235,7 @@ button:active {
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: none;
   }
 }
 
@@ -263,6 +267,53 @@ button:active {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow: var(--shadow-card);
+}
+
+/* ==========================================================================
+   Universal Modal Centering & Viewport Guard
+   Đảm bảo 100% mọi popup/modal luôn ở chính giữa màn hình dù trang cuộn ở đâu
+   ========================================================================== */
+.dispute-modal-overlay,
+.eo-modal-overlay,
+.cani-modal-overlay,
+.modal-overlay,
+.ekyc-required-backdrop {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 999999 !important;
+  padding: 1.5rem !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+
+.dispute-modal,
+.eo-modal-box,
+.cani-modal-box,
+.ekyc-required-card {
+  position: relative !important;
+  margin: auto !important;
+  width: 100% !important;
+  max-width: 640px !important;
+  max-height: calc(100vh - 3rem) !important;
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif) !important;
 }
 
 /* Page loading fallback for React.lazy & Suspense */
@@ -472,6 +523,123 @@ label:has(input[type="radio"]) {
     padding: 1rem;
   }
 }
+
+/* ==========================================================================
+   UNIVERSAL MODAL CENTERING SYSTEM
+   Đảm bảo 100% mọi pop-up/modal luôn luôn ở chính giữa màn hình (viewport),
+   bất kể trang chính đang cuộn ở đâu.
+   ========================================================================== */
+.dispute-modal-overlay,
+.eo-modal-overlay,
+.modal-overlay,
+.cani-modal-backdrop,
+.ekyc-required-backdrop,
+.plan-modal-overlay,
+.shift-modal-overlay,
+.user-modal-overlay,
+.wage-modal-overlay,
+.ticket-modal-overlay,
+.map-modal-backdrop,
+.proof-lightbox-overlay,
+[class*="-modal-overlay"],
+[class*="-modal-backdrop"] {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 999999 !important;
+  padding: 1.25rem !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  overflow-y: auto !important;
+}
+
+.dispute-modal,
+.eo-modal-box,
+.cani-modal-dialog,
+.ekyc-required-card,
+.plan-modal-box,
+.shift-modal-box,
+.user-modal-box,
+.wage-modal-box,
+.ticket-modal-box,
+.map-modal-box,
+[class*="-modal-box"],
+[class*="-modal-card"] {
+  position: relative !important;
+  margin: auto !important;
+  width: 100% !important;
+  max-width: 620px !important;
+  max-height: calc(100vh - 2.5rem) !important;
+  max-height: calc(100dvh - 2.5rem) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(226, 232, 240, 0.8) !important;
+  box-sizing: border-box !important;
+}
+
+.dispute-modal form,
+.eo-modal-box form,
+.cani-modal-dialog form,
+.plan-modal-box form,
+.shift-modal-box form,
+.user-modal-box form,
+[class*="-modal-box"] form {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+}
+
+.dispute-modal-body,
+.eo-modal-body,
+.cani-modal-body,
+.plan-modal-body,
+.shift-modal-body,
+.user-modal-body,
+[class*="-modal-body"] {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding: 1.25rem 1.5rem !important;
+  box-sizing: border-box !important;
+}
+
+.dispute-modal-footer,
+.eo-modal-footer,
+.cani-modal-footer,
+.plan-modal-actions,
+.shift-modal-footer,
+.user-modal-footer,
+[class*="-modal-footer"] {
+  flex-shrink: 0 !important;
+  padding: 1rem 1.5rem !important;
+  border-top: 1px solid var(--color-border, #e2e8f0) !important;
+  background: var(--color-bg-subtle, #f8fafc) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.75rem !important;
+  box-sizing: border-box !important;
+}
+
 
 
 

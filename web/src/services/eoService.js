@@ -174,6 +174,15 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // UC-88: EO báo cáo Worker vắng mặt không báo trước (No-show) & kích hoạt Emergency Dispatch
+  reportNoShow: async (assignmentId, payload) => {
+    const body = typeof payload === 'string'
+      ? { notes: payload }
+      : { notes: payload?.notes || '' };
+    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/no-show`, body);
+    return response.data?.data;
+  },
+
   // UC-18: Cập nhật ca làm việc
   updateShift: async (shiftId, shiftData) => {
     const response = await apiClient.put(`/v1/eo/events/shifts/${shiftId}`, shiftData);
@@ -457,5 +466,11 @@ export const eoService = {
   getEoPublicProfile: async (eoId) => {
     const response = await apiClient.get(`/v1/eo/${eoId}/public-profile`);
     return response.data?.data;
+  },
+
+  // Lấy danh sách đánh giá & nhận xét từ người lao động dành cho EO
+  getEoReviews: async () => {
+    const response = await apiClient.get('/v1/eo/reviews');
+    return response.data?.data || [];
   },
 };

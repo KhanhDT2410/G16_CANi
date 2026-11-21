@@ -3,6 +3,7 @@ package com.cani.controller;
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
+import com.cani.dto.event.EoReviewResponseDto;
 import com.cani.dto.response.ApiResponse;
 import com.cani.security.SecurityUtils;
 import com.cani.service.EventOrganizerEkycService;
@@ -90,6 +91,19 @@ public class EventOrganizerEkycController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoProfileDto profile = eoEkycService.updateEoProfile(userId, request);
         return ResponseEntity.ok(ApiResponse.ok(profile, "Cập nhật thông tin hồ sơ doanh nghiệp thành công"));
+    }
+
+    /**
+     * Nhà tổ chức xem danh sách các đánh giá từ người lao động (Worker)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/eo/reviews")
+    public ResponseEntity<ApiResponse<List<EoReviewResponseDto>>> getMyReviews(
+            Authentication authentication) {
+
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<EoReviewResponseDto> reviews = eoEkycService.getEoReviews(userId);
+        return ResponseEntity.ok(ApiResponse.ok(reviews, "Lấy danh sách đánh giá từ người lao động thành công"));
     }
 
     /**

@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { showToast } from '../../../components/common/Toast';
+import { eoService } from '../../../services/eoService';
 import {
   DISPUTE_EVIDENCE_TYPES,
   DISPUTE_EVIDENCE_LABELS,
@@ -10,6 +12,34 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
   const [fileUrl, setFileUrl] = useState('');
   const [label, setLabel] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await eoService.uploadImage(file);
+      if (url) {
+        setFileUrl(url);
+        setFileType(DISPUTE_EVIDENCE_TYPES.IMAGE);
+        if (!label) setLabel(file.name);
+        showToast('Tải ảnh minh chứng lên thành công', 'success');
+      }
+    } catch (err) {
+      showToast('Lỗi tải ảnh: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,7 +63,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div className="dispute-modal-overlay" onClick={onClose}>
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
@@ -64,15 +94,37 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
             </div>
 
             <div className="dispute-field-group">
-              <label>Đường dẫn tệp chứng từ / Hình ảnh (URL) *</label>
+              <label>Đường dẫn tệp chứng từ / Hình ảnh *</label>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label className="btn-quick-fill" style={{ margin: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                  {uploading ? 'Đang tải ảnh...' : 'Chọn ảnh từ thiết bị'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                  />
+                </label>
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>hoặc dán đường dẫn trực tiếp</span>
+              </div>
               <input
-                type="url"
+                type="text"
                 className="dispute-input"
-                placeholder="https://storage.cani.vn/disputes/..."
+                placeholder="https://... hoặc đường dẫn hình ảnh"
                 value={fileUrl}
                 onChange={(e) => setFileUrl(e.target.value)}
                 required
               />
+              {fileUrl && fileType === DISPUTE_EVIDENCE_TYPES.IMAGE && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <img
+                    src={fileUrl}
+                    alt="Xem trước ảnh"
+                    style={{ maxHeight: 100, maxWidth: '100%', borderRadius: 6, border: '1px solid #cbd5e1', objectFit: 'cover' }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="dispute-field-group">
@@ -107,7 +159,8 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

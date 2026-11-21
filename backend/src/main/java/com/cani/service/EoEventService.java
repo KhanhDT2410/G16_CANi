@@ -1,11 +1,13 @@
 package com.cani.service;
 
+import com.cani.dto.admin.noshow.NoShowResponseDto;
 import com.cani.dto.event.*;
 import com.cani.dto.worker.ShiftChecklistItemDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
+import com.cani.entity.enums.NoShowDetectedBy;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.VerificationStatus;
@@ -81,6 +83,9 @@ public class EoEventService {
 
     @Autowired(required = false)
     private SkillProgressionService skillProgressionService;
+
+    @Autowired(required = false)
+    private NoShowService noShowService;
 
     /**
      * EO tạo Sự kiện mới (Trạng thái DRAFT)
@@ -584,6 +589,34 @@ public class EoEventService {
         com.cani.dto.dispute.DisputeDetailResponseDto dispute = disputeService.createDispute(userId, disputeReq);
         log.info("EO {} đã báo cáo công việc không đạt cho assignment {}: disputeId={}", eo.getEoId(), assignmentId, dispute.getId());
         return dispute;
+    }
+
+    /**
+     * UC-88: EO báo cáo Worker vắng mặt không báo trước (Report No-Show)
+     * Kích hoạt chế tài phạt 25 RS, tự động khóa tài khoản nếu RS < 20 và kích hoạt Emergency Dispatch bù người.
+     */
+    @Transactional
+    public NoShowResponseDto reportNoShow(UUID userId, UUID assignmentId, ReportNoShowRequestDto request) {
+        EventOrganizer eo = getEoOrThrow(userId);
+        ShiftAssignment sa = getOwnedAssignmentOrThrow(assignmentId, eo.getEoId());
+
+        if (noShowService == null) {
+            throw new BadRequestException("Hệ thống xử lý vi phạm No-show đang tạm bảo trì");
+        }
+
+        Shift shift = sa.getShift();
+        if (shift != null && shift.getStartTime() != null) {
+            if (Instant.now().isBefore(shift.getStartTime())) {
+                throw new BadRequestException("Ca làm việc chưa đến giờ bắt đầu, chưa thể báo cáo vắng mặt (No-show).");
+            }
+        }
+
+        String notes = (request != null && request.getNotes() != null && !request.getNotes().trim().isEmpty())
+                ? request.getNotes().trim()
+                : "Nhà tổ chức sự kiện báo cáo nhân sự không có mặt khi ca làm việc bắt đầu.";
+
+        UUID eoUserId = resolveEoUserId(eo, userId);
+        return noShowService.markNoShow(assignmentId, NoShowDetectedBy.EVENT_ORGANIZER, eoUserId, notes);
     }
 
     /**

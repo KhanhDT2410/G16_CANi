@@ -5,6 +5,7 @@ import { showToast } from '../../../components/common/Toast';
 import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
+import { formatDevelopmentAndRank } from '../utils/skillDisplayUtils';
 
 export default function EOMyTeamTab() {
   const [team, setTeam] = useState([]);
@@ -182,18 +183,7 @@ export default function EOMyTeamTab() {
   const savedWorkerIds = new Set(team.map((t) => t.workerId));
   const unsavedCollaborators = collaborators.filter((c) => !c.isSavedInMyTeam && !savedWorkerIds.has(c.workerId));
 
-  const formatTierLabel = (tier) => {
-    switch (tier) {
-      case 'EXPERT':
-        return 'Chuyên gia';
-      case 'PRO':
-        return 'Thành thạo';
-      case 'CAPABLE':
-        return 'Có kinh nghiệm';
-      default:
-        return 'Cơ bản';
-    }
-  };
+  const formatTierLabel = (tier) => formatDevelopmentAndRank(tier);
 
   return (
     <div className="eo-my-team-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

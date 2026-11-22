@@ -29,6 +29,10 @@ public class WorkerSkillPoint {
     @JoinColumn(name = "worker_id", nullable = false)
     private Worker worker;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "skill_id")
+    private Skill skill;
+
     @Column(name = "job_type", nullable = false, length = 100)
     private String jobType;
 
@@ -64,7 +68,11 @@ public class WorkerSkillPoint {
 
     @Column(name = "avg_rating", precision = 3, scale = 2)
     @Builder.Default
-    private BigDecimal avgRating = BigDecimal.valueOf(5.0);
+    private BigDecimal avgRating = BigDecimal.ZERO;
+
+    @Column(name = "rating_count", nullable = false)
+    @Builder.Default
+    private Integer ratingCount = 0;
 
     @UpdateTimestamp
     @Column(name = "updated_at")

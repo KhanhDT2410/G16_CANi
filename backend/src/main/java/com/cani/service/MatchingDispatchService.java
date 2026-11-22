@@ -55,6 +55,29 @@ public class MatchingDispatchService {
     @Autowired(required = false)
     private com.cani.repository.WorkerAvailabilityRepository workerAvailabilityRepository;
 
+    @Autowired(required = false)
+    private com.cani.repository.ShiftSkillRequirementRepository shiftSkillRequirementRepository;
+
+    @Autowired(required = false)
+    private com.cani.repository.SkillRepository skillRepository;
+
+    @Autowired(required = false)
+    private WorkerShiftEligibilityService workerShiftEligibilityService;
+
+    private WorkerShiftEligibilityService getEligibilityService() {
+        if (workerShiftEligibilityService != null) {
+            return workerShiftEligibilityService;
+        }
+        return WorkerShiftEligibilityService.withFallbackDependencies(
+                workerSkillRepository,
+                shiftSkillRequirementRepository,
+                shiftAssignmentRepository,
+                workerAvailabilityRepository,
+                blockListService,
+                skillRepository
+        );
+    }
+
     private static final List<ProposalStatus> ACTIVE_PROPOSAL_STATUSES = List.of(
             ProposalStatus.PENDING, ProposalStatus.ACCEPTED
     );
@@ -291,7 +314,7 @@ public class MatchingDispatchService {
             if (needed <= 0) {
                 continue;
             }
-            if (!passHardFilter(worker, shift)) {
+            if (!passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.REVERSE_MATCHING)) {
                 continue;
             }
             Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
@@ -371,179 +394,11 @@ public class MatchingDispatchService {
      * Hard Filter: Loại bỏ các ứng viên không đạt tiêu chuẩn tối thiểu
      */
     private boolean passHardFilter(Worker worker, Shift shift) {
-        if (worker == null || shift == null) {
-            return false;
-        }
-
-        // 1. Phải bật trạng thái "Bắt đầu kiếm việc" (isOnline == true, không chấp nhận null)
-        if (!Boolean.TRUE.equals(worker.getIsOnline())) {
-            return false;
-        }
-
-        // 1b. Bắt buộc tài khoản đã hoàn tất định danh eKYC (KycStatus == APPROVED)
-        if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
-            return false;
-        }
-
-        // 2. Tài khoản User phải ACTIVE
-        if (worker.getUser() == null || worker.getUser().getStatus() != UserStatus.ACTIVE) {
-            return false;
-        }
-
-        // 3. Điểm tin cậy (Reliability Score) >= 60 (hoặc theo yêu cầu của shift)
-        int minRs = shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0
-                ? shift.getMinReliabilityScore() : MIN_RELIABILITY_SCORE;
-        if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
-            return false;
-        }
-
-        // 4. Kiểm tra kinh nghiệm tối thiểu nếu ca làm có yêu cầu (minExperienceLevel)
-        if (shift.getMinExperienceLevel() != null) {
-            int requiredShifts = switch (shift.getMinExperienceLevel()) {
-                case INTERMEDIATE -> 3;
-                case ADVANCED -> 5;
-                case EXPERT -> 10;
-                default -> 0;
-            };
-            int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
-            if (completed < requiredShifts) {
-                return false;
-            }
-        }
-
-        // 4b. Kiểm tra kỹ năng bắt buộc theo tiêu chí ca làm việc (fail-closed nếu không truy vấn được dữ liệu kỹ năng)
-        if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0) {
-            Set<UUID> requiredSkillIds = Arrays.stream(shift.getRequiredSkills())
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            if (!requiredSkillIds.isEmpty()) {
-                if (workerSkillRepository == null) {
-                    log.error("Từ chối worker {} cho ca {}: hệ thống không thể truy vấn WorkerSkillRepository.",
-                            worker.getWorkerId(), shift.getShiftId());
-                    return false;
-                }
-                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
-                if (workerSkills == null) {
-                    return false;
-                }
-                Instant now = Instant.now();
-                Set<UUID> haveSkillIds = workerSkills.stream()
-                        .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
-                        .filter(ws -> ws.getExpiresAt() == null || ws.getExpiresAt().isAfter(now))
-                        .map(ws -> ws.getSkill().getSkillId())
-                        .collect(Collectors.toSet());
-                if (!haveSkillIds.containsAll(requiredSkillIds)) {
-                    return false;
-                }
-            }
-        }
-
-        // 5. Kiểm tra xung đột lịch làm việc (Không được trùng ca đã xác nhận/đang chờ)
-        List<AssignmentStatus> activeStatuses = List.of(
-                AssignmentStatus.CONFIRMED,
-                AssignmentStatus.CHECKED_IN,
-                AssignmentStatus.PENDING
-        );
-        List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
-                worker.getWorkerId(),
-                shift.getStartTime(),
-                shift.getEndTime(),
-                activeStatuses
-        );
-        if (conflicts != null && !conflicts.isEmpty()) {
-            return false;
-        }
-
-        // 6. Kiểm tra Danh sách Chặn (UC-38, UC-39): Không match nếu Worker hoặc EO đã chặn nhau
-        if (blockListService != null && shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null) {
-            EventOrganizer eo = shift.getEvent().getEventOrganizer();
-            if (eo.getUser() != null && worker.getUser() != null) {
-                if (blockListService.isEitherBlocked(eo.getUser().getUserId(), worker.getUser().getUserId())) {
-                    log.debug("Loại trừ ứng viên {} do có chặn tương tác với EO {}", worker.getWorkerId(), eo.getEoId());
-                    return false;
-                }
-            }
-        }
-
-        // 7. Kiểm tra mức lương tối thiểu theo tiêu chí tìm việc của Worker (Worker Preferences: minWage)
-        if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0) {
-            if (shift.getHourlyWage() == null || shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
-                log.debug("Loại trừ ứng viên {}: Lương ca làm ({} đ) không đáp ứng lương tối thiểu mong muốn ({} đ)",
-                        worker.getWorkerId(), shift.getHourlyWage(), worker.getMinWage());
-                return false;
-            }
-        }
-
-        // 8. Kiểm tra lịch rảnh cố định hàng tuần (Worker Availability: 1=T2 ... 6=T7, 0=CN)
-        if (!isShiftCoveredByAvailability(worker, shift)) {
-            log.debug("Loại trừ ứng viên {}: Ca làm không nằm trong khung giờ rảnh hàng tuần đã cài đặt", worker.getWorkerId());
-            return false;
-        }
-
-        return true;
+        return passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.MATCHING_DISPATCH);
     }
 
-    /**
-     * Kiểm tra ca làm có nằm trong lịch rảnh cố định hàng tuần của Worker hay không.
-     * Quy tắc Kỹ nghệ:
-     * - Nếu Worker chưa cấu hình lịch rảnh (bảng trống) -> xem như rảnh linh hoạt toàn thời gian (return true).
-     * - Nếu Worker đã cấu hình lịch rảnh -> ca làm việc bắt buộc phải nằm trọn trong ít nhất một slot rảnh.
-     */
-    private boolean isShiftCoveredByAvailability(Worker worker, Shift shift) {
-        if (workerAvailabilityRepository == null || shift.getStartTime() == null || shift.getEndTime() == null) {
-            return true;
-        }
-
-        List<WorkerAvailability> slots = workerAvailabilityRepository
-                .findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId());
-
-        if (slots == null || slots.isEmpty()) {
-            return true;
-        }
-
-        List<WorkerAvailability> availableSlots = slots.stream()
-                .filter(s -> Boolean.TRUE.equals(s.getIsAvailable()))
-                .toList();
-
-        if (availableSlots.isEmpty()) {
-            return false;
-        }
-
-        ZoneId vnZone = ZoneId.of("Asia/Ho_Chi_Minh");
-        ZonedDateTime shiftStart = shift.getStartTime().atZone(vnZone);
-        ZonedDateTime shiftEnd = shift.getEndTime().atZone(vnZone);
-
-        // Day of week mapping chuẩn CANi: 0=Chủ Nhật, 1=Thứ Hai, ..., 6=Thứ Bảy
-        int shiftDayOfWeek = shiftStart.getDayOfWeek().getValue() % 7;
-        LocalTime shiftStartTime = shiftStart.toLocalTime();
-        LocalTime shiftEndTime = shiftEnd.toLocalTime();
-
-        for (WorkerAvailability slot : availableSlots) {
-            if (slot.getDayOfWeek() == null || slot.getDayOfWeek() != shiftDayOfWeek) {
-                continue;
-            }
-            LocalTime slotStart = slot.getStartTime();
-            LocalTime slotEnd = slot.getEndTime();
-            if (slotStart == null || slotEnd == null) {
-                continue;
-            }
-
-            // Trường hợp 1: Slot trong cùng 1 ngày (ví dụ 08:00 -> 17:00 hoặc 18:00 -> 23:00)
-            if (!slotEnd.isBefore(slotStart)) {
-                if (shiftStart.toLocalDate().equals(shiftEnd.toLocalDate())) {
-                    if (!shiftStartTime.isBefore(slotStart) && !shiftEndTime.isAfter(slotEnd)) {
-                        return true;
-                    }
-                }
-            } else {
-                // Trường hợp 2: Slot làm việc qua đêm (ví dụ 22:00 -> 06:00 hôm sau)
-                if (!shiftStartTime.isBefore(slotStart) || !shiftEndTime.isAfter(slotEnd)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+    private boolean passHardFilter(Worker worker, Shift shift, WorkerShiftEligibilityService.MatchingChannel channel) {
+        return getEligibilityService().evaluate(worker, shift, channel).eligible();
     }
 
     /**
@@ -577,35 +432,24 @@ public class MatchingDispatchService {
         double newWorkerBonus = (completedShifts < 3) ? newWorkerBoostConfig : 0.0;
         double idleBonus = isEligibleForIdleBoost(worker, completedShifts) ? idleWorkerBoostConfig : 0.0;
 
-        // Bonus kỹ năng đã xác thực còn hiệu lực & khớp kỹ năng yêu cầu của ca: +10.0
-        double skillBonus = 0.0;
-        if (shift != null && shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
-            Set<UUID> reqIds = Arrays.stream(shift.getRequiredSkills()).filter(Objects::nonNull).collect(Collectors.toSet());
-            if (!reqIds.isEmpty()) {
-                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
-                if (workerSkills != null) {
-                    Instant now = Instant.now();
-                    boolean hasVerifiedSkill = workerSkills.stream()
-                            .anyMatch(ws -> ws.getSkill() != null
-                                    && reqIds.contains(ws.getSkill().getSkillId())
-                                    && ws.getVerificationTier() != null
-                                    && ws.getVerificationTier() != com.cani.entity.enums.VerificationTier.SELF_DECLARED
-                                    && (ws.getExpiresAt() == null || ws.getExpiresAt().isAfter(now)));
-                    if (hasVerifiedSkill) {
-                        skillBonus = 10.0;
-                    }
-                }
-            }
-        }
+        // SkillFitBonus V3 = 6 * RequiredQuality + 4 * PreferredFit (tổng tối đa 10.0)
+        WorkerShiftEligibilityService.SkillFitResult skillFit = getEligibilityService().evaluateSkillFit(worker, shift);
+        double requiredSkillQuality = skillFit.requiredQuality();
+        double preferredSkillFit = skillFit.preferredFit();
+        double skillFitBonus = skillFit.skillFitBonus();
+        String matchedSkillIdsJson = skillFit.matchedSkillIds().stream()
+                .map(id -> "\"" + id + "\"")
+                .collect(Collectors.joining(",", "[", "]"));
 
-        double rawFinalScore = (0.4 * distanceScore) + (0.3 * ratingScore) + (0.2 * expScore) + (0.1 * rsScore)
-                + newWorkerBonus + idleBonus + skillBonus;
+        double baseScore = (0.4 * distanceScore) + (0.3 * ratingScore) + (0.2 * expScore) + (0.1 * rsScore);
+        double rawFinalScore = baseScore + newWorkerBonus + idleBonus + skillFitBonus;
         double finalScore = Double.isFinite(rawFinalScore) ? rawFinalScore : 0.0;
 
         String breakdownJson = String.format(
                 Locale.US,
-                "{\"distanceKm\":%.2f,\"distScore\":%.1f,\"ratingScore\":%.1f,\"expScore\":%.1f,\"rsScore\":%.1f,\"newWorkerBonus\":%.1f,\"idleBonus\":%.1f,\"skillBonus\":%.1f,\"finalScore\":%.2f}",
-                safeDistanceKm, distanceScore, ratingScore, expScore, rsScore, newWorkerBonus, idleBonus, skillBonus, finalScore
+                "{\"algorithmVersion\":\"v3.0\",\"distanceKm\":%.2f,\"baseScore\":%.2f,\"distScore\":%.1f,\"ratingScore\":%.1f,\"expScore\":%.1f,\"rsScore\":%.1f,\"newWorkerBonus\":%.1f,\"idleBonus\":%.1f,\"requiredSkillQuality\":%.2f,\"preferredSkillFit\":%.2f,\"skillFitBonus\":%.2f,\"skillBonus\":%.2f,\"finalScore\":%.2f,\"matchedSkillIds\":%s}",
+                safeDistanceKm, baseScore, distanceScore, ratingScore, expScore, rsScore,
+                newWorkerBonus, idleBonus, requiredSkillQuality, preferredSkillFit, skillFitBonus, skillFitBonus, finalScore, matchedSkillIdsJson
         );
 
         return CandidateMatch.builder()
@@ -685,7 +529,7 @@ public class MatchingDispatchService {
 
         List<CandidateMatch> matchedCandidates = new ArrayList<>();
         for (Worker worker : onlineWorkers) {
-            if (!passHardFilter(worker, shift)) {
+            if (!passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_DISPATCH)) {
                 continue;
             }
             if (!isValidCoordinate(worker.getBaseLat(), worker.getBaseLng())) {

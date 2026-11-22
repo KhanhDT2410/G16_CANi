@@ -115,6 +115,10 @@ export function usePayments() {
 
   const handleDeclarePayment = async (e) => {
     e.preventDefault();
+    if (paymentForm.paymentMethod === 'BANK_TRANSFER' && !paymentForm.paymentProofUrl) {
+      showToast('Vui lòng tải lên ảnh chụp biên lai chuyển khoản làm bằng chứng đối soát!', 'warning');
+      return;
+    }
     try {
       await eoService.declarePayment(paymentForm);
       setShowPaymentModal(false);
@@ -126,12 +130,18 @@ export function usePayments() {
                 declaredAmount: paymentForm.declaredAmount,
                 paymentMethod: paymentForm.paymentMethod,
                 externalRef: paymentForm.externalRef,
+                paymentProofUrl: paymentForm.paymentProofUrl,
                 status: 'DECLARED_PENDING_WORKER',
               }
             : p
         )
       );
-      showToast('Khai báo thanh toán thành công! Hệ thống đã gửi thông báo đến Worker để xác nhận.', 'success');
+      window.dispatchEvent(
+        new CustomEvent('cani_payment_updated', {
+          detail: { assignmentId: paymentForm.assignmentId },
+        })
+      );
+      showToast('Khai báo thanh toán thành công! Hệ thống đã gửi thông báo & email chứng từ đến Worker.', 'success');
     } catch (error) {
       if (import.meta.env.VITE_DEMO === 'true') {
         setPayments((prev) =>
@@ -157,12 +167,13 @@ export function usePayments() {
 
   const handleOpenPaymentDeclarationFromAttendance = (attendanceItem) => {
     setSelectedAssignment(attendanceItem);
+    const hasBank = Boolean(attendanceItem.bankCode && attendanceItem.bankAccountNumber);
     setPaymentForm({
       assignmentId: attendanceItem.assignmentId,
-      declaredAmount: attendanceItem.agreedWage || 200000,
-      paymentMethod: 'BANK_TRANSFER',
-      externalRef: `VCB-${Date.now().toString().slice(-6)}`,
-      paymentProofUrl: '',
+      declaredAmount: attendanceItem.declaredAmount ?? attendanceItem.agreedWage ?? attendanceItem.agreedAmount ?? 200000,
+      paymentMethod: attendanceItem.paymentMethod || (hasBank ? 'BANK_TRANSFER' : 'CASH'),
+      externalRef: attendanceItem.externalRef || `VCB-${Date.now().toString().slice(-6)}`,
+      paymentProofUrl: attendanceItem.paymentProofUrl || '',
     });
     setShowPaymentModal(true);
   };

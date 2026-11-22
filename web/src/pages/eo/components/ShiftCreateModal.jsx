@@ -364,10 +364,17 @@ const ShiftCreateModal = ({
             </div>
           </div>
 
-          {/* KỸ NĂNG BẮT BUỘC CHO CA NÀY (DYNAMIC CUSTOM SKILLS + TAXONOMY) */}
+          {/* KỸ NĂNG BẮT BUỘC / ƯU TIÊN & KỸ NĂNG CHÍNH */}
           <ShiftSkillSelector
+            jobType={newShift.jobType}
             selectedSkillIds={newShift.requiredSkills}
             onChange={(nextSkills) => setNewShift({ ...newShift, requiredSkills: nextSkills })}
+            performedSkillId={newShift.performedSkillId}
+            onPerformedSkillChange={(nextId) => setNewShift((prev) => ({ ...prev, performedSkillId: nextId }))}
+            skillRequirements={newShift.skillRequirements}
+            onSkillRequirementsChange={(nextReqs) => setNewShift((prev) => ({ ...prev, skillRequirements: nextReqs }))}
+            customSkillNotes={newShift.customSkillNotes}
+            onCustomSkillNotesChange={(notes) => setNewShift((prev) => ({ ...prev, customSkillNotes: notes }))}
             taxonomy={skillTaxonomy}
           />
 

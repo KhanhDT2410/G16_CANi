@@ -2,6 +2,7 @@ import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 
 import '../models/proposal_models.dart';
+import 'shift_workflow_stepper.dart';
 
 class ShiftAssignmentCard extends StatelessWidget {
   final ShiftAssignmentItem assignment;
@@ -31,9 +32,11 @@ class ShiftAssignmentCard extends StatelessWidget {
     final cani = Theme.of(context).cani;
     final isCheckedIn = a.status == 'CHECKED_IN' || (a.checkinTime != null && a.checkoutTime == null);
     final isCompleted = a.status == 'COMPLETED' || a.checkoutTime != null;
+    final isOverdueCheckout = !isCompleted && isCheckedIn && DateTime.now().isAfter(a.endTime);
     final isCancelledOrNoShow = a.status == 'CANCELLED' || a.status == 'NO_SHOW' || a.attendanceStatus == 'NO_SHOW';
     final isExpired = !isCheckedIn && !isCompleted && (isCancelledOrNoShow || DateTime.now().isAfter(a.endTime));
     final isNotStarted = !isCheckedIn && !isCompleted && !isExpired;
+    final isPaymentConfirmed = isAssignmentPaymentConfirmed(a);
 
     final isDeclared = a.paymentStatus == 'DECLARED_PENDING_WORKER';
     final isConfirmedFull = a.paymentStatus == 'CONFIRMED_FULL';
@@ -44,7 +47,9 @@ class ShiftAssignmentCard extends StatelessWidget {
         ? cani.danger
         : (isCompleted
             ? const Color(0xFF7E22CE)
-            : (isCheckedIn ? const Color(0xFF10B981) : cani.brand));
+            : (isOverdueCheckout
+                ? cani.warning
+                : (isCheckedIn ? const Color(0xFF10B981) : cani.brand)));
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -94,9 +99,11 @@ class ShiftAssignmentCard extends StatelessWidget {
                             ? const Color(0xFFFEF2F2)
                             : (isCompleted
                                 ? const Color(0xFFF3E8FF)
-                                : (isCheckedIn
-                                    ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                    : cani.brand.withValues(alpha: 0.10))),
+                                : (isOverdueCheckout
+                                    ? cani.warningBg
+                                    : (isCheckedIn
+                                        ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                        : cani.brand.withValues(alpha: 0.10)))),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -111,7 +118,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                                   ? cani.danger
                                   : (isCompleted
                                       ? const Color(0xFF7E22CE)
-                                      : (isCheckedIn ? const Color(0xFF10B981) : cani.brand)),
+                                      : (isOverdueCheckout
+                                          ? cani.warning
+                                          : (isCheckedIn ? const Color(0xFF10B981) : cani.brand))),
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -122,7 +131,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                                     : (a.status == 'NO_SHOW' ? 'VẮNG MẶT' : 'HẾT HẠN ĐIỂM DANH'))
                                 : (isCompleted
                                     ? 'ĐÃ HOÀN THÀNH'
-                                    : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN')),
+                                    : (isOverdueCheckout
+                                        ? 'QUÁ GIỜ · CHỜ KẾT CA'
+                                        : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN'))),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
@@ -131,7 +142,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                                   ? cani.danger
                                   : (isCompleted
                                       ? const Color(0xFF7E22CE)
-                                      : (isCheckedIn ? const Color(0xFF059669) : cani.brand)),
+                                      : (isOverdueCheckout
+                                          ? cani.warning
+                                          : (isCheckedIn ? const Color(0xFF059669) : cani.brand))),
                             ),
                           ),
                         ],
@@ -194,7 +207,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.venueAddress}',
+                        '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.startTime.day.toString().padLeft(2, '0')}/${a.startTime.month.toString().padLeft(2, '0')} · ${a.venueAddress}',
                         style: TextStyle(
                           fontSize: 11.5,
                           color: cani.textMuted,
@@ -230,22 +243,41 @@ class ShiftAssignmentCard extends StatelessWidget {
                     ),
                   ),
 
-                // Kỹ năng bắt buộc (chips)
-                if (a.requiredSkillNames.isNotEmpty)
+                // Kỹ năng chính & kỹ năng bắt buộc (chips)
+                if (a.confirmedPerformedSkillName != null || a.performedSkillName != null || a.requiredSkillNames.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Wrap(
                       spacing: 6,
                       runSpacing: 4,
-                      children: a.requiredSkillNames.map((n) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
-                        ),
-                        child: Text(n, style: TextStyle(fontSize: 11, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
-                      )).toList(),
+                      children: [
+                        if ((a.confirmedPerformedSkillName ?? a.performedSkillName) != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F2922) : const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: isDark ? const Color(0xFF065F46) : const Color(0xFFA7F3D0)),
+                            ),
+                            child: Text(
+                              'Kỹ năng chính: ${a.confirmedPerformedSkillName ?? a.performedSkillName}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.greenAccent : const Color(0xFF047857),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ...a.requiredSkillNames.map((n) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                          ),
+                          child: Text(n, style: TextStyle(fontSize: 11, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
+                        )),
+                      ],
                     ),
                   ),
 
@@ -272,10 +304,26 @@ class ShiftAssignmentCard extends StatelessWidget {
                         ],
                       ),
                       child: ElevatedButton.icon(
-                        onPressed: onQrScan,
-                        icon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Colors.white),
+                        onPressed: !isCheckedIn
+                            ? onQrScan
+                            : (!a.eoConfirmed
+                                ? (onOpenChecklist ?? onTap)
+                                : (!isPaymentConfirmed ? onConfirmPayment : onQrScan)),
+                        icon: Icon(
+                          !isCheckedIn || (a.eoConfirmed && isPaymentConfirmed)
+                              ? Icons.qr_code_scanner_rounded
+                              : (!a.eoConfirmed ? Icons.fact_check_outlined : Icons.payments_outlined),
+                          size: 18,
+                          color: Colors.white,
+                        ),
                         label: Text(
-                          isCheckedIn ? 'Quét QR Check-out (Kết ca)' : 'Quét QR Check-in (Vào ca)',
+                          !isCheckedIn
+                              ? 'Quét QR Check-in (Vào ca)'
+                              : (!a.eoConfirmed
+                                  ? 'Đầu việc & Chờ duyệt (Bước 2–3)'
+                                  : (!isPaymentConfirmed
+                                      ? 'Thanh toán thù lao (Bước 4)'
+                                      : 'Quét QR Check-out (Bước 5)')),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,

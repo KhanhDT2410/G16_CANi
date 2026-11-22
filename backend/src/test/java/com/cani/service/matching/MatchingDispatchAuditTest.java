@@ -376,7 +376,7 @@ class MatchingDispatchAuditTest {
         }
 
         @Test
-        @DisplayName("Verified skill còn hạn cộng +10.0, SELF_DECLARED không cộng bonus")
+        @DisplayName("Verified skill còn hạn tính SkillFitBonus = 6*RequiredQuality, SELF_DECLARED = 0")
         void softRanking_VerifiedSkillBonusAppliedProperly() {
             UUID reqSkill = UUID.randomUUID();
             activeShift.setRequiredSkills(new UUID[]{reqSkill});
@@ -403,8 +403,70 @@ class MatchingDispatchAuditTest {
             DispatchProposal first = captor.getAllValues().get(0);
             DispatchProposal second = captor.getAllValues().get(1);
             assertEquals(verifiedWorker.getWorkerId(), first.getWorker().getWorkerId());
-            assertTrue(first.getScoreBreakdown().contains("\"skillBonus\":10.0"));
-            assertTrue(second.getScoreBreakdown().contains("\"skillBonus\":0.0"));
+            assertTrue(first.getScoreBreakdown().contains("\"skillFitBonus\":6.00"));
+            assertTrue(second.getScoreBreakdown().contains("\"skillFitBonus\":0.00"));
+        }
+
+        @Test
+        @DisplayName("V3 Ranking Fixture 3 Worker (Base 78 / 80 / 75): SkillFitBonus 6*Required + 4*Preferred đảo xếp hạng chuẩn xác")
+        void softRanking_ThreeWorkerFixtureWithRequiredAndPreferredQuality() {
+            UUID reqId = UUID.randomUUID();
+            UUID prefId = UUID.randomUUID();
+            Skill reqSkill = Skill.builder().skillId(reqId).name("Phục vụ bàn").isActive(true).build();
+            Skill prefSkill = Skill.builder().skillId(prefId).name("Tiếng Anh giao tiếp").isActive(true).build();
+
+            // Sử dụng shiftSkillRequirementRepository để cấu hình 1 REQUIRED + 1 PREFERRED
+            com.cani.repository.ShiftSkillRequirementRepository reqRepo = mock(com.cani.repository.ShiftSkillRequirementRepository.class);
+            ReflectionTestUtils.setField(matchingDispatchService, "shiftSkillRequirementRepository", reqRepo);
+
+            when(reqRepo.findByShiftIdWithSkill(activeShift.getShiftId())).thenReturn(List.of(
+                    com.cani.entity.ShiftSkillRequirement.builder()
+                            .shift(activeShift).skill(reqSkill)
+                            .requirementType(com.cani.entity.enums.SkillRequirementType.REQUIRED)
+                            .minVerificationTier(VerificationTier.SELF_DECLARED).build(),
+                    com.cani.entity.ShiftSkillRequirement.builder()
+                            .shift(activeShift).skill(prefSkill)
+                            .requirementType(com.cani.entity.enums.SkillRequirementType.PREFERRED)
+                            .minVerificationTier(VerificationTier.SELF_DECLARED).build()
+            ));
+
+            // Worker A: Base ~ 78 (dist=40 + rating=3.5->21 + exp=5->10 + rs=70->7 = 78.0) + Req PLATFORM_PROVEN(6) + Pref AI_DOC(2) = 86.0
+            Worker workerA = createEligibleWorker("W_A_Base78", 10.7769, 106.7009, 3.5, 5, 5, 70);
+            // Worker B: Base ~ 80 (dist=40 + rating=4.0->24 + exp=5->10 + rs=60->6 = 80.0) + SELF_DECLARED(0) = 80.0
+            Worker workerB = createEligibleWorker("W_B_Base80", 10.7769, 106.7009, 4.0, 5, 5, 60);
+            // Worker C: Base ~ 75 (dist=40 + rating=3.0->18 + exp=5->10 + rs=70->7 = 75.0) + Req AI_DOC(3) + Pref PLATFORM_PROVEN(4) = 82.0
+            Worker workerC = createEligibleWorker("W_C_Base75", 10.7769, 106.7009, 3.0, 5, 5, 70);
+
+            when(workerSkillRepository.findByWorker_WorkerId(workerA.getWorkerId())).thenReturn(List.of(
+                    WorkerSkill.builder().worker(workerA).skill(reqSkill).verificationTier(VerificationTier.PLATFORM_PROVEN).build(),
+                    WorkerSkill.builder().worker(workerA).skill(prefSkill).verificationTier(VerificationTier.AI_DOCUMENT)
+                            .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS)).build()
+            ));
+            when(workerSkillRepository.findByWorker_WorkerId(workerB.getWorkerId())).thenReturn(List.of(
+                    WorkerSkill.builder().worker(workerB).skill(reqSkill).verificationTier(VerificationTier.SELF_DECLARED).build()
+            ));
+            when(workerSkillRepository.findByWorker_WorkerId(workerC.getWorkerId())).thenReturn(List.of(
+                    WorkerSkill.builder().worker(workerC).skill(reqSkill).verificationTier(VerificationTier.AI_DOCUMENT)
+                            .expiresAt(Instant.now().plus(10, ChronoUnit.DAYS)).build(),
+                    WorkerSkill.builder().worker(workerC).skill(prefSkill).verificationTier(VerificationTier.PLATFORM_PROVEN).build()
+            ));
+
+            when(shiftRepository.findById(activeShift.getShiftId())).thenReturn(Optional.of(activeShift));
+            when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(workerB, workerC, workerA));
+            when(dispatchProposalRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            matchingDispatchService.dispatchForShift(activeShift.getShiftId());
+
+            ArgumentCaptor<DispatchProposal> captor = ArgumentCaptor.forClass(DispatchProposal.class);
+            verify(dispatchProposalRepository, times(3)).save(captor.capture());
+
+            List<DispatchProposal> saved = captor.getAllValues();
+            assertEquals(workerA.getWorkerId(), saved.get(0).getWorker().getWorkerId()); // 86.0
+            assertEquals(workerC.getWorkerId(), saved.get(1).getWorker().getWorkerId()); // 82.0
+            assertEquals(workerB.getWorkerId(), saved.get(2).getWorker().getWorkerId()); // 80.0
+            assertTrue(saved.get(0).getScoreBreakdown().contains("\"skillFitBonus\":8.00"));
+            assertTrue(saved.get(1).getScoreBreakdown().contains("\"skillFitBonus\":7.00"));
+            assertTrue(saved.get(2).getScoreBreakdown().contains("\"skillFitBonus\":0.00"));
         }
 
         @Test

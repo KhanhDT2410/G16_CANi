@@ -2,112 +2,116 @@ import 'package:flutter/material.dart';
 
 import 'skill_hub_theme.dart';
 
+/// Thanh 4 tác vụ nhanh không trùng lặp trên màn hình Kỹ năng của tôi.
 class QuickActionBar extends StatelessWidget {
-  final VoidCallback onStartAiVerification;
   final VoidCallback onDeclareSkills;
+  final VoidCallback onStartAiVerification;
   final VoidCallback onViewHistory;
+  final VoidCallback? onViewPolicy;
 
   const QuickActionBar({
     super.key,
     required this.onStartAiVerification,
     required this.onDeclareSkills,
     required this.onViewHistory,
+    this.onViewPolicy,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        // Main AI Verification Button
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: onStartAiVerification,
-              icon: const Icon(Icons.document_scanner_outlined, size: 18, color: Colors.white),
-              label: const Text(
-                'Thẩm định kỹ năng AI',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: SkillHubColors.ctaPrimary,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.add_circle_outline_rounded,
+                label: 'Khai báo kỹ năng',
+                color: SkillHubColors.textPrimary,
+                bgColor: SkillHubColors.surface,
+                onTap: onDeclareSkills,
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.document_scanner_outlined,
+                label: 'Tải chứng chỉ',
+                color: Colors.white,
+                bgColor: SkillHubColors.ctaPrimary,
+                isPrimary: true,
+                onTap: onStartAiVerification,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-
-        // Sub-add Button (+) for fast Self-declaration
-        Tooltip(
-          message: 'Tự khai báo kỹ năng',
-          child: InkWell(
-            onTap: onDeclareSkills,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: SkillHubColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: SkillHubColors.borderSoft, width: 1.5),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x0A03045E),
-                    blurRadius: 6,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.add,
-                size: 22,
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.folder_copy_outlined,
+                label: 'Kho chứng chỉ',
                 color: SkillHubColors.textSecondary,
+                bgColor: SkillHubColors.surface,
+                onTap: onViewHistory,
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 8),
-
-        // Vault / History button
-        Tooltip(
-          message: 'Kho chứng chỉ & Lịch sử',
-          child: InkWell(
-            onTap: onViewHistory,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: SkillHubColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: SkillHubColors.borderSoft, width: 1.5),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x0A03045E),
-                    blurRadius: 6,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.history_edu_outlined,
-                size: 20,
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.menu_book_outlined,
+                label: 'Quy chế điểm',
                 color: SkillHubColors.textSecondary,
+                bgColor: SkillHubColors.surface,
+                onTap: onViewPolicy ?? onViewHistory,
               ),
             ),
-          ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color bgColor,
+    required VoidCallback onTap,
+    bool isPrimary = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+          border: isPrimary ? null : Border.all(color: SkillHubColors.borderSoft, width: 1.2),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

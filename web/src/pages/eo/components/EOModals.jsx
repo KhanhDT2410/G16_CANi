@@ -94,6 +94,7 @@ export default function EOModals({
         isOpen={Boolean(shifts.selectedShiftForAttendance)}
         onClose={() => shifts.setSelectedShiftForAttendance(null)}
         shift={shifts.selectedShiftForAttendance}
+        skillTaxonomy={shifts.skillTaxonomy}
         onReloadEvents={events.loadEvents}
         onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
       />

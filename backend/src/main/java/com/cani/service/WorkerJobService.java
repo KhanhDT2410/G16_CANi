@@ -97,6 +97,26 @@ public class WorkerJobService {
     @Autowired(required = false)
     private BlockListService blockListService;
 
+    @Autowired(required = false)
+    private ShiftSkillRequirementRepository shiftSkillRequirementRepository;
+
+    @Autowired(required = false)
+    private WorkerShiftEligibilityService workerShiftEligibilityService;
+
+    private WorkerShiftEligibilityService getEligibilityService() {
+        if (workerShiftEligibilityService != null) {
+            return workerShiftEligibilityService;
+        }
+        return WorkerShiftEligibilityService.withFallbackDependencies(
+                workerSkillRepository,
+                shiftSkillRequirementRepository,
+                shiftAssignmentRepository,
+                workerAvailabilityRepository,
+                blockListService,
+                skillRepository
+        );
+    }
+
     /**
      * Bật / tắt trạng thái "Bắt đầu kiếm việc" (Online status)
      */
@@ -178,62 +198,6 @@ public class WorkerJobService {
         if (shift == null) {
             throw new BadRequestException("Ca làm việc của đề xuất này không còn tồn tại.");
         }
-        if (shift.getStatus() != ShiftStatus.ACTIVE) {
-            throw new BadRequestException("Ca làm việc này không còn mở tuyển (Trạng thái: " + shift.getStatus() + ").");
-        }
-        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
-            throw new BadRequestException("Ca làm việc này đã kết thúc, không thể nhận việc.");
-        }
-
-        Event shiftEvent = shift.getEvent();
-        if (shiftEvent != null
-                && shiftEvent.getStatus() != com.cani.entity.enums.EventStatus.ACTIVE
-                && shiftEvent.getStatus() != com.cani.entity.enums.EventStatus.ONGOING) {
-            throw new BadRequestException("Sự kiện của ca làm việc này không còn hoạt động (Trạng thái: " + shiftEvent.getStatus() + ").");
-        }
-
-        // Kiểm tra lại điều kiện bắt buộc của Worker tại thời điểm nhận ca
-        int minRs = (shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0)
-                ? shift.getMinReliabilityScore() : 60;
-        if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
-            throw new BadRequestException("Điểm uy tín hiện tại không đáp ứng yêu cầu tối thiểu (" + minRs + " điểm) của ca làm việc.");
-        }
-        if (shift.getMinExperienceLevel() != null) {
-            int requiredShifts = switch (shift.getMinExperienceLevel()) {
-                case INTERMEDIATE -> 3;
-                case ADVANCED -> 5;
-                case EXPERT -> 10;
-                default -> 0;
-            };
-            int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
-            if (completed < requiredShifts) {
-                throw new BadRequestException("Kinh nghiệm hiện tại chưa đáp ứng mức yêu cầu của ca làm việc.");
-            }
-        }
-        if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
-            Set<UUID> requiredSkillIds = Arrays.stream(shift.getRequiredSkills())
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            if (!requiredSkillIds.isEmpty()) {
-                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
-                Instant now = Instant.now();
-                Set<UUID> haveSkillIds = workerSkills == null ? Collections.emptySet() :
-                        workerSkills.stream()
-                                .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
-                                .filter(ws -> ws.getExpiresAt() == null || ws.getExpiresAt().isAfter(now))
-                                .map(ws -> ws.getSkill().getSkillId())
-                                .collect(Collectors.toSet());
-                if (!haveSkillIds.containsAll(requiredSkillIds)) {
-                    throw new BadRequestException("Hồ sơ kỹ năng hiện tại không còn đáp ứng kỹ năng bắt buộc của ca làm việc.");
-                }
-            }
-        }
-        if (blockListService != null && shiftEvent != null && shiftEvent.getEventOrganizer() != null
-                && shiftEvent.getEventOrganizer().getUser() != null && worker.getUser() != null) {
-            if (blockListService.isEitherBlocked(shiftEvent.getEventOrganizer().getUser().getUserId(), worker.getUser().getUserId())) {
-                throw new BadRequestException("Không thể nhận ca do tồn tại hạn chế tương tác với Nhà tổ chức sự kiện.");
-            }
-        }
 
         // Chống tạo trùng Assignment cho cùng Worker & Shift
         Optional<ShiftAssignment> existingAssignment = shiftAssignmentRepository
@@ -242,22 +206,14 @@ public class WorkerJobService {
             throw new BadRequestException("Bạn đã xác nhận tham gia ca làm việc này trước đó.");
         }
 
-        // 1. Kiểm tra lại trùng ca làm việc (phòng trường hợp vừa nhận ca khác)
-        List<AssignmentStatus> activeStatuses = List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING);
-        List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
-                worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
-        if (!conflicts.isEmpty()) {
-            ShiftAssignment conflict = conflicts.get(0);
-            Shift cShift = conflict.getShift();
-            String cJob = cShift != null ? cShift.getJobType() : "Ca làm việc";
-            String cEvent = (cShift != null && cShift.getEvent() != null) ? cShift.getEvent().getName() : "";
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
-            String timeRange = (cShift != null && cShift.getStartTime() != null && cShift.getEndTime() != null)
-                    ? fmt.format(cShift.getStartTime()) + " - " + fmt.format(cShift.getEndTime())
-                    : "";
-            throw new BadRequestException(String.format(
-                    "Không thể nhận ca: Bạn đã có ca làm việc khác trùng khung giờ (\"%s\" - %s, %s). Mỗi thời điểm chỉ được làm 1 ca duy nhất!",
-                    cJob, cEvent, timeRange));
+        // Re-check toàn bộ điều kiện hợp lệ (kỹ năng, chứng chỉ, mức xác minh, eKYC, blocklist, xung đột ca)
+        WorkerShiftEligibilityService.EligibilityResult eligibility = getEligibilityService().evaluate(
+                worker,
+                shift,
+                WorkerShiftEligibilityService.MatchingChannel.PROPOSAL_ACCEPTANCE
+        );
+        if (!eligibility.eligible()) {
+            throw new BadRequestException(eligibility.reasonMessageVi());
         }
 
         // 2. ATOMIC CONCURRENCY CHECK: Tăng confirmed_workers một cách nguyên tử
@@ -521,11 +477,12 @@ public class WorkerJobService {
         Payment payment = paymentRepository != null
                 ? paymentRepository.findByAssignmentId(assignmentId).orElse(null)
                 : null;
-        // Chỉ chặn khi bản ghi thanh toán TỒN TẠI mà worker chưa xác nhận —
-        // ca chưa được EO declare payment thì vẫn cho kết ca (tránh deadlock rating)
+        // Chỉ chặn khi EO ĐÃ KHAI BÁO THANH TOÁN mà worker chưa phản hồi —
+        // Ca chưa được EO khai báo thanh toán (NOT_DECLARED) thì vẫn cho kết ca (lối thoát kết ca hợp lệ theo quy tắc dự án)
         if (payment != null
+                && payment.getStatus() != com.cani.entity.enums.PaymentStatus.NOT_DECLARED
                 && (payment.getWorkerConfirmStatus() == null || payment.getWorkerConfirmStatus().isBlank())) {
-            throw new BadRequestException("Hãy xác nhận tình trạng thanh toán thù lao trước khi kết ca (Bước thanh toán bắt buộc).");
+            throw new BadRequestException("Ban tổ chức đã khai báo thanh toán. Vui lòng phản hồi tình trạng nhận thù lao (Bước 4) trước khi quét QR kết ca.");
         }
         Shift shift = assignment.getShift();
 
@@ -570,9 +527,11 @@ public class WorkerJobService {
         if (!wasAlreadyCompleted) {
             worker.setTotalShiftsCompleted((worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0) + 1);
             workerRepository.save(worker);
-            if (skillProgressionService != null) {
-                skillProgressionService.recordCompletedShift(worker, assignment.getShift());
-            }
+        }
+        // Chỉ cấp SP_experience khi EO đã xác nhận kỹ năng hoàn thành (hoặc đã EO verify trước checkout);
+        // nếu chưa verify, giữ SP ở trạng thái chờ xác nhận, tuyệt đối không chặn checkout/payment.
+        if (Boolean.TRUE.equals(assignment.getEoConfirmed()) && skillProgressionService != null) {
+            skillProgressionService.recordCompletedShiftForAssignment(assignment, assignment.getConfirmedPerformedSkillId());
         }
 
         Shift completedShift = assignment.getShift();
@@ -681,6 +640,21 @@ public class WorkerJobService {
                 String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
                         ? eo.getCompanyName()
                         : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
+                List<WorkerShiftEligibilityService.EffectiveRequirement> effectiveReqs = getEligibilityService().resolveEffectiveRequirements(s);
+                List<String> reqSkillNames = effectiveReqs.stream()
+                        .filter(r -> r.requirementType() == com.cani.entity.enums.SkillRequirementType.REQUIRED)
+                        .map(WorkerShiftEligibilityService.EffectiveRequirement::skillName)
+                        .filter(Objects::nonNull)
+                        .toList();
+                if (reqSkillNames.isEmpty() && s.getRequiredSkills() != null && s.getRequiredSkills().length > 0) {
+                    reqSkillNames = resolveSkillNames(s.getRequiredSkills());
+                }
+                List<String> prefSkillNames = effectiveReqs.stream()
+                        .filter(r -> r.requirementType() == com.cani.entity.enums.SkillRequirementType.PREFERRED)
+                        .map(WorkerShiftEligibilityService.EffectiveRequirement::skillName)
+                        .filter(Objects::nonNull)
+                        .toList();
+
                 nearbyList.add(NearbyShiftResponseDto.builder()
                         .shiftId(s.getShiftId())
                         .eventId(e != null ? e.getEventId() : null)
@@ -700,7 +674,12 @@ public class WorkerJobService {
                         .endTime(s.getEndTime())
                         .arrivalTime(s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
                         .requiredSkills(s.getRequiredSkills())
-                        .requiredSkillNames(resolveSkillNames(s.getRequiredSkills()))
+                        .requiredSkillNames(reqSkillNames)
+                        .preferredSkillNames(prefSkillNames)
+                        .performedSkillId(s.getPerformedSkillId())
+                        .performedSkillName(resolveSingleSkillName(s.getPerformedSkillId()))
+                        .skillRequirements(effectiveReqs.stream().map(WorkerShiftEligibilityService.EffectiveRequirement::toDto).toList())
+                        .customSkillNotes(s.getCustomSkillNotes())
                         .distanceKm(Math.round(distance * 10.0) / 10.0)
                         .requiredWorkers(s.getRequiredWorkers())
                         .confirmedWorkers(s.getConfirmedWorkers())
@@ -727,6 +706,40 @@ public class WorkerJobService {
         return skills.stream().map(Skill::getName).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
+    private String resolveSingleSkillName(UUID skillId) {
+        if (skillId == null || skillRepository == null) {
+            return null;
+        }
+        return skillRepository.findById(skillId).map(Skill::getName).orElse(null);
+    }
+
+    private String buildProposalRecommendationReason(
+            WorkerShiftEligibilityService.SkillFitResult fit,
+            Shift s,
+            DispatchProposal p
+    ) {
+        if (fit != null && !fit.matchedSkillNames().isEmpty()) {
+            String joined = String.join(", ", fit.matchedSkillNames().stream().limit(2).toList());
+            if (fit.requiredQuality() >= 0.5 || fit.preferredFit() >= 0.5) {
+                return "Kỹ năng đã xác thực phù hợp với ca (" + joined + ")";
+            }
+            return "Đáp ứng kỹ năng công việc (" + joined + ")";
+        }
+        if (p != null && p.getScoreBreakdown() != null && !p.getScoreBreakdown().isBlank()) {
+            try {
+                JsonNode node = objectMapper.readTree(p.getScoreBreakdown());
+                double distScore = node.path("distScore").asDouble(0.0);
+                if (distScore >= 75.0) {
+                    return "Vị trí làm việc gần bạn và hồ sơ uy tín phù hợp";
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return s != null && s.getJobType() != null && !s.getJobType().isBlank()
+                ? "Phù hợp hồ sơ và lịch rảnh cho vị trí " + s.getJobType()
+                : "Đề xuất phù hợp theo hồ sơ của bạn";
+    }
+
     /**
      * Worker chủ động ứng tuyển trực tiếp vào ca làm việc trên Job Radar (M5)
      */
@@ -741,37 +754,18 @@ public class WorkerJobService {
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy ca làm việc ID: " + shiftId));
 
-        if (shift.getStatus() != ShiftStatus.ACTIVE) {
-            throw new BadRequestException("Ca làm việc này hiện không còn mở tuyển nhân sự.");
-        }
-
-        if (!Boolean.TRUE.equals(shift.getEmergency())) {
-            throw new BadRequestException("Ca này chưa ở chế độ khẩn cấp. Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp — hãy chờ lời mời việc (matching) hoặc quay lại sau khi ca được mở rộng phạm vi tuyển dụng.");
-        }
-
         if (shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
             throw new BadRequestException("Bạn đã nhận hoặc ứng tuyển vào ca làm việc này rồi!");
         }
 
-        List<AssignmentStatus> activeStatuses = List.of(
-                AssignmentStatus.CONFIRMED,
-                AssignmentStatus.CHECKED_IN,
-                AssignmentStatus.PENDING
+        // Thống nhất kiểm tra điều kiện qua WorkerShiftEligibilityService (Emergency KHÔNG bypass kỹ năng/RS/eKYC/trùng ca)
+        WorkerShiftEligibilityService.EligibilityResult eligibility = getEligibilityService().evaluate(
+                worker,
+                shift,
+                WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_APPLY
         );
-        List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
-                worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
-        if (!conflicts.isEmpty()) {
-            ShiftAssignment conflict = conflicts.get(0);
-            Shift cShift = conflict.getShift();
-            String cJob = cShift != null ? cShift.getJobType() : "Ca làm việc";
-            String cEvent = (cShift != null && cShift.getEvent() != null) ? cShift.getEvent().getName() : "";
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
-            String timeRange = (cShift != null && cShift.getStartTime() != null && cShift.getEndTime() != null)
-                    ? fmt.format(cShift.getStartTime()) + " - " + fmt.format(cShift.getEndTime())
-                    : "";
-            throw new BadRequestException(String.format(
-                    "Không thể nhận ca: Bạn đã có ca làm việc khác trùng khung giờ (\"%s\" - %s, %s). Mỗi thời điểm chỉ được làm 1 ca duy nhất!",
-                    cJob, cEvent, timeRange));
+        if (!eligibility.eligible()) {
+            throw new BadRequestException(eligibility.reasonMessageVi());
         }
 
         int updatedRows = shiftRepository.incrementConfirmedWorkersAtomic(shiftId);
@@ -1214,18 +1208,59 @@ public class WorkerJobService {
             }
         }
 
-        if (!newlyCompletedLabels.isEmpty() && shift != null) {
-            String evName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện";
-            if (!templateItems.isEmpty() && completedCount >= templateItems.size()) {
+        // Kiểm tra xem tất cả các đầu việc và minh chứng bắt buộc đã hoàn tất hay chưa
+        boolean allRequiredItemsDone = !templateItems.isEmpty();
+        for (ShiftChecklistItemDto item : templateItems) {
+            ChecklistProgressDto prog = progressMap.get(item.getId());
+            boolean done = prog != null && Boolean.TRUE.equals(prog.getIsCompleted());
+            if (!done) {
+                allRequiredItemsDone = false;
+                break;
+            }
+            if (Boolean.TRUE.equals(item.getIsRequiredEvidence())) {
+                boolean hasProof = prog != null && prog.getEvidenceImageUrl() != null && !prog.getEvidenceImageUrl().isBlank();
+                if (!hasProof) {
+                    allRequiredItemsDone = false;
+                    break;
+                }
+            }
+        }
+
+        boolean isReadyForApproval = assignment.getStatus() == AssignmentStatus.CHECKED_IN && allRequiredItemsDone;
+        boolean alreadyNotifiedThisBatch = progressMap.containsKey("__META_READY_NOTIFIED__");
+
+        if (isReadyForApproval) {
+            if (!alreadyNotifiedThisBatch && shift != null) {
+                progressMap.put("__META_READY_NOTIFIED__", ChecklistProgressDto.builder()
+                        .isCompleted(true)
+                        .completedAt(Instant.now())
+                        .build());
+                try {
+                    assignment.setChecklistProgress(objectMapper.writeValueAsString(progressMap));
+                    shiftAssignmentRepository.save(assignment);
+                } catch (Exception ignored) {}
+
+                String evName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện";
                 sendEoShiftNotification(
                         shift,
-                        "Hoàn thành toàn bộ đầu việc",
-                        worker.getFullName() + " đã hoàn thành 100% (" + completedCount + "/" + templateItems.size()
-                                + ") đầu việc trong ca \"" + shift.getJobType() + "\" (" + evName + "). Bạn có thể duyệt công và khai báo trả lương.",
+                        "Nhân sự hoàn thành công việc · Chờ nghiệm thu",
+                        worker.getFullName() + " đã hoàn tất 100% đầu việc và nộp đủ minh chứng ca \""
+                                + (shift.getJobType() != null ? shift.getJobType() : "") + "\" (" + evName + "). Bạn có thể nghiệm thu và duyệt công.",
                         com.cani.entity.enums.NotificationType.ASSIGNMENT,
-                        assignmentId
+                        assignmentId,
+                        worker.getWorkerId()
                 );
-            } else {
+            }
+        } else {
+            if (alreadyNotifiedThisBatch) {
+                progressMap.remove("__META_READY_NOTIFIED__");
+                try {
+                    assignment.setChecklistProgress(objectMapper.writeValueAsString(progressMap));
+                    shiftAssignmentRepository.save(assignment);
+                } catch (Exception ignored) {}
+            }
+            if (!newlyCompletedLabels.isEmpty() && shift != null) {
+                String evName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện";
                 String completedTasksText = String.join(", ", newlyCompletedLabels);
                 sendEoShiftNotification(
                         shift,
@@ -1233,7 +1268,8 @@ public class WorkerJobService {
                         worker.getFullName() + " vừa hoàn thành đầu việc \"" + completedTasksText + "\" (" + completedCount + "/"
                                 + Math.max(1, templateItems.size()) + ") trong ca \"" + shift.getJobType() + "\" (" + evName + ").",
                         com.cani.entity.enums.NotificationType.ASSIGNMENT,
-                        assignmentId
+                        assignmentId,
+                        worker.getWorkerId()
                 );
             }
         }
@@ -1495,6 +1531,16 @@ public class WorkerJobService {
                 ? eo.getCompanyName()
                 : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
 
+        WorkerShiftEligibilityService.SkillFitResult skillFit = (s != null)
+                ? getEligibilityService().evaluateSkillFit(p.getWorker(), s)
+                : WorkerShiftEligibilityService.SkillFitResult.empty();
+        List<WorkerShiftEligibilityService.EffectiveRequirement> reqEntries = (s != null)
+                ? getEligibilityService().resolveEffectiveRequirements(s)
+                : Collections.emptyList();
+        List<String> requiredNames = !skillFit.requiredSkillNames().isEmpty()
+                ? skillFit.requiredSkillNames()
+                : (s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList());
+
         return JobProposalResponseDto.builder()
                 .proposalId(p.getProposalId())
                 .shiftId(s != null ? s.getShiftId() : null)
@@ -1510,7 +1556,13 @@ public class WorkerJobService {
                 .startTime(s != null ? s.getStartTime() : null)
                 .endTime(s != null ? s.getEndTime() : null)
                 .arrivalTime(s != null ? (s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime()) : null)
-                .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : java.util.Collections.emptyList())
+                .requiredSkillNames(requiredNames)
+                .preferredSkillNames(skillFit.preferredSkillNames())
+                .matchedSkillNames(skillFit.matchedSkillNames())
+                .performedSkillId(s != null ? s.getPerformedSkillId() : null)
+                .performedSkillName(s != null ? resolveSingleSkillName(s.getPerformedSkillId()) : null)
+                .recommendationReasonVi(buildProposalRecommendationReason(skillFit, s, p))
+                .skillRequirements(reqEntries.stream().map(WorkerShiftEligibilityService.EffectiveRequirement::toDto).toList())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
                 .allowance(s != null ? s.getAllowance() : BigDecimal.ZERO)
                 .totalEstimatedPay(calculateSingleWorkerShiftPay(s))
@@ -1612,6 +1664,10 @@ public class WorkerJobService {
     }
 
     private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId) {
+        sendEoShiftNotification(shift, title, body, type, assignmentId, null);
+    }
+
+    private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId, UUID workerId) {
         if (notificationService == null || shift == null) return;
         Event ev = shift.getEvent();
         if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
@@ -1623,6 +1679,9 @@ public class WorkerJobService {
                 metadata.put("shiftId", shift.getShiftId().toString());
                 if (assignmentId != null) {
                     metadata.put("assignmentId", assignmentId.toString());
+                }
+                if (workerId != null) {
+                    metadata.put("workerId", workerId.toString());
                 }
                 notificationService.createAndSend(
                         eoUserId,
@@ -1660,6 +1719,18 @@ public class WorkerJobService {
                 ? paymentRepository.findByAssignmentId(a.getAssignmentId())
                 : Optional.empty();
 
+        BigDecimal totalPay = calculateSingleWorkerShiftPay(s);
+        BigDecimal declaredAmt = paymentOpt.map(Payment::getDeclaredAmount).orElse(BigDecimal.ZERO);
+        BigDecimal qrAmount = (declaredAmt != null && declaredAmt.compareTo(BigDecimal.ZERO) > 0) ? declaredAmt : totalPay;
+        Worker workerEntity = a.getWorker();
+        String bCode = workerEntity != null ? workerEntity.getBankCode() : null;
+        String bAccNum = workerEntity != null ? workerEntity.getBankAccountNumber() : null;
+        String bAccName = workerEntity != null ? workerEntity.getBankAccountName() : null;
+        if ((bAccName == null || bAccName.isBlank()) && workerEntity != null && workerEntity.getUser() != null) {
+            bAccName = workerEntity.getUser().getFullName();
+        }
+        String vietQr = VietQrUtil.buildVietQrUrl(bCode, bAccNum, bAccName, qrAmount);
+
         return ShiftAssignmentResponseDto.builder()
                 .assignmentId(a.getAssignmentId())
                 .shiftId(s != null ? s.getShiftId() : null)
@@ -1675,8 +1746,16 @@ public class WorkerJobService {
                 .endTime(s != null ? s.getEndTime() : null)
                 .arrivalTime(s != null ? (s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime()) : null)
                 .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList())
+                .performedSkillId(s != null ? s.getPerformedSkillId() : null)
+                .performedSkillName(s != null ? resolveSingleSkillName(s.getPerformedSkillId()) : null)
+                .confirmedPerformedSkillId(a.getConfirmedPerformedSkillId())
+                .confirmedPerformedSkillName(resolveSingleSkillName(a.getConfirmedPerformedSkillId()))
+                .spExperienceAwarded(Boolean.TRUE.equals(a.getSpExperienceAwarded()))
+                .spExperienceAwardedAt(a.getSpExperienceAwardedAt())
+                .spRatingAwarded(Boolean.TRUE.equals(a.getSpRatingAwarded()))
+                .inviteOverrideReason(a.getInviteOverrideReason())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
-                .totalPay(calculateSingleWorkerShiftPay(s))
+                .totalPay(totalPay)
                 .status(a.getStatus())
                 .source(a.getSource())
                 .eoConfirmed(a.getEoConfirmed())
@@ -1691,10 +1770,17 @@ public class WorkerJobService {
                 .proofImageUrl(attendanceOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
                 .proofSubmittedAt(attendanceOpt.map(AttendanceLog::getProofSubmittedAt).orElse(null))
                 .paymentStatus(paymentOpt.map(p -> p.getStatus() != null ? p.getStatus().name() : "NOT_DECLARED").orElse("NOT_DECLARED"))
-                .declaredAmount(paymentOpt.map(Payment::getDeclaredAmount).orElse(BigDecimal.ZERO))
+                .declaredAmount(declaredAmt)
                 .paymentMethod(paymentOpt.map(Payment::getPaymentMethod).orElse(null))
                 .workerConfirmStatus(paymentOpt.map(Payment::getWorkerConfirmStatus).orElse(null))
                 .paymentProofUrl(paymentOpt.map(Payment::getPaymentProofUrl).orElse(null))
+                .externalRef(paymentOpt.map(Payment::getExternalRef).orElse(null))
+                .declaredAt(paymentOpt.map(Payment::getDeclaredAt).orElse(null))
+                .workerComment(paymentOpt.map(Payment::getWorkerComment).orElse(null))
+                .bankCode(bCode)
+                .bankAccountNumber(bAccNum)
+                .bankAccountName(bAccName)
+                .vietQrUrl(vietQr)
                 .build();
     }
 
@@ -1735,6 +1821,18 @@ public class WorkerJobService {
             }
         }
 
+        BigDecimal totalPay = calculateSingleWorkerShiftPay(s);
+        BigDecimal declaredAmt = p != null && p.getDeclaredAmount() != null ? p.getDeclaredAmount() : BigDecimal.ZERO;
+        BigDecimal qrAmount = (declaredAmt != null && declaredAmt.compareTo(BigDecimal.ZERO) > 0) ? declaredAmt : totalPay;
+        Worker workerEntity = a.getWorker();
+        String bCode = workerEntity != null ? workerEntity.getBankCode() : null;
+        String bAccNum = workerEntity != null ? workerEntity.getBankAccountNumber() : null;
+        String bAccName = workerEntity != null ? workerEntity.getBankAccountName() : null;
+        if ((bAccName == null || bAccName.isBlank()) && workerEntity != null && workerEntity.getUser() != null) {
+            bAccName = workerEntity.getUser().getFullName();
+        }
+        String vietQr = VietQrUtil.buildVietQrUrl(bCode, bAccNum, bAccName, qrAmount);
+
         return ShiftAssignmentResponseDto.builder()
                 .assignmentId(a.getAssignmentId())
                 .shiftId(s != null ? s.getShiftId() : null)
@@ -1750,8 +1848,16 @@ public class WorkerJobService {
                 .endTime(s != null ? s.getEndTime() : null)
                 .arrivalTime(s != null ? (s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime()) : null)
                 .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList())
+                .performedSkillId(s != null ? s.getPerformedSkillId() : null)
+                .performedSkillName(s != null ? resolveSingleSkillName(s.getPerformedSkillId()) : null)
+                .confirmedPerformedSkillId(a.getConfirmedPerformedSkillId())
+                .confirmedPerformedSkillName(resolveSingleSkillName(a.getConfirmedPerformedSkillId()))
+                .spExperienceAwarded(Boolean.TRUE.equals(a.getSpExperienceAwarded()))
+                .spExperienceAwardedAt(a.getSpExperienceAwardedAt())
+                .spRatingAwarded(Boolean.TRUE.equals(a.getSpRatingAwarded()))
+                .inviteOverrideReason(a.getInviteOverrideReason())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
-                .totalPay(calculateSingleWorkerShiftPay(s))
+                .totalPay(totalPay)
                 .status(a.getStatus())
                 .source(a.getSource())
                 .eoConfirmed(a.getEoConfirmed())
@@ -1766,10 +1872,17 @@ public class WorkerJobService {
                 .proofImageUrl(att != null ? att.getProofImageUrl() : null)
                 .proofSubmittedAt(att != null ? att.getProofSubmittedAt() : null)
                 .paymentStatus(p != null && p.getStatus() != null ? p.getStatus().name() : "NOT_DECLARED")
-                .declaredAmount(p != null && p.getDeclaredAmount() != null ? p.getDeclaredAmount() : BigDecimal.ZERO)
+                .declaredAmount(declaredAmt)
                 .paymentMethod(p != null ? p.getPaymentMethod() : null)
                 .workerConfirmStatus(p != null ? p.getWorkerConfirmStatus() : null)
                 .paymentProofUrl(p != null ? p.getPaymentProofUrl() : null)
+                .externalRef(p != null ? p.getExternalRef() : null)
+                .declaredAt(p != null ? p.getDeclaredAt() : null)
+                .workerComment(p != null ? p.getWorkerComment() : null)
+                .bankCode(bCode)
+                .bankAccountNumber(bAccNum)
+                .bankAccountName(bAccName)
+                .vietQrUrl(vietQr)
                 .eoRating(eoRating)
                 .eoReviewComment(eoComment)
                 .eoReviewedAt(eoReviewedAt)

@@ -1,8 +1,8 @@
 import React from 'react';
+import { formatDevelopmentAndRank } from '../../utils/skillDisplayUtils';
 
 /**
- * WorkerProfileHeader: Hiển thị định danh, huy hiệu cấp bậc và các chỉ số hiệu suất
- * Tiêu chuẩn < 200 dòng theo AGENTS.md
+ * WorkerProfileHeader V3: Hiển thị định danh, cấp bậc tiếng Việt và chỉ số hiệu suất thật.
  */
 export const WorkerProfileHeader = ({ profile }) => {
   if (!profile) return null;
@@ -19,7 +19,7 @@ export const WorkerProfileHeader = ({ profile }) => {
     skillTier = 'STARTER',
     totalSp = 0,
     reliabilityScore = 100,
-    ratingAvg = 5.0,
+    ratingAvg = 0,
     ratingCount = 0,
     totalShiftsCompleted = 0,
     isMyTeamMember,
@@ -28,6 +28,7 @@ export const WorkerProfileHeader = ({ profile }) => {
   } = profile;
 
   const tierKey = (skillTier || 'STARTER').toLowerCase();
+  const hasRealRating = Number(ratingCount || 0) > 0 && Number(ratingAvg || 0) > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -51,18 +52,20 @@ export const WorkerProfileHeader = ({ profile }) => {
           <div className="worker-name-row">
             <h3 className="worker-full-name">{fullName || 'Nhân sự CANi'}</h3>
             <span className={`tier-badge ${tierKey}`}>
-              Hạng {skillTier}
+              {formatDevelopmentAndRank(skillTier)}
             </span>
             {isMyTeamMember && (
-              <span style={{
-                background: '#eff6ff',
-                color: '#1d4ed8',
-                fontSize: '0.725rem',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: 4,
-                border: '1px solid #bfdbfe',
-              }}>
+              <span
+                style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontSize: '0.725rem',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  border: '1px solid #bfdbfe',
+                }}
+              >
                 {isFavorited ? '★ Nhân sự yêu thích' : '✓ Nhân sự quen thuộc'}
               </span>
             )}
@@ -105,9 +108,16 @@ export const WorkerProfileHeader = ({ profile }) => {
         </div>
 
         <div className="metric-stat-item">
-          <span className="metric-stat-label">Đánh Giá</span>
-          <span className="metric-stat-val" style={{ color: '#eab308' }}>
-            ⭐ {Number(ratingAvg || 5.0).toFixed(1)} <small style={{ fontSize: '0.75rem', color: '#64748b' }}>({ratingCount})</small>
+          <span className="metric-stat-label">Đánh Giá Thực Tế</span>
+          <span className="metric-stat-val" style={{ color: hasRealRating ? '#b45309' : '#64748b' }}>
+            {hasRealRating ? (
+              <>
+                ⭐ {Number(ratingAvg).toFixed(1)}{' '}
+                <small style={{ fontSize: '0.75rem', color: '#64748b' }}>({ratingCount})</small>
+              </>
+            ) : (
+              'Chưa có'
+            )}
           </span>
         </div>
 

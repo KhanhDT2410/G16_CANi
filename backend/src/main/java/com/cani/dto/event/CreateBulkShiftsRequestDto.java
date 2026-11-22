@@ -46,6 +46,12 @@ public class CreateBulkShiftsRequestDto {
 
     private UUID[] requiredSkills;
 
+    private UUID performedSkillId;
+
+    private List<ShiftSkillRequirementDto> skillRequirements;
+
+    private String customSkillNotes;
+
     @Builder.Default
     private Integer minReliabilityScore = 60;
 

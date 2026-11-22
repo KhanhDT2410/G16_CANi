@@ -113,9 +113,11 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   color: const Color(0xFF10B981).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text(
-                  'Phù hợp kỹ năng',
-                  style: TextStyle(
+                child: Text(
+                  p.matchedSkillNames.isNotEmpty
+                      ? 'Khớp ${p.matchedSkillNames.length} kỹ năng'
+                      : 'Đề xuất cho bạn',
+                  style: const TextStyle(
                     color: Color(0xFF059669),
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,
@@ -241,22 +243,46 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
             ],
           ),
 
-          // Kỹ năng bắt buộc (chips) — worker cần biết trước khi accept
-          if (p.requiredSkillNames.isNotEmpty)
+          if (p.recommendationReasonVi != null && p.recommendationReasonVi!.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                p.recommendationReasonVi!,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF047857),
+                ),
+              ),
+            ),
+
+          // Kỹ năng yêu cầu (bắt buộc) & ưu tiên thêm
+          if (p.requiredSkillNames.isNotEmpty || p.preferredSkillNames.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Wrap(
                 spacing: 6,
                 runSpacing: 4,
-                children: p.requiredSkillNames.map((n) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
-                  ),
-                  child: Text('Kỹ năng: $n', style: TextStyle(fontSize: 10.5, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
-                )).toList(),
+                children: [
+                  ...p.requiredSkillNames.map((n) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                    ),
+                    child: Text('Bắt buộc: $n', style: TextStyle(fontSize: 10.5, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
+                  )),
+                  ...p.preferredSkillNames.map((n) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBBF7D0)),
+                    ),
+                    child: Text('Ưu tiên: $n', style: TextStyle(fontSize: 10.5, color: isDark ? Colors.greenAccent : const Color(0xFF15803D), fontWeight: FontWeight.w600)),
+                  )),
+                ],
               ),
             ),
           const SizedBox(height: 12),

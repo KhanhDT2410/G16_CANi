@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -680,12 +681,12 @@ class WorkerJobServiceTest {
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
         when(paymentRepository.findByAssignmentId(assignmentId)).thenReturn(Optional.of(
-                Payment.builder().status(PaymentStatus.NOT_DECLARED).workerConfirmStatus(null).build()
+                Payment.builder().status(PaymentStatus.DECLARED_PENDING_WORKER).workerConfirmStatus(null).build()
         ));
 
         assertThatThrownBy(() -> workerJobService.checkoutAssignment(userId, assignmentId, req))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Hãy xác nhận tình trạng thanh toán thù lao trước khi kết ca");
+                .hasMessageContaining("Ban tổ chức đã khai báo thanh toán");
     }
 
     @Test
@@ -1222,7 +1223,7 @@ class WorkerJobServiceTest {
 
         List<ShiftChecklistItemDto> res = workerJobService.updateShiftChecklist(userId, assignmentId, req);
 
-        verify(shiftAssignmentRepository).save(sa);
+        verify(shiftAssignmentRepository, atLeastOnce()).save(sa);
         verify(shiftRepository, never()).save(any());
         assertThat(res.get(0).getIsCompleted()).isTrue();
     }
@@ -1728,5 +1729,54 @@ class WorkerJobServiceTest {
         workerJobService.cancelAssignment(userId, assignment.getAssignmentId(), "Bận đột xuất");
 
         verify(matchingDispatchService, never()).dispatchForShift(any());
+    }
+
+    @Test
+    @DisplayName("Skill V3 - applyForShift() emergency: Không bypass kỹ năng/RS qua WorkerShiftEligibilityService")
+    void applyForShift_SkillV3_EmergencyDoesNotBypassEligibility() {
+        activeShift.setEmergency(true);
+        WorkerShiftEligibilityService mockEligibility = mock(WorkerShiftEligibilityService.class);
+        ReflectionTestUtils.setField(workerJobService, "workerShiftEligibilityService", mockEligibility);
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftRepository.findById(activeShift.getShiftId())).thenReturn(Optional.of(activeShift));
+        when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(activeShift.getShiftId(), worker.getWorkerId()))
+                .thenReturn(false);
+        when(mockEligibility.evaluate(worker, activeShift, WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_APPLY))
+                .thenReturn(WorkerShiftEligibilityService.EligibilityResult.fail(
+                        "MISSING_REQUIRED_SKILL",
+                        "Hồ sơ của bạn chưa có hoặc đã hết hạn kỹ năng bắt buộc: \"Phục vụ\"."
+                ));
+
+        assertThatThrownBy(() -> workerJobService.applyForShift(userId, activeShift.getShiftId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("kỹ năng bắt buộc");
+
+        verify(shiftRepository, never()).incrementConfirmedWorkersAtomic(any());
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Skill V3 - acceptProposal(): Re-check eligibility khi chứng chỉ hết hạn sau lúc gửi đề xuất")
+    void acceptProposal_SkillV3_RechecksStaleProposalWhenCertificateExpired() {
+        WorkerShiftEligibilityService mockEligibility = mock(WorkerShiftEligibilityService.class);
+        ReflectionTestUtils.setField(workerJobService, "workerShiftEligibilityService", mockEligibility);
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+        when(shiftAssignmentRepository.findByShift_ShiftIdAndWorker_WorkerId(activeShift.getShiftId(), worker.getWorkerId()))
+                .thenReturn(Optional.empty());
+        when(mockEligibility.evaluate(worker, activeShift, WorkerShiftEligibilityService.MatchingChannel.PROPOSAL_ACCEPTANCE))
+                .thenReturn(WorkerShiftEligibilityService.EligibilityResult.fail(
+                        "CERTIFICATE_REQUIRED_OR_EXPIRED",
+                        "Ca làm việc yêu cầu chứng chỉ còn hiệu lực cho kỹ năng \"An toàn PCCC\"."
+                ));
+
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chứng chỉ còn hiệu lực");
+
+        verify(shiftRepository, never()).incrementConfirmedWorkersAtomic(any());
+        verify(shiftAssignmentRepository, never()).save(any());
     }
 }

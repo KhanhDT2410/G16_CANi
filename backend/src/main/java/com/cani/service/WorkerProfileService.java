@@ -10,6 +10,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.SkillTier;
 import com.cani.entity.enums.VerificationStatus;
+import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.*;
@@ -109,22 +111,68 @@ public class WorkerProfileService {
         // 1. Tính tuổi Worker từ eKYC hoặc kinh nghiệm
         Integer workerAge = calculateWorkerAge(actualWorkerId, worker.getYearsExperience());
 
-        // 2. Nạp tổng điểm kỹ năng (SP)
+        // 2. Nạp tổng điểm kỹ năng (SP) và index theo skill_id / tên kỹ năng
         List<WorkerSkillPoint> skillPoints = workerSkillPointRepository.findByWorker_WorkerId(actualWorkerId);
         int totalSp = skillPoints.stream()
                 .mapToInt(sp -> sp.getTotalSp() != null ? sp.getTotalSp() : 0)
                 .sum();
+        Map<UUID, WorkerSkillPoint> spBySkillId = new HashMap<>();
+        Map<String, WorkerSkillPoint> spByJobTypeLower = new HashMap<>();
+        for (WorkerSkillPoint sp : skillPoints) {
+            if (sp.getSkill() != null && sp.getSkill().getSkillId() != null) {
+                spBySkillId.putIfAbsent(sp.getSkill().getSkillId(), sp);
+            }
+            if (sp.getJobType() != null && !sp.getJobType().isBlank()) {
+                spByJobTypeLower.putIfAbsent(sp.getJobType().trim().toLowerCase(Locale.ROOT), sp);
+            }
+        }
 
-        // 3. Nạp danh sách kỹ năng (Phân tầng Tier 1, Tier 2 tích xanh AI, Tier 3)
+        // 3. Nạp danh sách kỹ năng (giữ độc lập VerificationTier và SkillRank, không lộ file chứng chỉ riêng tư)
+        Instant now = Instant.now();
         List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(actualWorkerId);
         List<WorkerSkillProfileDto> skillDtos = workerSkills.stream()
-                .map(ws -> WorkerSkillProfileDto.builder()
-                        .skillId(ws.getSkill() != null ? ws.getSkill().getSkillId() : null)
-                        .skillName(ws.getSkill() != null ? ws.getSkill().getName() : "Kỹ năng")
-                        .category(ws.getSkill() != null ? ws.getSkill().getCategory() : "Khác")
-                        .proficiency(ws.getProficiency())
-                        .verificationTier(ws.getVerificationTier())
-                        .build())
+                .map(ws -> {
+                    UUID skId = ws.getSkill() != null ? ws.getSkill().getSkillId() : null;
+                    String skName = ws.getSkill() != null ? ws.getSkill().getName() : "Kỹ năng";
+                    WorkerSkillPoint matchedSp = skId != null ? spBySkillId.get(skId) : null;
+                    if (matchedSp == null && skName != null) {
+                        matchedSp = spByJobTypeLower.get(skName.trim().toLowerCase(Locale.ROOT));
+                    }
+
+                    int spRatingCount = matchedSp != null && matchedSp.getRatingCount() != null
+                            ? matchedSp.getRatingCount()
+                            : 0;
+                    int spRatingPoints = matchedSp != null && matchedSp.getSpRating() != null
+                            ? matchedSp.getSpRating()
+                            : 0;
+                    BigDecimal rawSkillAvg = matchedSp != null && matchedSp.getAvgRating() != null
+                            ? matchedSp.getAvgRating()
+                            : BigDecimal.ZERO;
+                    BigDecimal safeSkillAvg = (spRatingCount == 0 && spRatingPoints == 0
+                            && rawSkillAvg.compareTo(new BigDecimal("5.00")) == 0)
+                            ? BigDecimal.ZERO
+                            : rawSkillAvg;
+
+                    boolean hasCertEvidence = ws.getEvidenceRequestId() != null
+                            || ws.getVerificationTier() == VerificationTier.AI_DOCUMENT;
+                    boolean certNotExpired = ws.getExpiresAt() == null || ws.getExpiresAt().isAfter(now);
+                    boolean hasValidCert = hasCertEvidence && certNotExpired;
+
+                    return WorkerSkillProfileDto.builder()
+                            .skillId(skId)
+                            .skillName(skName)
+                            .category(ws.getSkill() != null ? ws.getSkill().getCategory() : "Khác")
+                            .proficiency(ws.getProficiency())
+                            .verificationTier(ws.getVerificationTier())
+                            .skillTier(matchedSp != null && matchedSp.getTier() != null ? matchedSp.getTier() : SkillTier.STARTER)
+                            .totalSp(matchedSp != null && matchedSp.getTotalSp() != null ? matchedSp.getTotalSp() : 0)
+                            .totalShiftsCompleted(matchedSp != null && matchedSp.getTotalShiftsCompleted() != null ? matchedSp.getTotalShiftsCompleted() : 0)
+                            .avgRating(safeSkillAvg)
+                            .ratingCount(spRatingCount)
+                            .hasValidCertificate(hasValidCert)
+                            .certificateExpiresAt(ws.getExpiresAt())
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         // 4. Nạp lịch sử đánh giá (Reviews) từ các EO khác

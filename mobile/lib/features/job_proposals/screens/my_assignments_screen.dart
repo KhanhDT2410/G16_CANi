@@ -7,12 +7,13 @@ import '../models/proposal_models.dart';
 import '../widgets/cancel_assignment_dialog.dart';
 import '../widgets/history_kpi_bar.dart';
 import '../widgets/history_shift_card.dart';
-import '../widgets/payment_confirm_dialog.dart';
-import '../widgets/rate_eo_dialog.dart';
 import '../widgets/shift_assignment_card.dart';
 import '../widgets/shift_navigation_sheet.dart';
+import '../widgets/shift_workflow_stepper.dart';
 import 'attendance_qr_scanner_screen.dart';
+import 'rate_eo_screen.dart';
 import 'shift_detail_execution_screen.dart';
+import 'shift_payment_screen.dart';
 
 class MyAssignmentsScreen extends ConsumerStatefulWidget {
   const MyAssignmentsScreen({super.key});
@@ -24,52 +25,14 @@ class MyAssignmentsScreen extends ConsumerStatefulWidget {
 class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   String _historyFilter = 'ALL'; // ALL, COMPLETED, PENDING_PAYMENT, CONFIRMED_PAYMENT, CANCELLED
 
-  Future<void> _openPaymentDialog(ShiftAssignmentItem a) async {
-    final result = await showDialog<Map<String, String>>(
-      context: context,
-      builder: (_) => PaymentConfirmDialog(assignment: a),
+  Future<void> _openPaymentScreen(ShiftAssignmentItem a) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => ShiftPaymentScreen(assignment: a)),
     );
-    if (result != null && mounted) {
-      final status = result['status']!;
-      final comment = result['comment'] ?? '';
-      await _confirmPayment(a, status, comment: comment);
-    }
-  }
-
-  Future<void> _confirmPayment(ShiftAssignmentItem item, String status, {String comment = ''}) async {
-    final t = Theme.of(context).cani;
-    final isFull = status == 'RECEIVED_FULL' || status == 'CONFIRMED_FULL';
-    final isPartial = status == 'RECEIVED_PARTIAL' || status == 'CONFIRMED_PARTIAL';
-
-    try {
-      await ref.read(proposalRepositoryProvider).confirmPayment(item.assignmentId, status, comment);
+    if (updated == true && mounted) {
       ref.invalidate(assignmentsListProvider);
       ref.invalidate(incomeSummaryProvider);
-
-      if (mounted) {
-        String msg = 'Đã xác nhận nhận đủ tiền thù lao!';
-        Color color = t.success;
-        if (isPartial) {
-          msg = 'Đã ghi nhận tình trạng nhận một phần thù lao.';
-          color = t.warning;
-        } else if (!isFull && !isPartial) {
-          msg = 'Đã gửi khiếu nại (Dispute). Đội ngũ CSKH CANi sẽ liên hệ hỗ trợ bạn!';
-          color = t.danger;
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: color),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khi gửi xác nhận thanh toán: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: Theme.of(context).cani.danger,
-          ),
-        );
-      }
     }
   }
 
@@ -190,6 +153,22 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
     final active = scannable.first;
     final isCheckedIn = active.status == 'CHECKED_IN';
+    if (isCheckedIn) {
+      if (!active.eoConfirmed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Cần hoàn tất đầu việc & chờ BTC Duyệt công (Bước 3) trước khi Check-out.'),
+            backgroundColor: Theme.of(context).cani.warning,
+          ),
+        );
+        _openExecutionScreen(active);
+        return;
+      }
+      if (!isAssignmentPaymentConfirmed(active)) {
+        _openPaymentScreen(active);
+        return;
+      }
+    }
     _openQrScanner(active, !isCheckedIn);
   }
 
@@ -220,19 +199,14 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
-  Future<void> _openRateDialog(ShiftAssignmentItem a) async {
-    final rated = await showDialog<bool>(
-      context: context,
-      builder: (_) => RateEoDialog(assignment: a),
+  Future<void> _openRateScreen(ShiftAssignmentItem a) async {
+    final rated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => RateEoScreen(assignment: a)),
     );
     if (rated == true && mounted) {
       ref.invalidate(assignmentsListProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Cảm ơn bạn đã gửi đánh giá cho Ban tổ chức!'),
-          backgroundColor: Theme.of(context).cani.success,
-        ),
-      );
+      ref.invalidate(incomeSummaryProvider);
     }
   }
 
@@ -542,10 +516,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
           onTap: () => _openExecutionScreen(item),
           onNavigate: () => _openNavigationSheet(item),
           onQrScan: () => _openQrScanner(item, !isCheckedIn),
-          onConfirmPayment: () => _openPaymentDialog(item),
+          onConfirmPayment: () => _openPaymentScreen(item),
           onOpenChecklist: () => _openExecutionScreen(item),
           onCancelAssignment: () => _openCancelDialog(item),
-          onRateOrganizer: () => _openRateDialog(item),
+          onRateOrganizer: () => _openRateScreen(item),
         );
       },
     );
@@ -584,8 +558,8 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
                 return HistoryShiftCard(
                   assignment: item,
                   onTap: () => _openExecutionScreen(item),
-                  onConfirmPayment: () => _openPaymentDialog(item),
-                  onRateOrganizer: () => _openRateDialog(item),
+                  onConfirmPayment: () => _openPaymentScreen(item),
+                  onRateOrganizer: () => _openRateScreen(item),
                 );
               }).toList(),
             ),

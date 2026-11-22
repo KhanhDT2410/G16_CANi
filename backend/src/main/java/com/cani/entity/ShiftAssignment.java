@@ -88,6 +88,23 @@ public class ShiftAssignment {
     @Column(name = "checklist_progress", columnDefinition = "jsonb")
     private String checklistProgress;
 
+    @Column(name = "confirmed_performed_skill_id")
+    private UUID confirmedPerformedSkillId;
+
+    @Column(name = "sp_experience_awarded", nullable = false)
+    @Builder.Default
+    private Boolean spExperienceAwarded = false;
+
+    @Column(name = "sp_experience_awarded_at")
+    private Instant spExperienceAwardedAt;
+
+    @Column(name = "sp_rating_awarded", nullable = false)
+    @Builder.Default
+    private Boolean spRatingAwarded = false;
+
+    @Column(name = "invite_override_reason", columnDefinition = "TEXT")
+    private String inviteOverrideReason;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

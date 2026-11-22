@@ -16,6 +16,7 @@ import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_map_painter.dart';
 import 'package:cani/features/job_radar/widgets/radar_sliding_job_card.dart';
 import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
+import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 
 class JobRadarScreen extends ConsumerStatefulWidget {
   const JobRadarScreen({super.key});
@@ -207,7 +208,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     final userName = user?.fullName.isNotEmpty == true ? user!.fullName : 'Nhân Sự';
     final initialChar = userName.isNotEmpty ? userName[0].toUpperCase() : 'N';
     final totalSp = skillState.skillPoints.fold<int>(0, (sum, p) => sum + p.totalSp);
-    final currentTier = skillState.skillPoints.isNotEmpty ? skillState.skillPoints.first.tier : 'STARTER';
+    final currentTier = SkillHubColors.resolveHighestTier(skillState.skillPoints);
 
     final selectedOrFirstShift = state.selectedShift ?? (state.nearbyShifts.isNotEmpty ? state.nearbyShifts.first : null);
 

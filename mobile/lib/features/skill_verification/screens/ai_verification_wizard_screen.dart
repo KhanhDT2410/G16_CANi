@@ -328,7 +328,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
         ),
         const SizedBox(height: 6),
         const Text(
-          'Đang trích xuất: Đơn vị cấp, Số hiệu chứng chỉ, Đối chiếu danh mục',
+          'AI đang đọc và trích xuất thông tin tài liệu...',
           style: TextStyle(fontSize: 11, color: SkillHubColors.textSecondary),
         ),
       ],
@@ -402,10 +402,10 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                   const SizedBox(height: 12),
                   Text(
                     isAutoApprove
-                        ? 'Chứng chỉ hợp lệ - Đã duyệt ngay'
+                        ? 'Đã duyệt - Đạt mức xác thực tài liệu'
                         : (isPendingReview
-                            ? 'Hồ sơ đã tiếp nhận - Đang chờ CSKH duyệt'
-                            : 'Chứng chỉ chưa đạt chuẩn nhận diện'),
+                            ? 'Đang chờ duyệt'
+                            : 'Từ chối - Cần bổ sung tài liệu rõ nét hơn'),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -532,12 +532,13 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
         ),
         const SizedBox(height: 16),
         const Text(
-          'NÂNG HẠNG THÀNH CÔNG!',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: SkillHubColors.textPrimary),
+          'XÁC THỰC TÀI LIỆU HOÀN TẤT',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: SkillHubColors.textPrimary),
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         const Text(
-          'Kỹ năng của bạn đã được chứng thực chính thức với thời hạn 24 tháng.',
+          'Tài liệu của bạn đã được hệ thống phê duyệt ở mức "Đã xác thực tài liệu" (hiệu lực tối đa 24 tháng).',
           style: TextStyle(fontSize: 12.5, color: SkillHubColors.textSecondary, height: 1.4),
           textAlign: TextAlign.center,
         ),

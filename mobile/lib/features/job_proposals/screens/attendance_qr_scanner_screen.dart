@@ -6,6 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
+import 'rate_eo_screen.dart';
 
 class AttendanceQrScannerScreen extends ConsumerStatefulWidget {
   final ShiftAssignmentItem assignment;
@@ -143,10 +144,13 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
         );
       }
 
+      ref.invalidate(assignmentsListProvider);
+      ref.invalidate(incomeSummaryProvider);
+
       if (!mounted) return;
 
       // 4. Hiển thị Dialog kết quả thành công
-      await showDialog(
+      final action = await showDialog<String>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
@@ -225,16 +229,38 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
             ],
           ),
           actions: [
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pop(context, true); // Trả về true để refresh
-              },
-              child: const Text('Xác nhận & Hoàn tất'),
-            ),
+            if (!widget.isCheckin && widget.assignment.hasWorkerReviewed != true) ...[
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'DONE'),
+                child: const Text('Để sau'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(ctx, 'RATE'),
+                icon: const Icon(Icons.star_rate_rounded, size: 18),
+                label: const Text('Đánh giá BTC (Bước 6)'),
+              ),
+            ] else
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'DONE'),
+                child: const Text('Xác nhận & Hoàn tất'),
+              ),
           ],
         ),
       );
+      if (!mounted) return;
+      if (action == 'RATE' && !widget.isCheckin) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RateEoScreen(
+              assignment: widget.assignment,
+              checkoutHoursWorked: result.hoursWorked,
+            ),
+          ),
+        );
+      } else {
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       if (!mounted) return;
       await showDialog(

@@ -185,9 +185,12 @@ export const eoService = {
     return response.data?.data || [];
   },
 
-  // UC-49: EO xác nhận hoàn thành ca & duyệt công cho Worker
-  verifyAttendance: async (assignmentId) => {
-    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/verify`);
+  // UC-49 + Skill V3: EO xác nhận hoàn thành ca, duyệt công và xác nhận kỹ năng thực hiện chính
+  verifyAttendance: async (assignmentId, payload = null) => {
+    const response = await apiClient.post(
+      `/v1/eo/events/assignments/${assignmentId}/verify`,
+      payload || undefined
+    );
     return response.data?.data;
   },
 

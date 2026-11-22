@@ -132,13 +132,33 @@ const EventShiftsDrawer = ({
                   Đồng phục: {shift.dressCode}
                 </span>
               )}
-              {Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0 && (
+              {(shift.performedSkillName || skillNameMap[shift.performedSkillId]) && (
+                <span
+                  style={{ fontSize: '0.75rem', color: '#047857', background: '#ecfdf5', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}
+                  title="Kỹ năng thực hiện chính để cộng +20 SP/ca"
+                >
+                  Chính: {shift.performedSkillName || skillNameMap[shift.performedSkillId]}
+                </span>
+              )}
+              {Array.isArray(shift.skillRequirements) && shift.skillRequirements.length > 0 ? (
                 <span
                   style={{ fontSize: '0.75rem', color: '#1d4ed8', background: '#dbeafe', padding: '2px 6px', borderRadius: 4 }}
-                  title="Kỹ năng bắt buộc (matching lọc cứng theo kỹ năng)"
+                  title="Yêu cầu kỹ năng của ca làm"
                 >
-                  Kỹ năng: {(shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') || `${shift.requiredSkills.length} kỹ năng`)}
+                  {shift.skillRequirements
+                    .map((r) => `${r.requirementType === 'PREFERRED' ? 'Ưu tiên' : 'Bắt buộc'}: ${r.skillName || skillNameMap[r.skillId] || 'Kỹ năng'}`)
+                    .join(', ')}
                 </span>
+              ) : (
+                Array.isArray(shift.requiredSkills) &&
+                shift.requiredSkills.length > 0 && (
+                  <span
+                    style={{ fontSize: '0.75rem', color: '#1d4ed8', background: '#dbeafe', padding: '2px 6px', borderRadius: 4 }}
+                    title="Kỹ năng bắt buộc (matching lọc cứng theo kỹ năng)"
+                  >
+                    Kỹ năng: {(shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') || `${shift.requiredSkills.length} kỹ năng`)}
+                  </span>
+                )
               )}
             </div>
             <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
@@ -356,6 +376,7 @@ const EventShiftsDrawer = ({
           <ShiftQrAndAttendancePanel
             shift={{ ...shift, eventName: event.name }}
             event={event}
+            skillTaxonomy={skillTaxonomy}
             onSelectShift={(nextShift) => setSelectedShiftForPanel(nextShift)}
             onClose={() => setSelectedShiftForPanel(null)}
             onReloadEvents={onReloadEvents}

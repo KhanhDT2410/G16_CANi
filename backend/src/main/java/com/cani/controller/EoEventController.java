@@ -167,10 +167,11 @@ public class EoEventController {
     @PostMapping("/assignments/{assignmentId}/verify")
     public ResponseEntity<ApiResponse<ShiftAttendanceDto>> verifyAttendance(
             @PathVariable("assignmentId") UUID assignmentId,
+            @RequestBody(required = false) VerifyAttendanceRequestDto request,
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        ShiftAttendanceDto verified = eoEventService.verifyAttendance(userId, assignmentId);
+        ShiftAttendanceDto verified = eoEventService.verifyAttendance(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(verified, "Xác nhận hoàn thành ca và duyệt công cho Worker thành công!"));
     }
 

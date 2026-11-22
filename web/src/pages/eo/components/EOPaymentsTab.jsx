@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import DisputeResolutionDetailModal from './DisputeResolutionDetailModal';
+import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
 
 export default function EOPaymentsTab({
   payments = [],
@@ -11,6 +12,7 @@ export default function EOPaymentsTab({
   onNavigateToDisputes,
 }) {
   const [selectedDisputePayment, setSelectedDisputePayment] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const renderStatusBadge = (p) => {
     const isDisputeResolved = p.disputeStatus === 'RESOLVED' || p.disputeStatus === 'FINAL_RESOLVED';
@@ -144,8 +146,36 @@ export default function EOPaymentsTab({
                     <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
                       {p.declaredAmount > 0 ? `${(p.declaredAmount || 0).toLocaleString()} đ` : 'Chưa trả'}
                     </td>
-                    <td>{p.paymentMethod || '—'}</td>
-                    <td style={{ fontSize: '0.85rem', color: '#64748b' }}>{p.externalRef || 'Chưa có'}</td>
+                    <td>{p.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : p.paymentMethod === 'CASH' ? 'Tiền mặt' : (p.paymentMethod || '—')}</td>
+                    <td style={{ fontSize: '0.82rem', color: '#475569' }}>
+                      <div>{p.externalRef || 'Chưa có'}</div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                        {p.paymentProofUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage({
+                              url: resolveAssetUrl(p.paymentProofUrl),
+                              title: `Chứng từ thanh toán cho ${p.workerName}${p.externalRef ? ' (' + p.externalRef + ')' : ''}`,
+                            })}
+                            style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            🧾 Xem chứng từ
+                          </button>
+                        )}
+                        {buildWorkerVietQrUrl(p) && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage({
+                              url: buildWorkerVietQrUrl(p),
+                              title: `Mã VietQR nhận lương của ${p.workerName}`,
+                            })}
+                            style={{ background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            📱 QR
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td>{renderStatusBadge(p)}</td>
                     <td>{renderActions(p, isDisputeActive, isDisputeResolved)}</td>
                   </tr>
@@ -163,6 +193,40 @@ export default function EOPaymentsTab({
         onNavigateToDisputes={onNavigateToDisputes}
         onOpenPaymentDeclaration={onOpenPaymentModal}
       />
+
+      {previewImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            zIndex: 10000,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem',
+          }}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div style={{ color: '#ffffff', fontWeight: 700, marginBottom: '1rem', fontSize: '1.05rem' }}>
+            {previewImage.title}
+          </div>
+          <img
+            src={previewImage.url}
+            alt={previewImage.title}
+            style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', backgroundColor: '#ffffff' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            style={{ marginTop: '1rem', background: '#ffffff', color: '#0f172a', border: 'none', borderRadius: '8px', padding: '0.5rem 1.25rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Đóng ảnh
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -42,6 +42,9 @@ const EditShiftModal = ({
     minReliabilityScore: 60,
     dressCode: '',
     requiredSkills: [],
+    performedSkillId: null,
+    skillRequirements: [],
+    customSkillNotes: '',
     checklistItems: [],
   });
 
@@ -101,6 +104,9 @@ const EditShiftModal = ({
         minReliabilityScore: shift.minReliabilityScore || 60,
         dressCode: shift.dressCode || '',
         requiredSkills: Array.isArray(shift.requiredSkills) ? shift.requiredSkills : [],
+        performedSkillId: shift.performedSkillId || null,
+        skillRequirements: Array.isArray(shift.skillRequirements) ? shift.skillRequirements : [],
+        customSkillNotes: shift.customSkillNotes || '',
         checklistItems: normalizeChecklistItems(shift.checklistItems || shift.checklist),
       });
     }
@@ -185,6 +191,9 @@ const EditShiftModal = ({
       endTime: eDate.toISOString(),
       arrivalTime: formData.arrivalTime ? new Date(formData.arrivalTime).toISOString() : null,
       requiredSkills: Array.isArray(formData.requiredSkills) ? formData.requiredSkills : [],
+      performedSkillId: formData.performedSkillId || null,
+      skillRequirements: Array.isArray(formData.skillRequirements) ? formData.skillRequirements : [],
+      customSkillNotes: formData.customSkillNotes?.trim() || null,
       dressCode: formData.dressCode || '',
       requiredWorkers: Math.max(1, Number(formData.requiredWorkers) || 1),
       hourlyWage: Math.max(20000, Number(formData.hourlyWage) || 20000),
@@ -291,10 +300,17 @@ const EditShiftModal = ({
             error={validateShiftArrivalTime(formData.arrivalTime, formData.startTime)}
           />
 
-          {/* Kỹ năng bắt buộc (DYNAMIC CUSTOM SKILLS + TAXONOMY) */}
+          {/* Yêu cầu kỹ năng V3 */}
           <ShiftSkillSelector
+            jobType={formData.jobType}
             selectedSkillIds={formData.requiredSkills}
             onChange={(nextSkills) => setFormData({ ...formData, requiredSkills: nextSkills })}
+            performedSkillId={formData.performedSkillId}
+            onPerformedSkillChange={(nextId) => setFormData((prev) => ({ ...prev, performedSkillId: nextId }))}
+            skillRequirements={formData.skillRequirements}
+            onSkillRequirementsChange={(nextReqs) => setFormData((prev) => ({ ...prev, skillRequirements: nextReqs }))}
+            customSkillNotes={formData.customSkillNotes}
+            onCustomSkillNotesChange={(notes) => setFormData((prev) => ({ ...prev, customSkillNotes: notes }))}
             taxonomy={skillTaxonomy}
           />
 

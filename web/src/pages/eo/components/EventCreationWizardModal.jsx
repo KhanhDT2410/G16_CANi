@@ -124,7 +124,10 @@ const EventCreationWizardModal = ({
     allowance: 0,
     maxDistanceKm: 15,
     imageUrl: '',
+    performedSkillId: null,
     requiredSkills: [],
+    skillRequirements: [],
+    customSkillNotes: '',
     checklistItems: [
       { id: 'chk_1', title: 'Có mặt trước 20 phút nhận thẻ và vị trí', isRequiredEvidence: false },
       { id: 'chk_2', title: 'Đồng phục chỉn chu theo quy định', isRequiredEvidence: true },
@@ -225,7 +228,10 @@ const EventCreationWizardModal = ({
       allowance: Number(shift.allowance || 0),
       maxDistanceKm: Number(shift.maxDistanceKm || 15),
       imageUrl: shift.imageUrl || '',
+      performedSkillId: shift.performedSkillId || null,
       requiredSkills: Array.isArray(shift.requiredSkills) ? shift.requiredSkills : [],
+      skillRequirements: Array.isArray(shift.skillRequirements) ? shift.skillRequirements : [],
+      customSkillNotes: shift.customSkillNotes || '',
       checklistItems: parsedChecklist,
     });
     setIsAddingShift(true);
@@ -265,7 +271,10 @@ const EventCreationWizardModal = ({
           allowance: safeAllowance,
           maxDistanceKm: Number(currentShift.maxDistanceKm || 15),
           imageUrl: null,
+          performedSkillId: null,
           requiredSkills: [],
+          skillRequirements: [],
+          customSkillNotes: '',
           checklist: '[]',
           startTime: slotStart.toISOString(),
           endTime: slotEnd.toISOString(),
@@ -566,7 +575,10 @@ const EventCreationWizardModal = ({
         hourlyWage: Math.max(20000, Number(currentShift.hourlyWage || 50000)),
         allowance: Math.max(0, Number(currentShift.allowance || 0)),
         imageUrl: currentShift.imageUrl?.trim() || null,
+        performedSkillId: currentShift.performedSkillId || null,
         requiredSkills: Array.isArray(currentShift.requiredSkills) ? currentShift.requiredSkills : [],
+        skillRequirements: Array.isArray(currentShift.skillRequirements) ? currentShift.skillRequirements : [],
+        customSkillNotes: currentShift.customSkillNotes?.trim() || null,
         checklist: checklistJson,
         arrivalTime: currentShift.arrivalTime ? new Date(currentShift.arrivalTime).toISOString() : null,
         startTime: sStart.toISOString(),
@@ -653,7 +665,10 @@ const EventCreationWizardModal = ({
         allowance: 0,
         maxDistanceKm: 15,
         imageUrl: '',
+        performedSkillId: null,
         requiredSkills: [],
+        skillRequirements: [],
+        customSkillNotes: '',
         checklistItems: [
           { id: 'chk_1', title: 'Có mặt đúng giờ quy định', isRequiredEvidence: false },
           { id: 'chk_2', title: 'Quét mã QR Check-in', isRequiredEvidence: false },
@@ -1220,24 +1235,59 @@ const EventCreationWizardModal = ({
                           {shift.allowance > 0 && <span>Phụ cấp: {Number(shift.allowance).toLocaleString('vi-VN')} đ</span>}
                         </div>
 
-                        {Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0 && (
+                        {((shift.performedSkillId || shift.performedSkillName) ||
+                          (Array.isArray(shift.skillRequirements) && shift.skillRequirements.length > 0) ||
+                          (Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0)) && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
-                            {shift.requiredSkills.map((skillId) => (
+                            {(shift.performedSkillName || skillNameMap[shift.performedSkillId]) && (
                               <span
-                                key={skillId}
                                 style={{
                                   fontSize: '0.72rem',
                                   padding: '0.15rem 0.5rem',
                                   borderRadius: '999px',
-                                  backgroundColor: '#eff6ff',
-                                  color: '#1d4ed8',
-                                  border: '1px solid #bfdbfe',
-                                  fontWeight: 600,
+                                  backgroundColor: '#ecfdf5',
+                                  color: '#047857',
+                                  border: '1px solid #a7f3d0',
+                                  fontWeight: 700,
                                 }}
                               >
-                                {skillNameMap[skillId] || 'Kỹ năng yêu cầu'}
+                                Kỹ năng chính: {shift.performedSkillName || skillNameMap[shift.performedSkillId]}
                               </span>
-                            ))}
+                            )}
+                            {Array.isArray(shift.skillRequirements) && shift.skillRequirements.length > 0
+                              ? shift.skillRequirements.map((req) => (
+                                  <span
+                                    key={req.skillId}
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: '999px',
+                                      backgroundColor: req.requirementType === 'PREFERRED' ? '#f8fafc' : '#eff6ff',
+                                      color: req.requirementType === 'PREFERRED' ? '#475569' : '#1d4ed8',
+                                      border: req.requirementType === 'PREFERRED' ? '1px solid #cbd5e1' : '1px solid #bfdbfe',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {req.requirementType === 'PREFERRED' ? 'Ưu tiên' : 'Bắt buộc'}:{' '}
+                                    {req.skillName || skillNameMap[req.skillId] || 'Kỹ năng'}
+                                  </span>
+                                ))
+                              : (shift.requiredSkills || []).map((skillId) => (
+                                  <span
+                                    key={skillId}
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: '999px',
+                                      backgroundColor: '#eff6ff',
+                                      color: '#1d4ed8',
+                                      border: '1px solid #bfdbfe',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Bắt buộc: {skillNameMap[skillId] || 'Kỹ năng yêu cầu'}
+                                  </span>
+                                ))}
                           </div>
                         )}
 
@@ -1829,8 +1879,15 @@ const EventCreationWizardModal = ({
               </div>
 
               <ShiftSkillSelector
+                jobType={currentShift.jobType}
                 selectedSkillIds={currentShift.requiredSkills}
-                onChange={(nextSkills) => setCurrentShift({ ...currentShift, requiredSkills: nextSkills })}
+                onChange={(nextSkills) => setCurrentShift((prev) => ({ ...prev, requiredSkills: nextSkills }))}
+                performedSkillId={currentShift.performedSkillId}
+                onPerformedSkillChange={(nextId) => setCurrentShift((prev) => ({ ...prev, performedSkillId: nextId }))}
+                skillRequirements={currentShift.skillRequirements}
+                onSkillRequirementsChange={(nextReqs) => setCurrentShift((prev) => ({ ...prev, skillRequirements: nextReqs }))}
+                customSkillNotes={currentShift.customSkillNotes}
+                onCustomSkillNotesChange={(nextNotes) => setCurrentShift((prev) => ({ ...prev, customSkillNotes: nextNotes }))}
                 taxonomy={skillTaxonomy}
               />
 

@@ -15,6 +15,12 @@ class JobProposalItem {
   final DateTime? arrivalTime;
   final DateTime? expiresAt;
   final List<String> requiredSkillNames;
+  final List<String> preferredSkillNames;
+  final List<String> matchedSkillNames;
+  final String? performedSkillId;
+  final String? performedSkillName;
+  final String? confirmedPerformedSkillName;
+  final String? recommendationReasonVi;
   final double hourlyWage;
   final double allowance;
   final double totalEstimatedPay;
@@ -39,6 +45,12 @@ class JobProposalItem {
     this.arrivalTime,
     this.expiresAt,
     this.requiredSkillNames = const [],
+    this.preferredSkillNames = const [],
+    this.matchedSkillNames = const [],
+    this.performedSkillId,
+    this.performedSkillName,
+    this.confirmedPerformedSkillName,
+    this.recommendationReasonVi,
     required this.hourlyWage,
     required this.allowance,
     required this.totalEstimatedPay,
@@ -65,6 +77,11 @@ class JobProposalItem {
       arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
       expiresAt: json['expiresAt'] != null ? DateTime.tryParse(json['expiresAt'].toString())?.toLocal() : null,
       requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
+      preferredSkillNames: (json['preferredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
+      matchedSkillNames: (json['matchedSkillNames'] as List<dynamic>? ?? []).cast<String>(),
+      performedSkillId: json['performedSkillId']?.toString(),
+      performedSkillName: json['performedSkillName'] as String?,
+      recommendationReasonVi: json['recommendationReasonVi'] as String?,
       hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
       allowance: (json['allowance'] is num) ? (json['allowance'] as num).toDouble() : 0.0,
       totalEstimatedPay: (json['totalEstimatedPay'] is num) ? (json['totalEstimatedPay'] as num).toDouble() : 0.0,
@@ -90,6 +107,9 @@ class ShiftAssignmentItem {
   final DateTime endTime;
   final DateTime? arrivalTime;
   final List<String> requiredSkillNames;
+  final String? performedSkillId;
+  final String? performedSkillName;
+  final String? confirmedPerformedSkillName;
   final double hourlyWage;
   final double totalPay;
   final String status;
@@ -108,10 +128,17 @@ class ShiftAssignmentItem {
   final DateTime? proofSubmittedAt;
   final String? workerConfirmStatus;
   final String? paymentProofUrl;
+  final String? externalRef;
+  final DateTime? declaredAt;
+  final String? workerComment;
   final int? eoRating;
   final String? eoReviewComment;
   final DateTime? eoReviewedAt;
   final bool? hasWorkerReviewed;
+  final String? bankCode;
+  final String? bankAccountNumber;
+  final String? bankAccountName;
+  final String? vietQrUrl;
 
   ShiftAssignmentItem({
     required this.assignmentId,
@@ -128,6 +155,9 @@ class ShiftAssignmentItem {
     required this.endTime,
     this.arrivalTime,
     this.requiredSkillNames = const [],
+    this.performedSkillId,
+    this.performedSkillName,
+    this.confirmedPerformedSkillName,
     required this.hourlyWage,
     required this.totalPay,
     required this.status,
@@ -146,10 +176,17 @@ class ShiftAssignmentItem {
     this.proofSubmittedAt,
     this.workerConfirmStatus,
     this.paymentProofUrl,
+    this.externalRef,
+    this.declaredAt,
+    this.workerComment,
     this.eoRating,
     this.eoReviewComment,
     this.eoReviewedAt,
     this.hasWorkerReviewed,
+    this.bankCode,
+    this.bankAccountNumber,
+    this.bankAccountName,
+    this.vietQrUrl,
   });
 
   factory ShiftAssignmentItem.fromJson(Map<String, dynamic> json) {
@@ -170,6 +207,9 @@ class ShiftAssignmentItem {
       requiredSkillNames: (json['requiredSkillNames'] is List)
           ? (json['requiredSkillNames'] as List).map((e) => e.toString()).toList()
           : const [],
+      performedSkillId: json['performedSkillId']?.toString(),
+      performedSkillName: json['performedSkillName'] as String?,
+      confirmedPerformedSkillName: json['confirmedPerformedSkillName'] as String?,
       hourlyWage: (json['hourlyWage'] is num)
           ? (json['hourlyWage'] as num).toDouble()
           : (double.tryParse(json['hourlyWage']?.toString() ?? '') ?? 0.0),
@@ -200,12 +240,19 @@ class ShiftAssignmentItem {
       proofSubmittedAt: json['proofSubmittedAt'] != null ? DateTime.tryParse(json['proofSubmittedAt'].toString())?.toLocal() : null,
       workerConfirmStatus: json['workerConfirmStatus'] as String?,
       paymentProofUrl: json['paymentProofUrl'] as String?,
+      externalRef: json['externalRef'] as String?,
+      declaredAt: json['declaredAt'] != null ? DateTime.tryParse(json['declaredAt'].toString())?.toLocal() : null,
+      workerComment: json['workerComment'] as String?,
       eoRating: (json['eoRating'] is num)
           ? (json['eoRating'] as num).toInt()
           : int.tryParse(json['eoRating']?.toString() ?? ''),
       eoReviewComment: json['eoReviewComment'] as String?,
       eoReviewedAt: json['eoReviewedAt'] != null ? DateTime.tryParse(json['eoReviewedAt'].toString())?.toLocal() : null,
       hasWorkerReviewed: json['hasWorkerReviewed'] as bool?,
+      bankCode: json['bankCode'] as String?,
+      bankAccountNumber: json['bankAccountNumber'] as String?,
+      bankAccountName: json['bankAccountName'] as String?,
+      vietQrUrl: json['vietQrUrl'] as String?,
     );
   }
 }

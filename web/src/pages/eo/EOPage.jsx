@@ -57,6 +57,7 @@ export default function EOPage() {
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('overview');
   const [activeEventSubTab, setActiveEventSubTab] = useState('list');
+  const [highlightAssignmentId, setHighlightAssignmentId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('cani_eo_sidebar_collapsed') === 'true';
@@ -86,6 +87,11 @@ export default function EOPage() {
       const targetTab = e.detail?.tab;
       const targetShiftId = e.detail?.shiftId;
       const targetEventId = e.detail?.eventId;
+      const targetAssignmentId = e.detail?.assignmentId;
+
+      if (targetAssignmentId) {
+        setHighlightAssignmentId(targetAssignmentId);
+      }
 
       if (targetTab) {
         if (targetTab === 'recruitment') {
@@ -505,6 +511,7 @@ export default function EOPage() {
                 <ShiftWorkspacePage
                   shift={workspaceShift}
                   event={resolvedEvent}
+                  targetAssignmentId={highlightAssignmentId}
                   onSelectShift={(nextShift) => {
                     setWorkspaceShiftId(nextShift.shiftId);
                     syncUrlRoute({ tab: 'events', eventId: resolvedEvent.eventId, shiftId: nextShift.shiftId });

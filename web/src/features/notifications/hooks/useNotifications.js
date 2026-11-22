@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { notificationApi } from '../api/notificationApi';
+import { showToast } from '../../../components/common/Toast';
 
 /**
  * Hook quản lý nghiệp vụ và trạng thái thông báo In-App (SRS UC-117)
- * Tuyệt đối lấy dữ liệu thật từ DB, không dùng mock fallback.
+ * Kết hợp Web Browser Notification API để hiện thông báo trên máy ngay khi có cập nhật mới.
  */
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState([]);
@@ -12,17 +13,53 @@ export const useNotifications = () => {
   const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'UNREAD'
+  const seenUnreadIdsRef = useRef(null);
 
-  // 1. Tải số lượng thông báo chưa đọc từ server
+  const notifyDesktop = useCallback((item) => {
+    const title = item?.title || 'Thông báo mới từ CANi';
+    const body = item?.body || '';
+    showToast(`${title}${body ? ': ' + body : ''}`, 'info');
+
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (window.Notification.permission === 'granted') {
+        try {
+          new window.Notification(title, { body });
+        } catch {
+          // ignore browser notification errors
+        }
+      }
+    }
+  }, []);
+
+  // 1. Tải số lượng thông báo chưa đọc & thông báo mới từ server
   const fetchUnreadCount = useCallback(async () => {
     try {
       const count = await notificationApi.getUnreadCount();
-      setUnreadCount(Number(count) || 0);
+      const numericCount = Number(count) || 0;
+      setUnreadCount((prev) => {
+        if (numericCount > prev || (numericCount > 0 && seenUnreadIdsRef.current === null)) {
+          notificationApi.getMyNotifications().then((list) => {
+            const arr = Array.isArray(list) ? list : [];
+            setNotifications(arr);
+            const unreadItems = arr.filter((n) => !n.isRead);
+            if (seenUnreadIdsRef.current === null) {
+              seenUnreadIdsRef.current = new Set(unreadItems.map((n) => n.notificationId));
+            } else {
+              const newItems = unreadItems.filter((n) => !seenUnreadIdsRef.current.has(n.notificationId));
+              newItems.forEach((n) => {
+                seenUnreadIdsRef.current.add(n.notificationId);
+                notifyDesktop(n);
+              });
+            }
+          }).catch(() => {});
+        }
+        return numericCount;
+      });
     } catch (err) {
       // Khi chưa đăng nhập hoặc lỗi kết nối, giữ count = 0
       console.warn('[useNotifications] Không thể tải unread count:', err?.message);
     }
-  }, []);
+  }, [notifyDesktop]);
 
   // 2. Tải toàn bộ danh sách thông báo từ DB
   const fetchNotifications = useCallback(async () => {
@@ -30,10 +67,16 @@ export const useNotifications = () => {
     setError(null);
     try {
       const data = await notificationApi.getMyNotifications();
-      setNotifications(Array.isArray(data) ? data : []);
+      const arr = Array.isArray(data) ? data : [];
+      setNotifications(arr);
       // Cập nhật lại unread count dựa trên dữ liệu thật
-      const unread = (Array.isArray(data) ? data : []).filter((n) => !n.isRead).length;
-      setUnreadCount(unread);
+      const unreadItems = arr.filter((n) => !n.isRead);
+      setUnreadCount(unreadItems.length);
+      if (seenUnreadIdsRef.current === null) {
+        seenUnreadIdsRef.current = new Set(unreadItems.map((n) => n.notificationId));
+      } else {
+        unreadItems.forEach((n) => seenUnreadIdsRef.current.add(n.notificationId));
+      }
     } catch (err) {
       console.error('[useNotifications] Lỗi khi tải thông báo:', err);
       setError(err?.response?.data?.message || 'Không thể tải danh sách thông báo');
@@ -77,8 +120,15 @@ export const useNotifications = () => {
     }
   }, [fetchNotifications]);
 
-  // 5. Đóng/mở dropdown
+  // 5. Đóng/mở dropdown (xin quyền thông báo trình duyệt nếu chưa từ chối)
   const toggleDropdown = useCallback(() => {
+    if (
+      typeof window !== 'undefined' &&
+      'Notification' in window &&
+      window.Notification.permission === 'default'
+    ) {
+      window.Notification.requestPermission().catch(() => {});
+    }
     setIsOpen((prev) => {
       const next = !prev;
       if (next) {
@@ -92,13 +142,13 @@ export const useNotifications = () => {
     setIsOpen(false);
   }, []);
 
-  // 6. Tự động kiểm tra unread count định kỳ (mỗi 60s) và lắng nghe sự kiện
+  // 6. Tự động kiểm tra unread count định kỳ (mỗi 15s) và lắng nghe sự kiện
   useEffect(() => {
     fetchUnreadCount();
 
     const intervalId = setInterval(() => {
       fetchUnreadCount();
-    }, 60000);
+    }, 15000);
 
     const handleRefresh = () => {
       fetchUnreadCount();

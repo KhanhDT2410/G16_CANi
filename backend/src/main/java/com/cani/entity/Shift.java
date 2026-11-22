@@ -88,6 +88,12 @@ public class Shift {
     @Column(name = "required_skills")
     private UUID[] requiredSkills;
 
+    @Column(name = "performed_skill_id")
+    private UUID performedSkillId;
+
+    @Column(name = "custom_skill_notes", columnDefinition = "TEXT")
+    private String customSkillNotes;
+
     @Column(name = "min_reliability_score")
     @Builder.Default
     private Integer minReliabilityScore = 0;

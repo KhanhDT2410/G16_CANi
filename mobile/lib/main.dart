@@ -5,8 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cani/app/app.dart';
 import 'package:cani/app/home_screen.dart';
 import 'package:cani/core/constants/api_constants.dart';
+import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/core/notifications/fcm_service.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,9 +30,23 @@ void main() async {
 
   // Khởi tạo Firebase Cloud Messaging (FCM) & Kênh thông báo nổi (Heads-up banner)
   await FcmService.initialize(
+    onForegroundMessage: (_) {
+      if (!container.read(authStateProvider).isAuthenticated) return;
+      container.invalidate(assignmentsListProvider);
+      container.invalidate(incomeSummaryProvider);
+    },
+    onTokenRefresh: (_) {
+      final authState = container.read(authStateProvider);
+      if (authState.isAuthenticated && authState.user != null) {
+        FcmService.syncTokenWithBackend(container.read(dioProvider), explicitUserId: authState.user!.id);
+      }
+    },
     onNotificationNavigate: (data) {
       debugPrint('[Notification Navigate] Navigating from notification data: $data');
       if (!container.read(authStateProvider).isAuthenticated) return;
+
+      container.invalidate(assignmentsListProvider);
+      container.invalidate(incomeSummaryProvider);
 
       final rawPayload = data['payload'];
       final type = data['type'] ?? (rawPayload is Map ? rawPayload['type'] : null);

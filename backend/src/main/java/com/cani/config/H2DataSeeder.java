@@ -388,8 +388,12 @@ public class H2DataSeeder implements CommandLineRunner {
                         }
 
                         if (workerSkillPointRepository.count() == 0) {
+                                Skill sLeTan = skillRepository.findByName("Lễ tân / Check-in").orElse(null);
+                                Skill sPhucVu = skillRepository.findByName("Phục vụ bàn").orElse(null);
+
                                 workerSkillPointRepository.save(WorkerSkillPoint.builder()
                                                 .worker(worker)
+                                                .skill(sLeTan)
                                                 .jobType("Lễ tân / Check-in")
                                                 .spVerify(50)
                                                 .spExperience(200)
@@ -399,10 +403,12 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .totalShiftsCompleted(5)
                                                 .totalShiftsCancelled(0)
                                                 .avgRating(new BigDecimal("4.90"))
+                                                .ratingCount(5)
                                                 .build());
 
                                 workerSkillPointRepository.save(WorkerSkillPoint.builder()
                                                 .worker(worker)
+                                                .skill(sPhucVu)
                                                 .jobType("Phục vụ bàn")
                                                 .spVerify(0)
                                                 .spExperience(120)
@@ -412,6 +418,7 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .totalShiftsCompleted(3)
                                                 .totalShiftsCancelled(0)
                                                 .avgRating(new BigDecimal("4.75"))
+                                                .ratingCount(3)
                                                 .build());
                                 log.info("==> [H2 Profile] Seeded demo WorkerSkillPoints (GOLD & SILVER)");
                         }

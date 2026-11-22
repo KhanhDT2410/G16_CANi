@@ -333,8 +333,8 @@ class JobDetailBottomSheet extends StatelessWidget {
                     ),
                   ),
 
-                // Kỹ năng bắt buộc
-                if (shift.requiredSkillNames.isNotEmpty)
+                // Kỹ năng bắt buộc & ưu tiên
+                if (shift.requiredSkillNames.isNotEmpty || shift.preferredSkillNames.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8, left: 24),
                     child: Row(
@@ -350,31 +350,36 @@ class JobDetailBottomSheet extends StatelessWidget {
                           child: Wrap(
                             spacing: 6,
                             runSpacing: 4,
-                            children: shift.requiredSkillNames
-                                .map(
-                                  (n) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: Colors.blue.shade200,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      n,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.blueAccent,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                            children: [
+                              ...shift.requiredSkillNames.map(
+                                (n) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.blue.shade200),
                                   ),
-                                )
-                                .toList(),
+                                  child: Text(
+                                    'Bắt buộc: $n',
+                                    style: const TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ),
+                              ...shift.preferredSkillNames.map(
+                                (n) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.green.shade200),
+                                  ),
+                                  child: Text(
+                                    'Ưu tiên: $n',
+                                    style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

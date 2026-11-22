@@ -5,9 +5,12 @@ import com.cani.dto.invite.InviteResponseDto;
 import com.cani.dto.invite.JoinInviteResponseDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.*;
+import com.cani.exception.BadRequestException;
 import com.cani.repository.*;
+import com.cani.service.AuditLogService;
 import com.cani.service.InviteService;
 import com.cani.service.NotificationService;
+import com.cani.service.WorkerShiftEligibilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -153,5 +157,115 @@ class InviteServiceTest {
         assertEquals(AssignmentStatus.CONFIRMED.name(), joined.getStatus());
         assertEquals(1, storedInvite.getUsedCount());
         assertEquals(1, inviteShift.getConfirmedWorkers());
+    }
+
+    @Test
+    @DisplayName("Invite Mode V3: Chặn tuyệt đối khi chưa duyệt eKYC hoặc thiếu chứng chỉ bắt buộc dù có overrideReason")
+    void inviteMode_BlocksNonOverridableEkycOrCert_EvenWithOverrideReason() {
+        WorkerSkillRepository workerSkillRepo = mock(WorkerSkillRepository.class);
+        ShiftSkillRequirementRepository shiftSkillReqRepo = mock(ShiftSkillRequirementRepository.class);
+        SkillRepository skillRepo = mock(SkillRepository.class);
+        WorkerShiftEligibilityService realEligibility = new WorkerShiftEligibilityService(
+                workerSkillRepo, shiftSkillReqRepo, shiftAssignmentRepository, null, null, skillRepo
+        );
+        ReflectionTestUtils.setField(inviteService, "workerShiftEligibilityService", realEligibility);
+
+        Invite storedInvite = Invite.builder()
+                .inviteId(UUID.randomUUID())
+                .event(inviteEvent)
+                .shift(inviteShift)
+                .code("INV-SAFE")
+                .maxUses(3)
+                .usedCount(0)
+                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .isActive(true)
+                .build();
+
+        // Trường hợp 1: Chưa duyệt eKYC -> Chặn dù có overrideReason
+        worker.setKycStatus(KycStatus.PENDING);
+        when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(worker));
+        when(inviteRepository.findByCodeAndIsActiveTrue("INV-SAFE")).thenReturn(Optional.of(storedInvite));
+        when(shiftAssignmentRepository.findByShift_ShiftIdAndWorker_WorkerId(inviteShift.getShiftId(), worker.getWorkerId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(BadRequestException.class,
+                () -> inviteService.joinViaInviteCode(workerUserId, "INV-SAFE", "Người quen EO"));
+
+        // Trường hợp 2: Đã duyệt eKYC nhưng thiếu chứng chỉ an toàn bắt buộc -> Chặn dù có overrideReason
+        worker.setKycStatus(KycStatus.APPROVED);
+        Skill certSkill = Skill.builder().skillId(UUID.randomUUID()).name("An toàn PCCC").isActive(true).build();
+        ShiftSkillRequirement certReq = ShiftSkillRequirement.builder()
+                .shift(inviteShift)
+                .skill(certSkill)
+                .requirementType(SkillRequirementType.REQUIRED)
+                .minVerificationTier(VerificationTier.AI_DOCUMENT)
+                .requiresValidCertificate(true)
+                .build();
+        when(shiftSkillReqRepo.findByShiftIdWithSkill(inviteShift.getShiftId())).thenReturn(List.of(certReq));
+        when(workerSkillRepo.findByWorker_WorkerId(worker.getWorkerId())).thenReturn(List.of());
+
+        BadRequestException certEx = assertThrows(BadRequestException.class,
+                () -> inviteService.joinViaInviteCode(workerUserId, "INV-SAFE", "Người quen EO"));
+        assertTrue(certEx.getMessage().contains("chứng chỉ"));
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Invite Mode V3: Cho phép override điều kiện non-safety khi có overrideReason, lưu lý do và ghi AuditLog")
+    void inviteMode_AllowsNonSafetyOverrideWithReason_SavesReasonAndAuditLog() {
+        WorkerSkillRepository workerSkillRepo = mock(WorkerSkillRepository.class);
+        ShiftSkillRequirementRepository shiftSkillReqRepo = mock(ShiftSkillRequirementRepository.class);
+        SkillRepository skillRepo = mock(SkillRepository.class);
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        WorkerShiftEligibilityService realEligibility = new WorkerShiftEligibilityService(
+                workerSkillRepo, shiftSkillReqRepo, shiftAssignmentRepository, null, null, skillRepo
+        );
+        ReflectionTestUtils.setField(inviteService, "workerShiftEligibilityService", realEligibility);
+        ReflectionTestUtils.setField(inviteService, "auditLogService", auditLogService);
+
+        Skill optionalSafetyFalseSkill = Skill.builder().skillId(UUID.randomUUID()).name("Pha chế").isActive(true).build();
+        ShiftSkillRequirement nonCertReq = ShiftSkillRequirement.builder()
+                .shift(inviteShift)
+                .skill(optionalSafetyFalseSkill)
+                .requirementType(SkillRequirementType.REQUIRED)
+                .minVerificationTier(VerificationTier.SELF_DECLARED)
+                .requiresValidCertificate(false)
+                .build();
+
+        Invite storedInvite = Invite.builder()
+                .inviteId(UUID.randomUUID())
+                .event(inviteEvent)
+                .shift(inviteShift)
+                .code("INV-OVR")
+                .maxUses(3)
+                .usedCount(0)
+                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .isActive(true)
+                .build();
+
+        when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(worker));
+        when(inviteRepository.findByCodeAndIsActiveTrue("INV-OVR")).thenReturn(Optional.of(storedInvite));
+        when(shiftAssignmentRepository.findByShift_ShiftIdAndWorker_WorkerId(inviteShift.getShiftId(), worker.getWorkerId()))
+                .thenReturn(Optional.empty());
+        when(shiftSkillReqRepo.findByShiftIdWithSkill(inviteShift.getShiftId())).thenReturn(List.of(nonCertReq));
+        when(workerSkillRepo.findByWorker_WorkerId(worker.getWorkerId())).thenReturn(List.of());
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> {
+            ShiftAssignment sa = i.getArgument(0);
+            sa.setAssignmentId(UUID.randomUUID());
+            return sa;
+        });
+
+        JoinInviteResponseDto joined = inviteService.joinViaInviteCode(workerUserId, "INV-OVR", "Đã kiểm tra tay nghề trực tiếp");
+
+        assertEquals(AssignmentStatus.CONFIRMED.name(), joined.getStatus());
+        verify(shiftAssignmentRepository).save(argThat(sa ->
+                "Đã kiểm tra tay nghề trực tiếp".equals(sa.getInviteOverrideReason())
+                        && sa.getSource() == AssignmentSource.DIRECT
+        ));
+        verify(auditLogService).logAction(argThat(entry ->
+                "INVITE_ELIGIBILITY_OVERRIDE".equals(entry.getAction())
+                        && entry.getNewValues() != null
+                        && entry.getNewValues().contains("Đã kiểm tra tay nghề trực tiếp")
+        ));
     }
 }

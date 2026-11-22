@@ -17,6 +17,9 @@ class NearbyShiftItem {
   final DateTime? endTime;
   final DateTime? arrivalTime;
   final List<String> requiredSkillNames;
+  final List<String> preferredSkillNames;
+  final String? performedSkillName;
+  final String? customSkillNotes;
   final double distanceKm;
   final int requiredWorkers;
   final int confirmedWorkers;
@@ -45,6 +48,9 @@ class NearbyShiftItem {
     this.endTime,
     this.arrivalTime,
     this.requiredSkillNames = const [],
+    this.preferredSkillNames = const [],
+    this.performedSkillName,
+    this.customSkillNotes,
     required this.distanceKm,
     required this.requiredWorkers,
     required this.confirmedWorkers,
@@ -75,6 +81,9 @@ class NearbyShiftItem {
       endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'] as String)?.toLocal() : null,
       arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
       requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
+      preferredSkillNames: (json['preferredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
+      performedSkillName: json['performedSkillName'] as String?,
+      customSkillNotes: json['customSkillNotes'] as String?,
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       requiredWorkers: (json['requiredWorkers'] as num?)?.toInt() ?? 1,
       confirmedWorkers: (json['confirmedWorkers'] as num?)?.toInt() ?? 0,

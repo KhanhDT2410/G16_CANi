@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/notifications/local_notification_service.dart';
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/screens/complete_profile_screen.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
@@ -21,7 +24,10 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  Timer? _notifSyncTimer;
+  Set<String>? _seenNotifIds;
+  bool _syncingNotifs = false;
 
   final List<Widget> _pages = const [
     JobRadarScreen(),
@@ -32,13 +38,82 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final user = ref.read(authStateProvider).user;
       if (user != null) {
         TermsOfServiceDialog.checkAndShow(context, user.id);
+        _syncDeviceNotifications();
       }
     });
+    _notifSyncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _syncDeviceNotifications();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifSyncTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncDeviceNotifications();
+    }
+  }
+
+  /// Đồng bộ thông báo mới từ backend và bật banner Local Notification trên thiết bị
+  /// (bổ sung fallback khi thiết bị/emulator không có Google Play Services cho FCM).
+  Future<void> _syncDeviceNotifications() async {
+    if (_syncingNotifs || !mounted) return;
+    final auth = ref.read(authStateProvider);
+    if (!auth.isAuthenticated || auth.user == null) return;
+
+    _syncingNotifs = true;
+    try {
+      final dio = ref.read(dioProvider);
+      final res = await dio.get('/v1/notifications');
+      final raw = res.data is Map ? res.data['data'] : null;
+      if (raw is! List) return;
+
+      final unread = raw
+          .whereType<Map>()
+          .where((item) => item['isRead'] != true && item['notificationId'] != null)
+          .toList();
+      final ids = unread.map((e) => e['notificationId'].toString()).toSet();
+
+      if (_seenNotifIds == null) {
+        _seenNotifIds = ids;
+        return;
+      }
+
+      final newlyArrived = unread.where((e) => !_seenNotifIds!.contains(e['notificationId'].toString())).toList();
+      _seenNotifIds!.addAll(ids);
+
+      if (newlyArrived.isNotEmpty) {
+        ref.invalidate(assignmentsListProvider);
+        ref.invalidate(incomeSummaryProvider);
+        for (final n in newlyArrived.take(3)) {
+          final idStr = n['notificationId'].toString();
+          final title = n['title']?.toString() ?? 'Thông báo mới từ CANi';
+          final body = n['body']?.toString() ?? '';
+          await LocalNotificationService.showNotification(
+            id: idStr.hashCode,
+            title: title,
+            body: body,
+            payload: n['data']?.toString(),
+          );
+        }
+      }
+    } catch (_) {
+      // ignore background polling failures silently
+    } finally {
+      _syncingNotifs = false;
+    }
   }
 
   @override

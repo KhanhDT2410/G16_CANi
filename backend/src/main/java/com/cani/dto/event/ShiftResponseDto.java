@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -42,6 +43,10 @@ public class ShiftResponseDto {
     private String checklist;
     /** Kỹ năng bắt buộc của ca (matching hard filter + hiển thị web) */
     private UUID[] requiredSkills;
+    private UUID performedSkillId;
+    private String performedSkillName;
+    private List<ShiftSkillRequirementDto> skillRequirements;
+    private String customSkillNotes;
     /** Cờ điều phối khẩn cấp (Emergency Dispatch) cho phép radar free-pick */
     private Boolean emergency;
 }

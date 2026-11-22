@@ -204,10 +204,25 @@ export default function EventDetailModal({
     }
   };
 
-  const skillNames = (shift) =>
-    Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0
-      ? (shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') || `${shift.requiredSkills.length} kỹ năng`)
-      : '';
+  const skillNames = (shift) => {
+    const parts = [];
+    const performedName = shift.performedSkillName || skillNameMap[shift.performedSkillId];
+    if (performedName) {
+      parts.push(`Chính: ${performedName}`);
+    }
+    if (Array.isArray(shift.skillRequirements) && shift.skillRequirements.length > 0) {
+      const reqNames = shift.skillRequirements
+        .map((r) => `${r.requirementType === 'PREFERRED' ? 'Ưu tiên' : 'Bắt buộc'}: ${r.skillName || skillNameMap[r.skillId] || 'Kỹ năng'}`)
+        .join(', ');
+      parts.push(reqNames);
+    } else if (Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0) {
+      parts.push(
+        shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') ||
+          `${shift.requiredSkills.length} kỹ năng`
+      );
+    }
+    return parts.join(' • ');
+  };
 
   const hasCustomArrival = (shift) =>
     shift.arrivalTime && shift.startTime &&
@@ -1001,6 +1016,7 @@ export default function EventDetailModal({
                     <ShiftQrAndAttendancePanel
                       shift={selectedQrShift}
                       event={event}
+                      skillTaxonomy={skillTaxonomy}
                       onSelectShift={(nextShift) => setActiveWorkspaceShiftId(nextShift.shiftId)}
                       onReloadEvents={onReloadEvents}
                       onOpenPaymentDeclaration={onOpenPaymentDeclaration}

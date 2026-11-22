@@ -43,6 +43,41 @@ public class InviteService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private NotificationService notificationService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WorkerShiftEligibilityService workerShiftEligibilityService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WorkerSkillRepository workerSkillRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ShiftSkillRequirementRepository shiftSkillRequirementRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WorkerAvailabilityRepository workerAvailabilityRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private BlockListService blockListService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SkillRepository skillRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AuditLogService auditLogService;
+
+    private WorkerShiftEligibilityService getEligibilityService() {
+        if (workerShiftEligibilityService != null) {
+            return workerShiftEligibilityService;
+        }
+        return WorkerShiftEligibilityService.withFallbackDependencies(
+                workerSkillRepository,
+                shiftSkillRequirementRepository,
+                shiftAssignmentRepository,
+                workerAvailabilityRepository,
+                blockListService,
+                skillRepository
+        );
+    }
+
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -145,6 +180,14 @@ public class InviteService {
      */
     @Transactional
     public JoinInviteResponseDto joinViaInviteCode(UUID workerUserId, String code) {
+        return joinViaInviteCode(workerUserId, code, null);
+    }
+
+    /**
+     * UC-73: Worker tham gia ca làm việc qua Mã mời (hỗ trợ ghi nhận lý do ngoại lệ EO cho điều kiện không liên quan an toàn)
+     */
+    @Transactional
+    public JoinInviteResponseDto joinViaInviteCode(UUID workerUserId, String code, String overrideReason) {
         Worker worker = workerRepository.findByUser_UserId(workerUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài khoản chưa đăng ký hồ sơ Người lao động (Worker)"));
 
@@ -176,6 +219,16 @@ public class InviteService {
             }
         }
 
+        WorkerShiftEligibilityService.EligibilityResult eligibility = getEligibilityService().evaluate(
+                worker,
+                shift,
+                WorkerShiftEligibilityService.MatchingChannel.INVITE_MODE,
+                overrideReason
+        );
+        if (!eligibility.eligible()) {
+            throw new BadRequestException(eligibility.reasonMessageVi());
+        }
+
         // Tính thù lao dự kiến
         long hours = 4;
         if (shift.getStartTime() != null && shift.getEndTime() != null) {
@@ -184,6 +237,10 @@ public class InviteService {
         BigDecimal hourlyWage = shift.getHourlyWage() != null ? shift.getHourlyWage() : BigDecimal.valueOf(50000);
         BigDecimal agreedAmount = hourlyWage.multiply(BigDecimal.valueOf(hours));
 
+        String cleanOverrideReason = (eligibility.overrideApplied() && overrideReason != null && !overrideReason.isBlank())
+                ? overrideReason.trim()
+                : null;
+
         // Tạo ShiftAssignment với source = DIRECT
         ShiftAssignment assignment = ShiftAssignment.builder()
                 .shift(shift)
@@ -191,10 +248,26 @@ public class InviteService {
                 .inviteId(invite.getInviteId())
                 .source(AssignmentSource.DIRECT)
                 .status(AssignmentStatus.CONFIRMED)
+                .inviteOverrideReason(cleanOverrideReason)
                 .build();
         attachGroupInfoIfPresent(assignment, worker);
 
         ShiftAssignment savedAssignment = shiftAssignmentRepository.save(assignment);
+
+        if (cleanOverrideReason != null && auditLogService != null) {
+            try {
+                auditLogService.logAction(AuditLog.builder()
+                        .userId(workerUserId)
+                        .action("INVITE_ELIGIBILITY_OVERRIDE")
+                        .entityType("SHIFT_ASSIGNMENT")
+                        .entityId(savedAssignment.getAssignmentId())
+                        .newValues("{\"shiftId\":\"" + shift.getShiftId() + "\",\"inviteId\":\"" + invite.getInviteId()
+                                + "\",\"overrideReason\":\"" + cleanOverrideReason.replace("\"", "'") + "\"}")
+                        .build());
+            } catch (Exception ex) {
+                log.warn("Không thể ghi AuditLog ngoại lệ Invite: {}", ex.getMessage());
+            }
+        }
 
         // Cập nhật lượt sử dụng mã mời
         invite.setUsedCount(invite.getUsedCount() + 1);

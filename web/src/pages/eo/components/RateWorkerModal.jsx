@@ -70,9 +70,12 @@ const RateWorkerModal = ({
         </div>
 
         <div style={{ background: '#f8fafc', padding: '0.8rem 1rem', borderRadius: 8, marginBottom: '1.2rem', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontWeight: 600, color: '#1e293b' }}>{assignment.workerName || 'Worker'}</div>
+          <div style={{ fontWeight: 600, color: '#1e293b' }}>{assignment.workerName || 'Nhân sự'}</div>
           <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 2 }}>
             SĐT: {assignment.workerPhone || 'Chưa cập nhật'} • Điểm uy tín: <strong style={{ color: '#2563eb' }}>{assignment.workerReliabilityScore || 100}/100</strong>
+            {(assignment.confirmedPerformedSkillName || assignment.performedSkillName) && (
+              <> • Kỹ năng: <strong style={{ color: '#047857' }}>{assignment.confirmedPerformedSkillName || assignment.performedSkillName}</strong></>
+            )}
           </div>
         </div>
 

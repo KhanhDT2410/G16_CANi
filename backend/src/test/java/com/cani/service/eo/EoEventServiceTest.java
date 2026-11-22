@@ -1244,6 +1244,12 @@ class EoEventServiceTest {
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId))
+                .thenReturn(Optional.of(AttendanceLog.builder()
+                        .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS))
+                        .checkoutTime(Instant.now().minus(5, ChronoUnit.MINUTES))
+                        .hoursWorked(BigDecimal.valueOf(4))
+                        .build()));
         when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> i.getArgument(0));
 
         ShiftAttendanceDto result = eoEventService.verifyAttendance(userId, assignmentId);
@@ -1285,6 +1291,12 @@ class EoEventServiceTest {
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId))
+                .thenReturn(Optional.of(AttendanceLog.builder()
+                        .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS))
+                        .checkoutTime(Instant.now().minus(5, ChronoUnit.MINUTES))
+                        .hoursWorked(BigDecimal.valueOf(4))
+                        .build()));
         when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> i.getArgument(0));
 
         ShiftAttendanceDto result = eoEventService.verifyAttendance(userId, assignmentId);
@@ -1341,6 +1353,12 @@ class EoEventServiceTest {
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId))
+                .thenReturn(Optional.of(AttendanceLog.builder()
+                        .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS))
+                        .checkoutTime(Instant.now().minus(5, ChronoUnit.MINUTES))
+                        .hoursWorked(BigDecimal.valueOf(4))
+                        .build()));
         when(paymentRepository.findByAssignmentId(assignmentId)).thenReturn(Optional.of(declaredPayment));
         when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> i.getArgument(0));
 
@@ -1979,6 +1997,130 @@ class EoEventServiceTest {
 
         assertThrows(BadRequestException.class, () -> eoEventService.triggerEmergencyDispatch(userId, shiftId, 20.0));
         verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+    }
+
+    @Test
+    @DisplayName("Skill V3 - addShiftToEvent(): Validate active taxonomy & lưu ShiftSkillRequirement chuẩn hóa")
+    void addShiftToEvent_SkillV3_ValidatesActiveTaxonomyAndSavesRequirements() {
+        SkillRepository skillRepo = mock(SkillRepository.class);
+        ShiftSkillRequirementRepository shiftSkillReqRepo = mock(ShiftSkillRequirementRepository.class);
+        ReflectionTestUtils.setField(eoEventService, "skillRepository", skillRepo);
+        ReflectionTestUtils.setField(eoEventService, "shiftSkillRequirementRepository", shiftSkillReqRepo);
+
+        UUID eventId = UUID.randomUUID();
+        UUID mainSkillId = UUID.randomUUID();
+        UUID prefSkillId = UUID.randomUUID();
+        Skill mainSkill = Skill.builder().skillId(mainSkillId).name("Phục vụ bàn").isActive(true).build();
+        Skill prefSkill = Skill.builder().skillId(prefSkillId).name("Tiếng Anh giao tiếp").isActive(true).build();
+
+        Event activeEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .name("Gala Dinner 2026")
+                .mode(EventMode.INVITE)
+                .status(EventStatus.ACTIVE)
+                .startTime(Instant.now().plus(1, ChronoUnit.DAYS))
+                .endTime(Instant.now().plus(2, ChronoUnit.DAYS))
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(activeEvent));
+        when(skillRepo.findById(mainSkillId)).thenReturn(Optional.of(mainSkill));
+        when(skillRepo.findById(prefSkillId)).thenReturn(Optional.of(prefSkill));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(i -> {
+            Shift s = i.getArgument(0);
+            if (s.getShiftId() == null) s.setShiftId(UUID.randomUUID());
+            return s;
+        });
+
+        Instant start = activeEvent.getStartTime().plus(2, ChronoUnit.HOURS);
+        CreateShiftRequestDto dto = CreateShiftRequestDto.builder()
+                .jobType("Phục vụ tiệc")
+                .startTime(start)
+                .endTime(start.plus(4, ChronoUnit.HOURS))
+                .requiredWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .performedSkillId(mainSkillId)
+                .skillRequirements(List.of(
+                        ShiftSkillRequirementDto.builder()
+                                .skillId(mainSkillId)
+                                .requirementType(SkillRequirementType.REQUIRED)
+                                .minVerificationTier(VerificationTier.AI_DOCUMENT)
+                                .requiresValidCertificate(false)
+                                .build(),
+                        ShiftSkillRequirementDto.builder()
+                                .skillId(prefSkillId)
+                                .requirementType(SkillRequirementType.PREFERRED)
+                                .minVerificationTier(VerificationTier.SELF_DECLARED)
+                                .requiresValidCertificate(false)
+                                .build()
+                ))
+                .build();
+
+        ShiftResponseDto res = eoEventService.addShiftToEvent(userId, eventId, dto);
+
+        assertEquals(mainSkillId, res.getPerformedSkillId());
+        verify(shiftRepository).save(argThat(s ->
+                mainSkillId.equals(s.getPerformedSkillId())
+                        && s.getRequiredSkills() != null
+                        && s.getRequiredSkills().length == 1
+                        && mainSkillId.equals(s.getRequiredSkills()[0])
+        ));
+        verify(shiftSkillReqRepo).saveAll(argThat((List<ShiftSkillRequirement> list) -> list.size() == 2));
+    }
+
+    @Test
+    @DisplayName("Skill V3 - verifyAttendance(): Xác nhận kỹ năng thực hiện chính và gọi SkillProgressionService")
+    void verifyAttendance_SkillV3_ConfirmsPerformedSkillAndTriggersProgression() {
+        SkillRepository skillRepo = mock(SkillRepository.class);
+        SkillProgressionService progService = mock(SkillProgressionService.class);
+        ReflectionTestUtils.setField(eoEventService, "skillRepository", skillRepo);
+        ReflectionTestUtils.setField(eoEventService, "skillProgressionService", progService);
+
+        UUID assignmentId = UUID.randomUUID();
+        UUID confirmedSkillId = UUID.randomUUID();
+        Skill confirmedSkill = Skill.builder().skillId(confirmedSkillId).name("Phục vụ bàn").isActive(true).build();
+
+        Event mockEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).name("Gala").build();
+        Shift mockShift = Shift.builder().shiftId(UUID.randomUUID()).event(mockEvent).jobType("Phục vụ").hourlyWage(BigDecimal.valueOf(50000)).build();
+        Worker mockWorker = Worker.builder()
+                .workerId(UUID.randomUUID())
+                .user(User.builder().userId(UUID.randomUUID()).fullName("Worker V3").build())
+                .totalShiftsCompleted(2)
+                .build();
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId)
+                .shift(mockShift)
+                .worker(mockWorker)
+                .status(AssignmentStatus.CHECKED_IN)
+                .eoConfirmed(false)
+                .build();
+        AttendanceLog attLog = AttendanceLog.builder()
+                .shiftAssignment(sa)
+                .worker(mockWorker)
+                .checkinTime(Instant.now().minus(4, ChronoUnit.HOURS))
+                .checkoutTime(Instant.now().minus(5, ChronoUnit.MINUTES))
+                .hoursWorked(BigDecimal.valueOf(4))
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)).thenReturn(Optional.of(attLog));
+        when(skillRepo.findById(confirmedSkillId)).thenReturn(Optional.of(confirmedSkill));
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.findByAssignmentId(assignmentId)).thenReturn(Optional.empty());
+
+        VerifyAttendanceRequestDto req = VerifyAttendanceRequestDto.builder()
+                .confirmedPerformedSkillId(confirmedSkillId)
+                .confirmPerformedSkill(true)
+                .build();
+
+        ShiftAttendanceDto result = eoEventService.verifyAttendance(userId, assignmentId, req);
+
+        assertNotNull(result);
+        assertEquals(confirmedSkillId, sa.getConfirmedPerformedSkillId());
+        assertTrue(sa.getEoConfirmed());
+        verify(progService).recordCompletedShiftForAssignment(sa, confirmedSkillId);
     }
 
 }

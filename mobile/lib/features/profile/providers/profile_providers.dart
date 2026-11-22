@@ -6,6 +6,7 @@ import 'package:cani/features/ekyc/models/ekyc_models.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/skill_verification/models/skill_models.dart';
 import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
+import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 
 /// Aggregated, typed view of profile-relevant state re-exposed from the
 /// real feature providers. No state is duplicated or invented here.
@@ -23,11 +24,23 @@ class ProfileData {
   int get totalSp =>
       skillPoints.fold(0, (sum, point) => sum + point.totalSp);
 
-  String get tier =>
-      skillPoints.isEmpty ? 'STARTER' : skillPoints.first.tier;
+  String get tier => SkillHubColors.resolveHighestTier(skillPoints);
 
-  double get avgRating =>
-      skillPoints.isEmpty ? 5.0 : (skillPoints.first.avgRating > 0 ? skillPoints.first.avgRating : 5.0);
+  double get avgRating {
+    double weightedSum = 0.0;
+    int totalWeight = 0;
+    for (final point in skillPoints) {
+      if (point.hasRealRating) {
+        final weight = point.ratingCount > 0 ? point.ratingCount : 1;
+        weightedSum += point.avgRating * weight;
+        totalWeight += weight;
+      }
+    }
+    if (totalWeight == 0) {
+      return 0.0;
+    }
+    return weightedSum / totalWeight;
+  }
 
   bool get isEkycApproved => ekycResult?.isApproved ?? false;
   bool get isEkycPending => ekycResult?.isPending ?? false;
@@ -47,4 +60,3 @@ final profileDataProvider = Provider<ProfileData>((ref) {
     ekycResult: ekycResult,
   );
 });
-

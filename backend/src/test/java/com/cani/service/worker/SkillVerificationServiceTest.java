@@ -630,13 +630,21 @@ class SkillVerificationServiceTest {
     }
 
     @Test
-    @DisplayName("getOrCreateCustomSkill: trả về kỹ năng tồn tại hoặc tạo mới, chặn rỗng")
+    @DisplayName("getOrCreateCustomSkill: trả về kỹ năng chuẩn theo alias hoặc tạo đề xuất isActive=false, chặn rỗng")
     void getOrCreateCustomSkill_Tests() {
         when(skillRepository.findByNameIgnoreCase("pha chế (bartender/barista)")).thenReturn(Optional.of(mockSkill));
         Skill existing = verificationService.getOrCreateCustomSkill("  pha chế (bartender/barista)  ", "Đồ uống");
         assertEquals(mockSkill.getSkillId(), existing.getSkillId());
         verify(skillRepository, never()).save(any(Skill.class));
 
+        // Alias matching về taxonomy chuẩn đang active -> KHÔNG tạo Skill trùng
+        when(skillRepository.findByNameIgnoreCase("Bartender")).thenReturn(Optional.empty());
+        when(skillRepository.findByIsActiveTrue()).thenReturn(List.of(mockSkill));
+        Skill aliased = verificationService.getOrCreateCustomSkill("Bartender", null);
+        assertEquals(mockSkill.getSkillId(), aliased.getSkillId());
+        verify(skillRepository, never()).save(any(Skill.class));
+
+        // Kỹ năng mới hoàn toàn -> tạo proposal với isActive = false (không làm ô nhiễm taxonomy chính)
         when(skillRepository.findByNameIgnoreCase("Lái xe nâng")).thenReturn(Optional.empty());
         when(skillRepository.save(any(Skill.class))).thenAnswer(i -> {
             Skill s = i.getArgument(0);
@@ -645,7 +653,8 @@ class SkillVerificationServiceTest {
         });
         Skill created = verificationService.getOrCreateCustomSkill("Lái xe nâng", null);
         assertEquals("Lái xe nâng", created.getName());
-        assertEquals("Tự chọn", created.getCategory());
+        assertEquals("Đề xuất", created.getCategory());
+        assertFalse(Boolean.TRUE.equals(created.getIsActive()));
 
         assertThrows(BadRequestException.class, () -> verificationService.getOrCreateCustomSkill("   ", null));
     }

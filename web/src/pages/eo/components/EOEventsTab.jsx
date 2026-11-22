@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import SkeletonCard from '../../../components/common/SkeletonLoader';
-import EventShiftsDrawer from './EventShiftsDrawer';
 import {
   getEventStatusPriority,
   getDynamicEventStatus,
@@ -504,7 +503,6 @@ export default function EOEventsTab({
                   </thead>
                   <tbody>
                     {filteredEvents.map((evt) => {
-                      const isExpanded = expandedEventId === evt.eventId;
                       const isMenuOpen = activeMenuEventId === evt.eventId;
                       const activeShifts = Array.isArray(evt.shifts)
                         ? evt.shifts.filter((s) => s.status !== 'CANCELLED')
@@ -524,36 +522,37 @@ export default function EOEventsTab({
                       const estCost = resolveEventEstimatedCost(evt, activeShifts);
 
                       return (
-                        <React.Fragment key={evt.eventId}>
-                          <tr
-                            className={`event-table-row ${isExpanded ? 'row-expanded' : ''}`}
-                            onClick={() => setExpandedEventId(isExpanded ? null : evt.eventId)}
-                          >
-                            {/* Cột 1: Poster nhỏ gọn + Tên + Thời gian */}
-                            <td>
-                              <div
-                                className="ev-info-cell"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenEventDetail?.(evt);
-                                }}
-                                title="Nhấn để xem chi tiết sự kiện & nhân sự"
-                              >
-                                <EventThumb imageUrl={evt.imageUrl} name={evt.name} />
+                        <tr
+                          key={evt.eventId}
+                          className="event-table-row"
+                          onClick={() => onOpenEventDetail?.(evt)}
+                          title="Nhấn để xem chi tiết sự kiện &amp; quản lý ca"
+                        >
+                          {/* Cột 1: Poster nhỏ gọn + Tên + Thời gian */}
+                          <td>
+                            <div
+                              className="ev-info-cell"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenEventDetail?.(evt);
+                              }}
+                              title="Nhấn để xem chi tiết sự kiện & nhân sự"
+                            >
+                              <EventThumb imageUrl={evt.imageUrl} name={evt.name} />
 
-                                <div className="ev-title-stack">
-                                  <span className="ev-title-link" title={evt.name}>
-                                    {evt.name}
-                                  </span>
-                                  <span className="ev-time-line">
-                                    {formatEventTimeRange(evt)}
-                                  </span>
-                                  <span className="ev-detail-hint">
-                                    Mở chi tiết &amp; quản lý ca &rarr;
-                                  </span>
-                                </div>
+                              <div className="ev-title-stack">
+                                <span className="ev-title-link" title={evt.name}>
+                                  {evt.name}
+                                </span>
+                                <span className="ev-time-line">
+                                  {formatEventTimeRange(evt)}
+                                </span>
+                                <span className="ev-detail-hint">
+                                  Mở chi tiết &amp; quản lý ca &rarr;
+                                </span>
                               </div>
-                            </td>
+                            </div>
+                          </td>
 
                             {/* Cột 2: Địa điểm */}
                             <td>
@@ -624,7 +623,7 @@ export default function EOEventsTab({
                                     })}
                                     {activeShifts.length > 3 && (
                                       <span style={{ fontSize: '0.71rem', color: '#64748b', fontWeight: 600 }}>
-                                        +{activeShifts.length - 3} ca khác (bấm dòng để mở rộng)
+                                        +{activeShifts.length - 3} ca khác
                                       </span>
                                     )}
                                   </div>
@@ -771,17 +770,6 @@ export default function EOEventsTab({
                                     <span>Điểm danh &amp; Mã QR ca</span>
                                   </button>
 
-                                  <button
-                                    type="button"
-                                    className="dropdown-item"
-                                    onClick={() => {
-                                      setExpandedEventId(isExpanded ? null : evt.eventId);
-                                      closeMenu();
-                                    }}
-                                  >
-                                    <span>{isExpanded ? 'Thu gọn ca làm' : `Mở nhanh ${evt.totalShifts || 0} ca`}</span>
-                                  </button>
-
                                   {evt.status === 'DRAFT' &&
                                     !getDynamicEventStatus(evt).isExpiredDraft &&
                                     (activeShifts.length > 0 || Number(evt.totalShifts || 0) > 0) && (
@@ -848,31 +836,8 @@ export default function EOEventsTab({
                               )}
                             </td>
                           </tr>
-
-                          {isExpanded && (
-                            <tr className="drawer-expanded-row">
-                              <td colSpan={6} style={{ padding: 0 }}>
-                                <div className="drawer-container-inside-table">
-                                  <EventShiftsDrawer
-                                    event={evt}
-                                    onOpenDetail={onOpenEventDetail}
-                                    onOpenShiftWorkspace={onOpenShiftWorkspace}
-                                    onAddShift={onOpenAddShift}
-                                    onOpenQr={onOpenQr}
-                                    onOpenInvite={onOpenInvite}
-                                    onOpenAttendance={onOpenAttendance}
-                                    onEditShift={onEditShift}
-                                    onCancelShift={onCancelShift}
-                                    onReloadEvents={onReloadEvents}
-                                    onOpenPaymentDeclaration={onOpenPaymentDeclaration}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
+                        );
+                      })}
                   </tbody>
                 </table>
               )}

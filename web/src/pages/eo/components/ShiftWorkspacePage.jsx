@@ -182,30 +182,6 @@ export default function ShiftWorkspacePage({
     }
   };
 
-  const handleToggleEmergency = async (enable) => {
-    const confirmed = await showConfirm({
-      title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
-      description: enable
-        ? 'Phát thông báo khẩn cấp đến nhân sự xung quanh (bán kính 15km) và cho phép nhận ca trực tiếp trên bản đồ.'
-        : `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
-      type: enable ? 'warning' : 'info',
-      confirmText: enable ? 'Bật khẩn cấp' : 'Tắt chế độ',
-    });
-    if (!confirmed) return;
-    try {
-      if (enable) {
-        await eoService.enableEmergencyDispatch(shift.shiftId, 15);
-        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}".`, 'success');
-      } else {
-        await eoService.disableEmergencyDispatch(shift.shiftId);
-        showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
-      }
-      onReloadEvents?.();
-    } catch (err) {
-      showToast(err.response?.data?.message || err.message || 'Lỗi thao tác điều phối khẩn cấp', 'error');
-    }
-  };
-
   const handleVerify = async (assignmentId) => {
     setVerifyingId(assignmentId);
     try {
@@ -379,23 +355,23 @@ export default function ShiftWorkspacePage({
             Chiếu Mã QR Điểm Danh
           </button>
 
-          {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
-            <button
-              type="button"
-              onClick={() => handleToggleEmergency(!shift.emergency)}
+          {shift.emergency && (
+            <span
               style={{
-                background: shift.emergency ? '#fef2f2' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-                color: shift.emergency ? '#b91c1c' : '#ffffff',
-                border: shift.emergency ? '1.5px solid #f87171' : 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: '#fff1f2',
+                color: '#e11d48',
+                border: '1.5px solid #fecdd3',
                 borderRadius: '8px',
-                padding: '0.5rem 0.95rem',
-                fontSize: '0.84rem',
-                fontWeight: 800,
-                cursor: 'pointer',
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.82rem',
+                fontWeight: 700,
               }}
+              title="Hệ thống đang mở rộng tìm kiếm 15km và phát sóng trên Radar tìm việc của Worker"
             >
-              {shift.emergency ? 'Tắt Khẩn Cấp' : 'Bật Khẩn Cấp'}
-            </button>
+              Đang tìm kiếm khẩn cấp (15km)
+            </span>
           )}
 
           {onOpenInvite && (
@@ -623,27 +599,9 @@ export default function ShiftWorkspacePage({
               Chưa có nhân sự nào trong ca "{shift.jobType}"
             </h4>
             <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
-              Bạn có thể bật điều phối khẩn cấp hoặc gửi mã mời trực tiếp để nhanh chóng lấp đầy ca.
+              Bạn có thể gửi mã mời trực tiếp để nhanh chóng lấp đầy ca làm việc này.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {!shift.emergency && shift.status !== 'COMPLETED' && shift.status !== 'CANCELLED' && (
-                <button
-                  type="button"
-                  onClick={() => handleToggleEmergency(true)}
-                  style={{
-                    background: '#e11d48',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.55rem 1.15rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Bật Điều Phối Khẩn Cấp Ngay
-                </button>
-              )}
               {onOpenInvite && (
                 <button
                   type="button"

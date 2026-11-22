@@ -499,6 +499,10 @@ public class VnptEkycClient implements EkycProvider {
         if (observed.contains(LivenessStatus.FAILED)) {
             return LivenessStatus.FAILED;
         }
+        // Document liveness alone cannot attest that the selfie depicts a live person.
+        if (faceLivenessNode == null && (faceObj == null || !faceObj.has("liveness"))) {
+            return LivenessStatus.NOT_EVALUATED;
+        }
         if (observed.stream().allMatch(s -> s == LivenessStatus.PASSED)) {
             return LivenessStatus.PASSED;
         }
@@ -744,11 +748,8 @@ public class VnptEkycClient implements EkycProvider {
         if (node == null || !node.isObject()) {
             return false;
         }
-        if (node.has("message")) {
-            String msg = node.path("message").asText("");
-            if (!isBlank(msg) && !VNPT_SUCCESS_CODE.equalsIgnoreCase(msg.trim())) {
-                return false;
-            }
+        if (!VNPT_SUCCESS_CODE.equalsIgnoreCase(node.path("message").asText("").trim())) {
+            return false;
         }
         JsonNode obj = node.get("object");
         return obj != null && obj.isObject() && !obj.isEmpty();

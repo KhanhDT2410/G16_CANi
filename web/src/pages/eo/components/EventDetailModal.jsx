@@ -4,7 +4,7 @@ import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import { getDynamicEventStatus, getDynamicShiftStatus, getShiftStaffingAlerts } from '../utils/eventHelpers';
+import { getDynamicEventStatus, getDynamicShiftStatus, getShiftStaffingAlerts, resolveEventEstimatedCost } from '../utils/eventHelpers';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import './EventDetailModal.css';
@@ -166,10 +166,7 @@ export default function EventDetailModal({
   const totalConfirmed = event.totalConfirmedWorkers || shifts.reduce((s, sh) => s + (sh.confirmedWorkers || 0), 0);
   const fillRate = totalRequired > 0 ? Math.round((totalConfirmed / totalRequired) * 100) : 0;
   const hasStaffingShortage = staffingAlerts.length > 0 || (totalRequired > 0 && fillRate < 50);
-  const totalCost = event.totalEstimatedCost || shifts.reduce((s, sh) => {
-    const hours = sh.startTime && sh.endTime ? Math.max(0.5, (new Date(sh.endTime) - new Date(sh.startTime)) / 3600000) : 4;
-    return s + (hours * (sh.requiredWorkers || 1) * (sh.hourlyWage || 50000) + (sh.allowance || 0));
-  }, 0);
+  const totalCost = resolveEventEstimatedCost(event);
 
   const formatTime = (timeStr, fallback = '--:--') => {
     if (!timeStr) return fallback;
@@ -236,7 +233,7 @@ export default function EventDetailModal({
 
   const contentBox = (
     <div
-      className={asPage ? 'eo-widget-card animate-fade-in-up' : 'event-detail-modal-box'}
+      className={asPage ? 'eo-widget-card event-detail-workspace' : 'event-detail-modal-box'}
       style={
         asPage
           ? {
@@ -432,11 +429,16 @@ export default function EventDetailModal({
             )}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                <h3 className="event-detail-title">{event.name}</h3>
+                {asPage ? (
+                  <h1 className="event-detail-title">{event.name}</h1>
+                ) : (
+                  <h3 className="event-detail-title">{event.name}</h3>
+                )}
                 {getStatusBadge(event.status)}
               </div>
               <p className="event-detail-sub">
-                Mã sự kiện: <code>{event.eventId}</code> • Ngày tạo: {formatDate(event.createdAt || event.eventDate)}
+                {event.createdAt && <span>Ngày tạo {formatDate(event.createdAt)}</span>}
+                {event.eventId && <code title="Mã sự kiện">{event.eventId}</code>}
               </p>
             </div>
           </div>

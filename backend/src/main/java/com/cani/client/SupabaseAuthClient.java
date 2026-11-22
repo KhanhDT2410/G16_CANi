@@ -68,7 +68,7 @@ public class SupabaseAuthClient {
                     .retrieve()
                     .body(SupabaseUser.class);
         } catch (HttpClientErrorException e) {
-            log.error("Lỗi khi gọi GoTrue Admin API createUser: {}", e.getResponseBodyAsString());
+            log.error("Lỗi khi gọi GoTrue Admin API createUser: {}", e.getStatusCode().value());
             throw new BadRequestException("Không thể tạo tài khoản trên hệ thống xác thực: " + e.getResponseBodyAsString());
         }
     }
@@ -90,10 +90,10 @@ public class SupabaseAuthClient {
                     .retrieve()
                     .body(SupabaseSession.class);
         } catch (HttpClientErrorException.BadRequest e) {
-            log.warn("Đăng nhập thất bại cho email {}: {}", email, e.getResponseBodyAsString());
+            log.warn("Đăng nhập thất bại cho email {}: {}", email, e.getStatusCode().value());
             throw new BadRequestException("Email hoặc mật khẩu không chính xác");
         } catch (HttpClientErrorException e) {
-            log.error("Lỗi xác thực GoTrue signInWithPassword: {}", e.getResponseBodyAsString());
+            log.error("Lỗi xác thực GoTrue signInWithPassword: {}", e.getStatusCode().value());
             throw new BadRequestException("Lỗi xác thực: " + e.getMessage());
         }
     }
@@ -116,7 +116,7 @@ public class SupabaseAuthClient {
                     .retrieve()
                     .toBodilessEntity();
         } catch (HttpClientErrorException e) {
-            log.error("Xác thực OTP thất bại cho email {}: {}", email, e.getResponseBodyAsString());
+            log.error("Xác thực OTP thất bại cho email {}: {}", email, e.getStatusCode().value());
             throw new BadRequestException("Mã OTP không hợp lệ hoặc đã hết hạn");
         }
     }
@@ -135,7 +135,7 @@ public class SupabaseAuthClient {
                     .retrieve()
                     .toBodilessEntity();
         } catch (HttpClientErrorException e) {
-            log.error("Gửi email reset password thất bại cho {}: {}", email, e.getResponseBodyAsString());
+            log.error("Gửi email reset password thất bại cho {}: {}", email, e.getStatusCode().value());
             throw new BadRequestException("Không thể gửi email đặt lại mật khẩu");
         }
     }
@@ -154,7 +154,7 @@ public class SupabaseAuthClient {
                     .retrieve()
                     .body(SupabaseSession.class);
         } catch (HttpClientErrorException e) {
-            log.error("Làm mới token thất bại: {}", e.getResponseBodyAsString());
+            log.error("Làm mới token thất bại: {}", e.getStatusCode().value());
             throw new BadRequestException("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
         }
     }
@@ -177,7 +177,7 @@ public class SupabaseAuthClient {
                     .toBodilessEntity();
             log.info("Đã cập nhật mật khẩu mới thành công qua GoTrue Admin cho user: {}", userId);
         } catch (HttpClientErrorException e) {
-            log.error("Lỗi khi cập nhật mật khẩu qua GoTrue Admin API: {}", e.getResponseBodyAsString());
+            log.error("Lỗi khi cập nhật mật khẩu qua GoTrue Admin API: {}", e.getStatusCode().value());
             throw new BadRequestException("Không thể cập nhật mật khẩu mới: " + e.getResponseBodyAsString());
         }
     }

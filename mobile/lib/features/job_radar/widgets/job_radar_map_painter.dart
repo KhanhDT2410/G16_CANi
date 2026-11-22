@@ -14,6 +14,7 @@ class JobRadarMapWidget extends StatefulWidget {
   final double userLat;
   final double userLng;
   final VoidCallback? onRecenterGps;
+  final bool hasBottomCard;
 
   const JobRadarMapWidget({
     super.key,
@@ -25,6 +26,7 @@ class JobRadarMapWidget extends StatefulWidget {
     this.userLat = 10.7769,
     this.userLng = 106.7009,
     this.onRecenterGps,
+    this.hasBottomCard = false,
   });
 
   @override
@@ -272,121 +274,108 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
           ],
         ),
 
-        // 2. Cột nút Zoom & Recenter tiện lợi ở góc phải
+        // 2. Cụm nút Recenter & Zoom gọn gàng ở cạnh phải (tự nâng vị trí khi có Bottom Card)
         Positioned(
-          right: 14,
-          bottom: 90, // Cách đáy hợp lý để không che sliding card
+          right: 12,
+          bottom: widget.hasBottomCard ? 190 : 16,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              FloatingActionButton.small(
-                heroTag: 'map_recenter',
-                backgroundColor: Colors.white,
-                foregroundColor: cani.brand,
-                elevation: 3,
-                onPressed: _recenter,
-                tooltip: 'Về vị trí GPS của tôi',
-                child: const Icon(Icons.my_location),
+              Container(
+                decoration: BoxDecoration(
+                  color: cani.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: cani.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  constraints: const BoxConstraints.tightFor(width: 38, height: 38),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(Icons.my_location_rounded, size: 19, color: cani.brand),
+                  tooltip: 'Về vị trí GPS của tôi',
+                  onPressed: _recenter,
+                ),
               ),
               const SizedBox(height: 8),
-              FloatingActionButton.small(
-                heroTag: 'map_zoom_in',
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF1E293B),
-                elevation: 3,
-                onPressed: () {
-                  final zoom = _mapController.camera.zoom + 1;
-                  _mapController.move(_mapController.camera.center, zoom);
-                },
-                child: const Icon(Icons.add),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton.small(
-                heroTag: 'map_zoom_out',
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF1E293B),
-                elevation: 3,
-                onPressed: () {
-                  final zoom = _mapController.camera.zoom - 1;
-                  _mapController.move(_mapController.camera.center, zoom);
-                },
-                child: const Icon(Icons.remove),
+              Container(
+                decoration: BoxDecoration(
+                  color: cani.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: cani.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      constraints: const BoxConstraints.tightFor(width: 38, height: 36),
+                      padding: EdgeInsets.zero,
+                      icon: Icon(Icons.add_rounded, size: 19, color: cani.textMain),
+                      onPressed: () {
+                        final zoom = _mapController.camera.zoom + 1;
+                        _mapController.move(_mapController.camera.center, zoom);
+                      },
+                    ),
+                    Container(width: 24, height: 1, color: cani.border),
+                    IconButton(
+                      constraints: const BoxConstraints.tightFor(width: 38, height: 36),
+                      padding: EdgeInsets.zero,
+                      icon: Icon(Icons.remove_rounded, size: 19, color: cani.textMain),
+                      onPressed: () {
+                        final zoom = _mapController.camera.zoom - 1;
+                        _mapController.move(_mapController.camera.center, zoom);
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
 
-        // 3. Thông báo trạng thái khi Tắt chế độ tìm việc (Offline) - Đã bọc chống tràn
-        if (!widget.isOnline)
-          Positioned(
-            top: 10,
-            left: 14,
-            right: 14,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: cani.textMain.withValues(alpha: 0.90),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.visibility_off_outlined, color: cani.warning, size: 16),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Đang tắt chế độ tìm việc. Gạt công tắc trên để bắt đầu.',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-        // 4. Banner thông tin lộ trình dẫn đường khi chọn ca làm việc
+        // 3. Banner thông tin lộ trình dẫn đường khi chọn ca làm việc (Không bị đè bởi chip nào)
         if (widget.selectedShift != null)
           Positioned(
             top: 12,
-            left: 16,
-            right: 16,
+            left: 12,
+            right: 12,
             child: Material(
               color: Colors.transparent,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  color: cani.surface,
+                  borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.12),
+                      color: Colors.black.withValues(alpha: 0.10),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
                   ],
-                  border: Border.all(color: cani.brand.withValues(alpha: 0.3), width: 1.5),
+                  border: Border.all(color: cani.brand.withValues(alpha: 0.35)),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
+                        color: cani.brandSoft,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.route, color: cani.brand, size: 20),
+                      child: Icon(Icons.route_rounded, color: cani.brand, size: 18),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -396,10 +385,11 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                         children: [
                           Text(
                             widget.selectedShift!.eventName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: cani.textMain),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          const SizedBox(height: 1),
                           Text(
                             'Lộ trình: ${widget.selectedShift!.distanceKm.toStringAsFixed(1)} km (~${((widget.selectedShift!.distanceKm / 25.0) * 60).round().clamp(5, 120)} phút đi xe máy)',
                             style: TextStyle(fontSize: 11, color: cani.brand, fontWeight: FontWeight.w600),
@@ -409,7 +399,7 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                     ),
                     IconButton(
                       visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.center_focus_strong, size: 20, color: Color(0xFF64748B)),
+                      icon: Icon(Icons.center_focus_strong_rounded, size: 19, color: cani.textMuted),
                       tooltip: 'Căn chỉnh toàn bộ lộ trình',
                       onPressed: _fitSelectedRoute,
                     ),

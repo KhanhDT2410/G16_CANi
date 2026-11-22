@@ -68,6 +68,17 @@ public class EkycImageRetentionService {
         };
     }
 
+    public void deleteAfterCommit(String front, String back, String selfie) {
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            deleteStoredImagesQuietly(front, back, selfie);
+            return;
+        }
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCommit() { deleteStoredImagesQuietly(front, back, selfie); }
+                });
+    }
+
     public void deleteStoredImagesQuietly(String frontKey, String backKey, String selfieKey) {
         if (imageStorage == null) {
             return;
@@ -92,7 +103,9 @@ public class EkycImageRetentionService {
         List<WorkerEkycVerification> expiredWorkers =
                 workerEkycRepository.findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(now);
         for (WorkerEkycVerification record : expiredWorkers) {
-            deleteStoredImagesQuietly(record.getFrontImageUrl(), record.getBackImageUrl(), record.getSelfieImageUrl());
+            if (record.isLegalHold() || !imageStorage.deleteIfPresent(record.getFrontImageUrl())
+                    || !imageStorage.deleteIfPresent(record.getBackImageUrl())
+                    || !imageStorage.deleteIfPresent(record.getSelfieImageUrl())) continue;
             record.setFrontImageUrl(null);
             record.setBackImageUrl(null);
             record.setSelfieImageUrl(null);
@@ -104,7 +117,9 @@ public class EkycImageRetentionService {
         List<EoEkycVerification> expiredEos =
                 eoEkycRepository.findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(now);
         for (EoEkycVerification record : expiredEos) {
-            deleteStoredImagesQuietly(record.getFrontImageUrl(), record.getBackImageUrl(), record.getSelfieImageUrl());
+            if (record.isLegalHold() || !imageStorage.deleteIfPresent(record.getFrontImageUrl())
+                    || !imageStorage.deleteIfPresent(record.getBackImageUrl())
+                    || !imageStorage.deleteIfPresent(record.getSelfieImageUrl())) continue;
             record.setFrontImageUrl(null);
             record.setBackImageUrl(null);
             record.setSelfieImageUrl(null);

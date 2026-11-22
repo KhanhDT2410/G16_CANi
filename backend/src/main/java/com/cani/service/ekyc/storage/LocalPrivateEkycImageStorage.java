@@ -90,7 +90,7 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
                     .storageProvider(PROVIDER_NAME)
                     .build();
         } catch (IOException e) {
-            log.error("Lỗi nghiêm trọng khi lưu ảnh eKYC vào private storage [scope={}, slot={}]: {}", scope, normalizedSlot, e.getMessage());
+            log.error("Lỗi nghiêm trọng khi lưu ảnh eKYC vào private storage [scope={}, slot={}]: {}", scope, normalizedSlot, e.getClass().getSimpleName());
             throw new AppException("Không thể lưu trữ ảnh xác minh danh tính vào kho bảo mật. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -126,15 +126,17 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
     }
 
     @Override
-    public void deleteQuietly(String objectKey) {
+    public boolean deleteIfPresent(String objectKey) {
         if (!isManagedObjectKey(objectKey)) {
-            return;
+            return true;
         }
         try {
             Path filePath = resolveSafePath(objectKey);
             Files.deleteIfExists(filePath);
+            return true;
         } catch (Exception e) {
-            log.warn("Không thể xóa ảnh eKYC từ private storage: {}", e.getMessage());
+            log.warn("Private eKYC image removal failed [{}]", e.getClass().getSimpleName());
+            return false;
         }
     }
 

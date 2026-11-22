@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import SkeletonCard from '../../../components/common/SkeletonLoader';
 import EventShiftsDrawer from './EventShiftsDrawer';
+import EOEventDataState from './EOEventDataState';
 import {
   getEventStatusPriority,
   getDynamicEventStatus,
   getDynamicShiftStatus,
+  resolveEventEstimatedCost,
 } from '../utils/eventHelpers';
 import './EOEventsTab.css';
 
@@ -70,24 +71,9 @@ function EventThumb({ imageUrl, name }) {
   );
 }
 
-function resolveEventEstimatedCost(evt, activeShifts) {
-  if (Number(evt?.totalEstimatedCost) > 0) return Number(evt.totalEstimatedCost);
-  if (!Array.isArray(activeShifts) || activeShifts.length === 0) return 0;
-  return activeShifts.reduce((sum, sh) => {
-    if (Number(sh?.totalCost) > 0) return sum + Number(sh.totalCost);
-    const s = new Date(sh?.startTime);
-    const e = new Date(sh?.endTime);
-    const hrs = !isNaN(s.getTime()) && !isNaN(e.getTime()) && e > s ? (e - s) / 3600000 : 0;
-    return (
-      sum +
-      hrs * Math.max(1, Number(sh?.requiredWorkers || 1)) * Math.max(0, Number(sh?.hourlyWage || 0)) +
-      Math.max(0, Number(sh?.allowance || 0))
-    );
-  }, 0);
-}
-
 export default function EOEventsTab({
   loading,
+  loadError,
   allEvents = [],
   filteredEvents,
   searchQuery,
@@ -216,24 +202,36 @@ export default function EOEventsTab({
   };
 
   const archivedCount = cancelledEventsList.length + cancelledShiftsFromActiveEvents.length;
+  const hasEventData = !loading && !loadError;
 
   return (
     <div className="ev-page-stack" onClick={closeMenu}>
+      <header className="ev-page-heading">
+        <div>
+          <h1>Quản lý sự kiện</h1>
+          <p>Theo dõi lịch tổ chức, ca làm và tiến độ tuyển nhân sự.</p>
+        </div>
+        <button type="button" className="eo-workspace-create" onClick={onOpenCreateEvent}>
+          <span aria-hidden="true">+</span> Tạo sự kiện
+        </button>
+      </header>
       {/* Thanh Điều Hướng Phân Khu Sự Kiện */}
-      <div className="ev-subnav-card">
+      <nav className="ev-subnav-card" aria-label="Các mục quản lý sự kiện">
         <div className="ev-subnav-tabs">
           <button
             type="button"
             className={`ev-subnav-btn ${activeSubTab === 'list' ? 'is-active' : ''}`}
+            aria-current={activeSubTab === 'list' ? 'page' : undefined}
             onClick={() => handleSelectSubTab('list')}
           >
             <span>Danh sách sự kiện</span>
-            <span className="ev-subnav-count">{nonCancelledEvents.length}</span>
+            {hasEventData && <span className="ev-subnav-count">{nonCancelledEvents.length}</span>}
           </button>
 
           <button
             type="button"
             className={`ev-subnav-btn ${activeSubTab === 'detail' ? 'is-active' : ''}`}
+            disabled={!hasEventData || allEvents.length === 0}
             onClick={() => handleSelectSubTab('detail')}
           >
             <span>Chi tiết sự kiện &amp; Điểm danh</span>
@@ -242,25 +240,20 @@ export default function EOEventsTab({
           <button
             type="button"
             className={`ev-subnav-btn is-danger ${activeSubTab === 'cancelled' ? 'is-active' : ''}`}
+            aria-current={activeSubTab === 'cancelled' ? 'page' : undefined}
             onClick={() => handleSelectSubTab('cancelled')}
           >
             <span>Sự kiện đã hủy</span>
-            {archivedCount > 0 && <span className="ev-subnav-count">{archivedCount}</span>}
+            {hasEventData && archivedCount > 0 && <span className="ev-subnav-count">{archivedCount}</span>}
           </button>
         </div>
 
-        <button
-          type="button"
-          className="table-btn-create-event"
-          onClick={onOpenCreateEvent}
-        >
-          <span>+</span>
-          <span>Tạo sự kiện mới</span>
-        </button>
-      </div>
+      </nav>
+
+      {!hasEventData && <EOEventDataState loading={loading} onRetry={onReloadEvents} />}
 
       {/* PHÂN KHU LƯU TRỮ SỰ KIỆN ĐÃ HỦY */}
-      {activeSubTab === 'cancelled' && (
+      {hasEventData && activeSubTab === 'cancelled' && (
         <div className="eo-widget-card animate-fade-in-up" style={{ padding: '1.5rem' }}>
           <div style={{ marginBottom: '1.25rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#991b1b' }}>
@@ -368,7 +361,7 @@ export default function EOEventsTab({
       )}
 
       {/* PHÂN KHU CHÍNH: DANH SÁCH SỰ KIỆN */}
-      {activeSubTab === 'list' && (
+      {hasEventData && activeSubTab === 'list' && (
         <>
           {/* Dải chỉ số tổng quan nhanh từ dữ liệu thật */}
           <div className="ev-kpi-grid">
@@ -404,8 +397,9 @@ export default function EOEventsTab({
             <div className="table-card-header-bar">
               <div className="table-header-title-group">
                 <h3 className="table-card-heading">
-                  Danh sách sự kiện ({filteredEvents.length})
+                  Danh sách sự kiện
                 </h3>
+                <span className="ev-result-count" aria-live="polite">{filteredEvents.length} kết quả</span>
               </div>
 
               <div className="table-header-actions-group">
@@ -424,6 +418,7 @@ export default function EOEventsTab({
                   </svg>
                   <input
                     type="text"
+                    aria-label="Tìm theo tên hoặc địa điểm sự kiện"
                     placeholder="Tìm theo tên hoặc địa điểm..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -455,6 +450,7 @@ export default function EOEventsTab({
                     key={f.key}
                     type="button"
                     className={`ev-filter-chip ${active ? 'is-active' : ''}`}
+                    aria-pressed={active}
                     onClick={() => setStatusFilter(f.key)}
                   >
                     {f.label}
@@ -465,11 +461,7 @@ export default function EOEventsTab({
 
             {/* Bảng Danh Sách Sự Kiện */}
             <div className="table-responsive-wrapper">
-              {loading ? (
-                <div style={{ padding: '1.5rem' }}>
-                  <SkeletonCard count={3} height="80px" />
-                </div>
-              ) : filteredEvents.length === 0 ? (
+              {filteredEvents.length === 0 ? (
                 <div className="eo-empty-state-card">
                   <div className="empty-calendar-icon">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
@@ -536,7 +528,7 @@ export default function EOEventsTab({
                       const confirmedTotal = Math.max(Number(evt.totalConfirmedWorkers || 0), shiftConfirmedSum);
                       const fillPct =
                         requiredTotal > 0 ? Math.min(100, Math.round((confirmedTotal / requiredTotal) * 100)) : 0;
-                      const estCost = resolveEventEstimatedCost(evt, activeShifts);
+                      const estCost = resolveEventEstimatedCost(evt);
 
                       return (
                         <React.Fragment key={evt.eventId}>
@@ -546,7 +538,8 @@ export default function EOEventsTab({
                           >
                             {/* Cột 1: Poster nhỏ gọn + Tên + Thời gian */}
                             <td>
-                              <div
+                              <button
+                                type="button"
                                 className="ev-info-cell"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -554,7 +547,7 @@ export default function EOEventsTab({
                                 }}
                                 title="Nhấn để xem chi tiết sự kiện & nhân sự"
                               >
-                                <EventThumb imageUrl={evt.imageUrl} name={evt.name} />
+                                <EventThumb key={evt.imageUrl} imageUrl={evt.imageUrl} name={evt.name} />
 
                                 <div className="ev-title-stack">
                                   <span className="ev-title-link" title={evt.name}>
@@ -563,11 +556,8 @@ export default function EOEventsTab({
                                   <span className="ev-time-line">
                                     {formatEventTimeRange(evt)}
                                   </span>
-                                  <span className="ev-detail-hint">
-                                    Mở chi tiết &amp; quản lý ca &rarr;
-                                  </span>
                                 </div>
-                              </div>
+                              </button>
                             </td>
 
                             {/* Cột 2: Địa điểm */}
@@ -755,6 +745,7 @@ export default function EOEventsTab({
                                   className="btn-kebab-menu"
                                   onClick={(e) => toggleKebabMenu(e, evt.eventId)}
                                   title="Thêm tùy chọn"
+                                  aria-expanded={isMenuOpen}
                                 >
                                   ⋮
                                 </button>

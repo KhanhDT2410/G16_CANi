@@ -52,5 +52,6 @@ public class EkycVerificationResultDto {
     private UUID reviewedBy;
     private String reviewNotes;
     private Instant createdAt;
+    private Instant reviewedAt;
     private Instant updatedAt;
 }

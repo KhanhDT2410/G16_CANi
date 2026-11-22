@@ -83,7 +83,7 @@ public class AuthService {
                     assignedRole.name(),
                     request.getCompanyName());
         } catch (Exception e) {
-            log.warn("Không thể tạo user qua Supabase GoTrue (fallback local registration): {}", e.getMessage());
+            log.warn("Không thể tạo user qua Supabase GoTrue (fallback local registration): {}", e.getClass().getSimpleName());
         }
 
         UUID userId = (supabaseUser != null && supabaseUser.getId() != null)
@@ -153,12 +153,12 @@ public class AuthService {
                             "EKYC",
                             finalUser.getUserId());
                 } catch (Exception e) {
-                    log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getMessage());
+                    log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getClass().getSimpleName());
                 }
             }
         }
 
-        log.info("Đã đăng ký tài khoản thành công cho user: {}, role: {}", savedUser.getEmail(), assignedRole);
+        log.info("Đã đăng ký tài khoản thành công cho user: {}, role: {}", savedUser.getUserId(), assignedRole);
         return toUserDto(savedUser);
     }
 
@@ -172,7 +172,7 @@ public class AuthService {
             // Re-throw lỗi xác thực sai mật khẩu từ GoTrue, không nuốt thành lỗi kết nối
             throw e;
         } catch (Exception e) {
-            log.warn("Supabase GoTrue auth failed or unreachable: {}. Falling back to local check...", e.getMessage());
+            log.warn("Supabase GoTrue auth failed or unreachable: {}. Falling back to local check...", e.getClass().getSimpleName());
         }
 
         UUID userId;
@@ -358,7 +358,7 @@ public class AuthService {
                     .user(toUserDto(finalSavedUser))
                     .build();
         } catch (JwtException e) {
-            log.error("Token Supabase Google không hợp lệ: {}", e.getMessage());
+            log.error("Token Supabase Google không hợp lệ: {}", e.getClass().getSimpleName());
             throw new BadRequestException("Token xác thực Google không hợp lệ hoặc đã hết hạn");
         }
     }

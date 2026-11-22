@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
+import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_radar/data/job_radar_repository.dart';
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
 
@@ -18,12 +19,18 @@ class JobRadarState {
   final bool isLocationPermissionGranted;
   final bool isRealLocation;
   final String? locationName;
+  final bool usingPreferenceLocation;
+  final double? preferredLat;
+  final double? preferredLng;
+  final String? preferredAddress;
+  final double? gpsLat;
+  final double? gpsLng;
 
   const JobRadarState({
-    this.isOnline = true,
+    this.isOnline = false,
     this.isLoading = false,
-    this.userLat = 10.7769,
-    this.userLng = 106.7009,
+    this.userLat = 21.0285,
+    this.userLng = 105.8542,
     this.searchRadiusKm = 15.0,
     this.nearbyShifts = const [],
     this.selectedShift,
@@ -32,7 +39,15 @@ class JobRadarState {
     this.isLocationPermissionGranted = false,
     this.isRealLocation = false,
     this.locationName,
+    this.usingPreferenceLocation = false,
+    this.preferredLat,
+    this.preferredLng,
+    this.preferredAddress,
+    this.gpsLat,
+    this.gpsLng,
   });
+
+  bool get hasPreferredLocation => preferredLat != null && preferredLng != null;
 
   JobRadarState copyWith({
     bool? isOnline,
@@ -48,6 +63,12 @@ class JobRadarState {
     bool? isLocationPermissionGranted,
     bool? isRealLocation,
     String? locationName,
+    bool? usingPreferenceLocation,
+    double? preferredLat,
+    double? preferredLng,
+    String? preferredAddress,
+    double? gpsLat,
+    double? gpsLng,
   }) {
     return JobRadarState(
       isOnline: isOnline ?? this.isOnline,
@@ -62,6 +83,12 @@ class JobRadarState {
       isLocationPermissionGranted: isLocationPermissionGranted ?? this.isLocationPermissionGranted,
       isRealLocation: isRealLocation ?? this.isRealLocation,
       locationName: locationName ?? this.locationName,
+      usingPreferenceLocation: usingPreferenceLocation ?? this.usingPreferenceLocation,
+      preferredLat: preferredLat ?? this.preferredLat,
+      preferredLng: preferredLng ?? this.preferredLng,
+      preferredAddress: preferredAddress ?? this.preferredAddress,
+      gpsLat: gpsLat ?? this.gpsLat,
+      gpsLng: gpsLng ?? this.gpsLng,
     );
   }
 }
@@ -69,39 +96,55 @@ class JobRadarState {
 final jobRadarProvider = StateNotifierProvider<JobRadarNotifier, JobRadarState>((ref) {
   final repo = ref.watch(jobRadarRepositoryProvider);
   final proposalRepo = ref.watch(proposalRepositoryProvider);
-  return JobRadarNotifier(repo, proposalRepo);
+  return JobRadarNotifier(repo, proposalRepo, ref);
 });
 
 class JobRadarNotifier extends StateNotifier<JobRadarState> {
   final JobRadarRepository _repo;
   final ProposalRepository _proposalRepo;
+  final Ref _ref;
 
-  JobRadarNotifier(this._repo, this._proposalRepo) : super(const JobRadarState()) {
+  JobRadarNotifier(this._repo, this._proposalRepo, this._ref) : super(const JobRadarState()) {
     initLocationAndScan();
   }
 
-  /// Khởi tạo lấy vị trí GPS thực tế từ máy điện thoại, đồng bộ tiêu chí tìm việc (Preferences)
-  Future<void> initLocationAndScan() async {
+  /// Khởi tạo: đồng bộ Preferences (tọa độ ưu tiên + bán kính + trạng thái isOnline thật) & vị trí GPS thực tế
+  Future<void> initLocationAndScan({bool preferGpsCenter = false}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
-    // Đồng bộ bán kính tìm việc từ Worker Preferences đã lưu
+    WorkerPreferencesModel? prefs;
     try {
-      final prefs = await _proposalRepo.fetchPreferences();
-      if (prefs.maxDistanceKm > 0) {
-        state = state.copyWith(searchRadiusKm: prefs.maxDistanceKm);
-      }
+      prefs = await _proposalRepo.fetchPreferences();
+      state = state.copyWith(
+        searchRadiusKm: prefs.maxDistanceKm > 0 ? prefs.maxDistanceKm : state.searchRadiusKm,
+        isOnline: prefs.isOnline ?? state.isOnline,
+        preferredLat: prefs.baseLat,
+        preferredLng: prefs.baseLng,
+        preferredAddress: prefs.baseAddress,
+      );
     } catch (_) {
-      // Dùng bán kính mặc định nếu chưa lưu preferences
+      // Bỏ qua nếu chưa lấy được preferences
+    }
+
+    final hasPrefCenter = prefs?.baseLat != null && prefs?.baseLng != null;
+    if (!preferGpsCenter && hasPrefCenter) {
+      state = state.copyWith(
+        userLat: prefs!.baseLat!,
+        userLng: prefs.baseLng!,
+        usingPreferenceLocation: true,
+        locationName: prefs.baseAddress.trim().isNotEmpty ? prefs.baseAddress.trim() : 'Khu vực ưu tiên',
+      );
     }
 
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        state = state.copyWith(
-          errorMessage: 'GPS trên điện thoại đang tắt. Vui lòng bật Định vị vị trí.',
-          isLocationPermissionGranted: false,
-        );
-        await scanNearbyShifts();
+        if (preferGpsCenter || !hasPrefCenter) {
+          state = state.copyWith(
+            errorMessage: 'GPS trên điện thoại đang tắt. Vui lòng bật Định vị vị trí.',
+            isLocationPermissionGranted: false,
+          );
+        }
         return;
       }
 
@@ -109,25 +152,27 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          state = state.copyWith(
-            errorMessage: 'Ứng dụng cần quyền vị trí để quét các việc làm quanh bạn.',
-            isLocationPermissionGranted: false,
-          );
-          await scanNearbyShifts();
+          if (preferGpsCenter || !hasPrefCenter) {
+            state = state.copyWith(
+              errorMessage: 'Ứng dụng cần quyền vị trí để quét các việc làm quanh bạn.',
+              isLocationPermissionGranted: false,
+            );
+          }
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        state = state.copyWith(
-          errorMessage: 'Quyền vị trí bị từ chối vĩnh viễn. Vui lòng cấp quyền trong Cài đặt.',
-          isLocationPermissionGranted: false,
-        );
-        await scanNearbyShifts();
+        if (preferGpsCenter || !hasPrefCenter) {
+          state = state.copyWith(
+            errorMessage: 'Quyền vị trí bị từ chối vĩnh viễn. Vui lòng cấp quyền trong Cài đặt.',
+            isLocationPermissionGranted: false,
+          );
+        }
         return;
       }
 
-      // Đã có quyền: Lấy tọa độ GPS thực tế của điện thoại
+      // Lấy tọa độ GPS thực tế của điện thoại (lưu riêng vào gpsLat/gpsLng)
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -136,36 +181,77 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
       );
 
       state = state.copyWith(
-        userLat: position.latitude,
-        userLng: position.longitude,
+        gpsLat: position.latitude,
+        gpsLng: position.longitude,
         isLocationPermissionGranted: true,
         isRealLocation: true,
-        locationName: 'Vị trí hiện tại (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})',
       );
+
+      // Chỉ đặt tâm bản đồ về GPS khi người dùng chưa cài Khu vực ưu tiên hoặc chủ động chuyển về GPS
+      if (preferGpsCenter || !hasPrefCenter) {
+        state = state.copyWith(
+          userLat: position.latitude,
+          userLng: position.longitude,
+          usingPreferenceLocation: false,
+          locationName: 'Vị trí hiện tại (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})',
+        );
+      }
     } catch (e) {
-      // Fallback nếu không bắt được GPS
-      state = state.copyWith(
-        errorMessage: 'Không lấy được GPS chính xác ($e), đang dùng vị trí mặc định.',
-      );
+      if (preferGpsCenter || !hasPrefCenter) {
+        state = state.copyWith(
+          errorMessage: 'Không lấy được GPS chính xác ($e).',
+        );
+      }
     } finally {
       await scanNearbyShifts();
     }
   }
 
-  /// Tải lại tiêu chí tìm việc (Preferences) và quét lại Radar tức thì
+  /// Chuyển đổi tâm bản đồ giữa Khu vực ưu tiên (Preferences) và Vị trí GPS hiện tại
+  Future<void> switchCenterMode({required bool usePreference}) async {
+    if (usePreference && state.preferredLat != null && state.preferredLng != null) {
+      state = state.copyWith(
+        userLat: state.preferredLat!,
+        userLng: state.preferredLng!,
+        usingPreferenceLocation: true,
+        clearSelectedShift: true,
+        locationName: (state.preferredAddress != null && state.preferredAddress!.trim().isNotEmpty)
+            ? state.preferredAddress!.trim()
+            : 'Khu vực ưu tiên',
+      );
+      await scanNearbyShifts();
+    } else if (!usePreference) {
+      await initLocationAndScan(preferGpsCenter: true);
+    }
+  }
+
+  /// Tải lại tiêu chí tìm việc (Preferences) và quét lại Radar + cập nhật đề xuất tức thì
   Future<void> reloadPreferences() async {
     try {
       final prefs = await _proposalRepo.fetchPreferences();
-      if (prefs.maxDistanceKm > 0) {
-        state = state.copyWith(searchRadiusKm: prefs.maxDistanceKm);
-      }
+      final hasPrefCenter = prefs.baseLat != null && prefs.baseLng != null;
+      state = state.copyWith(
+        searchRadiusKm: prefs.maxDistanceKm > 0 ? prefs.maxDistanceKm : state.searchRadiusKm,
+        isOnline: prefs.isOnline ?? state.isOnline,
+        preferredLat: prefs.baseLat,
+        preferredLng: prefs.baseLng,
+        preferredAddress: prefs.baseAddress,
+        userLat: hasPrefCenter ? prefs.baseLat! : state.userLat,
+        userLng: hasPrefCenter ? prefs.baseLng! : state.userLng,
+        usingPreferenceLocation: hasPrefCenter ? true : state.usingPreferenceLocation,
+        locationName: hasPrefCenter && prefs.baseAddress.trim().isNotEmpty
+            ? prefs.baseAddress.trim()
+            : state.locationName,
+        clearSelectedShift: true,
+      );
       await scanNearbyShifts();
+      _ref.invalidate(proposalsListProvider);
     } catch (_) {}
   }
 
-  /// Nút GPS Recenter: Lấy lại vị trí GPS thực tế tức thì
+  /// Nút GPS Recenter: Lấy lại vị trí GPS thực tế và chuyển tâm sang GPS
   Future<void> refreshCurrentLocation() async {
-    await initLocationAndScan();
+    await initLocationAndScan(preferGpsCenter: true);
   }
 
   Future<void> toggleOnlineStatus() async {
@@ -175,11 +261,12 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     try {
       await _repo.setOnlineStatus(
         isOnline: nextStatus,
-        lat: state.userLat,
-        lng: state.userLng,
+        lat: state.usingPreferenceLocation ? state.preferredLat : (state.gpsLat ?? state.userLat),
+        lng: state.usingPreferenceLocation ? state.preferredLng : (state.gpsLng ?? state.userLng),
       );
       if (nextStatus) {
-        scanNearbyShifts();
+        await scanNearbyShifts();
+        _ref.invalidate(proposalsListProvider);
       }
     } catch (e) {
       // Rollback trạng thái khi API lỗi hoặc mất kết nối, triệt tiêu trạng thái "Online giả"

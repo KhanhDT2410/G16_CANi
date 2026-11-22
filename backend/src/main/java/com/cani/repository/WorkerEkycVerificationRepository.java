@@ -15,11 +15,16 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
 
     List<WorkerEkycVerification> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"worker", "worker.user"})
+    Optional<WorkerEkycVerification> findById(UUID id);
+
     Optional<WorkerEkycVerification> findTopByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
     Optional<WorkerEkycVerification> findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
             UUID workerId, Collection<String> statuses);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "worker")
     List<WorkerEkycVerification> findByStatusOrderByCreatedAtDesc(String status);
 
     boolean existsByCccdNumberHashAndStatus(String cccdNumberHash, String status);
@@ -38,6 +43,7 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
     boolean existsByCccdNumberHashInAndStatusInAndWorker_User_UserIdNot(
             Collection<String> cccdNumberHashes, Collection<String> statuses, UUID userId);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     List<WorkerEkycVerification> findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(Instant cutoff);
 
     long countByStatus(String status);

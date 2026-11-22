@@ -109,7 +109,12 @@ public class WorkerJobService {
         }
 
         worker.setIsOnline(dto.getIsOnline());
-        if (dto.getCurrentLat() != null && dto.getCurrentLng() != null) {
+        boolean hasSavedPreferencesLocation = worker.getBaseLat() != null
+                && worker.getBaseLng() != null
+                && Double.isFinite(worker.getBaseLat())
+                && Double.isFinite(worker.getBaseLng());
+        // Chỉ khởi tạo tọa độ cơ sở từ GPS khi Worker chưa thiết lập khu vực ưu tiên trong Preferences
+        if (!hasSavedPreferencesLocation && dto.getCurrentLat() != null && dto.getCurrentLng() != null) {
             worker.setBaseLat(dto.getCurrentLat());
             worker.setBaseLng(dto.getCurrentLng());
         }
@@ -855,6 +860,7 @@ public class WorkerJobService {
                 .baseLng(worker.getBaseLng())
                 .minWage(worker.getMinWage() != null ? worker.getMinWage() : BigDecimal.ZERO)
                 .maxDistanceKm(worker.getMaxDistanceKm() != null ? worker.getMaxDistanceKm() : DEFAULT_MAX_DISTANCE_KM)
+                .isOnline(Boolean.TRUE.equals(worker.getIsOnline()))
                 .build();
     }
 
@@ -868,9 +874,22 @@ public class WorkerJobService {
         if (dto.getMinWage() != null) worker.setMinWage(dto.getMinWage());
         if (dto.getMaxDistanceKm() != null) worker.setMaxDistanceKm(dto.getMaxDistanceKm());
 
-        workerRepository.save(worker);
+        Worker savedWorker = workerRepository.save(worker);
+        if (savedWorker != null) {
+            worker = savedWorker;
+        }
         log.info("Worker {} đã cập nhật tiêu chí tìm việc (Bán kính: {} km, Lương tối thiểu: {})",
                 userId, worker.getMaxDistanceKm(), worker.getMinWage());
+
+        // Tự động quét lại các ca ACTIVE phù hợp với khu vực/tiêu chí vừa cập nhật nếu Worker đang bật nhận việc
+        if (Boolean.TRUE.equals(worker.getIsOnline()) && matchingDispatchService != null) {
+            try {
+                matchingDispatchService.dispatchActiveShiftsForWorker(worker);
+            } catch (Exception ex) {
+                log.warn("Reverse-matching sau khi cập nhật Preferences cho worker {} gặp lỗi không nghiêm trọng: {}",
+                        userId, ex.getMessage());
+            }
+        }
 
         return getWorkerPreferences(userId);
     }

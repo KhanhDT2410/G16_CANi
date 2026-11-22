@@ -156,54 +156,62 @@ public class EventOrganizerEkycService {
             throw storageEx;
         }
 
-        if (prepared.isRetry()) {
-            imageRetentionService.deleteStoredImagesQuietly(
-                    prepared.previousFrontKey(),
-                    prepared.previousBackKey(),
-                    prepared.previousSelfieKey()
+        try {
+            // 4. Gọi VNPT eKYC thực tế (ngoài DB transaction)
+            EkycIdentityResultDto providerResult = ekycProvider.verifyIdentity(
+                    validatedFront.getBytes(), validatedFront.getDetectedMimeType(),
+                    validatedBack.getBytes(), validatedBack.getDetectedMimeType(),
+                    validatedSelfie.getBytes(), validatedSelfie.getDetectedMimeType()
             );
+
+            String verifiedRawCccd = (providerResult != null && !providerResult.isTechnicalFailure())
+                    ? cryptoService.normalizeCccd(providerResult.getIdNumber())
+                    : null;
+            String primaryHash = cryptoService.hashCccd(verifiedRawCccd);
+            Set<String> lookupHashes = cryptoService.computeLookupHashes(verifiedRawCccd);
+
+            final EkycImageStorage.StoredObject finalFront = storedFront;
+            final EkycImageStorage.StoredObject finalBack = storedBack;
+            final EkycImageStorage.StoredObject finalSelfie = storedSelfie;
+
+            // 5. Transaction ngắn 2 (khóa đồng bộ theo hash CCCD): Check trùng Worker+EO, chấm quyết định & lưu kết quả
+            EoEkycVerificationResultDto result = cccdLockManager.executeWithCccdLock(primaryHash, () ->
+                    executeInTransaction(() -> finalizeSubmission(
+                            userId,
+                            prepared.eoId(),
+                            prepared.verificationId(),
+                            prepared.attempt(),
+                            providerResult,
+                            userInput,
+                            verifiedRawCccd,
+                            primaryHash,
+                            lookupHashes,
+                            finalFront.getObjectKey(),
+                            finalBack.getObjectKey(),
+                            finalSelfie.getObjectKey()
+                    ))
+            );
+            if (prepared.isRetry()) {
+                imageRetentionService.deleteStoredImagesQuietly(
+                        prepared.previousFrontKey(),
+                        prepared.previousBackKey(),
+                        prepared.previousSelfieKey()
+                );
+            }
+            return result;
+        } catch (RuntimeException failure) {
+            imageRetentionService.deleteStoredImagesQuietly(storedFront.getObjectKey(),
+                    storedBack.getObjectKey(), storedSelfie.getObjectKey());
+            throw failure;
         }
-
-        // 4. Gọi VNPT eKYC thực tế (ngoài DB transaction)
-        EkycIdentityResultDto providerResult = ekycProvider.verifyIdentity(
-                validatedFront.getBytes(), validatedFront.getDetectedMimeType(),
-                validatedBack.getBytes(), validatedBack.getDetectedMimeType(),
-                validatedSelfie.getBytes(), validatedSelfie.getDetectedMimeType()
-        );
-
-        String verifiedRawCccd = (providerResult != null && !providerResult.isTechnicalFailure())
-                ? cryptoService.normalizeCccd(providerResult.getIdNumber())
-                : null;
-        String primaryHash = cryptoService.hashCccd(verifiedRawCccd);
-        Set<String> lookupHashes = cryptoService.computeLookupHashes(verifiedRawCccd);
-
-        final EkycImageStorage.StoredObject finalFront = storedFront;
-        final EkycImageStorage.StoredObject finalBack = storedBack;
-        final EkycImageStorage.StoredObject finalSelfie = storedSelfie;
-
-        // 5. Transaction ngắn 2 (khóa đồng bộ theo hash CCCD): Check trùng Worker+EO, chấm quyết định & lưu kết quả
-        return cccdLockManager.executeWithCccdLock(primaryHash, () ->
-                executeInTransaction(() -> finalizeSubmission(
-                        userId,
-                        prepared.eoId(),
-                        prepared.verificationId(),
-                        providerResult,
-                        userInput,
-                        verifiedRawCccd,
-                        primaryHash,
-                        lookupHashes,
-                        finalFront.getObjectKey(),
-                        finalBack.getObjectKey(),
-                        finalSelfie.getObjectKey()
-                ))
-        );
     }
 
     private PreparedEoSubmission prepareSubmissionRecord(UUID userId) {
+        userRepository.lockForEkyc(userId);
         EventOrganizer eo = getOrCreateEo(userId);
 
         Optional<EoEkycVerification> retryCandidate = eoEkycVerificationRepository
-                .findTopByEventOrganizer_EoIdAndStatusInOrderByCreatedAtDesc(eo.getEoId(), RETRYABLE_RECORD_STATUSES);
+                .findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId()).filter(row -> RETRYABLE_RECORD_STATUSES.contains(row.getStatus()));
 
         EoEkycVerification record;
         boolean isRetry = false;
@@ -211,7 +219,7 @@ public class EventOrganizerEkycService {
         String prevBack = null;
         String prevSelfie = null;
 
-        if (retryCandidate.isPresent()) {
+        if (retryCandidate.filter(candidate -> !candidate.isLegalHold()).isPresent()) {
             record = retryCandidate.get();
             isRetry = true;
             prevFront = record.getFrontImageUrl();
@@ -236,7 +244,7 @@ public class EventOrganizerEkycService {
         }
 
         record = eoEkycVerificationRepository.save(record);
-        return new PreparedEoSubmission(eo.getEoId(), record.getId(), isRetry, prevFront, prevBack, prevSelfie);
+        return new PreparedEoSubmission(eo.getEoId(), record.getId(), record.getRetryCount(), isRetry, prevFront, prevBack, prevSelfie);
     }
 
     private void markStorageTechnicalFailure(UUID verificationId) {
@@ -256,6 +264,7 @@ public class EventOrganizerEkycService {
             UUID userId,
             UUID eoId,
             UUID verificationId,
+            int attempt,
             EkycIdentityResultDto providerResult,
             EkycUserSubmittedInput userInput,
             String verifiedRawCccd,
@@ -265,20 +274,17 @@ public class EventOrganizerEkycService {
             String backObjectKey,
             String selfieObjectKey) {
 
+        userRepository.lockForEkyc(userId);
         cccdLockManager.acquireDbTransactionLockIfPostgres(primaryHash);
 
         EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Nhà tổ chức sự kiện."));
 
-        EoEkycVerification record = (verificationId != null
-                ? eoEkycVerificationRepository.findById(verificationId).orElse(null)
-                : null);
-        if (record == null) {
-            record = EoEkycVerification.builder()
-                    .eventOrganizer(eo)
-                    .provider(ekycProvider.getProviderName())
-                    .retryCount(0)
-                    .build();
+        EoEkycVerification record = eoEkycVerificationRepository.findById(verificationId)
+                .orElseThrow(() -> new BadRequestException("Hồ sơ xác minh đã thay đổi."));
+        if (record.isLegalHold() || !Objects.equals(record.getRetryCount(), attempt)
+                || !EkycVerificationStatus.PROCESSING.name().equals(record.getStatus())) {
+            throw new BadRequestException("Hồ sơ đã được thay thế hoặc bảo lưu.");
         }
 
         boolean isDuplicateCccd = false;
@@ -661,7 +667,14 @@ public class EventOrganizerEkycService {
     public List<EoEkycVerificationResultDto> getPendingEkycQueue() {
         return eoEkycVerificationRepository.findByStatusOrderByCreatedAtAsc(EkycVerificationStatus.PENDING_REVIEW.name())
                 .stream()
-                .map(this::mapToDto)
+                .map(row -> EoEkycVerificationResultDto.builder()
+                        .verificationId(row.getId())
+                        .eoId(row.getEventOrganizer().getEoId())
+                        .representativeName(row.getRepresentativeName())
+                        .createdAt(row.getCreatedAt())
+                        .status(row.getStatus())
+                        .routingDecision(row.getRoutingDecision())
+                        .build())
                 .collect(Collectors.toList());
     }
 
@@ -707,6 +720,9 @@ public class EventOrganizerEkycService {
             if (eo != null) {
                 eo.setVerificationStatus(VerificationStatus.APPROVED);
                 eo.setVerifiedAt(Instant.now());
+                if (eo.getUser() != null && record.getRepresentativeName() != null && !record.getRepresentativeName().isBlank()) {
+                    eo.getUser().setFullName(record.getRepresentativeName().trim());
+                }
             }
         } else if (EkycVerificationStatus.REJECTED.name().equals(decision)) {
             record.setStatus(EkycVerificationStatus.REJECTED.name());
@@ -719,6 +735,7 @@ public class EventOrganizerEkycService {
             throw new BadRequestException("Quyết định duyệt chỉ chấp nhận APPROVED hoặc REJECTED");
         }
 
+        record.setReviewedAt(Instant.now());
         record.setReviewedBy(adminUser);
         record.setReviewNotes(reviewRequest.getReviewNotes());
 
@@ -769,6 +786,7 @@ public class EventOrganizerEkycService {
                 .reviewedBy(record.getReviewedBy() != null ? record.getReviewedBy().getUserId() : null)
                 .reviewNotes(record.getReviewNotes())
                 .createdAt(record.getCreatedAt())
+                .reviewedAt(record.getReviewedAt())
                 .updatedAt(record.getUpdatedAt())
                 .build();
     }
@@ -777,7 +795,7 @@ public class EventOrganizerEkycService {
         if (v.getId() == null || v.getImagesPurgedAt() != null || !imageStorage.isManagedObjectKey(storedKey)) {
             return null;
         }
-        return imageAccessTokenService.generateSignedImageUrl("eo", v.getId(), slot);
+        return imageAccessTokenService.generateSignedImageUrl("eo", v.getId(), slot, storedKey, v.getStatus());
     }
 
     private <T> T executeInTransaction(Supplier<T> action) {
@@ -818,6 +836,7 @@ public class EventOrganizerEkycService {
     private record PreparedEoSubmission(
             UUID eoId,
             UUID verificationId,
+            int attempt,
             boolean isRetry,
             String previousFrontKey,
             String previousBackKey,

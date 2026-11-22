@@ -57,7 +57,7 @@ public class EkycImageController {
         User currentUser = extractUser(authentication);
         ResolvedImageRecord record = resolveRecord(normTarget, verificationId, normSlot);
 
-        enforceAccessControl(currentUser, record.ownerUserId(), normTarget, verificationId, normSlot, expires, sig);
+        enforceAccessControl(currentUser, record, normTarget, verificationId, normSlot, expires, sig);
 
         if (record.purged() || !ekycImageStorage.isManagedObjectKey(record.objectKey())) {
             throw new ResourceNotFoundException("Ảnh xác minh eKYC không tồn tại hoặc đã bị xóa theo chính sách lưu giữ.");
@@ -92,13 +92,13 @@ public class EkycImageController {
         }
 
         ResolvedImageRecord record = resolveRecord(normTarget, verificationId, normSlot);
-        enforceAuthenticatedAuthorization(currentUser, record.ownerUserId());
+        enforceAuthenticatedAuthorization(currentUser, record);
 
         if (record.purged() || !ekycImageStorage.isManagedObjectKey(record.objectKey()) || !ekycImageStorage.exists(record.objectKey())) {
             throw new ResourceNotFoundException("Ảnh xác minh eKYC không còn tồn tại trong kho lưu trữ bảo mật.");
         }
 
-        String signedUrl = accessTokenService.generateSignedImageUrl(normTarget, verificationId, normSlot);
+        String signedUrl = accessTokenService.generateSignedImageUrl(normTarget, verificationId, normSlot, record.objectKey(), record.status());
         return ResponseEntity.ok(ApiResponse.ok(
                 Map.of("signedUrl", signedUrl),
                 "Cấp liên kết xem ảnh bảo mật ngắn hạn thành công"
@@ -107,7 +107,7 @@ public class EkycImageController {
 
     private void enforceAccessControl(
             User currentUser,
-            UUID ownerUserId,
+            ResolvedImageRecord record,
             String targetType,
             UUID verificationId,
             String slot,
@@ -115,19 +115,19 @@ public class EkycImageController {
             String sig
     ) {
         if (currentUser != null) {
-            enforceAuthenticatedAuthorization(currentUser, ownerUserId);
+            enforceAuthenticatedAuthorization(currentUser, record);
             return;
         }
-        if (!accessTokenService.isValidSignature(targetType, verificationId.toString(), slot, expires, sig)) {
+        if (!accessTokenService.isValidSignature(targetType, verificationId.toString(), slot, expires, sig) || !accessTokenService.matchesRecord(sig, record.objectKey(), record.status())) {
             throw new AppException("Bạn không có quyền truy cập ảnh xác minh eKYC này hoặc liên kết đã hết hạn.", HttpStatus.FORBIDDEN);
         }
     }
 
-    private void enforceAuthenticatedAuthorization(User currentUser, UUID ownerUserId) {
-        if (currentUser.getRole() == UserRole.ADMIN || currentUser.getRole() == UserRole.CUSTOMER_CARE) {
+    private void enforceAuthenticatedAuthorization(User currentUser, ResolvedImageRecord record) {
+        if (currentUser.getRole() == UserRole.ADMIN || (currentUser.getRole() == UserRole.CUSTOMER_CARE && "PENDING_REVIEW".equals(record.status()))) {
             return;
         }
-        if (ownerUserId != null && ownerUserId.equals(currentUser.getUserId())) {
+        if (record.ownerUserId() != null && record.ownerUserId().equals(currentUser.getUserId())) {
             return;
         }
         throw new AppException("Bạn không có quyền truy cập ảnh xác minh danh tính của tài khoản khác.", HttpStatus.FORBIDDEN);
@@ -146,7 +146,7 @@ public class EkycImageController {
                 case "selfie" -> v.getSelfieImageUrl();
                 default -> null;
             };
-            return new ResolvedImageRecord(ownerUserId, key, v.getImagesPurgedAt() != null);
+            return new ResolvedImageRecord(ownerUserId, key, v.getImagesPurgedAt() != null, v.getStatus());
         }
 
         EoEkycVerification v = eoEkycRepository.findById(verificationId)
@@ -160,7 +160,7 @@ public class EkycImageController {
             case "selfie" -> v.getSelfieImageUrl();
             default -> null;
         };
-        return new ResolvedImageRecord(ownerUserId, key, v.getImagesPurgedAt() != null);
+        return new ResolvedImageRecord(ownerUserId, key, v.getImagesPurgedAt() != null, v.getStatus());
     }
 
     private static String normalizeTarget(String raw) {
@@ -203,5 +203,5 @@ public class EkycImageController {
         return MediaType.IMAGE_JPEG;
     }
 
-    private record ResolvedImageRecord(UUID ownerUserId, String objectKey, boolean purged) {}
+    private record ResolvedImageRecord(UUID ownerUserId, String objectKey, boolean purged, String status) {}
 }

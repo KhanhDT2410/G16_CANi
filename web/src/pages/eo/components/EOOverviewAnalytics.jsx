@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
+import { resolveEventEstimatedCost } from '../utils/eventHelpers';
 
 /**
  * EOOverviewAnalytics
@@ -38,28 +39,9 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
   const eventsFinancialData = useMemo(() => {
     return activeEvents.map((evt) => {
       const shifts = evt.shifts || [];
-      let calculatedLaborCost = 0;
-      let totalReq = evt.totalRequiredWorkers || 0;
-      let totalConf = evt.totalConfirmedWorkers || 0;
-
-      shifts.forEach((sh) => {
-        if (sh.status === 'CANCELLED') return;
-        const req = Number(sh.requiredWorkers) || 1;
-        const wage = Number(sh.hourlyWage) || 50000;
-        const allowance = Number(sh.allowance) || 0;
-        let hours = 4;
-        if (sh.startTime && sh.endTime) {
-          try {
-            const h = (new Date(sh.endTime) - new Date(sh.startTime)) / 3600000;
-            if (h > 0 && h <= 24) hours = h;
-          } catch {
-            // fallback
-          }
-        }
-        calculatedLaborCost += (hours * wage * req) + (allowance * req);
-      });
-
-      const estimatedBudget = evt.totalEstimatedCost ? Number(evt.totalEstimatedCost) : calculatedLaborCost;
+      const totalReq = Number(evt.totalRequiredWorkers) || 0;
+      const totalConf = Number(evt.totalConfirmedWorkers) || 0;
+      const estimatedBudget = resolveEventEstimatedCost(evt);
       const paidAmount = evt.totalPaid ? Number(evt.totalPaid) : 0;
       const remainingAmount = Math.max(0, estimatedBudget - paidAmount);
       const fillRate = totalReq > 0 ? Math.round((totalConf / totalReq) * 100) : 0;
@@ -70,7 +52,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
         name: evt.name || 'Sự kiện không tên',
         eventDate: evt.eventDate,
         venueAddress: evt.venueAddress,
-        shiftsCount: evt.totalShifts || shifts.length || 1,
+        shiftsCount: evt.totalShifts ?? shifts.length,
         totalRequired: totalReq,
         totalConfirmed: totalConf,
         fillRate,
@@ -107,19 +89,9 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
       (evt.shifts || []).forEach((sh) => {
         if (sh.status === 'CANCELLED') return;
         const role = sh.jobType || 'Nhân sự tổng hợp';
-        const req = Number(sh.requiredWorkers) || 1;
-        const wage = Number(sh.hourlyWage) || 50000;
-        const allowance = Number(sh.allowance) || 0;
-        let hours = 4;
-        if (sh.startTime && sh.endTime) {
-          try {
-            const h = (new Date(sh.endTime) - new Date(sh.startTime)) / 3600000;
-            if (h > 0 && h <= 24) hours = h;
-          } catch {
-            // fallback
-          }
-        }
-        const cost = (hours * wage * req) + (allowance * req);
+        const req = Number(sh.requiredWorkers) || 0;
+        const cost = Number(sh.totalCost);
+        if (sh.totalCost == null || !Number.isFinite(cost)) return;
 
         if (!map[role]) {
           map[role] = { role, totalCost: 0, totalWorkers: 0 };
@@ -135,7 +107,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
     }
 
     const totalCalculatedCost = list.reduce((sum, item) => sum + item.totalCost, 0) || 1;
-    const colors = ['#6366f1', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'];
+    const colors = ['var(--color-primary-active)', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'];
 
     return list.map((item, idx) => ({
       ...item,
@@ -146,9 +118,13 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
 
   // 5. Tính toán trần trục Y cho Biểu đồ Cột Đứng
   const chartMax = useMemo(() => {
-    const maxVal = Math.max(...eventsFinancialData.map((e) => e.estimatedBudget), 5000000);
-    const step = 2000000;
-    return Math.ceil((maxVal * 1.15) / step) * step;
+    const maxValue = eventsFinancialData.reduce(
+      (max, item) => Math.max(max, item.estimatedBudget, item.paidAmount),
+      0
+    );
+    if (!maxValue) return 0;
+    const step = 10 ** Math.floor(Math.log10(maxValue)) / 2;
+    return Math.ceil(maxValue / step) * step;
   }, [eventsFinancialData]);
 
   // Các mốc vạch trục Y: 100%, 75%, 50%, 25%, 0%
@@ -164,7 +140,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
 
   if (!activeEvents || activeEvents.length === 0 || eventsFinancialData.length === 0) {
     return (
-      <div className="eo-widget-card animate-fade-in-up" style={{ marginTop: '1.25rem', padding: '3.5rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
+      <div className="eo-widget-card animate-fade-in-up" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
         <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700, color: '#1e293b' }}>
           Chưa Có Dữ Liệu Vận Hành & Ngân Sách
         </h4>
@@ -176,19 +152,20 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
   }
 
   return (
-    <div className="eo-overview-analytics-container animate-fade-in-up" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <section aria-labelledby="eo-analytics-title" className="eo-overview-analytics-container" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
+      <h2 id="eo-analytics-title" className="eo-overview-section-title">Ngân sách và tiến độ theo sự kiện</h2>
       {/* =========================================================================
           KHỐI 1: BÁO CÁO NGÂN SÁCH & VẬN HÀNH THỰC TẾ (REAL OPERATIONAL METRICS)
           ========================================================================= */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         
         {/* Thẻ 1: Dự Toán Ngân Sách Nhân Sự */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #6366f1' }}>
+        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid var(--color-primary-active)' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Dự Toán Ngân Sách
           </div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#1e1b4b', margin: '0.35rem 0 0.2rem' }}>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-text-main)', margin: '0.35rem 0 0.2rem' }}>
             {formatCurrency(totalSummary.totalEstimatedBudget)} đ
           </div>
           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
@@ -212,7 +189,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
         {/* Thẻ 3: Cần Chi Trả Còn Lại */}
         <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #f59e0b' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Cần Chi Trả Còn Lại
+            Dự toán còn lại
           </div>
           <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#c2410c', margin: '0.35rem 0 0.2rem' }}>
             {formatCurrency(totalSummary.totalRemainingAmount)} đ
@@ -257,7 +234,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
             {/* Legend chú thích màu sắc cột kép */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', fontSize: '0.72rem', fontWeight: 600 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: 10, height: 10, backgroundColor: '#6366f1', borderRadius: 2 }} />
+                <span style={{ width: 10, height: 10, backgroundColor: 'var(--color-primary-active)', borderRadius: 2 }} />
                 <span style={{ color: '#475569' }}>Dự toán</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -268,6 +245,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
           </div>
 
           {/* VÙNG VẼ BIỂU ĐỒ CỘT ĐỨNG (Không dùng flex: 1 để tránh flex-basis: 0% làm sập height: 0px khi xếp 1 cột trên Mobile) */}
+          {chartMax > 0 ? (
           <div style={{ position: 'relative', height: '240px', minHeight: '240px', width: '100%' }}>
             
             {/* 1. Các vạch gióng ngang trục tung Y (Horizontal Grid Lines) */}
@@ -322,10 +300,8 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
               }}
             >
               {eventsFinancialData.slice(0, 4).map((item) => {
-                const budgetHeightPercent = Math.min(100, Math.max(6, Math.round((item.estimatedBudget / chartMax) * 100)));
-                const paidHeightPercent = item.paidAmount > 0
-                  ? Math.min(100, Math.max(6, Math.round((item.paidAmount / chartMax) * 100)))
-                  : 2;
+                const budgetHeightPercent = (item.estimatedBudget / chartMax) * 100;
+                const paidHeightPercent = (item.paidAmount / chartMax) * 100;
 
                 return (
                   <div
@@ -356,11 +332,10 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                         style={{
                           width: 'clamp(10px, 3.2vw, 20px)',
                           height: `${budgetHeightPercent}%`,
-                          background: 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
+                          background: 'var(--color-primary-active)',
                           borderRadius: '5px 5px 0 0',
                           boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)',
                           transition: 'height 0.4s ease',
-                          cursor: 'pointer',
                           position: 'relative',
                         }}
                         title={`Dự toán: ${formatCurrency(item.estimatedBudget)} đ`}
@@ -375,7 +350,6 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                           borderRadius: '5px 5px 0 0',
                           boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)',
                           transition: 'height 0.4s ease',
-                          cursor: 'pointer',
                           position: 'relative',
                         }}
                         title={`Đã chi trả: ${formatCurrency(item.paidAmount)} đ`}
@@ -430,6 +404,9 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
             </div>
 
           </div>
+          ) : (
+            <p className="eo-analytics-empty">Chưa có chi phí dự toán hoặc khoản chi trả.</p>
+          )}
         </div>
 
         {/* CỘT PHẢI: Cơ Cấu Chi Phí Lương Theo Vị Trí Chuyên Môn */}
@@ -443,7 +420,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                 Phân bổ quỹ lương theo từng nhóm chuyên môn ca làm
               </p>
             </div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6366f1', backgroundColor: '#f5f3ff', padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary-active)', backgroundColor: '#f5f3ff', padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
               {roleCostBreakdown.length} vị trí
             </span>
           </div>
@@ -464,7 +441,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                     style={{
                       width: `${Math.min(100, Math.max(6, item.percent))}%`,
                       height: '100%',
-                      backgroundColor: item.color || '#6366f1',
+                      backgroundColor: item.color || 'var(--color-primary-active)',
                       borderRadius: 4,
                       transition: 'width 0.4s ease-in-out',
                     }}
@@ -537,14 +514,14 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                     <td style={{ padding: '12px', minWidth: '140px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: 3 }}>
                         <span style={{ fontWeight: 600, color: '#334155' }}>{item.totalConfirmed}/{item.totalRequired} người</span>
-                        <span style={{ fontWeight: 700, color: item.fillRate >= 100 ? '#10b981' : '#6366f1' }}>{item.fillRate}%</span>
+                        <span style={{ fontWeight: 700, color: item.fillRate >= 100 ? '#10b981' : 'var(--color-primary-active)' }}>{item.fillRate}%</span>
                       </div>
                       <div style={{ width: '100%', height: '5px', backgroundColor: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
                         <div
                           style={{
                             width: `${Math.min(100, Math.max(5, item.fillRate))}%`,
                             height: '100%',
-                            backgroundColor: item.fillRate >= 100 ? '#10b981' : '#6366f1',
+                            backgroundColor: item.fillRate >= 100 ? '#10b981' : 'var(--color-primary-active)',
                             borderRadius: 3,
                           }}
                         />
@@ -578,6 +555,6 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
         )}
       </div>
 
-    </div>
+    </section>
   );
 }

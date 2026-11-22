@@ -22,10 +22,9 @@ public class EmailService {
      * Gửi email chứa mã xác thực OTP 6 số đến người dùng.
      */
     public void sendOtpEmail(String toEmail, String otpCode) {
-        log.info("📧 [CANi OTP Service] Mã xác thực OTP cho [{}] là: [{}] (Hiệu lực: 5 phút)", toEmail, otpCode);
 
         if (mailSender == null || fromEmail == null || fromEmail.isBlank()) {
-            log.info("ℹ️ Cấu hình SMTP (SPRING_MAIL_USERNAME) chưa được thiết lập. Mã OTP được ghi log phục vụ môi trường Dev/Test.");
+            log.warn("OTP delivery unavailable: SMTP is not configured.");
             return;
         }
 
@@ -35,15 +34,15 @@ public class EmailService {
 
             helper.setFrom(fromEmail, "CANi Event Staffing Platform");
             helper.setTo(toEmail);
-            helper.setSubject("[CANi] Mã xác thực đăng ký tài khoản: " + otpCode);
+            helper.setSubject("[CANi] Mã xác thực tài khoản");
 
             String htmlBody = buildOtpEmailHtml(otpCode);
             helper.setText(htmlBody, true);
 
             mailSender.send(message);
-            log.info("✅ Đã gửi email xác thực OTP thực tế thành công tới: {}", toEmail);
+            log.info("OTP email delivered.");
         } catch (Exception e) {
-            log.error("⚠️ Không thể gửi email qua SMTP tới {}: {}. OTP ghi nhận trong log để tiếp tục kiểm thử.", toEmail, e.getMessage());
+            log.error("OTP email delivery failed [{}]", e.getClass().getSimpleName());
         }
     }
 

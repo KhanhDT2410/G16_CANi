@@ -124,24 +124,6 @@ export function validateShiftTimeRange(
   return null;
 }
 
-export const DEMO_EVENTS = [
-  {
-    eventId: 'EVT-98721',
-    name: 'Lễ Hội Âm Nhạc Mùa Hè 2026 - Summer Fest Live Stage',
-    description: 'Đại nhạc hội ngoài trời quy tụ các nghệ sĩ trẻ hàng đầu, dự kiến đón tiếp 5.000 khán giả.',
-    venueAddress: 'Trung tâm Hội chợ & Triển lãm Sài Gòn (SECC), 799 Nguyễn Văn Linh, Q.7, TP.HCM',
-    venueLat: 10.7328,
-    venueLng: 106.7214,
-    eventDate: '2026-10-20T18:00:00Z',
-    mode: 'MATCHING',
-    status: 'ACTIVE',
-    totalShifts: 3,
-    totalRequiredWorkers: 15,
-    totalConfirmedWorkers: 12,
-    totalEstimatedCost: 4500000,
-  },
-];
-
 /**
  * Xác định trạng thái chi tiết của từng Ca làm việc (Shift) theo thời gian thực và tiến độ nhân sự
  */
@@ -453,6 +435,12 @@ export function getEventStatusPriority(evtOrStatus) {
 }
 
 export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
+  const now = Date.now();
+  const upcomingStart = (event) => {
+    const start = new Date(event.startTime || event.eventDate || 0).getTime();
+    return start >= now ? start : Infinity;
+  };
+
   return events
     .filter((evt) => {
       const matchSearch =
@@ -481,6 +469,11 @@ export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
       return matchSearch && matchStatus;
     })
     .sort((a, b) => {
+      if (sortBy === 'UPCOMING') {
+        const aStart = upcomingStart(a);
+        const bStart = upcomingStart(b);
+        if (aStart !== bStart) return aStart < bStart ? -1 : 1;
+      }
       const priorityDiff = getEventStatusPriority(a) - getEventStatusPriority(b);
       if (priorityDiff !== 0) return priorityDiff;
 
@@ -491,15 +484,24 @@ export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
     });
 }
 
+export function resolveEventEstimatedCost(event) {
+  const total = Number(event.totalEstimatedCost);
+  if (event.totalEstimatedCost != null && Number.isFinite(total)) return total;
+
+  return (event.shifts || []).reduce((sum, shift) => (
+    shift.status === 'CANCELLED' ? sum : sum + (Number(shift.totalCost) || 0)
+  ), 0);
+}
+
 export function calculateEventMetrics(events) {
   const nonCancelled = events.filter((e) => e.status !== 'CANCELLED');
   const activeEvents = events.filter((e) => e.status === 'ACTIVE' || e.status === 'APPROVED');
 
   const totalEvents = nonCancelled.length;
   const activeEventsCount = activeEvents.length;
-  const totalRequiredWorkers = nonCancelled.reduce((sum, e) => sum + (e.totalRequiredWorkers || 0), 0);
-  const totalConfirmedWorkers = nonCancelled.reduce((sum, e) => sum + (e.totalConfirmedWorkers || 0), 0);
-  const totalEstimatedCost = nonCancelled.reduce((sum, e) => sum + (e.totalEstimatedCost || 0), 0);
+  const totalRequiredWorkers = nonCancelled.reduce((sum, e) => sum + (Number(e.totalRequiredWorkers) || 0), 0);
+  const totalConfirmedWorkers = nonCancelled.reduce((sum, e) => sum + (Number(e.totalConfirmedWorkers) || 0), 0);
+  const totalEstimatedCost = nonCancelled.reduce((sum, e) => sum + resolveEventEstimatedCost(e), 0);
   const fillRate = totalRequiredWorkers > 0 ? Math.round((totalConfirmedWorkers / totalRequiredWorkers) * 100) : 0;
 
   return {

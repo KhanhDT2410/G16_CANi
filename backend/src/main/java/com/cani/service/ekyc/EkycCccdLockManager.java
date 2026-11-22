@@ -66,13 +66,9 @@ public class EkycCccdLockManager {
         if (!isPostgres || entityManager == null || cccdHash == null || cccdHash.isBlank()) {
             return;
         }
-        try {
-            entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(hashtext(:key))")
-                    .setParameter("key", "ekyc_cccd:" + cccdHash)
-                    .getSingleResult();
-        } catch (Exception e) {
-            log.debug("Bỏ qua pg_advisory_xact_lock (không khả dụng trên kết nối hiện tại): {}", e.getMessage());
-        }
+        entityManager.createNativeQuery("SELECT 1 FROM pg_advisory_xact_lock(hashtext(:key))")
+                .setParameter("key", "ekyc_cccd:" + cccdHash)
+                .getSingleResult();
     }
 
     private static boolean detectPostgres(DataSource dataSource) {

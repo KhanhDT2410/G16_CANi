@@ -28,4 +28,7 @@ public class WorkerPreferencesDto {
     @Min(value = 1, message = "Bán kính tối thiểu là 1 km")
     @Max(value = 50, message = "Bán kính tối đa là 50 km")
     private Double maxDistanceKm;
+
+    /** Trạng thái sẵn sàng nhận việc thực tế của Worker trong CSDL để đồng bộ UI Mobile */
+    private Boolean isOnline;
 }

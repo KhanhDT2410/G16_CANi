@@ -121,6 +121,12 @@ public class EoEkycVerification {
     @Column(name = "review_notes", columnDefinition = "TEXT")
     private String reviewNotes;
 
+    @Column(name = "legal_hold", nullable = false)
+    private boolean legalHold;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
     @Version
     @Column(name = "version", nullable = false)
     @Builder.Default

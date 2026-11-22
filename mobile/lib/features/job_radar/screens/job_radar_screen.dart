@@ -340,7 +340,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                               Text(
                                 !isEkycApproved
                                     ? 'Chưa kích hoạt'
-                                    : (state.isOnline ? 'GPS bật' : 'GPS tắt'),
+                                    : (state.isOnline
+                                        ? (state.usingPreferenceLocation ? 'Theo khu vực' : 'GPS bật')
+                                        : 'Đang tạm tắt'),
                                  style: TextStyle(
                                    fontSize: 8.5,
                                    color: cani.textMuted,
@@ -386,128 +388,183 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
             if (!isEkycApproved)
               _buildEkycWarningBanner(context, isDark, ekycState),
 
-            // 2. Section "Lời mời làm việc": toàn bộ lời mời đang chờ phản hồi
+            // 2. Section "Lời mời làm việc" hoặc Trạng thái nhận việc gọn gàng
             if (isEkycApproved)
-              _buildInviteSection(ref.watch(proposalsListProvider), cani),
+              _buildInviteSection(ref.watch(proposalsListProvider), state, notifier, cani),
 
-            // 3. Thanh Bán Kính & Chuyển Đổi Bản Đồ / Danh Sách (Chỉ hiển thị khi đã hoàn tất eKYC)
+            // 3. Thanh Công Cụ Radar Gọn (Khu vực · Bán kính Dropdown · Mã mời · Xem Danh sách)
             if (isEkycApproved)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Bán kính:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: cani.textMain,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ...[5.0, 10.0, 15.0].map((r) {
-                        final isSel = state.searchRadiusKm == r;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: InkWell(
-                            onTap: () => notifier.setRadius(r),
-                            borderRadius: BorderRadius.circular(999),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: isSel ? cani.brand : (isDark ? cani.surface : Colors.white),
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: isSel ? cani.brand : cani.border,
-                                ),
-                                boxShadow: isSel
-                                    ? [BoxShadow(color: cani.brand.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))]
-                                    : null,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        // Chọn nhanh tâm khu vực (Ưu tiên vs GPS)
+                        if (state.hasPreferredLocation) ...[
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => notifier.switchCenterMode(
+                                usePreference: !state.usingPreferenceLocation,
                               ),
-                              child: Text(
-                                '${r.toInt()} km',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: isSel ? Colors.white : cani.textMuted,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 34,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: state.usingPreferenceLocation ? cani.brandSoft : cani.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: state.usingPreferenceLocation
+                                        ? cani.brand.withValues(alpha: 0.35)
+                                        : cani.border,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      state.usingPreferenceLocation
+                                          ? Icons.tune_rounded
+                                          : Icons.my_location_rounded,
+                                      size: 14,
+                                      color: cani.brand,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        state.usingPreferenceLocation
+                                            ? (state.preferredAddress?.isNotEmpty == true
+                                                ? state.preferredAddress!
+                                                : 'Khu vực ưu tiên')
+                                            : 'Vị trí GPS',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: cani.brand,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(Icons.swap_horiz_rounded, size: 14, color: cani.brand),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                        );
-                      }),
-                      const SizedBox(width: 4),
-                      InkWell(
-                        onTap: _openInviteCodeDialogOnHome,
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          height: 30,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? cani.surface : cani.brandSoft,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: cani.border),
+                          const SizedBox(width: 6),
+                        ] else ...[
+                          Text(
+                            '${state.nearbyShifts.length} ca quanh bạn',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.textMain),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.confirmation_number_outlined, size: 14, color: isDark ? cani.accent : cani.brand),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Mã mời',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: isDark ? cani.accent : cani.brand,
+                          const Spacer(),
+                        ],
+
+                        // Dropdown chọn Bán kính gọn (không bị tràn hàng)
+                        PopupMenuButton<double>(
+                          initialValue: state.searchRadiusKm,
+                          onSelected: (r) => notifier.setRadius(r),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          itemBuilder: (_) => [5.0, 10.0, 15.0, 20.0, 25.0, 30.0]
+                              .map((r) => PopupMenuItem<double>(
+                                    value: r,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('Bán kính ${r.toInt()} km', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                        if (state.searchRadiusKm == r)
+                                          Icon(Icons.check_rounded, size: 16, color: cani.brand),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
+                          child: Container(
+                            height: 34,
+                            padding: const EdgeInsets.symmetric(horizontal: 9),
+                            decoration: BoxDecoration(
+                              color: cani.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: cani.border),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.radar_rounded, size: 14, color: cani.brand),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${state.searchRadiusKm.toInt()} km',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: cani.textMain),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: () => notifier.toggleRadarView(),
-                        borderRadius: BorderRadius.circular(999),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isDark ? cani.surface : Colors.white,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: cani.border,
+                                Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: cani.textMuted),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                state.isRadarView ? Icons.list_alt : Icons.map_outlined,
-                                size: 14,
-                                color: isDark ? cani.accent : cani.brand,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                state.isRadarView ? 'Danh sách' : 'Bản đồ',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? cani.accent : cani.brand,
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Nút Mã mời
+                        InkWell(
+                          onTap: _openInviteCodeDialogOnHome,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            height: 34,
+                            padding: const EdgeInsets.symmetric(horizontal: 9),
+                            decoration: BoxDecoration(
+                              color: cani.brandSoft,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: cani.brand.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.confirmation_number_outlined, size: 14, color: cani.brand),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Mã mời',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: cani.brand),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 6),
+
+                        // Nút chuyển Bản đồ / Danh sách
+                        InkWell(
+                          onTap: () => notifier.toggleRadarView(),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            height: 34,
+                            padding: const EdgeInsets.symmetric(horizontal: 9),
+                            decoration: BoxDecoration(
+                              color: cani.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: cani.border),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  state.isRadarView ? Icons.view_list_rounded : Icons.map_outlined,
+                                  size: 16,
+                                  color: cani.textMain,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  state.isRadarView ? 'DS (${state.nearbyShifts.length})' : 'Bản đồ',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: cani.textMain),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            if (isEkycApproved) const SizedBox(height: 6),
 
             // 4. Nội Dung Chính: Khóa eKYC hoặc Bản Đồ Radar / Danh Sách
             Expanded(
@@ -518,19 +575,20 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                       : state.isRadarView
                           ? Stack(
                               children: [
-                                // Bản đồ Radar Map
+                                // Bản đồ Radar Map (không còn badge đè lên top banner Lộ trình)
                                 Positioned.fill(
                                   child: Container(
-                                    margin: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                                     decoration: BoxDecoration(
-                                       borderRadius: BorderRadius.circular(24),
-                                       boxShadow: [
-                                         BoxShadow(
-                                           color: Theme.of(context).cani.brand.withValues(alpha: 0.08),
-                                           blurRadius: 18,
-                                         ),
-                                       ],
-                                     ),
+                                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: cani.border),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Theme.of(context).cani.brand.withValues(alpha: 0.06),
+                                          blurRadius: 14,
+                                        ),
+                                      ],
+                                    ),
                                     clipBehavior: Clip.antiAlias,
                                     child: JobRadarMapWidget(
                                       shifts: state.nearbyShifts,
@@ -539,6 +597,7 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                                       isOnline: state.isOnline,
                                       userLat: state.userLat,
                                       userLng: state.userLng,
+                                      hasBottomCard: selectedOrFirstShift != null,
                                       onRecenterGps: () => notifier.refreshCurrentLocation(),
                                       onSelectShift: (shift) {
                                         notifier.selectShift(shift);
@@ -546,36 +605,6 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
                                     ),
                                   ),
                                 ),
-
-                                // Badge số ca tìm thấy ở góc trên bản đồ (Chỉ hiện khi Đang bật nhận việc)
-                                if (state.isOnline)
-                                  Positioned(
-                                    top: 10,
-                                    right: 24,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                       decoration: BoxDecoration(
-                                         color: (isDark ? cani.surface : Colors.white).withValues(alpha: 0.94),
-                                         borderRadius: BorderRadius.circular(999),
-                                         boxShadow: [
-                                           BoxShadow(
-                                             color: isDark
-                                                 ? Colors.black.withValues(alpha: 0.35)
-                                                 : const Color(0xFF0B1B3D).withValues(alpha: 0.12),
-                                             blurRadius: 8,
-                                           ),
-                                         ],
-                                       ),
-                                       child: Text(
-                                         '${state.nearbyShifts.length} ca trong bán kính ${state.searchRadiusKm.toInt()} km',
-                                         style: TextStyle(
-                                           fontSize: 10.5,
-                                           fontWeight: FontWeight.w800,
-                                           color: isDark ? Colors.white : cani.textBody,
-                                         ),
-                                      ),
-                                    ),
-                                  ),
 
                                 // Sliding Job Card ở dưới đáy bản đồ
                                 if (selectedOrFirstShift != null)
@@ -599,31 +628,63 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     );
   }
 
-  Widget _buildInviteSection(AsyncValue<List<JobProposalItem>> proposals, CaniTokens cani) {
+  Widget _buildInviteSection(
+    AsyncValue<List<JobProposalItem>> proposals,
+    JobRadarState radarState,
+    JobRadarNotifier notifier,
+    CaniTokens cani,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Widget emptyState = Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: isDark ? cani.surface : Colors.white,
+        color: !radarState.isOnline ? cani.warningBg : (isDark ? cani.surface : Colors.white),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cani.border),
+        border: Border.all(
+          color: !radarState.isOnline ? cani.warning.withValues(alpha: 0.35) : cani.border,
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.inbox_outlined, size: 18, color: isDark ? cani.accent : cani.brand),
-          const SizedBox(width: 10),
+          Icon(
+            !radarState.isOnline ? Icons.pause_circle_outline_rounded : Icons.notifications_none_rounded,
+            size: 18,
+            color: !radarState.isOnline ? cani.warning : cani.brand,
+          ),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
-              'Hiện không có lời mời làm việc nào. Bật "Sẵn sàng nhận việc" ở phía trên để nhận ca gần bạn.',
+              !radarState.isOnline
+                  ? 'Đang tạm nghỉ — bật nhận việc để nhận đề xuất & thông báo tự động.'
+                  : 'Chưa có lời mời mới · Đang tìm ca phù hợp quanh khu vực của bạn.',
               style: TextStyle(
                 fontSize: 11.5,
-                color: isDark ? cani.textMuted : cani.textBody,
-                fontWeight: FontWeight.w500,
+                color: !radarState.isOnline ? cani.textMain : cani.textBody,
+                fontWeight: FontWeight.w600,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (!radarState.isOnline) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () => notifier.toggleOnlineStatus(),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: cani.brand,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'Bật ngay',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

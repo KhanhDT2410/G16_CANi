@@ -161,55 +161,62 @@ public class WorkerEkycService {
             throw storageEx;
         }
 
-        // Xóa ảnh cũ của lần retry thất bại trước đó sau khi ảnh mới đã lưu an toàn
-        if (prepared.isRetry()) {
-            imageRetentionService.deleteStoredImagesQuietly(
-                    prepared.previousFrontKey(),
-                    prepared.previousBackKey(),
-                    prepared.previousSelfieKey()
+        try {
+            // 4. Gọi VNPT eKYC thực tế (bên ngoài DB transaction)
+            EkycIdentityResultDto providerResult = ekycProvider.verifyIdentity(
+                    validatedFront.getBytes(), validatedFront.getDetectedMimeType(),
+                    validatedBack.getBytes(), validatedBack.getDetectedMimeType(),
+                    validatedSelfie.getBytes(), validatedSelfie.getDetectedMimeType()
             );
+
+            String verifiedRawCccd = (providerResult != null && !providerResult.isTechnicalFailure())
+                    ? cryptoService.normalizeCccd(providerResult.getIdNumber())
+                    : null;
+            String primaryHash = cryptoService.hashCccd(verifiedRawCccd);
+            Set<String> lookupHashes = cryptoService.computeLookupHashes(verifiedRawCccd);
+
+            final EkycImageStorage.StoredObject finalFront = storedFront;
+            final EkycImageStorage.StoredObject finalBack = storedBack;
+            final EkycImageStorage.StoredObject finalSelfie = storedSelfie;
+
+            // 5. Transaction ngắn 2 (đồng bộ khóa theo hash CCCD): Check trùng, chấm quyết định & lưu kết quả
+            EkycVerificationResultDto result = cccdLockManager.executeWithCccdLock(primaryHash, () ->
+                    executeInTransaction(() -> finalizeSubmission(
+                            userId,
+                            prepared.workerId(),
+                            prepared.verificationId(),
+                            prepared.attempt(),
+                            providerResult,
+                            userInput,
+                            verifiedRawCccd,
+                            primaryHash,
+                            lookupHashes,
+                            finalFront.getObjectKey(),
+                            finalBack.getObjectKey(),
+                            finalSelfie.getObjectKey()
+                    ))
+            );
+            if (prepared.isRetry()) {
+                imageRetentionService.deleteStoredImagesQuietly(
+                        prepared.previousFrontKey(),
+                        prepared.previousBackKey(),
+                        prepared.previousSelfieKey()
+                );
+            }
+            return result;
+        } catch (RuntimeException failure) {
+            imageRetentionService.deleteStoredImagesQuietly(storedFront.getObjectKey(),
+                    storedBack.getObjectKey(), storedSelfie.getObjectKey());
+            throw failure;
         }
-
-        // 4. Gọi VNPT eKYC thực tế (bên ngoài DB transaction)
-        EkycIdentityResultDto providerResult = ekycProvider.verifyIdentity(
-                validatedFront.getBytes(), validatedFront.getDetectedMimeType(),
-                validatedBack.getBytes(), validatedBack.getDetectedMimeType(),
-                validatedSelfie.getBytes(), validatedSelfie.getDetectedMimeType()
-        );
-
-        String verifiedRawCccd = (providerResult != null && !providerResult.isTechnicalFailure())
-                ? cryptoService.normalizeCccd(providerResult.getIdNumber())
-                : null;
-        String primaryHash = cryptoService.hashCccd(verifiedRawCccd);
-        Set<String> lookupHashes = cryptoService.computeLookupHashes(verifiedRawCccd);
-
-        final EkycImageStorage.StoredObject finalFront = storedFront;
-        final EkycImageStorage.StoredObject finalBack = storedBack;
-        final EkycImageStorage.StoredObject finalSelfie = storedSelfie;
-
-        // 5. Transaction ngắn 2 (đồng bộ khóa theo hash CCCD): Check trùng, chấm quyết định & lưu kết quả
-        return cccdLockManager.executeWithCccdLock(primaryHash, () ->
-                executeInTransaction(() -> finalizeSubmission(
-                        userId,
-                        prepared.workerId(),
-                        prepared.verificationId(),
-                        providerResult,
-                        userInput,
-                        verifiedRawCccd,
-                        primaryHash,
-                        lookupHashes,
-                        finalFront.getObjectKey(),
-                        finalBack.getObjectKey(),
-                        finalSelfie.getObjectKey()
-                ))
-        );
     }
 
     private PreparedSubmission prepareSubmissionRecord(UUID userId) {
+        userRepository.lockForEkyc(userId);
         Worker worker = getOrCreateWorker(userId);
 
         Optional<WorkerEkycVerification> retryCandidate = ekycVerificationRepository
-                .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(), RETRYABLE_RECORD_STATUSES);
+                .findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()).filter(row -> RETRYABLE_RECORD_STATUSES.contains(row.getStatus()));
 
         WorkerEkycVerification record;
         boolean isRetry = false;
@@ -217,7 +224,7 @@ public class WorkerEkycService {
         String prevBack = null;
         String prevSelfie = null;
 
-        if (retryCandidate.isPresent()) {
+        if (retryCandidate.filter(candidate -> !candidate.isLegalHold()).isPresent()) {
             record = retryCandidate.get();
             isRetry = true;
             prevFront = record.getFrontImageUrl();
@@ -242,7 +249,7 @@ public class WorkerEkycService {
         }
 
         record = ekycVerificationRepository.save(record);
-        return new PreparedSubmission(worker.getWorkerId(), record.getId(), isRetry, prevFront, prevBack, prevSelfie);
+        return new PreparedSubmission(worker.getWorkerId(), record.getId(), record.getRetryCount(), isRetry, prevFront, prevBack, prevSelfie);
     }
 
     private void markStorageTechnicalFailure(UUID verificationId) {
@@ -262,6 +269,7 @@ public class WorkerEkycService {
             UUID userId,
             UUID workerId,
             UUID verificationId,
+            int attempt,
             EkycIdentityResultDto providerResult,
             EkycUserSubmittedInput userInput,
             String verifiedRawCccd,
@@ -271,20 +279,17 @@ public class WorkerEkycService {
             String backObjectKey,
             String selfieObjectKey) {
 
+        userRepository.lockForEkyc(userId);
         cccdLockManager.acquireDbTransactionLockIfPostgres(primaryHash);
 
         Worker worker = workerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ Worker."));
 
-        WorkerEkycVerification verification = (verificationId != null
-                ? ekycVerificationRepository.findById(verificationId).orElse(null)
-                : null);
-        if (verification == null) {
-            verification = WorkerEkycVerification.builder()
-                    .worker(worker)
-                    .provider(ekycProvider.getProviderName())
-                    .retryCount(0)
-                    .build();
+        WorkerEkycVerification verification = ekycVerificationRepository.findById(verificationId)
+                .orElseThrow(() -> new BadRequestException("Hồ sơ xác minh đã thay đổi."));
+        if (verification.isLegalHold() || !Objects.equals(verification.getRetryCount(), attempt)
+                || !EkycVerificationStatus.PROCESSING.name().equals(verification.getStatus())) {
+            throw new BadRequestException("Hồ sơ đã được thay thế hoặc bảo lưu.");
         }
 
         boolean isDuplicate = false;
@@ -328,7 +333,7 @@ public class WorkerEkycService {
             verification.setResidenceAddress(providerResult.getResidenceAddress());
             verification.setExpiryDate(providerResult.getExpiryDate());
             verification.setIssueDate(providerResult.getIssueDate());
-            verification.setIdentificationFeatures(providerResult.getIdentificationFeatures());
+            verification.setIdentificationFeatures(null);
             verification.setFaceMatchScore(scaleOrNull(providerResult.getFaceMatchScore()));
             verification.setOcrConfidence(scaleOrNull(providerResult.getOcrConfidence()));
         } else {
@@ -486,6 +491,7 @@ public class WorkerEkycService {
         verification.setRoutingDecision(targetStatus == EkycVerificationStatus.APPROVED
                 ? EkycRoutingDecision.MANUAL_APPROVED.name()
                 : EkycRoutingDecision.MANUAL_REJECTED.name());
+        verification.setReviewedAt(java.time.Instant.now());
         verification.setReviewedBy(adminUserId);
         verification.setReviewNotes(dto.getReviewNotes());
         verification.setImageRetentionUntil(imageRetentionService.calculateRetentionDeadline(targetStatus));
@@ -494,6 +500,10 @@ public class WorkerEkycService {
         if (worker != null) {
             if (targetStatus == EkycVerificationStatus.APPROVED) {
                 worker.setKycStatus(KycStatus.APPROVED);
+                if (verification.getFullName() != null && !verification.getFullName().isBlank()) {
+                    worker.setFullName(verification.getFullName().trim());
+                    if (worker.getUser() != null) worker.getUser().setFullName(worker.getFullName());
+                }
                 if (verification.getCccdNumberMasked() != null) {
                     worker.setCccdNumber(verification.getCccdNumberMasked());
                 }
@@ -514,13 +524,15 @@ public class WorkerEkycService {
      */
     @Transactional
     public void resetMyEkyc(UUID userId) {
+        userRepository.lockForEkyc(userId);
         Worker worker = workerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Worker không tồn tại"));
 
         List<WorkerEkycVerification> oldList = ekycVerificationRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
         if (oldList != null && !oldList.isEmpty()) {
             for (WorkerEkycVerification old : oldList) {
-                imageRetentionService.deleteStoredImagesQuietly(
+                if (old.isLegalHold()) throw new BadRequestException("Hồ sơ đang được bảo lưu.");
+                imageRetentionService.deleteAfterCommit(
                         old.getFrontImageUrl(), old.getBackImageUrl(), old.getSelfieImageUrl());
             }
             ekycVerificationRepository.deleteAll(oldList);
@@ -538,7 +550,14 @@ public class WorkerEkycService {
     @Transactional(readOnly = true)
     public List<EkycVerificationResultDto> getPendingEkycQueue() {
         return ekycVerificationRepository.findByStatusOrderByCreatedAtDesc(EkycVerificationStatus.PENDING_REVIEW.name()).stream()
-                .map(this::mapToDto)
+                .map(row -> EkycVerificationResultDto.builder()
+                        .verificationId(row.getId())
+                        .workerId(row.getWorker().getWorkerId())
+                        .fullName(row.getFullName())
+                        .createdAt(row.getCreatedAt())
+                        .status(row.getStatus())
+                        .routingDecision(row.getRoutingDecision())
+                        .build())
                 .collect(Collectors.toList());
     }
 
@@ -583,6 +602,7 @@ public class WorkerEkycService {
                 .reviewedBy(v.getReviewedBy())
                 .reviewNotes(v.getReviewNotes())
                 .createdAt(v.getCreatedAt())
+                .reviewedAt(v.getReviewedAt())
                 .updatedAt(v.getUpdatedAt())
                 .build();
     }
@@ -591,7 +611,7 @@ public class WorkerEkycService {
         if (v.getId() == null || v.getImagesPurgedAt() != null || !imageStorage.isManagedObjectKey(storedKey)) {
             return null;
         }
-        return imageAccessTokenService.generateSignedImageUrl("worker", v.getId(), slot);
+        return imageAccessTokenService.generateSignedImageUrl("worker", v.getId(), slot, storedKey, v.getStatus());
     }
 
     private <T> T executeInTransaction(Supplier<T> action) {
@@ -632,6 +652,7 @@ public class WorkerEkycService {
     private record PreparedSubmission(
             UUID workerId,
             UUID verificationId,
+            int attempt,
             boolean isRetry,
             String previousFrontKey,
             String previousBackKey,

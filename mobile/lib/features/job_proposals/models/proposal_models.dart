@@ -310,6 +310,7 @@ class WorkerPreferencesModel {
   final double? baseLng;
   final double minWage;
   final double maxDistanceKm;
+  final bool? isOnline;
 
   const WorkerPreferencesModel({
     this.baseAddress = 'TP. Hồ Chí Minh',
@@ -317,6 +318,7 @@ class WorkerPreferencesModel {
     this.baseLng,
     this.minWage = 35000,
     this.maxDistanceKm = 15.0,
+    this.isOnline,
   });
 
   factory WorkerPreferencesModel.fromJson(Map<String, dynamic> json) {
@@ -326,6 +328,7 @@ class WorkerPreferencesModel {
       baseLng: (json['baseLng'] is num) ? (json['baseLng'] as num).toDouble() : null,
       minWage: (json['minWage'] is num) ? (json['minWage'] as num).toDouble() : 35000,
       maxDistanceKm: (json['maxDistanceKm'] is num) ? (json['maxDistanceKm'] as num).toDouble() : 15.0,
+      isOnline: json['isOnline'] is bool ? json['isOnline'] as bool : null,
     );
   }
 
@@ -343,6 +346,7 @@ class WorkerPreferencesModel {
     double? baseLng,
     double? minWage,
     double? maxDistanceKm,
+    bool? isOnline,
   }) {
     return WorkerPreferencesModel(
       baseAddress: baseAddress ?? this.baseAddress,
@@ -350,6 +354,7 @@ class WorkerPreferencesModel {
       baseLng: baseLng ?? this.baseLng,
       minWage: minWage ?? this.minWage,
       maxDistanceKm: maxDistanceKm ?? this.maxDistanceKm,
+      isOnline: isOnline ?? this.isOnline,
     );
   }
 }

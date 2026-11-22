@@ -141,7 +141,7 @@ class WorkerEkycServiceTest {
 
         assertThat(result.getStatus()).isEqualTo("APPROVED");
         assertThat(result.getRoutingDecision()).isEqualTo("AUTO_APPROVED");
-        assertThat(result.getCccdNumberMasked()).isEqualTo("079201******345");
+        assertThat(result.getCccdNumberMasked()).isEqualTo("********2345");
         assertThat(result.getFrontImageUrl()).startsWith("/api/v1/ekyc/images/worker/");
         assertThat(result.getFrontImageUrl()).contains("sig=");
         assertThat(result.getFrontImageUrl()).doesNotContain("storage.cani.vn");
@@ -232,7 +232,7 @@ class WorkerEkycServiceTest {
                 null, null, null, null, null, null
         );
 
-        assertThat(result.getCccdNumberMasked()).isEqualTo("079201******345");
+        assertThat(result.getCccdNumberMasked()).isEqualTo("********2345");
         assertThat(result.getFullName()).isEqualTo("TRẦN THỊ HOA");
         assertThat(result.getStatus()).isEqualTo("PENDING_REVIEW");
         assertThat(result.getFraudFlags()).containsEntry("userInputMismatch", true);
@@ -243,7 +243,7 @@ class WorkerEkycServiceTest {
     @DisplayName("Tài khoản Worker đã APPROVED KHÔNG bị hạ trạng thái khi lần xác minh mới gặp lỗi kỹ thuật")
     void shouldNotDowngradeAlreadyApprovedWorkerOnTechnicalFailure() {
         worker.setKycStatus(KycStatus.APPROVED);
-        worker.setCccdNumber("079201******345");
+        worker.setCccdNumber("********2345");
 
         EkycIdentityResultDto techFailure = EkycIdentityResultDto.builder()
                 .providerName("VNPT_EKYC")
@@ -260,7 +260,7 @@ class WorkerEkycServiceTest {
 
         assertThat(result.getStatus()).isEqualTo("TECHNICAL_FAILURE");
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
-        assertThat(worker.getCccdNumber()).isEqualTo("079201******345");
+        assertThat(worker.getCccdNumber()).isEqualTo("********2345");
     }
 
     @Test
@@ -284,8 +284,8 @@ class WorkerEkycServiceTest {
                 .build();
 
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
-        when(ekycVerificationRepository.findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
-                eq(worker.getWorkerId()), any())).thenReturn(Optional.of(existingFailed));
+        when(ekycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(
+                eq(worker.getWorkerId()))).thenReturn(Optional.of(existingFailed));
         when(ekycVerificationRepository.findById(existingVerificationId)).thenReturn(Optional.of(existingFailed));
         when(ekycVerificationRepository.existsByCccdNumberHashInAndStatusInAndWorker_WorkerIdNot(any(), any(), any()))
                 .thenReturn(false);
@@ -317,7 +317,7 @@ class WorkerEkycServiceTest {
                 .id(verificationId)
                 .worker(worker)
                 .status("PENDING_REVIEW")
-                .cccdNumberMasked("079201******345")
+                .cccdNumberMasked("********2345")
                 .cccdNumberHash(cryptoService.hashCccd("079201012345"))
                 .frontImageUrl(storedFront.getObjectKey())
                 .build();
@@ -333,7 +333,7 @@ class WorkerEkycServiceTest {
         assertThat(approved.getStatus()).isEqualTo("APPROVED");
         assertThat(approved.getRoutingDecision()).isEqualTo("MANUAL_APPROVED");
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
-        assertThat(worker.getCccdNumber()).isEqualTo("079201******345");
+        assertThat(worker.getCccdNumber()).isEqualTo("********2345");
         assertThat(approved.getFrontImageUrl()).startsWith("/api/v1/ekyc/images/worker/");
 
         // Reject một hồ sơ PENDING_REVIEW khác của worker chưa approved
@@ -363,7 +363,7 @@ class WorkerEkycServiceTest {
         UUID generatedId = UUID.randomUUID();
         final WorkerEkycVerification[] holder = new WorkerEkycVerification[1];
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
-        when(ekycVerificationRepository.findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(any(), any()))
+        when(ekycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(any()))
                 .thenReturn(Optional.empty());
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
             WorkerEkycVerification v = i.getArgument(0);

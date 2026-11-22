@@ -33,6 +33,18 @@
   gap: 1rem;
 }
 
+.event-detail-workspace .event-detail-modal-header {
+  padding: clamp(1rem, 3vw, 1.75rem);
+  background: linear-gradient(112deg, var(--color-surface-card), var(--color-primary-50));
+  border-color: var(--color-primary-100);
+}
+
+.event-detail-workspace .event-detail-title {
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+
 .event-detail-header-left {
   display: flex;
   align-items: center;
@@ -61,6 +73,10 @@
   margin: 0.2rem 0 0;
   font-size: 0.8rem;
   color: #64748b;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .event-detail-sub code {
@@ -68,6 +84,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   font-family: monospace;
+  overflow-wrap: anywhere;
 }
 
 .event-detail-close-btn {

@@ -237,7 +237,7 @@ class EventOrganizerEkycServiceTest {
         EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
                 user.getUserId(), frontFile, backFile, selfieFile, "099999999999");
 
-        assertEquals("001201******345", result.getCccdNumberMasked());
+        assertEquals("********2345", result.getCccdNumberMasked());
         assertEquals("PENDING_REVIEW", result.getStatus());
         assertEquals(Boolean.TRUE, result.getFraudFlags().get("userInputMismatch"));
         assertEquals(VerificationStatus.PENDING, eo.getVerificationStatus());
@@ -258,8 +258,8 @@ class EventOrganizerEkycServiceTest {
                 .build();
 
         when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
-        when(eoEkycVerificationRepository.findTopByEventOrganizer_EoIdAndStatusInOrderByCreatedAtDesc(
-                eq(eo.getEoId()), any())).thenReturn(Optional.of(existing));
+        when(eoEkycVerificationRepository.findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(
+                eq(eo.getEoId()))).thenReturn(Optional.of(existing));
         when(eoEkycVerificationRepository.findById(existingId)).thenReturn(Optional.of(existing));
         when(eoEkycVerificationRepository.save(any(EoEkycVerification.class))).thenAnswer(i -> i.getArgument(0));
         when(eoEkycVerificationRepository.existsByCccdNumberHashInAndStatusInAndEventOrganizer_EoIdNot(any(), any(), any()))
@@ -355,7 +355,7 @@ class EventOrganizerEkycServiceTest {
         UUID generatedId = UUID.randomUUID();
         final EoEkycVerification[] holder = new EoEkycVerification[1];
         when(eventOrganizerRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(eo));
-        when(eoEkycVerificationRepository.findTopByEventOrganizer_EoIdAndStatusInOrderByCreatedAtDesc(any(), any()))
+        when(eoEkycVerificationRepository.findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(any()))
                 .thenReturn(Optional.empty());
         when(eoEkycVerificationRepository.save(any(EoEkycVerification.class))).thenAnswer(i -> {
             EoEkycVerification v = i.getArgument(0);

@@ -123,7 +123,7 @@ cani:
       card-liveness-path: ${VNPT_EKYC_CARD_LIVENESS_PATH:}
       face-liveness-enabled: ${VNPT_EKYC_FACE_LIVENESS_ENABLED:false}
       face-liveness-path: ${VNPT_EKYC_FACE_LIVENESS_PATH:}
-      require-liveness-for-auto-approve: ${VNPT_EKYC_REQUIRE_LIVENESS_FOR_AUTO_APPROVE:false}
+      require-liveness-for-auto-approve: ${VNPT_EKYC_REQUIRE_LIVENESS_FOR_AUTO_APPROVE:true}
   firebase:
     enabled: ${FIREBASE_ENABLED:true}
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}

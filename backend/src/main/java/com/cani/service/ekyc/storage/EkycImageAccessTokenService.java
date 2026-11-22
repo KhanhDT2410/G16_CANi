@@ -57,7 +57,7 @@ public class EkycImageAccessTokenService {
         this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
-    public String generateSignedImageUrl(String targetType, UUID verificationId, String slot) {
+    public String generateSignedImageUrl(String targetType, UUID verificationId, String slot, String key, String status) {
         if (verificationId == null) {
             return null;
         }
@@ -67,7 +67,8 @@ public class EkycImageAccessTokenService {
             return null;
         }
         long expires = Instant.now(clock).getEpochSecond() + defaultTtlSeconds;
-        String sig = sign(normTarget, verificationId.toString(), normSlot, expires);
+        String revision = revision(key, status);
+        String sig = revision + "." + sign(normTarget, verificationId.toString(), normSlot + ":" + revision, expires);
         return IMAGE_BASE_PATH + normTarget + "/" + verificationId + "/" + normSlot
                 + "?expires=" + expires + "&sig=" + sig;
     }
@@ -93,10 +94,13 @@ public class EkycImageAccessTokenService {
             return false;
         }
         long now = Instant.now(clock).getEpochSecond();
-        if (now > expires) {
+        if (now >= expires) {
             return false;
         }
-        String expected = sign(normTarget, verificationId.trim(), normSlot, expires);
+        int split = signatureParam.indexOf('.');
+        if (split != 43) return false;
+        String revision = signatureParam.substring(0, split);
+        String expected = revision + "." + sign(normTarget, verificationId.trim(), normSlot + ":" + revision, expires);
         return MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.UTF_8),
                 signatureParam.trim().getBytes(StandardCharsets.UTF_8)
@@ -120,6 +124,14 @@ public class EkycImageAccessTokenService {
             return false;
         }
         return isValidSignature(parts[0], parts[1], parts[2], expiresParam, signatureParam);
+    }
+
+    public boolean matchesRecord(String signature, String key, String status) {
+        return signature != null && signature.startsWith(revision(key, status) + ".");
+    }
+
+    private String revision(String key, String status) {
+        return sign("revision", key, status, 0);
     }
 
     private String normalizeTarget(String target) {

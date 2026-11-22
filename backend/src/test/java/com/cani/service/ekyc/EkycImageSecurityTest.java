@@ -124,6 +124,13 @@ class EkycImageSecurityTest {
                         .with(authentication(authOf(otherWorkerUser))))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(get("/api/v1/ekyc/images/worker/{id}/front", verificationId)
+                        .with(authentication(authOf(buildUser(UserRole.EVENT_ORGANIZER)))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/ekyc/images/worker/{id}/front", verificationId)
+                        .with(authentication(authOf(buildUser(UserRole.CUSTOMER_CARE)))))
+                .andExpect(status().isForbidden());
+
         // Chính chủ sở hữu được phép (200) kèm header no-store
         mockMvc.perform(get("/api/v1/ekyc/images/worker/{id}/front", verificationId)
                         .with(authentication(authOf(ownerWorkerUser))))
@@ -162,10 +169,21 @@ class EkycImageSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         // Signed URL hợp lệ -> 200 OK
-        String signedUrl = tokenService.generateSignedImageUrl("worker", verificationId, "selfie");
+        String signedUrl = tokenService.generateSignedImageUrl("worker", verificationId, "selfie", objectKey, record.getStatus());
         mockMvc.perform(get(signedUrl))
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+    }
+
+    @Test
+    void expiredLinkCannotBeUsed() {
+        var signer = new EkycImageAccessTokenService("test-secret", 1);
+        var id = UUID.randomUUID();
+        var url = signer.generateSignedImageUrl("worker", id, "front", "key", "PENDING_REVIEW");
+        var sig = url.substring(url.indexOf("&sig=") + 5);
+        assertThat(signer.matchesRecord(sig, "replacement", "PENDING_REVIEW")).isFalse();
+        assertThat(signer.matchesRecord(sig, "key", "APPROVED")).isFalse();
+        assertThat(signer.isValidSignature("worker", id.toString(), "front", "1", sig)).isFalse();
     }
 
     @Test

@@ -51,7 +51,11 @@ public interface EkycImageStorage {
 
     boolean exists(String objectKey);
 
-    void deleteQuietly(String objectKey);
+    boolean deleteIfPresent(String objectKey);
+
+    default void deleteQuietly(String objectKey) {
+        deleteIfPresent(objectKey);
+    }
 
     /**
      * Kiểm tra xem chuỗi lưu trong DB có phải là objectKey nội bộ hợp lệ (không phải public/fake URL).

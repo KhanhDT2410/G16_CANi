@@ -83,6 +83,9 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
     _DistrictHub('Quận Tây Hồ, Hà Nội', 'Tây Hồ', 21.0706, 105.8202),
     _DistrictHub('Quận Hà Đông, Hà Nội', 'Hà Đông', 20.9723, 105.7766),
     _DistrictHub('Quận Bắc Từ Liêm, Hà Nội', 'Bắc Từ Liêm', 21.0628, 105.7601),
+    _DistrictHub('Huyện Đông Anh, Hà Nội', 'Đông Anh', 21.1389, 105.8473),
+    _DistrictHub('Huyện Gia Lâm, Hà Nội', 'Gia Lâm', 21.0235, 105.9395),
+    _DistrictHub('Huyện Thạch Thất (Hòa Lạc), Hà Nội', 'Hòa Lạc', 21.0128, 105.5256),
 
     // TP. Hồ Chí Minh
     _DistrictHub('Quận 1, TP. Hồ Chí Minh', 'Quận 1', 10.7769, 106.7009),

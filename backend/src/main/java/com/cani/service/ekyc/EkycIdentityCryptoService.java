@@ -30,7 +30,7 @@ public class EkycIdentityCryptoService {
     ) {
         this.hashPepper = hashPepper != null ? hashPepper.trim() : "";
         if (this.hashPepper.isEmpty()) {
-            log.warn("cani.security.ekyc-hash-pepper chưa được cấu hình; đang dùng SHA-256 tương thích dữ liệu cũ. Khuyến nghị cấu hình EKYC_HASH_PEPPER cho production.");
+            log.warn("CCCD indexing is unavailable until EKYC_HASH_PEPPER is configured.");
         }
     }
 
@@ -59,7 +59,7 @@ public class EkycIdentityCryptoService {
         if (!hashPepper.isEmpty()) {
             return hmacSha256Hex(normalized, hashPepper);
         }
-        return sha256Hex(normalized);
+        throw new IllegalStateException("EKYC_HASH_PEPPER is required for identity verification");
     }
 
     /**
@@ -93,7 +93,7 @@ public class EkycIdentityCryptoService {
         if (clean.length() < 6) {
             return "******";
         }
-        return clean.substring(0, 6) + "******" + (clean.length() > 9 ? clean.substring(clean.length() - 3) : "");
+        return "********" + clean.substring(clean.length() - 4);
     }
 
     /**
@@ -106,7 +106,7 @@ public class EkycIdentityCryptoService {
         }
         Set<String> candidates = new LinkedHashSet<>();
         candidates.add(normalized);
-        String masked = maskCccd(normalized);
+        String masked = normalized.substring(0, 6) + "******" + (normalized.length() > 9 ? normalized.substring(normalized.length() - 3) : "");
         if (masked != null) {
             candidates.add(masked);
         }

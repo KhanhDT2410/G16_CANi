@@ -9,6 +9,7 @@ import { usePayments } from './hooks/usePayments';
 
 import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
+import EOEventDataState from './components/EOEventDataState';
 import EOMetricsGrid from './components/EOMetricsGrid';
 import EOOverviewAnalytics from './components/EOOverviewAnalytics';
 import EOModals from './components/EOModals';
@@ -318,6 +319,7 @@ export default function EOPage() {
       target = 'overview';
     } else if (navKey === 'events') {
       target = 'events';
+      if (events.statusFilter === 'CANCELLED') events.setStatusFilter('ALL');
     } else if (navKey === 'recruitment') {
       target = 'events';
       setActiveNav('events');
@@ -397,73 +399,18 @@ export default function EOPage() {
           {/* TRANG TỔNG QUAN (Gộp Báo Cáo & Thống Kê Tài Chính + Uy Tín vào Tổng Quan) */}
           {activeTab === 'overview' && (
             <>
-              <section
-                className="eo-hero-banner-clean"
-                style={{
-                  background: 'linear-gradient(90deg, #dbeafe 0%, #edf5ff 35%, #daebfe 70%, #dbeafe 100%)',
-                  border: '1px solid #bfdbfe',
-                  borderRadius: '20px',
-                  padding: '1.4rem 2rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  minHeight: '110px',
-                  boxShadow: '0 4px 18px rgba(37, 99, 235, 0.06)',
-                }}
-              >
-                {/* 1. Phần chữ bên trái */}
-                <div className="eo-hero-banner-text">
-                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', marginBottom: '2px' }}>
-                    Chào mừng trở lại,
+              <section className="eo-workspace-hero" aria-labelledby="eo-overview-title">
+                <div className="eo-workspace-hero-copy">
+                  <p>Xin chào, {displayName}</p>
+                  <h1 id="eo-overview-title">Tổng quan điều hành</h1>
+                  <div className="eo-workspace-actions">
+                    <button type="button" className="eo-workspace-create" onClick={handleOpenCreateEvent}>
+                      <span aria-hidden="true">+</span> Tạo sự kiện
+                    </button>
+                    <button type="button" className="eo-workspace-secondary" onClick={() => handleNavClick('events')}>
+                      Xem sự kiện <span aria-hidden="true">→</span>
+                    </button>
                   </div>
-                  <h1
-                    style={{
-                      fontSize: '1.75rem',
-                      fontWeight: 900,
-                      color: '#0f172a',
-                      margin: '0 0 0.35rem',
-                      letterSpacing: '-0.025em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {displayName}
-                  </h1>
-                  <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, fontWeight: 500 }}>
-                    Quản lý sự kiện, tuyển dụng nhân sự và theo dõi vận hành trên CANi.
-                  </p>
-                </div>
-
-                {/* 2. Ảnh minh họa sân khấu sự kiện & lịch 3D bên phải (Chuẩn 100% Mockup Ảnh 1) */}
-                <div
-                  className="eo-hero-banner-art"
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    pointerEvents: 'none',
-                    zIndex: 1,
-                  }}
-                >
-                  <img
-                    src="/assets/eo-banner-stage.png"
-                    alt="CANi Event Stage & Calendar"
-                    style={{
-                      height: '100%',
-                      width: 'auto',
-                      objectFit: 'cover',
-                      objectPosition: 'right center',
-                      display: 'block',
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
                 </div>
               </section>
 
@@ -491,21 +438,23 @@ export default function EOPage() {
                 </div>
               )}
 
-              <EOMetricsGrid
-                metrics={events.metrics}
-                onOpenActiveEventDetail={() => {
-                  const active = events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0];
-                  if (active) {
-                    handleOpenEventDetailPage(active);
-                  }
-                }}
-              />
-
-              {/* Bảng Số Liệu Vận Hành & Thống Kê Tổng Quát (Pure Analytics & Operational Metrics) */}
-              <EOOverviewAnalytics
-                events={events.events}
-                onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
-              />
+              {events.loading || events.loadError ? (
+                <EOEventDataState loading={events.loading} onRetry={events.loadEvents} />
+              ) : (
+                <>
+                  <EOMetricsGrid
+                    metrics={events.metrics}
+                    onOpenActiveEventDetail={() => {
+                      const active = events.events.find((event) => event.status === 'ACTIVE' || event.status === 'APPROVED');
+                      if (active) handleOpenEventDetailPage(active);
+                    }}
+                  />
+                  <EOOverviewAnalytics
+                    events={events.events}
+                    onSelectEvent={handleOpenEventDetailPage}
+                  />
+                </>
+              )}
             </>
           )}
 
@@ -631,6 +580,7 @@ export default function EOPage() {
             return (
               <EOEventsTab
                 loading={events.loading}
+                loadError={events.loadError}
                 allEvents={events.events}
                 filteredEvents={events.filteredEvents}
                 searchQuery={events.searchQuery}
@@ -753,7 +703,7 @@ export default function EOPage() {
           )}
         </main>
 
-        {activeTab === 'overview' && (
+        {activeTab === 'overview' && !events.loading && !events.loadError && (
           <EORightSidebar
             metrics={events.metrics}
             events={events.events}
@@ -771,7 +721,8 @@ export default function EOPage() {
             }}
             onOpenRecruitment={() => {
               handleNavClick('events');
-              handleEventSubTabChange('recruitment');
+              handleEventSubTabChange('list');
+              events.setStatusFilter('RECRUITING');
             }}
             onOpenSubscription={() => switchTab('subscription')}
             onViewAllEvents={() => {

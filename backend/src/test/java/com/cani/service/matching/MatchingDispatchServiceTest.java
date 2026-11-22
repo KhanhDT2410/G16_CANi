@@ -436,8 +436,10 @@ class MatchingDispatchServiceTest {
         @DisplayName("MATCH015: Worker có lịch rảnh cố định bao trọn ca làm việc -> Được đề xuất thành công")
         void passHardFilter_ShiftWithinWorkerWeeklyAvailability_PassesFilter() {
             ZoneId vnZone = ZoneId.of("Asia/Ho_Chi_Minh");
-            ZonedDateTime shiftStart = sampleShift.getStartTime().atZone(vnZone);
-            int shiftDayOfWeek = shiftStart.getDayOfWeek().getValue() % 7;
+            ZonedDateTime dayStart = ZonedDateTime.now(vnZone).plusDays(1).withHour(10).withMinute(0).withSecond(0).withNano(0);
+            sampleShift.setStartTime(dayStart.toInstant());
+            sampleShift.setEndTime(dayStart.plusHours(4).toInstant());
+            int shiftDayOfWeek = dayStart.getDayOfWeek().getValue() % 7;
 
             // Slot từ 00:00 đến 23:59 của ngày diễn ra ca làm việc
             WorkerAvailability slot = WorkerAvailability.builder()

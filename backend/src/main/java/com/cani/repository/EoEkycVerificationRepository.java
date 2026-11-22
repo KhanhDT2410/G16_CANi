@@ -16,6 +16,10 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
     /**
      * Lấy hồ sơ eKYC mới nhất của Nhà tổ chức sự kiện
      */
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"eventOrganizer", "eventOrganizer.user"})
+    Optional<EoEkycVerification> findById(UUID id);
+
     Optional<EoEkycVerification> findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(UUID eoId);
 
     Optional<EoEkycVerification> findTopByEventOrganizer_EoIdAndStatusInOrderByCreatedAtDesc(
@@ -43,8 +47,10 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
     /**
      * Lấy danh sách hồ sơ eKYC chờ duyệt (PENDING_REVIEW) cho Admin thẩm định
      */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "eventOrganizer")
     List<EoEkycVerification> findByStatusOrderByCreatedAtAsc(String status);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     List<EoEkycVerification> findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(Instant cutoff);
 
     /**

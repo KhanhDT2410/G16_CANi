@@ -185,6 +185,24 @@ class WorkerJobServiceTest {
     }
 
     @Test
+    @DisplayName("UTC001b - setOnlineStatus() - Protection: Không ghi đè tọa độ Preferences đã lưu khi bật Online từ vị trí khác")
+    void setOnlineStatus_DoesNotOverwriteSavedPreferencesCoordinates() {
+        worker.setBaseAddress("Huyện Đông Anh, Hà Nội");
+        worker.setBaseLat(21.1389);
+        worker.setBaseLng(105.8473);
+        WorkerOnlineStatusRequestDto dto = WorkerOnlineStatusRequestDto.builder()
+                .isOnline(true).currentLat(10.7769).currentLng(106.7009).build();
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerRepository.save(any(Worker.class))).thenAnswer(i -> i.getArgument(0));
+
+        Worker result = workerJobService.setOnlineStatus(userId, dto);
+
+        assertThat(result.getIsOnline()).isTrue();
+        assertThat(result.getBaseLat()).isEqualTo(21.1389);
+        assertThat(result.getBaseLng()).isEqualTo(105.8473);
+    }
+
+    @Test
     @DisplayName("UTC002 - setOnlineStatus() - Abnormal: Không tìm thấy Worker ném ResourceNotFoundException")
     void setOnlineStatus_Abnormal_WorkerNotFoundThrowsResourceNotFoundException() {
         WorkerOnlineStatusRequestDto dto = WorkerOnlineStatusRequestDto.builder().isOnline(true).build();
@@ -1014,12 +1032,15 @@ class WorkerJobServiceTest {
                 .minWage(BigDecimal.valueOf(45000)).maxDistanceKm(10.0).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerRepository.save(any(Worker.class))).thenAnswer(i -> i.getArgument(0));
 
         WorkerPreferencesDto res = workerJobService.updateWorkerPreferences(userId, req);
 
         verify(workerRepository).save(worker);
+        verify(matchingDispatchService).dispatchActiveShiftsForWorker(worker);
         assertThat(res.getBaseAddress()).isEqualTo("Quận 1");
         assertThat(res.getMinWage()).isEqualTo(BigDecimal.valueOf(45000));
+        assertThat(res.getIsOnline()).isTrue();
     }
 
     @Test

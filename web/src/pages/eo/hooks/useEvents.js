@@ -4,9 +4,7 @@ import { showToast } from '../../../components/common/Toast';
 import { showConfirm } from '../../../components/common/PromptModal';
 import { getAddressFromCoordinates, getCoordinatesFromAddress } from '../utils/geoUtils';
 import {
-  DEFAULT_NEW_EVENT,
   createDefaultNewEvent,
-  DEMO_EVENTS,
   filterAndSortEvents,
   calculateEventMetrics,
 } from '../utils/eventHelpers';
@@ -14,6 +12,7 @@ import {
 export function useEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
@@ -31,18 +30,23 @@ export function useEvents() {
 
   const loadEvents = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
-      const deletedIds = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
       const data = await eoService.getMyEvents();
-      const raw = data && data.length > 0 ? data : (import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : []);
-      const visible = raw.filter((e) => !deletedIds.includes(e.eventId) && !e.deletedAt);
+      let deletedIds = [];
+      try {
+        const stored = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
+        if (Array.isArray(stored)) deletedIds = stored;
+      } catch {
+        // Local preferences are optional.
+      }
+      const visible = data.filter((e) => !deletedIds.includes(e.eventId) && !e.deletedAt);
       setEvents(visible);
       return visible;
     } catch (e) {
       console.error(e);
-      const fallback = import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : [];
-      setEvents(fallback);
-      return fallback;
+      setLoadError(true);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -223,6 +227,7 @@ export function useEvents() {
     events,
     setEvents,
     loading,
+    loadError,
     loadEvents,
     searchQuery,
     setSearchQuery,

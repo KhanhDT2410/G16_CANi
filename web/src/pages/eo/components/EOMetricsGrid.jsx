@@ -11,14 +11,7 @@ export default function EOMetricsGrid({ metrics, onOpenActiveEventDetail }) {
   return (
     <section className="eo-metrics-grid">
       {/* 1. Tổng sự kiện */}
-      <div
-        className={`eo-metric-card-modern ${safeActive > 0 && onOpenActiveEventDetail ? 'clickable-metric-card' : ''}`}
-        onClick={() => {
-          if (safeActive > 0 && onOpenActiveEventDetail) onOpenActiveEventDetail();
-        }}
-        title={safeActive > 0 ? 'Bấm để xem chi tiết sự kiện đang hoạt động' : undefined}
-        style={safeActive > 0 && onOpenActiveEventDetail ? { cursor: 'pointer' } : undefined}
-      >
+      <div className="eo-metric-card-modern">
         <div className="metric-card-top">
           <div className="metric-icon-box blue">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -32,19 +25,17 @@ export default function EOMetricsGrid({ metrics, onOpenActiveEventDetail }) {
             <span className="metric-title-text">Tổng sự kiện</span>
             <div className="metric-data-row">
               <span className="metric-big-number">{safeEvents}</span>
-              {safeActive > 0 ? (
+              {safeActive > 0 && (
                 <span className="metric-trend-pill green">{safeActive} Đang hoạt động</span>
-              ) : safeEvents > 0 ? (
-                <span className="metric-trend-pill yellow">Bản nháp</span>
-              ) : (
-                <span className="metric-trend-pill neutral">0 hoạt động</span>
               )}
             </div>
           </div>
         </div>
-        <div className="metric-bottom-sub">
-          {safeActive > 0 && onOpenActiveEventDetail ? 'Nhấn để xem chi tiết sự kiện' : 'Sự kiện trên hệ thống'}
-        </div>
+        {safeActive > 0 && onOpenActiveEventDetail ? (
+          <button type="button" className="eo-metric-details" onClick={onOpenActiveEventDetail}>Xem sự kiện đang hoạt động →</button>
+        ) : (
+          <div className="metric-bottom-sub">Sự kiện trên hệ thống</div>
+        )}
       </div>
 
       {/* 2. Nhân sự cần tuyển */}
@@ -59,12 +50,9 @@ export default function EOMetricsGrid({ metrics, onOpenActiveEventDetail }) {
             </svg>
           </div>
           <div className="metric-meta-group">
-            <span className="metric-title-text">Nhân sự cần tuyển</span>
+            <span className="metric-title-text">Nhu cầu nhân sự</span>
             <div className="metric-data-row">
               <span className="metric-big-number">{safeRequired}</span>
-              {safeRequired > 0 && (
-                <span className="metric-trend-pill green">Đang mở tuyển</span>
-              )}
             </div>
           </div>
         </div>
@@ -84,7 +72,6 @@ export default function EOMetricsGrid({ metrics, onOpenActiveEventDetail }) {
             <span className="metric-title-text">Nhân sự đã chốt ca</span>
             <div className="metric-data-row">
               <span className="metric-big-number">{safeConfirmed}</span>
-              <span className="metric-trend-pill neutral">{safeFillRate}%</span>
             </div>
           </div>
         </div>

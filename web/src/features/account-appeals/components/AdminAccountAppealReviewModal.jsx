@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ACCOUNT_APPEAL_STATUS_CONFIG } from '../types/accountAppeal.constants';
 import { showToast } from '../../../components/common/Toast';
 import './AdminAccountAppeals.css';
@@ -8,7 +9,22 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
   const [adminNotes, setAdminNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (!appeal) return null;
+  useEffect(() => {
+    if (!appeal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [appeal, onClose]);
+
+  if (!appeal || typeof document === 'undefined') return null;
 
   const cfg = ACCOUNT_APPEAL_STATUS_CONFIG[appeal.status] || ACCOUNT_APPEAL_STATUS_CONFIG.SUBMITTED;
   const isPending = appeal.status === 'SUBMITTED' || appeal.status === 'UNDER_REVIEW';
@@ -39,8 +55,8 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
     }
   };
 
-  return (
-    <div className="appeal-modal-backdrop" onClick={onClose}>
+  const modalContent = (
+    <div className="appeal-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div className="appeal-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="appeal-modal-header">
           <h3>Thẩm Định Đơn Giải Trình Khóa Tài Khoản</h3>
@@ -161,4 +177,6 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

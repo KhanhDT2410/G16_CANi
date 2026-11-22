@@ -56,7 +56,7 @@ export const STATUTORY_HOURLY_FLOORS = {
 };
 
 const VOWELS_REGEX = /[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/i;
-const VOWELLESS_CONSONANT_RUN_REGEX = /[^aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ\s\d,.\-_/()&+]{4,}/i;
+const VOWELLESS_CONSONANT_RUN_REGEX = /[^aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ\s\d,.\-_/()&+]{5,}/i;
 
 /**
  * Kiểm tra chuỗi nhập liệu có phải spam / cào phím / ký tự vô nghĩa không.
@@ -103,11 +103,15 @@ export function isGibberishOrSpam(text, { allowShortEventAcronyms = false } = {}
     if (Math.max(...Object.values(counts)) / words.length >= 0.45) return true;
   }
 
-  // 6. Độ đa dạng ký tự quá thấp trên chuỗi dài
+  // 6. Độ đa dạng ký tự quá thấp trên chuỗi (chỉ áp dụng tỷ lệ 0.3 cho chuỗi ngắn <= 30 ký tự)
   const cleanLetters = str.replace(/[^a-zàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/gi, '');
   if (cleanLetters.length >= 10) {
     const uniqueChars = new Set(cleanLetters.split('')).size;
-    if (uniqueChars <= 4 || uniqueChars / cleanLetters.length < 0.3) return true;
+    if (cleanLetters.length <= 30) {
+      if (uniqueChars <= 4 || uniqueChars / cleanLetters.length < 0.3) return true;
+    } else {
+      if (uniqueChars <= 5) return true;
+    }
   }
 
   // 7. Từ >= 3 chữ cái nhưng không có bất kỳ nguyên âm nào (vd: sdfh, zxc, dfg) trừ viết tắt hợp lệ

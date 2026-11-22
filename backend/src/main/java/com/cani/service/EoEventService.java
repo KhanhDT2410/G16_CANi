@@ -1472,20 +1472,25 @@ public class EoEventService {
         String cleanLetters = str.replaceAll("[^a-zàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]", "");
         if (cleanLetters.length() >= 10) {
             long uniqueChars = cleanLetters.chars().distinct().count();
-            double ratio = (double) uniqueChars / cleanLetters.length();
-            if (uniqueChars <= 4 || ratio < 0.30) {
-                return true;
+            if (cleanLetters.length() <= 30) {
+                double ratio = (double) uniqueChars / cleanLetters.length();
+                if (uniqueChars <= 4 || ratio < 0.30) {
+                    return true;
+                }
+            } else {
+                if (uniqueChars <= 5) {
+                    return true;
+                }
             }
         }
 
         // 7. Regex nhận diện nguyên âm tiếng Việt và tiếng Anh
         String vowelsPattern = ".*[aeiouyáàảãạăằắẳẵặâầấẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơờớởỡợúùúủũụưứừửữựýỳỷỹỵ].*";
 
-        // Nếu một từ có độ dài >= 4 ký tự nhưng hoàn toàn KHÔNG chứa nguyên âm
+        // Nếu một từ chữ cái có độ dài >= 4 ký tự nhưng hoàn toàn KHÔNG chứa nguyên âm (bỏ qua số, dấu phân cách)
         for (String w : words) {
-            if (w.matches("\\d+")) continue; // Bỏ qua nếu từ chỉ toàn chữ số
-            String cleanWord = w.replaceAll("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$", "");
-            if (cleanWord.length() >= 4 && !cleanWord.matches(vowelsPattern)) {
+            String lettersOnly = w.replaceAll("[^\\p{L}]", "");
+            if (lettersOnly.length() >= 4 && !lettersOnly.matches(vowelsPattern)) {
                 return true;
             }
         }
@@ -1499,9 +1504,9 @@ public class EoEventService {
             return true;
         }
 
-        // 9. Chuỗi tổng thể >= 6 ký tự nhưng không có nguyên âm nào
-        String nonSpace = str.replaceAll("\\s+", "");
-        if (nonSpace.length() >= 6 && !nonSpace.matches(vowelsPattern) && !nonSpace.matches("\\d+")) {
+        // 9. Chuỗi tổng thể >= 6 ký tự chữ cái nhưng không có nguyên âm nào
+        String lettersAll = str.replaceAll("[^\\p{L}]", "");
+        if (lettersAll.length() >= 6 && !lettersAll.matches(vowelsPattern)) {
             return true;
         }
 

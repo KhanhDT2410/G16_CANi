@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
@@ -1227,9 +1228,11 @@ export default function EventDetailModal({
     return contentBox;
   }
 
-  return (
-    <div className="event-detail-modal-overlay" onClick={onClose}>
+  const modalNode = (
+    <div className="event-detail-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       {contentBox}
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : null;
 }

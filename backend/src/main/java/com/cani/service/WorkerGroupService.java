@@ -36,6 +36,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -84,6 +86,7 @@ public class WorkerGroupService {
                 .avgRating(leader.getRatingAvg() != null ? leader.getRatingAvg() : BigDecimal.ZERO)
                 .reliabilityScore(leader.getReliabilityScore() != null ? leader.getReliabilityScore() : 100)
                 .isActive(true)
+                .inviteCode(generateUniqueInviteCode())
                 .build();
 
         WorkerGroup savedGroup = workerGroupRepository.save(group);
@@ -540,6 +543,8 @@ public class WorkerGroupService {
             throw new BadRequestException("Đề xuất ca này đã được xử lý (Trạng thái: " + proposal.getStatus() + ")");
         }
         if (proposal.getExpiresAt() != null && proposal.getExpiresAt().isBefore(Instant.now())) {
+            proposal.setStatus(ProposalStatus.EXPIRED);
+            dispatchProposalRepository.save(proposal);
             throw new BadRequestException("Đề xuất ca làm việc này đã hết hạn phản hồi");
         }
         Shift shift = proposal.getShift();
@@ -547,54 +552,59 @@ public class WorkerGroupService {
             throw new BadRequestException("Ca làm việc này không còn ở trạng thái đang mở");
         }
 
-        // Validate thành viên: dedup + phải là membership ACTIVE của nhóm
-        if (memberWorkerIds == null || memberWorkerIds.isEmpty()) {
-            throw new BadRequestException("Vui lòng chọn ít nhất một thành viên trong nhóm");
-        }
-        List<UUID> selectedIds = new ArrayList<>(new LinkedHashSet<>(memberWorkerIds));
         List<WorkerGroupMembership> activeMembers = membershipRepository
                 .findByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE);
         Map<UUID, WorkerGroupMembership> activeByWorker = activeMembers.stream()
                 .filter(m -> m.getWorker() != null)
                 .collect(Collectors.toMap(m -> m.getWorker().getWorkerId(), Function.identity(), (a, b) -> a));
-        for (UUID workerId : selectedIds) {
-            if (!activeByWorker.containsKey(workerId)) {
-                throw new BadRequestException("Member " + workerId + " không phải là thành viên ACTIVE của nhóm");
+
+        if (activeMembers.isEmpty() || activeByWorker.isEmpty()) {
+            throw new BadRequestException("Nhóm không có thành viên nào đang hoạt động");
+        }
+        int packSize = activeByWorker.size();
+
+        // CẤM partial:
+        // Request null/rỗng memberWorkerIds -> dùng toàn bộ ACTIVE members (k = packSize).
+        // Request truyền danh sách KHÔNG khớp đúng tập ACTIVE members (subset hoặc thừa ngoài nhóm) -> 400 BadRequest.
+        List<UUID> allActiveWorkerIds = activeMembers.stream()
+                .filter(m -> m.getWorker() != null)
+                .map(m -> m.getWorker().getWorkerId())
+                .toList();
+
+        List<UUID> selectedIds;
+        if (memberWorkerIds == null || memberWorkerIds.isEmpty()) {
+            selectedIds = allActiveWorkerIds;
+        } else {
+            Set<UUID> requestedSet = new HashSet<>(memberWorkerIds);
+            Set<UUID> activeSet = new HashSet<>(allActiveWorkerIds);
+            if (!requestedSet.equals(activeSet)) {
+                throw new BadRequestException("Group proposal chỉ hỗ trợ nhận ca trọn đội");
             }
+            selectedIds = allActiveWorkerIds;
         }
 
-        // Re-check điều kiện từng member (kết quả mới tính) + giới hạn k ≤ claimableSlots
-        Map<UUID, String> ineligibleReasons = new HashMap<>();
+        // Re-check eligibility TOÀN pack trong transaction (1 fail -> toàn bộ rollback, 0 assignment)
         for (WorkerGroupMembership m : activeMembers) {
             if (m.getWorker() == null) continue;
             String reason = matchingDispatchService.groupMemberEligibilityReason(m.getWorker(), shift);
             if (reason != null) {
-                ineligibleReasons.put(m.getWorker().getWorkerId(), reason);
+                throw new BadRequestException("Member " + m.getWorker().getWorkerId() + " không đủ điều kiện cho ca này (" + reason + ")");
             }
-        }
-        int eligibleCount = activeByWorker.size() - ineligibleReasons.size();
-        int remaining = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : 0;
-        int claimableSlots = Math.min(eligibleCount, remaining);
-        int k = selectedIds.size();
-        for (UUID workerId : selectedIds) {
-            String reason = ineligibleReasons.get(workerId);
-            if (reason != null) {
-                throw new BadRequestException("Member " + workerId + " không đủ điều kiện cho ca này (" + reason + ")");
-            }
-        }
-        if (k > claimableSlots) {
-            throw new BadRequestException("Không thể chọn " + k + " thành viên: ca chỉ còn " + claimableSlots
-                    + " slot khả dụng (thành viên đủ điều kiện: " + eligibleCount + ")");
         }
 
-        // ATOMIC: giữ k slot cùng lúc — ca vừa đủ người thì 409 + rollback toàn bộ
-        int updatedRows = shiftRepository.incrementConfirmedWorkersAtomicBy(shift.getShiftId(), k);
+        int remaining = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : 0;
+        if (remaining < packSize) {
+            throw new AppException("Ca vừa đủ người trước khi đội xác nhận", HttpStatus.CONFLICT);
+        }
+
+        // ATOMIC: giữ packSize slot cùng lúc — ca vừa đủ người thì 409 + rollback toàn bộ
+        int updatedRows = shiftRepository.incrementConfirmedWorkersAtomicBy(shift.getShiftId(), packSize);
         if (updatedRows == 0) {
             throw new AppException("Ca vừa đủ người trước khi bạn xác nhận", HttpStatus.CONFLICT);
         }
         // Sync bộ đếm trong memory (native query đã persist vào DB)
-        shift.setConfirmedWorkers((shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0) + k);
-        int newRemaining = Math.max(0, remaining - k);
+        shift.setConfirmedWorkers((shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0) + packSize);
+        int newRemaining = Math.max(0, remaining - packSize);
         shift.setRemainingWorkers(newRemaining);
         if (newRemaining == 0) {
             shift.setStatus(ShiftStatus.FULLY_STAFFED);
@@ -606,7 +616,20 @@ public class WorkerGroupService {
         proposal.setRespondedAt(Instant.now());
         dispatchProposalRepository.save(proposal);
 
-        // k × (ShiftAssignment CONFIRMED source=GROUP + payment ban đầu)
+        // Guard chống trùng lặp assignment active trong cùng shift
+        // shortcut: H2 không hỗ trợ partial unique index; production PostgreSQL mới có index, nâng cấp test sang embedded PG khi có CI.
+        List<AssignmentStatus> activeStatuses = List.of(
+                AssignmentStatus.PENDING,
+                AssignmentStatus.CONFIRMED,
+                AssignmentStatus.CHECKED_IN
+        );
+        for (UUID workerId : selectedIds) {
+            if (shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shift.getShiftId(), workerId, activeStatuses)) {
+                throw new AppException("Thành viên " + workerId + " đã có ca làm việc đang hoạt động trong ca này", HttpStatus.CONFLICT);
+            }
+        }
+
+        // packSize × (ShiftAssignment CONFIRMED source=GROUP + payment ban đầu)
         Event event = shift.getEvent();
         String eventName = event != null ? event.getName() : "Sự kiện";
         List<UUID> assignmentIds = new ArrayList<>();
@@ -628,26 +651,37 @@ public class WorkerGroupService {
             directPaymentService.createInitialPayment(assignment);
         }
 
-        // Counter event += k
+        // Counter event += packSize
         if (event != null) {
-            event.setTotalConfirmedWorkers((event.getTotalConfirmedWorkers() != null ? event.getTotalConfirmedWorkers() : 0) + k);
+            event.setTotalConfirmedWorkers((event.getTotalConfirmedWorkers() != null ? event.getTotalConfirmedWorkers() : 0) + packSize);
             eventRepository.save(event);
         }
 
-        // Notifications: EO + từng member đã chọn + leader
+        // Notifications: FCM gửi SAU KHI commit DB thành công
         String arriveHint = shift.getArrivalTime() != null
                 ? " — có mặt trước " + shift.getArrivalTime()
                     .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
                 : "";
-        safeNotify(event, shift, leader, group, selectedIds, eventName, arriveHint);
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    safeNotify(event, shift, leader, group, selectedIds, eventName, arriveHint);
+                }
+            });
+        } else {
+            safeNotify(event, shift, leader, group, selectedIds, eventName, arriveHint);
+        }
+
         log.info("Leader {} đã nhận ca {} cho nhóm {} với {} thành viên",
-                leader.getWorkerId(), shift.getShiftId(), groupId, k);
+                leader.getWorkerId(), shift.getShiftId(), groupId, packSize);
 
         return AcceptGroupProposalResponseDto.builder()
                 .assignmentIds(assignmentIds)
                 .shiftId(shift.getShiftId())
-                .memberCount(k)
+                .memberCount(packSize)
                 .build();
     }
 
@@ -722,8 +756,9 @@ public class WorkerGroupService {
                     .build());
         }
 
+        int packSize = activeMembers.size();
         int remaining = shift != null && shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : 0;
-        int claimableSlots = Math.min(eligibleCount, remaining);
+        int claimableSlots = packSize;
 
         return GroupProposalResponseDto.builder()
                 .shiftId(shift != null ? shift.getShiftId() : null)
@@ -867,8 +902,94 @@ public class WorkerGroupService {
                 .avgRating(g.getAvgRating())
                 .reliabilityScore(g.getReliabilityScore())
                 .isActive(g.getIsActive())
+                .inviteCode(g.getInviteCode())
                 .createdAt(g.getCreatedAt())
                 .build();
+    }
+
+    public String generateUniqueInviteCode() {
+        final String CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+        String code;
+        do {
+            StringBuilder sb = new StringBuilder("CAN-");
+            for (int i = 0; i < 4; i++) {
+                sb.append(CHARS.charAt(java.util.concurrent.ThreadLocalRandom.current().nextInt(CHARS.length())));
+            }
+            code = sb.toString();
+        } while (workerGroupRepository.existsByInviteCode(code));
+        return code;
+    }
+
+    /**
+     * Tham gia nhóm bằng Mã mời (Self-service Join via Invite Code)
+     */
+    @Transactional
+    public WorkerGroupResponseDto joinByCode(UUID userId, JoinGroupByCodeRequestDto request) {
+        if (request == null || request.getInviteCode() == null || request.getInviteCode().trim().isEmpty()) {
+            throw new BadRequestException("Mã mời không được để trống");
+        }
+        String cleanCode = request.getInviteCode().trim().toUpperCase();
+        WorkerGroup group = workerGroupRepository.findByInviteCodeIgnoreCase(cleanCode)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkerGroup", "inviteCode", cleanCode));
+
+        if (!Boolean.TRUE.equals(group.getIsActive())) {
+            throw new BadRequestException("Nhóm này hiện đang tạm ngưng hoạt động");
+        }
+
+        Worker worker = getWorkerByUserId(userId);
+
+        Optional<WorkerGroupMembership> existingOpt = membershipRepository
+                .findByWorkerGroup_GroupIdAndWorker_WorkerId(group.getGroupId(), worker.getWorkerId());
+
+        if (existingOpt.isPresent()) {
+            WorkerGroupMembership existing = existingOpt.get();
+            if (existing.getStatus() == MembershipStatus.ACTIVE) {
+                throw new BadRequestException("Bạn đã là thành viên chính thức của nhóm \"" + group.getName() + "\"");
+            }
+            // Tái kích hoạt thành viên nếu trước đó bị xóa/rời nhóm
+            existing.setStatus(MembershipStatus.ACTIVE);
+            existing.setJoinedAt(Instant.now());
+            membershipRepository.save(existing);
+        } else {
+            if (group.getMaxSize() != null && group.getMemberCount() != null && group.getMemberCount() >= group.getMaxSize()) {
+                throw new BadRequestException("Nhóm đã đạt số lượng thành viên tối đa (" + group.getMaxSize() + ")");
+            }
+
+            WorkerGroupMembership membership = WorkerGroupMembership.builder()
+                    .workerGroup(group)
+                    .worker(worker)
+                    .roleInGroup(GroupRole.MEMBER)
+                    .roleTitle("Thành viên")
+                    .status(MembershipStatus.ACTIVE)
+                    .joinedAt(Instant.now())
+                    .build();
+            membershipRepository.save(membership);
+        }
+
+        int activeCount = membershipRepository.countByWorkerGroup_GroupIdAndStatus(group.getGroupId(), MembershipStatus.ACTIVE);
+        group.setMemberCount(activeCount);
+        workerGroupRepository.save(group);
+
+        log.info("Worker {} đã gia nhập nhóm {} qua mã mời {}", worker.getWorkerId(), group.getGroupId(), cleanCode);
+
+        // Thông báo cho Leader
+        if (group.getLeaderWorkerId() != null) {
+            workerRepository.findById(group.getLeaderWorkerId()).ifPresent(leader -> {
+                if (leader.getUser() != null) {
+                    sendSafe(leader.getUser().getUserId(),
+                            "Thành viên mới gia nhập đội",
+                            worker.getFullName() + " vừa gia nhập đội \"" + group.getName() + "\" bằng mã mời " + cleanCode + ".");
+                }
+            });
+        }
+
+        String leaderName = "N/A";
+        if (group.getLeaderWorkerId() != null) {
+            leaderName = workerRepository.findById(group.getLeaderWorkerId())
+                    .map(w -> w.getUser() != null ? w.getUser().getFullName() : w.getFullName())
+                    .orElse("N/A");
+        }
+        return mapToGroupDto(group, leaderName);
     }
 
     private WorkerGroupMemberResponseDto mapToMemberDto(WorkerGroupMembership m) {

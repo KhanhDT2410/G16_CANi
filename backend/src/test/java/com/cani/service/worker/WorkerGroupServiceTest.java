@@ -5,6 +5,7 @@ import com.cani.dto.group.CreateWorkerGroupRequestDto;
 import com.cani.dto.group.GroupProposalResponseDto;
 import com.cani.dto.group.GroupShiftResponseDto;
 import com.cani.dto.group.InviteGroupMemberRequestDto;
+import com.cani.dto.group.JoinGroupByCodeRequestDto;
 import com.cani.dto.group.UpdateWorkerGroupRequestDto;
 import com.cani.dto.group.WorkerGroupMemberResponseDto;
 import com.cani.dto.group.WorkerGroupResponseDto;
@@ -42,6 +43,7 @@ import com.cani.service.MatchingDispatchService;
 import com.cani.service.NotificationService;
 import com.cani.service.WorkerGroupService;
 import org.junit.jupiter.api.BeforeEach;
+import java.util.Collections;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -514,9 +516,9 @@ class WorkerGroupServiceTest {
                 .startTime(Instant.now().plus(Duration.ofDays(1)))
                 .endTime(Instant.now().plus(Duration.ofDays(1)).plus(Duration.ofHours(8)))
                 .hourlyWage(BigDecimal.valueOf(50000))
-                .requiredWorkers(3)
+                .requiredWorkers(4)
                 .confirmedWorkers(1)
-                .remainingWorkers(2)
+                .remainingWorkers(3)
                 .status(ShiftStatus.ACTIVE)
                 .build();
 
@@ -558,55 +560,55 @@ class WorkerGroupServiceTest {
     }
 
     @Test
-    @DisplayName("T3-1 - acceptGroupProposal() - Normal: k=2 → 2 assignment CONFIRMED/GROUP/groupId, isGroupLeader theo role, counters, payment, notify")
-    void accept_group_proposal_creates_k_assignments_source_GROUP() {
+    @DisplayName("T3-1 - acceptGroupProposal() - Normal: body rỗng → k=packSize=3, tạo đủ 3 assignment CONFIRMED/GROUP, isGroupLeader đúng role, counters, payment")
+    void accept_group_proposal_creates_full_pack_assignments_source_GROUP() {
         setupTask3Context();
-        when(shiftRepository.incrementConfirmedWorkersAtomicBy(shiftId, 2)).thenReturn(1);
+        when(shiftRepository.incrementConfirmedWorkersAtomicBy(shiftId, 3)).thenReturn(1);
 
         AcceptGroupProposalResponseDto result = workerGroupService.acceptGroupProposal(
-                leaderUserId, groupId, proposalId, List.of(memberWorkerId, secondWorkerId));
+                leaderUserId, groupId, proposalId, null);
 
-        assertEquals(2, result.getAssignmentIds().size());
+        assertEquals(3, result.getAssignmentIds().size());
         assertEquals(shiftId, result.getShiftId());
-        assertEquals(2, result.getMemberCount());
+        assertEquals(3, result.getMemberCount());
 
-        // 2 ShiftAssignment: CONFIRMED + source GROUP + groupId, isGroupLeader đúng theo role membership
+        // 3 ShiftAssignment: CONFIRMED + source GROUP + groupId, isGroupLeader đúng theo role membership
         ArgumentCaptor<ShiftAssignment> captor = ArgumentCaptor.forClass(ShiftAssignment.class);
-        verify(shiftAssignmentRepository, times(2)).save(captor.capture());
+        verify(shiftAssignmentRepository, times(3)).save(captor.capture());
         List<ShiftAssignment> saved = captor.getAllValues();
+        long leaderCount = saved.stream().filter(ShiftAssignment::getIsGroupLeader).count();
+        long memberCount = saved.stream().filter(a -> !a.getIsGroupLeader()).count();
+        assertEquals(1, leaderCount, "Phải có đúng 1 leader assignment");
+        assertEquals(2, memberCount, "2 thành viên còn lại là member");
+
         for (ShiftAssignment a : saved) {
             assertEquals(AssignmentStatus.CONFIRMED, a.getStatus());
             assertEquals(AssignmentSource.GROUP, a.getSource());
             assertEquals(groupId, a.getGroupId());
             assertEquals(proposalId, a.getProposalId());
         }
-        assertEquals(false, saved.get(0).getIsGroupLeader()); // MEMBER
-        assertEquals(false, saved.get(1).getIsGroupLeader()); // MEMBER
 
-        // Counters: shift confirmed += 2, remaining -= 2; event counter += 2
-        assertEquals(3, task3Shift.getConfirmedWorkers());
+        // Counters: shift confirmed += 3, remaining -= 3; event counter += 3
+        assertEquals(4, task3Shift.getConfirmedWorkers());
         assertEquals(0, task3Shift.getRemainingWorkers());
         assertEquals(ShiftStatus.FULLY_STAFFED, task3Shift.getStatus());
-        assertEquals(2, task3Event.getTotalConfirmedWorkers());
+        assertEquals(3, task3Event.getTotalConfirmedWorkers());
         verify(eventRepository).save(task3Event);
 
         // Payment per member + proposal ACCEPTED
-        verify(directPaymentService, times(2)).createInitialPayment(any(ShiftAssignment.class));
+        verify(directPaymentService, times(3)).createInitialPayment(any(ShiftAssignment.class));
         assertEquals(ProposalStatus.ACCEPTED, task3Proposal.getStatus());
         verify(dispatchProposalRepository).save(task3Proposal);
-
-        // Notify: EO + 2 member + leader = 4 bản FCM
-        verify(notificationService, atLeast(4)).createAndSend(any(UUID.class), anyString(), anyString(),
-                eq(NotificationType.GROUP), anyString(), isNull(), isNull());
     }
 
     @Test
-    @DisplayName("T3-2 - acceptGroupProposal() - Abnormal: k > claimableSlots → BadRequest, 0 assignment")
-    void accept_k_exceeds_claimable_slots_rejects_400() {
+    @DisplayName("T3-2 - acceptGroupProposal() - Cấm partial: gửi subset 2/3 thành viên → BadRequest 400, 0 assignment")
+    void accept_subset_of_members_rejects_400() {
         setupTask3Context();
-        // Còn 2 slot, đủ 3 member → chọn cả 3 > claimableSlots
-        assertThrows(BadRequestException.class, () -> workerGroupService.acceptGroupProposal(
-                leaderUserId, groupId, proposalId, List.of(leaderWorkerId, memberWorkerId, secondWorkerId)));
+        // Nhóm có 3 thành viên, gửi yêu cầu chỉ nhận 2 thành viên -> Phải bị từ chối
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, List.of(memberWorkerId, secondWorkerId)));
+        assertTrue(ex.getMessage().contains("Group proposal chỉ hỗ trợ nhận ca trọn đội"));
         verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
         verify(shiftRepository, never()).incrementConfirmedWorkersAtomicBy(any(UUID.class), anyInt());
     }
@@ -615,27 +617,67 @@ class WorkerGroupServiceTest {
     @DisplayName("T3-3 - acceptGroupProposal() - Conflict: atomic counter trả 0 → AppException 409, không persistence gì")
     void accept_atomic_counter_rejects_409() {
         setupTask3Context();
-        when(shiftRepository.incrementConfirmedWorkersAtomicBy(shiftId, 2)).thenReturn(0);
+        when(shiftRepository.incrementConfirmedWorkersAtomicBy(shiftId, 3)).thenReturn(0);
 
         AppException ex = assertThrows(AppException.class, () -> workerGroupService.acceptGroupProposal(
-                leaderUserId, groupId, proposalId, List.of(memberWorkerId, secondWorkerId)));
+                leaderUserId, groupId, proposalId, Collections.emptyList()));
         assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
         verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
         verify(directPaymentService, never()).createInitialPayment(any(ShiftAssignment.class));
     }
 
     @Test
-    @DisplayName("T3-4 - acceptGroupProposal() - All-or-nothing: 1 member conflict → cả nhóm fail, 0 assignment")
+    @DisplayName("T3-4 - acceptGroupProposal() - All-or-nothing: 1 member conflict → cả nhóm fail, 0 assignment, proposal giữ PENDING")
     void accept_one_member_conflict_rejects_all() {
         setupTask3Context();
-        // 1 trong 2 member chọn bị SHIFT_CONFLICT → cả thao tác fail (before any writes)
         when(matchingDispatchService.groupMemberEligibilityReason(eq(memberWorker), eq(task3Shift)))
                 .thenReturn("SHIFT_CONFLICT");
 
         assertThrows(BadRequestException.class, () -> workerGroupService.acceptGroupProposal(
-                leaderUserId, groupId, proposalId, List.of(memberWorkerId, secondWorkerId)));
+                leaderUserId, groupId, proposalId, null));
+        assertEquals(ProposalStatus.PENDING, task3Proposal.getStatus());
         verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
         verify(shiftRepository, never()).incrementConfirmedWorkersAtomicBy(any(UUID.class), anyInt());
+    }
+
+    @Test
+    @DisplayName("T3-4b - acceptGroupProposal() - remaining < packSize → AppException 409 Conflict")
+    void accept_remaining_less_than_pack_size_rejects_409() {
+        setupTask3Context();
+        task3Shift.setRemainingWorkers(2); // packSize = 3 > remaining (2)
+
+        AppException ex = assertThrows(AppException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+        verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
+        verify(shiftRepository, never()).incrementConfirmedWorkersAtomicBy(any(UUID.class), anyInt());
+    }
+
+    @Test
+    @DisplayName("T3-4c - acceptGroupProposal() - proposal EXPIRED tại thời điểm accept → set status EXPIRED trong DB + reject 400")
+    void accept_expired_proposal_updates_status_to_expired_and_rejects() {
+        setupTask3Context();
+        task3Proposal.setExpiresAt(Instant.now().minusSeconds(10));
+
+        assertThrows(BadRequestException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null));
+        assertEquals(ProposalStatus.EXPIRED, task3Proposal.getStatus());
+        verify(dispatchProposalRepository).save(task3Proposal);
+        verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
+    }
+
+    @Test
+    @DisplayName("T3-4d - acceptGroupProposal() - Guard chống trùng active assignment cùng shift/worker → AppException 409")
+    void accept_duplicate_active_assignment_rejects_409() {
+        setupTask3Context();
+        when(shiftRepository.incrementConfirmedWorkersAtomicBy(shiftId, 3)).thenReturn(1);
+        when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(eq(shiftId), eq(leaderWorkerId), any()))
+                .thenReturn(true);
+
+        AppException ex = assertThrows(AppException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+        verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
     }
 
     @Test
@@ -815,5 +857,64 @@ class WorkerGroupServiceTest {
         assertThrows(BadRequestException.class,
                 () -> workerGroupService.transferLeader(leaderUserId, groupId, leaderWorkerId));
         verify(membershipRepository, never()).save(any());
+    }
+
+    // ============================= Self-service Join by Invite Code Tests =============================
+
+    @Test
+    @DisplayName("CODE001 - joinByCode() - Normal: Worker nhập mã hợp lệ → gia nhập thành công, ACTIVE")
+    void joinByCode_Success() {
+        String code = "CAN-7X9K";
+        JoinGroupByCodeRequestDto req = JoinGroupByCodeRequestDto.builder().inviteCode(code).build();
+
+        Worker newWorker = Worker.builder()
+                .workerId(UUID.randomUUID())
+                .fullName("Thành Viên Mới")
+                .user(User.builder().userId(UUID.randomUUID()).build())
+                .build();
+
+        when(workerGroupRepository.findByInviteCodeIgnoreCase(code)).thenReturn(Optional.of(mockGroup));
+        when(workerRepository.findByUser_UserId(memberUserId)).thenReturn(Optional.of(newWorker));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, newWorker.getWorkerId()))
+                .thenReturn(Optional.empty());
+        when(membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE))
+                .thenReturn(3);
+
+        WorkerGroupResponseDto result = workerGroupService.joinByCode(memberUserId, req);
+
+        assertNotNull(result);
+        assertEquals(3, result.getMemberCount());
+        verify(membershipRepository).save(any(WorkerGroupMembership.class));
+        verify(workerGroupRepository).save(mockGroup);
+    }
+
+    @Test
+    @DisplayName("CODE002 - joinByCode() - Abnormal: Mã không tồn tại → 404 ResourceNotFound")
+    void joinByCode_NotFound() {
+        JoinGroupByCodeRequestDto req = JoinGroupByCodeRequestDto.builder().inviteCode("CAN-XXXX").build();
+        when(workerGroupRepository.findByInviteCodeIgnoreCase("CAN-XXXX")).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> workerGroupService.joinByCode(memberUserId, req));
+    }
+
+    @Test
+    @DisplayName("CODE003 - joinByCode() - Abnormal: Worker đã là thành viên ACTIVE → 400 BadRequest")
+    void joinByCode_AlreadyActiveMember_ThrowsBadRequest() {
+        String code = "CAN-7X9K";
+        JoinGroupByCodeRequestDto req = JoinGroupByCodeRequestDto.builder().inviteCode(code).build();
+
+        WorkerGroupMembership activeMembership = WorkerGroupMembership.builder()
+                .workerGroup(mockGroup)
+                .worker(memberWorker)
+                .status(MembershipStatus.ACTIVE)
+                .roleInGroup(GroupRole.MEMBER)
+                .build();
+
+        when(workerGroupRepository.findByInviteCodeIgnoreCase(code)).thenReturn(Optional.of(mockGroup));
+        when(workerRepository.findByUser_UserId(memberUserId)).thenReturn(Optional.of(memberWorker));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, memberWorkerId))
+                .thenReturn(Optional.of(activeMembership));
+
+        assertThrows(BadRequestException.class, () -> workerGroupService.joinByCode(memberUserId, req));
     }
 }

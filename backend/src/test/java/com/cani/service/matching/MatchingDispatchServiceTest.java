@@ -443,6 +443,9 @@ class MatchingDispatchServiceTest {
         @DisplayName("MATCH015: Worker có lịch rảnh cố định bao trọn ca làm việc -> Được đề xuất thành công")
         void passHardFilter_ShiftWithinWorkerWeeklyAvailability_PassesFilter() {
             ZoneId vnZone = ZoneId.of("Asia/Ho_Chi_Minh");
+            java.time.LocalDate tomorrow = java.time.LocalDate.now(vnZone).plusDays(1);
+            sampleShift.setStartTime(tomorrow.atTime(8, 0).atZone(vnZone).toInstant());
+            sampleShift.setEndTime(tomorrow.atTime(12, 0).atZone(vnZone).toInstant());
             ZonedDateTime shiftStart = sampleShift.getStartTime().atZone(vnZone);
             int shiftDayOfWeek = shiftStart.getDayOfWeek().getValue() % 7;
 
@@ -683,6 +686,8 @@ class MatchingDispatchServiceTest {
                     .isOnline(online)
                     .reliabilityScore(reliabilityScore)
                     .totalShiftsCompleted(5)
+                    .baseLat(10.7769)
+                    .baseLng(106.7009)
                     .build();
         }
 
@@ -704,7 +709,7 @@ class MatchingDispatchServiceTest {
                     .leaderWorkerId(leader.getWorkerId())
                     .isActive(true)
                     .build();
-            when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
             return new Fixture(group, leader, member);
         }
 
@@ -795,13 +800,13 @@ class MatchingDispatchServiceTest {
                     .leaderWorkerId(leader.getWorkerId())
                     .isActive(true)
                     .build();
-            when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
 
             when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
             when(workerGroupRepository.findAll()).thenReturn(List.of(group));
             when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
                     .thenReturn(List.of(membership(group, m1), membership(group, m2), membership(group, m3), membership(group, m4)));
-            when(shiftAssignmentRepository.findConflictingAssignments(eq(m4.getWorkerId()), any(), any(), anyList()))
+            lenient().when(shiftAssignmentRepository.findConflictingAssignments(eq(m4.getWorkerId()), any(), any(), anyList()))
                     .thenReturn(List.of(ShiftAssignment.builder().assignmentId(UUID.randomUUID()).status(AssignmentStatus.CONFIRMED).build()));
 
             // Act & Assert: không ném exception, 0 proposal
@@ -820,7 +825,7 @@ class MatchingDispatchServiceTest {
                     .leaderWorkerId(leader.getWorkerId())
                     .isActive(true)
                     .build();
-            when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
 
             when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
             when(workerGroupRepository.findAll()).thenReturn(List.of(group));
@@ -976,6 +981,184 @@ class MatchingDispatchServiceTest {
                     eq("PROPOSAL"),
                     any(),
                     anyMap());
+        }
+
+        @Test
+        @DisplayName("SQUAD001: 5 ACTIVE đủ điều kiện, remaining 5 -> 1 proposal, packSize 5, breakdown chứa packWorkerIds và packSize")
+        void dispatch_squad_pack_5_active_remaining_5_creates_proposal() {
+            sampleShift.setRemainingWorkers(5);
+            Worker leader = groupWorker("Leader Squad", KycStatus.APPROVED, true, 90);
+            List<Worker> members = List.of(
+                    groupWorker("Member 1", KycStatus.APPROVED, true, 85),
+                    groupWorker("Member 2", KycStatus.APPROVED, true, 80),
+                    groupWorker("Member 3", KycStatus.APPROVED, true, 82),
+                    groupWorker("Member 4", KycStatus.APPROVED, true, 88),
+                    groupWorker("Member 5", KycStatus.APPROVED, true, 86)
+            );
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội 5 Người")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+
+            List<WorkerGroupMembership> memberships = members.stream()
+                    .map(m -> membership(group, m))
+                    .toList();
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(memberships);
+
+            when(dispatchProposalRepository.save(any(DispatchProposal.class))).thenAnswer(inv -> {
+                DispatchProposal p = inv.getArgument(0);
+                p.setProposalId(UUID.randomUUID());
+                return p;
+            });
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(1, count);
+            ArgumentCaptor<DispatchProposal> captor = ArgumentCaptor.forClass(DispatchProposal.class);
+            verify(dispatchProposalRepository).save(captor.capture());
+            DispatchProposal saved = captor.getValue();
+            assertEquals(AssignmentSource.GROUP, saved.getSource());
+            assertTrue(saved.getScoreBreakdown().contains("\"packSize\":5"));
+            assertTrue(saved.getScoreBreakdown().contains("packWorkerIds"));
+            for (Worker m : members) {
+                assertTrue(saved.getScoreBreakdown().contains(m.getWorkerId().toString()));
+            }
+        }
+
+        @Test
+        @DisplayName("SQUAD002: 5 ACTIVE, remaining 4 -> 0 proposal (không đủ chỗ cho cả đội)")
+        void dispatch_squad_pack_5_active_remaining_4_skips_group() {
+            sampleShift.setRemainingWorkers(4);
+            Worker leader = groupWorker("Leader Squad", KycStatus.APPROVED, true, 90);
+            List<Worker> members = List.of(
+                    groupWorker("Member 1", KycStatus.APPROVED, true, 85),
+                    groupWorker("Member 2", KycStatus.APPROVED, true, 80),
+                    groupWorker("Member 3", KycStatus.APPROVED, true, 82),
+                    groupWorker("Member 4", KycStatus.APPROVED, true, 88),
+                    groupWorker("Member 5", KycStatus.APPROVED, true, 86)
+            );
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội 5 Người")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(members.stream().map(m -> membership(group, m)).toList());
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(0, count);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("SQUAD003: 5 ACTIVE, 1 conflict -> 0 proposal (KHÔNG proposal 4 người)")
+        void dispatch_squad_pack_5_active_1_conflict_skips_group() {
+            sampleShift.setRemainingWorkers(5);
+            Worker leader = groupWorker("Leader Squad", KycStatus.APPROVED, true, 90);
+            Worker conflicted = groupWorker("Member Trùng Lịch", KycStatus.APPROVED, true, 85);
+            List<Worker> members = List.of(
+                    conflicted,
+                    groupWorker("Member 2", KycStatus.APPROVED, true, 80),
+                    groupWorker("Member 3", KycStatus.APPROVED, true, 82),
+                    groupWorker("Member 4", KycStatus.APPROVED, true, 88),
+                    groupWorker("Member 5", KycStatus.APPROVED, true, 86)
+            );
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội 5 Người")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(members.stream().map(m -> membership(group, m)).toList());
+            when(shiftAssignmentRepository.findConflictingAssignments(eq(conflicted.getWorkerId()), any(), any(), anyList()))
+                    .thenReturn(List.of(ShiftAssignment.builder().assignmentId(UUID.randomUUID()).status(AssignmentStatus.CONFIRMED).build()));
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(0, count);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("SQUAD004: 1 member thiếu location -> 0 proposal (không fallback GPS leader)")
+        void dispatch_squad_pack_1_member_missing_location_skips_group() {
+            sampleShift.setRemainingWorkers(5);
+            Worker leader = groupWorker("Leader Squad", KycStatus.APPROVED, true, 90);
+            Worker missingLoc = groupWorker("Member Mất Tọa Độ", KycStatus.APPROVED, true, 85);
+            missingLoc.setBaseLat(null);
+            missingLoc.setBaseLng(null);
+            List<Worker> members = List.of(
+                    missingLoc,
+                    groupWorker("Member 2", KycStatus.APPROVED, true, 80),
+                    groupWorker("Member 3", KycStatus.APPROVED, true, 82),
+                    groupWorker("Member 4", KycStatus.APPROVED, true, 88),
+                    groupWorker("Member 5", KycStatus.APPROVED, true, 86)
+            );
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Thiếu GPS")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(members.stream().map(m -> membership(group, m)).toList());
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(0, count);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("SQUAD005: 1 member khoảng cách > maxDistance -> 0 proposal (hard safety check)")
+        void dispatch_squad_pack_1_member_exceeds_radius_skips_group() {
+            sampleShift.setRemainingWorkers(5);
+            Worker leader = groupWorker("Leader Squad", KycStatus.APPROVED, true, 90);
+            Worker farAway = groupWorker("Member Ở Quá Xa", KycStatus.APPROVED, true, 85);
+            // Hà Nội vs TP.HCM -> ~1140 km > 15 km
+            farAway.setBaseLat(21.0285);
+            farAway.setBaseLng(105.8542);
+            List<Worker> members = List.of(
+                    farAway,
+                    groupWorker("Member 2", KycStatus.APPROVED, true, 80),
+                    groupWorker("Member 3", KycStatus.APPROVED, true, 82),
+                    groupWorker("Member 4", KycStatus.APPROVED, true, 88),
+                    groupWorker("Member 5", KycStatus.APPROVED, true, 86)
+            );
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Có Người Ở Xa")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(members.stream().map(m -> membership(group, m)).toList());
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(0, count);
+            verify(dispatchProposalRepository, never()).save(any());
         }
     }
 }

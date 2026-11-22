@@ -85,7 +85,10 @@ public class MatchingDispatchService {
             Worker leader,
             List<Worker> eligible,
             double score,
-            double distanceKm) {
+            double medianDist,
+            double p90Dist,
+            double maxDist,
+            int packSize) {
     }
 
     /**
@@ -630,7 +633,13 @@ public class MatchingDispatchService {
         List<GroupCandidate> groupCandidates = new ArrayList<>();
         for (WorkerGroup group : candidateGroups) {
             List<WorkerGroupMembership> groupMemberships = membershipsByGroup.getOrDefault(group.getGroupId(), Collections.emptyList());
-            if (groupMemberships.isEmpty()) {
+            int packSize = groupMemberships.size();
+            if (packSize == 0) {
+                continue;
+            }
+
+            // Ca không đủ chỗ cho toàn bộ tổ đội -> bỏ qua, không partial-fill
+            if (remaining < packSize) {
                 continue;
             }
 
@@ -663,31 +672,55 @@ public class MatchingDispatchService {
                 continue;
             }
 
-            // Member đủ điều kiện (không xét isOnline — leader cử cả thành viên offline)
+            // Eligibility nguyên tử: Toàn bộ thành viên pack phải đủ điều kiện
             List<Worker> eligible = groupMemberships.stream()
                     .map(WorkerGroupMembership::getWorker)
+                    .filter(Objects::nonNull)
                     .filter(w -> isGroupChannelMemberEligible(w, shift))
                     .toList();
-            int claimableSlots = Math.min(eligible.size(), remaining);
-            if (eligible.isEmpty() || claimableSlots == 0) {
+            if (eligible.size() != packSize) {
+                // 1 thành viên fail -> loại toàn bộ pack, không fallback subset
                 continue;
             }
 
-            // Khoảng cách: TB Haversine các member eligible; thiếu tọa độ -> 0.0 (cùng chính sách kênh cá nhân)
-            double distanceKm = 0.0;
-            int computed = 0;
-            for (Worker w : eligible) {
-                double d = calculateDistance(targetLat, targetLng, w.getBaseLat(), w.getBaseLng());
-                if (d != Double.MAX_VALUE) {
-                    distanceKm += d;
-                    computed++;
-                }
-            }
-            if (computed > 0) {
-                distanceKm /= computed;
+            // Distance nguyên tử: Toàn bộ thành viên phải có tọa độ hợp lệ và không vượt quá bán kính cho phép
+            double effectiveMaxDist = (shift.getMaxDistanceKm() != null && shift.getMaxDistanceKm().doubleValue() > 0)
+                    ? shift.getMaxDistanceKm().doubleValue()
+                    : MAX_DISTANCE_KM;
+
+            if (targetLat == null || targetLng == null) {
+                continue;
             }
 
-            double groupScore = 0.35 * Math.max(0.0, 100.0 - (distanceKm / MAX_DISTANCE_KM) * 100.0)
+            List<Double> distances = new ArrayList<>();
+            boolean locationDisqualified = false;
+            for (Worker w : eligible) {
+                if (w.getBaseLat() == null || w.getBaseLng() == null) {
+                    locationDisqualified = true;
+                    break;
+                }
+                double d = calculateDistance(targetLat, targetLng, w.getBaseLat(), w.getBaseLng());
+                if (d == Double.MAX_VALUE || d > effectiveMaxDist) {
+                    locationDisqualified = true;
+                    break;
+                }
+                distances.add(d);
+            }
+
+            if (locationDisqualified || distances.size() != packSize) {
+                continue;
+            }
+
+            double medianDist = calculateMedian(distances);
+            double p90Dist = calculatePercentile(distances, 90.0);
+            double maxDist = Collections.max(distances);
+
+            // Scoring distance pack = 0.6 * normalize(median) + 0.4 * normalize(p90)
+            double normMedian = Math.max(0.0, 100.0 - (medianDist / MAX_DISTANCE_KM) * 100.0);
+            double normP90 = Math.max(0.0, 100.0 - (p90Dist / MAX_DISTANCE_KM) * 100.0);
+            double distanceScore = 0.6 * normMedian + 0.4 * normP90;
+
+            double groupScore = 0.35 * distanceScore
                     + 0.25 * Math.min(100.0, ((group.getAvgRating() != null ? group.getAvgRating().doubleValue() : 5.0) / 5.0) * 100.0)
                     + 0.2 * Math.min(100.0, eligible.stream()
                         .mapToDouble(w -> (double) (w.getTotalShiftsCompleted() != null ? w.getTotalShiftsCompleted() : 0))
@@ -709,7 +742,12 @@ public class MatchingDispatchService {
                 }
             }
 
-            groupCandidates.add(new GroupCandidate(group, leader, eligible, groupScore, distanceKm));
+            // Bonus +20: Tổ đội vừa khít số lượng slot ca đang cần (Perfect-Fit Squad Bonus)
+            if (packSize == remaining) {
+                groupScore += 20.0;
+            }
+
+            groupCandidates.add(new GroupCandidate(group, leader, eligible, groupScore, medianDist, p90Dist, maxDist, packSize));
         }
 
         if (groupCandidates.isEmpty()) {
@@ -726,17 +764,22 @@ public class MatchingDispatchService {
         int createdCount = 0;
         for (GroupCandidate candidate : topGroups) {
             List<Worker> eligible = candidate.eligible();
-            int claimableSlots = Math.min(eligible.size(), remaining);
+            int packSize = candidate.packSize();
+            int claimableSlots = packSize;
 
             String breakdownJson = String.format(
                     Locale.US,
-                    "{\"groupId\":\"%s\",\"groupName\":\"%s\",\"distanceKm\":%.2f,\"eligibleMemberWorkerIds\":[%s],\"eligibleCount\":%d,\"claimableSlots\":%d,\"finalScore\":%.2f}",
+                    "{\"groupId\":\"%s\",\"groupName\":\"%s\",\"distanceMedianKm\":%.2f,\"distanceP90Km\":%.2f,\"distanceMaxKm\":%.2f,\"packWorkerIds\":[%s],\"packSize\":%d,\"claimableSlots\":%d,\"eligibleMemberWorkerIds\":[%s],\"eligibleCount\":%d,\"finalScore\":%.2f}",
                     candidate.group().getGroupId(),
                     candidate.group().getName(),
-                    candidate.distanceKm(),
+                    candidate.medianDist(),
+                    candidate.p90Dist(),
+                    candidate.maxDist(),
+                    eligible.stream().map(w -> "\"" + w.getWorkerId() + "\"").collect(Collectors.joining(",")),
+                    packSize,
+                    claimableSlots,
                     eligible.stream().map(w -> "\"" + w.getWorkerId() + "\"").collect(Collectors.joining(",")),
                     eligible.size(),
-                    claimableSlots,
                     candidate.score()
             );
 
@@ -760,7 +803,7 @@ public class MatchingDispatchService {
                     notificationService.createAndSend(
                             candidate.leader().getUser().getUserId(),
                             (emergency ? "🚨 GẤP " : "") + "Lời mời ca cho đội " + candidate.group().getName(),
-                            "Cử 1 đến " + claimableSlots + " thành viên — ca " + shift.getJobType() + " tại " + eventName + ", thù lao " + shift.getHourlyWage() + " đ/giờ.",
+                            "Đội " + candidate.group().getName() + " (" + packSize + " người) — ca " + shift.getJobType() + " tại " + eventName + ", thù lao " + shift.getHourlyWage() + " đ/giờ — xác nhận trọn đội.",
                             NotificationType.PROPOSAL,
                             "PROPOSAL",
                             savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shiftId,
@@ -882,5 +925,41 @@ public class MatchingDispatchService {
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return EARTH_RADIUS_KM * c;
+    }
+
+    // shortcut: P90 tính tuyến tính đơn giản; nâng cấp khi cần chính xác hơn.
+    public static double calculateMedian(List<Double> values) {
+        if (values == null || values.isEmpty()) {
+            return 0.0;
+        }
+        List<Double> sorted = new ArrayList<>(values);
+        Collections.sort(sorted);
+        int n = sorted.size();
+        if (n % 2 == 1) {
+            return sorted.get(n / 2);
+        } else {
+            return (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2.0;
+        }
+    }
+
+    // shortcut: P90 tính tuyến tính đơn giản; nâng cấp khi cần chính xác hơn.
+    public static double calculatePercentile(List<Double> values, double percentile) {
+        if (values == null || values.isEmpty()) {
+            return 0.0;
+        }
+        List<Double> sorted = new ArrayList<>(values);
+        Collections.sort(sorted);
+        int n = sorted.size();
+        if (n == 1) {
+            return sorted.get(0);
+        }
+        double rank = (percentile / 100.0) * (n - 1);
+        int lower = (int) Math.floor(rank);
+        int upper = (int) Math.ceil(rank);
+        if (lower == upper) {
+            return sorted.get(lower);
+        }
+        double weight = rank - lower;
+        return sorted.get(lower) * (1.0 - weight) + sorted.get(upper) * weight;
     }
 }

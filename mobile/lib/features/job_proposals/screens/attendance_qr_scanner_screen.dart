@@ -349,8 +349,8 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
                     decoration: BoxDecoration(
                       color: _distanceMeters! > 200
                           ? cani.danger.withValues(alpha: 0.92)
-                          : const Color(0xFF16A34A).withValues(alpha: 0.92),
-                      borderRadius: BorderRadius.circular(12),
+                          : cani.success.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(14),
                       boxShadow: const [
                         BoxShadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 3)),
                       ],
@@ -379,13 +379,13 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488).withValues(alpha: 0.92),
+                      color: cani.brand.withValues(alpha: 0.92),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.image, color: Colors.white, size: 14),
+                        Icon(Icons.image_outlined, color: Colors.white, size: 14),
                         SizedBox(width: 6),
                         Text(
                           'Đã đính kèm ảnh bằng chứng nghiệm thu',
@@ -399,22 +399,22 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
             ),
           ),
 
-          // 2. Scanner Overlay & Bounding Box
+          // 2. Scanner Overlay & Bounding Box (CANi Brand)
           Center(
             child: Container(
-              width: 270,
-              height: 270,
+              width: 268,
+              height: 268,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: widget.isCheckin ? Colors.greenAccent : Colors.amberAccent,
-                  width: 3,
+                  color: widget.isCheckin ? cani.accent : cani.brand,
+                  width: 2.5,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
-                    color: (widget.isCheckin ? Colors.green : Colors.amber).withValues(alpha: 0.25),
-                    blurRadius: 20,
-                    spreadRadius: 4,
+                    color: (widget.isCheckin ? cani.accent : cani.brand).withValues(alpha: 0.28),
+                    blurRadius: 22,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
@@ -425,15 +425,15 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
                     left: 12,
                     right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        widget.isCheckin ? 'Đưa mã QR của Ban tổ chức vào ô' : 'Đưa mã QR kết thúc ca vào ô',
+                        widget.isCheckin ? 'Đưa mã QR của Ban tổ chức vào khung' : 'Đưa mã QR kết thúc ca vào khung',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -446,13 +446,13 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
           Positioned(
             left: 20,
             right: 20,
-            bottom: 40,
+            bottom: 36,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white24),
+                color: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -461,14 +461,14 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                         decoration: BoxDecoration(
-                          color: widget.isCheckin ? Colors.green : Colors.amber,
-                          borderRadius: BorderRadius.circular(6),
+                          color: widget.isCheckin ? cani.success : cani.brand,
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           widget.isCheckin ? 'CHECK-IN' : 'CHECK-OUT',
-                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10.5, letterSpacing: 0.4),
                         ),
                       ),
                       const SizedBox(width: 8),

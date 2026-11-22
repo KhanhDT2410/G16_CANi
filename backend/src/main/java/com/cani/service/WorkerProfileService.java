@@ -190,125 +190,312 @@ public class WorkerProfileService {
         boolean isVerified = eo.getVerificationStatus() == VerificationStatus.APPROVED;
 
         int totalEventsCreated = 0;
-        int totalEventsPublishedOrCompleted = eo.getTotalEventsCompleted() != null ? eo.getTotalEventsCompleted() : 0;
+        int totalEventsPublished = 0;
+        int totalEventsCompleted = 0;
         int totalConfirmedWorkers = 0;
 
         if (eventRepository != null) {
             List<Event> eoEvents = eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId());
             if (eoEvents != null) {
+                // totalEventsCreated: Tổng số sự kiện hợp lệ đã tạo (không tính sự kiện đã bị hủy CANCELLED)
                 totalEventsCreated = (int) eoEvents.stream()
-                        .filter(ev -> ev.getStatus() != EventStatus.CANCELLED)
+                        .filter(ev -> ev.getStatus() != null && ev.getStatus() != EventStatus.CANCELLED)
                         .count();
-                long realPublishedCount = eoEvents.stream()
-                        .filter(ev -> ev.getStatus() != null
-                                && ev.getStatus() != EventStatus.DRAFT
-                                && ev.getStatus() != EventStatus.CANCELLED)
+                // totalEventsPublished: Số sự kiện đã xuất bản (ACTIVE, ONGOING, COMPLETED; không tính DRAFT, CANCELLED)
+                totalEventsPublished = (int) eoEvents.stream()
+                        .filter(ev -> ev.getStatus() == EventStatus.ACTIVE
+                                || ev.getStatus() == EventStatus.ONGOING
+                                || ev.getStatus() == EventStatus.COMPLETED)
                         .count();
-                totalEventsPublishedOrCompleted = (int) Math.max(totalEventsPublishedOrCompleted, realPublishedCount);
+                // totalEventsCompleted: Chỉ đếm sự kiện đã hoàn thành (COMPLETED)
+                totalEventsCompleted = (int) eoEvents.stream()
+                        .filter(ev -> ev.getStatus() == EventStatus.COMPLETED)
+                        .count();
                 totalConfirmedWorkers = eoEvents.stream()
-                        .filter(ev -> ev.getStatus() != EventStatus.CANCELLED)
+                        .filter(ev -> ev.getStatus() != null && ev.getStatus() != EventStatus.CANCELLED)
                         .mapToInt(ev -> ev.getTotalConfirmedWorkers() != null ? ev.getTotalConfirmedWorkers() : 0)
                         .sum();
             }
+        } else {
+            totalEventsCompleted = eo.getTotalEventsCompleted() != null ? eo.getTotalEventsCompleted() : 0;
         }
 
-        List<EoReviewResponseDto> reviewDtos = loadEoReviews(eo, user != null ? user.getUserId() : null);
-        int actualRatingCount = eo.getRatingCount() != null ? eo.getRatingCount() : 0;
-        BigDecimal actualRatingAvg = (actualRatingCount > 0 && eo.getRatingAvg() != null)
-                ? eo.getRatingAvg()
-                : BigDecimal.ZERO;
+        UUID eoUserId = user != null ? user.getUserId() : null;
+        Set<UUID> revieweeIds = collectEoRevieweeIds(eo, eoUserId);
+        List<EoReviewResponseDto> reviewDtos = loadEoReviews(eo, eoUserId);
 
-        if (!reviewDtos.isEmpty()) {
-            actualRatingCount = reviewDtos.size();
-            double avg = reviewDtos.stream()
-                    .filter(r -> r.getRating() != null)
-                    .mapToInt(EoReviewResponseDto::getRating)
+        List<Integer> validDbRatings = (reviewRepository != null && !revieweeIds.isEmpty())
+                ? Optional.ofNullable(reviewRepository.findValidRatingsByRevieweeIds(revieweeIds))
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .filter(r -> r != null && r >= 1 && r <= 5)
+                        .toList()
+                : Collections.emptyList();
+
+        List<Integer> validLoadedRatings = reviewDtos.stream()
+                .map(EoReviewResponseDto::getRating)
+                .filter(r -> r != null && r >= 1 && r <= 5)
+                .toList();
+
+        int actualRatingCount = 0;
+        BigDecimal actualRatingAvg = BigDecimal.ZERO;
+
+        List<Integer> ratingsToAggregate = !validDbRatings.isEmpty() ? validDbRatings : validLoadedRatings;
+        if (!ratingsToAggregate.isEmpty()) {
+            actualRatingCount = ratingsToAggregate.size();
+            double avg = ratingsToAggregate.stream()
+                    .mapToInt(Integer::intValue)
                     .average()
                     .orElse(0.0);
             actualRatingAvg = BigDecimal.valueOf(avg).setScale(1, RoundingMode.HALF_UP);
+        } else if (reviewDtos.isEmpty()
+                && eo.getRatingCount() != null && eo.getRatingCount() > 0
+                && eo.getRatingAvg() != null
+                && eo.getRatingAvg().compareTo(BigDecimal.ONE) >= 0
+                && eo.getRatingAvg().compareTo(BigDecimal.valueOf(5)) <= 0) {
+            actualRatingCount = eo.getRatingCount();
+            actualRatingAvg = eo.getRatingAvg();
         }
+
+        boolean showFullContact = canViewFullEoContact(eo, user);
+        String publicPhone = user != null
+                ? (showFullContact ? user.getPhone() : maskPhone(user.getPhone()))
+                : null;
+        String publicEmail = user != null
+                ? (showFullContact ? user.getEmail() : maskEmail(user.getEmail()))
+                : null;
 
         return EoPublicProfileResponseDto.builder()
                 .eoId(eo.getEoId())
-                .userId(user != null ? user.getUserId() : null)
+                .userId(eoUserId)
                 .companyName(eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
                         ? eo.getCompanyName() : "Ban Tổ Chức Sự Kiện")
                 .representativeName(user != null ? user.getFullName() : null)
                 .avatarUrl(user != null ? user.getAvatarUrl() : null)
                 .address(eo.getAddress())
-                .phone(user != null ? user.getPhone() : null)
-                .email(user != null ? user.getEmail() : null)
+                .phone(publicPhone)
+                .email(publicEmail)
                 .description(null)
                 .isVerified(isVerified)
                 .verifiedAt(eo.getVerifiedAt())
                 .ratingAvg(actualRatingAvg)
                 .ratingCount(actualRatingCount)
-                .totalEventsCompleted(totalEventsPublishedOrCompleted)
+                .totalEventsCompleted(totalEventsCompleted)
+                .totalEventsPublished(totalEventsPublished)
                 .totalEventsCreated(totalEventsCreated)
                 .totalConfirmedWorkers(totalConfirmedWorkers)
-                .reviews(reviewDtos.stream().limit(10).toList())
+                .reviews(reviewDtos)
                 .build();
+    }
+
+    private Set<UUID> collectEoRevieweeIds(EventOrganizer eo, UUID eoUserId) {
+        Set<UUID> revieweeIds = new LinkedHashSet<>();
+        if (eoUserId != null) {
+            revieweeIds.add(eoUserId);
+        }
+        if (eo != null && eo.getEoId() != null) {
+            revieweeIds.add(eo.getEoId());
+        }
+        return revieweeIds;
+    }
+
+    private boolean canViewFullEoContact(EventOrganizer eo, User eoUser) {
+        try {
+            org.springframework.security.core.Authentication auth =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated()) {
+                return false;
+            }
+            boolean isAdmin = auth.getAuthorities() != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()) || "ADMIN".equals(a.getAuthority()));
+            if (isAdmin) {
+                return true;
+            }
+            String principalName = auth.getName();
+            if (principalName == null || principalName.isBlank()) {
+                return false;
+            }
+            if (eoUser != null) {
+                if (principalName.equalsIgnoreCase(eoUser.getEmail())
+                        || (eoUser.getUserId() != null && principalName.equals(eoUser.getUserId().toString()))) {
+                    return true;
+                }
+            }
+            if (workerRepository != null && shiftAssignmentRepository != null && eo != null && eo.getEoId() != null) {
+                Optional<Worker> callerWorker = Optional.empty();
+                try {
+                    UUID callerUserId = UUID.fromString(principalName);
+                    callerWorker = workerRepository.findByUser_UserId(callerUserId);
+                } catch (IllegalArgumentException ignored) {
+                    if (userRepository != null) {
+                        callerWorker = userRepository.findByEmail(principalName)
+                                .flatMap(u -> workerRepository.findByUser_UserId(u.getUserId()));
+                    }
+                }
+                if (callerWorker.isPresent() && callerWorker.get().getWorkerId() != null) {
+                    List<ShiftAssignment> activeOrPast = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
+                            callerWorker.get().getWorkerId(),
+                            List.of(
+                                    com.cani.entity.enums.AssignmentStatus.CONFIRMED,
+                                    com.cani.entity.enums.AssignmentStatus.CHECKED_IN,
+                                    com.cani.entity.enums.AssignmentStatus.COMPLETED
+                            )
+                    );
+                    if (activeOrPast != null) {
+                        return activeOrPast.stream().anyMatch(sa ->
+                                sa.getShift() != null
+                                        && sa.getShift().getEvent() != null
+                                        && sa.getShift().getEvent().getEventOrganizer() != null
+                                        && eo.getEoId().equals(sa.getShift().getEvent().getEventOrganizer().getEoId()));
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) return null;
+        String trimmed = phone.trim();
+        if (trimmed.length() <= 5) return "***";
+        return trimmed.substring(0, 3) + "***" + trimmed.substring(trimmed.length() - 3);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) return null;
+        String trimmed = email.trim();
+        int atIndex = trimmed.indexOf('@');
+        if (atIndex <= 0) return "***";
+        String local = trimmed.substring(0, atIndex);
+        String domain = trimmed.substring(atIndex);
+        String prefix = local.length() <= 2 ? local.substring(0, 1) : local.substring(0, 2);
+        return prefix + "***" + domain;
     }
 
     private List<EoReviewResponseDto> loadEoReviews(EventOrganizer eo, UUID eoUserId) {
         if (reviewRepository == null) return List.of();
-        List<Review> reviews = new ArrayList<>();
-        if (eoUserId != null) {
-            List<Review> byUser = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(eoUserId);
-            if (byUser != null) reviews.addAll(byUser);
+        Set<UUID> revieweeIds = collectEoRevieweeIds(eo, eoUserId);
+        if (revieweeIds.isEmpty()) return List.of();
+
+        Comparator<Review> latestFirstNullsLast = Comparator.comparing(
+                Review::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())
+        );
+
+        List<Review> rawCandidates = new ArrayList<>();
+        Set<UUID> seenReviewIds = new HashSet<>();
+        int page = 0;
+        final int pageSize = 10;
+        final int maxPages = 5;
+
+        while (page < maxPages) {
+            List<Review> pageBatch = reviewRepository.findLatestByRevieweeIds(
+                    revieweeIds,
+                    org.springframework.data.domain.PageRequest.of(page, pageSize)
+            );
+            if (pageBatch == null || pageBatch.isEmpty()) {
+                break;
+            }
+            int addedInPage = 0;
+            for (Review r : pageBatch) {
+                if (r == null) continue;
+                UUID rid = r.getReviewId();
+                if (rid == null || seenReviewIds.add(rid)) {
+                    rawCandidates.add(r);
+                    addedInPage++;
+                }
+            }
+            if (rawCandidates.size() >= pageSize || pageBatch.size() < pageSize || addedInPage == 0) {
+                break;
+            }
+            page++;
         }
-        if (eo != null && eo.getEoId() != null && !eo.getEoId().equals(eoUserId)) {
-            List<Review> byEo = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(eo.getEoId());
-            if (byEo != null && !byEo.isEmpty()) {
-                Set<UUID> seen = reviews.stream().map(Review::getReviewId).collect(Collectors.toSet());
-                for (Review r : byEo) {
-                    if (seen.add(r.getReviewId())) {
-                        reviews.add(r);
+
+        // Fallback tương thích nếu repository chỉ có dữ liệu qua phương thức cũ theo từng revieweeId
+        if (rawCandidates.isEmpty()) {
+            for (UUID targetId : revieweeIds) {
+                List<Review> byTarget = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(targetId);
+                if (byTarget != null) {
+                    for (Review r : byTarget) {
+                        if (r == null) continue;
+                        UUID rid = r.getReviewId();
+                        if (rid == null || seenReviewIds.add(rid)) {
+                            rawCandidates.add(r);
+                        }
                     }
                 }
             }
         }
-        if (reviews.isEmpty()) return List.of();
 
-        Set<UUID> reviewerIds = reviews.stream()
+        if (rawCandidates.isEmpty()) return List.of();
+
+        List<Review> topReviews = rawCandidates.stream()
+                .sorted(latestFirstNullsLast)
+                .limit(pageSize)
+                .toList();
+
+        Set<UUID> reviewerIds = topReviews.stream()
                 .map(Review::getReviewerId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<UUID, User> userMap = reviewerIds.isEmpty() ? Collections.emptyMap() :
-                userRepository.findAllById(reviewerIds).stream()
+        Map<UUID, User> userMap = (userRepository == null || reviewerIds.isEmpty())
+                ? Collections.emptyMap()
+                : Optional.ofNullable(userRepository.findAllById(reviewerIds))
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .filter(u -> u != null && u.getUserId() != null)
                         .collect(Collectors.toMap(User::getUserId, u -> u, (u1, u2) -> u1));
 
-        Set<UUID> assignmentIds = reviews.stream()
+        Map<UUID, Worker> workerByUserId = (workerRepository == null || reviewerIds.isEmpty())
+                ? Collections.emptyMap()
+                : Optional.ofNullable(workerRepository.findByUser_UserIdIn(reviewerIds))
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .filter(w -> w != null && w.getUser() != null && w.getUser().getUserId() != null)
+                        .collect(Collectors.toMap(w -> w.getUser().getUserId(), w -> w, (w1, w2) -> w1));
+
+        Set<UUID> assignmentIds = topReviews.stream()
                 .map(Review::getAssignmentId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<UUID, ShiftAssignment> assignmentMap = (shiftAssignmentRepository == null || assignmentIds.isEmpty())
                 ? Collections.emptyMap()
-                : shiftAssignmentRepository.findAllById(assignmentIds).stream()
+                : Optional.ofNullable(shiftAssignmentRepository.findAllById(assignmentIds))
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .filter(sa -> sa != null && sa.getAssignmentId() != null)
                         .collect(Collectors.toMap(ShiftAssignment::getAssignmentId, sa -> sa, (s1, s2) -> s1));
 
-        return reviews.stream()
-                .sorted(Comparator.comparing(Review::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+        return topReviews.stream()
                 .map(r -> {
-                    User reviewer = userMap.get(r.getReviewerId());
+                    User reviewer = r.getReviewerId() != null ? userMap.get(r.getReviewerId()) : null;
+                    Worker reviewerWorker = r.getReviewerId() != null ? workerByUserId.get(r.getReviewerId()) : null;
+                    UUID actualWorkerId = reviewerWorker != null ? reviewerWorker.getWorkerId() : null;
+
                     String workerName = (reviewer != null && reviewer.getFullName() != null && !reviewer.getFullName().isBlank())
                             ? reviewer.getFullName()
                             : "Nhân sự CANi";
                     String workerAvatar = reviewer != null ? reviewer.getAvatarUrl() : null;
 
-                    ShiftAssignment sa = assignmentMap.get(r.getAssignmentId());
+                    ShiftAssignment sa = r.getAssignmentId() != null ? assignmentMap.get(r.getAssignmentId()) : null;
                     Shift s = sa != null ? sa.getShift() : null;
                     Event ev = s != null ? s.getEvent() : null;
+
+                    Integer validRating = (r.getRating() != null && r.getRating() >= 1 && r.getRating() <= 5)
+                            ? r.getRating()
+                            : null;
 
                     return EoReviewResponseDto.builder()
                             .reviewId(r.getReviewId())
                             .assignmentId(r.getAssignmentId())
                             .eventName(ev != null ? ev.getName() : null)
                             .shiftName(s != null ? s.getJobType() : null)
-                            .reviewerWorkerId(r.getReviewerId())
+                            .reviewerUserId(r.getReviewerId())
+                            .reviewerWorkerId(actualWorkerId)
                             .reviewerWorkerName(workerName)
                             .workerAvatarUrl(workerAvatar)
-                            .rating(r.getRating())
+                            .rating(validRating)
                             .criteriaShiftClarity(r.getCriteriaShiftClarity())
                             .criteriaTiming(r.getCriteriaTiming())
                             .criteriaWorkEnvironment(r.getCriteriaWorkEnvironment())

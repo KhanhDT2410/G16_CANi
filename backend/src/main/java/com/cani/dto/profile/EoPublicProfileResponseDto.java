@@ -34,6 +34,7 @@ public class EoPublicProfileResponseDto {
     private BigDecimal ratingAvg;
     private Integer ratingCount;
     private Integer totalEventsCompleted;
+    private Integer totalEventsPublished;
     private Integer totalEventsCreated;
     private Integer totalConfirmedWorkers;
 

@@ -509,6 +509,7 @@ class EoPublicProfileData {
   final double ratingAvg;
   final int ratingCount;
   final int totalEventsCompleted;
+  final int totalEventsPublished;
   final int totalEventsCreated;
   final int totalConfirmedWorkers;
   final List<EoPublicReviewItem> reviews;
@@ -528,10 +529,13 @@ class EoPublicProfileData {
     this.ratingAvg = 0.0,
     this.ratingCount = 0,
     this.totalEventsCompleted = 0,
+    this.totalEventsPublished = 0,
     this.totalEventsCreated = 0,
     this.totalConfirmedWorkers = 0,
     this.reviews = const [],
   });
+
+  bool get hasValidRating => ratingCount > 0 && ratingAvg >= 1.0 && ratingAvg <= 5.0;
 
   factory EoPublicProfileData.fromJson(Map<String, dynamic> json) {
     final rawReviews = (json['reviews'] is List)
@@ -540,6 +544,12 @@ class EoPublicProfileData {
             .map(EoPublicReviewItem.fromJson)
             .toList()
         : const <EoPublicReviewItem>[];
+
+    final parsedRatingCount = _parseNonNegativeInt(json['ratingCount']);
+    final rawAvg = _parseDouble(json['ratingAvg']);
+    final validRatingAvg = (parsedRatingCount > 0 && rawAvg != null && rawAvg >= 1.0 && rawAvg <= 5.0)
+        ? rawAvg
+        : 0.0;
 
     return EoPublicProfileData(
       eoId: json['eoId']?.toString() ?? '',
@@ -555,50 +565,94 @@ class EoPublicProfileData {
       description: json['description'] as String?,
       isVerified: json['isVerified'] == true,
       verifiedAt: json['verifiedAt'] != null ? DateTime.tryParse(json['verifiedAt'].toString())?.toLocal() : null,
-      ratingAvg: (json['ratingAvg'] is num) ? (json['ratingAvg'] as num).toDouble() : 0.0,
-      ratingCount: (json['ratingCount'] is num) ? (json['ratingCount'] as num).toInt() : 0,
-      totalEventsCompleted: (json['totalEventsCompleted'] is num) ? (json['totalEventsCompleted'] as num).toInt() : 0,
-      totalEventsCreated: (json['totalEventsCreated'] is num) ? (json['totalEventsCreated'] as num).toInt() : 0,
-      totalConfirmedWorkers: (json['totalConfirmedWorkers'] is num) ? (json['totalConfirmedWorkers'] as num).toInt() : 0,
+      ratingAvg: validRatingAvg,
+      ratingCount: validRatingAvg > 0.0 ? parsedRatingCount : 0,
+      totalEventsCompleted: _parseNonNegativeInt(json['totalEventsCompleted']),
+      totalEventsPublished: _parseNonNegativeInt(json['totalEventsPublished']),
+      totalEventsCreated: _parseNonNegativeInt(json['totalEventsCreated']),
+      totalConfirmedWorkers: _parseNonNegativeInt(json['totalConfirmedWorkers']),
       reviews: rawReviews,
     );
+  }
+
+  static int _parseNonNegativeInt(dynamic value) {
+    if (value is num) {
+      final v = value.toInt();
+      return v >= 0 ? v : 0;
+    }
+    if (value is String) {
+      final v = int.tryParse(value.trim());
+      if (v != null && v >= 0) return v;
+    }
+    return 0;
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim());
+    return null;
   }
 }
 
 class EoPublicReviewItem {
   final String reviewId;
+  final String? reviewerUserId;
+  final String? reviewerWorkerId;
   final String reviewerWorkerName;
   final String? eventName;
   final String? shiftName;
-  final int rating;
+  final int? rating;
   final String? comment;
   final List<String> tags;
   final DateTime? createdAt;
 
   const EoPublicReviewItem({
     required this.reviewId,
+    this.reviewerUserId,
+    this.reviewerWorkerId,
     required this.reviewerWorkerName,
     this.eventName,
     this.shiftName,
-    required this.rating,
+    this.rating,
     this.comment,
     this.tags = const [],
     this.createdAt,
   });
 
+  bool get hasValidRating => rating != null && rating! >= 1 && rating! <= 5;
+
   factory EoPublicReviewItem.fromJson(Map<String, dynamic> json) {
     return EoPublicReviewItem(
       reviewId: json['reviewId']?.toString() ?? '',
+      reviewerUserId: json['reviewerUserId']?.toString(),
+      reviewerWorkerId: json['reviewerWorkerId']?.toString(),
       reviewerWorkerName: (json['reviewerWorkerName'] as String?)?.trim().isNotEmpty == true
           ? (json['reviewerWorkerName'] as String).trim()
           : 'Nhân sự CANi',
       eventName: json['eventName'] as String?,
       shiftName: json['shiftName'] as String?,
-      rating: (json['rating'] is num) ? (json['rating'] as num).toInt() : 5,
+      rating: _parseValidStarRating(json['rating']),
       comment: json['comment'] as String?,
       tags: (json['tags'] is List) ? (json['tags'] as List).map((e) => e.toString()).toList() : const [],
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString())?.toLocal() : null,
     );
+  }
+
+  static int? _parseValidStarRating(dynamic raw) {
+    int? parsed;
+    if (raw is int) {
+      parsed = raw;
+    } else if (raw is num) {
+      if (raw == raw.roundToDouble()) {
+        parsed = raw.toInt();
+      }
+    } else if (raw is String) {
+      parsed = int.tryParse(raw.trim());
+    }
+    if (parsed != null && parsed >= 1 && parsed <= 5) {
+      return parsed;
+    }
+    return null;
   }
 }
 

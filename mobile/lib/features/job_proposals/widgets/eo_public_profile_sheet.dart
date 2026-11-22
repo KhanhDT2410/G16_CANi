@@ -125,7 +125,7 @@ class _EoPublicProfileSheetState extends ConsumerState<EoPublicProfileSheet> {
                 }
 
                 final eo = snapshot.data!;
-                final hasRatings = eo.ratingCount > 0;
+                final hasRatings = eo.hasValidRating;
                 final ratingLabel = hasRatings ? '${eo.ratingAvg.toStringAsFixed(1)} ★ (${eo.ratingCount})' : 'Chưa có';
 
                 return SingleChildScrollView(
@@ -234,13 +234,21 @@ class _EoPublicProfileSheetState extends ConsumerState<EoPublicProfileSheet> {
                             Expanded(
                               child: Column(
                                 children: [
-                                  Text('Sự kiện đã mở', style: TextStyle(fontSize: 11, color: cani.textMuted)),
+                                  Text('Đã hoàn thành', style: TextStyle(fontSize: 11, color: cani.textMuted)),
                                   const SizedBox(height: 4),
                                   Text(
                                     '${eo.totalEventsCompleted} sự kiện',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: cani.brand),
                                   ),
+                                  if (eo.totalEventsPublished > eo.totalEventsCompleted) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Đã xuất bản: ${eo.totalEventsPublished}',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 10.5, color: cani.textMuted),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -284,7 +292,9 @@ class _EoPublicProfileSheetState extends ConsumerState<EoPublicProfileSheet> {
                           'Điện thoại liên hệ',
                           eo.phone!.trim(),
                           cani,
-                          onTap: () => launchUrl(Uri.parse('tel:${eo.phone!.trim()}')),
+                          onTap: eo.phone!.contains('*')
+                              ? null
+                              : () => launchUrl(Uri.parse('tel:${eo.phone!.trim()}')),
                         ),
                       if (eo.email != null && eo.email!.trim().isNotEmpty)
                         _buildInfoRow(Icons.email_outlined, 'Email', eo.email!.trim(), cani),
@@ -344,17 +354,23 @@ class _EoPublicProfileSheetState extends ConsumerState<EoPublicProfileSheet> {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cani.textMain),
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.star_rounded, size: 15, color: Color(0xFFF59E0B)),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${r.rating}.0',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
-                  ),
-                ],
-              ),
+              if (r.hasValidRating)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, size: 15, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${r.rating}.0',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFFD97706)),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  'Chưa có điểm sao',
+                  style: TextStyle(fontSize: 11.5, fontStyle: FontStyle.italic, color: cani.textMuted),
+                ),
             ],
           ),
           if (r.eventName != null || r.shiftName != null || r.createdAt != null) ...[

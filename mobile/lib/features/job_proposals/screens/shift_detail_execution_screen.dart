@@ -798,14 +798,28 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       return;
     }
 
-    if (!_assignment.eoConfirmed && !_isPaymentConfirmed && _assignment.paymentStatus == 'NOT_DECLARED') {
+    if (!_assignment.eoConfirmed && !_isPaymentConfirmed) {
       await _refreshAssignment();
       if (!mounted) return;
       if (!_assignment.eoConfirmed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã làm mới! Vui lòng chờ Ban tổ chức kiểm tra ảnh nghiệm thu và bấm Duyệt công.'),
-            backgroundColor: Color(0xFF0284C7),
+          SnackBar(
+            content: const Text('Đã làm mới! Vui lòng chờ Ban tổ chức kiểm tra ảnh nghiệm thu và bấm Duyệt công.'),
+            backgroundColor: cani.brand,
+          ),
+        );
+        return;
+      }
+    }
+
+    if (!_assignment.eoConfirmed) {
+      await _refreshAssignment();
+      if (!mounted) return;
+      if (!_assignment.eoConfirmed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Ban tổ chức chưa bấm Duyệt công (Bước 3). Vui lòng chờ BTC duyệt công trước khi kết ca!'),
+            backgroundColor: cani.brand,
           ),
         );
         return;
@@ -896,12 +910,18 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     final isReviewed = isCompleted && _assignment.hasWorkerReviewed == true;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: cani.canvas,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        elevation: 0.5,
+        backgroundColor: cani.surface,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        surfaceTintColor: Colors.transparent,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: cani.border),
+        ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, size: 20, color: isDark ? Colors.white : Colors.black87),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 19, color: cani.textMain),
           onPressed: () => Navigator.pop(context, true),
         ),
         title: Text(
@@ -910,27 +930,28 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 15,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             color: cani.textMain,
           ),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.help_outline, color: cani.brand),
+            icon: Icon(Icons.help_outline_rounded, color: cani.brand, size: 22),
             onPressed: () {
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Quy trình vận hành ca làm'),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  title: const Text('Quy trình vận hành ca làm', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                   content: const Text(
                     '1. Có mặt tại địa điểm và quét QR Check-in để vào ca.\n'
                     '2. Hoàn thành Checklist đầu việc & chụp ảnh nghiệm thu ca làm.\n'
                     '3. Chờ Ban tổ chức kiểm tra & duyệt công hoàn thành.\n'
-                    '4. Ban tổ chức thanh toán thù lao -> Bạn kiểm tra & xác nhận đã nhận đủ tiền.\n'
+                    '4. Ban tổ chức thanh toán thù lao → Bạn kiểm tra & xác nhận đã nhận đủ tiền.\n'
                     '5. Quét mã QR Check-out để kết thúc ca.\n'
-                    '6. Gửi đánh giá (Rating) Ban tổ chức sau khi kết ca.',
-                    style: TextStyle(height: 1.5, fontSize: 13),
+                    '6. Gửi đánh giá Ban tổ chức sau khi kết ca.',
+                    style: TextStyle(height: 1.55, fontSize: 13),
                   ),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đã hiểu')),
@@ -945,6 +966,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         children: [
           Expanded(
             child: RefreshIndicator(
+              color: cani.brand,
               onRefresh: () async {
                 await Future.wait([
                   _refreshAssignment(),
@@ -959,209 +981,326 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                  // 1. Venue & Job Card (Shopee Driver Style)
+                  // 1. Hero Shift Info Card (CANi Clean Workforce Style)
                   Container(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cani.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: cani.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.16)
+                              : const Color(0xFF0F172A).withValues(alpha: 0.03),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Status pill + nút Chỉ đường
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: _isExpired
+                                    ? cani.dangerBg
+                                    : (isCompleted
+                                        ? cani.successBg
+                                        : (isCheckedIn ? cani.successBg : cani.brandSoft)),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _isExpired
+                                          ? cani.danger
+                                          : (isCompleted || isCheckedIn ? cani.success : cani.brand),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    '${_assignment.jobType} – ${_assignment.eventName}',
+                                    _isExpired
+                                        ? (_assignment.status == 'CANCELLED'
+                                            ? 'Ca đã bị hủy'
+                                            : (_assignment.status == 'NO_SHOW'
+                                                ? 'Vắng mặt (No-show)'
+                                                : 'Quá hạn điểm danh'))
+                                        : (isCompleted
+                                            ? 'Đã hoàn thành ca'
+                                            : (isCheckedIn ? 'Đang trong ca làm việc' : 'Đã xác nhận nhận ca')),
                                     style: TextStyle(
-                                      fontSize: 15.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                      height: 1.3,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: _isExpired
+                                          ? cani.danger
+                                          : (isCompleted || isCheckedIn ? cani.success : cani.brand),
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _assignment.venueAddress,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                                      height: 1.3,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.access_time_rounded, size: 14, color: cani.brand),
-                                      const SizedBox(width: 5),
-                                      Expanded(
-                                        child: Text(
-                                          '${_assignment.startTime.hour.toString().padLeft(2, '0')}:${_assignment.startTime.minute.toString().padLeft(2, '0')} - ${_assignment.endTime.hour.toString().padLeft(2, '0')}:${_assignment.endTime.minute.toString().padLeft(2, '0')} · ${_assignment.startTime.day.toString().padLeft(2, '0')}/${_assignment.startTime.month.toString().padLeft(2, '0')}/${_assignment.startTime.year}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (_assignment.eoId != null && _assignment.eoId!.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    InkWell(
-                                      onTap: () => EoPublicProfileSheet.show(
-                                        context,
-                                        eoId: _assignment.eoId!,
-                                        fallbackName: _assignment.eoName,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          color: cani.brandSoft,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: cani.brand.withValues(alpha: 0.25)),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              _assignment.eoVerified ? Icons.verified_rounded : Icons.apartment_rounded,
-                                              size: 14,
-                                              color: cani.brand,
-                                            ),
-                                            const SizedBox(width: 5),
-                                            Flexible(
-                                              child: Text(
-                                                '${_assignment.eoName ?? "Ban tổ chức"} · Xem hồ sơ BTC',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 11.5,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: cani.brand,
-                                                ),
-                                              ),
-                                            ),
-                                            Icon(Icons.chevron_right_rounded, size: 15, color: cani.brand),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const Spacer(),
                             InkWell(
                               onTap: _openGoogleMapsNavigation,
                               borderRadius: BorderRadius.circular(999),
                               child: Container(
-                                width: 44,
-                                height: 44,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: cani.brand.withValues(alpha: 0.1),
-                                  border: Border.all(color: cani.brand.withValues(alpha: 0.2)),
+                                  color: cani.brandSoft,
+                                  borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: Icon(Icons.directions, color: cani.brand, size: 22),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.near_me_rounded, color: cani.brand, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Chỉ đường',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: cani.brand,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        const Divider(height: 1),
-                        const SizedBox(height: 10),
+                        Text(
+                          '${_assignment.jobType} – ${_assignment.eventName}',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: cani.textMain,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Thù lao: ${_formatCurrency(_assignment.hourlyWage)}/giờ',
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0D9488)),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Icon(Icons.location_on_outlined, size: 15, color: cani.textMuted),
                             ),
-                            Text(
-                              'Tổng ước tính: ${_formatCurrency(_assignment.totalPay)}',
-                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFFEA580C)),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                _assignment.venueAddress,
+                                style: TextStyle(
+                                  fontSize: 12.8,
+                                  color: cani.textMuted,
+                                  height: 1.35,
+                                ),
+                              ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Icon(Icons.schedule_rounded, size: 15, color: cani.textMuted),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                '${_assignment.startTime.hour.toString().padLeft(2, '0')}:${_assignment.startTime.minute.toString().padLeft(2, '0')} - ${_assignment.endTime.hour.toString().padLeft(2, '0')}:${_assignment.endTime.minute.toString().padLeft(2, '0')} · ${_assignment.startTime.day.toString().padLeft(2, '0')}/${_assignment.startTime.month.toString().padLeft(2, '0')}/${_assignment.startTime.year}',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: cani.textBody,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_assignment.eoId != null && _assignment.eoId!.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          InkWell(
+                            onTap: () => EoPublicProfileSheet.show(
+                              context,
+                              eoId: _assignment.eoId!,
+                              fallbackName: _assignment.eoName,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: cani.brandSoft,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: cani.brand.withValues(alpha: 0.2)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _assignment.eoVerified ? Icons.verified_rounded : Icons.apartment_rounded,
+                                    size: 14,
+                                    color: cani.brand,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      '${_assignment.eoName ?? "Ban tổ chức"} · Xem hồ sơ BTC',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11.8,
+                                        fontWeight: FontWeight.w700,
+                                        color: cani.brand,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(Icons.chevron_right_rounded, size: 15, color: cani.brand),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: cani.canvas,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: cani.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Đơn giá thù lao', style: TextStyle(fontSize: 11, color: cani.textMuted)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${_formatCurrency(_assignment.hourlyWage)}/giờ',
+                                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: cani.textMain),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(width: 1, height: 28, color: cani.border),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text('Tổng ước tính ca', style: TextStyle(fontSize: 11, color: cani.textMuted)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _formatCurrency(_assignment.totalPay),
+                                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: cani.brand),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  // 2. Banner Trạng thái
+                  // 2. Countdown & Quy trình 5 bước vận hành
                   Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    color: _isExpired
-                        ? cani.danger
-                        : const Color(0xFF16A34A),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Center(
-                      child: Text(
-                        _isExpired
-                            ? (_assignment.status == 'CANCELLED'
-                                ? 'Ca làm việc đã bị hủy'
-                                : (_assignment.status == 'NO_SHOW'
-                                    ? 'Vắng mặt không điểm danh (No-show)'
-                                    : 'Ca làm việc đã quá hạn điểm danh vào ca'))
-                            : (isCompleted
-                                ? 'Ca làm việc đã hoàn thành thành công'
-                                : (isCheckedIn ? 'Đang trong ca làm việc' : 'Ban tổ chức đã xác nhận nhận ca')),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14.5,
+                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cani.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: cani.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isDark
+                              ? Colors.black.withValues(alpha: 0.16)
+                              : const Color(0xFF0F172A).withValues(alpha: 0.03),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
+                      ],
                     ),
-                  ),
-
-                  // 3. Countdown & Quy trình 5 bước vận hành
-                  Container(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                     child: Column(
                       children: [
-                        Text(
-                          isCompleted ? 'Ca làm việc đã kết thúc' : _countdownText,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isCompleted
+                                  ? Icons.task_alt_rounded
+                                  : (_isExpired ? Icons.event_busy_rounded : Icons.timelapse_rounded),
+                              size: 18,
+                              color: _isExpired
+                                  ? cani.danger
+                                  : (isCompleted ? cani.success : cani.brand),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                isCompleted ? 'Ca làm việc đã kết thúc' : _countdownText,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: _isExpired
+                                      ? cani.danger
+                                      : (isCompleted ? cani.success : cani.textMain),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
                             color: _isExpired
-                                ? cani.danger
-                                : (isDark ? cani.accent : const Color(0xFF0284C7)),
+                                ? cani.dangerBg
+                                : (isCompleted ? cani.successBg : cani.brandSoft),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _isExpired
+                                ? 'Đã qua thời gian kết thúc ca mà chưa có Check-in. Bạn vẫn có thể xem thông tin ca, checklist hoặc gửi khiếu nại nếu có vấn đề.'
+                                : (isCompleted
+                                    ? (isReviewed
+                                        ? 'Cảm ơn bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức.'
+                                        : 'Bạn đã Check-out thành công. Hãy gửi đánh giá Ban tổ chức bên dưới!')
+                                    : (isCheckedIn
+                                        ? (!_isWorkReadyForEoConfirm
+                                            ? 'Bước 2: Hoàn tất checklist và chụp ảnh nghiệm thu để Ban tổ chức duyệt công.'
+                                            : (!_assignment.eoConfirmed
+                                                ? 'Bước 3: Đã hoàn tất đầu việc — đang chờ Ban tổ chức kiểm tra & bấm Duyệt công.'
+                                                : (!_isPaymentConfirmed
+                                                    ? 'Bước 4: Ban tổ chức đã duyệt công. Hãy xác nhận nhận đủ thù lao trước khi kết ca.'
+                                                    : 'Bước 5: Đã xác nhận thanh toán! Quét QR Check-out để hoàn tất ca làm.')))
+                                        : 'Bước 1: Quét mã QR Check-in khi có mặt tại địa điểm sự kiện.')),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _isExpired
+                                  ? cani.danger
+                                  : (isCompleted ? cani.success : cani.brand),
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _isExpired
-                              ? 'Đã qua thời gian kết thúc ca mà chưa có Check-in. Bạn vẫn có thể xem thông tin ca, checklist hoặc gửi khiếu nại nếu có vấn đề.'
-                              : (isCompleted
-                                  ? (isReviewed
-                                      ? 'Cảm ơn bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức.'
-                                      : 'Bạn đã Check-out thành công. Hãy gửi đánh giá (Rating) Ban tổ chức bên dưới!')
-                                  : (isCheckedIn
-                                      ? (!_isWorkReadyForEoConfirm
-                                          ? '* Bước 2: Hoàn tất checklist và chụp ảnh nghiệm thu để Ban tổ chức duyệt công.'
-                                          : (!_assignment.eoConfirmed
-                                              ? '* Bước 3: Chờ Ban tổ chức kiểm tra & bấm Duyệt công.'
-                                              : (!_isPaymentConfirmed
-                                                  ? '* Bước 4: Xác nhận nhận đủ thù lao từ Ban tổ chức trước khi quét QR Check-out.'
-                                                  : '* Bước 5: Đã xác nhận thanh toán! Vui lòng quét QR Check-out để kết thúc ca.')))
-                                      : '* Bước 1: Quét mã QR Check-in khi có mặt tại địa điểm sự kiện.')),
-                          style: TextStyle(
-                            fontSize: 11.8,
-                            fontWeight: FontWeight.w600,
-                            color: _isExpired
-                                ? cani.danger
-                                : (isCompleted ? const Color(0xFF059669) : const Color(0xFFEA580C)),
-                            height: 1.4,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         _buildWorkflowStepper(
                           isExpired: _isExpired,
                           isCheckedIn: isCheckedIn,
@@ -1175,20 +1314,20 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     ),
                   ),
 
-                  // 4. GPS Geofencing Warning (Chỉ hiện khi ca chưa hoàn thành và chưa hết hạn)
+                  // 3. GPS Geofencing Card (Chỉ hiện khi ca chưa hoàn thành và chưa hết hạn)
                   if (!isCompleted && !_isExpired)
                     Container(
                       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: _distanceMeters != null && _distanceMeters! > 200
-                            ? const Color(0xFFFEF2F2)
-                            : const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(12),
+                            ? cani.dangerBg
+                            : cani.successBg,
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: _distanceMeters != null && _distanceMeters! > 200
-                              ? const Color(0xFFFCA5A5)
-                              : const Color(0xFF86EFAC),
+                              ? cani.danger.withValues(alpha: 0.35)
+                              : cani.success.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -1196,11 +1335,11 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           Icon(
                             _distanceMeters != null && _distanceMeters! > 200
                                 ? Icons.warning_amber_rounded
-                                : Icons.check_circle_outline,
-                              color: _distanceMeters != null && _distanceMeters! > 200
-                                  ? cani.danger
-                                  : const Color(0xFF16A34A),
-                            size: 24,
+                                : Icons.verified_user_outlined,
+                            color: _distanceMeters != null && _distanceMeters! > 200
+                                ? cani.danger
+                                : cani.success,
+                            size: 22,
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -1209,29 +1348,27 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                               children: [
                                 Text(
                                   _distanceMeters != null && _distanceMeters! > 200
-                                      ? 'Cảnh báo khoảng cách (> 200m)'
+                                      ? 'Ngoài bán kính điểm danh (> 200m)'
                                       : 'Vị trí điểm danh hợp lệ',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w700,
                                     fontSize: 13,
                                     color: _distanceMeters != null && _distanceMeters! > 200
-                                        ? const Color(0xFF991B1B)
-                                        : const Color(0xFF166534),
+                                        ? cani.danger
+                                        : cani.success,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   _distanceMeters != null
                                       ? (_distanceMeters! > 200
-                                          ? 'Bạn đang cách địa điểm ${_distanceMeters! >= 1000 ? "${(_distanceMeters! / 1000).toStringAsFixed(1)}km" : "${_distanceMeters!.toInt()}m"}. Hãy di chuyển đến gần địa điểm trước khi quét mã!'
-                                          : 'Bạn đang cách địa điểm ${_distanceMeters!.toInt()}m (nằm trong bán kính 200m cho phép).')
+                                          ? 'Cách địa điểm ${_distanceMeters! >= 1000 ? "${(_distanceMeters! / 1000).toStringAsFixed(1)}km" : "${_distanceMeters!.toInt()}m"}. Di chuyển lại gần trước khi quét mã.'
+                                          : 'Cách địa điểm ${_distanceMeters!.toInt()}m (trong bán kính 200m cho phép).')
                                       : (_isLoadingGps ? 'Đang xác định khoảng cách GPS...' : (_gpsError ?? 'Không có dữ liệu GPS')),
                                   style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: _distanceMeters != null && _distanceMeters! > 200
-                                        ? const Color(0xFFB91C1C)
-                                        : const Color(0xFF15803D),
-                                    height: 1.3,
+                                    fontSize: 11.8,
+                                    color: cani.textBody,
+                                    height: 1.35,
                                   ),
                                 ),
                               ],
@@ -1240,17 +1377,17 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           if (_distanceMeters != null && _distanceMeters! > 200)
                             TextButton(
                               onPressed: _openGoogleMapsNavigation,
-                                style: TextButton.styleFrom(
-                                  foregroundColor: cani.brand,
+                              style: TextButton.styleFrom(
+                                foregroundColor: cani.brand,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                               ),
-                              child: const Text('Chỉ đường', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              child: const Text('Chỉ đường', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                             ),
                         ],
                       ),
                     ),
 
-                  // 5. Checklist Công việc Chi tiết (Luôn hiển thị để xem trước, chỉ cho tương tác khi đã Check-in vào ca)
+                  // 4. Checklist Công việc Chi tiết
                   KeyedSubtree(
                     key: _checklistSectionKey,
                     child: ShiftChecklistSection(
@@ -1269,18 +1406,24 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     ),
                   ),
 
-                  // 6. Xác nhận Thanh toán Thù lao (Hard Gate trước Check-out)
+                  // 5. Xác nhận Thanh toán Thù lao
                   if (isCheckedIn || isCompleted)
                     Container(
                       key: _paymentSectionKey,
                       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _isPaymentConfirmed ? const Color(0xFF86EFAC) : const Color(0xFFBFDBFE),
-                          width: 1.5,
-                        ),
+                        color: cani.surface,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: cani.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark
+                                ? Colors.black.withValues(alpha: 0.16)
+                                : const Color(0xFF0F172A).withValues(alpha: 0.03),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -1288,78 +1431,137 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.payments_outlined, size: 20, color: cani.brand),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'THANH TOÁN THÙ LAO',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                              ),
-                              const Spacer(),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: cani.brandSoft,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(Icons.payments_outlined, size: 17, color: cani.brand),
+                              ),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  'Thanh toán thù lao',
+                                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: cani.textMain),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: _isPaymentConfirmed
-                                      ? const Color(0xFFDCFCE7)
+                                      ? cani.successBg
                                       : (_assignment.eoConfirmed && _assignment.paymentStatus == 'NOT_DECLARED'
-                                          ? const Color(0xFFE0F2FE)
-                                          : const Color(0xFFFEF3C7)),
-                                  borderRadius: BorderRadius.circular(6),
+                                          ? cani.brandSoft
+                                          : cani.warningBg),
+                                  borderRadius: BorderRadius.circular(999),
                                 ),
                                 child: Text(
                                   _paymentStatusLabel(_assignment.paymentStatus),
                                   style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                     color: _isPaymentConfirmed
-                                        ? const Color(0xFF16A34A)
+                                        ? cani.success
                                         : (_assignment.eoConfirmed && _assignment.paymentStatus == 'NOT_DECLARED'
-                                            ? const Color(0xFF0284C7)
-                                            : const Color(0xFFD97706)),
+                                            ? cani.brand
+                                            : cani.warning),
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Thù lao thỏa thuận:', style: TextStyle(fontSize: 12.5, color: cani.textMuted)),
-                              Text(
-                                _formatCurrency(_assignment.totalPay),
-                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('BTC khai báo thanh toán:', style: TextStyle(fontSize: 12.5, color: cani.textMuted)),
-                              Text(
-                                _assignment.declaredAmount > 0
-                                    ? _formatCurrency(_assignment.declaredAmount)
-                                    : 'Chưa khai báo',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: _assignment.declaredAmount > 0 ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: cani.canvas,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: cani.border),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Thù lao thỏa thuận', style: TextStyle(fontSize: 12.5, color: cani.textMuted)),
+                                    Text(
+                                      _formatCurrency(_assignment.totalPay),
+                                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: cani.textMain),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('BTC khai báo thanh toán', style: TextStyle(fontSize: 12.5, color: cani.textMuted)),
+                                    Text(
+                                      _assignment.declaredAmount > 0
+                                          ? _formatCurrency(_assignment.declaredAmount)
+                                          : 'Chưa khai báo',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: _assignment.declaredAmount > 0 ? cani.success : cani.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                           if (_assignment.paymentProofUrl != null && _assignment.paymentProofUrl!.isNotEmpty) ...[
                             const SizedBox(height: 10),
-                            GestureDetector(
+                            InkWell(
                               onTap: () => _showEvidenceViewer(_assignment.paymentProofUrl!, 'Chứng từ thanh toán từ BTC'),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: buildResolvedImageWidget(
-                                  _assignment.paymentProofUrl!,
-                                  height: 130,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorText: 'Không thể tải ảnh chứng từ',
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: cani.canvas,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: cani.border),
+                                ),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: SizedBox(
+                                        width: 52,
+                                        height: 52,
+                                        child: buildResolvedImageWidget(
+                                          _assignment.paymentProofUrl!,
+                                          height: 52,
+                                          width: 52,
+                                          fit: BoxFit.cover,
+                                          errorText: null,
+                                          errorBuilder: (ctx) => Container(
+                                            color: cani.brandSoft,
+                                            child: Icon(Icons.receipt_long_outlined, size: 22, color: cani.brand),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Chứng từ thanh toán từ BTC',
+                                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: cani.textMain),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Chạm để xem ảnh gốc & phóng to',
+                                            style: TextStyle(fontSize: 11.5, color: cani.textMuted),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(Icons.open_in_new_rounded, size: 17, color: cani.brand),
+                                  ],
                                 ),
                               ),
                             ),
@@ -1370,20 +1572,21 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFDCFCE7),
+                                color: cani.successBg,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFF86EFAC)),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.check_circle, size: 18, color: Color(0xFF16A34A)),
+                                  Icon(Icons.check_circle_rounded, size: 18, color: cani.success),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       isCompleted
                                           ? 'Đã xác nhận thanh toán và hoàn thành Check-out.'
-                                          : 'Đã xác nhận thanh toán — hãy bấm Quét QR Check-out để kết thúc ca!',
-                                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF15803D)),
+                                          : (_assignment.eoConfirmed
+                                              ? 'Đã xác nhận thanh toán — bấm Quét QR Check-out để kết thúc ca.'
+                                              : 'Đã ghi nhận xác nhận thanh toán — chờ BTC bấm Duyệt công (Bước 3).'),
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.success),
                                     ),
                                   ),
                                 ],
@@ -1394,80 +1597,84 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: _assignment.eoConfirmed ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9),
+                                color: _assignment.eoConfirmed ? cani.brandSoft : cani.canvas,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: _assignment.eoConfirmed ? const Color(0xFFBAE6FD) : const Color(0xFFCBD5E1),
-                                ),
+                                border: Border.all(color: _assignment.eoConfirmed ? cani.brand.withValues(alpha: 0.2) : cani.border),
                               ),
                               child: Row(
                                 children: [
                                   Icon(
-                                    _assignment.eoConfirmed ? Icons.verified_outlined : Icons.schedule,
+                                    _assignment.eoConfirmed ? Icons.verified_outlined : Icons.schedule_rounded,
                                     size: 18,
-                                    color: _assignment.eoConfirmed ? const Color(0xFF0284C7) : const Color(0xFF475569),
+                                    color: _assignment.eoConfirmed ? cani.brand : cani.textMuted,
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       _assignment.eoConfirmed
-                                          ? 'BTC đã xác nhận hoàn thành công việc! Vui lòng chờ BTC khai báo thanh toán thù lao.'
-                                          : 'Chờ bạn hoàn tất đầu việc & nộp ảnh nghiệm thu để BTC duyệt công trước khi thanh toán.',
+                                          ? 'BTC đã duyệt công! Vui lòng chờ BTC khai báo thanh toán thù lao.'
+                                          : 'Hoàn tất đầu việc & ảnh nghiệm thu để BTC duyệt công trước khi thanh toán.',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
-                                        color: _assignment.eoConfirmed ? const Color(0xFF0369A1) : const Color(0xFF475569),
+                                        color: _assignment.eoConfirmed ? cani.brand : cani.textBody,
                                       ),
                                     ),
                                   ),
                                   IconButton(
                                     onPressed: _refreshAssignment,
                                     tooltip: 'Làm mới trạng thái',
-                                    icon: const Icon(Icons.refresh, size: 18),
+                                    icon: Icon(Icons.refresh_rounded, size: 18, color: cani.brand),
                                     visualDensity: VisualDensity.compact,
                                   ),
                                 ],
                               ),
                             )
                           else if (_isConfirmingPayment)
-                            const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
+                            Center(child: Padding(padding: const EdgeInsets.all(8), child: CircularProgressIndicator(color: cani.brand)))
                           else
-                            Row(
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => _handleConfirmPayment('RECEIVED_FULL'),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFF16A34A),
-                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    child: const Text('Đã nhận đủ', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                                FilledButton.icon(
+                                  onPressed: () => _handleConfirmPayment('RECEIVED_FULL'),
+                                  icon: const Icon(Icons.check_circle_outline_rounded, size: 17),
+                                  label: const Text('Xác nhận đã nhận đủ thù lao', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: cani.success,
+                                    padding: const EdgeInsets.symmetric(vertical: 11),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => _handleConfirmPayment('RECEIVED_PARTIAL'),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD97706),
-                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => _handleConfirmPayment('RECEIVED_PARTIAL'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: cani.warning,
+                                          side: BorderSide(color: cani.warning.withValues(alpha: 0.45)),
+                                          padding: const EdgeInsets.symmetric(vertical: 9),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        child: const Text('Nhận 1 phần', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                      ),
                                     ),
-                                    child: const Text('Đã nhận 1 phần', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => _handleConfirmPayment('NOT_RECEIVED'),
-                                     style: FilledButton.styleFrom(
-                                       backgroundColor: cani.danger,
-                                       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => _handleConfirmPayment('NOT_RECEIVED'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: cani.danger,
+                                          side: BorderSide(color: cani.danger.withValues(alpha: 0.45)),
+                                          padding: const EdgeInsets.symmetric(vertical: 9),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        child: const Text('Chưa nhận', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                      ),
                                     ),
-                                    child: const Text('Chưa nhận', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
-                                  ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1475,22 +1682,23 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                       ),
                     ),
 
-                  // 7. Quick Actions Row (Chat BTC & Khiếu nại — bỏ nút Bản đồ thừa do đã có chỉ đường ở trên)
+                  // 6. Quick Actions Row (Surface Cards gọn đẹp đồng bộ)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Row(
                       children: [
                         Expanded(
                           child: _buildQuickAction(
-                            icon: Icons.chat_outlined,
-                            label: 'Chat BTC',
+                            icon: Icons.chat_bubble_outline_rounded,
+                            label: 'Chat với BTC',
                             onTap: _openChatSheet,
                           ),
                         ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: _buildQuickAction(
                             icon: Icons.gavel_rounded,
-                            label: 'Khiếu nại',
+                            label: 'Khiếu nại ca làm',
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -1510,7 +1718,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           ),
         ),
 
-          // 8. Bottom Sticky Action Bar (Theo đúng 5 bước vận hành; ẩn QR nếu ca đã hết hạn)
+          // 7. Bottom Sticky Action Bar (CANi Brand Style)
           _buildBottomStickyBar(
             context: context,
             isDark: isDark,
@@ -1534,13 +1742,14 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     required bool isCompleted,
     required bool isReviewed,
   }) {
-    Color bgColor;
+    Color? solidColor;
+    bool useBrandGradient = false;
     IconData iconData;
     String label;
     bool isActionDisabled = false;
 
     if (isExpired) {
-      bgColor = const Color(0xFF64748B);
+      solidColor = const Color(0xFF64748B);
       iconData = Icons.event_busy_rounded;
       label = _assignment.status == 'CANCELLED'
           ? 'CA LÀM VIỆC ĐÃ BỊ HỦY'
@@ -1549,99 +1758,115 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
               : 'ĐÃ HẾT HẠN ĐIỂM DANH VÀO CA');
       isActionDisabled = true;
     } else if (isCompleted) {
-      bgColor = isReviewed ? const Color(0xFF16A34A) : const Color(0xFF0D9488);
+      solidColor = isReviewed ? cani.success : null;
+      useBrandGradient = !isReviewed;
       iconData = isReviewed ? Icons.verified_rounded : Icons.star_rate_rounded;
       label = isReviewed
           ? 'ĐÃ HOÀN THÀNH & ĐÁNH GIÁ CA LÀM'
-          : 'ĐÁNH GIÁ BAN TỔ CHỨC (RATING)';
+          : 'ĐÁNH GIÁ BAN TỔ CHỨC';
     } else if (!isCheckedIn) {
       if (_isBeforeCheckinWindow) {
         final gate = _earliestCheckinTime;
         final gateTime = '${gate.hour.toString().padLeft(2, '0')}:${gate.minute.toString().padLeft(2, '0')}';
-        bgColor = const Color(0xFF64748B);
+        solidColor = const Color(0xFF64748B);
         iconData = Icons.lock_clock_rounded;
         label = 'CHƯA ĐẾN GIỜ CHECK-IN (MỞ LÚC $gateTime)';
       } else {
-        bgColor = cani.brand;
+        useBrandGradient = true;
         iconData = Icons.qr_code_scanner_rounded;
         label = 'QUÉT QR CHECK-IN (VÀO CA)';
       }
     } else if (!_isWorkReadyForEoConfirm) {
-      bgColor = const Color(0xFF0284C7);
+      useBrandGradient = true;
       iconData = Icons.checklist_rounded;
       label = 'HOÀN TẤT ĐẦU VIỆC & ẢNH NGHIỆM THU';
-    } else if (!_assignment.eoConfirmed &&
-        !_isPaymentConfirmed &&
-        _assignment.paymentStatus == 'NOT_DECLARED') {
-      bgColor = const Color(0xFF475569);
+    } else if (!_assignment.eoConfirmed) {
+      solidColor = const Color(0xFF475569);
       iconData = Icons.hourglass_top_rounded;
-      label = 'CHỜ BAN TỔ CHỨC XÁC NHẬN CÔNG';
+      label = 'CHỜ BAN TỔ CHỨC DUYỆT CÔNG (BƯỚC 3)';
     } else if (!_isPaymentConfirmed) {
       final isWaitingDeclare =
           _assignment.paymentStatus == 'NOT_DECLARED' && _assignment.declaredAmount <= 0;
-      bgColor = isWaitingDeclare ? const Color(0xFF0369A1) : const Color(0xFFD97706);
+      solidColor = isWaitingDeclare ? const Color(0xFF475569) : cani.brand;
       iconData = isWaitingDeclare ? Icons.refresh_rounded : Icons.payments_outlined;
       label = isWaitingDeclare
           ? 'CHỜ BAN TỔ CHỨC THANH TOÁN THÙ LAO'
           : 'XÁC NHẬN ĐÃ NHẬN THÙ LAO';
     } else {
-      bgColor = const Color(0xFFEA580C);
+      useBrandGradient = true;
       iconData = Icons.qr_code_scanner_rounded;
       label = 'QUÉT QR CHECK-OUT (KẾT THÚC CA)';
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        color: cani.surface,
+        border: Border(top: BorderSide(color: cani.border)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 12,
             offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 52,
+        child: Container(
+          height: 50,
           width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: (useBrandGradient && !isActionDisabled)
+                ? LinearGradient(
+                    colors: cani.brandGradient,
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  )
+                : null,
+            color: isActionDisabled
+                ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
+                : (useBrandGradient ? null : solidColor),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: (useBrandGradient && !isActionDisabled)
+                ? [
+                    BoxShadow(
+                      color: cani.brand.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
           child: ElevatedButton(
             onPressed: isActionDisabled ? null : _handleBottomAction,
             style: ElevatedButton.styleFrom(
-              backgroundColor: bgColor,
-              disabledBackgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+              backgroundColor: Colors.transparent,
+              disabledBackgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
               foregroundColor: Colors.white,
-              disabledForegroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-              elevation: isActionDisabled ? 0 : 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              disabledForegroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: (isActionDisabled ? Colors.black : Colors.white).withValues(alpha: 0.16),
-                  ),
-                  child: Icon(
-                    iconData,
-                    size: 15,
-                    color: isActionDisabled
-                        ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569))
-                        : Colors.white,
-                  ),
+                Icon(
+                  iconData,
+                  size: 18,
+                  color: isActionDisabled
+                      ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                      : Colors.white,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     label,
                     style: const TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.3,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1663,12 +1888,45 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     required bool isCompleted,
     required bool isReviewed,
   }) {
+    final cani = Theme.of(context).cani;
+    final step1Done = isCheckedIn || isCompleted;
+    final step2Done = (isCheckedIn && isWorkReady) || isEoConfirmed || isCompleted;
+    final step3Done = isEoConfirmed || isCompleted;
+    // Không bao giờ đánh dấu Bước 4 hoàn thành khi Bước 3 (EO duyệt công) chưa xong
+    final step4Done = step3Done && (isPaymentConfirmed || isCompleted);
+    final step5Done = isCompleted && isReviewed;
+
     final steps = [
-      (label: 'Vào ca', done: isCheckedIn || isCompleted, active: !isCheckedIn && !isCompleted && !isExpired, failed: isExpired),
-      (label: 'Đầu việc', done: (isCheckedIn && isWorkReady) || isEoConfirmed || isCompleted, active: isCheckedIn && !isWorkReady && !isEoConfirmed, failed: false),
-      (label: 'Duyệt', done: isEoConfirmed || isCompleted, active: isCheckedIn && isWorkReady && !isEoConfirmed, failed: false),
-      (label: 'Thù lao', done: isPaymentConfirmed, active: isCheckedIn && isEoConfirmed && !isPaymentConfirmed, failed: false),
-      (label: 'Kết ca', done: isCompleted && isReviewed, active: (isCheckedIn && isPaymentConfirmed) || (isCompleted && !isReviewed), failed: false),
+      (
+        label: 'Vào ca',
+        done: step1Done,
+        active: !step1Done && !isExpired,
+        failed: isExpired,
+      ),
+      (
+        label: 'Đầu việc',
+        done: step2Done,
+        active: isCheckedIn && !step2Done,
+        failed: false,
+      ),
+      (
+        label: 'Duyệt',
+        done: step3Done,
+        active: isCheckedIn && step2Done && !step3Done,
+        failed: false,
+      ),
+      (
+        label: 'Thù lao',
+        done: step4Done,
+        active: isCheckedIn && step3Done && !step4Done,
+        failed: false,
+      ),
+      (
+        label: 'Kết ca',
+        done: step5Done,
+        active: (isCheckedIn && step4Done && !isCompleted) || (isCompleted && !isReviewed),
+        failed: false,
+      ),
     ];
 
     return Row(
@@ -1678,43 +1936,45 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
             child: Column(
               children: [
                 Container(
-                  width: 22,
-                  height: 22,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: steps[i].failed
-                        ? const Color(0xFFDC2626)
+                        ? cani.danger
                         : (steps[i].done
-                            ? const Color(0xFF16A34A)
-                            : (steps[i].active ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0))),
+                            ? cani.success
+                            : (steps[i].active ? cani.brand : cani.border)),
                   ),
                   child: Center(
                     child: steps[i].failed
-                        ? const Icon(Icons.close, size: 13, color: Colors.white)
+                        ? const Icon(Icons.close_rounded, size: 14, color: Colors.white)
                         : (steps[i].done
-                            ? const Icon(Icons.check, size: 13, color: Colors.white)
+                            ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
                             : Text(
                                 '${i + 1}',
                                 style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: steps[i].active ? Colors.white : const Color(0xFF64748B),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: steps[i].active ? Colors.white : cani.textMuted,
                                 ),
                               )),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 5),
                 Text(
                   steps[i].label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 10,
                     fontWeight: (steps[i].active || steps[i].done) ? FontWeight.w700 : FontWeight.w500,
-                    color: steps[i].done
-                        ? const Color(0xFF16A34A)
-                        : (steps[i].active ? const Color(0xFF0284C7) : const Color(0xFF94A3B8)),
+                    color: steps[i].failed
+                        ? cani.danger
+                        : (steps[i].done
+                            ? cani.success
+                            : (steps[i].active ? cani.brand : cani.textMuted)),
                   ),
                 ),
               ],
@@ -1723,9 +1983,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           if (i < steps.length - 1)
             Expanded(
               child: Container(
-                height: 2,
-                margin: const EdgeInsets.only(bottom: 16),
-                color: steps[i].done ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                height: 2.5,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  color: steps[i].done ? cani.success.withValues(alpha: 0.45) : cani.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
         ],
@@ -1738,29 +2001,38 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     required String label,
     required VoidCallback onTap,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 24, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+    final cani = Theme.of(context).cani;
+    return Material(
+      color: cani.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: cani.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: cani.brand),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: cani.textMain,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

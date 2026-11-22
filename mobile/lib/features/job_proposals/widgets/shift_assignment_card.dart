@@ -249,31 +249,33 @@ class ShiftAssignmentCard extends StatelessWidget {
                     ),
                   ),
 
-                // Nút Quét QR Lớn cao 52px màu Teal chỉ hiện khi ca còn hiệu lực (không hiển thị khi đã kết thúc/hết hạn)
+                // Nút Quét QR Lớn cao 48px đồng bộ Brand Gradient CANi chỉ hiện khi ca còn hiệu lực
                 if (!isCompleted && !isExpired) ...[
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 48,
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                        gradient: LinearGradient(
+                          colors: cani.brandGradient,
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
                         ),
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x550D9488),
-                            blurRadius: 16,
-                            offset: Offset(0, 5),
+                            color: cani.brand.withValues(alpha: 0.24),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: ElevatedButton.icon(
                         onPressed: onQrScan,
-                        icon: const Icon(Icons.qr_code_scanner, size: 19, color: Colors.white),
+                        icon: const Icon(Icons.qr_code_scanner_rounded, size: 18, color: Colors.white),
                         label: Text(
-                          isCheckedIn ? 'Quét QR Check-out Thực Địa' : 'Quét QR Check-in Thực Địa',
+                          isCheckedIn ? 'Quét QR Check-out (Kết ca)' : 'Quét QR Check-in (Vào ca)',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
@@ -299,17 +301,15 @@ class ShiftAssignmentCard extends StatelessWidget {
                         Expanded(
                           child: TextButton.icon(
                             onPressed: onOpenChecklist,
-                            icon: const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF0D9488)),
-                            label: const Text(
-                              'Vận hành & Checklist',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0D9488)),
+                            icon: Icon(Icons.fact_check_outlined, size: 16, color: cani.brand),
+                            label: Text(
+                              'Chi tiết & Đầu việc',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.brand),
                             ),
                             style: TextButton.styleFrom(
-                              backgroundColor: isDark
-                                  ? const Color(0xFF134E4A).withValues(alpha: 0.35)
-                                  : const Color(0xFFF0FDFA),
+                              backgroundColor: cani.brandSoft,
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
@@ -357,17 +357,21 @@ class ShiftAssignmentCard extends StatelessWidget {
 
                 const SizedBox(height: 12),
 
-                // Khung Thù Lao & Nút Xác Nhận
+                // Khung Thù Lao & Nút Xác Nhận (CANi Clean Surface)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.15 : 0.08),
+                    color: isDark ? cani.canvas : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.30)),
+                    border: Border.all(color: cani.border),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.monetization_on_outlined, size: 16, color: Color(0xFF059669)),
+                      Icon(
+                        Icons.payments_outlined,
+                        size: 16,
+                        color: isConfirmedFull ? cani.success : cani.brand,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text.rich(
@@ -377,20 +381,20 @@ class ShiftAssignmentCard extends StatelessWidget {
                                     ? 'BTC khai báo: '
                                     : 'BTC đã thanh toán: ')
                                 : 'Thù lao: ',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
+                            style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontWeight: FontWeight.w600),
                             children: [
                               TextSpan(
                                 text: isDeclared && a.declaredAmount > 0 && a.declaredAmount < a.totalPay
                                     ? '${a.declaredAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ / ${a.totalPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ'
                                     : '${(isDeclared && a.declaredAmount > 0 ? a.declaredAmount : a.totalPay).toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
-                                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+                                style: TextStyle(fontWeight: FontWeight.w800, color: cani.textMain),
                               ),
                               if (isDeclared && a.paymentMethod != null)
                                 TextSpan(
-                                  text: ' (${a.paymentMethod == 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Tiền mặt'})',
+                                  text: ' · ${a.paymentMethod == 'BANK_TRANSFER' ? 'CK' : 'Tiền mặt'}',
                                   style: TextStyle(
                                     fontSize: 10.5,
-                                    color: isDark ? const Color(0xFFA7F3D0) : const Color(0xFF065F46),
+                                    color: cani.textMuted,
                                   ),
                                 ),
                             ],
@@ -402,57 +406,57 @@ class ShiftAssignmentCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF059669),
-                            borderRadius: BorderRadius.circular(10),
+                            color: cani.successBg,
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          child: const Text(
-                            'Đã nhận đủ ✓',
-                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          child: Text(
+                            'Đã nhận đủ',
+                            style: TextStyle(color: cani.success, fontSize: 10.5, fontWeight: FontWeight.w700),
                           ),
                         )
                       else if (isConfirmedPartial)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFD97706),
-                            borderRadius: BorderRadius.circular(10),
+                            color: cani.warningBg,
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          child: const Text(
-                            'Nhận một phần ⚠️',
-                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          child: Text(
+                            'Nhận 1 phần',
+                            style: TextStyle(color: cani.warning, fontSize: 10.5, fontWeight: FontWeight.w700),
                           ),
                         )
                       else if (isDisputed)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: cani.danger,
-                            borderRadius: BorderRadius.circular(10),
+                            color: cani.dangerBg,
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          child: const Text(
-                            'Đang khiếu nại ⚖️',
-                            style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                          child: Text(
+                            'Đang khiếu nại',
+                            style: TextStyle(color: cani.danger, fontSize: 10.5, fontWeight: FontWeight.w700),
                           ),
                         )
-                      else                       if (isDeclared)
+                      else if (isDeclared)
                         InkWell(
                           onTap: onConfirmPayment,
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              color: cani.brandSoft,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF10B981), width: 1.2),
+                              border: Border.all(color: cani.brand.withValues(alpha: 0.35)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.edit_note, size: 14, color: const Color(0xFF059669)),
+                                Icon(Icons.fact_check_outlined, size: 13, color: cani.brand),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Xác nhận thù lao',
-                                  style: TextStyle(color: const Color(0xFF059669), fontSize: 10.5, fontWeight: FontWeight.w800),
+                                  'Xác nhận',
+                                  style: TextStyle(color: cani.brand, fontSize: 10.5, fontWeight: FontWeight.w800),
                                 ),
                               ],
                             ),
@@ -460,11 +464,11 @@ class ShiftAssignmentCard extends StatelessWidget {
                         )
                       else
                         Text(
-                          'Sẽ trả sau ca',
+                          'Trả sau ca',
                           style: TextStyle(
                             fontSize: 10.5,
-                            color: isDark ? cani.textMuted : Colors.grey.shade600,
-                            fontWeight: FontWeight.w700,
+                            color: cani.textMuted,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                     ],

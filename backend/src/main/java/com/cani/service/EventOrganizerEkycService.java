@@ -371,6 +371,14 @@ public class EventOrganizerEkycService {
         Map<UUID, User> userMap = userRepository.findAllById(reviewerIds).stream()
                 .collect(Collectors.toMap(User::getUserId, u -> u, (u1, u2) -> u1));
 
+        Map<UUID, com.cani.entity.Worker> workerByUserId = (workerRepository == null || reviewerIds.isEmpty())
+                ? Collections.emptyMap()
+                : Optional.ofNullable(workerRepository.findByUser_UserIdIn(reviewerIds))
+                        .orElse(Collections.emptyList())
+                        .stream()
+                        .filter(w -> w != null && w.getUser() != null && w.getUser().getUserId() != null)
+                        .collect(Collectors.toMap(w -> w.getUser().getUserId(), w -> w, (w1, w2) -> w1));
+
         Set<UUID> assignmentIds = reviews.stream()
                 .map(Review::getAssignmentId)
                 .filter(Objects::nonNull)
@@ -384,9 +392,11 @@ public class EventOrganizerEkycService {
 
         final Map<UUID, ShiftAssignment> finalAssignmentMap = assignmentMap;
         return reviews.stream()
-                .sorted(Comparator.comparing(Review::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .sorted(Comparator.comparing(Review::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(r -> {
                     User reviewer = userMap.get(r.getReviewerId());
+                    com.cani.entity.Worker reviewerWorker = r.getReviewerId() != null ? workerByUserId.get(r.getReviewerId()) : null;
+                    UUID actualWorkerId = reviewerWorker != null ? reviewerWorker.getWorkerId() : null;
                     String workerName = (reviewer != null && reviewer.getFullName() != null && !reviewer.getFullName().isBlank())
                             ? reviewer.getFullName()
                             : "Nhân sự CANi";
@@ -409,7 +419,8 @@ public class EventOrganizerEkycService {
                             .assignmentId(r.getAssignmentId())
                             .eventName(eventName)
                             .shiftName(shiftName)
-                            .reviewerWorkerId(r.getReviewerId())
+                            .reviewerUserId(r.getReviewerId())
+                            .reviewerWorkerId(actualWorkerId)
                             .reviewerWorkerName(workerName)
                             .workerAvatarUrl(workerAvatar)
                             .rating(r.getRating())

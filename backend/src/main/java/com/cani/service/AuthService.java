@@ -9,6 +9,7 @@ import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
+import com.cani.exception.AccountLockedException;
 import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
@@ -46,6 +47,9 @@ public class AuthService {
     private final EmailOtpService emailOtpService;
     private final NotificationService notificationService;
     private final org.springframework.core.env.Environment environment;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AccountAppealService accountAppealService;
 
     @Transactional
     public UserDto register(RegisterRequest request) {
@@ -208,9 +212,7 @@ public class AuthService {
                 .or(() -> userRepository.findByEmail(email))
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy thông tin tài khoản trong hệ thống"));
 
-        if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
-            throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
-        }
+        checkUserNotLocked(user);
 
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
@@ -333,9 +335,7 @@ public class AuthService {
                 }
             }
 
-            if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
-                throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
-            }
+            checkUserNotLocked(user);
 
             // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
             if (user.getRole() == UserRole.EVENT_ORGANIZER) {
@@ -444,6 +444,23 @@ public class AuthService {
                 .expiresIn(session.getExpiresIn())
                 .user(toUserDto(user))
                 .build();
+    }
+
+    private void checkUserNotLocked(User user) {
+        if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
+            String lockReason = accountAppealService != null
+                    ? accountAppealService.findLatestLockReason(user.getUserId())
+                    : "Tài khoản bị tạm khóa do vi phạm chính sách hoặc điều khoản hoạt động của hệ thống CANi.";
+            String appealToken = "appeal-token-" + user.getUserId() + "-" + System.currentTimeMillis();
+            throw new AccountLockedException(
+                    "Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động",
+                    user.getEmail(),
+                    user.getRole() != null ? user.getRole().name() : "EVENT_ORGANIZER",
+                    user.getStatus().name(),
+                    lockReason,
+                    appealToken
+            );
+        }
     }
 
     private UserDto toUserDto(User user) {

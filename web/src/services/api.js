@@ -38,6 +38,7 @@ apiClient.interceptors.response.use(
         pathname.startsWith('/login') ||
         pathname.startsWith('/register') ||
         pathname.startsWith('/support') ||
+        pathname.startsWith('/account-locked') ||
         pathname.startsWith('/auth');
 
       if (!isPublicPath) {

@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Cấu hình Flyway Migration Strategy
- * Tự động chạy flyway.repair() trước khi migrate để tự chữa lành lỗi lệch checksum
- * do định dạng xuống dòng (CRLF/LF trên Windows) hoặc cập nhật chú thích SQL.
+ * Cấu hình Flyway Migration Strategy.
+ * Không tự động chạy flyway.repair() khi startup để tránh ghi đè/sửa đổi lịch sử
+ * migration flyway_schema_history trên môi trường cơ sở dữ liệu chung (Supabase).
  */
 @Configuration
 public class FlywayConfig {
@@ -20,8 +20,6 @@ public class FlywayConfig {
     @Bean
     public FlywayMigrationStrategy flywayMigrationStrategy() {
         return (Flyway flyway) -> {
-            log.info("[FlywayConfig] Tự động sửa lỗi checksum và đồng bộ schema history (repair)...");
-            flyway.repair();
             log.info("[FlywayConfig] Tiến hành thực thi migrations mới (migrate)...");
             flyway.migrate();
         };

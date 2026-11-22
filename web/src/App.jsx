@@ -5,10 +5,12 @@ import RequireRole from './features/auth/components/RequireRole';
 import { AuthProvider } from './features/auth';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { PromptDialogHost } from './components/common/PromptModal';
+import { ToastContainer } from './components/common/Toast';
 
 const EOPage = lazy(() => import('./pages/eo/EOPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const AccountLockedPage = lazy(() => import('./pages/auth/AccountLockedPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const CompleteProfilePage = lazy(() => import('./pages/auth/CompleteProfilePage'));
@@ -53,6 +55,7 @@ function App() {
             <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/account-locked" element={<AccountLockedPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/complete-profile" element={<CompleteProfilePage />} />
@@ -98,6 +101,7 @@ function App() {
         </AuthProvider>
       </BrowserRouter>
       <PromptDialogHost />
+      <ToastContainer />
     </ErrorBoundary>
   );
 }

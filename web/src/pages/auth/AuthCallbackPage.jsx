@@ -89,6 +89,24 @@ const AuthCallbackPage = () => {
         }, 400);
       } catch (err) {
         console.error('Lỗi đồng bộ Google Auth:', err);
+        const errData = err.response?.data?.data;
+        const isLocked =
+          errData?.code === 'ACCOUNT_LOCKED' ||
+          err.message?.toLowerCase().includes('khóa') ||
+          err.response?.data?.message?.toLowerCase().includes('khóa');
+
+        if (isLocked) {
+          navigate('/account-locked', {
+            state: {
+              email: errData?.email || session?.user?.email || '',
+              lockReason: errData?.lockReason || err.response?.data?.message || '',
+              appealToken: errData?.appealToken || '',
+              role: errData?.role || 'EVENT_ORGANIZER',
+            },
+            replace: true,
+          });
+          return;
+        }
         setErrorMessage(err.message || 'Đăng nhập bằng Google thất bại. Vui lòng thử lại.');
         setIsProcessing(false);
       }

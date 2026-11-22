@@ -18,6 +18,18 @@ export const supportChatApi = {
     return response.data?.data;
   },
 
+  /** Tải tệp đính kèm (hình ảnh hoặc tài liệu) */
+  uploadAttachment: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/v1/support/chat/upload', formData, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    });
+    return response.data?.data;
+  },
+
   // === Dành cho Customer Care & Admin ===
 
   /** CSKH lấy tóm tắt số tin nhắn chưa đọc & hội thoại mới nhất cho Header & Sidebar */

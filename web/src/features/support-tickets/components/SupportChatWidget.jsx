@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../auth';
 import { supportChatApi } from '../api/supportChatApi';
+import { showToast } from '../../../components/common/Toast';
+import SupportChatFaqModal from './SupportChatFaqModal';
 import './SupportChatWidget.css';
 
 const QUICK_FAQS = [
@@ -31,6 +33,14 @@ export const SupportChatWidget = () => {
   const [sending, setSending] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeShiftContext, setActiveShiftContext] = useState(null);
+
+  // Tùy chọn menu (Đính kèm tệp / Bật FAQ) & tệp đang chờ gửi
+  const [showMenu, setShowMenu] = useState(false);
+  const [showFaqModal, setShowFaqModal] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const localFaqMessagesRef = useRef([]);
 
   useEffect(() => {
     const handleOpenWithShift = (e) => {
@@ -148,27 +158,32 @@ export const SupportChatWidget = () => {
             return {
               id: m.id,
               isBot: isFromStaff,
-              senderLabel: isFromStaff ? `🎧 ${m.senderName || 'CSKH CANi'}` : null,
+              senderLabel: isFromStaff ? (m.senderName || 'CSKH CANi') : null,
               shiftCode: m.shiftCode,
               text: m.messageText,
+              attachmentUrl: m.attachmentUrl,
               time: new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
             };
           });
 
+          // Giữ lại các tin nhắn FAQ cục bộ (không bao giờ bị xóa khi polling)
+          const localMessages = localFaqMessagesRef.current || [];
+          const combined = [...apiMessages, ...localMessages];
+
           // Tránh set lại state gây re-render khi tin nhắn không đổi
           if (
-            prev.length === apiMessages.length &&
-            prev[prev.length - 1]?.id === apiMessages[apiMessages.length - 1]?.id &&
-            prev[prev.length - 1]?.text === apiMessages[apiMessages.length - 1]?.text
+            prev.length === combined.length &&
+            prev[prev.length - 1]?.id === combined[combined.length - 1]?.id &&
+            prev[prev.length - 1]?.text === combined[combined.length - 1]?.text
           ) {
             return prev;
           }
 
           // Nếu có tin nhắn mới từ CSKH khi đang thu nhỏ, tăng badge thông báo
-          if (isMinimized && apiMessages.length > prev.length) {
-            setUnreadCount((c) => c + (apiMessages.length - prev.length));
+          if (isMinimized && apiMessages.length > prev.filter((p) => !p.isLocal).length) {
+            setUnreadCount((c) => c + (apiMessages.length - prev.filter((p) => !p.isLocal).length));
           }
-          return apiMessages.length > 0 ? apiMessages : prev;
+          return combined.length > 0 ? combined : prev;
         });
       } catch { /* Bỏ qua lỗi mạng nền */ }
     };
@@ -276,19 +291,49 @@ export const SupportChatWidget = () => {
 
   if (isStaff) return null;
 
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Dung lượng tệp không được vượt quá 10MB', 'error');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const res = await supportChatApi.uploadAttachment(file);
+      if (res?.url) {
+        setPendingAttachment({ url: res.url, name: file.name });
+        showToast('Tải tệp thành công! Nhấn Gửi để chuyển tin nhắn.', 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Không thể tải tệp lên máy chủ', 'error');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSend = async (customText = null) => {
     const textToSend = customText || inputText.trim();
-    if (!textToSend || sending) return;
+    if ((!textToSend && !pendingAttachment) || sending || isUploading) return;
+
+    const attachmentToSend = pendingAttachment;
+    const finalMsgText = textToSend || (attachmentToSend ? `Đã gửi tệp đính kèm: ${attachmentToSend.name}` : '');
 
     const userMsg = {
-      id: String(Date.now()),
+      id: `local-${Date.now()}`,
       isBot: false,
-      text: textToSend,
+      text: finalMsgText,
+      attachmentUrl: attachmentToSend?.url || null,
       time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     if (!customText) setInputText('');
+    setPendingAttachment(null);
     setSending(true);
     isAtBottomRef.current = true;
     setTimeout(() => scrollToBottom(true), 50);
@@ -296,7 +341,8 @@ export const SupportChatWidget = () => {
     try {
       if (user) {
         await supportChatApi.sendUserMessage({
-          messageText: textToSend,
+          messageText: finalMsgText,
+          attachmentUrl: attachmentToSend?.url || null,
           shiftId: activeShiftContext?.shiftId || null,
         });
       }
@@ -307,11 +353,29 @@ export const SupportChatWidget = () => {
 
   const handleQuickFaqClick = (faq) => {
     const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    setMessages((prev) => [
-      ...prev,
-      { id: String(Date.now()), isBot: false, text: faq.q, time: now },
-      { id: String(Date.now() + 1), isBot: true, text: faq.a, time: now },
-    ]);
+    const questionText = faq.q || faq.question;
+    const answerText = faq.a || faq.answer;
+
+    const qMsg = {
+      id: `local-faq-q-${Date.now()}`,
+      isLocal: true,
+      isBot: false,
+      text: questionText,
+      time: now,
+    };
+    const aMsg = {
+      id: `local-faq-a-${Date.now() + 1}`,
+      isLocal: true,
+      isBot: true,
+      senderLabel: 'Trợ lý FAQ CANi',
+      text: answerText,
+      time: now,
+    };
+
+    localFaqMessagesRef.current = [...localFaqMessagesRef.current, qMsg, aMsg];
+    setMessages((prev) => [...prev, qMsg, aMsg]);
+    setShowFaqModal(false);
+    setShowMenu(false);
     isAtBottomRef.current = true;
     setTimeout(() => scrollToBottom(true), 50);
   };
@@ -401,8 +465,14 @@ export const SupportChatWidget = () => {
                 setUnreadCount(0);
               }}
               title="Phóng to cửa sổ chat"
+              aria-label="Phóng to"
             >
-              🗖
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
             </button>
             <button
               type="button"
@@ -432,7 +502,11 @@ export const SupportChatWidget = () => {
             title="Nhấn giữ thanh tiêu đề để di chuyển cửa sổ chat"
           >
             <div className="support-header-brand">
-              <div className="support-avatar-circle">🎧</div>
+              <div className="support-avatar-circle">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
               <div className="support-header-info">
                 <h4>Hỗ Trợ Khách Hàng CANi</h4>
                 <div className="support-status-text">
@@ -476,6 +550,19 @@ export const SupportChatWidget = () => {
                   </div>
                 )}
                 <div className="support-msg-bubble">{m.text}</div>
+                {m.attachmentUrl && (
+                  <div className="support-msg-attachment-wrap">
+                    {/\.(png|jpe?g|webp|gif)$/i.test(m.attachmentUrl) ? (
+                      <a href={m.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                        <img src={m.attachmentUrl} alt="Đính kèm" className="support-attachment-thumb" />
+                      </a>
+                    ) : (
+                      <a href={m.attachmentUrl} target="_blank" rel="noopener noreferrer" className="support-attachment-doc">
+                        Xem tệp đính kèm ↗
+                      </a>
+                    )}
+                  </div>
+                )}
                 <span className="support-msg-time">{m.time}</span>
               </div>
             ))}
@@ -485,7 +572,7 @@ export const SupportChatWidget = () => {
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Câu hỏi thường gặp:</span>
                 {QUICK_FAQS.map((faq, idx) => (
                   <button key={idx} type="button" className="support-faq-chip" onClick={() => handleQuickFaqClick(faq)}>
-                    💡 {faq.q}
+                    {faq.q}
                   </button>
                 ))}
               </div>
@@ -494,7 +581,7 @@ export const SupportChatWidget = () => {
 
           {activeShiftContext && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 10px', background: '#eff6ff', borderTop: '1px solid #bfdbfe', fontSize: '0.74rem', color: '#1d4ed8' }}>
-              <span>🏷️ Đang trao đổi về ca: <strong>{activeShiftContext.shiftCode || activeShiftContext.shiftName || 'Ca làm việc'}</strong></span>
+              <span>Đang trao đổi về ca: <strong>{activeShiftContext.shiftCode || activeShiftContext.shiftName || 'Ca làm việc'}</strong></span>
               <button
                 type="button"
                 onClick={() => setActiveShiftContext(null)}
@@ -506,16 +593,92 @@ export const SupportChatWidget = () => {
             </div>
           )}
 
+          {pendingAttachment && (
+            <div className="support-pending-attachment-bar">
+              <span className="pending-file-info">Đính kèm: <strong>{pendingAttachment.name}</strong></span>
+              <button
+                type="button"
+                className="pending-file-remove"
+                onClick={() => setPendingAttachment(null)}
+                title="Hủy tệp này"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <form className="support-chat-footer" onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
+            <div className="support-chat-menu-container">
+              <button
+                type="button"
+                className="support-chat-menu-btn"
+                onClick={() => setShowMenu((prev) => !prev)}
+                title="Tác vụ hỗ trợ (Đính kèm tệp / Bật FAQ)"
+                aria-label="Menu hỗ trợ"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              </button>
+
+              {showMenu && (
+                <div className="support-chat-menu-popover animate-scale-in" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="support-chat-menu-row"
+                    onClick={() => {
+                      setShowMenu(false);
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                    <span>Đính kèm tệp / hình ảnh</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="support-chat-menu-row"
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowFaqModal(true);
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <span>Xem câu hỏi thường gặp (FAQ)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              accept="image/*,.pdf,.doc,.docx,.txt"
+              onChange={handleFileSelect}
+            />
+
             <input
               type="text"
               className="support-chat-input"
-              placeholder="Nhập tin nhắn cần hỗ trợ..."
+              placeholder={isUploading ? "Đang tải tệp lên..." : "Nhập tin nhắn cần hỗ trợ..."}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              disabled={sending}
+              disabled={sending || isUploading}
             />
-            <button type="submit" className="support-send-btn" disabled={!inputText.trim() || sending} title="Gửi tin nhắn">
+            <button
+              type="submit"
+              className="support-send-btn"
+              disabled={(!inputText.trim() && !pendingAttachment) || sending || isUploading}
+              title="Gửi tin nhắn"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -524,6 +687,12 @@ export const SupportChatWidget = () => {
           </form>
         </div>
       )}
+
+      <SupportChatFaqModal
+        isOpen={showFaqModal}
+        onClose={() => setShowFaqModal(false)}
+        onSelectFaq={handleQuickFaqClick}
+      />
     </>
   );
 };

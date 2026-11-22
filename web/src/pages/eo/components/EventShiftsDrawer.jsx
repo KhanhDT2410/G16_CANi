@@ -152,6 +152,16 @@ const EventShiftsDrawer = ({
                 {Number(shift.hourlyWage || 50000).toLocaleString()} đ/h
               </strong>
             </div>
+            {shift.status === 'SUSPENDED' && shift.adminNote && (
+              <div style={{ fontSize: '0.8rem', color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', padding: '4px 8px', borderRadius: 4, marginTop: 4 }}>
+                Lưu ý từ Ban quản trị: {shift.adminNote}
+              </div>
+            )}
+            {shift.status === 'CANCELLED' && shift.cancellationReason && (
+              <div style={{ fontSize: '0.8rem', color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: 4, marginTop: 4 }}>
+                Lý do hủy ca: {shift.cancellationReason}
+              </div>
+            )}
           </div>
 
           {/* Thao tác trên từng ca */}

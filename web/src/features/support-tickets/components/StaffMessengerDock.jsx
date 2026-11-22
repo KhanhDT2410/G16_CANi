@@ -1,17 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supportChatApi } from '../api/supportChatApi';
+import { showToast } from '../../../components/common/Toast';
+import SupportChatFaqModal from './SupportChatFaqModal';
 
 /**
  * Cửa sổ chat Messenger thu nhỏ ở góc dưới màn hình dành cho CSKH / Quản trị viên.
  * Luôn ghim cố định ở góc dưới màn hình qua createPortal, không làm cuộn nhảy trang.
- * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenShiftDetail }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
   const [convId, setConvId] = useState(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showFaqModal, setShowFaqModal] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const fileInputRef = useRef(null);
   const dockBodyRef = useRef(null);
 
   const formatMessage = (m) => ({
@@ -19,6 +27,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
     sender: m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN' ? 'staff' : 'user',
     senderName: m.senderName,
     text: m.messageText,
+    attachmentUrl: m.attachmentUrl,
     shiftId: m.shiftId,
     shiftCode: m.shiftCode,
     shiftName: m.shiftName,
@@ -72,7 +81,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
     return () => clearInterval(interval);
   }, [convId, isMinimized]);
 
-  // Tự động cuộn xuống cuối bên trong khung tin nhắn (không cuộn trang web cha)
+  // Tự động cuộn xuống cuối bên trong khung tin nhắn
   useEffect(() => {
     if (!isMinimized && dockBodyRef.current) {
       dockBodyRef.current.scrollTop = dockBodyRef.current.scrollHeight;
@@ -81,10 +90,38 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
 
   if (!activeChat || typeof document === 'undefined') return null;
 
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Dung lượng tệp không được vượt quá 10MB', 'error');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const res = await supportChatApi.uploadAttachment(file);
+      if (res?.url) {
+        setPendingAttachment({ url: res.url, name: file.name });
+        showToast('Tải tệp thành công!', 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Không thể tải tệp lên máy chủ', 'error');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSendMessage = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const text = inputText.trim();
-    if (!text) return;
+    if ((!text && !pendingAttachment) || sending || isUploading) return;
+
+    const attachmentToSend = pendingAttachment;
+    const finalMsgText = text || (attachmentToSend ? `Đã gửi tệp đính kèm: ${attachmentToSend.name}` : '');
 
     setMessages((prev) => [
       ...prev,
@@ -92,19 +129,29 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
         id: String(Date.now()),
         sender: 'staff',
         senderName: 'CSKH CANi',
-        text,
+        text: finalMsgText,
+        attachmentUrl: attachmentToSend?.url || null,
         time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
     setInputText('');
+    setPendingAttachment(null);
+    setSending(true);
 
     if (convId) {
       try {
-        await supportChatApi.sendStaffReply(convId, { messageText: text });
+        await supportChatApi.sendStaffReply(convId, {
+          messageText: finalMsgText,
+          attachmentUrl: attachmentToSend?.url || null,
+        });
         window.dispatchEvent(new CustomEvent('cani_staff_chat_refresh'));
       } catch (err) {
-        console.error('Lỗi khi gửi phản hồi:', err);
+        showToast('Lỗi khi gửi phản hồi: ' + (err.response?.data?.message || err.message), 'error');
+      } finally {
+        setSending(false);
       }
+    } else {
+      setSending(false);
     }
   };
 
@@ -158,7 +205,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
                   }}
                   title="Bấm để xem chi tiết ca làm việc"
                 >
-                  🏷️ {activeChat.currentShiftCode || activeChat.shiftCode} ↗
+                  {activeChat.currentShiftCode || activeChat.shiftCode} ↗
                 </button>
               </span>
             </div>
@@ -212,29 +259,128 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
                     onClick={() => m.shiftId && onOpenShiftDetail && onOpenShiftDetail(m.shiftId)}
                     title="Bấm để xem chi tiết ca làm này"
                   >
-                    🏷️ {m.shiftCode} ↗
+                    {m.shiftCode} ↗
                   </span>
                 )}
               </div>
               <div className="dock-bubble-text">{m.text}</div>
+              {m.attachmentUrl && (
+                <div className="dock-attachment-wrap">
+                  {/\.(png|jpe?g|webp|gif)$/i.test(m.attachmentUrl) ? (
+                    <a href={m.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                      <img src={m.attachmentUrl} alt="Đính kèm" className="dock-attachment-thumb" />
+                    </a>
+                  ) : (
+                    <a href={m.attachmentUrl} target="_blank" rel="noopener noreferrer" className="dock-attachment-doc">
+                      Xem tệp đính kèm ↗
+                    </a>
+                  )}
+                </div>
+              )}
               <div className="dock-bubble-time">{m.time}</div>
             </div>
           ))
         )}
       </div>
 
+      {pendingAttachment && (
+        <div className="dock-pending-attachment-bar">
+          <span className="pending-file-info">Đính kèm: <strong>{pendingAttachment.name}</strong></span>
+          <button
+            type="button"
+            className="pending-file-remove"
+            onClick={() => setPendingAttachment(null)}
+            title="Hủy tệp này"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <form className="dock-footer" onSubmit={handleSendMessage}>
+        <div className="dock-menu-container">
+          <button
+            type="button"
+            className="dock-menu-btn"
+            onClick={() => setShowMenu((prev) => !prev)}
+            title="Tác vụ (Đính kèm tệp / Bật FAQ)"
+            aria-label="Menu tác vụ"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+
+          {showMenu && (
+            <div className="dock-menu-popover animate-scale-in" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="dock-menu-row"
+                onClick={() => {
+                  setShowMenu(false);
+                  fileInputRef.current?.click();
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+                <span>Đính kèm tệp / hình ảnh</span>
+              </button>
+              <button
+                type="button"
+                className="dock-menu-row"
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowFaqModal(true);
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <span>Xem câu hỏi thường gặp (FAQ)</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept="image/*,.pdf,.doc,.docx,.txt"
+          onChange={handleFileSelect}
+        />
+
         <input
           type="text"
           className="dock-input"
-          placeholder="Nhập tin nhắn phản hồi cho khách..."
+          placeholder={isUploading ? "Đang tải tệp lên..." : "Nhập tin nhắn phản hồi cho khách..."}
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
+          disabled={sending || isUploading}
         />
-        <button type="submit" className="dock-send-btn" disabled={!inputText.trim()}>
+        <button
+          type="submit"
+          className="dock-send-btn"
+          disabled={(!inputText.trim() && !pendingAttachment) || sending || isUploading}
+        >
           Gửi
         </button>
       </form>
+
+      <SupportChatFaqModal
+        isOpen={showFaqModal}
+        onClose={() => setShowFaqModal(false)}
+        onSelectFaq={(faq) => {
+          setShowFaqModal(false);
+          const answer = faq.answer || faq.a || '';
+          setInputText((prev) => (prev.trim() ? `${prev}\n\n${answer}` : answer));
+        }}
+      />
     </div>
   );
 

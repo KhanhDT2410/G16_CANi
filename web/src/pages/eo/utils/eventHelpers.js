@@ -160,6 +160,17 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
     };
   }
 
+  if (rawStatus === 'SUSPENDED') {
+    return {
+      code: 'SUSPENDED',
+      label: 'Tạm đình chỉ ca',
+      colorClass: 'yellow',
+      bg: '#fffbeb',
+      color: '#b45309',
+      border: '#fde68a',
+    };
+  }
+
   if (evtStatus === 'DRAFT') {
     return {
       code: 'NOT_STARTED',

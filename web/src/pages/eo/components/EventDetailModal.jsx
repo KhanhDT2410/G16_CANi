@@ -556,15 +556,13 @@ export default function EventDetailModal({
             >
               Chi Tiết Ca Làm Việc ({shifts.length})
             </button>
-            {!onOpenShiftWorkspace && (
-              <button
-                type="button"
-                className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
-                onClick={() => setActiveTab('QR_ATTENDANCE')}
-              >
-                Trạm Điểm Danh & Mã QR Ca
-              </button>
-            )}
+            <button
+              type="button"
+              className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
+              onClick={() => setActiveTab('QR_ATTENDANCE')}
+            >
+              Trạm Điểm Danh & Mã QR Ca
+            </button>
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'WORKERS' ? 'active' : ''}`}

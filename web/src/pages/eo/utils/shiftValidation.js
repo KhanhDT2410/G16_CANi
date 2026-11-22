@@ -5,7 +5,7 @@
 export const ROLES = [
   'Lễ tân / Check-in',
   'Phục vụ bàn',
-  'Pha chế (Bartender/Barista)',
+  'Pha chế',
   'Thu ngân',
   'Điều phối sự kiện',
   'Kỹ thuật âm thanh - ánh sáng',
@@ -17,6 +17,7 @@ export const ROLES = [
 export const WAGE_RECOMMENDATIONS_MAP = {
   'Lễ tân / Check-in': { min: 45000, max: 60000, defaultWage: 50000, recommended: 50000, note: 'Giao tiếp tốt, ngoại hình sáng' },
   'Phục vụ bàn': { min: 35000, max: 50000, defaultWage: 40000, recommended: 40000, note: 'Nhanh nhẹn, cẩn thận' },
+  'Pha chế': { min: 60000, max: 85000, defaultWage: 70000, recommended: 70000, note: 'Có tay nghề pha chế' },
   'Pha chế (Bartender/Barista)': { min: 60000, max: 85000, defaultWage: 70000, recommended: 70000, note: 'Có tay nghề pha chế' },
   'Thu ngân': { min: 40000, max: 55000, defaultWage: 45000, recommended: 45000, note: 'Trung thực, tính toán chuẩn xác' },
   'Điều phối sự kiện': { min: 70000, max: 100000, defaultWage: 80000, recommended: 80000, note: 'Kinh nghiệm quản lý nhóm' },

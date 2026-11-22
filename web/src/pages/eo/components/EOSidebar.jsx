@@ -38,7 +38,6 @@ export default function EOSidebar({
       ),
       subItems: [
         { key: 'list', label: 'Danh sách sự kiện' },
-        { key: 'detail', label: 'Chi tiết sự kiện' },
         { key: 'cancelled', label: 'Sự kiện đã xóa' },
       ],
     },

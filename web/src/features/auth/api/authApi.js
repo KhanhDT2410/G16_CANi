@@ -93,6 +93,11 @@ export const authApi = {
     }
   },
 
+  refreshToken: async (refreshToken) => {
+    const response = await apiClient.post('/auth/refresh', { refreshToken });
+    return response.data.data;
+  },
+
   logout: async () => {
     try {
       await supabase.auth.signOut();

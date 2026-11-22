@@ -200,13 +200,6 @@ export default function EOEventsTab({
   };
 
   const handleSelectSubTab = (subKey) => {
-    if (subKey === 'detail') {
-      const target = nonCancelledEvents[0] || allEvents[0];
-      if (target && onOpenEventDetail) {
-        onOpenEventDetail(target);
-        return;
-      }
-    }
     onSubTabChange?.(subKey);
     if (subKey === 'cancelled') {
       setStatusFilter('CANCELLED');
@@ -229,14 +222,6 @@ export default function EOEventsTab({
           >
             <span>Danh sách sự kiện</span>
             <span className="ev-subnav-count">{nonCancelledEvents.length}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`ev-subnav-btn ${activeSubTab === 'detail' ? 'is-active' : ''}`}
-            onClick={() => handleSelectSubTab('detail')}
-          >
-            <span>Chi tiết sự kiện &amp; Điểm danh</span>
           </button>
 
           <button

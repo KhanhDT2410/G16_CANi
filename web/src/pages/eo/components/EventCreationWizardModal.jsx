@@ -119,9 +119,9 @@ const EventCreationWizardModal = ({
     startTime: newEvent.startTime || '',
     endTime: newEvent.endTime || '',
     arrivalTime: '',
-    requiredWorkers: 4,
+    requiredWorkers: 1,
     hourlyWage: 50000,
-    allowance: 20000,
+    allowance: 0,
     maxDistanceKm: 15,
     imageUrl: '',
     requiredSkills: [],
@@ -334,9 +334,10 @@ const EventCreationWizardModal = ({
   };
 
   const handlePackageWageChange = (val) => {
-    const pkg = Math.max(0, parseFloat(val) || 0);
+    let raw = typeof val === 'string' ? val.replace(/^0+(?=\d)/, '') : String(val ?? '');
+    const pkg = raw === '' ? '' : Math.max(0, parseFloat(raw) || 0);
     setShiftPackageWage(pkg);
-    const computedHourly = Math.max(0, Math.round(pkg / Math.max(0.5, currentDurationHours)));
+    const computedHourly = Math.max(0, Math.round((Number(pkg) || 0) / Math.max(0.5, currentDurationHours)));
     setCurrentShift((prev) => ({
       ...prev,
       hourlyWage: computedHourly,
@@ -647,7 +648,7 @@ const EventCreationWizardModal = ({
         startTime: toDateTimeInputVal(nextStart),
         endTime: toDateTimeInputVal(nextEnd),
         arrivalTime: '',
-        requiredWorkers: 2,
+        requiredWorkers: 1,
         hourlyWage: nextWage,
         allowance: 0,
         maxDistanceKm: 15,
@@ -1559,16 +1560,29 @@ const EventCreationWizardModal = ({
                       min="1"
                       required
                       className="eo-form-input"
-                      value={currentShift.requiredWorkers}
+                      value={currentShift.requiredWorkers ?? ''}
+                      onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => {
                         if (e.key === '-' || e.key === 'e') e.preventDefault();
                       }}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                        if (e.target.value !== raw) e.target.value = raw;
+                        if (raw === '') {
+                          setCurrentShift({ ...currentShift, requiredWorkers: '' });
+                          return;
+                        }
+                        const parsed = parseInt(raw, 10);
                         setCurrentShift({
                           ...currentShift,
-                          requiredWorkers: Math.max(1, parseInt(e.target.value, 10) || 1),
-                        })
-                      }
+                          requiredWorkers: isNaN(parsed) ? '' : Math.max(0, parsed),
+                        });
+                      }}
+                      onBlur={() => {
+                        if (!currentShift.requiredWorkers || Number(currentShift.requiredWorkers) < 1) {
+                          setCurrentShift((prev) => ({ ...prev, requiredWorkers: 1 }));
+                        }
+                      }}
                     />
                   </div>
 
@@ -1585,16 +1599,24 @@ const EventCreationWizardModal = ({
                           borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
                           boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
                         }}
-                        value={currentShift.hourlyWage}
+                        value={currentShift.hourlyWage ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
                         }}
                         onChange={(e) => {
-                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                          let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== raw) e.target.value = raw;
+                          const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
                           setCurrentShift({ ...currentShift, hourlyWage: val });
-                          setShiftPackageWage(Math.round(val * currentDurationHours));
+                          setShiftPackageWage(Math.round((Number(val) || 0) * currentDurationHours));
                           if (shiftErrors.hourlyWage) {
                             setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (currentShift.hourlyWage === '' || isNaN(currentShift.hourlyWage)) {
+                            setCurrentShift((prev) => ({ ...prev, hourlyWage: 0 }));
                           }
                         }}
                       />
@@ -1621,14 +1643,22 @@ const EventCreationWizardModal = ({
                           borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
                           boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
                         }}
-                        value={shiftPackageWage}
+                        value={shiftPackageWage ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
                         }}
                         onChange={(e) => {
-                          handlePackageWageChange(e.target.value);
+                          let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== raw) e.target.value = raw;
+                          handlePackageWageChange(raw);
                           if (shiftErrors.hourlyWage) {
                             setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (shiftPackageWage === '' || isNaN(shiftPackageWage)) {
+                            setShiftPackageWage(0);
                           }
                         }}
                       />
@@ -1674,13 +1704,21 @@ const EventCreationWizardModal = ({
                     min="0"
                     step="10000"
                     className="eo-form-input"
-                    value={currentShift.allowance}
+                    value={currentShift.allowance ?? ''}
+                    onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
                     onChange={(e) => {
-                      const rawVal = parseFloat(e.target.value);
-                      setCurrentShift({ ...currentShift, allowance: isNaN(rawVal) ? 0 : Math.max(0, rawVal) });
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
+                      setCurrentShift({ ...currentShift, allowance: val });
+                    }}
+                    onBlur={() => {
+                      if (currentShift.allowance === '' || isNaN(currentShift.allowance)) {
+                        setCurrentShift((prev) => ({ ...prev, allowance: 0 }));
+                      }
                     }}
                   />
                 </div>
@@ -1691,16 +1729,28 @@ const EventCreationWizardModal = ({
                     min="1"
                     max="50"
                     className="eo-form-input"
-                    value={currentShift.maxDistanceKm}
+                    value={currentShift.maxDistanceKm ?? ''}
+                    onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      if (raw === '') {
+                        setCurrentShift({ ...currentShift, maxDistanceKm: '' });
+                        return;
+                      }
                       setCurrentShift({
                         ...currentShift,
-                        maxDistanceKm: Math.max(1, Math.min(50, parseFloat(e.target.value) || 15)),
-                      })
-                    }
+                        maxDistanceKm: Math.max(1, Math.min(50, parseFloat(raw) || 15)),
+                      });
+                    }}
+                    onBlur={() => {
+                      if (!currentShift.maxDistanceKm || Number(currentShift.maxDistanceKm) < 1) {
+                        setCurrentShift((prev) => ({ ...prev, maxDistanceKm: 15 }));
+                      }
+                    }}
                   />
                 </div>
               </div>

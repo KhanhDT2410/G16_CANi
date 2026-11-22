@@ -76,6 +76,23 @@ export const useLogin = () => {
           break;
       }
     } catch (err) {
+      const errData = err.response?.data?.data;
+      const isLocked =
+        errData?.code === 'ACCOUNT_LOCKED' ||
+        err.message?.toLowerCase().includes('khóa') ||
+        err.response?.data?.message?.toLowerCase().includes('khóa');
+
+      if (isLocked) {
+        navigate('/account-locked', {
+          state: {
+            email: formData.email,
+            lockReason: errData?.lockReason || err.response?.data?.message || '',
+            appealToken: errData?.appealToken || '',
+            role: errData?.role || 'EVENT_ORGANIZER',
+          },
+        });
+        return;
+      }
       setErrorMessage(err.message || 'Đăng nhập không thành công.');
     } finally {
       setIsLoading(false);
@@ -88,6 +105,17 @@ export const useLogin = () => {
     try {
       await authApi.loginWithGoogle();
     } catch (err) {
+      const errData = err.response?.data?.data;
+      if (errData?.code === 'ACCOUNT_LOCKED' || err.response?.data?.message?.toLowerCase().includes('khóa')) {
+        navigate('/account-locked', {
+          state: {
+            email: errData?.email || '',
+            lockReason: errData?.lockReason || '',
+            appealToken: errData?.appealToken || '',
+          },
+        });
+        return;
+      }
       setErrorMessage(err.message || 'Không thể đăng nhập bằng Google.');
       setIsLoading(false);
     }

@@ -8,6 +8,7 @@ import { SystemConfigView } from '../../features/system-configs';
 import { FaqView } from '../../features/faqs';
 import { RevenueDashboardView } from '../../features/revenue-dashboard';
 import { RsAppealsView } from '../../features/rs-appeals';
+import { AdminAccountAppealsTable } from '../../features/account-appeals';
 import { NoShowView } from '../../features/no-shows';
 import { AdminPlansView } from '../../features/admin-plans';
 import { WageMatrixView } from '../../features/admin-wage-matrix';
@@ -38,6 +39,10 @@ const TAB_METADATA = {
   appeals: {
     title: 'Kháng Cáo Điểm Uy Tín',
     subtitle: 'Thẩm định bằng chứng và xét duyệt khiếu nại hoàn trả điểm uy tín cho người lao động',
+  },
+  account_appeals: {
+    title: 'Giải Trình Khóa Tài Khoản',
+    subtitle: 'Thẩm định hồ sơ giải trình và chứng từ khắc phục từ Nhà tổ chức (EO) hoặc Người lao động (Worker) bị khóa',
   },
   tickets: {
     title: 'Phiếu Hỗ Trợ Khách Hàng',
@@ -191,6 +196,7 @@ const AdminPage = () => {
           {activeTab === 'appeals' && <RsAppealsView />}
           {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
           {activeTab === 'users' && <UserManagementView />}
+          {activeTab === 'account_appeals' && <AdminAccountAppealsTable />}
           {activeTab === 'shifts' && <AdminShiftView />}
           {activeTab === 'disputes' && <DisputeCenterView />}
           {activeTab === 'tickets' && (

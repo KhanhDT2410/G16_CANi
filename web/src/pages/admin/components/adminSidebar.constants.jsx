@@ -31,6 +31,7 @@ export const ADMIN_NAV_GROUPS = [
     groupLabel: 'Quản trị & Vận hành',
     items: [
       { id: 'users', label: 'Quản Trị Người Dùng', icon: <UsersIcon /> },
+      { id: 'account_appeals', label: 'Giải Trình Khóa Tài Khoản', icon: <AppealIcon /> },
       { id: 'shifts', label: 'Danh Sách Ca Làm Việc', icon: <ShiftIcon /> },
       { id: 'noshows', label: 'Xử Lý Vi Phạm Vắng Mặt', icon: <NoShowIcon /> },
       { id: 'appeals', label: 'Kháng Cáo Điểm Uy Tín', icon: <AppealIcon /> },

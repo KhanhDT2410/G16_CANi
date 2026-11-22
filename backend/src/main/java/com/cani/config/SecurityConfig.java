@@ -59,7 +59,8 @@ public class SecurityConfig {
                     "/api/v1/workers/skills/tiers/config",
                     "/api/v1/eo/subscriptions/payos-webhook",
                     "/api/v1/eo/events/images/**",
-                    "/api/v1/workers/proof/**"
+                    "/api/v1/workers/proof/**",
+                    "/api/v1/public/account-appeals/**"
                 ).permitAll()
                 // Tài liệu chứng chỉ cá nhân (PII): TUYỆT ĐỐI KHÔNG permitAll.
                 // Chỉ cho phép user đã đăng nhập (kiểm tra ownership tại Controller/Service)
@@ -104,6 +105,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/ekyc/**", "/api/v1/admin/eo-ekyc/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Module Kháng cáo điểm uy tín Worker (UC-94, SRS FE-10): Customer Care cùng quyền xử lý với Admin
                 // ĐẶT TRƯỚC wildcard /api/v1/admin/** để Customer Care không bị 403 Forbidden.
+                .requestMatchers("/api/v1/admin/account-appeals/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 .requestMatchers("/api/v1/admin/appeals/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 .requestMatchers("/api/v1/workers/appeals/**").hasRole("WORKER")
                 // Module Quản lý vi phạm No-show (UC-88, SRS FE-09): Customer Care cùng quyền xử lý với Admin

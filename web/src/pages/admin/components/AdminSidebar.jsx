@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CollapseToggleIcon, ChevronDownIcon } from './AdminSidebarIcons';
 import { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS } from './adminSidebar.constants';
 import { useStaffChatAlerts } from '../../../features/support-tickets';
+import { usePendingAccountAppeals } from '../../../features/account-appeals';
 
 export { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS };
 
@@ -19,6 +20,7 @@ export const AdminSidebar = ({
 }) => {
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
   const { totalUnread } = useStaffChatAlerts();
+  const { pendingCount } = usePendingAccountAppeals();
 
   const renderExpandableItem = (item, isExpanded, onToggleExpand, subItems, activeKey, onSubClick) => {
     const isActive = activeTab === item.id;
@@ -131,16 +133,39 @@ export const AdminSidebar = ({
                 }
 
                 const isActive = activeTab === item.id;
+                const isAccountAppeals = item.id === 'account_appeals';
+                const showAppealBadge = isAccountAppeals && pendingCount > 0;
+
                 return (
                   <button
                     key={item.id}
                     type="button"
                     className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => onSelectTab(item.id)}
-                    title={item.label}
+                    title={showAppealBadge ? `${item.label} (${pendingCount} đơn chờ duyệt)` : item.label}
                   >
-                    <span className="sidebar-item-icon">{item.icon}</span>
-                    {!collapsed && <span className="sidebar-item-label">{item.label}</span>}
+                    <span className="sidebar-item-icon" style={{ position: 'relative' }}>
+                      {item.icon}
+                      {showAppealBadge && (
+                        <span
+                          className="sidebar-item-dot-badge"
+                          title={`${pendingCount} đơn giải trình chờ duyệt`}
+                        />
+                      )}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="sidebar-item-label">{item.label}</span>
+                        {showAppealBadge && (
+                          <span
+                            className="sidebar-sub-badge"
+                            title={`${pendingCount} đơn giải trình đang chờ Admin xét duyệt`}
+                          >
+                            {pendingCount > 99 ? '99+' : pendingCount}
+                          </span>
+                        )}
+                      </>
+                    )}
                     {isActive && <span className="sidebar-active-indicator" />}
                   </button>
                 );

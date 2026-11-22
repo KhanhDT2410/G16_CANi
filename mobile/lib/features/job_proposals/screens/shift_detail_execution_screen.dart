@@ -1666,7 +1666,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     final steps = [
       (label: 'Vào ca', done: isCheckedIn || isCompleted, active: !isCheckedIn && !isCompleted && !isExpired, failed: isExpired),
       (label: 'Đầu việc', done: (isCheckedIn && isWorkReady) || isEoConfirmed || isCompleted, active: isCheckedIn && !isWorkReady && !isEoConfirmed, failed: false),
-      (label: 'Duyệt công', done: isEoConfirmed || isCompleted, active: isCheckedIn && isWorkReady && !isEoConfirmed, failed: false),
+      (label: 'Duyệt', done: isEoConfirmed || isCompleted, active: isCheckedIn && isWorkReady && !isEoConfirmed, failed: false),
       (label: 'Thù lao', done: isPaymentConfirmed, active: isCheckedIn && isEoConfirmed && !isPaymentConfirmed, failed: false),
       (label: 'Kết ca', done: isCompleted && isReviewed, active: (isCheckedIn && isPaymentConfirmed) || (isCompleted && !isReviewed), failed: false),
     ];

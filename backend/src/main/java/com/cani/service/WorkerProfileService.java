@@ -1,21 +1,25 @@
 package com.cani.service;
 
+import com.cani.dto.event.EoReviewResponseDto;
 import com.cani.dto.profile.EoPublicProfileResponseDto;
 import com.cani.dto.profile.UpdateWorkerProfileRequestDto;
 import com.cani.dto.profile.WorkerPublicProfileResponseDto;
 import com.cani.dto.profile.WorkerReviewSummaryDto;
 import com.cani.dto.profile.WorkerSkillProfileDto;
 import com.cani.entity.*;
+import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.SkillTier;
 import com.cani.entity.enums.VerificationStatus;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.*;
@@ -34,6 +38,12 @@ public class WorkerProfileService {
     private final ReviewRepository reviewRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final EoWorkerRepository eoWorkerRepository;
+
+    @Autowired(required = false)
+    private EventRepository eventRepository;
+
+    @Autowired(required = false)
+    private ShiftAssignmentRepository shiftAssignmentRepository;
 
     /**
      * Lấy hồ sơ đầy đủ của chính Worker đang đăng nhập.
@@ -168,7 +178,7 @@ public class WorkerProfileService {
 
     /**
      * Lấy hồ sơ công khai của Nhà tổ chức sự kiện (EO) cho Worker hoặc bất kỳ người dùng nào xem.
-     * Tuyệt đối không để lộ mã số thuế (taxId).
+     * Tính toán số liệu thực tế từ bảng events & reviews, tuyệt đối không hardcode mô tả giả hay để lộ taxId.
      */
     @Transactional(readOnly = true)
     public EoPublicProfileResponseDto getEoPublicProfile(UUID eoId) {
@@ -179,20 +189,137 @@ public class WorkerProfileService {
         User user = eo.getUser();
         boolean isVerified = eo.getVerificationStatus() == VerificationStatus.APPROVED;
 
+        int totalEventsCreated = 0;
+        int totalEventsPublishedOrCompleted = eo.getTotalEventsCompleted() != null ? eo.getTotalEventsCompleted() : 0;
+        int totalConfirmedWorkers = 0;
+
+        if (eventRepository != null) {
+            List<Event> eoEvents = eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId());
+            if (eoEvents != null) {
+                totalEventsCreated = (int) eoEvents.stream()
+                        .filter(ev -> ev.getStatus() != EventStatus.CANCELLED)
+                        .count();
+                long realPublishedCount = eoEvents.stream()
+                        .filter(ev -> ev.getStatus() != null
+                                && ev.getStatus() != EventStatus.DRAFT
+                                && ev.getStatus() != EventStatus.CANCELLED)
+                        .count();
+                totalEventsPublishedOrCompleted = (int) Math.max(totalEventsPublishedOrCompleted, realPublishedCount);
+                totalConfirmedWorkers = eoEvents.stream()
+                        .filter(ev -> ev.getStatus() != EventStatus.CANCELLED)
+                        .mapToInt(ev -> ev.getTotalConfirmedWorkers() != null ? ev.getTotalConfirmedWorkers() : 0)
+                        .sum();
+            }
+        }
+
+        List<EoReviewResponseDto> reviewDtos = loadEoReviews(eo, user != null ? user.getUserId() : null);
+        int actualRatingCount = eo.getRatingCount() != null ? eo.getRatingCount() : 0;
+        BigDecimal actualRatingAvg = (actualRatingCount > 0 && eo.getRatingAvg() != null)
+                ? eo.getRatingAvg()
+                : BigDecimal.ZERO;
+
+        if (!reviewDtos.isEmpty()) {
+            actualRatingCount = reviewDtos.size();
+            double avg = reviewDtos.stream()
+                    .filter(r -> r.getRating() != null)
+                    .mapToInt(EoReviewResponseDto::getRating)
+                    .average()
+                    .orElse(0.0);
+            actualRatingAvg = BigDecimal.valueOf(avg).setScale(1, RoundingMode.HALF_UP);
+        }
+
         return EoPublicProfileResponseDto.builder()
                 .eoId(eo.getEoId())
                 .userId(user != null ? user.getUserId() : null)
-                .companyName(eo.getCompanyName() != null ? eo.getCompanyName() : "Ban Tổ Chức Sự Kiện")
+                .companyName(eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
+                        ? eo.getCompanyName() : "Ban Tổ Chức Sự Kiện")
+                .representativeName(user != null ? user.getFullName() : null)
                 .avatarUrl(user != null ? user.getAvatarUrl() : null)
                 .address(eo.getAddress())
                 .phone(user != null ? user.getPhone() : null)
                 .email(user != null ? user.getEmail() : null)
-                .description("Đơn vị tổ chức sự kiện chuyên nghiệp trên nền tảng CANi")
+                .description(null)
                 .isVerified(isVerified)
-                .ratingAvg(eo.getRatingAvg() != null ? eo.getRatingAvg() : BigDecimal.valueOf(5.0))
-                .ratingCount(eo.getRatingCount() != null ? eo.getRatingCount() : 0)
-                .totalEventsCompleted(eo.getTotalEventsCompleted() != null ? eo.getTotalEventsCompleted() : 0)
+                .verifiedAt(eo.getVerifiedAt())
+                .ratingAvg(actualRatingAvg)
+                .ratingCount(actualRatingCount)
+                .totalEventsCompleted(totalEventsPublishedOrCompleted)
+                .totalEventsCreated(totalEventsCreated)
+                .totalConfirmedWorkers(totalConfirmedWorkers)
+                .reviews(reviewDtos.stream().limit(10).toList())
                 .build();
+    }
+
+    private List<EoReviewResponseDto> loadEoReviews(EventOrganizer eo, UUID eoUserId) {
+        if (reviewRepository == null) return List.of();
+        List<Review> reviews = new ArrayList<>();
+        if (eoUserId != null) {
+            List<Review> byUser = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(eoUserId);
+            if (byUser != null) reviews.addAll(byUser);
+        }
+        if (eo != null && eo.getEoId() != null && !eo.getEoId().equals(eoUserId)) {
+            List<Review> byEo = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(eo.getEoId());
+            if (byEo != null && !byEo.isEmpty()) {
+                Set<UUID> seen = reviews.stream().map(Review::getReviewId).collect(Collectors.toSet());
+                for (Review r : byEo) {
+                    if (seen.add(r.getReviewId())) {
+                        reviews.add(r);
+                    }
+                }
+            }
+        }
+        if (reviews.isEmpty()) return List.of();
+
+        Set<UUID> reviewerIds = reviews.stream()
+                .map(Review::getReviewerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, User> userMap = reviewerIds.isEmpty() ? Collections.emptyMap() :
+                userRepository.findAllById(reviewerIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, u -> u, (u1, u2) -> u1));
+
+        Set<UUID> assignmentIds = reviews.stream()
+                .map(Review::getAssignmentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, ShiftAssignment> assignmentMap = (shiftAssignmentRepository == null || assignmentIds.isEmpty())
+                ? Collections.emptyMap()
+                : shiftAssignmentRepository.findAllById(assignmentIds).stream()
+                        .collect(Collectors.toMap(ShiftAssignment::getAssignmentId, sa -> sa, (s1, s2) -> s1));
+
+        return reviews.stream()
+                .sorted(Comparator.comparing(Review::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .map(r -> {
+                    User reviewer = userMap.get(r.getReviewerId());
+                    String workerName = (reviewer != null && reviewer.getFullName() != null && !reviewer.getFullName().isBlank())
+                            ? reviewer.getFullName()
+                            : "Nhân sự CANi";
+                    String workerAvatar = reviewer != null ? reviewer.getAvatarUrl() : null;
+
+                    ShiftAssignment sa = assignmentMap.get(r.getAssignmentId());
+                    Shift s = sa != null ? sa.getShift() : null;
+                    Event ev = s != null ? s.getEvent() : null;
+
+                    return EoReviewResponseDto.builder()
+                            .reviewId(r.getReviewId())
+                            .assignmentId(r.getAssignmentId())
+                            .eventName(ev != null ? ev.getName() : null)
+                            .shiftName(s != null ? s.getJobType() : null)
+                            .reviewerWorkerId(r.getReviewerId())
+                            .reviewerWorkerName(workerName)
+                            .workerAvatarUrl(workerAvatar)
+                            .rating(r.getRating())
+                            .criteriaShiftClarity(r.getCriteriaShiftClarity())
+                            .criteriaTiming(r.getCriteriaTiming())
+                            .criteriaWorkEnvironment(r.getCriteriaWorkEnvironment())
+                            .criteriaSupport(r.getCriteriaSupport())
+                            .criteriaPaymentTiming(r.getCriteriaPaymentTiming())
+                            .comment(r.getComment())
+                            .tags(r.getTags())
+                            .createdAt(r.getCreatedAt())
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     private List<WorkerReviewSummaryDto> loadWorkerReviews(UUID workerUserId) {

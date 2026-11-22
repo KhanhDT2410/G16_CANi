@@ -498,47 +498,106 @@ class EoPublicProfileData {
   final String eoId;
   final String? userId;
   final String companyName;
+  final String? representativeName;
   final String? avatarUrl;
   final String? address;
   final String? phone;
   final String? email;
   final String? description;
   final bool isVerified;
+  final DateTime? verifiedAt;
   final double ratingAvg;
   final int ratingCount;
   final int totalEventsCompleted;
+  final int totalEventsCreated;
+  final int totalConfirmedWorkers;
+  final List<EoPublicReviewItem> reviews;
 
   const EoPublicProfileData({
     required this.eoId,
     this.userId,
     required this.companyName,
+    this.representativeName,
     this.avatarUrl,
     this.address,
     this.phone,
     this.email,
     this.description,
     this.isVerified = false,
+    this.verifiedAt,
     this.ratingAvg = 0.0,
     this.ratingCount = 0,
     this.totalEventsCompleted = 0,
+    this.totalEventsCreated = 0,
+    this.totalConfirmedWorkers = 0,
+    this.reviews = const [],
   });
 
   factory EoPublicProfileData.fromJson(Map<String, dynamic> json) {
+    final rawReviews = (json['reviews'] is List)
+        ? (json['reviews'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(EoPublicReviewItem.fromJson)
+            .toList()
+        : const <EoPublicReviewItem>[];
+
     return EoPublicProfileData(
       eoId: json['eoId']?.toString() ?? '',
       userId: json['userId']?.toString(),
       companyName: (json['companyName'] as String?)?.trim().isNotEmpty == true
           ? (json['companyName'] as String).trim()
           : 'Ban tổ chức sự kiện',
+      representativeName: json['representativeName'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
       address: json['address'] as String?,
       phone: json['phone'] as String?,
       email: json['email'] as String?,
       description: json['description'] as String?,
       isVerified: json['isVerified'] == true,
+      verifiedAt: json['verifiedAt'] != null ? DateTime.tryParse(json['verifiedAt'].toString())?.toLocal() : null,
       ratingAvg: (json['ratingAvg'] is num) ? (json['ratingAvg'] as num).toDouble() : 0.0,
       ratingCount: (json['ratingCount'] is num) ? (json['ratingCount'] as num).toInt() : 0,
       totalEventsCompleted: (json['totalEventsCompleted'] is num) ? (json['totalEventsCompleted'] as num).toInt() : 0,
+      totalEventsCreated: (json['totalEventsCreated'] is num) ? (json['totalEventsCreated'] as num).toInt() : 0,
+      totalConfirmedWorkers: (json['totalConfirmedWorkers'] is num) ? (json['totalConfirmedWorkers'] as num).toInt() : 0,
+      reviews: rawReviews,
+    );
+  }
+}
+
+class EoPublicReviewItem {
+  final String reviewId;
+  final String reviewerWorkerName;
+  final String? eventName;
+  final String? shiftName;
+  final int rating;
+  final String? comment;
+  final List<String> tags;
+  final DateTime? createdAt;
+
+  const EoPublicReviewItem({
+    required this.reviewId,
+    required this.reviewerWorkerName,
+    this.eventName,
+    this.shiftName,
+    required this.rating,
+    this.comment,
+    this.tags = const [],
+    this.createdAt,
+  });
+
+  factory EoPublicReviewItem.fromJson(Map<String, dynamic> json) {
+    return EoPublicReviewItem(
+      reviewId: json['reviewId']?.toString() ?? '',
+      reviewerWorkerName: (json['reviewerWorkerName'] as String?)?.trim().isNotEmpty == true
+          ? (json['reviewerWorkerName'] as String).trim()
+          : 'Nhân sự CANi',
+      eventName: json['eventName'] as String?,
+      shiftName: json['shiftName'] as String?,
+      rating: (json['rating'] is num) ? (json['rating'] as num).toInt() : 5,
+      comment: json['comment'] as String?,
+      tags: (json['tags'] is List) ? (json['tags'] as List).map((e) => e.toString()).toList() : const [],
+      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString())?.toLocal() : null,
     );
   }
 }

@@ -47,6 +47,10 @@ public class EventOrganizerEkycController {
             message = "Định danh eKYC thành công! Bạn đã được chứng thực uy tín.";
         } else if ("PENDING_REVIEW".equals(result.getStatus())) {
             message = "Hồ sơ eKYC đã được gửi và đang chờ Admin / CSKH thẩm định.";
+        } else if ("TECHNICAL_FAILURE".equals(result.getStatus())) {
+            message = "Hệ thống xác thực VNPT eKYC đang gặp sự cố kỹ thuật tạm thời. Hồ sơ chưa bị từ chối, vui lòng thử lại.";
+        } else if ("PROCESSING".equals(result.getStatus()) || "PENDING".equals(result.getStatus())) {
+            message = "Hồ sơ eKYC đang được xử lý. Vui lòng chờ trong giây lát.";
         } else {
             message = "Định danh eKYC không thành công: " + result.getRoutingReason();
         }

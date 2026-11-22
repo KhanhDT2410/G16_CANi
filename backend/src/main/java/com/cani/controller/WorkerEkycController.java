@@ -51,7 +51,13 @@ public class WorkerEkycController {
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
-            message = "Xác thực danh tính eKYC thành công! Tài khoản của bạn đã được tự động cấp tích xanh định danh.";
+            message = "Xác thực danh tính eKYC thành công! Tài khoản của bạn đã được cấp tích xanh định danh.";
+        } else if ("PENDING_REVIEW".equals(result.getStatus())) {
+            message = "Hồ sơ eKYC đã được tiếp nhận và đang chờ Admin / CSKH kiểm tra thủ công.";
+        } else if ("TECHNICAL_FAILURE".equals(result.getStatus())) {
+            message = "Hệ thống xác thực VNPT eKYC đang gặp sự cố kỹ thuật tạm thời. Hồ sơ chưa bị từ chối, vui lòng thử lại.";
+        } else if ("PROCESSING".equals(result.getStatus()) || "PENDING".equals(result.getStatus())) {
+            message = "Hồ sơ eKYC đang được xử lý. Vui lòng chờ trong giây lát.";
         } else {
             message = "Xác thực eKYC không thành công: " + result.getRoutingReason();
         }

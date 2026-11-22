@@ -940,32 +940,43 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
 
   Widget _buildEkycWarningBanner(BuildContext context, bool isDark, EkycState ekycState) {
     final isPending = ekycState.result?.isPending ?? false;
+    final isTechnicalFailure = ekycState.result?.isTechnicalFailure ?? false;
     final isRejected = ekycState.result?.isRejected ?? false;
     final cani = Theme.of(context).cani;
 
     final Color bannerBg = isPending
         ? (isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF))
-        : (isRejected
-            ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : cani.dangerBg)
-            : (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : cani.warningBg));
+        : (isTechnicalFailure
+            ? (isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED))
+            : (isRejected
+                ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : cani.dangerBg)
+                : (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : cani.warningBg)));
 
     final Color bannerBorder = isPending
         ? (isDark ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE))
-        : (isRejected
-            ? (isDark ? const Color(0xFFB91C1C) : const Color(0xFFFECACA))
-            : (isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A)));
+        : (isTechnicalFailure
+            ? (isDark ? const Color(0xFFC2410C) : const Color(0xFFFED7AA))
+            : (isRejected
+                ? (isDark ? const Color(0xFFB91C1C) : const Color(0xFFFECACA))
+                : (isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A))));
 
     final Color primaryColor = isPending
         ? cani.brand
-        : (isRejected ? cani.danger : const Color(0xFFD97706));
+        : (isTechnicalFailure
+            ? const Color(0xFFEA580C)
+            : (isRejected ? cani.danger : const Color(0xFFD97706)));
 
     final String message = isPending
         ? 'Hồ sơ eKYC đang được xét duyệt. Radar sẽ mở khóa ngay khi hoàn tất.'
-        : (isRejected
-            ? 'Hồ sơ eKYC trước đó bị từ chối. Vui lòng xác thực lại.'
-            : 'Chưa xác thực CCCD: Hoàn tất eKYC để bật nhận việc & mở khóa Radar.');
+        : (isTechnicalFailure
+            ? 'Xác minh eKYC gặp lỗi kết nối tạm thời. Vui lòng mở để thử lại.'
+            : (isRejected
+                ? 'Hồ sơ eKYC trước đó bị từ chối. Vui lòng xác thực lại.'
+                : 'Chưa xác thực CCCD: Hoàn tất eKYC để bật nhận việc & mở khóa Radar.'));
 
-    final String ctaLabel = isPending ? 'Chi tiết' : (isRejected ? 'Chụp lại' : 'Xác thực');
+    final String ctaLabel = isPending
+        ? 'Chi tiết'
+        : (isTechnicalFailure ? 'Thử lại' : (isRejected ? 'Chụp lại' : 'Xác thực'));
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),

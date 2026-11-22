@@ -17,16 +17,34 @@ class ProfileEkycCard extends StatelessWidget {
     final t = Theme.of(context).profileX;
     final item = status;
     final approved = item != null && item.isApproved;
-    final pending = item != null && item.isPending;
+    final pendingReview = item != null && item.isPendingReview;
+    final processing = item != null && item.isProcessing;
+    final technicalFailure = item != null && item.isTechnicalFailure;
+    final rejected = item != null && item.isRejected;
+
     final (label, color, icon) = approved
         ? ('ĐÃ XÁC THỰC', t.success, Icons.verified)
-        : pending
-            ? ('ĐANG XỬ LÝ', t.accent, Icons.hourglass_top)
-            : ('CHƯA XÁC THỰC', t.danger, Icons.gps_off);
+        : pendingReview
+            ? ('CHỜ ADMIN DUYỆT', const Color(0xFFD97706), Icons.hourglass_top)
+            : processing
+                ? ('ĐANG XỬ LÝ', t.accent, Icons.sync)
+                : technicalFailure
+                    ? ('LỖI KỸ THUẬT', const Color(0xFFEA580C), Icons.cloud_off_rounded)
+                    : rejected
+                        ? ('BỊ TỪ CHỐI', t.danger, Icons.error_outline)
+                        : ('CHƯA XÁC THỰC', t.danger, Icons.gps_off);
 
     final String subtitle;
-    if (item != null && item.isApproved) {
+    if (approved) {
       subtitle = 'Xác thực thành công ngày ${item.createdAt.toIso8601String().split('T').first}.';
+    } else if (pendingReview) {
+      subtitle = 'Hồ sơ đã được tiếp nhận và đang chờ Admin / CSKH kiểm tra.';
+    } else if (processing) {
+      subtitle = 'Hồ sơ đang được xác minh qua cổng VNPT eKYC.';
+    } else if (technicalFailure) {
+      subtitle = 'Kết nối VNPT eKYC tạm gián đoạn. Bấm để thử lại (hồ sơ chưa bị từ chối).';
+    } else if (rejected) {
+      subtitle = 'Xác minh chưa đạt yêu cầu. Vui lòng chụp lại ảnh rõ nét.';
     } else {
       subtitle = 'Hoàn thiện định danh để mở khoá mức tin cậy cao hơn.';
     }

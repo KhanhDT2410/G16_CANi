@@ -28,8 +28,10 @@ export const USER_STATUS_LABELS = {
 
 export const KYC_STATUS_LABELS = {
   APPROVED: { label: 'Đã xác thực', badgeClass: 'badge-status-active' },
-  PENDING: { label: 'Chờ duyệt', badgeClass: 'badge-status-pending' },
+  PENDING: { label: 'Chờ xác minh', badgeClass: 'badge-status-pending' },
+  PROCESSING: { label: 'Đang xác minh', badgeClass: 'badge-status-pending' },
   PENDING_REVIEW: { label: 'Chờ duyệt', badgeClass: 'badge-status-pending' },
+  TECHNICAL_FAILURE: { label: 'Lỗi kỹ thuật', badgeClass: 'badge-status-suspended' },
   REJECTED: { label: 'Bị từ chối', badgeClass: 'badge-status-locked' },
   SUSPICIOUS: { label: 'Nghi vấn', badgeClass: 'badge-status-suspended' },
   NOT_SUBMITTED: { label: 'Chưa nộp', badgeClass: 'badge-status-pending' },

@@ -28,6 +28,9 @@ public class EkycVerificationResultDto {
     private String issueDate;
     private String identificationFeatures;
 
+    /**
+     * Signed URL ngắn hạn (chỉ cấp cho chủ sở hữu / Admin khi ảnh riêng tư còn hiệu lực).
+     */
     private String frontImageUrl;
     private String backImageUrl;
     private String selfieImageUrl;
@@ -35,6 +38,12 @@ public class EkycVerificationResultDto {
     private BigDecimal faceMatchScore;
     private BigDecimal ocrConfidence;
     private Map<String, Object> fraudFlags;
+
+    private String provider;
+    private String failureCode;
+    private Boolean retryable;
+    private Integer retryCount;
+    private Boolean imagesAvailable;
 
     private String routingDecision;
     private String routingReason;

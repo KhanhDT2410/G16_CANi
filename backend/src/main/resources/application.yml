@@ -90,11 +90,23 @@ cani:
   security:
     document-signing-secret: ${DOCUMENT_SIGNING_SECRET:}
     document-url-ttl-seconds: ${DOCUMENT_URL_TTL_SECONDS:300}
+    ekyc-image-signing-secret: ${EKYC_IMAGE_SIGNING_SECRET:${DOCUMENT_SIGNING_SECRET:}}
+    ekyc-image-url-ttl-seconds: ${EKYC_IMAGE_URL_TTL_SECONDS:180}
+    ekyc-hash-pepper: ${EKYC_HASH_PEPPER:}
   storage:
     certificate-dir: ${CERTIFICATE_STORAGE_DIR:uploads/certificates}
+    ekyc-dir: ${EKYC_STORAGE_DIR:uploads/ekyc-private}
+    ekyc-max-file-size-bytes: ${EKYC_MAX_FILE_SIZE_BYTES:5242880}
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
     strict: ${EKYC_STRICT:false}
+    retention:
+      approved-image-days: ${EKYC_RETENTION_APPROVED_DAYS:30}
+      rejected-image-days: ${EKYC_RETENTION_REJECTED_DAYS:7}
+      technical-failure-image-days: ${EKYC_RETENTION_TECH_FAILURE_DAYS:3}
+      pending-review-image-days: ${EKYC_RETENTION_PENDING_REVIEW_DAYS:30}
+      cleanup-enabled: ${EKYC_RETENTION_CLEANUP_ENABLED:true}
+      cleanup-cron: ${EKYC_RETENTION_CLEANUP_CRON:0 30 2 * * *}
     vnpt:
       enabled: ${VNPT_EKYC_ENABLED:false}
       base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}
@@ -102,7 +114,16 @@ cani:
       token-key: ${VNPT_EKYC_TOKEN_KEY:}
       access-token: ${VNPT_EKYC_ACCESS_TOKEN:}
       mac-address: ${VNPT_EKYC_MAC_ADDRESS:}
-      timeout-ms: 25000
+      timeout-ms: ${VNPT_EKYC_TIMEOUT_MS:25000}
+      verify-back-card: ${VNPT_EKYC_VERIFY_BACK_CARD:true}
+      ocr-front-path: ${VNPT_EKYC_OCR_FRONT_PATH:/ai/v1/ocr/id/front}
+      ocr-back-path: ${VNPT_EKYC_OCR_BACK_PATH:/ai/v1/ocr/id/back}
+      face-compare-path: ${VNPT_EKYC_FACE_COMPARE_PATH:/ai/v1/face/compare}
+      card-liveness-enabled: ${VNPT_EKYC_CARD_LIVENESS_ENABLED:false}
+      card-liveness-path: ${VNPT_EKYC_CARD_LIVENESS_PATH:}
+      face-liveness-enabled: ${VNPT_EKYC_FACE_LIVENESS_ENABLED:false}
+      face-liveness-path: ${VNPT_EKYC_FACE_LIVENESS_PATH:}
+      require-liveness-for-auto-approve: ${VNPT_EKYC_REQUIRE_LIVENESS_FOR_AUTO_APPROVE:false}
   firebase:
     enabled: ${FIREBASE_ENABLED:true}
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}

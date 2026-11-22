@@ -3,6 +3,7 @@ package com.cani.config;
 import com.cani.security.RestAccessDeniedHandler;
 import com.cani.security.RestAuthenticationEntryPoint;
 import com.cani.security.UserAuthorityFilter;
+import com.cani.service.ekyc.storage.EkycImageAccessTokenService;
 import com.cani.service.skill.DocumentAccessTokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final ObjectProvider<DocumentAccessTokenService> documentAccessTokenServiceProvider;
+    private final ObjectProvider<EkycImageAccessTokenService> ekycImageAccessTokenServiceProvider;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -88,6 +90,31 @@ public class SecurityConfig {
                         );
                         return new AuthorizationDecision(validSigned);
                     })
+                // Ảnh eKYC CCCD / Selfie riêng tư (PII đặc biệt nhạy cảm): TUYỆT ĐỐI KHÔNG permitAll.
+                // Chỉ cho phép user đã đăng nhập (kiểm tra vai trò Admin/CSKH hoặc đúng chủ sở hữu tại Controller)
+                // HOẶC Signed URL HMAC-SHA256 còn hiệu lực cho đúng targetType + verificationId + slot.
+                .requestMatchers(HttpMethod.GET, "/api/v1/ekyc/images/*/*/*")
+                    .access((authenticationSupplier, context) -> {
+                        Authentication authentication = authenticationSupplier.get();
+                        boolean authenticated = authentication != null
+                                && authentication.isAuthenticated()
+                                && !(authentication instanceof AnonymousAuthenticationToken);
+                        if (authenticated) {
+                            return new AuthorizationDecision(true);
+                        }
+                        EkycImageAccessTokenService ekycTokenService = ekycImageAccessTokenServiceProvider.getIfAvailable();
+                        if (ekycTokenService == null) {
+                            return new AuthorizationDecision(false);
+                        }
+                        HttpServletRequest request = context.getRequest();
+                        boolean validSigned = ekycTokenService.isValidRequestUri(
+                                request.getRequestURI(),
+                                request.getParameter("expires"),
+                                request.getParameter("sig")
+                        );
+                        return new AuthorizationDecision(validSigned);
+                    })
+                .requestMatchers("/api/v1/ekyc/images/**").authenticated()
                 // Thẩm định chứng chỉ kỹ năng (UC-47): Customer Care cùng quyền kiểm duyệt với Admin
                 .requestMatchers("/api/v1/workers/skills/admin/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Module tranh chấp (UC-99/100/102/109): Customer Care cùng quyền với Admin

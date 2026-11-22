@@ -264,12 +264,16 @@ export default function EoProfileTab() {
 
       const result = await eoService.submitEkyc(formData);
       setEkycData(result);
-      if (result?.status === 'REJECTED') {
-        showToast(result.routingReason || 'Hồ sơ định danh eKYC không hợp lệ hoặc bị trùng CCCD!', 'error');
+      if (result?.status === 'APPROVED') {
+        showToast('Xác thực định danh eKYC thành công!', 'success');
       } else if (result?.status === 'PENDING_REVIEW') {
         showToast(result.routingReason || 'Đã nộp hồ sơ eKYC! Đang chờ Admin thẩm định.', 'info');
+      } else if (result?.status === 'PROCESSING' || result?.status === 'PENDING') {
+        showToast(result.routingReason || 'Hồ sơ eKYC đang được xử lý.', 'info');
+      } else if (result?.status === 'TECHNICAL_FAILURE') {
+        showToast(result.routingReason || 'Lỗi kết nối VNPT eKYC tạm thời. Hồ sơ chưa bị từ chối, vui lòng thử lại.', 'error');
       } else {
-        showToast('Xác thực định danh eKYC thành công!', 'success');
+        showToast(result?.routingReason || 'Hồ sơ định danh eKYC chưa đạt yêu cầu hoặc bị trùng CCCD!', 'error');
       }
       await loadData();
       try {
@@ -762,6 +766,14 @@ export default function EoProfileTab() {
               {ekycStatus === 'PENDING_REVIEW' && (
                 <span className="status-pill pending">ĐANG CHỜ DUYỆT</span>
               )}
+              {(ekycStatus === 'PROCESSING' || ekycStatus === 'PENDING') && (
+                <span className="status-pill pending">ĐANG XÁC MINH</span>
+              )}
+              {ekycStatus === 'TECHNICAL_FAILURE' && (
+                <span className="status-pill none" style={{ color: '#c2410c', borderColor: '#fdba74', backgroundColor: '#fff7ed' }}>
+                  LỖI KỸ THUẬT — THỬ LẠI
+                </span>
+              )}
               {ekycStatus === 'REJECTED' && (
                 <span className="status-pill none" style={{ color: '#dc2626', borderColor: '#fca5a5' }}>
                   HỒ SƠ BỊ TỪ CHỐI
@@ -842,6 +854,17 @@ export default function EoProfileTab() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {ekycStatus === 'TECHNICAL_FAILURE' && (
+                <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
+                  <div style={{ fontWeight: 700, color: '#c2410c', marginBottom: '0.25rem' }}>
+                    Lỗi kỹ thuật tạm thời từ cổng VNPT eKYC — Bạn có thể thử lại
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#9a3412' }}>
+                    {ekycData?.routingReason || 'Không thể kết nối tới cổng VNPT eKYC. Hồ sơ của bạn không bị từ chối — vui lòng gửi lại.'}
+                  </div>
                 </div>
               )}
 

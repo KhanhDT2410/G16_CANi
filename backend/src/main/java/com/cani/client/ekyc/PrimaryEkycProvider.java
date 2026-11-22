@@ -1,7 +1,8 @@
 package com.cani.client.ekyc;
 
-import com.cani.config.VnptEkycProperties;
 import com.cani.dto.ekyc.EkycIdentityResultDto;
+import com.cani.entity.enums.EkycRoutingDecision;
+import com.cani.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
@@ -10,11 +11,13 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * Điều phối viên eKYC thực tế (100% Real Verification - Zero Mock).
- * Tuân thủ nguyên tắc định danh thật:
- * 1. Gọi trực tiếp cổng VNPT eKYC API (trích xuất OCR, Face Matching, Anti-fraud).
- * 2. Nếu VNPT gặp sự cố mạng/gián đoạn, sử dụng Gemini Vision AI để đọc OCR trực tiếp trên ảnh CCCD thực tế của người dùng.
- * 3. Tuyệt đối không giả lập dữ liệu: Nếu ảnh không hợp lệ hoặc cả 2 hệ thống không thể nhận diện -> REJECTED.
+ * Điều phối viên eKYC production — sử dụng VNPT eKYC là nhà cung cấp xác minh danh tính DUY NHẤT.
+ *
+ * Nguyên tắc bảo mật & kiến trúc:
+ * - Không sử dụng Gemini hay bất kỳ LLM nào trong luồng eKYC.
+ * - Không fallback sang AI/Mock khi VNPT lỗi, thiếu cấu hình hoặc không trả đủ dữ liệu.
+ * - Không ghi CCCD đầy đủ, họ tên, ảnh hay raw response chứa PII vào log.
+ * - Lỗi kỹ thuật trả về cờ technicalFailure=true (cho phép retry), không đánh đồng gian lận.
  */
 @Slf4j
 @Component
@@ -23,12 +26,10 @@ import java.util.Map;
 public class PrimaryEkycProvider implements EkycProvider {
 
     private final VnptEkycClient vnptClient;
-    private final GeminiEkycClient geminiClient;
-    private final VnptEkycProperties vnptProperties;
 
     @Override
     public String getProviderName() {
-        return "VNPT_EKYC";
+        return vnptClient.getProviderName();
     }
 
     @Override
@@ -37,55 +38,33 @@ public class PrimaryEkycProvider implements EkycProvider {
             byte[] backBytes, String backMime,
             byte[] selfieBytes, String selfieMime) {
 
-        // 1. Ưu tiên gọi VNPT eKYC thực tế nếu đã bật và có Access Token
-        if (vnptProperties.isEnabled()
-                && vnptProperties.getAccessToken() != null
-                && !vnptProperties.getAccessToken().isBlank()) {
-            log.info("eKYC Router: Đang thực thi xác thực thực tế qua cổng VNPT eKYC API...");
-            try {
-                EkycIdentityResultDto vnptResult = vnptClient.verifyIdentity(
-                        frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
-                boolean isFallback = vnptResult != null
-                        && vnptResult.getRawAnalysis() != null
-                        && "VNPT_EKYC_FALLBACK".equals(vnptResult.getRawAnalysis().get("provider"));
-                if (vnptResult != null && !isFallback && vnptResult.getIdNumber() != null && !vnptResult.getIdNumber().isBlank()) {
-                    log.info("VNPT eKYC trích xuất thành công: CCCD={}, Họ tên={}", vnptResult.getIdNumber(), vnptResult.getFullName());
-                    return vnptResult;
-                }
-                log.warn("VNPT eKYC không thể trích xuất hoặc trả về Fallback ({}). Chuyển sang Gemini Vision AI để đọc OCR trực tiếp trên ảnh thẻ CCCD...",
-                        vnptResult != null ? vnptResult.getRoutingReason() : "null");
-            } catch (Exception e) {
-                log.error("Lỗi kết nối VNPT eKYC API: {}. Chuyển sang Gemini Vision AI...", e.getMessage(), e);
+        try {
+            EkycIdentityResultDto result = vnptClient.verifyIdentity(
+                    frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
+            if (result == null) {
+                log.error("eKYC Provider [{}] trả về kết quả null không mong đợi.", getProviderName());
+                return EkycIdentityResultDto.builder()
+                        .providerName(getProviderName())
+                        .technicalFailure(true)
+                        .technicalErrorCode("VNPT_EMPTY_RESULT")
+                        .routingDecision(EkycRoutingDecision.TECHNICAL_FAILURE.name())
+                        .routingReason("Dịch vụ VNPT eKYC không trả về dữ liệu phản hồi. Vui lòng thử lại sau.")
+                        .rawAnalysis(Map.of("provider", getProviderName(), "errorCode", "VNPT_EMPTY_RESULT"))
+                        .build();
             }
+            return result;
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi kỹ thuật không mong đợi khi gọi VNPT eKYC: {}", e.getClass().getSimpleName());
+            return EkycIdentityResultDto.builder()
+                    .providerName(getProviderName())
+                    .technicalFailure(true)
+                    .technicalErrorCode("VNPT_UNEXPECTED_ERROR")
+                    .routingDecision(EkycRoutingDecision.TECHNICAL_FAILURE.name())
+                    .routingReason("Hệ thống xác thực VNPT eKYC đang gặp sự cố kỹ thuật tạm thời. Vui lòng thử lại sau.")
+                    .rawAnalysis(Map.of("provider", getProviderName(), "errorCode", "VNPT_UNEXPECTED_ERROR"))
+                    .build();
         }
-
-        // 2. Sử dụng Gemini Vision AI OCR & Face Matching để đọc trực tiếp trên ảnh thẻ CCCD thật của người dùng
-        if (geminiClient != null && geminiClient.isAvailable()) {
-            log.info("eKYC Router: Đang điều phối yêu cầu xác thực sang [GEMINI_VISION_EKYC]...");
-            try {
-                EkycIdentityResultDto geminiResult = geminiClient.verifyIdentity(
-                        frontBytes, frontMime, backBytes, backMime, selfieBytes, selfieMime);
-                if (geminiResult != null && geminiResult.getIdNumber() != null && !geminiResult.getIdNumber().isBlank()) {
-                    log.info("Gemini Vision eKYC trích xuất thành công: CCCD={}, Họ tên={}", geminiResult.getIdNumber(), geminiResult.getFullName());
-                    return geminiResult;
-                }
-            } catch (Exception e) {
-                log.error("Lỗi xử lý Gemini Vision AI OCR: {}", e.getMessage(), e);
-            }
-        }
-
-        // 3. KHÔNG DÙNG MOCK GIẢ LẬP: Từ chối nếu không thể nhận diện được thẻ CCCD thật
-        log.warn("eKYC Router: Không thể trích xuất thông tin hợp lệ từ ảnh CCCD. Trả về kết quả REJECTED.");
-        return EkycIdentityResultDto.builder()
-                .ocrConfidence(0.0)
-                .faceMatchScore(0.0)
-                .isCutCorner(false)
-                .isScreenCaptured(false)
-                .isPhotoshoped(false)
-                .isExpired(false)
-                .routingDecision("REJECTED")
-                .routingReason("Xác thực eKYC không thành công: Hệ thống không thể nhận diện được thông tin Căn cước công dân hoặc khuôn mặt từ ảnh tải lên. Vui lòng chụp rõ nét mặt trước, mặt sau thẻ CCCD thật và ảnh selfie chính diện.")
-                .rawAnalysis(Map.of("provider", "REAL_VERIFICATION_FAILED", "status", "REJECTED"))
-                .build();
     }
 }

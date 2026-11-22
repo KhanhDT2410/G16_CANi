@@ -38,25 +38,119 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
     );
   }
 
+  void _showJoinByCodeDialog(BuildContext context) {
+    final textController = TextEditingController();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.vpn_key_rounded, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Gia nhập bằng mã',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Nhập mã mời do Trưởng nhóm cung cấp để gia nhập đội ngay lập tức:',
+              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: textController,
+              textCapitalization: TextCapitalization.characters,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Mã mời đội (VD: CAN-7K9M)',
+                hintText: 'CAN-XXXX',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                prefixIcon: const Icon(Icons.tag_rounded),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text('Hủy', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final code = textController.text.trim();
+              if (code.isEmpty) return;
+              Navigator.of(dialogCtx).pop();
+              final error = await ref.read(workerGroupsProvider.notifier).joinGroupByCode(code);
+              if (context.mounted) {
+                if (error == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Gia nhập đội nhóm thành công!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Gia nhập'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workerGroupsProvider);
 
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Đội Nhóm Của Tôi',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.vpn_key_rounded, color: colorScheme.primary),
+            tooltip: 'Gia nhập bằng mã',
+            onPressed: () => _showJoinByCodeDialog(context),
+          ),
+        ],
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
         elevation: 0.5,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFF0D9488),
-          unselectedLabelColor: const Color(0xFF64748B),
-          indicatorColor: const Color(0xFF0D9488),
+          labelColor: colorScheme.primary,
+          unselectedLabelColor: colorScheme.onSurfaceVariant,
+          indicatorColor: colorScheme.primary,
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
           tabs: [
@@ -388,6 +482,9 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
   }
 
   Widget _buildGroupCard(BuildContext context, WorkerGroupModel group) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -400,9 +497,9 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -419,10 +516,9 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
                 Expanded(
                   child: Text(
                     group.name,
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: colorScheme.onSurface,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -430,14 +526,14 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDFA),
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: const Color(0xFFCCFBF1)),
+                    border: Border.all(color: colorScheme.primaryContainer),
                   ),
                   child: Text(
                     group.skillFocus ?? 'Đa kỹ năng',
-                    style: const TextStyle(
-                      color: Color(0xFF0D9488),
+                    style: TextStyle(
+                      color: colorScheme.primary,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -451,20 +547,21 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
                 group.description!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
             const SizedBox(height: 14),
             Row(
               children: [
-                const Icon(Icons.people_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                Icon(Icons.people_outline_rounded, size: 16, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    '${group.memberCount} thành viên',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                Text(
+                  '${group.memberCount} thành viên',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -472,25 +569,43 @@ class _WorkerGroupsScreenState extends ConsumerState<WorkerGroupsScreen>
                 const SizedBox(width: 2),
                 Text(
                   '${group.avgRating}',
-                  style: const TextStyle(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155),
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Icon(Icons.shield_outlined, size: 15, color: Color(0xFF0D9488)),
+                Icon(Icons.shield_outlined, size: 15, color: colorScheme.primary),
                 const SizedBox(width: 3),
                 Text(
                   '${group.reliabilityScore} RS',
-                  style: const TextStyle(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D9488),
+                    color: colorScheme.primary,
                   ),
                 ),
+                if (group.inviteCode != null && group.inviteCode!.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      group.inviteCode!,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
-                const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                Icon(Icons.chevron_right_rounded, color: colorScheme.outlineVariant),
               ],
             ),
           ],

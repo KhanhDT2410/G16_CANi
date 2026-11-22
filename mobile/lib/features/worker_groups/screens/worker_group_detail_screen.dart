@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/auth/auth.dart';
@@ -211,6 +212,102 @@ class _WorkerGroupDetailScreenState
     );
   }
 
+  void _confirmFullSquadProposal(GroupProposalModel proposal) {
+    final packSize = proposal.claimableSlots ?? proposal.eligibleMembers.length;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.groups_rounded, color: Color(0xFF0D9488)),
+            SizedBox(width: 8),
+            Text('Nhận ca trọn đội', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Đội của bạn sẽ nhận trọn gói ca "${proposal.jobType ?? 'Công việc'}" (${proposal.eventName ?? 'Sự kiện'}).',
+              style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDFA),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCCFBF1)),
+              ),
+              child: Text(
+                'Toàn bộ $packSize thành viên ACTIVE sẽ nhận ca cùng nhau. 1 người vướng → cả đội không nhận được.',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Hủy', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final result = await ref
+                  .read(workerGroupsProvider.notifier)
+                  .acceptGroupProposal(widget.group.groupId, proposal.proposalId);
+              if (mounted) {
+                if (result.success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đội của bạn đã nhận ca trọn đội thành công!'),
+                      backgroundColor: Color(0xFF0D9488),
+                    ),
+                  );
+                } else if (result.statusCode == 409) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Ca vừa đủ người trước khi đội xác nhận'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result.message ??
+                          'Không thể nhận ca. Ca có thể đã đủ người hoặc có thành viên không đủ điều kiện.'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Xác nhận nhận ca'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openMemberSheet(GroupProposalModel p) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GroupProposalMemberSheet(
+        groupId: widget.group.groupId,
+        proposal: p,
+      ),
+    );
+  }
+
   Widget _buildProposalCard(GroupProposalModel p) {
     final isPending = p.status.toUpperCase() == 'PENDING';
     return Container(
@@ -347,8 +444,48 @@ class _WorkerGroupDetailScreenState
               ],
             ),
           ],
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDFA),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFCCFBF1)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded,
+                    size: 16, color: Color(0xFF0D9488)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Toàn bộ ${p.claimableSlots ?? p.eligibleMembers.length} thành viên ACTIVE sẽ nhận ca cùng nhau. 1 người vướng → cả đội không nhận được.',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF0F766E),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _openMemberSheet(p),
+              icon: const Icon(Icons.visibility_outlined, size: 14),
+              label: const Text('Xem trạng thái đội',
+                  style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF0D9488),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
           if (isPending) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -371,18 +508,10 @@ class _WorkerGroupDetailScreenState
                 const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => GroupProposalMemberSheet(
-                        groupId: widget.group.groupId,
-                        proposal: p,
-                      ),
-                    ),
+                    onPressed: () => _confirmFullSquadProposal(p),
                     icon: const Icon(Icons.check_rounded, size: 16),
                     label: const Text(
-                      'Xác nhận cho đội',
+                      'Nhận ca trọn đội',
                       style: TextStyle(
                           fontSize: 12.5, fontWeight: FontWeight.bold),
                     ),
@@ -473,7 +602,7 @@ class _WorkerGroupDetailScreenState
       children: [
         header,
         const SizedBox(height: 8),
-        ...state.groupProposals.map((p) => _buildProposalCard(p)).toList(),
+        ...state.groupProposals.map((p) => _buildProposalCard(p)),
       ],
     );
   }
@@ -776,6 +905,75 @@ class _WorkerGroupDetailScreenState
                         ),
                       ],
                     ),
+                    if (widget.group.inviteCode != null &&
+                        widget.group.inviteCode!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.tag_rounded,
+                                size: 16, color: Colors.white70),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Mã mời: ${widget.group.inviteCode}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const Spacer(),
+                            InkWell(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(
+                                    text: widget.group.inviteCode!));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Đã sao chép mã mời vào bộ nhớ tạm!'),
+                                    backgroundColor: Colors.green,
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.copy_rounded,
+                                        size: 13, color: Color(0xFF0D9488)),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Sao chép',
+                                      style: TextStyle(
+                                        color: Color(0xFF0D9488),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

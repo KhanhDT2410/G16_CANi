@@ -1,9 +1,22 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/features/worker_groups/models/group_proposal_models.dart';
 import 'package:cani/features/worker_groups/models/worker_group_models.dart';
+
+class AcceptProposalResult {
+  final bool success;
+  final int? statusCode;
+  final String? message;
+
+  const AcceptProposalResult({
+    required this.success,
+    this.statusCode,
+    this.message,
+  });
+}
 
 class WorkerGroupsState {
   final List<WorkerGroupModel> myGroups;
@@ -93,6 +106,31 @@ class WorkerGroupsNotifier extends StateNotifier<WorkerGroupsState> {
     } catch (e) {
       debugPrint('Lỗi chấp nhận lời mời vào nhóm: $e');
       return false;
+    }
+  }
+
+  Future<String?> joinGroupByCode(String inviteCode) async {
+    try {
+      final dio = _ref.read(dioProvider);
+      final response = await dio.post(
+        '/v1/worker-groups/join-by-code',
+        data: {'inviteCode': inviteCode.trim().toUpperCase()},
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await loadMyGroups();
+        return null; // Thành công, không có lỗi
+      }
+      return 'Không thể gia nhập nhóm. Vui lòng thử lại.';
+    } catch (e) {
+      debugPrint('Lỗi gia nhập nhóm bằng mã: $e');
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data.containsKey('message')) {
+          return data['message'].toString();
+        }
+      }
+      return 'Mã mời không hợp lệ hoặc nhóm đã đủ thành viên';
     }
   }
 
@@ -291,27 +329,37 @@ class WorkerGroupsNotifier extends StateNotifier<WorkerGroupsState> {
   }
 
   /// Accept trả 409 khi slot vừa bị fill hết / 400 khi member không đủ điều kiện:
-  /// caller hiển thị SnackBar lỗi chung rồi reload danh sách.
-  Future<bool> acceptGroupProposal(
+  Future<AcceptProposalResult> acceptGroupProposal(
     String groupId,
-    String proposalId,
-    List<String> memberWorkerIds,
-  ) async {
+    String proposalId, [
+    List<String> memberWorkerIds = const [],
+  ]) async {
     try {
       final dio = _ref.read(dioProvider);
       final response = await dio.post(
         '/v1/worker-groups/$groupId/group-proposals/$proposalId/accept',
-        data: {'memberWorkerIds': memberWorkerIds},
+        data: memberWorkerIds.isEmpty ? {} : {'memberWorkerIds': memberWorkerIds},
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         await loadGroupProposals(groupId);
-        return true;
+        return const AcceptProposalResult(success: true);
       }
-      return false;
+      return AcceptProposalResult(success: false, statusCode: response.statusCode);
     } catch (e) {
       debugPrint('Lỗi xác nhận đề xuất ca cho đội: $e');
-      return false;
+      if (e is DioException) {
+        final statusCode = e.response?.statusCode;
+        final msg = e.response?.data is Map<String, dynamic>
+            ? (e.response?.data as Map<String, dynamic>)['message']?.toString()
+            : null;
+        return AcceptProposalResult(
+          success: false,
+          statusCode: statusCode,
+          message: msg,
+        );
+      }
+      return AcceptProposalResult(success: false, message: e.toString());
     }
   }
 

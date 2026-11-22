@@ -8,6 +8,7 @@ class WorkerGroupModel {
   final String? skillFocus;
   final String? leaderWorkerId;
   final String? leaderName;
+  final String? inviteCode;
   final int minSize;
   final int maxSize;
   final int memberCount;
@@ -23,6 +24,7 @@ class WorkerGroupModel {
     this.skillFocus,
     this.leaderWorkerId,
     this.leaderName,
+    this.inviteCode,
     this.minSize = 5,
     this.maxSize = 20,
     this.memberCount = 1,
@@ -40,6 +42,7 @@ class WorkerGroupModel {
       skillFocus: json['skillFocus']?.toString(),
       leaderWorkerId: json['leaderWorkerId']?.toString(),
       leaderName: json['leaderName']?.toString(),
+      inviteCode: json['inviteCode']?.toString(),
       minSize: (json['minSize'] as num?)?.toInt() ?? 5,
       maxSize: (json['maxSize'] as num?)?.toInt() ?? 20,
       memberCount: (json['memberCount'] as num?)?.toInt() ?? 1,

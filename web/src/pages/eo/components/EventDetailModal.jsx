@@ -98,31 +98,57 @@ export default function EventDetailModal({
     }
   };
 
-  const handleToggleEmergency = async (shift, enable) => {
-    const confirmed = await showConfirm({
-      title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
-      description: enable
-        ? 'Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự trong bán kính tối đa 15km để chủ động nhận ca trực tiếp trên bản đồ.'
-        : `Bạn có chắc chắn muốn TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
-      type: enable ? 'warning' : 'info',
-      confirmText: enable ? 'Bật khẩn cấp' : 'Tắt chế độ',
-    });
-    if (!confirmed) return;
+  // Tự động quét ca sát giờ thiếu người để gợi ý mở rộng tìm kiếm khẩn cấp (Emergency Dispatch)
+  useEffect(() => {
+    if (!isOpen || !event?.eventId || event?.status === 'DRAFT') return;
 
-    try {
-      if (enable) {
-        await eoService.enableEmergencyDispatch(shift.shiftId, 15);
-        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}".`, 'success');
-      } else {
-        await eoService.disableEmergencyDispatch(shift.shiftId);
-        showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
-      }
-      onReloadEvents?.();
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Lỗi thao tác điều phối khẩn cấp';
-      showToast(msg, 'error');
+    const urgentShift = (event.shifts || []).find((s) => {
+      if (!s || s.status === 'CANCELLED' || s.emergency) return false;
+      const confirmed = Number(s.confirmedWorkers || 0);
+      const required = Math.max(1, Number(s.requiredWorkers || 1));
+      if (confirmed >= required) return false;
+
+      const now = new Date();
+      const start = s.startTime ? new Date(s.startTime) : null;
+      if (!start || isNaN(start.getTime())) return false;
+
+      // Sát giờ: còn <= 4 tiếng trước ca hoặc đang diễn ra
+      const diffMs = start.getTime() - now.getTime();
+      const isUrgent = diffMs <= 4 * 3600 * 1000 && diffMs >= -2 * 3600 * 1000;
+      if (!isUrgent) return false;
+
+      const prompted = sessionStorage.getItem(`cani_emergency_prompted_${s.shiftId}`);
+      return !prompted;
+    });
+
+    if (urgentShift) {
+      sessionStorage.setItem(`cani_emergency_prompted_${urgentShift.shiftId}`, '1');
+      const startStr = urgentShift.startTime
+        ? new Date(urgentShift.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        : 'sắp tới';
+      const confirmed = Number(urgentShift.confirmedWorkers || 0);
+      const required = Number(urgentShift.requiredWorkers || 1);
+
+      showConfirm({
+        title: `Cảnh báo thiếu nhân sự sát giờ: Ca "${urgentShift.jobType}"`,
+        description: `Ca làm việc sắp bắt đầu lúc ${startStr} nhưng hiện mới có ${confirmed}/${required} nhân sự.\n\nBạn có muốn hệ thống kích hoạt chế độ Điều Phối Khẩn Cấp (mở rộng bán kính tìm kiếm lên 15km và ưu tiên phát sóng trên Radar tìm việc của Worker gần đây) không?`,
+        type: 'warning',
+        confirmText: 'Mở rộng tìm kiếm khẩn cấp',
+        cancelText: 'Để sau',
+      }).then(async (agreed) => {
+        if (agreed) {
+          try {
+            await eoService.enableEmergencyDispatch(urgentShift.shiftId, 15);
+            showToast(`Đã kích hoạt điều phối khẩn cấp (15km) cho ca "${urgentShift.jobType}".`, 'success');
+            onReloadEvents?.();
+          } catch (err) {
+            const msg = err.response?.data?.message || err.message || 'Lỗi khi kích hoạt điều phối khẩn cấp';
+            showToast(msg, 'error');
+          }
+        }
+      });
     }
-  };
+  }, [isOpen, event?.eventId, event?.status, event?.shifts, onReloadEvents]);
 
   const rawShifts = event?.shifts || [];
   const activeAndDraftShifts = rawShifts
@@ -617,7 +643,7 @@ export default function EventDetailModal({
                         {staffingAlerts
                           .map((s) => `"${s.jobType}" (thiếu ${Math.max(0, (s.requiredWorkers || 1) - (s.confirmedWorkers || 0))} người)`)
                           .join(', ')}
-                        . Hãy bấm <strong>"Bật Khẩn Cấp"</strong> tại ca để mở rộng phạm vi và cho phép nhân sự nhận ca trực tiếp trên bản đồ.
+                        . Hệ thống đang tự động theo dõi và hỗ trợ mở rộng bán kính tìm kiếm cho các ca sát giờ.
                       </div>
                     </div>
                   </div>
@@ -645,6 +671,7 @@ export default function EventDetailModal({
                     const shiftRequired = shift.requiredWorkers || 1;
                     const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
                     const shDynStatus = getDynamicShiftStatus(shift, event.status);
+                    const isDraft = event?.status === 'DRAFT' || shift?.status === 'DRAFT';
 
                     return (
                       <div key={shift.shiftId || sIdx} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -748,45 +775,40 @@ export default function EventDetailModal({
 
                             {/* Thao tác ca */}
                             <div className="shift-card-actions">
-                              {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleEmergency(shift, !shift.emergency)}
+                              {/* Trạng thái mở rộng khẩn cấp */}
+                              {shift.emergency && (
+                                <span
                                   style={{
-                                    background: shift.emergency ? '#fef2f2' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-                                    color: shift.emergency ? '#b91c1c' : '#ffffff',
-                                    border: shift.emergency ? '1.5px solid #f87171' : 'none',
-                                    borderRadius: '8px',
-                                    padding: '0.4rem 0.85rem',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '5px',
-                                    boxShadow: shift.emergency ? 'none' : '0 2px 6px rgba(225, 29, 72, 0.25)',
+                                    background: '#fff1f2',
+                                    color: '#e11d48',
+                                    border: '1.5px solid #fecdd3',
+                                    borderRadius: '8px',
+                                    padding: '0.35rem 0.65rem',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
                                   }}
-                                  title={
-                                    shift.emergency
-                                      ? 'Nhấn để tắt điều phối khẩn cấp'
-                                      : 'Bật điều phối khẩn cấp: Cho phép ứng tuyển tự do trên Radar và mở rộng bán kính 15km'
-                                  }
+                                  title="Hệ thống đang mở rộng tìm kiếm 15km và phát sóng trên Radar của Worker"
                                 >
-                                  {shift.emergency ? 'Tắt Khẩn Cấp' : 'Bật Khẩn Cấp'}
-                                </button>
+                                  Đang tìm kiếm khẩn cấp (15km)
+                                </span>
                               )}
 
-                              <button
-                                type="button"
-                                className="btn-shift-action purple"
-                                onClick={() => {
-                                  if (!asPage) onClose();
-                                  onOpenInvite(shift, event);
-                                }}
-                                title="Lấy link & mã mời trực tiếp cho nhân sự"
-                              >
-                                Mã Mời Nhân Sự
-                              </button>
+                              {/* Mã mời nhân sự: Ẩn khi sự kiện hoặc ca là Bản nháp (DRAFT) */}
+                              {!isDraft && onOpenInvite && (
+                                <button
+                                  type="button"
+                                  className="btn-shift-action purple"
+                                  onClick={() => {
+                                    if (!asPage) onClose();
+                                    onOpenInvite(shift, event);
+                                  }}
+                                  title="Lấy link & mã mời trực tiếp cho nhân sự"
+                                >
+                                  Mã Mời Nhân Sự
+                                </button>
+                              )}
 
                               {onEditShift && (
                                 <button
@@ -810,21 +832,24 @@ export default function EventDetailModal({
                                 </button>
                               )}
 
-                              <button
-                                type="button"
-                                className="btn-shift-action emerald"
-                                onClick={() => {
-                                  if (onOpenShiftWorkspace) {
-                                    onOpenShiftWorkspace(shift);
-                                  } else {
-                                    setActiveWorkspaceShiftId(shift.shiftId);
-                                    setActiveTab('QR_ATTENDANCE');
-                                  }
-                                }}
-                                title="Mở trang quản lý chi tiết riêng cho ca làm việc này"
-                              >
-                                Quản Lý Ca & Nhân Sự
-                              </button>
+                              {/* Quản lý ca & nhân sự: Ẩn khi sự kiện hoặc ca là Bản nháp (DRAFT) */}
+                              {!isDraft && (
+                                <button
+                                  type="button"
+                                  className="btn-shift-action emerald"
+                                  onClick={() => {
+                                    if (onOpenShiftWorkspace) {
+                                      onOpenShiftWorkspace(shift);
+                                    } else {
+                                      setActiveWorkspaceShiftId(shift.shiftId);
+                                      setActiveTab('QR_ATTENDANCE');
+                                    }
+                                  }}
+                                  title="Mở trang quản lý chi tiết riêng cho ca làm việc này"
+                                >
+                                  Quản Lý Ca & Nhân Sự
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>

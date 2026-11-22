@@ -5,6 +5,7 @@ import { showConfirm } from '../../../components/common/PromptModal';
 import { getAddressFromCoordinates, getCoordinatesFromAddress } from '../utils/geoUtils';
 import {
   DEFAULT_NEW_EVENT,
+  createDefaultNewEvent,
   DEMO_EVENTS,
   filterAndSortEvents,
   calculateEventMetrics,
@@ -26,7 +27,7 @@ export function useEvents() {
   const [locating, setLocating] = useState(false);
   const [cancelModal, setCancelModal] = useState({ isOpen: false, event: null, loading: false });
 
-  const [newEvent, setNewEvent] = useState(DEFAULT_NEW_EVENT);
+  const [newEvent, setNewEvent] = useState(() => createDefaultNewEvent());
 
   const loadEvents = async () => {
     setLoading(true);
@@ -68,11 +69,12 @@ export function useEvents() {
             venueAddress: addr || prev.venueAddress,
             venueLat: lat,
             venueLng: lng,
+            locationPicked: true,
           }));
           if (addr) {
-            showToast('Đã xác định địa chỉ tổ chức thành công!', 'success');
+            showToast('Đã xác định địa chỉ tổ chức từ GPS!', 'success');
           } else {
-            showToast('Đã ghim vị trí trên bản đồ. Vui lòng nhập rõ địa chỉ số nhà, tên đường cụ thể.', 'info');
+            showToast('Đã định vị tọa độ GPS trên bản đồ. Vui lòng nhập thêm tên địa điểm/số nhà cụ thể.', 'info');
           }
         } finally {
           setLocating(false);

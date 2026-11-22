@@ -3,12 +3,17 @@ class JobProposalItem {
   final String shiftId;
   final String eventId;
   final String eventName;
+  final String? eoId;
+  final String? eoName;
+  final bool eoVerified;
+  final double? eoRatingAvg;
   final String venueAddress;
   final String jobType;
   final String description;
   final DateTime startTime;
   final DateTime endTime;
   final DateTime? arrivalTime;
+  final DateTime? expiresAt;
   final List<String> requiredSkillNames;
   final double hourlyWage;
   final double allowance;
@@ -22,12 +27,17 @@ class JobProposalItem {
     required this.shiftId,
     required this.eventId,
     required this.eventName,
+    this.eoId,
+    this.eoName,
+    this.eoVerified = false,
+    this.eoRatingAvg,
     required this.venueAddress,
     required this.jobType,
     required this.description,
     required this.startTime,
     required this.endTime,
     this.arrivalTime,
+    this.expiresAt,
     this.requiredSkillNames = const [],
     required this.hourlyWage,
     required this.allowance,
@@ -43,12 +53,17 @@ class JobProposalItem {
       shiftId: json['shiftId'] ?? '',
       eventId: json['eventId'] ?? '',
       eventName: json['eventName'] ?? 'Sự kiện',
+      eoId: json['eoId']?.toString(),
+      eoName: json['eoName'] as String?,
+      eoVerified: json['eoVerified'] == true,
+      eoRatingAvg: (json['eoRatingAvg'] is num) ? (json['eoRatingAvg'] as num).toDouble() : null,
       venueAddress: json['venueAddress'] ?? '',
       jobType: json['jobType'] ?? '',
       description: json['description'] ?? '',
       startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'])?.toLocal() ?? DateTime.now() : DateTime.now(),
       endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'])?.toLocal() ?? DateTime.now().add(const Duration(hours: 4)) : DateTime.now().add(const Duration(hours: 4)),
       arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
+      expiresAt: json['expiresAt'] != null ? DateTime.tryParse(json['expiresAt'].toString())?.toLocal() : null,
       requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
       hourlyWage: (json['hourlyWage'] is num) ? (json['hourlyWage'] as num).toDouble() : 0.0,
       allowance: (json['allowance'] is num) ? (json['allowance'] as num).toDouble() : 0.0,
@@ -65,6 +80,10 @@ class ShiftAssignmentItem {
   final String shiftId;
   final String eventId;
   final String eventName;
+  final String? eoId;
+  final String? eoName;
+  final bool eoVerified;
+  final double? eoRatingAvg;
   final String venueAddress;
   final String jobType;
   final DateTime startTime;
@@ -99,6 +118,10 @@ class ShiftAssignmentItem {
     required this.shiftId,
     required this.eventId,
     required this.eventName,
+    this.eoId,
+    this.eoName,
+    this.eoVerified = false,
+    this.eoRatingAvg,
     required this.venueAddress,
     required this.jobType,
     required this.startTime,
@@ -135,6 +158,10 @@ class ShiftAssignmentItem {
       shiftId: json['shiftId']?.toString() ?? '',
       eventId: json['eventId']?.toString() ?? '',
       eventName: json['eventName']?.toString() ?? 'Sự kiện',
+      eoId: json['eoId']?.toString(),
+      eoName: json['eoName'] as String?,
+      eoVerified: json['eoVerified'] == true,
+      eoRatingAvg: (json['eoRatingAvg'] is num) ? (json['eoRatingAvg'] as num).toDouble() : null,
       venueAddress: json['venueAddress']?.toString() ?? '',
       jobType: json['jobType']?.toString() ?? '',
       startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'].toString())?.toLocal() ?? DateTime.now() : DateTime.now(),
@@ -463,6 +490,55 @@ class ShiftChatMessageItem {
       createdAt: json['createdAt'] != null
           ? (DateTime.tryParse(json['createdAt'].toString())?.toLocal() ?? DateTime.now())
           : DateTime.now(),
+    );
+  }
+}
+
+class EoPublicProfileData {
+  final String eoId;
+  final String? userId;
+  final String companyName;
+  final String? avatarUrl;
+  final String? address;
+  final String? phone;
+  final String? email;
+  final String? description;
+  final bool isVerified;
+  final double ratingAvg;
+  final int ratingCount;
+  final int totalEventsCompleted;
+
+  const EoPublicProfileData({
+    required this.eoId,
+    this.userId,
+    required this.companyName,
+    this.avatarUrl,
+    this.address,
+    this.phone,
+    this.email,
+    this.description,
+    this.isVerified = false,
+    this.ratingAvg = 0.0,
+    this.ratingCount = 0,
+    this.totalEventsCompleted = 0,
+  });
+
+  factory EoPublicProfileData.fromJson(Map<String, dynamic> json) {
+    return EoPublicProfileData(
+      eoId: json['eoId']?.toString() ?? '',
+      userId: json['userId']?.toString(),
+      companyName: (json['companyName'] as String?)?.trim().isNotEmpty == true
+          ? (json['companyName'] as String).trim()
+          : 'Ban tổ chức sự kiện',
+      avatarUrl: json['avatarUrl'] as String?,
+      address: json['address'] as String?,
+      phone: json['phone'] as String?,
+      email: json['email'] as String?,
+      description: json['description'] as String?,
+      isVerified: json['isVerified'] == true,
+      ratingAvg: (json['ratingAvg'] is num) ? (json['ratingAvg'] as num).toDouble() : 0.0,
+      ratingCount: (json['ratingCount'] is num) ? (json['ratingCount'] as num).toInt() : 0,
+      totalEventsCompleted: (json['totalEventsCompleted'] is num) ? (json['totalEventsCompleted'] as num).toInt() : 0,
     );
   }
 }

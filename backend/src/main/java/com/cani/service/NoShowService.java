@@ -141,15 +141,21 @@ public class NoShowService {
                 .notes(notes)
                 .build();
 
-        // Kích hoạt Emergency Dispatch tìm nhân sự thay thế
+        // Kích hoạt Emergency Dispatch tìm nhân sự thay thế (chỉ áp dụng cho sự kiện chế độ MATCHING)
         boolean emergencyDispatched = false;
-        try {
-            int dispatched = matchingDispatchService.dispatchForShift(shift.getShiftId());
-            emergencyDispatched = (dispatched > 0);
-            log.info("Emergency Dispatch kích hoạt cho ca {}: gửi đề xuất tới {} ứng viên thay thế",
-                    shift.getShiftId(), dispatched);
-        } catch (Exception e) {
-            log.error("Lỗi khi kích hoạt Emergency Dispatch cho ca {}: {}", shift.getShiftId(), e.getMessage());
+        boolean isInviteMode = shift.getEvent() != null
+                && shift.getEvent().getMode() == com.cani.entity.enums.EventMode.INVITE;
+        if (!isInviteMode) {
+            try {
+                int dispatched = matchingDispatchService.dispatchForShift(shift.getShiftId());
+                emergencyDispatched = (dispatched > 0);
+                log.info("Emergency Dispatch kích hoạt cho ca {}: gửi đề xuất tới {} ứng viên thay thế",
+                        shift.getShiftId(), dispatched);
+            } catch (Exception e) {
+                log.error("Lỗi khi kích hoạt Emergency Dispatch cho ca {}: {}", shift.getShiftId(), e.getMessage());
+            }
+        } else {
+            log.info("Bỏ qua Emergency Matching cho ca {} vì sự kiện thuộc chế độ INVITE", shift.getShiftId());
         }
         record.setEmergencyDispatched(emergencyDispatched);
         NoShowRecord savedRecord = noShowRecordRepository.save(record);

@@ -13,6 +13,7 @@ import '../widgets/shift_chat_sheet.dart';
 import '../widgets/shift_checklist_section.dart';
 import 'attendance_qr_scanner_screen.dart';
 import 'my_disputes_screen.dart';
+import '../widgets/eo_public_profile_sheet.dart';
 import '../../ekyc/screens/card_scanner_screen.dart';
 
 class ShiftDetailExecutionScreen extends ConsumerStatefulWidget {
@@ -85,16 +86,23 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
   bool get _isCompleted =>
       _assignment.checkoutTime != null ||
-      (_assignment.status == 'COMPLETED' && _assignment.checkinTime == null);
+      _assignment.status == 'COMPLETED';
 
   bool get _isCheckedIn =>
       !_isCompleted &&
       (_assignment.status == 'CHECKED_IN' || _assignment.checkinTime != null);
 
+  bool get _isExpired =>
+      !_isCheckedIn &&
+      !_isCompleted &&
+      (_assignment.status == 'NO_SHOW' ||
+          _assignment.status == 'CANCELLED' ||
+          DateTime.now().isAfter(_assignment.endTime));
+
   DateTime get _earliestCheckinTime => _assignment.arrivalTime ?? _assignment.startTime;
 
   bool get _isBeforeCheckinWindow =>
-      !_isCheckedIn && !_isCompleted && DateTime.now().isBefore(_earliestCheckinTime);
+      !_isCheckedIn && !_isCompleted && !_isExpired && DateTime.now().isBefore(_earliestCheckinTime);
 
   bool get _isPaymentConfirmed =>
       (_assignment.workerConfirmStatus != null && _assignment.workerConfirmStatus!.isNotEmpty) ||
@@ -138,6 +146,19 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
   void _updateCountdown() {
     final now = DateTime.now();
+    if (_isExpired) {
+      if (mounted) {
+        setState(() {
+          _countdownText = _assignment.status == 'CANCELLED'
+              ? 'Ca làm việc đã bị hủy'
+              : (_assignment.status == 'NO_SHOW'
+                  ? 'Đã ghi nhận vắng mặt (No-show)'
+                  : 'Ca làm việc đã quá hạn điểm danh');
+        });
+      }
+      return;
+    }
+
     final isCheckedIn = _assignment.status == 'CHECKED_IN' ||
         (_assignment.checkinTime != null && _assignment.checkoutTime == null);
 
@@ -146,8 +167,19 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
     if (diff.isNegative) {
       if (mounted) {
+        String text;
+        if (isCheckedIn) {
+          text = 'Đã quá giờ kết thúc';
+        } else {
+          final remDiff = _assignment.endTime.difference(now);
+          final remHours = remDiff.inHours;
+          final remMins = remDiff.inMinutes % 60;
+          text = remHours > 0
+              ? 'Đang trong giờ ca (còn ${remHours}g ${remMins}p)'
+              : 'Đang trong giờ ca (còn $remMins phút)';
+        }
         setState(() {
-          _countdownText = isCheckedIn ? 'Đã quá giờ kết thúc' : 'Đang trong giờ ca làm';
+          _countdownText = text;
         });
       }
       return;
@@ -249,7 +281,11 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     if (!_isCheckedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc!'),
+          content: Text(
+            _isExpired
+                ? 'Ca làm việc đã quá hạn — danh sách đầu việc chỉ ở chế độ xem.'
+                : 'Vào ca (quét QR check-in) để bắt đầu tích chọn đầu việc!',
+          ),
           backgroundColor: cani.warning,
         ),
       );
@@ -357,7 +393,11 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     if (!_isCheckedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Vào ca (quét QR check-in) để chụp ảnh nghiệm thu đầu việc!'),
+          content: Text(
+            _isExpired
+                ? 'Ca làm việc đã quá hạn — không thể chụp ảnh nghiệm thu.'
+                : 'Vào ca (quét QR check-in) để chụp ảnh nghiệm thu đầu việc!',
+          ),
           backgroundColor: cani.warning,
         ),
       );
@@ -697,6 +737,16 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       return;
     }
 
+    if (_isExpired) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Ca làm việc đã quá hạn điểm danh, không thể quét QR vào ca.'),
+          backgroundColor: cani.danger,
+        ),
+      );
+      return;
+    }
+
     if (!_isCheckedIn) {
       if (_isBeforeCheckinWindow) {
         final gate = _earliestCheckinTime;
@@ -941,6 +991,66 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                       height: 1.3,
                                     ),
                                   ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.access_time_rounded, size: 14, color: cani.brand),
+                                      const SizedBox(width: 5),
+                                      Expanded(
+                                        child: Text(
+                                          '${_assignment.startTime.hour.toString().padLeft(2, '0')}:${_assignment.startTime.minute.toString().padLeft(2, '0')} - ${_assignment.endTime.hour.toString().padLeft(2, '0')}:${_assignment.endTime.minute.toString().padLeft(2, '0')} · ${_assignment.startTime.day.toString().padLeft(2, '0')}/${_assignment.startTime.month.toString().padLeft(2, '0')}/${_assignment.startTime.year}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_assignment.eoId != null && _assignment.eoId!.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    InkWell(
+                                      onTap: () => EoPublicProfileSheet.show(
+                                        context,
+                                        eoId: _assignment.eoId!,
+                                        fallbackName: _assignment.eoName,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: cani.brandSoft,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: cani.brand.withValues(alpha: 0.25)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              _assignment.eoVerified ? Icons.verified_rounded : Icons.apartment_rounded,
+                                              size: 14,
+                                              color: cani.brand,
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Flexible(
+                                              child: Text(
+                                                '${_assignment.eoName ?? "Ban tổ chức"} · Xem hồ sơ BTC',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: cani.brand,
+                                                ),
+                                              ),
+                                            ),
+                                            Icon(Icons.chevron_right_rounded, size: 15, color: cani.brand),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -981,16 +1091,24 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     ),
                   ),
 
-                  // 2. Banner Trạng thái màu xanh lá (Shopee Style)
+                  // 2. Banner Trạng thái
                   Container(
                     margin: const EdgeInsets.only(top: 8),
-                    color: const Color(0xFF16A34A),
+                    color: _isExpired
+                        ? cani.danger
+                        : const Color(0xFF16A34A),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Center(
                       child: Text(
-                        isCompleted
-                            ? 'Ca làm việc đã hoàn thành thành công'
-                            : (isCheckedIn ? 'Đang trong ca làm việc' : 'Ban tổ chức đã xác nhận nhận ca'),
+                        _isExpired
+                            ? (_assignment.status == 'CANCELLED'
+                                ? 'Ca làm việc đã bị hủy'
+                                : (_assignment.status == 'NO_SHOW'
+                                    ? 'Vắng mặt không điểm danh (No-show)'
+                                    : 'Ca làm việc đã quá hạn điểm danh vào ca'))
+                            : (isCompleted
+                                ? 'Ca làm việc đã hoàn thành thành công'
+                                : (isCheckedIn ? 'Đang trong ca làm việc' : 'Ban tổ chức đã xác nhận nhận ca')),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1011,34 +1129,41 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? cani.accent : const Color(0xFF0284C7),
+                            color: _isExpired
+                                ? cani.danger
+                                : (isDark ? cani.accent : const Color(0xFF0284C7)),
                           ),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          isCompleted
-                              ? (isReviewed
-                                  ? 'Cảm ơn bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức.'
-                                  : 'Bạn đã Check-out thành công. Hãy gửi đánh giá (Rating) Ban tổ chức bên dưới!')
-                              : (isCheckedIn
-                                  ? (!_isWorkReadyForEoConfirm
-                                      ? '* Bước 2: Hoàn tất checklist và chụp ảnh nghiệm thu để Ban tổ chức duyệt công.'
-                                      : (!_assignment.eoConfirmed
-                                          ? '* Bước 3: Chờ Ban tổ chức kiểm tra & bấm Duyệt công.'
-                                          : (!_isPaymentConfirmed
-                                              ? '* Bước 4: Xác nhận nhận đủ thù lao từ Ban tổ chức trước khi quét QR Check-out.'
-                                              : '* Bước 5: Đã xác nhận thanh toán! Vui lòng quét QR Check-out để kết thúc ca.')))
-                                  : '* Bước 1: Quét mã QR Check-in khi có mặt tại địa điểm sự kiện.'),
+                          _isExpired
+                              ? 'Đã qua thời gian kết thúc ca mà chưa có Check-in. Bạn vẫn có thể xem thông tin ca, checklist hoặc gửi khiếu nại nếu có vấn đề.'
+                              : (isCompleted
+                                  ? (isReviewed
+                                      ? 'Cảm ơn bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức.'
+                                      : 'Bạn đã Check-out thành công. Hãy gửi đánh giá (Rating) Ban tổ chức bên dưới!')
+                                  : (isCheckedIn
+                                      ? (!_isWorkReadyForEoConfirm
+                                          ? '* Bước 2: Hoàn tất checklist và chụp ảnh nghiệm thu để Ban tổ chức duyệt công.'
+                                          : (!_assignment.eoConfirmed
+                                              ? '* Bước 3: Chờ Ban tổ chức kiểm tra & bấm Duyệt công.'
+                                              : (!_isPaymentConfirmed
+                                                  ? '* Bước 4: Xác nhận nhận đủ thù lao từ Ban tổ chức trước khi quét QR Check-out.'
+                                                  : '* Bước 5: Đã xác nhận thanh toán! Vui lòng quét QR Check-out để kết thúc ca.')))
+                                      : '* Bước 1: Quét mã QR Check-in khi có mặt tại địa điểm sự kiện.')),
                           style: TextStyle(
                             fontSize: 11.8,
                             fontWeight: FontWeight.w600,
-                            color: isCompleted ? const Color(0xFF059669) : const Color(0xFFEA580C),
+                            color: _isExpired
+                                ? cani.danger
+                                : (isCompleted ? const Color(0xFF059669) : const Color(0xFFEA580C)),
                             height: 1.4,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 12),
                         _buildWorkflowStepper(
+                          isExpired: _isExpired,
                           isCheckedIn: isCheckedIn,
                           isWorkReady: _isWorkReadyForEoConfirm,
                           isEoConfirmed: _assignment.eoConfirmed,
@@ -1050,81 +1175,82 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                     ),
                   ),
 
-                  // 4. GPS Geofencing Warning (Cảnh báo khoảng cách)
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _distanceMeters != null && _distanceMeters! > 200
-                          ? const Color(0xFFFEF2F2)
-                          : const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
+                  // 4. GPS Geofencing Warning (Chỉ hiện khi ca chưa hoàn thành và chưa hết hạn)
+                  if (!isCompleted && !_isExpired)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
                         color: _distanceMeters != null && _distanceMeters! > 200
-                            ? const Color(0xFFFCA5A5)
-                            : const Color(0xFF86EFAC),
+                            ? const Color(0xFFFEF2F2)
+                            : const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _distanceMeters != null && _distanceMeters! > 200
+                              ? const Color(0xFFFCA5A5)
+                              : const Color(0xFF86EFAC),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _distanceMeters != null && _distanceMeters! > 200
+                                ? Icons.warning_amber_rounded
+                                : Icons.check_circle_outline,
+                              color: _distanceMeters != null && _distanceMeters! > 200
+                                  ? cani.danger
+                                  : const Color(0xFF16A34A),
+                            size: 24,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _distanceMeters != null && _distanceMeters! > 200
+                                      ? 'Cảnh báo khoảng cách (> 200m)'
+                                      : 'Vị trí điểm danh hợp lệ',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: _distanceMeters != null && _distanceMeters! > 200
+                                        ? const Color(0xFF991B1B)
+                                        : const Color(0xFF166534),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _distanceMeters != null
+                                      ? (_distanceMeters! > 200
+                                          ? 'Bạn đang cách địa điểm ${_distanceMeters! >= 1000 ? "${(_distanceMeters! / 1000).toStringAsFixed(1)}km" : "${_distanceMeters!.toInt()}m"}. Hãy di chuyển đến gần địa điểm trước khi quét mã!'
+                                          : 'Bạn đang cách địa điểm ${_distanceMeters!.toInt()}m (nằm trong bán kính 200m cho phép).')
+                                      : (_isLoadingGps ? 'Đang xác định khoảng cách GPS...' : (_gpsError ?? 'Không có dữ liệu GPS')),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: _distanceMeters != null && _distanceMeters! > 200
+                                        ? const Color(0xFFB91C1C)
+                                        : const Color(0xFF15803D),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_distanceMeters != null && _distanceMeters! > 200)
+                            TextButton(
+                              onPressed: _openGoogleMapsNavigation,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: cani.brand,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              child: const Text('Chỉ đường', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _distanceMeters != null && _distanceMeters! > 200
-                              ? Icons.warning_amber_rounded
-                              : Icons.check_circle_outline,
-                            color: _distanceMeters != null && _distanceMeters! > 200
-                                ? cani.danger
-                                : const Color(0xFF16A34A),
-                          size: 24,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _distanceMeters != null && _distanceMeters! > 200
-                                    ? 'Cảnh báo khoảng cách (> 200m)'
-                                    : 'Vị trí điểm danh hợp lệ',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: _distanceMeters != null && _distanceMeters! > 200
-                                      ? const Color(0xFF991B1B)
-                                      : const Color(0xFF166534),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _distanceMeters != null
-                                    ? (_distanceMeters! > 200
-                                        ? 'Bạn đang cách địa điểm ${_distanceMeters! >= 1000 ? "${(_distanceMeters! / 1000).toStringAsFixed(1)}km" : "${_distanceMeters!.toInt()}m"}. Hãy di chuyển đến gần địa điểm trước khi quét mã!'
-                                        : 'Bạn đang cách địa điểm ${_distanceMeters!.toInt()}m (nằm trong bán kính 200m cho phép).')
-                                    : (_isLoadingGps ? 'Đang xác định khoảng cách GPS...' : (_gpsError ?? 'Không có dữ liệu GPS')),
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: _distanceMeters != null && _distanceMeters! > 200
-                                      ? const Color(0xFFB91C1C)
-                                      : const Color(0xFF15803D),
-                                  height: 1.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_distanceMeters != null && _distanceMeters! > 200)
-                          TextButton(
-                            onPressed: _openGoogleMapsNavigation,
-                              style: TextButton.styleFrom(
-                                foregroundColor: cani.brand,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                            ),
-                            child: const Text('Chỉ đường', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          ),
-                      ],
-                    ),
-                  ),
 
-                  // 5. Checklist Công việc Chi tiết (Chỉ cho tương tác khi đã Check-in vào ca)
+                  // 5. Checklist Công việc Chi tiết (Luôn hiển thị để xem trước, chỉ cho tương tác khi đã Check-in vào ca)
                   KeyedSubtree(
                     key: _checklistSectionKey,
                     child: ShiftChecklistSection(
@@ -1133,6 +1259,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                       isSaving: _isSavingChecklist,
                       errorMessage: _checklistError,
                       canInteract: isCheckedIn,
+                      isExpired: _isExpired,
                       uploadingTaskIndex: _uploadingTaskIndex,
                       onRetryLoad: _loadChecklist,
                       onToggleItem: _toggleChecklistItem,
@@ -1367,7 +1494,9 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                             onTap: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const MyDisputesScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) => MyDisputesScreen(assignment: _assignment),
+                                ),
                               );
                             },
                           ),
@@ -1381,11 +1510,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           ),
         ),
 
-          // 8. Bottom Sticky Action Bar (Theo đúng 5 bước vận hành)
+          // 8. Bottom Sticky Action Bar (Theo đúng 5 bước vận hành; ẩn QR nếu ca đã hết hạn)
           _buildBottomStickyBar(
             context: context,
             isDark: isDark,
             cani: cani,
+            isExpired: _isExpired,
             isCheckedIn: isCheckedIn,
             isCompleted: isCompleted,
             isReviewed: isReviewed,
@@ -1399,6 +1529,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     required BuildContext context,
     required bool isDark,
     required CaniTokens cani,
+    required bool isExpired,
     required bool isCheckedIn,
     required bool isCompleted,
     required bool isReviewed,
@@ -1406,8 +1537,18 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     Color bgColor;
     IconData iconData;
     String label;
+    bool isActionDisabled = false;
 
-    if (isCompleted) {
+    if (isExpired) {
+      bgColor = const Color(0xFF64748B);
+      iconData = Icons.event_busy_rounded;
+      label = _assignment.status == 'CANCELLED'
+          ? 'CA LÀM VIỆC ĐÃ BỊ HỦY'
+          : (_assignment.status == 'NO_SHOW'
+              ? 'ĐÃ GHI NHẬN VẮNG MẶT (NO-SHOW)'
+              : 'ĐÃ HẾT HẠN ĐIỂM DANH VÀO CA');
+      isActionDisabled = true;
+    } else if (isCompleted) {
       bgColor = isReviewed ? const Color(0xFF16A34A) : const Color(0xFF0D9488);
       iconData = isReviewed ? Icons.verified_rounded : Icons.star_rate_rounded;
       label = isReviewed
@@ -1467,11 +1608,13 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           height: 52,
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _handleBottomAction,
+            onPressed: isActionDisabled ? null : _handleBottomAction,
             style: ElevatedButton.styleFrom(
               backgroundColor: bgColor,
+              disabledBackgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
               foregroundColor: Colors.white,
-              elevation: 3,
+              disabledForegroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              elevation: isActionDisabled ? 0 : 3,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Row(
@@ -1481,9 +1624,15 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: (isActionDisabled ? Colors.black : Colors.white).withValues(alpha: 0.16),
                   ),
-                  child: Icon(iconData, size: 15, color: Colors.white),
+                  child: Icon(
+                    iconData,
+                    size: 15,
+                    color: isActionDisabled
+                        ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569))
+                        : Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Flexible(
@@ -1506,6 +1655,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
   }
 
   Widget _buildWorkflowStepper({
+    required bool isExpired,
     required bool isCheckedIn,
     required bool isWorkReady,
     required bool isEoConfirmed,
@@ -1514,11 +1664,11 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     required bool isReviewed,
   }) {
     final steps = [
-      (label: 'Vào ca', done: isCheckedIn || isCompleted, active: !isCheckedIn && !isCompleted),
-      (label: 'Việc & Ảnh', done: isWorkReady || isEoConfirmed || isCompleted, active: isCheckedIn && !isWorkReady && !isEoConfirmed),
-      (label: 'BTC duyệt', done: isEoConfirmed || isCompleted, active: isCheckedIn && isWorkReady && !isEoConfirmed),
-      (label: 'Thù lao', done: isPaymentConfirmed, active: isCheckedIn && isEoConfirmed && !isPaymentConfirmed),
-      (label: 'Kết ca', done: isCompleted && isReviewed, active: (isCheckedIn && isPaymentConfirmed) || (isCompleted && !isReviewed)),
+      (label: 'Vào ca', done: isCheckedIn || isCompleted, active: !isCheckedIn && !isCompleted && !isExpired, failed: isExpired),
+      (label: 'Đầu việc', done: (isCheckedIn && isWorkReady) || isEoConfirmed || isCompleted, active: isCheckedIn && !isWorkReady && !isEoConfirmed, failed: false),
+      (label: 'Duyệt công', done: isEoConfirmed || isCompleted, active: isCheckedIn && isWorkReady && !isEoConfirmed, failed: false),
+      (label: 'Thù lao', done: isPaymentConfirmed, active: isCheckedIn && isEoConfirmed && !isPaymentConfirmed, failed: false),
+      (label: 'Kết ca', done: isCompleted && isReviewed, active: (isCheckedIn && isPaymentConfirmed) || (isCompleted && !isReviewed), failed: false),
     ];
 
     return Row(
@@ -1532,21 +1682,25 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                   height: 22,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: steps[i].done
-                        ? const Color(0xFF16A34A)
-                        : (steps[i].active ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0)),
+                    color: steps[i].failed
+                        ? const Color(0xFFDC2626)
+                        : (steps[i].done
+                            ? const Color(0xFF16A34A)
+                            : (steps[i].active ? const Color(0xFF0284C7) : const Color(0xFFE2E8F0))),
                   ),
                   child: Center(
-                    child: steps[i].done
-                        ? const Icon(Icons.check, size: 13, color: Colors.white)
-                        : Text(
-                            '${i + 1}',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
-                              color: steps[i].active ? Colors.white : const Color(0xFF64748B),
-                            ),
-                          ),
+                    child: steps[i].failed
+                        ? const Icon(Icons.close, size: 13, color: Colors.white)
+                        : (steps[i].done
+                            ? const Icon(Icons.check, size: 13, color: Colors.white)
+                            : Text(
+                                '${i + 1}',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: steps[i].active ? Colors.white : const Color(0xFF64748B),
+                                ),
+                              )),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1556,7 +1710,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: (steps[i].active || steps[i].done) ? FontWeight.w700 : FontWeight.w500,
                     color: steps[i].done
                         ? const Color(0xFF16A34A)

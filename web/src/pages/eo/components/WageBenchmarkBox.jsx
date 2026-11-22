@@ -17,6 +17,8 @@ export default function WageBenchmarkBox({
   startTime,
   endTime,
   venueAddress = '',
+  venueLat = null,
+  venueLng = null,
   onSelectWage,
 }) {
   const roleError = useMemo(
@@ -30,7 +32,7 @@ export default function WageBenchmarkBox({
   const cacheRef = useRef({});
 
   const trimmedRole = String(jobType || '').trim();
-  const city = detectCityFromAddress(venueAddress);
+  const city = detectCityFromAddress(venueAddress, venueLat, venueLng);
 
   useEffect(() => {
     if (roleError || !trimmedRole || !startTime) {
@@ -90,9 +92,11 @@ export default function WageBenchmarkBox({
       jobType: trimmedRole,
       startTime,
       venueAddress,
+      venueLat,
+      venueLng,
       apiBenchmark,
     });
-  }, [roleError, trimmedRole, startTime, venueAddress, apiBenchmark]);
+  }, [roleError, trimmedRole, startTime, venueAddress, venueLat, venueLng, apiBenchmark]);
 
   if (roleError || !benchmark) {
     return (

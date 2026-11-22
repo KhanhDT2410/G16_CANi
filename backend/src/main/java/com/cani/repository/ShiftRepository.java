@@ -26,11 +26,11 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     );
 
     @Modifying
-    @Query("UPDATE Shift s SET s.confirmedWorkers = s.confirmedWorkers + 1, s.remainingWorkers = CASE WHEN (s.remainingWorkers > 0) THEN s.remainingWorkers - 1 ELSE 0 END, s.status = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN :fullStatus ELSE s.status END, s.emergency = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN false ELSE s.emergency END WHERE s.shiftId = :shiftId AND s.confirmedWorkers < s.requiredWorkers")
-    int incrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId, @Param("fullStatus") ShiftStatus fullStatus);
+    @Query("UPDATE Shift s SET s.confirmedWorkers = s.confirmedWorkers + 1, s.remainingWorkers = CASE WHEN (s.remainingWorkers > 0) THEN s.remainingWorkers - 1 ELSE 0 END, s.status = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN :fullStatus ELSE s.status END, s.emergency = CASE WHEN (s.confirmedWorkers + 1 >= s.requiredWorkers) THEN false ELSE s.emergency END WHERE s.shiftId = :shiftId AND s.status = :activeStatus AND s.confirmedWorkers < s.requiredWorkers")
+    int incrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId, @Param("activeStatus") ShiftStatus activeStatus, @Param("fullStatus") ShiftStatus fullStatus);
 
     default int incrementConfirmedWorkersAtomic(UUID shiftId) {
-        return incrementConfirmedWorkersAtomic(shiftId, ShiftStatus.FULLY_STAFFED);
+        return incrementConfirmedWorkersAtomic(shiftId, ShiftStatus.ACTIVE, ShiftStatus.FULLY_STAFFED);
     }
 
     @Modifying

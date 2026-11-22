@@ -173,12 +173,12 @@ export function validateJobType(rawJobType) {
 }
 
 /**
- * Suy luận mã Thành phố (City enum của backend) từ địa chỉ sự kiện.
+ * Suy luận mã Thành phố (City enum của backend) từ địa chỉ hoặc tọa độ GPS sự kiện.
  */
-export function detectCityFromAddress(address = '') {
+export function detectCityFromAddress(address = '', lat = null, lng = null) {
   const norm = String(address || '').toLowerCase();
   if (
-    /(hà nội|ha noi|hoàn kiếm|đống đa|cầu giấy|ba đình|hai bà trưng|thanh xuân|tây hồ|nam từ liêm|bắc từ liêm|long biên|hà đông|hoàng mai|hòa lạc|thạch thất)/.test(
+    /(hà nội|ha noi|hoàn kiếm|đống đa|cầu giấy|ba đình|hai bà trưng|thanh xuân|tây hồ|nam từ liêm|bắc từ liêm|long biên|hà đông|hoàng mai|hòa lạc|thạch thất|cầu diễn|phú diễn|hồ tùng mậu|xuân thủy|mỹ đình|sư phạm|goldmark|đông anh|gia lâm|thanh trì|sóc sơn)/.test(
       norm
     )
   ) {
@@ -191,7 +191,62 @@ export function detectCityFromAddress(address = '') {
   ) {
     return 'DANANG';
   }
+  if (
+    /(tp\.?\s*hcm|hồ chí minh|ho chi minh|sài gòn|sai gon|secc|quận 1\b|quận 3\b|quận 4\b|quận 5\b|quận 7\b|quận 10\b|quận 11\b|quận 12\b|thủ đức|bình thạnh|phú nhuận|tân bình|gò vấp|tân phú|bình tân|nhà bè|bình chánh)/.test(
+      norm
+    )
+  ) {
+    return 'TP_HCM';
+  }
+
+  // Nếu text chưa ghi tên tỉnh/quận, suy luận từ tọa độ GPS đã ghim trên bản đồ
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  if (Number.isFinite(nLat) && Number.isFinite(nLng) && (nLat !== 0 || nLng !== 0)) {
+    if (nLat >= 20.5 && nLat <= 21.45 && nLng >= 105.2 && nLng <= 106.1) {
+      return 'HANOI';
+    }
+    if (nLat >= 15.8 && nLat <= 16.35 && nLng >= 107.8 && nLng <= 108.4) {
+      return 'DANANG';
+    }
+    if (nLat >= 10.3 && nLat <= 11.2 && nLng >= 106.3 && nLng <= 107.15) {
+      return 'TP_HCM';
+    }
+  }
+
   return 'TP_HCM';
+}
+
+/**
+ * Trả về thông tin vùng lương cho Sidebar: tránh hiển thị cứng TP.HCM khi EO chưa chọn địa chỉ hoặc chưa ghim vị trí mới.
+ */
+export function resolveWageRegionInfo(address = '', lat = null, lng = null, hasPickedLocation = false) {
+  const hasAddress = Boolean(String(address || '').trim());
+  const isDefaultSeccPin =
+    lat != null &&
+    lng != null &&
+    Math.abs(Number(lat) - 10.7328) < 0.0005 &&
+    Math.abs(Number(lng) - 106.7214) < 0.0005;
+
+  if (!hasAddress && (!hasPickedLocation || isDefaultSeccPin)) {
+    return {
+      isResolved: false,
+      city: null,
+      regionLabel: 'Chưa xác định khu vực',
+      wage: null,
+      decree: null,
+    };
+  }
+
+  const city = detectCityFromAddress(address, lat, lng);
+  const floorInfo = STATUTORY_HOURLY_FLOORS[city] || STATUTORY_HOURLY_FLOORS.TP_HCM;
+  return {
+    isResolved: true,
+    city,
+    regionLabel: floorInfo.regionLabel,
+    wage: floorInfo.wage,
+    decree: floorInfo.decree,
+  };
 }
 
 function roundToThousand(val) {
@@ -252,9 +307,11 @@ export function buildEvidenceWageBenchmark({
   jobType,
   startTime,
   venueAddress,
+  venueLat = null,
+  venueLng = null,
   apiBenchmark,
 }) {
-  const city = detectCityFromAddress(venueAddress);
+  const city = detectCityFromAddress(venueAddress, venueLat, venueLng);
   const floorInfo = STATUTORY_HOURLY_FLOORS[city] || STATUTORY_HOURLY_FLOORS.TP_HCM;
   const trimmedRole = String(jobType || '').trim();
 

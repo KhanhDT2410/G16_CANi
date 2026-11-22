@@ -320,47 +320,68 @@ export default function EventDetailModal({
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            {event.status === 'DRAFT' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    showToast('Đã lưu sự kiện ở trạng thái Bản nháp!', 'success');
-                    onReloadEvents?.();
-                  }}
-                  style={{
-                    background: '#ffffff',
-                    color: '#334155',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    padding: '0.45rem 0.95rem',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Lưu Bản Nháp
-                </button>
-                {onOpenConfirmPublish && (
+            {event.status === 'DRAFT' && (() => {
+              const dynEvt = getDynamicEventStatus(event);
+              const activeShiftCnt = shifts.length || Number(event.totalShifts || 0);
+              if (dynEvt.isExpiredDraft) {
+                return (
+                  <span
+                    style={{
+                      background: '#fef2f2',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      padding: '0.4rem 0.8rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Bản nháp đã qua giờ — hãy sửa lại thời gian
+                  </span>
+                );
+              }
+              return (
+                <>
                   <button
                     type="button"
-                    onClick={() => onOpenConfirmPublish(event)}
+                    onClick={() => {
+                      showToast('Đã lưu sự kiện ở trạng thái Bản nháp!', 'success');
+                      onReloadEvents?.();
+                    }}
                     style={{
-                      background: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
+                      background: '#ffffff',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
                       borderRadius: '8px',
-                      padding: '0.45rem 1rem',
+                      padding: '0.45rem 0.95rem',
                       fontSize: '0.82rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                     }}
                   >
-                    Đăng Tuyển Ngay
+                    Lưu Bản Nháp
                   </button>
-                )}
-              </>
-            )}
+                  {onOpenConfirmPublish && activeShiftCnt > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenConfirmPublish(event)}
+                      style={{
+                        background: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '0.45rem 1rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Đăng Tuyển Ngay
+                    </button>
+                  )}
+                </>
+              );
+            })()}
             {onOpenEditEvent && (
               <button
                 type="button"
@@ -636,7 +657,7 @@ export default function EventDetailModal({
                                 {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
                                 {hasCustomArrival(shift) && (
                                   <span style={{ marginLeft: 6, color: '#b45309', fontWeight: 600 }}>
-                                    (Mở điểm danh {formatTime(shift.arrivalTime, '')})
+                                    (Có mặt từ {formatTime(shift.arrivalTime, '')})
                                   </span>
                                 )}
                               </span>

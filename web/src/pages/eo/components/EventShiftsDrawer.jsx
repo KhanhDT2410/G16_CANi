@@ -143,7 +143,7 @@ const EventShiftsDrawer = ({
             </div>
             <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: 4 }}>
               {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
-              {hasCustomArrival(shift) && ` • Mở điểm danh ${formatTime(shift.arrivalTime, '')}`} •{' '}
+              {hasCustomArrival(shift) && ` • Có mặt từ ${formatTime(shift.arrivalTime, '')}`} •{' '}
               <strong>
                 {shift.confirmedWorkers || 0}/{shift.requiredWorkers || 0}
               </strong>{' '}

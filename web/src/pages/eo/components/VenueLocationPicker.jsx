@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { searchAddressSuggestions, getAddressFromCoordinates } from '../utils/geoUtils';
+import {
+  searchAddressSuggestions,
+  getAddressFromCoordinates,
+  getCoordinatesFromAddress,
+} from '../utils/geoUtils';
 import './VenueLocationPicker.css';
 
-// Custom SVG Pin Icon phong cách Google Maps (Màu đỏ đặc trưng #ea4335, vòng tròn trắng ở giữa)
 const createGooglePinIcon = () =>
   L.divIcon({
     className: 'google-custom-pin',
@@ -22,10 +25,10 @@ const createGooglePinIcon = () =>
 
 /**
  * VenueLocationPicker
- * Component chọn địa điểm tổ chức sự kiện tích hợp:
- * 1. Ô tìm kiếm địa chỉ kèm Autocomplete gợi ý thông minh
- * 2. Bản đồ tương tác Leaflet (OpenStreetMap)
- * 3. Kéo thả ghim hoặc click trên bản đồ để tinh chỉnh tọa độ và tự cập nhật địa chỉ
+ * Hỗ trợ:
+ * 1. Gõ tìm kiếm + Autocomplete gợi ý, hoặc nhấn Enter / rời ô để định vị thẳng trên bản đồ
+ * 2. Kéo thả ghim hoặc click bản đồ: cập nhật tọa độ & vùng lương tức thì + tự dò địa chỉ
+ * 3. Định vị GPS thiết bị hiện tại
  */
 export const VenueLocationPicker = ({
   address = '',
@@ -40,7 +43,9 @@ export const VenueLocationPicker = ({
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [mapType, setMapType] = useState('roadmap'); // 'roadmap' | 'satellite'
+  const [resolvingAddress, setResolvingAddress] = useState(false);
+  const [resolveFailedHint, setResolveFailedHint] = useState(false);
+  const [mapType, setMapType] = useState('roadmap');
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -49,10 +54,18 @@ export const VenueLocationPicker = ({
   const dropdownRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
-  // Tạo tile layer tương ứng với chế độ bản đồ Google
+  // Giữ ref mới nhất để handler Leaflet không bị stale closure & không gọi setState cha trong updater
+  const onLocationChangeRef = useRef(onLocationChange);
+  onLocationChangeRef.current = onLocationChange;
+  const inputValueRef = useRef(inputValue);
+  inputValueRef.current = inputValue;
+  const latRef = useRef(lat);
+  latRef.current = lat;
+  const lngRef = useRef(lng);
+  lngRef.current = lng;
+  const lastGeocodedTextRef = useRef('');
+
   const createGoogleTileLayer = (type) => {
-    // lyrs=m: Bản đồ đường sá tiêu chuẩn của Google (Tiếng Việt)
-    // lyrs=y: Ảnh vệ tinh kết hợp tên đường và địa danh (Hybrid Satellite)
     const lyrs = type === 'satellite' ? 'y' : 'm';
     return L.tileLayer(`https://mt{s}.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}&hl=vi`, {
       subdomains: ['0', '1', '2', '3'],
@@ -61,17 +74,48 @@ export const VenueLocationPicker = ({
     });
   };
 
-  // Đồng bộ giá trị input khi prop address từ bên ngoài thay đổi (ví dụ: bấm GPS)
   useEffect(() => {
     setInputValue(address);
+    if (address) setResolveFailedHint(false);
   }, [address]);
 
-  // Khởi tạo bản đồ Leaflet với Google Maps tile
+  const handlePinMoved = async (newLat, newLng) => {
+    setResolvingAddress(true);
+    setResolveFailedHint(false);
+
+    // Cập nhật tọa độ ngay lập tức để Sidebar hiển thị đúng Vùng lương & GPS
+    onLocationChangeRef.current?.({
+      address: inputValueRef.current,
+      lat: newLat,
+      lng: newLng,
+      locationPicked: true,
+    });
+
+    const resolvedAddress = await getAddressFromCoordinates(newLat, newLng);
+    setResolvingAddress(false);
+
+    if (resolvedAddress) {
+      lastGeocodedTextRef.current = resolvedAddress;
+      setInputValue(resolvedAddress);
+      onLocationChangeRef.current?.({
+        address: resolvedAddress,
+        lat: newLat,
+        lng: newLng,
+        locationPicked: true,
+      });
+    } else {
+      setResolveFailedHint(true);
+    }
+  };
+
+  const handlePinMovedRef = useRef(handlePinMoved);
+  handlePinMovedRef.current = handlePinMoved;
+
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const initialLat = lat || 10.7328;
-    const initialLng = lng || 106.7214;
+    const initialLat = latRef.current || 10.7328;
+    const initialLng = lngRef.current || 106.7214;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
@@ -80,12 +124,10 @@ export const VenueLocationPicker = ({
       attributionControl: false,
     });
 
-    // Tile layer Google Maps chuẩn tiếng Việt
     const initialTileLayer = createGoogleTileLayer('roadmap');
     initialTileLayer.addTo(map);
     tileLayerRef.current = initialTileLayer;
 
-    // Marker phong cách Google Maps đỏ có thể kéo thả
     const marker = L.marker([initialLat, initialLng], {
       icon: createGooglePinIcon(),
       draggable: true,
@@ -98,52 +140,24 @@ export const VenueLocationPicker = ({
       offset: [0, -32],
     });
 
-    // Khi người dùng kéo thả xong ghim
-    marker.on('dragend', async () => {
+    marker.on('dragend', () => {
       const position = marker.getLatLng();
       const newLat = parseFloat(position.lat.toFixed(6));
       const newLng = parseFloat(position.lng.toFixed(6));
-      
-      const resolvedAddress = await getAddressFromCoordinates(newLat, newLng);
-      setInputValue((prev) => {
-        const nextAddress = resolvedAddress || prev;
-        if (onLocationChange) {
-          onLocationChange({
-            address: nextAddress,
-            lat: newLat,
-            lng: newLng,
-          });
-        }
-        return nextAddress;
-      });
+      handlePinMovedRef.current(newLat, newLng);
     });
 
-    // Khi người dùng click bất kỳ đâu trên bản đồ
-    map.on('click', async (e) => {
+    map.on('click', (e) => {
       const clickedLat = parseFloat(e.latlng.lat.toFixed(6));
       const clickedLng = parseFloat(e.latlng.lng.toFixed(6));
-
       marker.setLatLng([clickedLat, clickedLng]);
       map.panTo([clickedLat, clickedLng]);
-
-      const resolvedAddress = await getAddressFromCoordinates(clickedLat, clickedLng);
-      setInputValue((prev) => {
-        const nextAddress = resolvedAddress || prev;
-        if (onLocationChange) {
-          onLocationChange({
-            address: nextAddress,
-            lat: clickedLat,
-            lng: clickedLng,
-          });
-        }
-        return nextAddress;
-      });
+      handlePinMovedRef.current(clickedLat, clickedLng);
     });
 
     mapInstanceRef.current = map;
     markerRef.current = marker;
 
-    // Fix lỗi hiển thị tile trong Modal bằng invalidateSize
     const resizeTimer = setTimeout(() => {
       map.invalidateSize();
     }, 250);
@@ -157,7 +171,6 @@ export const VenueLocationPicker = ({
     };
   }, []);
 
-  // Chuyển đổi giữa chế độ Bản đồ thường và Vệ tinh
   const handleSwitchMapType = (type) => {
     if (type === mapType || !mapInstanceRef.current) return;
     setMapType(type);
@@ -170,7 +183,6 @@ export const VenueLocationPicker = ({
     tileLayerRef.current = newLayer;
   };
 
-  // Cập nhật vị trí bản đồ khi tọa độ lat/lng từ ngoài thay đổi
   useEffect(() => {
     if (mapInstanceRef.current && markerRef.current && lat && lng) {
       const currentPos = markerRef.current.getLatLng();
@@ -181,7 +193,6 @@ export const VenueLocationPicker = ({
     }
   }, [lat, lng]);
 
-  // Click outside listener để đóng dropdown gợi ý
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -192,14 +203,45 @@ export const VenueLocationPicker = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Xử lý tìm kiếm gợi ý khi người dùng gõ
+  const movePinToCoords = (targetLat, targetLng, zoom = 16) => {
+    if (mapInstanceRef.current && markerRef.current) {
+      markerRef.current.setLatLng([targetLat, targetLng]);
+      mapInstanceRef.current.setView([targetLat, targetLng], zoom, { animate: true });
+    }
+  };
+
+  const commitTypedAddress = async (rawText) => {
+    const trimmed = String(rawText || '').trim();
+    if (trimmed.length < 3 || trimmed === lastGeocodedTextRef.current) return;
+    setSearching(true);
+    try {
+      const coords = await getCoordinatesFromAddress(trimmed);
+      if (coords && coords.lat && coords.lng) {
+        lastGeocodedTextRef.current = trimmed;
+        movePinToCoords(coords.lat, coords.lng, 16);
+        onLocationChangeRef.current?.({
+          address: trimmed,
+          lat: coords.lat,
+          lng: coords.lng,
+          locationPicked: true,
+        });
+      }
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInputValue(val);
+    setResolveFailedHint(false);
 
-    if (onLocationChange) {
-      onLocationChange({ address: val, lat, lng });
-    }
+    onLocationChangeRef.current?.({
+      address: val,
+      lat: latRef.current,
+      lng: lngRef.current,
+      locationPicked: Boolean(val.trim()),
+    });
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -221,37 +263,38 @@ export const VenueLocationPicker = ({
       } finally {
         setSearching(false);
       }
-    }, 350);
+    }, 400);
   };
 
-  // Chọn 1 gợi ý từ danh sách
   const handleSelectSuggestion = (item) => {
+    lastGeocodedTextRef.current = item.displayName;
     setInputValue(item.displayName);
     setShowSuggestions(false);
     setSuggestions([]);
+    setResolveFailedHint(false);
 
-    if (onLocationChange) {
-      onLocationChange({
-        address: item.displayName,
-        lat: item.lat,
-        lng: item.lng,
-      });
-    }
+    onLocationChangeRef.current?.({
+      address: item.displayName,
+      lat: item.lat,
+      lng: item.lng,
+      locationPicked: true,
+    });
 
-    if (mapInstanceRef.current && markerRef.current) {
-      markerRef.current.setLatLng([item.lat, item.lng]);
-      mapInstanceRef.current.setView([item.lat, item.lng], 16, { animate: true });
-    }
+    movePinToCoords(item.lat, item.lng, 16);
   };
 
-  // Xóa nội dung ô tìm kiếm
   const handleClear = () => {
+    lastGeocodedTextRef.current = '';
     setInputValue('');
     setSuggestions([]);
     setShowSuggestions(false);
-    if (onLocationChange) {
-      onLocationChange({ address: '', lat, lng });
-    }
+    setResolveFailedHint(false);
+    onLocationChangeRef.current?.({
+      address: '',
+      lat: latRef.current,
+      lng: lngRef.current,
+      locationPicked: false,
+    });
   };
 
   return (
@@ -292,9 +335,23 @@ export const VenueLocationPicker = ({
             type="text"
             required={required}
             className="venue-search-input"
-            placeholder="Nhập tên địa điểm (VD: SECC, White Palace, Mỹ Đình...)"
+            placeholder="Nhập tên địa điểm (VD: ĐH Sư phạm Hà Nội, SECC, Mỹ Đình...)"
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                setShowSuggestions(false);
+                commitTypedAddress(inputValue);
+              }
+            }}
+            onBlur={() => {
+              setTimeout(() => {
+                if (!showSuggestions && inputValue.trim().length >= 3) {
+                  commitTypedAddress(inputValue);
+                }
+              }, 180);
+            }}
             onFocus={() => {
               if (suggestions.length > 0) setShowSuggestions(true);
             }}
@@ -311,7 +368,6 @@ export const VenueLocationPicker = ({
           )}
         </div>
 
-        {/* Dropdown Gợi Ý Địa Điểm */}
         {showSuggestions && (
           <ul className="venue-suggestions-dropdown">
             {searching && (
@@ -321,6 +377,7 @@ export const VenueLocationPicker = ({
               <li
                 key={`${item.lat}-${item.lng}-${index}`}
                 className="venue-suggestion-item"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelectSuggestion(item)}
               >
                 <span className="venue-suggestion-icon">
@@ -338,11 +395,9 @@ export const VenueLocationPicker = ({
         )}
       </div>
 
-      {/* Bản Đồ Tương Tác Phong Cách Google Maps */}
       <div className="venue-map-wrapper">
         <div ref={mapContainerRef} className="venue-leaflet-map" />
 
-        {/* Nút chuyển đổi kiểu hiển thị: Bản đồ đường sá / Vệ tinh Google */}
         <div className="venue-map-type-toggle">
           <button
             type="button"
@@ -365,10 +420,18 @@ export const VenueLocationPicker = ({
 
       <div className="venue-map-statusbar">
         <span className="venue-map-hint">
-          Click hoặc kéo thả ghim trên bản đồ để chọn đúng địa điểm tổ chức
+          {resolvingAddress
+            ? 'Đang tự động dò tên đường từ vị trí ghim...'
+            : resolveFailedHint
+            ? 'Đã ghim tọa độ mới — chưa dò được tên đường tự động, vui lòng gõ địa chỉ cụ thể ở trên.'
+            : 'Click hoặc kéo thả ghim trên bản đồ (hoặc nhấn Enter khi gõ) để định vị đúng địa điểm'}
         </span>
         <span className="venue-gps-badge" title={inputValue || 'Địa chỉ tổ chức cụ thể'}>
-          {inputValue ? `Địa chỉ: ${inputValue.slice(0, 42)}${inputValue.length > 42 ? '...' : ''}` : 'Chưa nhập địa chỉ cụ thể'}
+          {inputValue
+            ? `Địa chỉ: ${inputValue.slice(0, 38)}${inputValue.length > 38 ? '...' : ''}`
+            : lat && lng
+            ? `Ghim: ${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`
+            : 'Chưa nhập địa chỉ cụ thể'}
         </span>
       </div>
     </div>
@@ -376,4 +439,3 @@ export const VenueLocationPicker = ({
 };
 
 export default VenueLocationPicker;
-

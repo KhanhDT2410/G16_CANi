@@ -316,6 +316,13 @@ button:active {
   font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif) !important;
 }
 
+.dispute-modal:not(:has([class*="-modal-body"])),
+.eo-modal-box:not(:has([class*="-modal-body"])),
+.cani-modal-box:not(:has([class*="-modal-body"])),
+.ekyc-required-card:not(:has([class*="-modal-body"])) {
+  overflow-y: auto !important;
+}
+
 /* Page loading fallback for React.lazy & Suspense */
 .page-loading-fallback {
   display: flex;
@@ -606,6 +613,36 @@ label:has(input[type="radio"]) {
   height: 100% !important;
   overflow: hidden !important;
   margin: 0 !important;
+}
+
+/* Modal không dùng *-modal-body (VD: EditShiftModal, ShiftCreateModal, EditEventModal...)
+   phải tự cuộn theo chiều dọc thay vì bị overflow: hidden cắt cụt nội dung */
+.dispute-modal:not(:has([class*="-modal-body"])),
+.eo-modal-box:not(:has([class*="-modal-body"])),
+.cani-modal-dialog:not(:has([class*="-modal-body"])),
+.ekyc-required-card:not(:has([class*="-modal-body"])),
+.plan-modal-box:not(:has([class*="-modal-body"])),
+.shift-modal-box:not(:has([class*="-modal-body"])),
+.user-modal-box:not(:has([class*="-modal-body"])),
+.wage-modal-box:not(:has([class*="-modal-body"])),
+.ticket-modal-box:not(:has([class*="-modal-body"])),
+.map-modal-box:not(:has([class*="-modal-body"])),
+[class*="-modal-box"]:not(:has([class*="-modal-body"])),
+[class*="-modal-card"]:not(:has([class*="-modal-body"])) {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dispute-modal:not(:has([class*="-modal-body"])) form,
+.eo-modal-box:not(:has([class*="-modal-body"])) form,
+.cani-modal-dialog:not(:has([class*="-modal-body"])) form,
+.plan-modal-box:not(:has([class*="-modal-body"])) form,
+.shift-modal-box:not(:has([class*="-modal-body"])) form,
+.user-modal-box:not(:has([class*="-modal-body"])) form,
+[class*="-modal-box"]:not(:has([class*="-modal-body"])) form {
+  flex: 0 0 auto !important;
+  height: auto !important;
+  overflow: visible !important;
 }
 
 .dispute-modal-body,

@@ -91,6 +91,12 @@ public class WorkerJobService {
     @Autowired(required = false)
     private EventOrganizerRepository eventOrganizerRepository;
 
+    @Autowired(required = false)
+    private WorkerSkillRepository workerSkillRepository;
+
+    @Autowired(required = false)
+    private BlockListService blockListService;
+
     /**
      * Bật / tắt trạng thái "Bắt đầu kiếm việc" (Online status)
      */
@@ -109,6 +115,13 @@ public class WorkerJobService {
         }
         worker = workerRepository.save(worker);
         log.info("Worker {} đã cập nhật trạng thái online: {}", userId, worker.getIsOnline());
+        if (Boolean.TRUE.equals(worker.getIsOnline())) {
+            try {
+                matchingDispatchService.dispatchActiveShiftsForWorker(worker);
+            } catch (Exception ex) {
+                log.warn("Reverse-matching khi worker {} online gặp lỗi không nghiêm trọng: {}", userId, ex.getMessage());
+            }
+        }
         return worker;
     }
 
@@ -137,6 +150,10 @@ public class WorkerJobService {
     public ShiftAssignmentResponseDto acceptProposal(UUID userId, UUID proposalId) {
         Worker worker = getWorkerOrThrow(userId);
 
+        if (worker.getUser() == null || worker.getUser().getStatus() != com.cani.entity.enums.UserStatus.ACTIVE) {
+            throw new BadRequestException("Tài khoản của bạn hiện không ở trạng thái hoạt động (ACTIVE), không thể nhận việc.");
+        }
+
         if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
             throw new BadRequestException("Tài khoản chưa hoàn tất định danh eKYC. Vui lòng xác thực CCCD trước khi nhận việc.");
         }
@@ -153,6 +170,72 @@ public class WorkerJobService {
         }
 
         Shift shift = proposal.getShift();
+        if (shift == null) {
+            throw new BadRequestException("Ca làm việc của đề xuất này không còn tồn tại.");
+        }
+        if (shift.getStatus() != ShiftStatus.ACTIVE) {
+            throw new BadRequestException("Ca làm việc này không còn mở tuyển (Trạng thái: " + shift.getStatus() + ").");
+        }
+        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
+            throw new BadRequestException("Ca làm việc này đã kết thúc, không thể nhận việc.");
+        }
+
+        Event shiftEvent = shift.getEvent();
+        if (shiftEvent != null
+                && shiftEvent.getStatus() != com.cani.entity.enums.EventStatus.ACTIVE
+                && shiftEvent.getStatus() != com.cani.entity.enums.EventStatus.ONGOING) {
+            throw new BadRequestException("Sự kiện của ca làm việc này không còn hoạt động (Trạng thái: " + shiftEvent.getStatus() + ").");
+        }
+
+        // Kiểm tra lại điều kiện bắt buộc của Worker tại thời điểm nhận ca
+        int minRs = (shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0)
+                ? shift.getMinReliabilityScore() : 60;
+        if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
+            throw new BadRequestException("Điểm uy tín hiện tại không đáp ứng yêu cầu tối thiểu (" + minRs + " điểm) của ca làm việc.");
+        }
+        if (shift.getMinExperienceLevel() != null) {
+            int requiredShifts = switch (shift.getMinExperienceLevel()) {
+                case INTERMEDIATE -> 3;
+                case ADVANCED -> 5;
+                case EXPERT -> 10;
+                default -> 0;
+            };
+            int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
+            if (completed < requiredShifts) {
+                throw new BadRequestException("Kinh nghiệm hiện tại chưa đáp ứng mức yêu cầu của ca làm việc.");
+            }
+        }
+        if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
+            Set<UUID> requiredSkillIds = Arrays.stream(shift.getRequiredSkills())
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!requiredSkillIds.isEmpty()) {
+                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
+                Instant now = Instant.now();
+                Set<UUID> haveSkillIds = workerSkills == null ? Collections.emptySet() :
+                        workerSkills.stream()
+                                .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
+                                .filter(ws -> ws.getExpiresAt() == null || ws.getExpiresAt().isAfter(now))
+                                .map(ws -> ws.getSkill().getSkillId())
+                                .collect(Collectors.toSet());
+                if (!haveSkillIds.containsAll(requiredSkillIds)) {
+                    throw new BadRequestException("Hồ sơ kỹ năng hiện tại không còn đáp ứng kỹ năng bắt buộc của ca làm việc.");
+                }
+            }
+        }
+        if (blockListService != null && shiftEvent != null && shiftEvent.getEventOrganizer() != null
+                && shiftEvent.getEventOrganizer().getUser() != null && worker.getUser() != null) {
+            if (blockListService.isEitherBlocked(shiftEvent.getEventOrganizer().getUser().getUserId(), worker.getUser().getUserId())) {
+                throw new BadRequestException("Không thể nhận ca do tồn tại hạn chế tương tác với Nhà tổ chức sự kiện.");
+            }
+        }
+
+        // Chống tạo trùng Assignment cho cùng Worker & Shift
+        Optional<ShiftAssignment> existingAssignment = shiftAssignmentRepository
+                .findByShift_ShiftIdAndWorker_WorkerId(shift.getShiftId(), worker.getWorkerId());
+        if (existingAssignment.isPresent() && existingAssignment.get().getStatus() != AssignmentStatus.CANCELLED) {
+            throw new BadRequestException("Bạn đã xác nhận tham gia ca làm việc này trước đó.");
+        }
 
         // 1. Kiểm tra lại trùng ca làm việc (phòng trường hợp vừa nhận ca khác)
         List<AssignmentStatus> activeStatuses = List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING);
@@ -232,10 +315,14 @@ public class WorkerJobService {
 
         log.info("Worker {} đã từ chối đề xuất {}. Lý do: {}", userId, proposalId, reason);
 
-        try {
-            matchingDispatchService.dispatchForShift(proposal.getShift().getShiftId());
-        } catch (Exception e) {
-            log.warn("Lỗi khi dispatch lại sau khi reject: {}", e.getMessage());
+        Shift rejectedShift = proposal.getShift();
+        if (rejectedShift != null && (rejectedShift.getEvent() == null
+                || rejectedShift.getEvent().getMode() != com.cani.entity.enums.EventMode.INVITE)) {
+            try {
+                matchingDispatchService.dispatchForShift(rejectedShift.getShiftId());
+            } catch (Exception e) {
+                log.warn("Lỗi khi dispatch lại sau khi reject: {}", e.getMessage());
+            }
         }
     }
 
@@ -331,12 +418,15 @@ public class WorkerJobService {
         }
         validateAndExtractShiftId(qrContent, "CANI_CHECKIN:", shift.getShiftId());
 
-        // Gate thời gian: điểm danh chỉ mở từ giờ đến (arrivalTime ?: startTime) — chặn check-in sớm
+        // Gate thời gian: điểm danh chỉ mở từ giờ đến (arrivalTime ?: startTime) và kết thúc trước endTime
         Instant earliestCheckin = shift.getArrivalTime() != null ? shift.getArrivalTime() : shift.getStartTime();
         if (earliestCheckin != null && now.isBefore(earliestCheckin)) {
             String earliestLabel = earliestCheckin.atZone(ZoneId.systemDefault())
                     .format(DateTimeFormatter.ofPattern("HH:mm"));
             throw new BadRequestException("Ca chưa mở điểm danh. Vui lòng quay lại sau " + earliestLabel + ".");
+        }
+        if (shift.getEndTime() != null && now.isAfter(shift.getEndTime())) {
+            throw new BadRequestException("Ca làm việc đã kết thúc, không thể quét QR điểm danh vào ca.");
         }
 
         // 2. Kiểm tra khoảng cách Geofence nếu có tọa độ
@@ -582,10 +672,18 @@ public class WorkerJobService {
                     }
                 }
 
+                EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
+                String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
+                        ? eo.getCompanyName()
+                        : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
                 nearbyList.add(NearbyShiftResponseDto.builder()
                         .shiftId(s.getShiftId())
                         .eventId(e != null ? e.getEventId() : null)
                         .eventName(e != null ? e.getName() : "Sự kiện")
+                        .eoId(eo != null ? eo.getEoId() : null)
+                        .eoName(eoName)
+                        .eoVerified(eo != null && eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED)
+                        .eoRatingAvg(eo != null ? eo.getRatingAvg() : null)
                         .jobType(s.getJobType())
                         .description(s.getDescription())
                         .locationAddress(s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
@@ -913,10 +1011,14 @@ public class WorkerJobService {
                 eventRepository.save(event);
             }
 
-            try {
-                matchingDispatchService.dispatchForShift(shift.getShiftId());
-            } catch (Exception e) {
-                log.warn("Không thể kích hoạt dispatch tìm người thay thế: {}", e.getMessage());
+            if (event == null || event.getMode() != com.cani.entity.enums.EventMode.INVITE) {
+                try {
+                    matchingDispatchService.dispatchForShift(shift.getShiftId());
+                } catch (Exception e) {
+                    log.warn("Không thể kích hoạt dispatch tìm người thay thế: {}", e.getMessage());
+                }
+            } else {
+                log.info("Bỏ qua re-dispatch Matching sau khi hủy ca {} vì sự kiện thuộc chế độ INVITE", shift.getShiftId());
             }
 
             String evName = (event != null) ? event.getName() : "Sự kiện";
@@ -942,11 +1044,6 @@ public class WorkerJobService {
     public List<ShiftChecklistItemDto> getShiftChecklist(UUID userId, UUID assignmentId) {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
-        if (assignment.getStatus() != AssignmentStatus.CHECKED_IN
-                && assignment.getStatus() != AssignmentStatus.COMPLETED) {
-            // Chưa điểm danh / chưa kết ca -> checklist chưa mở (ẩn progress)
-            return List.of();
-        }
 
         Shift shift = assignment.getShift();
         String templateJson = shift != null ? shift.getChecklist() : null;
@@ -955,7 +1052,14 @@ public class WorkerJobService {
             return List.of();
         }
 
-        Map<String, ChecklistProgressDto> progressMap = parseChecklistProgress(assignment.getChecklistProgress());
+        // Trước khi check-in: vẫn trả về danh sách đầu việc để Worker xem trước (chỉ đọc);
+        // chỉ cho phép cập nhật/tích chọn sau khi CHECKED_IN ở updateShiftChecklist().
+        boolean canHaveProgress = assignment.getStatus() == AssignmentStatus.CHECKED_IN
+                || assignment.getStatus() == AssignmentStatus.COMPLETED;
+        Map<String, ChecklistProgressDto> progressMap = canHaveProgress
+                ? parseChecklistProgress(assignment.getChecklistProgress())
+                : Collections.emptyMap();
+
         for (ShiftChecklistItemDto item : templateItems) {
             ChecklistProgressDto prog = progressMap.get(item.getId());
             if (prog != null && Boolean.TRUE.equals(prog.getIsCompleted())) {
@@ -1367,12 +1471,20 @@ public class WorkerJobService {
     private JobProposalResponseDto mapToProposalDto(DispatchProposal p) {
         Shift s = p.getShift();
         Event e = s != null ? s.getEvent() : null;
+        EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
+        String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
+                ? eo.getCompanyName()
+                : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
 
         return JobProposalResponseDto.builder()
                 .proposalId(p.getProposalId())
                 .shiftId(s != null ? s.getShiftId() : null)
                 .eventId(e != null ? e.getEventId() : null)
                 .eventName(e != null ? e.getName() : "Sự kiện")
+                .eoId(eo != null ? eo.getEoId() : null)
+                .eoName(eoName)
+                .eoVerified(eo != null && eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED)
+                .eoRatingAvg(eo != null ? eo.getRatingAvg() : null)
                 .venueAddress(s != null && s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
                 .jobType(s != null ? s.getJobType() : "")
                 .description(s != null ? s.getDescription() : "")
@@ -1511,6 +1623,10 @@ public class WorkerJobService {
     private ShiftAssignmentResponseDto mapToAssignmentDto(ShiftAssignment a) {
         Shift s = a.getShift();
         Event e = s != null ? s.getEvent() : null;
+        EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
+        String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
+                ? eo.getCompanyName()
+                : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
 
         Double venueLat = s != null && s.getLocationLat() != null ? s.getLocationLat()
                 : (e != null && e.getVenueLat() != null ? e.getVenueLat() : DEFAULT_CENTER_LAT);
@@ -1530,6 +1646,10 @@ public class WorkerJobService {
                 .shiftId(s != null ? s.getShiftId() : null)
                 .eventId(e != null ? e.getEventId() : null)
                 .eventName(e != null ? e.getName() : "Sự kiện")
+                .eoId(eo != null ? eo.getEoId() : null)
+                .eoName(eoName)
+                .eoVerified(eo != null && eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED)
+                .eoRatingAvg(eo != null ? eo.getRatingAvg() : null)
                 .venueAddress(s != null && s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
                 .jobType(s != null ? s.getJobType() : "")
                 .startTime(s != null ? s.getStartTime() : null)
@@ -1568,6 +1688,10 @@ public class WorkerJobService {
     ) {
         Shift s = a.getShift();
         Event e = s != null ? s.getEvent() : null;
+        EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
+        String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
+                ? eo.getCompanyName()
+                : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
 
         Double venueLat = s != null && s.getLocationLat() != null ? s.getLocationLat()
                 : (e != null && e.getVenueLat() != null ? e.getVenueLat() : DEFAULT_CENTER_LAT);
@@ -1597,10 +1721,16 @@ public class WorkerJobService {
                 .shiftId(s != null ? s.getShiftId() : null)
                 .eventId(e != null ? e.getEventId() : null)
                 .eventName(e != null ? e.getName() : "Sự kiện")
+                .eoId(eo != null ? eo.getEoId() : null)
+                .eoName(eoName)
+                .eoVerified(eo != null && eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED)
+                .eoRatingAvg(eo != null ? eo.getRatingAvg() : null)
                 .venueAddress(s != null && s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
                 .jobType(s != null ? s.getJobType() : "")
                 .startTime(s != null ? s.getStartTime() : null)
                 .endTime(s != null ? s.getEndTime() : null)
+                .arrivalTime(s != null ? (s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime()) : null)
+                .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
                 .totalPay(calculateSingleWorkerShiftPay(s))
                 .status(a.getStatus())

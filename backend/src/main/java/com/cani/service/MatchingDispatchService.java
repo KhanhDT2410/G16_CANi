@@ -62,6 +62,8 @@ public class MatchingDispatchService {
     private static final int MIN_RELIABILITY_SCORE = 60;
     private static final int DEFAULT_TIMEOUT_HOURS = 1;
     private static final double EARTH_RADIUS_KM = 6371.0;
+    private static final double DEFAULT_NEUTRAL_RATING = 3.5;
+    private static final int DEFAULT_IDLE_DAYS_THRESHOLD = 14;
 
     @Data
     @Builder
@@ -78,8 +80,15 @@ public class MatchingDispatchService {
     @Transactional
     public int dispatchForEvent(UUID eventId) {
         List<Shift> activeShifts = shiftRepository.findByEvent_EventIdAndStatus(eventId, ShiftStatus.ACTIVE);
+        if (activeShifts == null || activeShifts.isEmpty()) {
+            return 0;
+        }
         int totalProposalsCreated = 0;
         for (Shift shift : activeShifts) {
+            if (!isDispatchAllowedForEvent(shift)) {
+                log.info("Bỏ qua dispatchForEvent cho sự kiện {}: chế độ INVITE hoặc trạng thái sự kiện không hợp lệ.", eventId);
+                continue;
+            }
             totalProposalsCreated += dispatchForShift(shift.getShiftId());
         }
         return totalProposalsCreated;
@@ -93,8 +102,18 @@ public class MatchingDispatchService {
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca làm việc ID: " + shiftId));
 
+        if (!isDispatchAllowedForEvent(shift)) {
+            log.info("Bỏ qua dispatch: Sự kiện của ca {} đang ở chế độ INVITE hoặc trạng thái không hợp lệ.", shiftId);
+            return 0;
+        }
+
         if (shift.getStatus() != ShiftStatus.ACTIVE) {
             log.info("Bỏ qua dispatch: Ca làm việc {} không ở trạng thái ACTIVE (hiện tại: {})", shiftId, shift.getStatus());
+            return 0;
+        }
+
+        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
+            log.info("Bỏ qua dispatch: Ca làm việc {} đã qua giờ kết thúc ({}).", shiftId, shift.getEndTime());
             return 0;
         }
 
@@ -104,36 +123,45 @@ public class MatchingDispatchService {
             return 0;
         }
 
-        // Tọa độ mục tiêu của ca làm việc
+        // Tọa độ mục tiêu của ca làm việc (Bắt buộc hợp lệ, tuyệt đối không fallback 0 km)
         Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
         Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+        if (!isValidCoordinate(targetLat, targetLng)) {
+            log.warn("Bỏ qua dispatch ca {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).", shiftId, targetLat, targetLng);
+            return 0;
+        }
 
         // Bán kính tối đa của ca làm việc (hoặc mặc định 15km)
         double maxAllowedDistanceKm = (shift.getMaxDistanceKm() != null && shift.getMaxDistanceKm().doubleValue() > 0)
                 ? shift.getMaxDistanceKm().doubleValue()
                 : MAX_DISTANCE_KM;
 
-        // Ưu tiên truy vấn danh sách Worker đang Online dưới DB để tối ưu hiệu năng (O(online) thay vì full table scan)
-        List<Worker> allWorkers = workerRepository.findByIsOnlineTrue();
-        if (allWorkers == null || allWorkers.isEmpty()) {
-            allWorkers = workerRepository.findAll();
+        // 1. Chỉ lấy danh sách Worker đang Online (tuyệt đối không fallback full-table scan Worker offline)
+        List<Worker> onlineWorkers = workerRepository.findByIsOnlineTrue();
+        if (onlineWorkers == null || onlineWorkers.isEmpty()) {
+            log.info("Bỏ qua dispatch ca {}: hiện không có Worker nào đang Online.", shiftId);
+            return 0;
         }
 
         List<CandidateMatch> matchedCandidates = new ArrayList<>();
 
-        for (Worker worker : allWorkers) {
-            // STEP 1: HARD FILTER
+        for (Worker worker : onlineWorkers) {
+            // 2. Hard Filter
             if (!passHardFilter(worker, shift)) {
                 continue;
             }
 
-            // Tính khoảng cách Haversine & kiểm tra bán kính kết hợp (Ca làm việc & Tiêu chí Worker)
-            double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
-            if (targetLat == null || targetLng == null || worker.getBaseLat() == null || worker.getBaseLng() == null) {
-                // # ponytail: thiếu tọa độ (worker chưa báo GPS hoặc ca chưa có địa chỉ) -> bỏ kiểm tra bán kính,
-                // cho worker vào candidate; upgrade: bắt worker cập nhật GPS trước khi dispatch.
-                distanceKm = 0.0;
+            // 3. Kiểm tra tọa độ Worker & tính khoảng cách Haversine thực tế
+            if (!isValidCoordinate(worker.getBaseLat(), worker.getBaseLng())) {
+                log.debug("Loại trừ worker {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).",
+                        worker.getWorkerId(), worker.getBaseLat(), worker.getBaseLng());
+                continue;
             }
+            double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
+            if (!Double.isFinite(distanceKm)) {
+                continue;
+            }
+
             double workerMaxDist = (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0)
                     ? worker.getMaxDistanceKm()
                     : maxAllowedDistanceKm;
@@ -143,17 +171,23 @@ public class MatchingDispatchService {
                 continue;
             }
 
-            // STEP 2: SOFT RANKING SCORE
+            // 4. Soft Ranking Score
             CandidateMatch match = calculateSoftScore(worker, distanceKm, effectiveAllowedDistanceKm, shift);
             matchedCandidates.add(match);
         }
 
-        // Sắp xếp ứng viên theo điểm số giảm dần
-        matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed());
+        // 5. Sắp xếp ứng viên theo điểm số giảm dần (nếu bằng điểm thì ưu tiên gần hơn)
+        matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed()
+                .thenComparingDouble(CandidateMatch::getDistanceKm));
 
-        // Dispatch ratio: tuyển N người -> dispatch cho min(N * 2 + 3, số ứng viên phù hợp)
+        // 6-7. Loại Worker đã có Proposal PENDING/ACCEPTED hoặc đã có Assignment trước khi cắt Top N
+        List<CandidateMatch> eligibleCandidates = matchedCandidates.stream()
+                .filter(candidate -> !hasExistingProposalOrAssignment(shiftId, candidate.getWorker().getWorkerId()))
+                .toList();
+
+        // 8. Dispatch ratio: tuyển N người -> chọn Top min(N * 2 + 3, số ứng viên hợp lệ)
         int targetDispatchCount = Math.max(needed * 2 + 3, needed);
-        List<CandidateMatch> topCandidates = matchedCandidates.stream()
+        List<CandidateMatch> topCandidates = eligibleCandidates.stream()
                 .limit(targetDispatchCount)
                 .collect(Collectors.toList());
 
@@ -161,10 +195,14 @@ public class MatchingDispatchService {
         Instant expiresAt = Instant.now().plus(Duration.ofHours(DEFAULT_TIMEOUT_HOURS));
 
         for (CandidateMatch candidate : topCandidates) {
+            if (!isShiftReadyForProposal(shift)) {
+                log.info("Dừng dispatch sớm cho ca {}: ca không còn ACTIVE hoặc đã đủ nhân sự.", shiftId);
+                break;
+            }
+
             Worker worker = candidate.getWorker();
-            // Chỉ chặn nếu đã có proposal đang chờ/đã nhận (PENDING, ACCEPTED) hoặc đã có assignment
-            if (dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shiftId, worker.getWorkerId(), ACTIVE_PROPOSAL_STATUSES) ||
-                shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
+            // Kiểm tra lại trước khi ghi DB để hạn chế race condition
+            if (hasExistingProposalOrAssignment(shiftId, worker.getWorkerId())) {
                 continue;
             }
 
@@ -200,14 +238,107 @@ public class MatchingDispatchService {
 
         if (matchedCandidates.isEmpty()) {
             log.warn("Matching ca {}: KHÔNG TÌM THẤY ứng viên nào đạt điều kiện. "
-                            + "Kiểm tra: worker đang online? kycStatus APPROVED? có GPS? requiredSkills khớp worker_skills? "
+                            + "Kiểm tra: worker đang online? kycStatus APPROVED? có GPS hợp lệ? requiredSkills khớp worker_skills? "
                             + "khung giờ rảnh trùng ca? minWage không vượt lương ca? blocklist? "
-                            + "Tổng worker đã xét: {}",
-                    shiftId, allWorkers.size());
+                            + "Tổng worker online đã xét: {}",
+                    shiftId, onlineWorkers.size());
         }
 
-        log.info("Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên, đã gửi {} đề xuất (Proposals).",
-                shiftId, matchedCandidates.size(), createdCount);
+        log.info("Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên phù hợp ({} chưa trùng), đã gửi {} đề xuất (Proposals).",
+                shiftId, matchedCandidates.size(), eligibleCandidates.size(), createdCount);
+        return createdCount;
+    }
+
+    /**
+     * Reverse-Matching: Khi Worker bật trạng thái Online (isOnline = true),
+     * tự động quét các ca ACTIVE còn thiếu người và chưa hết hạn để gửi DispatchProposal phù hợp.
+     */
+    @Transactional
+    public int dispatchActiveShiftsForWorker(Worker worker) {
+        if (worker == null || !Boolean.TRUE.equals(worker.getIsOnline())
+                || worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED
+                || worker.getUser() == null || worker.getUser().getStatus() != UserStatus.ACTIVE) {
+            return 0;
+        }
+        if (!isValidCoordinate(worker.getBaseLat(), worker.getBaseLng())) {
+            log.info("Bỏ qua reverse-matching cho worker {}: thiếu tọa độ GPS hợp lệ.", worker.getWorkerId());
+            return 0;
+        }
+        List<Shift> activeShifts = shiftRepository.findByStatus(ShiftStatus.ACTIVE);
+        if (activeShifts == null || activeShifts.isEmpty()) {
+            return 0;
+        }
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(Duration.ofHours(DEFAULT_TIMEOUT_HOURS));
+        int createdCount = 0;
+
+        for (Shift shift : activeShifts) {
+            if (!isDispatchAllowedForEvent(shift)) {
+                continue;
+            }
+            if (shift.getEndTime() != null && now.isAfter(shift.getEndTime())) {
+                continue;
+            }
+            int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
+            if (needed <= 0) {
+                continue;
+            }
+            if (!passHardFilter(worker, shift)) {
+                continue;
+            }
+            Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+            Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+            if (!isValidCoordinate(targetLat, targetLng)) {
+                continue;
+            }
+            double maxAllowedDistanceKm = (shift.getMaxDistanceKm() != null && shift.getMaxDistanceKm().doubleValue() > 0)
+                    ? shift.getMaxDistanceKm().doubleValue() : MAX_DISTANCE_KM;
+            double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
+            if (!Double.isFinite(distanceKm)) {
+                continue;
+            }
+            double workerMaxDist = (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0)
+                    ? worker.getMaxDistanceKm() : maxAllowedDistanceKm;
+            double effectiveAllowedDistanceKm = Math.min(maxAllowedDistanceKm, workerMaxDist);
+            if (distanceKm > effectiveAllowedDistanceKm) {
+                continue;
+            }
+            if (hasExistingProposalOrAssignment(shift.getShiftId(), worker.getWorkerId())) {
+                continue;
+            }
+
+            CandidateMatch match = calculateSoftScore(worker, distanceKm, effectiveAllowedDistanceKm, shift);
+            DispatchProposal proposal = DispatchProposal.builder()
+                    .shift(shift)
+                    .worker(worker)
+                    .matchScore(BigDecimal.valueOf(match.getFinalScore()).setScale(2, RoundingMode.HALF_UP))
+                    .scoreBreakdown(match.getScoreBreakdownJson())
+                    .status(ProposalStatus.PENDING)
+                    .expiresAt(expiresAt)
+                    .build();
+            DispatchProposal savedProposal = dispatchProposalRepository.save(proposal);
+            createdCount++;
+
+            if (notificationService != null && worker.getUser() != null && worker.getUser().getUserId() != null) {
+                try {
+                    String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
+                    notificationService.createAndSend(
+                            worker.getUser().getUserId(),
+                            "Đề xuất ca làm mới: " + shift.getJobType(),
+                            "Có ca làm việc phù hợp gần bạn tại \"" + eventName + "\" với mức thù lao " + shift.getHourlyWage() + " đ/giờ.",
+                            NotificationType.PROPOSAL,
+                            "PROPOSAL",
+                            savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shift.getShiftId(),
+                            Map.of("shiftId", shift.getShiftId().toString(), "type", "NEW_PROPOSAL")
+                    );
+                } catch (Exception ex) {
+                    log.warn("Không thể gửi thông báo FCM reverse-matching: {}", ex.getMessage());
+                }
+            }
+        }
+        if (createdCount > 0) {
+            log.info("Reverse-matching khi Worker {} online: đã tạo {} DispatchProposal mới.", worker.getWorkerId(), createdCount);
+        }
         return createdCount;
     }
 
@@ -232,8 +363,12 @@ public class MatchingDispatchService {
      * Hard Filter: Loại bỏ các ứng viên không đạt tiêu chuẩn tối thiểu
      */
     private boolean passHardFilter(Worker worker, Shift shift) {
-        // 1. Phải bật trạng thái "Bắt đầu kiếm việc" (isOnline = true)
-        if (Boolean.FALSE.equals(worker.getIsOnline())) {
+        if (worker == null || shift == null) {
+            return false;
+        }
+
+        // 1. Phải bật trạng thái "Bắt đầu kiếm việc" (isOnline == true, không chấp nhận null)
+        if (!Boolean.TRUE.equals(worker.getIsOnline())) {
             return false;
         }
 
@@ -248,7 +383,7 @@ public class MatchingDispatchService {
         }
 
         // 3. Điểm tin cậy (Reliability Score) >= 60 (hoặc theo yêu cầu của shift)
-        int minRs = shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0 
+        int minRs = shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0
                 ? shift.getMinReliabilityScore() : MIN_RELIABILITY_SCORE;
         if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
             return false;
@@ -268,18 +403,27 @@ public class MatchingDispatchService {
             }
         }
 
-        // 4b. Kiểm tra kỹ năng bắt buộc theo tiêu chí ca làm việc (requiredSkills - containsAll)
-        if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
+        // 4b. Kiểm tra kỹ năng bắt buộc theo tiêu chí ca làm việc (fail-closed nếu không truy vấn được dữ liệu kỹ năng)
+        if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0) {
             Set<UUID> requiredSkillIds = Arrays.stream(shift.getRequiredSkills())
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
             if (!requiredSkillIds.isEmpty()) {
+                if (workerSkillRepository == null) {
+                    log.error("Từ chối worker {} cho ca {}: hệ thống không thể truy vấn WorkerSkillRepository.",
+                            worker.getWorkerId(), shift.getShiftId());
+                    return false;
+                }
                 List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
-                Set<UUID> haveSkillIds = workerSkills == null ? Collections.emptySet() :
-                        workerSkills.stream()
-                                .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
-                                .map(ws -> ws.getSkill().getSkillId())
-                                .collect(Collectors.toSet());
+                if (workerSkills == null) {
+                    return false;
+                }
+                Instant now = Instant.now();
+                Set<UUID> haveSkillIds = workerSkills.stream()
+                        .filter(ws -> ws.getSkill() != null && ws.getSkill().getSkillId() != null)
+                        .filter(ws -> ws.getExpiresAt() == null || ws.getExpiresAt().isAfter(now))
+                        .map(ws -> ws.getSkill().getSkillId())
+                        .collect(Collectors.toSet());
                 if (!haveSkillIds.containsAll(requiredSkillIds)) {
                     return false;
                 }
@@ -298,7 +442,7 @@ public class MatchingDispatchService {
                 shift.getEndTime(),
                 activeStatuses
         );
-        if (!conflicts.isEmpty()) {
+        if (conflicts != null && !conflicts.isEmpty()) {
             return false;
         }
 
@@ -315,8 +459,8 @@ public class MatchingDispatchService {
 
         // 7. Kiểm tra mức lương tối thiểu theo tiêu chí tìm việc của Worker (Worker Preferences: minWage)
         if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0) {
-            if (shift.getHourlyWage() != null && shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
-                log.debug("Loại trừ ứng viên {}: Lương ca làm ({} đ) thấp hơn lương tối thiểu mong muốn ({} đ)",
+            if (shift.getHourlyWage() == null || shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
+                log.debug("Loại trừ ứng viên {}: Lương ca làm ({} đ) không đáp ứng lương tối thiểu mong muốn ({} đ)",
                         worker.getWorkerId(), shift.getHourlyWage(), worker.getMinWage());
                 return false;
             }
@@ -398,59 +542,87 @@ public class MatchingDispatchService {
      * Soft Ranking Score: Tính điểm xếp hạng ứng viên dựa trên 4 thành phần + Điểm thưởng
      */
     private CandidateMatch calculateSoftScore(Worker worker, double distanceKm, double maxAllowedDistanceKm, Shift shift) {
-        double effectiveMaxDist = maxAllowedDistanceKm > 0 ? maxAllowedDistanceKm : MAX_DISTANCE_KM;
-        // 1. Distance Score: 100 - (distance / maxAllowedDistanceKm) * 100 (Trọng số 0.4)
-        double distanceScore = Math.max(0.0, 100.0 - (distanceKm / effectiveMaxDist) * 100.0);
+        double effectiveMaxDist = (Double.isFinite(maxAllowedDistanceKm) && maxAllowedDistanceKm > 0)
+                ? maxAllowedDistanceKm : MAX_DISTANCE_KM;
+        double safeDistanceKm = Double.isFinite(distanceKm) ? Math.max(0.0, distanceKm) : effectiveMaxDist;
 
-        // 2. Rating Score: (avg_rating / 5) * 100 (Trọng số 0.3)
-        double rating = worker.getRatingAvg() != null ? worker.getRatingAvg().doubleValue() : 5.0;
-        double ratingScore = Math.min(100.0, (rating / 5.0) * 100.0);
+        // 1. Distance Score: 100 - (distance / maxAllowedDistanceKm) * 100 (Trọng số 0.4)
+        double distanceScore = clamp(100.0 - (safeDistanceKm / effectiveMaxDist) * 100.0, 0.0, 100.0);
+
+        // 2. Rating Score: Nếu Worker chưa có rating history (ratingCount <= 0), dùng mức trung tính (3.5/5.0 = 70 điểm)
+        double neutralRating = clamp(getConfigDouble("matching.neutral_unrated_rating", DEFAULT_NEUTRAL_RATING), 0.0, 5.0);
+        boolean hasRatingHistory = worker.getRatingCount() != null && worker.getRatingCount() > 0 && worker.getRatingAvg() != null;
+        double rating = hasRatingHistory ? clamp(worker.getRatingAvg().doubleValue(), 0.0, 5.0) : neutralRating;
+        double ratingScore = clamp((rating / 5.0) * 100.0, 0.0, 100.0);
 
         // 3. Experience Score: (completed_shifts / 10) * 100 (Trọng số 0.2)
-        int completedShifts = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
-        double expScore = Math.min(100.0, (completedShifts / 10.0) * 100.0);
+        int completedShifts = worker.getTotalShiftsCompleted() != null ? Math.max(0, worker.getTotalShiftsCompleted()) : 0;
+        double expScore = clamp((completedShifts / 10.0) * 100.0, 0.0, 100.0);
 
         // 4. Reliability Score: Trọng số 0.1
-        double rsScore = worker.getReliabilityScore() != null ? Math.min(100.0, worker.getReliabilityScore()) : 80.0;
+        double rsScore = worker.getReliabilityScore() != null ? clamp(worker.getReliabilityScore(), 0.0, 100.0) : 60.0;
 
-        // Bonus: Người mới hoặc nghỉ lâu (UC-60, UC-61: Fairness Boost)
-        double newWorkerBoostConfig = getConfigDouble("fairness.new_worker_boost", 10.0);
-        double idleWorkerBoostConfig = getConfigDouble("fairness.idle_worker_boost", 10.0);
+        // Bonus: Người mới hoặc nghỉ lâu thực tế (UC-60, UC-61: Fairness Boost)
+        double newWorkerBoostConfig = Math.max(0.0, getConfigDouble("fairness.new_worker_boost", 10.0));
+        double idleWorkerBoostConfig = Math.max(0.0, getConfigDouble("fairness.idle_worker_boost", 10.0));
 
         double newWorkerBonus = (completedShifts < 3) ? newWorkerBoostConfig : 0.0;
-        double idleBonus = (completedShifts >= 3 && Boolean.TRUE.equals(worker.getIsOnline())) ? idleWorkerBoostConfig : 0.0;
+        double idleBonus = isEligibleForIdleBoost(worker, completedShifts) ? idleWorkerBoostConfig : 0.0;
 
-        // Bonus kỹ năng đã xác thực (AI_DOCUMENT / ADMIN_REVIEW): +10.0 (tương đương +0.1 trên thang chuẩn hóa)
+        // Bonus kỹ năng đã xác thực còn hiệu lực & khớp kỹ năng yêu cầu của ca: +10.0
         double skillBonus = 0.0;
         if (shift != null && shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0 && workerSkillRepository != null) {
             Set<UUID> reqIds = Arrays.stream(shift.getRequiredSkills()).filter(Objects::nonNull).collect(Collectors.toSet());
-            List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
-            if (workerSkills != null) {
-                boolean hasVerifiedSkill = workerSkills.stream()
-                        .anyMatch(ws -> ws.getSkill() != null
-                                && reqIds.contains(ws.getSkill().getSkillId())
-                                && ws.getVerificationTier() != null
-                                && ws.getVerificationTier() != com.cani.entity.enums.VerificationTier.SELF_DECLARED);
-                if (hasVerifiedSkill) {
-                    skillBonus = 10.0;
+            if (!reqIds.isEmpty()) {
+                List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
+                if (workerSkills != null) {
+                    Instant now = Instant.now();
+                    boolean hasVerifiedSkill = workerSkills.stream()
+                            .anyMatch(ws -> ws.getSkill() != null
+                                    && reqIds.contains(ws.getSkill().getSkillId())
+                                    && ws.getVerificationTier() != null
+                                    && ws.getVerificationTier() != com.cani.entity.enums.VerificationTier.SELF_DECLARED
+                                    && (ws.getExpiresAt() == null || ws.getExpiresAt().isAfter(now)));
+                    if (hasVerifiedSkill) {
+                        skillBonus = 10.0;
+                    }
                 }
             }
         }
 
-        double finalScore = (0.4 * distanceScore) + (0.3 * ratingScore) + (0.2 * expScore) + (0.1 * rsScore) + newWorkerBonus + idleBonus + skillBonus;
+        double rawFinalScore = (0.4 * distanceScore) + (0.3 * ratingScore) + (0.2 * expScore) + (0.1 * rsScore)
+                + newWorkerBonus + idleBonus + skillBonus;
+        double finalScore = Double.isFinite(rawFinalScore) ? rawFinalScore : 0.0;
 
         String breakdownJson = String.format(
                 Locale.US,
                 "{\"distanceKm\":%.2f,\"distScore\":%.1f,\"ratingScore\":%.1f,\"expScore\":%.1f,\"rsScore\":%.1f,\"newWorkerBonus\":%.1f,\"idleBonus\":%.1f,\"skillBonus\":%.1f,\"finalScore\":%.2f}",
-                distanceKm, distanceScore, ratingScore, expScore, rsScore, newWorkerBonus, idleBonus, skillBonus, finalScore
+                safeDistanceKm, distanceScore, ratingScore, expScore, rsScore, newWorkerBonus, idleBonus, skillBonus, finalScore
         );
 
         return CandidateMatch.builder()
                 .worker(worker)
-                .distanceKm(distanceKm)
+                .distanceKm(safeDistanceKm)
                 .finalScore(finalScore)
                 .scoreBreakdownJson(breakdownJson)
                 .build();
+    }
+
+    private boolean isEligibleForIdleBoost(Worker worker, int completedShifts) {
+        if (completedShifts < 3 || !Boolean.TRUE.equals(worker.getIsOnline()) || worker.getWorkerId() == null) {
+            return false;
+        }
+        int idleDays = (int) Math.max(1.0, getConfigDouble("fairness.idle_days_threshold", DEFAULT_IDLE_DAYS_THRESHOLD));
+        Instant idleCutoff = Instant.now().minus(Duration.ofDays(idleDays));
+        List<ShiftAssignment> history = shiftAssignmentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
+        if (history != null && !history.isEmpty()) {
+            ShiftAssignment latest = history.get(0);
+            Instant lastActivity = (latest.getShift() != null && latest.getShift().getEndTime() != null)
+                    ? latest.getShift().getEndTime()
+                    : latest.getCreatedAt();
+            return lastActivity != null && lastActivity.isBefore(idleCutoff);
+        }
+        return worker.getUpdatedAt() != null && worker.getUpdatedAt().isBefore(idleCutoff);
     }
 
     /**
@@ -461,8 +633,30 @@ public class MatchingDispatchService {
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca làm việc ID: " + shiftId));
 
+        if (!isDispatchAllowedForEvent(shift)) {
+            log.warn("Từ chối Emergency Dispatch: Sự kiện của ca {} đang ở chế độ INVITE hoặc không hợp lệ.", shiftId);
+            return 0;
+        }
+
         if (shift.getStatus() != ShiftStatus.ACTIVE) {
             log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE", shiftId);
+            return 0;
+        }
+
+        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
+            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} đã qua giờ kết thúc.", shiftId);
+            return 0;
+        }
+
+        int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
+        if (needed <= 0) {
+            return 0;
+        }
+
+        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+        if (!isValidCoordinate(targetLat, targetLng)) {
+            log.warn("Bỏ qua Emergency Dispatch ca {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).", shiftId, targetLat, targetLng);
             return 0;
         }
 
@@ -475,38 +669,39 @@ public class MatchingDispatchService {
         double emergencyRadius = Math.min(Math.max(rawRadius, 1.0), 50.0);
         log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km (Capped max 50km)", shiftId, emergencyRadius);
 
-        int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
-        if (needed <= 0) {
+        List<Worker> onlineWorkers = workerRepository.findByIsOnlineTrue();
+        if (onlineWorkers == null || onlineWorkers.isEmpty()) {
+            log.info("Bỏ qua Emergency Dispatch ca {}: không có Worker nào đang Online.", shiftId);
             return 0;
         }
 
-        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
-        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
-
-        List<Worker> allWorkers = workerRepository.findByIsOnlineTrue();
-        if (allWorkers == null || allWorkers.isEmpty()) {
-            allWorkers = workerRepository.findAll();
-        }
-
         List<CandidateMatch> matchedCandidates = new ArrayList<>();
-        for (Worker worker : allWorkers) {
+        for (Worker worker : onlineWorkers) {
             if (!passHardFilter(worker, shift)) {
                 continue;
             }
+            if (!isValidCoordinate(worker.getBaseLat(), worker.getBaseLng())) {
+                log.debug("Emergency Dispatch loại worker {}: thiếu tọa độ GPS hợp lệ.", worker.getWorkerId());
+                continue;
+            }
             double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
-            if (targetLat == null || targetLng == null || worker.getBaseLat() == null || worker.getBaseLng() == null) {
-                distanceKm = 0.0; // cùng chính sách bỏ kiểm tra bán kính khi thiếu tọa độ
-            } else if (distanceKm > emergencyRadius) {
+            if (!Double.isFinite(distanceKm) || distanceKm > emergencyRadius) {
                 continue;
             }
             CandidateMatch match = calculateSoftScore(worker, distanceKm, emergencyRadius, shift);
             matchedCandidates.add(match);
         }
 
-        matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed());
+        matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed()
+                .thenComparingDouble(CandidateMatch::getDistanceKm));
+
+        // Loại ứng viên đã có Proposal PENDING/ACCEPTED hoặc Assignment trước khi lấy Top N
+        List<CandidateMatch> eligibleCandidates = matchedCandidates.stream()
+                .filter(candidate -> !hasExistingProposalOrAssignment(shiftId, candidate.getWorker().getWorkerId()))
+                .toList();
 
         int targetDispatchCount = Math.max(needed * 3 + 5, needed);
-        List<CandidateMatch> topCandidates = matchedCandidates.stream()
+        List<CandidateMatch> topCandidates = eligibleCandidates.stream()
                 .limit(targetDispatchCount)
                 .toList();
 
@@ -514,9 +709,11 @@ public class MatchingDispatchService {
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(30)); // Khẩn cấp: Hết hạn sau 30 phút
 
         for (CandidateMatch candidate : topCandidates) {
+            if (!isShiftReadyForProposal(shift)) {
+                break;
+            }
             Worker worker = candidate.getWorker();
-            if (dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shiftId, worker.getWorkerId(), ACTIVE_PROPOSAL_STATUSES) ||
-                shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, worker.getWorkerId())) {
+            if (hasExistingProposalOrAssignment(shiftId, worker.getWorkerId())) {
                 continue;
             }
 
@@ -554,12 +751,47 @@ public class MatchingDispatchService {
         return createdCount;
     }
 
+    private boolean isDispatchAllowedForEvent(Shift shift) {
+        if (shift == null) {
+            return false;
+        }
+        Event event = shift.getEvent();
+        if (event == null) {
+            return true;
+        }
+        if (event.getMode() == com.cani.entity.enums.EventMode.INVITE) {
+            return false;
+        }
+        com.cani.entity.enums.EventStatus status = event.getStatus();
+        return status != com.cani.entity.enums.EventStatus.CANCELLED
+                && status != com.cani.entity.enums.EventStatus.COMPLETED
+                && status != com.cani.entity.enums.EventStatus.SUSPENDED;
+    }
+
+    private boolean hasExistingProposalOrAssignment(UUID shiftId, UUID workerId) {
+        return dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(
+                shiftId, workerId, ACTIVE_PROPOSAL_STATUSES)
+                || shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, workerId);
+    }
+
+    private boolean isShiftReadyForProposal(Shift shift) {
+        if (shift == null || shift.getStatus() != ShiftStatus.ACTIVE) {
+            return false;
+        }
+        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
+            return false;
+        }
+        int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
+        return needed > 0 && isDispatchAllowedForEvent(shift);
+    }
+
     private double getConfigDouble(String key, double defaultValue) {
         if (systemConfigRepository != null) {
             return systemConfigRepository.findByKey(key)
                     .map(cfg -> {
                         try {
-                            return Double.parseDouble(cfg.getValue().trim());
+                            double val = Double.parseDouble(cfg.getValue().trim());
+                            return Double.isFinite(val) ? val : defaultValue;
                         } catch (Exception ignored) {
                             return defaultValue;
                         }
@@ -569,12 +801,26 @@ public class MatchingDispatchService {
         return defaultValue;
     }
 
+    private static double clamp(double value, double min, double max) {
+        if (!Double.isFinite(value)) {
+            return min;
+        }
+        return Math.min(max, Math.max(min, value));
+    }
+
+    public static boolean isValidCoordinate(Double lat, Double lng) {
+        if (lat == null || lng == null || !Double.isFinite(lat) || !Double.isFinite(lng)) {
+            return false;
+        }
+        return lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0;
+    }
+
     /**
      * Tính khoảng cách Haversine giữa 2 tọa độ GPS (km)
      */
     public static double calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
-        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
-            return Double.MAX_VALUE; // Không xác định được tọa độ -> ngoài tầm phủ sóng để tránh matching nhầm
+        if (!isValidCoordinate(lat1, lon1) || !isValidCoordinate(lat2, lon2)) {
+            return Double.MAX_VALUE; // Tọa độ thiếu hoặc ngoài miền hợp lệ -> loại an toàn
         }
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);

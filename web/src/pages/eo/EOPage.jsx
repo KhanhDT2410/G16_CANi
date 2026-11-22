@@ -14,7 +14,7 @@ import EOOverviewAnalytics from './components/EOOverviewAnalytics';
 import EOModals from './components/EOModals';
 import EkycRequiredModal from './components/EkycRequiredModal';
 import { eoService } from '../../services/eoService';
-import { DEFAULT_NEW_EVENT } from './utils/eventHelpers';
+import { createDefaultNewEvent } from './utils/eventHelpers';
 import { useDirectChat, DirectMessengerDock } from '../../features/direct-chat';
 import EOMessagesTab from './components/EOMessagesTab';
 import './EOPage.css';
@@ -143,9 +143,29 @@ export default function EOPage() {
     return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
   }, [setSearchQuery]);
 
-  // Kiểm tra nếu có redirect từ VNPay / PayOS (?tab=subscription hoặc chứa param vnp_, payos, orderCode) hoặc điều hướng tab (?tab=profile)
+  // Helper đẩy URL query params vào Browser History để nút Back quay lại đúng màn/bước trước
+  const syncUrlRoute = (paramsObj, { replace = false } = {}) => {
+    try {
+      const next = {};
+      Object.entries(paramsObj || {}).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          next[k] = String(v);
+        }
+      });
+      setSearchParams(next, { replace });
+    } catch (err) {
+      console.warn('Lỗi setSearchParams:', err);
+    }
+  };
+
+  // Đồng bộ state từ URL searchParams (hỗ trợ redirect PayOS/tab & nút Back/Forward trình duyệt)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
+    const viewParam = searchParams.get('view');
+    const stepParam = Number(searchParams.get('step'));
+    const eventIdParam = searchParams.get('eventId');
+    const shiftIdParam = searchParams.get('shiftId');
+
     if (
       tabParam === 'subscription' ||
       searchParams.has('vnp_ResponseCode') ||
@@ -167,8 +187,36 @@ export default function EOPage() {
     } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'messages', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
+    } else if (!tabParam) {
+      setActiveTab('overview');
+      setActiveNav('overview');
     }
-  }, [searchParams]);
+
+    if (tabParam === 'events') {
+      if (viewParam === 'create') {
+        setActiveEventSubTab('create');
+        setDetailEvent(null);
+        setWorkspaceShiftId(null);
+        if (stepParam >= 1 && stepParam <= 3) {
+          setWizardStep(stepParam);
+        }
+      } else if (eventIdParam) {
+        const matched = Array.isArray(events.events)
+          ? events.events.find((e) => e.eventId === eventIdParam)
+          : null;
+        if (matched) setDetailEvent(matched);
+        setWorkspaceShiftId(shiftIdParam || null);
+        setActiveEventSubTab('detail');
+      } else {
+        setDetailEvent(null);
+        setWorkspaceShiftId(null);
+        setActiveEventSubTab(viewParam || 'list');
+      }
+    } else {
+      setDetailEvent(null);
+      setWorkspaceShiftId(null);
+    }
+  }, [searchParams, events.events]);
 
   const [mapModal, setMapModal] = useState({
     isOpen: false,
@@ -194,6 +242,7 @@ export default function EOPage() {
   const [detailEvent, setDetailEvent] = useState(null);
   const [detailInitialTab, setDetailInitialTab] = useState('SHIFTS');
   const [workspaceShiftId, setWorkspaceShiftId] = useState(null);
+  const [wizardStep, setWizardStep] = useState(1);
   const [ekycStatus, setEkycStatus] = useState(null);
   const [showEkycModal, setShowEkycModal] = useState(false);
 
@@ -214,6 +263,8 @@ export default function EOPage() {
     setDetailInitialTab(initialTab);
     setActiveTab('events');
     setActiveNav('events');
+    setActiveEventSubTab('detail');
+    syncUrlRoute({ tab: 'events', eventId: evt.eventId });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -247,12 +298,14 @@ export default function EOPage() {
       setShowEkycModal(true);
       return;
     }
-    events.setNewEvent({ ...DEFAULT_NEW_EVENT });
+    events.setNewEvent(createDefaultNewEvent());
     setDetailEvent(null);
     setWorkspaceShiftId(null);
+    setWizardStep(1);
     setActiveTab('events');
     setActiveNav('events');
     setActiveEventSubTab('create');
+    syncUrlRoute({ tab: 'events', view: 'create', step: 1 });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -286,11 +339,7 @@ export default function EOPage() {
     }
 
     setActiveTab(target);
-    try {
-      setSearchParams({ tab: target }, { replace: true });
-    } catch (err) {
-      console.warn('Lỗi setSearchParams:', err);
-    }
+    syncUrlRoute({ tab: target });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -299,21 +348,13 @@ export default function EOPage() {
       setActiveTab('events');
       setActiveNav('events');
       setActiveEventSubTab('list');
-      try {
-        setSearchParams({ tab: 'events' }, { replace: true });
-      } catch (err) {
-        console.warn('Lỗi setSearchParams:', err);
-      }
+      syncUrlRoute({ tab: 'events' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     setActiveTab(tabKey);
     setActiveNav(tabKey);
-    try {
-      setSearchParams({ tab: tabKey }, { replace: true });
-    } catch (err) {
-      console.warn('Lỗi setSearchParams:', err);
-    }
+    syncUrlRoute({ tab: tabKey });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -323,6 +364,7 @@ export default function EOPage() {
       setDetailEvent(target);
       setDetailInitialTab('SHIFTS');
       setActiveEventSubTab('detail');
+      syncUrlRoute(target?.eventId ? { tab: 'events', eventId: target.eventId } : { tab: 'events' });
       return;
     }
     setDetailEvent(null);
@@ -333,6 +375,7 @@ export default function EOPage() {
     } else if (events.statusFilter === 'CANCELLED') {
       events.setStatusFilter('ALL');
     }
+    syncUrlRoute(subKey && subKey !== 'list' ? { tab: 'events', view: subKey } : { tab: 'events' });
   };
 
   const displayName = user?.fullName || user?.username || 'Ban Tổ Chức';
@@ -475,6 +518,11 @@ export default function EOPage() {
                 <EventCreationWizardModal
                   isOpen={true}
                   asPage={true}
+                  controlledStep={wizardStep}
+                  onStepChange={(nextStep) => {
+                    setWizardStep(nextStep);
+                    syncUrlRoute({ tab: 'events', view: 'create', step: nextStep });
+                  }}
                   onClose={() => handleEventSubTabChange('list')}
                   onSuccess={events.loadEvents}
                   onEventCreated={async (createdEvt) => {
@@ -510,10 +558,12 @@ export default function EOPage() {
                   event={resolvedEvent}
                   onSelectShift={(nextShift) => {
                     setWorkspaceShiftId(nextShift.shiftId);
+                    syncUrlRoute({ tab: 'events', eventId: resolvedEvent.eventId, shiftId: nextShift.shiftId });
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   onBackToEvent={() => {
                     setWorkspaceShiftId(null);
+                    syncUrlRoute({ tab: 'events', eventId: resolvedEvent.eventId });
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   onEditShift={shifts.setEditingShift}
@@ -536,6 +586,9 @@ export default function EOPage() {
                   onSelectEvent={(nextEvt) => {
                     setWorkspaceShiftId(null);
                     setDetailEvent(nextEvt);
+                    if (nextEvt?.eventId) {
+                      syncUrlRoute({ tab: 'events', eventId: nextEvt.eventId });
+                    }
                   }}
                   onClose={() => {
                     setDetailEvent(null);
@@ -547,6 +600,9 @@ export default function EOPage() {
                   onOpenShiftWorkspace={(sh) => {
                     if (sh?.shiftId) {
                       setWorkspaceShiftId(sh.shiftId);
+                      if (resolvedEvent?.eventId) {
+                        syncUrlRoute({ tab: 'events', eventId: resolvedEvent.eventId, shiftId: sh.shiftId });
+                      }
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                   }}
@@ -591,6 +647,9 @@ export default function EOPage() {
                 onOpenShiftWorkspace={(sh, evt) => {
                   if (evt) setDetailEvent(evt);
                   if (sh?.shiftId) setWorkspaceShiftId(sh.shiftId);
+                  if (evt?.eventId && sh?.shiftId) {
+                    syncUrlRoute({ tab: 'events', eventId: evt.eventId, shiftId: sh.shiftId });
+                  }
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 onDeleteEvent={events.handleDeleteEvent}

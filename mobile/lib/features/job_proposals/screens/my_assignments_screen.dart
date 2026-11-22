@@ -178,14 +178,17 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
   }
 
   void _handleHeaderQrScan(List<ShiftAssignmentItem> activeAssignments) {
-    if (activeAssignments.isEmpty) {
+    final now = DateTime.now();
+    final scannable = activeAssignments.where((a) {
+      if (a.status == 'CHECKED_IN') return true;
+      if (a.status == 'CONFIRMED') return !now.isAfter(a.endTime);
+      return false;
+    }).toList();
+    if (scannable.isEmpty) {
       _openInviteCodeDialog();
       return;
     }
-    final active = activeAssignments.firstWhere(
-      (a) => a.status == 'CHECKED_IN' || a.status == 'CONFIRMED',
-      orElse: () => activeAssignments.first,
-    );
+    final active = scannable.first;
     final isCheckedIn = active.status == 'CHECKED_IN';
     _openQrScanner(active, !isCheckedIn);
   }

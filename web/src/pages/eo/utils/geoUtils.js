@@ -1,32 +1,99 @@
 /**
- * Reverse geocoding helper using OpenStreetMap Nominatim
- * Trả về địa chỉ cụ thể (Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố) - KHÔNG trả về chuỗi tọa độ GPS.
+ * Geocoding helpers: OpenStreetMap Nominatim + Photon fallback
+ * Trả về địa chỉ tiếng Việt chi tiết & tọa độ ổn định khi Nominatim chậm/throttle.
  */
+
+function formatNominatimAddress(data) {
+  if (!data) return '';
+  const addr = data.address || {};
+  const parts = [];
+  const houseRoad = [addr.house_number, addr.road || addr.pedestrian || addr.footway]
+    .filter(Boolean)
+    .join(' ');
+  const venueName = data.name && !houseRoad.includes(data.name) ? data.name : '';
+  if (venueName) parts.push(venueName);
+  if (houseRoad) parts.push(houseRoad);
+  const ward = addr.quarter || addr.suburb || addr.neighbourhood || addr.village;
+  if (ward) parts.push(ward);
+  const district = addr.city_district || addr.district || addr.county || addr.town;
+  if (district && !parts.includes(district)) parts.push(district);
+  const city = addr.city || addr.state || addr.province;
+  if (city && !parts.includes(city)) parts.push(city);
+  if (parts.length >= 2) {
+    return parts.join(', ');
+  }
+  return data.display_name || '';
+}
+
+function formatPhotonFeatureAddress(props = {}) {
+  const parts = [];
+  if (props.name) parts.push(props.name);
+  const street = [props.housenumber, props.street].filter(Boolean).join(' ');
+  if (street && !parts.includes(street)) parts.push(street);
+  if (props.district && !parts.includes(props.district)) parts.push(props.district);
+  if (props.city && !parts.includes(props.city)) parts.push(props.city);
+  if (props.state && !parts.includes(props.state)) parts.push(props.state);
+  return parts.join(', ');
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 6500) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function getAddressFromCoordinates(lat, lng) {
-  // Kiểm tra nhanh nếu trùng khớp với các địa điểm sự kiện phổ biến
+  if (lat == null || lng == null || isNaN(Number(lat)) || isNaN(Number(lng))) {
+    return '';
+  }
+  const numLat = Number(lat);
+  const numLng = Number(lng);
+
   const matchedPopular = POPULAR_VENUES.find(
-    (v) => Math.abs(v.lat - lat) < 0.002 && Math.abs(v.lng - lng) < 0.002
+    (v) => Math.abs(v.lat - numLat) < 0.002 && Math.abs(v.lng - numLng) < 0.002
   );
   if (matchedPopular) {
     return `${matchedPopular.name}, ${matchedPopular.displayName}`;
   }
 
+  // 1. OpenStreetMap Nominatim reverse geocoding
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-      { headers: { 'Accept-Language': 'vi' }, signal: controller.signal }
+    const res = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${numLat}&lon=${numLng}&zoom=18&addressdetails=1`,
+      { headers: { 'Accept-Language': 'vi' } },
+      6500
     );
-    clearTimeout(timeoutId);
-    const data = await res.json();
-    if (data && data.display_name) {
-      return data.display_name;
+    if (res.ok) {
+      const data = await res.json();
+      const formatted = formatNominatimAddress(data);
+      if (formatted) return formatted;
     }
-    return '';
   } catch {
-    return '';
+    // Chuyển sang fallback Photon
   }
+
+  // 2. Fallback: Photon (Komoot OSM) reverse geocoding
+  try {
+    const res = await fetchWithTimeout(
+      `https://photon.komoot.io/reverse?lat=${numLat}&lon=${numLng}`,
+      {},
+      5500
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const first = data?.features?.[0]?.properties;
+      const formatted = formatPhotonFeatureAddress(first);
+      if (formatted) return formatted;
+    }
+  } catch {
+    // Bỏ qua lỗi mạng
+  }
+
+  return '';
 }
 
 /**
@@ -44,56 +111,83 @@ export const POPULAR_VENUES = [
 ];
 
 /**
- * Search location suggestions using OpenStreetMap Nominatim with fallback
+ * Search location suggestions using Nominatim + Photon fallback
  */
 export async function searchAddressSuggestions(query) {
   if (!query || !query.trim()) return [];
-  const qLower = query.trim().toLowerCase();
+  const trimmed = query.trim();
+  const qLower = trimmed.toLowerCase();
 
-  // Tìm nhanh trong danh sách địa điểm sự kiện phổ biến trước
   const localMatches = POPULAR_VENUES.filter(
     (v) => v.name.toLowerCase().includes(qLower) || v.displayName.toLowerCase().includes(qLower)
   );
 
+  let apiResults = [];
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query.trim())}&countrycodes=vn&limit=5&addressdetails=1`,
-      { headers: { 'Accept-Language': 'vi' }, signal: controller.signal }
+    const res = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed)}&countrycodes=vn&limit=5&addressdetails=1`,
+      { headers: { 'Accept-Language': 'vi' } },
+      6500
     );
-    clearTimeout(timeoutId);
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      const apiResults = data.map((item) => ({
-        lat: parseFloat(parseFloat(item.lat).toFixed(6)),
-        lng: parseFloat(parseFloat(item.lon).toFixed(6)),
-        displayName: item.display_name,
-        name: item.name || item.display_name.split(',')[0],
-      }));
-
-      // Gộp và loại trừ trùng lặp
-      const combined = [...localMatches];
-      for (const item of apiResults) {
-        if (!combined.some((c) => Math.abs(c.lat - item.lat) < 0.001 && Math.abs(c.lng - item.lng) < 0.001)) {
-          combined.push(item);
-        }
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        apiResults = data.map((item) => ({
+          lat: parseFloat(parseFloat(item.lat).toFixed(6)),
+          lng: parseFloat(parseFloat(item.lon).toFixed(6)),
+          displayName: formatNominatimAddress(item) || item.display_name,
+          name: item.name || item.display_name.split(',')[0],
+        }));
       }
-      return combined.slice(0, 6);
     }
   } catch {
-    // Nếu mạng chậm hoặc timeout, trả về kết quả local
+    // Fallback sang Photon bên dưới
   }
 
-  return localMatches;
+  if (apiResults.length === 0) {
+    try {
+      const res = await fetchWithTimeout(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed + ', Vietnam')}&limit=5`,
+        {},
+        5500
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const features = Array.isArray(data?.features) ? data.features : [];
+        apiResults = features
+          .filter((f) => Array.isArray(f?.geometry?.coordinates))
+          .map((f) => {
+            const [lon, lat] = f.geometry.coordinates;
+            const formatted = formatPhotonFeatureAddress(f.properties);
+            return {
+              lat: parseFloat(Number(lat).toFixed(6)),
+              lng: parseFloat(Number(lon).toFixed(6)),
+              displayName: formatted || f.properties?.name || trimmed,
+              name: f.properties?.name || formatted.split(',')[0] || trimmed,
+            };
+          });
+      }
+    } catch {
+      // Giữ localMatches
+    }
+  }
+
+  const combined = [...localMatches];
+  for (const item of apiResults) {
+    if (!combined.some((c) => Math.abs(c.lat - item.lat) < 0.001 && Math.abs(c.lng - item.lng) < 0.001)) {
+      combined.push(item);
+    }
+  }
+  return combined.slice(0, 6);
 }
 
 /**
- * Forward geocoding helper using OpenStreetMap Nominatim
+ * Forward geocoding helper (Nominatim + Photon fallback)
  */
 export async function getCoordinatesFromAddress(address) {
   if (!address || !address.trim()) return null;
-  const qLower = address.trim().toLowerCase();
+  const trimmed = address.trim();
+  const qLower = trimmed.toLowerCase();
 
   const foundLocal = POPULAR_VENUES.find(
     (v) => v.name.toLowerCase().includes(qLower) || v.displayName.toLowerCase().includes(qLower)
@@ -103,24 +197,46 @@ export async function getCoordinatesFromAddress(address) {
   }
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address.trim())}&countrycodes=vn&limit=1`,
-      { headers: { 'Accept-Language': 'vi' }, signal: controller.signal }
+    const res = await fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed)}&countrycodes=vn&limit=1&addressdetails=1`,
+      { headers: { 'Accept-Language': 'vi' } },
+      6000
     );
-    clearTimeout(timeoutId);
-    const data = await res.json();
-    if (data && data.length > 0) {
-      return {
-        lat: parseFloat(parseFloat(data[0].lat).toFixed(6)),
-        lng: parseFloat(parseFloat(data[0].lon).toFixed(6)),
-        displayName: data[0].display_name,
-      };
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return {
+          lat: parseFloat(parseFloat(data[0].lat).toFixed(6)),
+          lng: parseFloat(parseFloat(data[0].lon).toFixed(6)),
+          displayName: formatNominatimAddress(data[0]) || data[0].display_name,
+        };
+      }
     }
-    return null;
   } catch {
-    return null;
+    // Thử Photon fallback
   }
-}
 
+  try {
+    const res = await fetchWithTimeout(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed + ', Vietnam')}&limit=1`,
+      {},
+      5500
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const first = data?.features?.[0];
+      if (Array.isArray(first?.geometry?.coordinates)) {
+        const [lon, lat] = first.geometry.coordinates;
+        return {
+          lat: parseFloat(Number(lat).toFixed(6)),
+          lng: parseFloat(Number(lon).toFixed(6)),
+          displayName: formatPhotonFeatureAddress(first.properties) || trimmed,
+        };
+      }
+    }
+  } catch {
+    // Bỏ qua lỗi mạng
+  }
+
+  return null;
+}

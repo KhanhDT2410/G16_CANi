@@ -3,9 +3,15 @@ import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { calculateShiftRiskAnalysis } from '../hooks/useShifts';
 import { validateJobType } from '../utils/shiftValidation';
+import {
+  toDateTimeLocalInput,
+  validateShiftArrivalTime,
+  validateShiftTimeRange,
+} from '../utils/eventHelpers';
 import WageBenchmarkBox from './WageBenchmarkBox';
 import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
+import ShiftArrivalTimeField from './ShiftArrivalTimeField';
 import './EventCreatePage.css';
 
 /**
@@ -81,6 +87,10 @@ const ShiftCreateModal = ({
 
   const riskInfo = calculateShiftRiskAnalysis(newShift);
   const wageRec = riskInfo.recommendation;
+  const liveTimeError = validateShiftTimeRange(newShift.startTime, newShift.endTime, null, null, {
+    allowPastStart: false,
+  });
+  const liveArrivalError = validateShiftArrivalTime(newShift.arrivalTime, newShift.startTime);
 
   const handleFormSubmit = (e) => {
     const err = validateJobType(newShift.jobType);
@@ -88,6 +98,16 @@ const ShiftCreateModal = ({
       e.preventDefault();
       setJobTypeError(err);
       showToast(err, 'error');
+      return;
+    }
+    if (liveTimeError) {
+      e.preventDefault();
+      showToast(liveTimeError, 'error');
+      return;
+    }
+    if (liveArrivalError) {
+      e.preventDefault();
+      showToast(liveArrivalError, 'error');
       return;
     }
     setJobTypeError(null);
@@ -242,19 +262,32 @@ const ShiftCreateModal = ({
               <label>Thời Gian Bắt Đầu *</label>
               <input
                 type="datetime-local"
+                min={toDateTimeLocalInput(new Date())}
                 required
                 className="eo-form-input"
+                style={{ borderColor: liveTimeError ? '#ef4444' : undefined }}
                 value={newShift.startTime}
                 onChange={(e) => {
                   const val = e.target.value;
                   const s = new Date(val);
                   const en = new Date(newShift.endTime);
                   const dur = !isNaN(s.getTime()) && !isNaN(en.getTime()) && en > s ? parseFloat(((en - s) / 3600000).toFixed(1)) : safeHours;
+                  let nextArrival = newShift.arrivalTime;
+                  if (newShift.arrivalTime && newShift.startTime && !isNaN(s.getTime())) {
+                    const oldS = new Date(newShift.startTime);
+                    const oldA = new Date(newShift.arrivalTime);
+                    if (!isNaN(oldS.getTime()) && !isNaN(oldA.getTime())) {
+                      const offsetMs = oldS.getTime() - oldA.getTime();
+                      if (offsetMs >= 0 && offsetMs <= 120 * 60 * 1000) {
+                        nextArrival = toDateTimeLocalInput(new Date(s.getTime() - offsetMs));
+                      }
+                    }
+                  }
                   if (wageMode === 'PER_SHIFT') {
                     const computed = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
-                    setNewShift({ ...newShift, startTime: val, hourlyWage: computed });
+                    setNewShift({ ...newShift, startTime: val, arrivalTime: nextArrival, hourlyWage: computed });
                   } else {
-                    setNewShift({ ...newShift, startTime: val });
+                    setNewShift({ ...newShift, startTime: val, arrivalTime: nextArrival });
                   }
                 }}
               />
@@ -263,8 +296,10 @@ const ShiftCreateModal = ({
               <label>Thời Gian Kết Thúc *</label>
               <input
                 type="datetime-local"
+                min={newShift.startTime || toDateTimeLocalInput(new Date())}
                 required
                 className="eo-form-input"
+                style={{ borderColor: liveTimeError ? '#ef4444' : undefined }}
                 value={newShift.endTime}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -281,20 +316,19 @@ const ShiftCreateModal = ({
               />
             </div>
           </div>
-
-          {/* Giờ mở cửa điểm danh (check-in gate) */}
-          <div className="eo-form-group">
-            <label>Thời Gian Mở Điểm Danh (Tùy chọn)</label>
-            <input
-              type="datetime-local"
-              className="eo-form-input"
-              value={newShift.arrivalTime || ''}
-              onChange={(e) => setNewShift({ ...newShift, arrivalTime: e.target.value })}
-            />
-            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.25rem' }}>
-              Người lao động chỉ được điểm danh từ thời điểm này. Để trống = mở cùng giờ bắt đầu ca.
+          {liveTimeError && (
+            <div className="ecw-field-error" style={{ marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
+              {liveTimeError}
             </div>
-          </div>
+          )}
+
+          {/* Giờ yêu cầu có mặt trước ca (Arrival Time) */}
+          <ShiftArrivalTimeField
+            startTime={newShift.startTime}
+            arrivalTime={newShift.arrivalTime}
+            onChange={(val) => setNewShift({ ...newShift, arrivalTime: val })}
+            error={liveArrivalError}
+          />
 
           {/* Trang phục + Kỹ năng bắt buộc */}
           <div className="eo-form-row">

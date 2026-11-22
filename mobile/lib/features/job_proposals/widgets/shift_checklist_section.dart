@@ -14,6 +14,7 @@ class ShiftChecklistSection extends StatelessWidget {
   final bool isSaving;
   final String? errorMessage;
   final bool canInteract;
+  final bool isExpired;
   final int? uploadingTaskIndex;
   final VoidCallback onRetryLoad;
   final ValueChanged<int> onToggleItem;
@@ -28,6 +29,7 @@ class ShiftChecklistSection extends StatelessWidget {
     required this.isSaving,
     this.errorMessage,
     required this.canInteract,
+    this.isExpired = false,
     this.uploadingTaskIndex,
     required this.onRetryLoad,
     required this.onToggleItem,
@@ -130,21 +132,29 @@ class ShiftChecklistSection extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF451A03) : const Color(0xFFFEF3C7),
+                color: isExpired
+                    ? (isDark ? const Color(0xFF3F1D1D) : const Color(0xFFFEF2F2))
+                    : (isDark ? const Color(0xFF451A03) : const Color(0xFFFEF3C7)),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFBBF24)),
+                border: Border.all(color: isExpired ? const Color(0xFFFCA5A5) : const Color(0xFFFBBF24)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.lock_clock_outlined, size: 18, color: Color(0xFFD97706)),
-                  SizedBox(width: 8),
+                  Icon(
+                    isExpired ? Icons.visibility_outlined : Icons.lock_clock_outlined,
+                    size: 18,
+                    color: isExpired ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Quét QR Check-in để mở khóa và tích chọn đầu việc trong ca.',
+                      isExpired
+                          ? 'Ca làm việc đã quá hạn — danh sách đầu việc chỉ ở chế độ xem.'
+                          : 'Chế độ xem trước: Quét QR Check-in khi vào ca để tích chọn & chụp ảnh nghiệm thu.',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFFB45309),
+                        color: isExpired ? const Color(0xFFB91C1C) : const Color(0xFFB45309),
                       ),
                     ),
                   ),
@@ -192,9 +202,7 @@ class ShiftChecklistSection extends StatelessWidget {
                 border: Border.all(color: isDark ? const Color(0xFF334155) : cani.border),
               ),
               child: Text(
-                canInteract
-                    ? 'Ban tổ chức chưa thiết lập đầu việc riêng cho ca này. Bạn chỉ cần thực hiện nhiệm vụ theo hướng dẫn trực tiếp và nộp ảnh nghiệm thu bên dưới.'
-                    : 'Danh sách đầu việc của ca sẽ hiển thị ngay sau khi bạn Check-in.',
+                'Ban tổ chức chưa thiết lập đầu việc chi tiết cho ca này.',
                 style: TextStyle(fontSize: 12.5, color: cani.textMuted, height: 1.4),
                 textAlign: TextAlign.center,
               ),
@@ -281,16 +289,22 @@ class ChecklistTaskTile extends StatelessWidget {
                     height: 22,
                     margin: const EdgeInsets.only(right: 10),
                     decoration: BoxDecoration(
-                      color: item.isCompleted ? const Color(0xFF16A34A) : Colors.transparent,
+                      color: item.isCompleted
+                          ? const Color(0xFF16A34A)
+                          : (canInteract ? Colors.transparent : const Color(0xFFE2E8F0).withValues(alpha: isDark ? 0.15 : 0.7)),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: item.isCompleted ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                        color: item.isCompleted
+                            ? const Color(0xFF16A34A)
+                            : (canInteract ? const Color(0xFF94A3B8) : const Color(0xFFCBD5E1)),
                         width: 2,
                       ),
                     ),
                     child: item.isCompleted
                         ? const Icon(Icons.check, size: 15, color: Colors.white)
-                        : null,
+                        : (!canInteract
+                            ? const Icon(Icons.lock_outline, size: 12, color: Color(0xFF64748B))
+                            : null),
                   ),
                   Expanded(
                     child: Column(

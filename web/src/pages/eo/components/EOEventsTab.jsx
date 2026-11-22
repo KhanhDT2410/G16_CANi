@@ -662,28 +662,81 @@ export default function EOEventsTab({
                             <td onClick={(e) => e.stopPropagation()}>
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
                                 {formatStatusBadge(evt)}
-                                {evt.status === 'DRAFT' && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onOpenConfirmPublish(evt);
-                                    }}
-                                    style={{
-                                      background: '#2563eb',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      padding: '0.28rem 0.65rem',
-                                      fontSize: '0.73rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    Đăng Tuyển Ngay
-                                  </button>
-                                )}
+                                {(() => {
+                                  if (evt.status !== 'DRAFT') return null;
+                                  const dyn = getDynamicEventStatus(evt);
+                                  const shiftCnt = activeShifts.length || Number(evt.totalShifts || 0);
+                                  if (dyn.isExpiredDraft) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onOpenEditEvent?.(evt);
+                                        }}
+                                        style={{
+                                          background: '#fff7ed',
+                                          color: '#c2410c',
+                                          border: '1px solid #fed7aa',
+                                          borderRadius: '6px',
+                                          padding: '0.28rem 0.65rem',
+                                          fontSize: '0.73rem',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          whiteSpace: 'nowrap',
+                                        }}
+                                      >
+                                        Sửa lại thời gian
+                                      </button>
+                                    );
+                                  }
+                                  if (shiftCnt === 0) {
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onOpenAddShift?.(evt.eventId);
+                                        }}
+                                        style={{
+                                          background: '#eff6ff',
+                                          color: '#1d4ed8',
+                                          border: '1px solid #bfdbfe',
+                                          borderRadius: '6px',
+                                          padding: '0.28rem 0.65rem',
+                                          fontSize: '0.73rem',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          whiteSpace: 'nowrap',
+                                        }}
+                                      >
+                                        + Thêm ca làm
+                                      </button>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenConfirmPublish(evt);
+                                      }}
+                                      style={{
+                                        background: '#2563eb',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        padding: '0.28rem 0.65rem',
+                                        fontSize: '0.73rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      Đăng Tuyển Ngay
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             </td>
 
@@ -744,7 +797,9 @@ export default function EOEventsTab({
                                     <span>{isExpanded ? 'Thu gọn ca làm' : `Mở nhanh ${evt.totalShifts || 0} ca`}</span>
                                   </button>
 
-                                  {evt.status === 'DRAFT' && (
+                                  {evt.status === 'DRAFT' &&
+                                    !getDynamicEventStatus(evt).isExpiredDraft &&
+                                    (activeShifts.length > 0 || Number(evt.totalShifts || 0) > 0) && (
                                     <button
                                       type="button"
                                       className="dropdown-item text-blue"

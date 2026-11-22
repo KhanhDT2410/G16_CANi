@@ -18,6 +18,10 @@ public class NearbyShiftResponseDto {
     private UUID shiftId;
     private UUID eventId;
     private String eventName;
+    private UUID eoId;
+    private String eoName;
+    private Boolean eoVerified;
+    private BigDecimal eoRatingAvg;
     private String jobType;
     private String description;
     private String locationAddress;

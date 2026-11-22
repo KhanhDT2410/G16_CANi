@@ -8,6 +8,11 @@ import {
   validateJobType,
   buildEvidenceWageBenchmark,
 } from '../utils/shiftValidation';
+import {
+  toDateTimeLocalInput,
+  validateShiftArrivalTime,
+  validateShiftTimeRange,
+} from '../utils/eventHelpers';
 
 export { ROLES, WAGE_RECOMMENDATIONS_MAP };
 
@@ -69,12 +74,14 @@ export function serializeChecklistItems(items = []) {
 /**
  * Phân tích gợi ý mức lương & Đánh giá khả năng tìm nhân sự
  */
-export function calculateShiftRiskAnalysis(shift = {}, venueAddress = '') {
+export function calculateShiftRiskAnalysis(shift = {}, venueAddress = '', venueLat = null, venueLng = null) {
   const role = String(shift.jobType || ROLES[0]).trim();
   const benchmark = buildEvidenceWageBenchmark({
     jobType: role,
     startTime: shift.startTime,
     venueAddress: venueAddress || shift.locationAddress || '',
+    venueLat,
+    venueLng,
   });
   const rec = {
     min: benchmark.minWage,
@@ -181,24 +188,31 @@ export function useShifts({ onReloadEvents }) {
     };
   }, []);
 
-  const [newShift, setNewShift] = useState({
-    jobType: ROLES[0],
-    description: 'Hỗ trợ công việc theo phân công của quản lý sự kiện, thái độ niềm nở, chủ động.',
-    startTime: '2026-11-20T08:00',
-    endTime: '2026-11-20T12:00',
-    arrivalTime: '',
-    requiredWorkers: 4,
-    hourlyWage: 50000,
-    allowance: 20000,
-    minReliabilityScore: 60,
-    maxDistanceKm: 15,
-    dressCode: '',
-    requiredSkills: [],
-    checklistItems: [
-      { id: 'chk_1', title: 'Có mặt trước 15-30 phút nhận vị trí', isRequiredEvidence: false },
-      { id: 'chk_2', title: 'Đồng phục chỉn chu theo hướng dẫn', isRequiredEvidence: true },
-      { id: 'chk_3', title: 'Thực hiện điểm danh check-in bằng mã QR', isRequiredEvidence: false },
-    ],
+  const [newShift, setNewShift] = useState(() => {
+    const tStart = new Date();
+    tStart.setDate(tStart.getDate() + 1);
+    tStart.setHours(8, 0, 0, 0);
+    const tEnd = new Date(tStart);
+    tEnd.setHours(12, 0, 0, 0);
+    return {
+      jobType: ROLES[0],
+      description: 'Hỗ trợ công việc theo phân công của quản lý sự kiện, thái độ niềm nở, chủ động.',
+      startTime: toDateTimeLocalInput(tStart),
+      endTime: toDateTimeLocalInput(tEnd),
+      arrivalTime: '',
+      requiredWorkers: 4,
+      hourlyWage: 50000,
+      allowance: 20000,
+      minReliabilityScore: 60,
+      maxDistanceKm: 15,
+      dressCode: '',
+      requiredSkills: [],
+      checklistItems: [
+        { id: 'chk_1', title: 'Có mặt trước 15-30 phút nhận vị trí', isRequiredEvidence: false },
+        { id: 'chk_2', title: 'Đồng phục chỉn chu theo hướng dẫn', isRequiredEvidence: true },
+        { id: 'chk_3', title: 'Thực hiện điểm danh check-in bằng mã QR', isRequiredEvidence: false },
+      ],
+    };
   });
 
   const getShiftDurationHours = () => {
@@ -253,15 +267,17 @@ export function useShifts({ onReloadEvents }) {
       showToast('Số lượng nhân sự cần tuyển tối thiểu là 1 người!', 'error');
       return;
     }
-    // arrivalTime (giờ mở điểm danh) phải nằm trong khung giờ ca nếu có điền
-    if (newShift.arrivalTime) {
-      const aTime = new Date(newShift.arrivalTime);
-      const sTime = new Date(newShift.startTime);
-      const eTime = new Date(newShift.endTime);
-      if (isNaN(aTime.getTime()) || aTime < sTime || aTime > eTime) {
-        showToast('Thời gian mở điểm danh phải nằm trong khoảng giờ của ca làm việc!', 'error');
-        return;
-      }
+    const timeErr = validateShiftTimeRange(newShift.startTime, newShift.endTime, null, null, {
+      allowPastStart: false,
+    });
+    if (timeErr) {
+      showToast(timeErr, 'error');
+      return;
+    }
+    const arrivalErr = validateShiftArrivalTime(newShift.arrivalTime, newShift.startTime);
+    if (arrivalErr) {
+      showToast(arrivalErr, 'error');
+      return;
     }
     try {
       const checklistStr = Array.isArray(newShift.checklistItems)

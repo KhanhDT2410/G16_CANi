@@ -653,6 +653,21 @@ class ProposalRepository {
     }
   }
 
+  // Lấy hồ sơ công khai của Nhà tổ chức sự kiện (EO)
+  Future<EoPublicProfileData> fetchEoPublicProfile(String eoId) async {
+    try {
+      final response = await _dio.get('/v1/eo/$eoId/public-profile');
+      final data = response.data;
+      if (data != null && data['data'] is Map<String, dynamic>) {
+        return EoPublicProfileData.fromJson(data['data'] as Map<String, dynamic>);
+      }
+      throw const RepositoryException('Không có dữ liệu hồ sơ Nhà tổ chức.');
+    } catch (e) {
+      if (e is RepositoryException) rethrow;
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải hồ sơ Nhà tổ chức.'), e);
+    }
+  }
+
   // Lấy danh sách tranh chấp / khiếu nại của tôi
   Future<List<WorkerDisputeItem>> fetchMyDisputes() async {
     try {
@@ -670,6 +685,23 @@ class ProposalRepository {
     }
   }
 
+  // Lấy danh sách ca làm việc đủ điều kiện để gửi khiếu nại
+  Future<List<DisputeEligibleAssignmentItem>> fetchEligibleAssignmentsForDispute() async {
+    try {
+      final response = await _dio.get('/v1/disputes/my-assignments');
+      final data = response.data;
+      if (data != null && data['data'] is List) {
+        return (data['data'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(DisputeEligibleAssignmentItem.fromJson)
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải danh sách ca làm việc.'), e);
+    }
+  }
+
   // Tạo mới khiếu nại tranh chấp
   Future<WorkerDisputeItem> createDispute(CreateDisputePayload payload) async {
     try {
@@ -682,7 +714,7 @@ class ProposalRepository {
         id: 'local-${DateTime.now().millisecondsSinceEpoch}',
         assignmentId: payload.assignmentId,
         type: payload.type,
-        status: 'PENDING',
+        status: 'OPEN',
         title: payload.title,
         description: payload.description,
         evidence: payload.evidence,

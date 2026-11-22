@@ -8,6 +8,8 @@ import {
 } from '../hooks/useShifts';
 import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
+import ShiftArrivalTimeField from './ShiftArrivalTimeField';
+import { validateShiftArrivalTime } from '../utils/eventHelpers';
 
 /**
  * EditShiftModal
@@ -162,9 +164,9 @@ const EditShiftModal = ({
       return;
     }
     if (formData.arrivalTime) {
-      const aDate = new Date(formData.arrivalTime);
-      if (isNaN(aDate.getTime()) || aDate < sDate || aDate > eDate) {
-        showToast('Thời gian mở điểm danh phải nằm trong khoảng giờ của ca làm việc!', 'error');
+      const arrivalErr = validateShiftArrivalTime(formData.arrivalTime, formData.startTime);
+      if (arrivalErr) {
+        showToast(arrivalErr, 'error');
         return;
       }
     }
@@ -273,19 +275,13 @@ const EditShiftModal = ({
             </div>
           </div>
 
-          {/* Giờ mở cửa điểm danh (check-in gate) */}
-          <div className="eo-form-group">
-            <label>Thời Gian Mở Điểm Danh (Tùy chọn)</label>
-            <input
-              type="datetime-local"
-              className="eo-form-input"
-              value={formData.arrivalTime || ''}
-              onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
-            />
-            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.25rem' }}>
-              Người lao động chỉ được điểm danh từ thời điểm này. Để trống = mở cùng giờ bắt đầu ca.
-            </div>
-          </div>
+          {/* Giờ yêu cầu có mặt trước ca (Arrival Time) */}
+          <ShiftArrivalTimeField
+            startTime={formData.startTime}
+            arrivalTime={formData.arrivalTime}
+            onChange={(val) => setFormData({ ...formData, arrivalTime: val })}
+            error={validateShiftArrivalTime(formData.arrivalTime, formData.startTime)}
+          />
 
           {/* Kỹ năng bắt buộc (DYNAMIC CUSTOM SKILLS + TAXONOMY) */}
           <ShiftSkillSelector

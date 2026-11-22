@@ -61,17 +61,17 @@ export const useLogin = () => {
 
       switch (data.user?.role) {
         case 'ADMIN':
-          navigate('/admin');
+          navigate('/admin', { replace: true });
           break;
         case 'CUSTOMER_CARE':
-          navigate('/customer-care');
+          navigate('/customer-care', { replace: true });
           break;
         case 'EVENT_ORGANIZER':
         default:
           if (!data.user?.phone?.trim() || !data.user?.fullName?.trim()) {
-            navigate('/complete-profile');
+            navigate('/complete-profile', { replace: true });
           } else {
-            navigate('/eo');
+            navigate('/eo', { replace: true });
           }
           break;
       }

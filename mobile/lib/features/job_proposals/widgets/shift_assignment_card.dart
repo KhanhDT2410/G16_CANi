@@ -31,16 +31,20 @@ class ShiftAssignmentCard extends StatelessWidget {
     final cani = Theme.of(context).cani;
     final isCheckedIn = a.status == 'CHECKED_IN' || (a.checkinTime != null && a.checkoutTime == null);
     final isCompleted = a.status == 'COMPLETED' || a.checkoutTime != null;
-    final isNotStarted = !isCheckedIn && !isCompleted;
+    final isCancelledOrNoShow = a.status == 'CANCELLED' || a.status == 'NO_SHOW' || a.attendanceStatus == 'NO_SHOW';
+    final isExpired = !isCheckedIn && !isCompleted && (isCancelledOrNoShow || DateTime.now().isAfter(a.endTime));
+    final isNotStarted = !isCheckedIn && !isCompleted && !isExpired;
 
     final isDeclared = a.paymentStatus == 'DECLARED_PENDING_WORKER';
     final isConfirmedFull = a.paymentStatus == 'CONFIRMED_FULL';
     final isConfirmedPartial = a.paymentStatus == 'CONFIRMED_PARTIAL';
     final isDisputed = a.paymentStatus == 'DISPUTED';
 
-    final barColor = isCompleted
-        ? const Color(0xFF7E22CE)
-        : (isCheckedIn ? const Color(0xFF10B981) : cani.brand);
+    final barColor = isExpired
+        ? cani.danger
+        : (isCompleted
+            ? const Color(0xFF7E22CE)
+            : (isCheckedIn ? const Color(0xFF10B981) : cani.brand));
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -86,11 +90,13 @@ class ShiftAssignmentCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isCompleted
-                            ? const Color(0xFFF3E8FF)
-                            : (isCheckedIn
-                                ? const Color(0xFF10B981).withValues(alpha: 0.12)
-                                : cani.brand.withValues(alpha: 0.10)),
+                        color: isExpired
+                            ? const Color(0xFFFEF2F2)
+                            : (isCompleted
+                                ? const Color(0xFFF3E8FF)
+                                : (isCheckedIn
+                                    ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                    : cani.brand.withValues(alpha: 0.10))),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
@@ -101,23 +107,31 @@ class ShiftAssignmentCard extends StatelessWidget {
                             height: 6,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isCompleted
-                                  ? const Color(0xFF7E22CE)
-                                  : (isCheckedIn ? const Color(0xFF10B981) : cani.brand),
+                              color: isExpired
+                                  ? cani.danger
+                                  : (isCompleted
+                                      ? const Color(0xFF7E22CE)
+                                      : (isCheckedIn ? const Color(0xFF10B981) : cani.brand)),
                             ),
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isCompleted
-                                ? 'ĐÃ HOÀN THÀNH'
-                                : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN'),
+                            isExpired
+                                ? (a.status == 'CANCELLED'
+                                    ? 'ĐÃ HỦY'
+                                    : (a.status == 'NO_SHOW' ? 'VẮNG MẶT' : 'HẾT HẠN ĐIỂM DANH'))
+                                : (isCompleted
+                                    ? 'ĐÃ HOÀN THÀNH'
+                                    : (isCheckedIn ? 'ĐANG TRONG CA' : 'CHỜ CHECK-IN')),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.5,
-                              color: isCompleted
-                                  ? const Color(0xFF7E22CE)
-                                  : (isCheckedIn ? const Color(0xFF059669) : cani.brand),
+                              color: isExpired
+                                  ? cani.danger
+                                  : (isCompleted
+                                      ? const Color(0xFF7E22CE)
+                                      : (isCheckedIn ? const Color(0xFF059669) : cani.brand)),
                             ),
                           ),
                         ],
@@ -193,9 +207,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                   ],
                 ),
 
-                // Giờ mở điểm danh (nếu khác giờ bắt đầu >= 5 phút)
+                // Giờ yêu cầu có mặt / mở điểm danh (nếu khác giờ bắt đầu)
                 if (a.arrivalTime != null &&
-                    a.arrivalTime!.difference(a.startTime).inMinutes >= 5)
+                    a.startTime.difference(a.arrivalTime!).inMinutes.abs() >= 1)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Row(
@@ -204,7 +218,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Mở điểm danh từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')} (check-in sớm sẽ bị chặn)',
+                            a.arrivalTime!.isBefore(a.startTime)
+                                ? 'Có mặt từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')} (trước ca ${a.startTime.difference(a.arrivalTime!).inMinutes}p)'
+                                : 'Mở điểm danh từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')}',
                             style: TextStyle(fontSize: 11, color: isDark ? Colors.amberAccent : Colors.amber.shade800, fontWeight: FontWeight.w600),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -233,8 +249,8 @@ class ShiftAssignmentCard extends StatelessWidget {
                     ),
                   ),
 
-                // Nút Quét QR Lớn cao 52px màu Teal nếu ca đang chạy hoặc chờ
-                if (!isCompleted) ...[
+                // Nút Quét QR Lớn cao 52px màu Teal chỉ hiện khi ca còn hiệu lực (không hiển thị khi đã kết thúc/hết hạn)
+                if (!isCompleted && !isExpired) ...[
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,

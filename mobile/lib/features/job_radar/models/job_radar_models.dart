@@ -2,6 +2,10 @@ class NearbyShiftItem {
   final String shiftId;
   final String? eventId;
   final String eventName;
+  final String? eoId;
+  final String? eoName;
+  final bool eoVerified;
+  final double? eoRatingAvg;
   final String jobType;
   final String? description;
   final String locationAddress;
@@ -26,6 +30,10 @@ class NearbyShiftItem {
     required this.shiftId,
     this.eventId,
     required this.eventName,
+    this.eoId,
+    this.eoName,
+    this.eoVerified = false,
+    this.eoRatingAvg,
     required this.jobType,
     this.description,
     required this.locationAddress,
@@ -52,6 +60,10 @@ class NearbyShiftItem {
       shiftId: json['shiftId'] as String? ?? '',
       eventId: json['eventId'] as String?,
       eventName: json['eventName'] as String? ?? 'Sự kiện',
+      eoId: json['eoId']?.toString(),
+      eoName: json['eoName'] as String?,
+      eoVerified: json['eoVerified'] == true,
+      eoRatingAvg: (json['eoRatingAvg'] as num?)?.toDouble(),
       jobType: json['jobType'] as String? ?? 'Nhân sự',
       description: json['description'] as String?,
       locationAddress: json['locationAddress'] as String? ?? '',

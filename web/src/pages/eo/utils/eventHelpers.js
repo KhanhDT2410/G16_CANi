@@ -1,15 +1,128 @@
-export const DEFAULT_NEW_EVENT = {
-  name: '',
-  description: '',
-  venueAddress: '',
-  venueLat: 10.7328,
-  venueLng: 106.7214,
-  eventDate: '2026-11-20T08:00:00Z',
-  startTime: '2026-11-20T08:00',
-  endTime: '2026-11-20T22:00',
-  imageUrl: '',
-  mode: 'MATCHING',
-};
+export function toDateTimeLocalInput(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+export function createDefaultNewEvent() {
+  const tomorrowStart = new Date();
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  tomorrowStart.setHours(8, 0, 0, 0);
+
+  const tomorrowEnd = new Date(tomorrowStart);
+  tomorrowEnd.setHours(18, 0, 0, 0);
+
+  return {
+    name: '',
+    description: '',
+    venueAddress: '',
+    venueLat: 10.7328,
+    venueLng: 106.7214,
+    locationPicked: false,
+    eventDate: toDateTimeLocalInput(tomorrowStart).slice(0, 10),
+    startTime: toDateTimeLocalInput(tomorrowStart),
+    endTime: toDateTimeLocalInput(tomorrowEnd),
+    imageUrl: '',
+    mode: 'MATCHING',
+  };
+}
+
+export const DEFAULT_NEW_EVENT = createDefaultNewEvent();
+
+/**
+ * Kiểm tra thời gian sự kiện (ngay khi chọn hoặc khi submit)
+ */
+export function validateEventTimeRange(startStr, endStr, { allowPastStart = false } = {}) {
+  const errs = {};
+  if (!startStr) errs.startTime = 'Vui lòng chọn thời gian bắt đầu sự kiện.';
+  if (!endStr) errs.endTime = 'Vui lòng chọn thời gian kết thúc sự kiện.';
+
+  if (startStr) {
+    const start = new Date(startStr);
+    if (isNaN(start.getTime())) {
+      errs.time = 'Thời gian bắt đầu sự kiện không hợp lệ.';
+      return errs;
+    }
+    if (!allowPastStart && start.getTime() < Date.now() - 5 * 60 * 1000) {
+      errs.time = 'Thời gian bắt đầu sự kiện không được nằm trong quá khứ.';
+      errs.startTime = errs.time;
+      return errs;
+    }
+  }
+
+  if (startStr && endStr) {
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      errs.time = 'Thời gian sự kiện không hợp lệ.';
+    } else if (start >= end) {
+      errs.time = 'Thời gian kết thúc phải diễn ra sau thời gian bắt đầu sự kiện.';
+    } else if (end.getTime() - start.getTime() < 30 * 60 * 1000) {
+      errs.time = 'Thời lượng sự kiện tối thiểu phải từ 30 phút trở lên.';
+    }
+  }
+  return errs;
+}
+
+/**
+ * Kiểm tra giờ yêu cầu có mặt (Arrival Time) trước khi bắt đầu ca
+ */
+export function validateShiftArrivalTime(arrivalStr, startStr) {
+  if (!arrivalStr) return null;
+  const aTime = new Date(arrivalStr);
+  const sTime = new Date(startStr);
+  if (isNaN(aTime.getTime()) || isNaN(sTime.getTime())) {
+    return 'Giờ yêu cầu có mặt không hợp lệ.';
+  }
+  if (aTime > sTime) {
+    return 'Giờ yêu cầu có mặt phải trước hoặc bằng giờ bắt đầu ca.';
+  }
+  const diffMinutes = (sTime.getTime() - aTime.getTime()) / (60 * 1000);
+  if (diffMinutes > 120) {
+    return 'Giờ yêu cầu có mặt không được sớm hơn giờ bắt đầu ca quá 120 phút (2 giờ).';
+  }
+  return null;
+}
+
+/**
+ * Kiểm tra khung giờ ca làm việc (chặn quá khứ khi tạo mới & bắt buộc nằm trong sự kiện)
+ */
+export function validateShiftTimeRange(
+  startStr,
+  endStr,
+  eventStartStr,
+  eventEndStr,
+  { allowPastStart = false } = {}
+) {
+  if (!startStr || !endStr) {
+    return 'Vui lòng chọn thời gian bắt đầu và kết thúc ca làm việc.';
+  }
+  const sStart = new Date(startStr);
+  const sEnd = new Date(endStr);
+  if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) {
+    return 'Thời gian ca làm việc không hợp lệ.';
+  }
+  if (!allowPastStart && sStart.getTime() < Date.now() - 5 * 60 * 1000) {
+    return 'Thời gian bắt đầu ca làm việc không được nằm trong quá khứ.';
+  }
+  if (sStart >= sEnd) {
+    return 'Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu ca.';
+  }
+  if (eventStartStr && eventEndStr) {
+    const eStart = new Date(eventStartStr);
+    const eEnd = new Date(eventEndStr);
+    if (!isNaN(eStart.getTime()) && !isNaN(eEnd.getTime()) && (sStart < eStart || sEnd > eEnd)) {
+      return 'Thời gian ca làm việc phải nằm trọn trong khung giờ diễn ra sự kiện.';
+    }
+  }
+  return null;
+}
 
 export const DEMO_EVENTS = [
   {
@@ -197,6 +310,30 @@ export function getDynamicEventStatus(evt = {}) {
   }
 
   if (rawStatus === 'DRAFT') {
+    const now = new Date();
+    const draftStart = evt.startTime ? new Date(evt.startTime) : evt.eventDate ? new Date(evt.eventDate) : null;
+    const draftEnd = evt.endTime ? new Date(evt.endTime) : null;
+
+    if (draftEnd && !isNaN(draftEnd.getTime()) && now > draftEnd) {
+      return {
+        code: 'DRAFT_EXPIRED',
+        label: 'Bản nháp (Đã qua giờ)',
+        colorClass: 'red',
+        subText: 'Đã qua thời gian tổ chức — hãy sửa lịch hoặc xóa',
+        isExpiredDraft: true,
+      };
+    }
+
+    if (draftStart && !isNaN(draftStart.getTime()) && now > draftStart) {
+      return {
+        code: 'DRAFT',
+        label: 'Bản nháp (Qua giờ bắt đầu)',
+        colorClass: 'yellow',
+        subText: 'Nên cập nhật lại lịch trước khi đăng tuyển',
+        isPastStartDraft: true,
+      };
+    }
+
     return {
       code: 'DRAFT',
       label: 'Chưa bắt đầu (Bản nháp)',
@@ -293,7 +430,8 @@ export function getEventStatusPriority(evtOrStatus) {
     case 'APPROVED':
       return 3; // Đã đủ nhân sự chờ diễn ra
     case 'DRAFT':
-      return 4; // Chưa bắt đầu (Bản nháp)
+    case 'DRAFT_EXPIRED':
+      return 4; // Chưa bắt đầu / Bản nháp quá hạn
     case 'COMPLETED':
       return 5; // Đã kết thúc
     case 'CANCELLED':
@@ -325,6 +463,7 @@ export function filterAndSortEvents(events, searchQuery, statusFilter, sortBy) {
       const matchStatus =
         statusFilter === 'ALL' ||
         (statusFilter === 'ACTIVE' && (evt.status === 'ACTIVE' || evt.status === 'APPROVED')) ||
+        (statusFilter === 'DRAFT' && (dynStatus.code === 'DRAFT' || dynStatus.code === 'DRAFT_EXPIRED')) ||
         statusFilter === dynStatus.code ||
         evt.status === statusFilter;
 

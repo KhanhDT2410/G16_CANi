@@ -102,6 +102,7 @@ public class EoEventService {
         }
 
         validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(), dto.getEndTime());
+        validateFutureStartTime(dto.getStartTime(), "Thời gian bắt đầu sự kiện không được nằm trong quá khứ.");
 
         Event event = Event.builder()
                 .eventOrganizer(eo)
@@ -143,6 +144,9 @@ public class EoEventService {
         }
 
         validateEventDetails(dto.getName(), dto.getDescription(), dto.getVenueAddress(), dto.getStartTime(), dto.getEndTime());
+        if (event.getStatus() == EventStatus.DRAFT && dto.getStartTime() != null) {
+            validateFutureStartTime(dto.getStartTime(), "Thời gian bắt đầu sự kiện không được nằm trong quá khứ.");
+        }
 
         event.setName(dto.getName());
         event.setDescription(dto.getDescription());
@@ -225,7 +229,9 @@ public class EoEventService {
     public ShiftResponseDto addShiftToEvent(UUID userId, UUID eventId, CreateShiftRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
+        validateFutureStartTime(dto.getStartTime(), "Thời gian bắt đầu ca làm việc không được nằm trong quá khứ.");
         validateShiftWithinEvent(event, dto.getStartTime(), dto.getEndTime());
+        validateShiftArrivalTime(dto.getStartTime(), dto.getArrivalTime());
         validateShiftJobType(dto.getJobType());
 
         int workers = dto.getRequiredWorkers();
@@ -273,7 +279,7 @@ public class EoEventService {
         event.setTotalEstimatedCost(currentCost.add(shiftCost));
         eventRepository.save(event);
 
-        if (event.getStatus() == EventStatus.ACTIVE) {
+        if (event.getStatus() == EventStatus.ACTIVE && !isInviteMode(event)) {
             try {
                 int n = matchingDispatchService.dispatchForShift(shift.getShiftId());
                 log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện {} — dispatch {} đề xuất",
@@ -281,6 +287,9 @@ public class EoEventService {
             } catch (Exception e) {
                 log.warn("Thêm ca '{}' thất bại dispatch tìm ứng viên: {}", shift.getJobType(), e.getMessage());
             }
+        } else if (isInviteMode(event)) {
+            log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện INVITE {} — bỏ qua auto-matching",
+                    shift.getJobType(), workers, event.getName());
         } else {
             log.info("Đã thêm ca làm việc '{}' (cần {} người) vào sự kiện {}", shift.getJobType(), workers, event.getName());
         }
@@ -307,6 +316,7 @@ public class EoEventService {
         List<ShiftResponseDto> results = new ArrayList<>();
         validateShiftJobType(dto.getJobType());
         for (CreateBulkShiftsRequestDto.TimeSlotItem slot : dto.getTimeSlots()) {
+            validateFutureStartTime(slot.getStartTime(), "Thời gian bắt đầu ca làm việc không được nằm trong quá khứ.");
             validateShiftWithinEvent(event, slot.getStartTime(), slot.getEndTime());
             BigDecimal shiftCost = calculateShiftTotalCost(slot.getStartTime(), slot.getEndTime(), dto.getHourlyWage(), workers, allowance);
 
@@ -342,7 +352,7 @@ public class EoEventService {
             BigDecimal currentCost = event.getTotalEstimatedCost() != null ? event.getTotalEstimatedCost() : BigDecimal.ZERO;
             event.setTotalEstimatedCost(currentCost.add(shiftCost));
 
-            if (event.getStatus() == EventStatus.ACTIVE) {
+            if (event.getStatus() == EventStatus.ACTIVE && !isInviteMode(event)) {
                 try {
                     matchingDispatchService.dispatchForShift(shift.getShiftId());
                 } catch (Exception e) {
@@ -365,6 +375,7 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
         validateShiftWithinEvent(shift.getEvent(), dto.getStartTime(), dto.getEndTime());
+        validateShiftArrivalTime(dto.getStartTime(), dto.getArrivalTime());
         validateShiftJobType(dto.getJobType());
 
         int workers = dto.getRequiredWorkers();
@@ -739,10 +750,19 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
 
+        if (event.getEndTime() != null && Instant.now().isAfter(event.getEndTime())) {
+            throw new BadRequestException("Thời gian tổ chức sự kiện đã trôi qua. Vui lòng chỉnh sửa lại thời gian sự kiện trước khi đăng tuyển.");
+        }
+
+        List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
+        if (shifts == null || shifts.isEmpty()) {
+            throw new BadRequestException("Sự kiện chưa có ca làm việc nào. Vui lòng thêm ít nhất 1 ca trước khi đăng tuyển.");
+        }
+
         // BR-08: Chỉ khấu trừ hạn mức Quota từ Gói cước khi sự kiện kích hoạt Matching Engine (MATCHING)
         // Chế độ Mời người (INVITE) hoàn toàn miễn phí, không tiêu hao Quota gói dịch vụ
-        if (event.getMode() == EventMode.MATCHING) {
-            if (subscriptionService != null) {
+        if (!isInviteMode(event)) {
+            if (event.getMode() == EventMode.MATCHING && subscriptionService != null) {
                 try {
                     subscriptionService.validateAndDeductEventQuota(eo);
                 } catch (BadRequestException e) {
@@ -754,21 +774,27 @@ public class EoEventService {
                 }
             }
         } else {
-            log.info("Sự kiện {} ở chế độ INVITE (Mời trực tiếp): Miễn phí, không tiêu quota gói dịch vụ", event.getName());
+            log.info("Sự kiện {} ở chế độ INVITE (Mời trực tiếp): Miễn phí, không tiêu quota gói dịch vụ và không kích hoạt Matching", event.getName());
         }
 
         event.setStatus(EventStatus.ACTIVE);
         event = eventRepository.save(event);
 
-        List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
         for (Shift s : shifts) {
             s.setStatus(ShiftStatus.ACTIVE);
             shiftRepository.save(s);
-            matchingDispatchService.dispatchForShift(s.getShiftId());
+            if (!isInviteMode(event)) {
+                matchingDispatchService.dispatchForShift(s.getShiftId());
+            }
         }
 
-        log.info("EO {} đã xuất bản sự kiện {} và kích hoạt Matching cho {} ca làm việc",
-                eo.getEoId(), event.getName(), shifts.size());
+        if (isInviteMode(event)) {
+            log.info("EO {} đã xuất bản sự kiện INVITE {} với {} ca làm việc (chỉ mời trực tiếp, không auto-matching)",
+                    eo.getEoId(), event.getName(), shifts.size());
+        } else {
+            log.info("EO {} đã xuất bản sự kiện {} và kích hoạt Matching cho {} ca làm việc",
+                    eo.getEoId(), event.getName(), shifts.size());
+        }
 
         return mapToEventResponseDto(event, shifts);
     }
@@ -781,11 +807,19 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
 
+        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
+            throw new BadRequestException("Thời gian ca làm việc đã trôi qua, không thể đăng tuyển.");
+        }
+
         shift.setStatus(ShiftStatus.ACTIVE);
         shift = shiftRepository.save(shift);
 
-        matchingDispatchService.dispatchForShift(shiftId);
-        log.info("EO {} kích hoạt điều phối ứng viên cho ca {}", eo.getEoId(), shiftId);
+        if (!isInviteMode(shift.getEvent())) {
+            matchingDispatchService.dispatchForShift(shiftId);
+            log.info("EO {} kích hoạt điều phối ứng viên cho ca {}", eo.getEoId(), shiftId);
+        } else {
+            log.info("EO {} mở ca {} thuộc sự kiện INVITE (không kích hoạt Matching)", eo.getEoId(), shiftId);
+        }
 
         return mapToShiftResponseDto(shift);
     }
@@ -798,6 +832,10 @@ public class EoEventService {
         EventOrganizer eo = getEoOrThrow(userId);
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
 
+        if (isInviteMode(shift.getEvent())) {
+            throw new BadRequestException("Sự kiện đang ở chế độ Mời trực tiếp (INVITE), không hỗ trợ điều phối tự động khẩn cấp (Matching Engine).");
+        }
+
         if (shift.getStatus() != ShiftStatus.ACTIVE) {
             throw new BadRequestException("Chỉ có thể kích hoạt điều phối khẩn cấp cho ca làm việc đang ACTIVE");
         }
@@ -808,6 +846,10 @@ public class EoEventService {
         int dispatched = matchingDispatchService.triggerEmergencyDispatch(shiftId, customRadiusKm);
         log.info("EO {} kích hoạt Emergency Dispatch cho ca {}: Đã gửi {} đề xuất", eo.getEoId(), shiftId, dispatched);
         return dispatched;
+    }
+
+    private boolean isInviteMode(Event event) {
+        return event != null && event.getMode() == EventMode.INVITE;
     }
 
     /**
@@ -864,6 +906,24 @@ public class EoEventService {
 
     private UUID resolveEoUserId(EventOrganizer eo, UUID fallbackUserId) {
         return eo.getUser() != null ? eo.getUser().getUserId() : fallbackUserId;
+    }
+
+    private void validateFutureStartTime(Instant startTime, String errorMessage) {
+        if (startTime == null) return;
+        Instant minAllowed = Instant.now().minus(Duration.ofMinutes(5));
+        if (startTime.isBefore(minAllowed)) {
+            throw new BadRequestException(errorMessage);
+        }
+    }
+
+    private void validateShiftArrivalTime(Instant startTime, Instant arrivalTime) {
+        if (startTime == null || arrivalTime == null) return;
+        if (arrivalTime.isAfter(startTime)) {
+            throw new BadRequestException("Giờ yêu cầu có mặt (Arrival Time) phải trước hoặc bằng giờ bắt đầu ca.");
+        }
+        if (Duration.between(arrivalTime, startTime).toMinutes() > 120) {
+            throw new BadRequestException("Giờ yêu cầu có mặt không được sớm hơn giờ bắt đầu ca quá 120 phút.");
+        }
     }
 
     private void validateShiftTimeRange(Instant startTime, Instant endTime) {

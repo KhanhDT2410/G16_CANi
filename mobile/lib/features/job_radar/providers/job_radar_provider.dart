@@ -103,6 +103,8 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
   final JobRadarRepository _repo;
   final ProposalRepository _proposalRepo;
   final Ref _ref;
+  bool _isTogglingStatus = false;
+  bool _hasUserToggledOnline = false;
 
   JobRadarNotifier(this._repo, this._proposalRepo, this._ref) : super(const JobRadarState()) {
     initLocationAndScan();
@@ -117,7 +119,8 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
       prefs = await _proposalRepo.fetchPreferences();
       state = state.copyWith(
         searchRadiusKm: prefs.maxDistanceKm > 0 ? prefs.maxDistanceKm : state.searchRadiusKm,
-        isOnline: prefs.isOnline ?? state.isOnline,
+        // Không ghi đè nếu người dùng vừa chủ động bấm bật/tắt trước khi API khởi tạo trả về
+        isOnline: _hasUserToggledOnline ? state.isOnline : (prefs.isOnline ?? state.isOnline),
         preferredLat: prefs.baseLat,
         preferredLng: prefs.baseLng,
         preferredAddress: prefs.baseAddress,
@@ -255,25 +258,36 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
   }
 
   Future<void> toggleOnlineStatus() async {
+    if (_isTogglingStatus) return;
+    _isTogglingStatus = true;
+    _hasUserToggledOnline = true;
     final prevStatus = state.isOnline;
     final nextStatus = !prevStatus;
     state = state.copyWith(isOnline: nextStatus, errorMessage: null);
     try {
-      await _repo.setOnlineStatus(
+      final confirmedStatus = await _repo.setOnlineStatus(
         isOnline: nextStatus,
         lat: state.usingPreferenceLocation ? state.preferredLat : (state.gpsLat ?? state.userLat),
         lng: state.usingPreferenceLocation ? state.preferredLng : (state.gpsLng ?? state.userLng),
       );
-      if (nextStatus) {
+      if (mounted) {
+        state = state.copyWith(isOnline: confirmedStatus, errorMessage: null);
+      }
+      if (confirmedStatus) {
         await scanNearbyShifts();
         _ref.invalidate(proposalsListProvider);
       }
     } catch (e) {
-      // Rollback trạng thái khi API lỗi hoặc mất kết nối, triệt tiêu trạng thái "Online giả"
-      state = state.copyWith(
-        isOnline: prevStatus,
-        errorMessage: 'Không thể cập nhật trạng thái hoạt động: $e',
-      );
+      // Rollback trạng thái khi API lỗi hoặc mất kết nối và gửi thông báo lỗi rõ ràng ra UI
+      final cleanError = e.toString().replaceFirst('Exception: ', '').trim();
+      if (mounted) {
+        state = state.copyWith(
+          isOnline: prevStatus,
+          errorMessage: cleanError.isNotEmpty ? cleanError : 'Không thể cập nhật trạng thái nhận việc',
+        );
+      }
+    } finally {
+      _isTogglingStatus = false;
     }
   }
 

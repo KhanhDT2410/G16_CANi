@@ -180,6 +180,21 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String?>(
+      jobRadarProvider.select((s) => s.errorMessage),
+      (previous, next) {
+        if (next != null && next.isNotEmpty && next != previous && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(next),
+              backgroundColor: Theme.of(context).cani.danger,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+    );
+
     final state = ref.watch(jobRadarProvider);
     final notifier = ref.read(jobRadarProvider.notifier);
     final authState = ref.watch(authStateProvider);

@@ -1,11 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export const RsAppealReviewModal = ({ appeal, isOpen, onClose, onSubmit, submitting }) => {
   const [approved, setApproved] = useState(true);
   const [decisionNote, setDecisionNote] = useState('');
   const [validationError, setValidationError] = useState('');
 
-  if (!isOpen || !appeal) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !appeal || typeof document === 'undefined') return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -17,8 +33,8 @@ export const RsAppealReviewModal = ({ appeal, isOpen, onClose, onSubmit, submitt
     onSubmit({ approved, decisionNote: decisionNote.trim() });
   };
 
-  return (
-    <div className="appeal-modal-overlay" onClick={onClose}>
+  const modalNode = (
+    <div className="appeal-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="appeal-modal-content" onClick={(e) => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="appeal-modal-header">
@@ -93,5 +109,7 @@ export const RsAppealReviewModal = ({ appeal, isOpen, onClose, onSubmit, submitt
       </div>
     </div>
   );
+
+  return createPortal(modalNode, document.body);
 };
 

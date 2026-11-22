@@ -13,6 +13,9 @@ import {
   isGibberishOrSpam,
   validateJobType,
   resolveWageRegionInfo,
+  validateShiftWageAgainstFloor,
+  detectCityFromAddress,
+  STATUTORY_HOURLY_FLOORS,
 } from '../utils/shiftValidation';
 import {
   toDateTimeLocalInput,
@@ -78,6 +81,7 @@ const EventCreationWizardModal = ({
   const [editingShiftIndex, setEditingShiftIndex] = useState(null);
   const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
   const [shiftPackageWage, setShiftPackageWage] = useState(200000);
+  const [currentShiftBenchmark, setCurrentShiftBenchmark] = useState(null);
 
   const toDateTimeInputVal = (date) => {
     if (!date) return '';
@@ -115,9 +119,9 @@ const EventCreationWizardModal = ({
     startTime: newEvent.startTime || '',
     endTime: newEvent.endTime || '',
     arrivalTime: '',
-    requiredWorkers: 4,
+    requiredWorkers: 1,
     hourlyWage: 50000,
-    allowance: 20000,
+    allowance: 0,
     maxDistanceKm: 15,
     imageUrl: '',
     requiredSkills: [],
@@ -330,9 +334,10 @@ const EventCreationWizardModal = ({
   };
 
   const handlePackageWageChange = (val) => {
-    const pkg = Math.max(0, parseFloat(val) || 0);
+    let raw = typeof val === 'string' ? val.replace(/^0+(?=\d)/, '') : String(val ?? '');
+    const pkg = raw === '' ? '' : Math.max(0, parseFloat(raw) || 0);
     setShiftPackageWage(pkg);
-    const computedHourly = Math.max(0, Math.round(pkg / Math.max(0.5, currentDurationHours)));
+    const computedHourly = Math.max(0, Math.round((Number(pkg) || 0) / Math.max(0.5, currentDurationHours)));
     setCurrentShift((prev) => ({
       ...prev,
       hourlyWage: computedHourly,
@@ -508,8 +513,17 @@ const EventCreationWizardModal = ({
       return;
     }
 
-    if (Number(currentShift.hourlyWage || 0) < 20000) {
-      showToast('Mức thù lao giờ tối thiểu trên hệ thống là 20.000 VNĐ/giờ!', 'error');
+    const wageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: currentShift.hourlyWage,
+      benchmark: currentShiftBenchmark,
+      city: regionInfo.city,
+      venueAddress: activeAddress,
+      venueLat: activeLat,
+      venueLng: activeLng,
+    });
+    if (!wageCheck.isValid) {
+      setShiftErrors((prev) => ({ ...prev, hourlyWage: wageCheck.error }));
+      showToast(wageCheck.error, 'error');
       return;
     }
 
@@ -634,7 +648,7 @@ const EventCreationWizardModal = ({
         startTime: toDateTimeInputVal(nextStart),
         endTime: toDateTimeInputVal(nextEnd),
         arrivalTime: '',
-        requiredWorkers: 2,
+        requiredWorkers: 1,
         hourlyWage: nextWage,
         allowance: 0,
         maxDistanceKm: 15,
@@ -683,6 +697,32 @@ const EventCreationWizardModal = ({
       showToast('Vui lòng thêm ít nhất một ca làm việc trước khi tiếp tục!', 'warning');
       return;
     }
+
+    const invalidShift = shiftsList.find((s) => {
+      const check = validateShiftWageAgainstFloor({
+        hourlyWage: s.hourlyWage,
+        city: regionInfo.city,
+        venueAddress: activeAddress,
+        venueLat: activeLat,
+        venueLng: activeLng,
+      });
+      return !check.isValid;
+    });
+    if (invalidShift) {
+      const check = validateShiftWageAgainstFloor({
+        hourlyWage: invalidShift.hourlyWage,
+        city: regionInfo.city,
+        venueAddress: activeAddress,
+        venueLat: activeLat,
+        venueLng: activeLng,
+      });
+      showToast(
+        `Ca "${invalidShift.jobType}": ${check.error} Vui lòng điều chỉnh trước khi tiếp tục.`,
+        'error'
+      );
+      return;
+    }
+
     setCurrentStep(3);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1520,16 +1560,29 @@ const EventCreationWizardModal = ({
                       min="1"
                       required
                       className="eo-form-input"
-                      value={currentShift.requiredWorkers}
+                      value={currentShift.requiredWorkers ?? ''}
+                      onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => {
                         if (e.key === '-' || e.key === 'e') e.preventDefault();
                       }}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                        if (e.target.value !== raw) e.target.value = raw;
+                        if (raw === '') {
+                          setCurrentShift({ ...currentShift, requiredWorkers: '' });
+                          return;
+                        }
+                        const parsed = parseInt(raw, 10);
                         setCurrentShift({
                           ...currentShift,
-                          requiredWorkers: Math.max(1, parseInt(e.target.value, 10) || 1),
-                        })
-                      }
+                          requiredWorkers: isNaN(parsed) ? '' : Math.max(0, parsed),
+                        });
+                      }}
+                      onBlur={() => {
+                        if (!currentShift.requiredWorkers || Number(currentShift.requiredWorkers) < 1) {
+                          setCurrentShift((prev) => ({ ...prev, requiredWorkers: 1 }));
+                        }
+                      }}
                     />
                   </div>
 
@@ -1542,19 +1595,40 @@ const EventCreationWizardModal = ({
                         step="5000"
                         required
                         className="eo-form-input"
-                        value={currentShift.hourlyWage}
+                        style={{
+                          borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
+                          boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
+                        }}
+                        value={currentShift.hourlyWage ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
                         }}
                         onChange={(e) => {
-                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                          let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== raw) e.target.value = raw;
+                          const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
                           setCurrentShift({ ...currentShift, hourlyWage: val });
-                          setShiftPackageWage(Math.round(val * currentDurationHours));
+                          setShiftPackageWage(Math.round((Number(val) || 0) * currentDurationHours));
+                          if (shiftErrors.hourlyWage) {
+                            setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (currentShift.hourlyWage === '' || isNaN(currentShift.hourlyWage)) {
+                            setCurrentShift((prev) => ({ ...prev, hourlyWage: 0 }));
+                          }
                         }}
                       />
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                        = {Math.round(Number(currentShift.hourlyWage || 0) * currentDurationHours).toLocaleString('vi-VN')}đ / ca ({currentDurationHours} giờ)
-                      </div>
+                      {shiftErrors.hourlyWage ? (
+                        <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {shiftErrors.hourlyWage}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          = {Math.round(Number(currentShift.hourlyWage || 0) * currentDurationHours).toLocaleString('vi-VN')}đ / ca ({currentDurationHours} giờ)
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="eo-form-group" style={{ marginBottom: 0 }}>
@@ -1565,15 +1639,38 @@ const EventCreationWizardModal = ({
                         step="10000"
                         required
                         className="eo-form-input"
-                        value={shiftPackageWage}
+                        style={{
+                          borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
+                          boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
+                        }}
+                        value={shiftPackageWage ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
                         }}
-                        onChange={(e) => handlePackageWageChange(e.target.value)}
+                        onChange={(e) => {
+                          let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== raw) e.target.value = raw;
+                          handlePackageWageChange(raw);
+                          if (shiftErrors.hourlyWage) {
+                            setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (shiftPackageWage === '' || isNaN(shiftPackageWage)) {
+                            setShiftPackageWage(0);
+                          }
+                        }}
                       />
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                        Quy đổi tương đương: ~{Number(currentShift.hourlyWage || 0).toLocaleString('vi-VN')}đ/giờ ({currentDurationHours} giờ/ca)
-                      </div>
+                      {shiftErrors.hourlyWage ? (
+                        <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {shiftErrors.hourlyWage}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          Quy đổi tương đương: ~{Number(currentShift.hourlyWage || 0).toLocaleString('vi-VN')}đ/giờ ({currentDurationHours} giờ/ca)
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1592,7 +1689,11 @@ const EventCreationWizardModal = ({
                 onSelectWage={(chosenWage) => {
                   setCurrentShift((prev) => ({ ...prev, hourlyWage: chosenWage }));
                   setShiftPackageWage(Math.round(chosenWage * currentDurationHours));
+                  if (shiftErrors.hourlyWage) {
+                    setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                  }
                 }}
+                onBenchmarkLoaded={(bm) => setCurrentShiftBenchmark(bm)}
               />
 
               <div className="eo-form-row">
@@ -1603,13 +1704,21 @@ const EventCreationWizardModal = ({
                     min="0"
                     step="10000"
                     className="eo-form-input"
-                    value={currentShift.allowance}
+                    value={currentShift.allowance ?? ''}
+                    onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
                     onChange={(e) => {
-                      const rawVal = parseFloat(e.target.value);
-                      setCurrentShift({ ...currentShift, allowance: isNaN(rawVal) ? 0 : Math.max(0, rawVal) });
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
+                      setCurrentShift({ ...currentShift, allowance: val });
+                    }}
+                    onBlur={() => {
+                      if (currentShift.allowance === '' || isNaN(currentShift.allowance)) {
+                        setCurrentShift((prev) => ({ ...prev, allowance: 0 }));
+                      }
                     }}
                   />
                 </div>
@@ -1620,16 +1729,28 @@ const EventCreationWizardModal = ({
                     min="1"
                     max="50"
                     className="eo-form-input"
-                    value={currentShift.maxDistanceKm}
+                    value={currentShift.maxDistanceKm ?? ''}
+                    onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      if (raw === '') {
+                        setCurrentShift({ ...currentShift, maxDistanceKm: '' });
+                        return;
+                      }
                       setCurrentShift({
                         ...currentShift,
-                        maxDistanceKm: Math.max(1, Math.min(50, parseFloat(e.target.value) || 15)),
-                      })
-                    }
+                        maxDistanceKm: Math.max(1, Math.min(50, parseFloat(raw) || 15)),
+                      });
+                    }}
+                    onBlur={() => {
+                      if (!currentShift.maxDistanceKm || Number(currentShift.maxDistanceKm) < 1) {
+                        setCurrentShift((prev) => ({ ...prev, maxDistanceKm: 15 }));
+                      }
+                    }}
                   />
                 </div>
               </div>

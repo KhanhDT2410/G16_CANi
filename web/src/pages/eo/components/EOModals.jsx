@@ -22,6 +22,9 @@ export default function EOModals({
   disputeModal,
   setDisputeModal,
 }) {
+  const activeEvent =
+    events?.eventsList?.find((e) => e.eventId === shifts?.selectedEventId) || null;
+
   return (
     <>
       <ShiftCreateModal
@@ -34,6 +37,9 @@ export default function EOModals({
         shiftDurationHours={shifts.getShiftDurationHours()}
         calculateShiftTotal={shifts.calculateShiftTotal}
         skillTaxonomy={shifts.skillTaxonomy}
+        venueAddress={activeEvent?.venueAddress || ''}
+        venueLat={activeEvent?.venueLat ?? null}
+        venueLng={activeEvent?.venueLng ?? null}
         onSubmit={shifts.handleAddShift}
       />
 

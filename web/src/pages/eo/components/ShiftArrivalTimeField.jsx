@@ -62,7 +62,7 @@ export default function ShiftArrivalTimeField({
   return (
     <div className="eo-form-group">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-        <label style={{ margin: 0 }}>Giờ Yêu Cầu Có Mặt Trước Ca (Arrival Time)</label>
+        <label style={{ margin: 0 }}>Giờ Yêu Cầu Có Mặt Trước Ca</label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
           {ARRIVAL_PRESETS.map((preset) => {
             const isActive = offsetInfo.activePreset === preset.minutes;

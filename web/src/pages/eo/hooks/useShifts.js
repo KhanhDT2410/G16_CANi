@@ -200,9 +200,9 @@ export function useShifts({ onReloadEvents }) {
       startTime: toDateTimeLocalInput(tStart),
       endTime: toDateTimeLocalInput(tEnd),
       arrivalTime: '',
-      requiredWorkers: 4,
+      requiredWorkers: 1,
       hourlyWage: 50000,
-      allowance: 20000,
+      allowance: 0,
       minReliabilityScore: 60,
       maxDistanceKm: 15,
       dressCode: '',
@@ -259,8 +259,8 @@ export function useShifts({ onReloadEvents }) {
       showToast('Phụ cấp thêm không được là số âm!', 'error');
       return;
     }
-    if (Number(newShift.hourlyWage || 0) < 10000) {
-      showToast('Mức thù lao giờ không hợp lệ!', 'error');
+    if (Number(newShift.hourlyWage || 0) < 20000) {
+      showToast('Mức thù lao giờ tối thiểu trên hệ thống là 20.000 VNĐ/giờ!', 'error');
       return;
     }
     if (Number(newShift.requiredWorkers || 0) < 1) {

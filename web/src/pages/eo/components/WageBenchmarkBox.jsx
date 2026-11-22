@@ -20,6 +20,8 @@ export default function WageBenchmarkBox({
   venueLat = null,
   venueLng = null,
   onSelectWage,
+  onBenchmarkLoaded,
+  onValidationChange,
 }) {
   const roleError = useMemo(
     () => jobTypeError || validateJobType(jobType),
@@ -98,6 +100,10 @@ export default function WageBenchmarkBox({
     });
   }, [roleError, trimmedRole, startTime, venueAddress, venueLat, venueLng, apiBenchmark]);
 
+  useEffect(() => {
+    onBenchmarkLoaded?.(benchmark);
+  }, [benchmark, onBenchmarkLoaded]);
+
   if (roleError || !benchmark) {
     return (
       <div className="ecw-wage-placeholder">
@@ -113,6 +119,7 @@ export default function WageBenchmarkBox({
 
   const numericWage = Number(hourlyWage || 0);
   const isBelowLegalFloor = numericWage > 0 && numericWage < benchmark.legalFloorWage;
+  const isBelowAdminFloor = numericWage > 0 && numericWage < benchmark.minWage;
 
   return (
     <div className="ecw-wage-benchmark-card">
@@ -185,11 +192,52 @@ export default function WageBenchmarkBox({
         </div>
       </div>
 
-      {isBelowLegalFloor && (
-        <div className="ecw-wage-legal-warning">
-          Cảnh báo tuân thủ: Mức thù lao đang nhập ({numericWage.toLocaleString('vi-VN')}đ/giờ)
-          thấp hơn mức lương tối thiểu giờ của <strong>{benchmark.legalRegionLabel}</strong> (
-          {benchmark.legalFloorWage.toLocaleString('vi-VN')}đ/giờ theo {benchmark.legalReference}).
+      {isBelowAdminFloor && (
+        <div
+          className="ecw-wage-legal-warning"
+          style={{
+            backgroundColor: isBelowLegalFloor ? '#fef2f2' : '#fffbeb',
+            borderColor: isBelowLegalFloor ? '#fecaca' : '#fde68a',
+            color: isBelowLegalFloor ? '#b91c1c' : '#b45309',
+            padding: '0.65rem 0.85rem',
+            borderRadius: '0.5rem',
+            border: '1px solid',
+            marginTop: '0.65rem',
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span>⚠️</span>
+            <span>
+              {isBelowLegalFloor
+                ? 'Cảnh báo vi phạm sàn thù lao pháp lý & sàn CANi'
+                : 'Cảnh báo vi phạm Biểu lương sàn của Admin'}
+            </span>
+          </div>
+          <div style={{ fontSize: '0.8rem', lineHeight: 1.45 }}>
+            Mức thù lao đang nhập (<strong>{numericWage.toLocaleString('vi-VN')}đ/giờ</strong>) thấp hơn định mức lương sàn tối thiểu của CANi (<strong>{benchmark.minWage.toLocaleString('vi-VN')}đ/h</strong>)
+            {isBelowLegalFloor && (
+              <span>
+                {' '}và thấp hơn mức lương tối thiểu vùng của <strong>{benchmark.legalRegionLabel}</strong> ({benchmark.legalFloorWage.toLocaleString('vi-VN')}đ/giờ theo {benchmark.legalReference}).
+              </span>
+            )}.
+          </div>
+          <button
+            type="button"
+            onClick={() => onSelectWage?.(benchmark.minWage)}
+            style={{
+              marginTop: '0.45rem',
+              padding: '0.25rem 0.65rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              borderRadius: '0.375rem',
+              border: `1px solid ${isBelowLegalFloor ? '#dc2626' : '#d97706'}`,
+              backgroundColor: '#ffffff',
+              color: isBelowLegalFloor ? '#dc2626' : '#d97706',
+              cursor: 'pointer',
+            }}
+          >
+            Áp dụng mức sàn CANi: {benchmark.minWage.toLocaleString('vi-VN')}đ/h
+          </button>
         </div>
       )}
 

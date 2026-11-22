@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
@@ -557,15 +558,13 @@ export default function EventDetailModal({
             >
               Chi Tiết Ca Làm Việc ({shifts.length})
             </button>
-            {!onOpenShiftWorkspace && (
-              <button
-                type="button"
-                className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
-                onClick={() => setActiveTab('QR_ATTENDANCE')}
-              >
-                Trạm Điểm Danh & Mã QR Ca
-              </button>
-            )}
+            <button
+              type="button"
+              className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
+              onClick={() => setActiveTab('QR_ATTENDANCE')}
+            >
+              Trạm Điểm Danh & Mã QR Ca
+            </button>
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'WORKERS' ? 'active' : ''}`}
@@ -1229,9 +1228,11 @@ export default function EventDetailModal({
     return contentBox;
   }
 
-  return (
-    <div className="event-detail-modal-overlay" onClick={onClose}>
+  const modalNode = (
+    <div className="event-detail-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       {contentBox}
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : null;
 }

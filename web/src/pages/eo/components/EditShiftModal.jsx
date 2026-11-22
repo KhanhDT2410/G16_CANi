@@ -10,6 +10,7 @@ import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
 import ShiftArrivalTimeField from './ShiftArrivalTimeField';
 import { validateShiftArrivalTime } from '../utils/eventHelpers';
+import { validateShiftWageAgainstFloor } from '../utils/shiftValidation';
 
 /**
  * EditShiftModal
@@ -138,9 +139,10 @@ const EditShiftModal = ({
   };
 
   const handlePackageWageChange = (val) => {
-    const pkg = Math.max(0, parseFloat(val) || 0);
+    let raw = typeof val === 'string' ? val.replace(/^0+(?=\d)/, '') : String(val ?? '');
+    const pkg = raw === '' ? '' : Math.max(0, parseFloat(raw) || 0);
     setShiftPackageWage(pkg);
-    const computedHourly = Math.max(0, Math.round(pkg / Math.max(0.5, durationHours)));
+    const computedHourly = Math.max(0, Math.round((Number(pkg) || 0) / Math.max(0.5, durationHours)));
     setFormData((prev) => ({
       ...prev,
       hourlyWage: computedHourly,
@@ -153,8 +155,14 @@ const EditShiftModal = ({
       showToast('Phụ cấp thêm không được là số âm!', 'error');
       return;
     }
-    if (Number(formData.hourlyWage) < 20000) {
-      showToast('Mức thù lao quy đổi tối thiểu là 20.000đ/giờ!', 'error');
+    const wageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: formData.hourlyWage,
+      venueAddress: shift?.locationAddress || '',
+      venueLat: shift?.locationLat,
+      venueLng: shift?.locationLng,
+    });
+    if (!wageCheck.isValid) {
+      showToast(wageCheck.error, 'error');
       return;
     }
     const sDate = new Date(formData.startTime);
@@ -338,8 +346,29 @@ const EditShiftModal = ({
                   min="1"
                   required
                   className="eo-form-input"
-                  value={formData.requiredWorkers}
-                  onChange={(e) => setFormData({ ...formData, requiredWorkers: e.target.value })}
+                  value={formData.requiredWorkers ?? ''}
+                  onFocus={(e) => e.target.select()}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === 'e') e.preventDefault();
+                  }}
+                  onChange={(e) => {
+                    let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                    if (e.target.value !== raw) e.target.value = raw;
+                    if (raw === '') {
+                      setFormData({ ...formData, requiredWorkers: '' });
+                      return;
+                    }
+                    const parsed = parseInt(raw, 10);
+                    setFormData({
+                      ...formData,
+                      requiredWorkers: isNaN(parsed) ? '' : Math.max(0, parsed),
+                    });
+                  }}
+                  onBlur={() => {
+                    if (!formData.requiredWorkers || Number(formData.requiredWorkers) < 1) {
+                      setFormData((prev) => ({ ...prev, requiredWorkers: 1 }));
+                    }
+                  }}
                 />
               </div>
 
@@ -352,11 +381,22 @@ const EditShiftModal = ({
                     min="20000"
                     required
                     className="eo-form-input"
-                    value={formData.hourlyWage}
+                    value={formData.hourlyWage ?? ''}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e') e.preventDefault();
+                    }}
                     onChange={(e) => {
-                      const val = Math.max(0, parseFloat(e.target.value) || 0);
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
                       setFormData({ ...formData, hourlyWage: val });
-                      setShiftPackageWage(Math.round(val * durationHours));
+                      setShiftPackageWage(Math.round((Number(val) || 0) * durationHours));
+                    }}
+                    onBlur={() => {
+                      if (formData.hourlyWage === '' || isNaN(formData.hourlyWage)) {
+                        setFormData((prev) => ({ ...prev, hourlyWage: 0 }));
+                      }
                     }}
                   />
                   <div style={{ fontSize: '0.72rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
@@ -372,8 +412,21 @@ const EditShiftModal = ({
                     min="20000"
                     required
                     className="eo-form-input"
-                    value={shiftPackageWage}
-                    onChange={(e) => handlePackageWageChange(e.target.value)}
+                    value={shiftPackageWage ?? ''}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e') e.preventDefault();
+                    }}
+                    onChange={(e) => {
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      handlePackageWageChange(raw);
+                    }}
+                    onBlur={() => {
+                      if (shiftPackageWage === '' || isNaN(shiftPackageWage)) {
+                        setShiftPackageWage(0);
+                      }
+                    }}
                   />
                   <div style={{ fontSize: '0.72rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
                     ~ {Number(formData.hourlyWage || 0).toLocaleString()}đ/giờ ({durationHours}h)
@@ -388,15 +441,23 @@ const EditShiftModal = ({
                   min="0"
                   step="5000"
                   className="eo-form-input"
-                  value={formData.allowance}
+                  value={formData.allowance ?? ''}
+                  onFocus={(e) => e.target.select()}
                   onKeyDown={(e) => {
                     if (e.key === '-' || e.key === 'e' || e.key === 'E') {
                       e.preventDefault();
                     }
                   }}
                   onChange={(e) => {
-                    const raw = parseFloat(e.target.value);
-                    setFormData({ ...formData, allowance: isNaN(raw) || raw < 0 ? 0 : raw });
+                    let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                    if (e.target.value !== raw) e.target.value = raw;
+                    const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
+                    setFormData({ ...formData, allowance: val });
+                  }}
+                  onBlur={() => {
+                    if (formData.allowance === '' || isNaN(formData.allowance)) {
+                      setFormData((prev) => ({ ...prev, allowance: 0 }));
+                    }
                   }}
                 />
               </div>
@@ -463,7 +524,7 @@ const EditShiftModal = ({
             </div>
 
             <div className="eo-form-group">
-              <label>Trang Phục Yêu Cầu (Dress Code)</label>
+              <label>Trang Phục Yêu Cầu</label>
               <input
                 type="text"
                 placeholder="Ví dụ: Áo sơ mi trắng, quần tây đen"

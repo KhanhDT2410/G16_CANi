@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -253,9 +254,16 @@ public class MatchingDispatchService {
      * Reverse-Matching: Khi Worker bật trạng thái Online (isOnline = true),
      * tự động quét các ca ACTIVE còn thiếu người và chưa hết hạn để gửi DispatchProposal phù hợp.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int dispatchActiveShiftsForWorker(Worker worker) {
-        if (worker == null || !Boolean.TRUE.equals(worker.getIsOnline())
+        if (worker == null) {
+            return 0;
+        }
+        // Tải lại thực thể Worker trong transaction mới để tránh LazyInitializationException hoặc rollback ngược transaction cha
+        if (worker.getWorkerId() != null) {
+            worker = workerRepository.findById(worker.getWorkerId()).orElse(worker);
+        }
+        if (!Boolean.TRUE.equals(worker.getIsOnline())
                 || worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED
                 || worker.getUser() == null || worker.getUser().getStatus() != UserStatus.ACTIVE) {
             return 0;

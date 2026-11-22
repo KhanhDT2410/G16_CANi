@@ -387,12 +387,18 @@ class EoEventServiceTest {
         assertTrue(EoEventService.isGibberishOrSpam("test test test"));
         assertTrue(EoEventService.isGibberishOrSpam("asdasdasd asdasd"));
         assertTrue(EoEventService.isGibberishOrSpam("qwertyuiop"));
+        assertTrue(EoEventService.isGibberishOrSpam("asdfasdfasdfasdfasdfasdfasdfasdf"));
 
         // Valid legitimate texts
         assertFalse(EoEventService.isGibberishOrSpam("Hung event"));
         assertFalse(EoEventService.isGibberishOrSpam("Vừa phải"));
         assertFalse(EoEventService.isGibberishOrSpam("Hội nghị Công nghệ FPT 2026"));
         assertFalse(EoEventService.isGibberishOrSpam("Gala Dinner tri ân khách hàng"));
+        assertFalse(EoEventService.isGibberishOrSpam("Workshop hướng dẫn kỹ năng"));
+        assertFalse(EoEventService.isGibberishOrSpam(
+                "CES 2027 là một trong những triển lãm công nghệ lớn nhất thế giới, được tổ chức tại Las Vegas, Hoa Kỳ. " +
+                "Sự kiện quy tụ hơn 148.000 người tham dự từ khắp thế giới, hơn 4.100 doanh nghiệp triển lãm và khoảng 1.200 startup công nghệ."
+        ));
     }
 
 

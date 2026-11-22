@@ -34,10 +34,26 @@ class JobRadarRepository {
         },
       );
       final data = response.data;
-      if (data != null && data['data'] != null) {
+      if (data != null && data['data'] is bool) {
         return data['data'] as bool;
       }
       return isOnline;
+    } on DioException catch (e) {
+      if (demoMode) {
+        return isOnline;
+      }
+      final serverMessage = e.response?.data is Map
+          ? (e.response?.data['message'] as String?)
+          : null;
+      if (serverMessage != null && serverMessage.trim().isNotEmpty) {
+        throw Exception(serverMessage.trim());
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        throw Exception('Không kết nối được tới máy chủ. Vui lòng kiểm tra mạng và Backend.');
+      }
+      throw Exception(e.message ?? 'Không thể cập nhật trạng thái nhận việc');
     } catch (e) {
       if (demoMode) {
         return isOnline;

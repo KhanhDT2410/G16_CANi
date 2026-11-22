@@ -239,9 +239,7 @@ public class EoEventService {
         if (allowance.compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("Phụ cấp thêm không được là số âm!");
         }
-        if (dto.getHourlyWage() == null || dto.getHourlyWage().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
-        }
+        validateShiftHourlyWage(event, dto.getHourlyWage());
         BigDecimal shiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(), workers, allowance);
 
         Shift shift = Shift.builder()
@@ -309,9 +307,7 @@ public class EoEventService {
         if (allowance.compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("Phụ cấp thêm không được là số âm!");
         }
-        if (dto.getHourlyWage() == null || dto.getHourlyWage().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
-        }
+        validateShiftHourlyWage(event, dto.getHourlyWage());
 
         List<ShiftResponseDto> results = new ArrayList<>();
         validateShiftJobType(dto.getJobType());
@@ -383,9 +379,7 @@ public class EoEventService {
         if (allowance.compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("Phụ cấp thêm không được là số âm!");
         }
-        if (dto.getHourlyWage() == null || dto.getHourlyWage().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
-        }
+        validateShiftHourlyWage(shift.getEvent(), dto.getHourlyWage());
         BigDecimal newShiftCost = calculateShiftTotalCost(dto.getStartTime(), dto.getEndTime(), dto.getHourlyWage(), workers, allowance);
 
         BigDecimal costDiff = newShiftCost.subtract(shift.getTotalCost() != null ? shift.getTotalCost() : BigDecimal.ZERO);
@@ -987,6 +981,15 @@ public class EoEventService {
         }
         if (!hasValidLetterToken) {
             throw new BadRequestException("Tên vị trí phải chứa từ khóa mô tả công việc hợp lệ (không thể chỉ nhập số).");
+        }
+    }
+
+    private void validateShiftHourlyWage(Event event, BigDecimal hourlyWage) {
+        if (hourlyWage == null || hourlyWage.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
+        }
+        if (hourlyWage.compareTo(new BigDecimal("20000")) < 0) {
+            throw new BadRequestException("Mức lương này đang thấp hơn định mức lương sàn tối thiểu của CANi (20,000 đ/h)!");
         }
     }
 

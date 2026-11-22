@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { calculateShiftRiskAnalysis } from '../hooks/useShifts';
-import { validateJobType } from '../utils/shiftValidation';
+import { validateJobType, validateShiftWageAgainstFloor } from '../utils/shiftValidation';
 import {
   toDateTimeLocalInput,
   validateShiftArrivalTime,
@@ -29,9 +29,14 @@ const ShiftCreateModal = ({
   shiftDurationHours = 4,
   calculateShiftTotal,
   skillTaxonomy = [],
+  venueAddress = '',
+  venueLat = null,
+  venueLng = null,
 }) => {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [jobTypeError, setJobTypeError] = useState(null);
+  const [wageError, setWageError] = useState(null);
+  const [wageBenchmark, setWageBenchmark] = useState(null);
   const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
   const [shiftPackageWage, setShiftPackageWage] = useState(
     Math.round(Number(newShift?.hourlyWage || 50000) * Math.max(0.5, Number(shiftDurationHours || 4)))
@@ -100,6 +105,19 @@ const ShiftCreateModal = ({
       showToast(err, 'error');
       return;
     }
+    const wageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: newShift.hourlyWage,
+      benchmark: wageBenchmark,
+      venueAddress,
+      venueLat,
+      venueLng,
+    });
+    if (!wageCheck.isValid) {
+      e.preventDefault();
+      setWageError(wageCheck.error);
+      showToast(wageCheck.error, 'error');
+      return;
+    }
     if (liveTimeError) {
       e.preventDefault();
       showToast(liveTimeError, 'error');
@@ -111,6 +129,7 @@ const ShiftCreateModal = ({
       return;
     }
     setJobTypeError(null);
+    setWageError(null);
     onSubmit?.(e);
   };
 
@@ -415,16 +434,27 @@ const ShiftCreateModal = ({
                     step="5000"
                     required
                     className="eo-form-input"
+                    style={{
+                      borderColor: wageError ? '#ef4444' : undefined,
+                      boxShadow: wageError ? '0 0 0 1px #ef4444' : undefined,
+                    }}
                     value={newShift.hourlyWage}
                     onChange={(e) => {
                       const val = Math.max(0, parseFloat(e.target.value) || 0);
                       setNewShift({ ...newShift, hourlyWage: val });
                       setShiftPackageWage(Math.round(val * safeHours));
+                      if (wageError) setWageError(null);
                     }}
                   />
-                  <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                    = {Math.round(Number(newShift.hourlyWage || 0) * safeHours).toLocaleString()}đ / ca ({safeHours}h)
-                  </div>
+                  {wageError ? (
+                    <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                      {wageError}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                      = {Math.round(Number(newShift.hourlyWage || 0) * safeHours).toLocaleString()}đ / ca ({safeHours}h)
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="eo-form-group" style={{ marginBottom: 0 }}>
@@ -435,12 +465,25 @@ const ShiftCreateModal = ({
                     step="10000"
                     required
                     className="eo-form-input"
+                    style={{
+                      borderColor: wageError ? '#ef4444' : undefined,
+                      boxShadow: wageError ? '0 0 0 1px #ef4444' : undefined,
+                    }}
                     value={shiftPackageWage}
-                    onChange={(e) => handlePackageWageChange(e.target.value)}
+                    onChange={(e) => {
+                      handlePackageWageChange(e.target.value);
+                      if (wageError) setWageError(null);
+                    }}
                   />
-                  <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                    Quy đổi: ~{Number(newShift.hourlyWage || 0).toLocaleString()}đ/giờ ({safeHours}h)
-                  </div>
+                  {wageError ? (
+                    <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                      {wageError}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                      Quy đổi: ~{Number(newShift.hourlyWage || 0).toLocaleString()}đ/giờ ({safeHours}h)
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -454,10 +497,15 @@ const ShiftCreateModal = ({
               hourlyWage={newShift.hourlyWage}
               startTime={newShift.startTime}
               endTime={newShift.endTime}
+              venueAddress={venueAddress}
+              venueLat={venueLat}
+              venueLng={venueLng}
               onSelectWage={(chosenWage) => {
                 setNewShift({ ...newShift, hourlyWage: chosenWage });
                 setShiftPackageWage(Math.round(chosenWage * safeHours));
+                if (wageError) setWageError(null);
               }}
+              onBenchmarkLoaded={setWageBenchmark}
             />
 
             <div

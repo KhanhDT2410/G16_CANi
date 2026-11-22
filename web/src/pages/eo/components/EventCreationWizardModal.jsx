@@ -13,6 +13,9 @@ import {
   isGibberishOrSpam,
   validateJobType,
   resolveWageRegionInfo,
+  validateShiftWageAgainstFloor,
+  detectCityFromAddress,
+  STATUTORY_HOURLY_FLOORS,
 } from '../utils/shiftValidation';
 import {
   toDateTimeLocalInput,
@@ -78,6 +81,7 @@ const EventCreationWizardModal = ({
   const [editingShiftIndex, setEditingShiftIndex] = useState(null);
   const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
   const [shiftPackageWage, setShiftPackageWage] = useState(200000);
+  const [currentShiftBenchmark, setCurrentShiftBenchmark] = useState(null);
 
   const toDateTimeInputVal = (date) => {
     if (!date) return '';
@@ -508,8 +512,17 @@ const EventCreationWizardModal = ({
       return;
     }
 
-    if (Number(currentShift.hourlyWage || 0) < 20000) {
-      showToast('Mức thù lao giờ tối thiểu trên hệ thống là 20.000 VNĐ/giờ!', 'error');
+    const wageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: currentShift.hourlyWage,
+      benchmark: currentShiftBenchmark,
+      city: regionInfo.city,
+      venueAddress: activeAddress,
+      venueLat: activeLat,
+      venueLng: activeLng,
+    });
+    if (!wageCheck.isValid) {
+      setShiftErrors((prev) => ({ ...prev, hourlyWage: wageCheck.error }));
+      showToast(wageCheck.error, 'error');
       return;
     }
 
@@ -683,6 +696,32 @@ const EventCreationWizardModal = ({
       showToast('Vui lòng thêm ít nhất một ca làm việc trước khi tiếp tục!', 'warning');
       return;
     }
+
+    const invalidShift = shiftsList.find((s) => {
+      const check = validateShiftWageAgainstFloor({
+        hourlyWage: s.hourlyWage,
+        city: regionInfo.city,
+        venueAddress: activeAddress,
+        venueLat: activeLat,
+        venueLng: activeLng,
+      });
+      return !check.isValid;
+    });
+    if (invalidShift) {
+      const check = validateShiftWageAgainstFloor({
+        hourlyWage: invalidShift.hourlyWage,
+        city: regionInfo.city,
+        venueAddress: activeAddress,
+        venueLat: activeLat,
+        venueLng: activeLng,
+      });
+      showToast(
+        `Ca "${invalidShift.jobType}": ${check.error} Vui lòng điều chỉnh trước khi tiếp tục.`,
+        'error'
+      );
+      return;
+    }
+
     setCurrentStep(3);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1542,6 +1581,10 @@ const EventCreationWizardModal = ({
                         step="5000"
                         required
                         className="eo-form-input"
+                        style={{
+                          borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
+                          boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
+                        }}
                         value={currentShift.hourlyWage}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
@@ -1550,11 +1593,20 @@ const EventCreationWizardModal = ({
                           const val = Math.max(0, parseFloat(e.target.value) || 0);
                           setCurrentShift({ ...currentShift, hourlyWage: val });
                           setShiftPackageWage(Math.round(val * currentDurationHours));
+                          if (shiftErrors.hourlyWage) {
+                            setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
                         }}
                       />
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                        = {Math.round(Number(currentShift.hourlyWage || 0) * currentDurationHours).toLocaleString('vi-VN')}đ / ca ({currentDurationHours} giờ)
-                      </div>
+                      {shiftErrors.hourlyWage ? (
+                        <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {shiftErrors.hourlyWage}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          = {Math.round(Number(currentShift.hourlyWage || 0) * currentDurationHours).toLocaleString('vi-VN')}đ / ca ({currentDurationHours} giờ)
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="eo-form-group" style={{ marginBottom: 0 }}>
@@ -1565,15 +1617,30 @@ const EventCreationWizardModal = ({
                         step="10000"
                         required
                         className="eo-form-input"
+                        style={{
+                          borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
+                          boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
+                        }}
                         value={shiftPackageWage}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
                         }}
-                        onChange={(e) => handlePackageWageChange(e.target.value)}
+                        onChange={(e) => {
+                          handlePackageWageChange(e.target.value);
+                          if (shiftErrors.hourlyWage) {
+                            setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
+                        }}
                       />
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                        Quy đổi tương đương: ~{Number(currentShift.hourlyWage || 0).toLocaleString('vi-VN')}đ/giờ ({currentDurationHours} giờ/ca)
-                      </div>
+                      {shiftErrors.hourlyWage ? (
+                        <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {shiftErrors.hourlyWage}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          Quy đổi tương đương: ~{Number(currentShift.hourlyWage || 0).toLocaleString('vi-VN')}đ/giờ ({currentDurationHours} giờ/ca)
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1592,7 +1659,11 @@ const EventCreationWizardModal = ({
                 onSelectWage={(chosenWage) => {
                   setCurrentShift((prev) => ({ ...prev, hourlyWage: chosenWage }));
                   setShiftPackageWage(Math.round(chosenWage * currentDurationHours));
+                  if (shiftErrors.hourlyWage) {
+                    setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                  }
                 }}
+                onBenchmarkLoaded={(bm) => setCurrentShiftBenchmark(bm)}
               />
 
               <div className="eo-form-row">

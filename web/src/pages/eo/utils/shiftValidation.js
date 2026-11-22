@@ -393,3 +393,66 @@ export function buildEvidenceWageBenchmark({
     explanation: '',
   };
 }
+
+/**
+ * Kiểm tra mức thù lao ca làm việc đối chiếu với Biểu lương sàn của Admin và Sàn pháp lý.
+ * @param {Object} params
+ * @param {number|string} params.hourlyWage Mức thù lao mỗi giờ
+ * @param {Object} [params.benchmark] Kết quả tra cứu khung thù lao từ API/Client
+ * @param {string} [params.city] Mã thành phố (HANOI, TP_HCM, DANANG)
+ * @param {string} [params.venueAddress] Địa chỉ tổ chức sự kiện
+ * @param {number} [params.venueLat] Vĩ độ
+ * @param {number} [params.venueLng] Kinh độ
+ * @returns {{ isValid: boolean, error: string|null, floorWage: number }}
+ */
+export function validateShiftWageAgainstFloor({
+  hourlyWage,
+  benchmark = null,
+  city = null,
+  venueAddress = '',
+  venueLat = null,
+  venueLng = null,
+} = {}) {
+  const resolvedCity = city || detectCityFromAddress(venueAddress, venueLat, venueLng);
+  const statutoryFloor = STATUTORY_HOURLY_FLOORS[resolvedCity] || STATUTORY_HOURLY_FLOORS.TP_HCM;
+  const numWage = Math.round(Number(hourlyWage || 0));
+
+  const minFloor = Number(benchmark?.minWage || statutoryFloor.wage);
+  const legalFloor = Number(benchmark?.legalFloorWage || statutoryFloor.wage);
+  const regionLabel = benchmark?.legalRegionLabel || statutoryFloor.regionLabel;
+  const legalReference = benchmark?.legalReference || statutoryFloor.decree;
+
+  if (numWage <= 0) {
+    return {
+      isValid: false,
+      error: 'Vui lòng nhập mức thù lao mỗi giờ cho ca làm việc.',
+      floorWage: minFloor,
+    };
+  }
+
+  // Vi phạm mức sàn tối thiểu của luật lao động
+  if (numWage < legalFloor) {
+    return {
+      isValid: false,
+      error: `Mức lương này đang thấp hơn định mức lương sàn tối thiểu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h) và dưới sàn pháp lý ${regionLabel} (${legalFloor.toLocaleString('vi-VN')}đ/h theo ${legalReference}).`,
+      floorWage: minFloor,
+      isBelowLegal: true,
+    };
+  }
+
+  // Vi phạm Biểu ma trận thù lao tối thiểu của Admin
+  if (numWage < minFloor) {
+    return {
+      isValid: false,
+      error: `Mức lương này đang thấp hơn định mức lương sàn tối thiểu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h).`,
+      floorWage: minFloor,
+      isBelowAdmin: true,
+    };
+  }
+
+  return {
+    isValid: true,
+    error: null,
+    floorWage: minFloor,
+  };
+}

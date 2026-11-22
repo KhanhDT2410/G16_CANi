@@ -10,6 +10,7 @@ import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
 import ShiftArrivalTimeField from './ShiftArrivalTimeField';
 import { validateShiftArrivalTime } from '../utils/eventHelpers';
+import { validateShiftWageAgainstFloor } from '../utils/shiftValidation';
 
 /**
  * EditShiftModal
@@ -153,8 +154,14 @@ const EditShiftModal = ({
       showToast('Phụ cấp thêm không được là số âm!', 'error');
       return;
     }
-    if (Number(formData.hourlyWage) < 20000) {
-      showToast('Mức thù lao quy đổi tối thiểu là 20.000đ/giờ!', 'error');
+    const wageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: formData.hourlyWage,
+      venueAddress: shift?.locationAddress || '',
+      venueLat: shift?.locationLat,
+      venueLng: shift?.locationLng,
+    });
+    if (!wageCheck.isValid) {
+      showToast(wageCheck.error, 'error');
       return;
     }
     const sDate = new Date(formData.startTime);

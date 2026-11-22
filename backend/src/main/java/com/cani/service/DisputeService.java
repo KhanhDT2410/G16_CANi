@@ -439,6 +439,9 @@ public class DisputeService {
         }
         dispute = disputeRepository.save(dispute);
 
+        // SRS FE-09 ↔ FE-11 (UC-87 / UC-100 / UC-102): Đồng bộ kết quả phân xử về bản ghi Payment
+        syncPaymentAfterDisputeDecision(dispute.getAssignmentId(), request.getOutcome());
+
         notifyDisputeParties(dispute, null, "Tranh chấp " + newStatus.name() + " được quyết định",
                 "Quản trị/CSCĐ đã quyết định tranh chấp " + dispute.getDisputeId()
                         + " với kết quả: " + request.getOutcome().name()
@@ -519,6 +522,26 @@ public class DisputeService {
                 log.info("Payment {} chuyển từ {} sang DISPUTED (assignment {})",
                         payment.getPaymentId(), oldStatus, assignmentId);
             }
+        });
+    }
+
+    /**
+     * SRS FE-09 ↔ FE-11 (UC-87 / UC-100 / UC-102): Cập nhật trạng thái thanh toán sau phán quyết của CSKH/Admin
+     */
+    private void syncPaymentAfterDisputeDecision(UUID assignmentId, DisputeOutcome outcome) {
+        if (assignmentId == null || paymentRepository == null) return;
+        paymentRepository.findByAssignmentId(assignmentId).ifPresent(payment -> {
+            PaymentStatus oldStatus = payment.getStatus();
+            if (outcome == DisputeOutcome.WORKER_FAULT) {
+                payment.setStatus(PaymentStatus.CONFIRMED_FULL);
+            } else if (outcome == DisputeOutcome.PARTIAL) {
+                payment.setStatus(PaymentStatus.CONFIRMED_PARTIAL);
+            } else if (outcome == DisputeOutcome.EO_FAULT) {
+                payment.setStatus(PaymentStatus.DISPUTED);
+            }
+            paymentRepository.save(payment);
+            log.info("Payment {} đồng bộ phán quyết Dispute: {} -> {} (assignment {})",
+                    payment.getPaymentId(), oldStatus, payment.getStatus(), assignmentId);
         });
     }
 

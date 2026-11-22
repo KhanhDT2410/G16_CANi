@@ -695,6 +695,7 @@ export default function EOPage() {
                 }}
                 onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
                 onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
+                onNavigateToDisputes={() => handleNavClick('disputes')}
               />
             </Suspense>
           )}

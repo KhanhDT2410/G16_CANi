@@ -131,6 +131,7 @@ export const DisputeConversationWorkspace = ({
             dispute={dispute}
             onSendMessage={onSendMessage}
             isSending={isSending}
+            isArbitrator={isArbitrator}
           />
         </div>
 

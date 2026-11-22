@@ -6,7 +6,7 @@ import { DISPUTE_EVIDENCE_LABELS } from '../types/dispute.constants';
  * Hỗ trợ gửi tin nhắn, hình ảnh và tệp đính kèm.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
-export const DisputeChatThread = ({ dispute, onSendMessage, isSending }) => {
+export const DisputeChatThread = ({ dispute, onSendMessage, isSending, isArbitrator = false }) => {
   const [message, setMessage] = useState('');
   const [attachmentMode, setAttachmentMode] = useState('NONE'); // 'NONE' | 'IMAGE' | 'DOCUMENT'
   const [attachmentUrl, setAttachmentUrl] = useState('');
@@ -19,12 +19,23 @@ export const DisputeChatThread = ({ dispute, onSendMessage, isSending }) => {
     const trimmedMsg = message.trim();
     if (!trimmedMsg && !attachmentUrl.trim()) return;
 
-    const fileType = attachmentMode === 'IMAGE' ? 'IMAGE' : attachmentMode === 'DOCUMENT' ? 'DOCUMENT' : 'DOCUMENT';
-    const payload = {
-      fileType,
-      fileUrl: attachmentUrl.trim() || 'https://cani.vn/evidence/note',
-      label: trimmedMsg || attachmentName || 'Bằng chứng bổ sung',
-    };
+    let payload;
+    if (isArbitrator) {
+      payload = {
+        fileType: 'DOCUMENT',
+        fileUrl: 'https://cani.vn/evidence/arbitrator-instruction',
+        label: trimmedMsg.startsWith('[Chỉ đạo Trọng tài]')
+          ? trimmedMsg
+          : `[Chỉ đạo Trọng tài] ${trimmedMsg}`,
+      };
+    } else {
+      const fileType = attachmentMode === 'IMAGE' ? 'IMAGE' : 'DOCUMENT';
+      payload = {
+        fileType,
+        fileUrl: attachmentUrl.trim() || 'https://cani.vn/evidence/note',
+        label: trimmedMsg || attachmentName || 'Bằng chứng bổ sung',
+      };
+    }
 
     await onSendMessage(dispute.id, payload);
     setMessage('');
@@ -33,7 +44,10 @@ export const DisputeChatThread = ({ dispute, onSendMessage, isSending }) => {
     setAttachmentMode('NONE');
   };
 
-  const getPartyBadge = (partyId) => {
+  const getPartyBadge = (partyId, label = '') => {
+    if (label && label.startsWith('[Chỉ đạo Trọng tài]')) {
+      return { text: 'Trọng tài CSKH / Admin', cls: 'party-arbitrator' };
+    }
     if (!partyId) return { text: 'Người tham gia', cls: 'party-neutral' };
     if (partyId === dispute.complainantId) return { text: 'Bên khiếu nại', cls: 'party-complainant' };
     if (partyId === dispute.respondentId) return { text: 'Bên bị đơn', cls: 'party-respondent' };
@@ -66,7 +80,7 @@ export const DisputeChatThread = ({ dispute, onSendMessage, isSending }) => {
 
         {/* 2. Các lượt trao đổi & nộp bằng chứng của các bên */}
         {dispute.evidences?.map((ev) => {
-          const party = getPartyBadge(ev.party);
+          const party = getPartyBadge(ev.party, ev.label);
           const isImage = ev.fileType === 'IMAGE' || (ev.fileUrl && ev.fileUrl.match(/\.(jpg|jpeg|png|webp|gif)/i));
 
           return (
@@ -128,7 +142,7 @@ export const DisputeChatThread = ({ dispute, onSendMessage, isSending }) => {
 
       {/* Khung nhập tin nhắn trao đổi & đính kèm ảnh/tệp */}
       <form onSubmit={handleSend} className="dispute-chat-input-bar">
-        {attachmentMode === 'IMAGE' && (
+        {!isArbitrator && attachmentMode === 'IMAGE' && (
           <div className="chat-attachment-field">
             <span>Nhập đường dẫn ảnh:</span>
             <input type="url" placeholder="https://.../anh-chup-bien-ban.png" value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} required />
@@ -136,7 +150,7 @@ export const DisputeChatThread = ({ dispute, onSendMessage, isSending }) => {
           </div>
         )}
 
-        {attachmentMode === 'DOCUMENT' && (
+        {!isArbitrator && attachmentMode === 'DOCUMENT' && (
           <div className="chat-attachment-field">
             <span>Nhập đường dẫn tệp tài liệu:</span>
             <input type="url" placeholder="https://.../bien-ban-su-co.pdf" value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} required />
@@ -148,22 +162,32 @@ export const DisputeChatThread = ({ dispute, onSendMessage, isSending }) => {
           <textarea
             className="chat-textarea"
             rows={2}
-            placeholder="Nhập nội dung trao đổi, giải trình hoặc yêu cầu bổ sung chứng cứ giữa các bên..."
+            placeholder={
+              isArbitrator
+                ? "Nhập nội dung chỉ đạo, nhắc nhở hoặc yêu cầu các bên giải trình / bổ sung chứng cứ..."
+                : "Nhập nội dung trao đổi, giải trình hoặc yêu cầu bổ sung chứng cứ giữa các bên..."
+            }
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             disabled={isSending}
           />
           <div className="chat-input-actions">
-            <div className="chat-attach-buttons">
-              <button type="button" className={`btn-attach ${attachmentMode === 'IMAGE' ? 'active' : ''}`} onClick={() => setAttachmentMode(attachmentMode === 'IMAGE' ? 'NONE' : 'IMAGE')} title="Đính kèm hình ảnh bằng chứng">
-                Ảnh
-              </button>
-              <button type="button" className={`btn-attach ${attachmentMode === 'DOCUMENT' ? 'active' : ''}`} onClick={() => setAttachmentMode(attachmentMode === 'DOCUMENT' ? 'NONE' : 'DOCUMENT')} title="Đính kèm tệp văn bản hoặc PDF">
-                Tệp tin
-              </button>
-            </div>
-            <button type="submit" className="btn-send-message" disabled={isSending || (!message.trim() && !attachmentUrl.trim())}>
-              {isSending ? 'Đang gửi...' : 'Gửi phản hồi'}
+            {!isArbitrator && (
+              <div className="chat-attach-buttons">
+                <button type="button" className={`btn-attach ${attachmentMode === 'IMAGE' ? 'active' : ''}`} onClick={() => setAttachmentMode(attachmentMode === 'IMAGE' ? 'NONE' : 'IMAGE')} title="Đính kèm hình ảnh bằng chứng">
+                  Ảnh
+                </button>
+                <button type="button" className={`btn-attach ${attachmentMode === 'DOCUMENT' ? 'active' : ''}`} onClick={() => setAttachmentMode(attachmentMode === 'DOCUMENT' ? 'NONE' : 'DOCUMENT')} title="Đính kèm tệp văn bản hoặc PDF">
+                  Tệp tin
+                </button>
+              </div>
+            )}
+            <button
+              type="submit"
+              className="btn-send-message"
+              disabled={isSending || (!message.trim() && (isArbitrator || !attachmentUrl.trim()))}
+            >
+              {isSending ? 'Đang gửi...' : (isArbitrator ? 'Gửi chỉ đạo' : 'Gửi phản hồi')}
             </button>
           </div>
         </div>

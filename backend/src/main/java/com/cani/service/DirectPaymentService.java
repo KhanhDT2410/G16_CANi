@@ -7,6 +7,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.PaymentStatus;
 import com.cani.exception.AppException;
+import com.cani.repository.DisputeRepository;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.util.VietQrUtil;
@@ -51,6 +52,9 @@ public class DirectPaymentService {
     @org.springframework.context.annotation.Lazy
     @Autowired(required = false)
     private DisputeService disputeService;
+
+    @Autowired(required = false)
+    private DisputeRepository disputeRepository;
 
     /**
      * Khởi tạo bản ghi Payment khi Worker được gán vào ca làm việc
@@ -355,6 +359,26 @@ public class DirectPaymentService {
         BigDecimal amount = p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount();
         String workerVietQrUrl = VietQrUtil.buildVietQrUrl(bankCode, bankAccountNumber, bankAccountName, amount);
 
+        UUID disputeId = null;
+        String disputeStatus = null;
+        String disputeOutcome = null;
+        String disputeRationale = null;
+        String disputeResolution = null;
+        Instant disputeResolvedAt = null;
+
+        if (disputeRepository != null && p.getAssignmentId() != null) {
+            List<Dispute> disputes = disputeRepository.findByAssignmentIdOrderByCreatedAtDesc(p.getAssignmentId());
+            if (disputes != null && !disputes.isEmpty()) {
+                Dispute d = disputes.get(0);
+                disputeId = d.getDisputeId();
+                disputeStatus = d.getStatus() != null ? d.getStatus().name() : null;
+                disputeOutcome = d.getOutcome() != null ? d.getOutcome().name() : null;
+                disputeRationale = d.getFinalDecisionRationale() != null ? d.getFinalDecisionRationale() : d.getDecisionRationale();
+                disputeResolution = d.getResolution();
+                disputeResolvedAt = d.getFinalDecidedAt() != null ? d.getFinalDecidedAt() : d.getResolvedAt();
+            }
+        }
+
         return PaymentResponseDto.builder()
                 .paymentId(p.getPaymentId())
                 .eventId(p.getEventId())
@@ -379,6 +403,12 @@ public class DirectPaymentService {
                 .bankAccountNumber(bankAccountNumber)
                 .bankAccountName(bankAccountName)
                 .workerVietQrUrl(workerVietQrUrl)
+                .disputeId(disputeId)
+                .disputeStatus(disputeStatus)
+                .disputeOutcome(disputeOutcome)
+                .disputeRationale(disputeRationale)
+                .disputeResolution(disputeResolution)
+                .disputeResolvedAt(disputeResolvedAt)
                 .build();
     }
 }

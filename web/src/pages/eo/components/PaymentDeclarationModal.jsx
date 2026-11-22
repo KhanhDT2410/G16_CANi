@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * PaymentDeclarationModal
@@ -15,6 +16,20 @@ const PaymentDeclarationModal = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !selectedAssignment) return null;
 
   const bankCode = selectedAssignment.bankCode;
@@ -29,9 +44,35 @@ const PaymentDeclarationModal = ({
       ? `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${amount}&accountName=${encodeURIComponent(accountName)}`
       : (selectedAssignment.vietQrUrl || null));
 
-  return (
-    <div className="eo-modal-overlay">
-      <div className="eo-modal-box" style={{ maxWidth: '540px' }}>
+  return createPortal(
+    <div
+      className="eo-modal-overlay"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '1rem',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        className="eo-modal-box animate-scale-up"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '540px',
+          margin: 'auto',
+          position: 'relative',
+        }}
+      >
         <h3>Khai Báo Đã Trả Lương Trực Tiếp</h3>
         <p style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1.25rem' }}>
           Sau khi chuyển khoản hoặc chi trả thù lao cho nhân sự, vui lòng khai báo để hệ thống ghi nhận đối soát và gửi thông báo xác nhận đến nhân sự.
@@ -255,7 +296,8 @@ const PaymentDeclarationModal = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

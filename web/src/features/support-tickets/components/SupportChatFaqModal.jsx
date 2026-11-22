@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { faqApi } from '../../faqs/api/faqApi';
 import { FAQ_CATEGORY, FAQ_CATEGORY_CONFIG } from '../../faqs/types/faq.constants';
 import './SupportChatFaqModal.css';
@@ -9,29 +10,34 @@ const DEFAULT_FALLBACK_FAQS = [
     category: 'ACCOUNT',
     question: 'Quy trình xác thực định danh (eKYC) trên ứng dụng CANi diễn ra như thế nào?',
     answer: 'Người lao động cần chụp rõ nét hai mặt Căn cước công dân (CCCD) gắn chip và một ảnh chân dung selfie khớp khuôn mặt. Hệ thống VNPT eKYC tích hợp của CANi sẽ tự động trích xuất thông tin OCR và đối soát sinh trắc học để kích hoạt tài khoản trong vòng 1-3 phút.',
+    summary: 'Hướng dẫn chụp ảnh CCCD gắn chip và quét khuôn mặt eKYC.',
   },
   {
     id: 'fb-2',
     category: 'SHIFT',
     question: 'Quy trình quét mã QR Check-in và Check-out tại sự kiện được thực hiện ra sao?',
     answer: 'Trước giờ bắt đầu ca làm 15-30 phút, người lao động có mặt tại địa điểm tổ chức, mở ứng dụng CANi và quét mã QR do Quản lý sự kiện hiển thị. Khi kết thúc ca, người lao động quét mã QR Check-out lần 2 để chốt giờ làm thực tế.',
+    summary: 'Cách quét mã QR điểm danh đầu ca và chốt ca làm việc thực tế.',
   },
   {
     id: 'fb-3',
     category: 'PAYMENT',
     question: 'Phương thức thanh toán thù lao trực tiếp (Non-Escrow) trên CANi vận hành như thế nào?',
     answer: 'Sau khi ca làm việc kết thúc và hoàn tất Check-out, Nhà tổ chức sự kiện (EO) có thời hạn 48 giờ để thực hiện chuyển khoản thù lao trực tiếp vào số tài khoản ngân hàng của người lao động và đính kèm ủy nhiệm chi.',
+    summary: 'Quy định đối soát và chuyển khoản thù lao trong vòng 48 giờ.',
   },
   {
     id: 'fb-4',
     category: 'DISPUTE',
     question: 'Cần chuẩn bị những bằng chứng nào khi tạo khiếu nại tranh chấp thù lao hoặc giờ làm việc?',
     answer: 'Bạn cần cung cấp: 1) Ảnh chụp màn hình tin nhắn hoặc thỏa thuận với Quản lý sự kiện; 2) Biên bản xác nhận giờ làm thực tế tại sự kiện (nếu có); 3) Sao kê tài khoản ngân hàng thể hiện chưa nhận được tiền trong vòng 48 giờ.',
+    summary: 'Hồ sơ minh chứng cần thiết khi kích hoạt giải quyết tranh chấp.',
   },
 ];
 
 /**
  * Bảng chọn câu hỏi thường gặp FAQ tích hợp trong khung Chat hỗ trợ.
+ * Luôn ghim cổng createPortal vào document.body để tránh lỗi layout flex / transform.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const SupportChatFaqModal = ({ isOpen, onClose, onSelectFaq }) => {
@@ -74,9 +80,9 @@ export const SupportChatFaqModal = ({ isOpen, onClose, onSelectFaq }) => {
     });
   }, [faqs, activeCategory, searchTerm]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
+  const modalContent = (
     <div className="support-faq-modal-overlay" onClick={onClose}>
       <div className="support-faq-modal-panel animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="support-faq-modal-header">
@@ -95,6 +101,7 @@ export const SupportChatFaqModal = ({ isOpen, onClose, onSelectFaq }) => {
             placeholder="Tìm nhanh câu hỏi trợ giúp..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            autoFocus
           />
         </div>
 
@@ -133,7 +140,11 @@ export const SupportChatFaqModal = ({ isOpen, onClose, onSelectFaq }) => {
                 tabIndex={0}
               >
                 <div className="support-faq-item-q">{item.question || item.q}</div>
-                {item.summary && <div className="support-faq-item-summary">{item.summary}</div>}
+                {(item.summary || item.answer || item.a) && (
+                  <div className="support-faq-item-summary">
+                    {item.summary || (item.answer || item.a).slice(0, 110) + '...'}
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -141,6 +152,8 @@ export const SupportChatFaqModal = ({ isOpen, onClose, onSelectFaq }) => {
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default SupportChatFaqModal;

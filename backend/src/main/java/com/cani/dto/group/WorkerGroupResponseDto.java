@@ -27,5 +27,6 @@ public class WorkerGroupResponseDto {
     private BigDecimal avgRating;
     private Integer reliabilityScore;
     private Boolean isActive;
+    private String inviteCode;
     private Instant createdAt;
 }

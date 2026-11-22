@@ -68,6 +68,9 @@ public class WorkerGroup {
     @Column(name = "last_no_show_at")
     private Instant lastNoShowAt;
 
+    @Column(name = "invite_code", length = 12, unique = true)
+    private String inviteCode;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

@@ -48,6 +48,21 @@ public class WorkerGroupController {
     }
 
     /**
+     * Gia nhập nhóm bằng mã mời (Invite Code)
+     */
+    @Operation(summary = "Gia nhập nhóm bằng mã", description = "Worker nhập mã mời duy nhất của nhóm để tự động gia nhập.")
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/join-by-code")
+    public ResponseEntity<ApiResponse<WorkerGroupResponseDto>> joinByCode(
+            @Valid @RequestBody JoinGroupByCodeRequestDto request,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        WorkerGroupResponseDto group = workerGroupService.joinByCode(userId, request);
+        return ResponseEntity.ok(ApiResponse.ok(group, "Gia nhập đội nhóm thành công!"));
+    }
+
+    /**
      * Xem danh sách nhóm thợ mà Worker hiện tại đang tham gia
      */
     @Operation(summary = "Nhóm thợ của tôi", description = "Lấy danh sách các nhóm thợ mà Worker đang là thành viên hoặc trưởng nhóm.")
@@ -222,18 +237,19 @@ public class WorkerGroupController {
     /**
      * Task 3: Leader chấp nhận đề xuất ca cho nhóm (toàn bộ hoặc không, giữ slot atomic)
      */
-    @Operation(summary = "Chấp nhận đề xuất ca cho nhóm", description = "Trưởng nhóm chọn thành viên nhận ca; k×(gán ca + thanh toán + counter + FCM), rollback toàn bộ nếu thất bại.")
+    @Operation(summary = "Chấp nhận đề xuất ca cho nhóm", description = "Trưởng nhóm nhận ca trọn đội (Squad Pack); k×(gán ca + thanh toán + counter + FCM), rollback toàn bộ nếu thất bại.")
     @PreAuthorize("hasAnyRole('WORKER','ADMIN')")
     @PostMapping("/{id}/group-proposals/{proposalId}/accept")
     public ResponseEntity<ApiResponse<AcceptGroupProposalResponseDto>> acceptGroupProposal(
             @PathVariable UUID id,
             @PathVariable UUID proposalId,
-            @Valid @RequestBody GroupProposalAcceptRequestDto request,
+            @Valid @RequestBody(required = false) GroupProposalAcceptRequestDto request,
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<UUID> memberWorkerIds = request != null ? request.getMemberWorkerIds() : null;
         AcceptGroupProposalResponseDto dto = workerGroupService.acceptGroupProposal(
-                userId, id, proposalId, request.getMemberWorkerIds());
+                userId, id, proposalId, memberWorkerIds);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Đội của bạn đã nhận ca làm việc thành công!"));
     }
 

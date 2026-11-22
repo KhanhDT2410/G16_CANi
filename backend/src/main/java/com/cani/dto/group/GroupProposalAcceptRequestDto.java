@@ -1,6 +1,5 @@
 package com.cani.dto.group;
 
-import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,6 +14,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class GroupProposalAcceptRequestDto {
 
-    @NotEmpty(message = "Vui lòng chọn ít nhất một thành viên trong nhóm")
+    /**
+     * Danh sách workerId thành viên được chọn.
+     * Để trống hoặc null: Chấp nhận ca TRỌN GÓI cho toàn bộ thành viên ACTIVE của đội (Squad Pack).
+     */
     private List<UUID> memberWorkerIds;
 }

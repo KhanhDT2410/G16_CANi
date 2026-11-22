@@ -19,6 +19,10 @@ public interface WorkerGroupRepository extends JpaRepository<WorkerGroup, UUID> 
 
     boolean existsByNameIgnoreCase(String name);
 
+    Optional<WorkerGroup> findByInviteCodeIgnoreCase(String inviteCode);
+
+    boolean existsByInviteCode(String inviteCode);
+
     @Query("SELECT wg FROM WorkerGroup wg WHERE " +
            "(:search IS NULL OR LOWER(wg.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            " LOWER(wg.skillFocus) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +

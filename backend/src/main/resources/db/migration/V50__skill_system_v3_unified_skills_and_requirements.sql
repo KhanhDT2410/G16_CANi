@@ -119,17 +119,20 @@ ALTER TABLE shift_assignments
 
 UPDATE shift_assignments sa
 SET sp_experience_awarded = TRUE,
-    sp_experience_awarded_at = COALESCE(sa.eo_confirmed_at, sa.checkout_time, sa.created_at),
+    sp_experience_awarded_at = COALESCE(sa.eo_confirmed_at, sa.created_at),
     confirmed_performed_skill_id = COALESCE(sa.confirmed_performed_skill_id, s.performed_skill_id)
 FROM shifts s
 WHERE sa.shift_id = s.id
   AND sa.status = 'COMPLETED'
   AND sa.sp_experience_awarded = FALSE;
 
-UPDATE shift_assignments
+UPDATE shift_assignments sa
 SET sp_rating_awarded = TRUE
-WHERE eo_rating IS NOT NULL
-  AND sp_rating_awarded = FALSE;
+WHERE EXISTS (
+    SELECT 1 FROM reviews r
+    WHERE r.assignment_id = sa.id
+)
+  AND sa.sp_rating_awarded = FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_shift_assignments_sp_awarded
     ON shift_assignments (shift_id, sp_experience_awarded);

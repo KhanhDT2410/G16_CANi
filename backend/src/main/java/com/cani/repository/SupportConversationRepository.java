@@ -10,7 +10,8 @@ import java.util.UUID;
 
 @Repository
 public interface SupportConversationRepository extends JpaRepository<SupportConversation, UUID> {
-    Optional<SupportConversation> findByUserId(UUID userId);
+    Optional<SupportConversation> findFirstByUserIdAndDisputeIdIsNullOrderByCreatedAtAsc(UUID userId);
+    List<SupportConversation> findByDisputeIdIsNullOrderByCreatedAtAsc();
     List<SupportConversation> findAllByOrderByLastMessageAtDesc();
     List<SupportConversation> findByDisputeId(UUID disputeId);
     Optional<SupportConversation> findByDisputeIdAndDisputeParty(UUID disputeId, String disputeParty);

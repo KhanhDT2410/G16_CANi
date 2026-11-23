@@ -104,7 +104,10 @@ public class SupportChatController {
 
     private UUID currentUserId(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof User u)) {
-            return null;
+            throw new com.cani.exception.AppException(
+                    "Phiên đăng nhập không hợp lệ hoặc đã hết hạn",
+                    org.springframework.http.HttpStatus.UNAUTHORIZED
+            );
         }
         return u.getUserId();
     }

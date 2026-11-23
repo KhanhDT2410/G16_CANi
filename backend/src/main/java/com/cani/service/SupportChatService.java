@@ -56,7 +56,8 @@ public class SupportChatService {
                 User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "id", userId));
 
-                SupportConversation conv = conversationRepository.findByUserId(userId)
+                SupportConversation conv = conversationRepository
+                                .findFirstByUserIdAndDisputeIdIsNullOrderByCreatedAtAsc(userId)
                                 .orElseGet(() -> conversationRepository.save(
                                                 SupportConversation.builder()
                                                                 .userId(userId)
@@ -109,7 +110,8 @@ public class SupportChatService {
                 User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "id", userId));
 
-                SupportConversation conv = conversationRepository.findByUserId(userId)
+                SupportConversation conv = conversationRepository
+                                .findFirstByUserIdAndDisputeIdIsNullOrderByCreatedAtAsc(userId)
                                 .orElseGet(() -> conversationRepository.save(
                                                 SupportConversation.builder()
                                                                 .userId(userId)
@@ -146,9 +148,10 @@ public class SupportChatService {
         public List<SupportConversationSummaryDto> getStaffConversations(String query) {
                 List<User> targetUsers = userRepository
                                 .findByRoleIn(List.of(UserRole.EVENT_ORGANIZER, UserRole.WORKER));
-                List<SupportConversation> allConvs = conversationRepository.findAll();
+                List<SupportConversation> allConvs = conversationRepository.findByDisputeIdIsNullOrderByCreatedAtAsc();
 
                 Map<UUID, SupportConversation> convMap = allConvs.stream()
+                                .filter(c -> c.getDisputeId() == null)
                                 .collect(Collectors.toMap(SupportConversation::getUserId, c -> c, (a, b) -> a));
 
                 String q = query != null ? query.trim().toLowerCase() : "";
@@ -250,7 +253,8 @@ public class SupportChatService {
                 User user = userRepository.findById(targetUserId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Người dùng", "id", targetUserId));
 
-                SupportConversation conv = conversationRepository.findByUserId(targetUserId)
+                SupportConversation conv = conversationRepository
+                                .findFirstByUserIdAndDisputeIdIsNullOrderByCreatedAtAsc(targetUserId)
                                 .orElseGet(() -> conversationRepository.save(
                                                 SupportConversation.builder()
                                                                 .userId(targetUserId)

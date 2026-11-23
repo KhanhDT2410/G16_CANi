@@ -34,7 +34,10 @@ class _CustomerCareChatScreenState
   void initState() {
     super.initState();
     _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (mounted) ref.invalidate(supportChatMessagesProvider);
+      if (!mounted) return;
+      final state = ref.read(supportChatMessagesProvider);
+      if (state.isLoading || state.hasError) return;
+      ref.invalidate(supportChatMessagesProvider);
     });
   }
 
@@ -190,15 +193,66 @@ class _CustomerCareChatScreenState
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text(
-                    'Lỗi tải tin nhắn: $err',
-                    style: const TextStyle(color: Color(0xFFB91C1C)),
+              error: (err, _) {
+                final friendlyMessage = err
+                    .toString()
+                    .replaceFirst(RegExp(r'^Exception:\s*'), '')
+                    .trim();
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          size: 44,
+                          color: Color(0xFFDC2626),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Không thể tải lịch sử trò chuyện',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          friendlyMessage.isNotEmpty
+                              ? friendlyMessage
+                              : 'Đã xảy ra lỗi khi kết nối với CSKH.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              ref.invalidate(supportChatMessagesProvider),
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Thử lại'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
           SupportChatInputBar(

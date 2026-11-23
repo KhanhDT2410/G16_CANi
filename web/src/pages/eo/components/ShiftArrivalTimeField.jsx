@@ -91,11 +91,11 @@ export default function ShiftArrivalTimeField({
 
       <input
         type="datetime-local"
-        className="eo-form-input"
+        className={`eo-form-input ${error ? 'has-error' : ''}`}
         max={startTime || undefined}
         style={{
           borderColor: error ? '#ef4444' : undefined,
-          boxShadow: error ? '0 0 0 1px #ef4444' : undefined,
+          boxShadow: error ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
         }}
         value={arrivalTime || startTime || ''}
         onChange={(e) => {
@@ -105,7 +105,10 @@ export default function ShiftArrivalTimeField({
       />
 
       {error ? (
-        <div className="ecw-field-error">{error}</div>
+        <div className="eo-field-error ecw-field-error">
+          <span aria-hidden="true">⚠️</span>
+          <span>{error}</span>
+        </div>
       ) : (
         <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.25rem' }}>
           {offsetInfo.diffMins > 0 && offsetInfo.previewTime

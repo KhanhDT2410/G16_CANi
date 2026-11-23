@@ -677,6 +677,54 @@ label:has(input[type="radio"]) {
   box-sizing: border-box !important;
 }
 
+/* ==========================================================================
+   GLOBAL FORM VALIDATION & ERROR STYLES (High-contrast, Accessible, Sharp)
+   ========================================================================== */
+.eo-field-error,
+.ecw-field-error,
+.form-field-error {
+  color: #dc2626 !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  margin-top: 0.35rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  line-height: 1.35 !important;
+  text-shadow: none !important;
+}
+
+.eo-form-input.has-error,
+.eo-form-textarea.has-error,
+.eo-form-select.has-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+  background-color: #fef2f2 !important;
+}
+
+.eo-form-input.has-error:focus,
+.eo-form-textarea.has-error:focus,
+.eo-form-select.has-error:focus {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.25) !important;
+}
+
+.eo-form-alert-error {
+  background-color: #fef2f2 !important;
+  border: 1.5px solid #f87171 !important;
+  border-radius: 10px !important;
+  padding: 0.75rem 1rem !important;
+  margin-bottom: 1.25rem !important;
+  color: #991b1b !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.5rem !important;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1) !important;
+}
+
+
 
 
 

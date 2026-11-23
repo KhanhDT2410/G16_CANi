@@ -317,7 +317,7 @@ export default function SettlementVoucherModal({
                 </tr>
               ) : (
                 filteredPayments.map((p, idx) => {
-                  const workerCccd = p.workerCccd || '001099******';
+                  const workerCccd = p.workerCccd || '—';
                   const netAmount = p.declaredAmount > 0 ? p.declaredAmount : p.agreedAmount;
                   return (
                     <tr key={p.paymentId || idx}>

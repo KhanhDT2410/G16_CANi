@@ -54,6 +54,12 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // Lấy toàn bộ danh sách khoản thanh toán của EO (Khai báo lương & Quyết toán)
+  getEoPayments: async () => {
+    const response = await apiClient.get('/v1/payments/eo/history');
+    return response.data?.data || [];
+  },
+
   // Xem danh sách thanh toán của một ca làm việc
   getShiftPayments: async (shiftId) => {
     try {

@@ -10,6 +10,7 @@ import com.cani.exception.AppException;
 import com.cani.repository.DisputeRepository;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
+import com.cani.repository.ShiftRepository;
 import com.cani.util.VietQrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +24,11 @@ import java.math.RoundingMode;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -42,6 +46,9 @@ public class DirectPaymentService {
 
     private final PaymentRepository paymentRepository;
     private final ShiftAssignmentRepository assignmentRepository;
+
+    @Autowired(required = false)
+    private ShiftRepository shiftRepository;
 
     @Autowired(required = false)
     private com.cani.repository.EventRepository eventRepository;
@@ -423,9 +430,7 @@ public class DirectPaymentService {
 
     @Transactional(readOnly = true)
     public List<PaymentResponseDto> getPaymentsByShift(UUID shiftId) {
-        return paymentRepository.findByShiftId(shiftId).stream()
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+        return mapListToDtos(paymentRepository.findByShiftId(shiftId));
     }
 
     @Transactional(readOnly = true)
@@ -438,16 +443,17 @@ public class DirectPaymentService {
                 throw new AppException("Không tìm thấy thông tin thanh toán của ca làm việc", HttpStatus.NOT_FOUND);
             }
         }
-        return payments.stream()
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+        return mapListToDtos(payments);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentResponseDto> getPaymentsByEo(UUID eoId) {
+        return mapListToDtos(paymentRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eoId));
     }
 
     @Transactional(readOnly = true)
     public List<PaymentResponseDto> getPaymentsByWorker(UUID workerId) {
-        return paymentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(workerId).stream()
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+        return mapListToDtos(paymentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(workerId));
     }
 
     @Transactional(readOnly = true)
@@ -479,7 +485,55 @@ public class DirectPaymentService {
         return mapToDto(payment);
     }
 
+    private List<PaymentResponseDto> mapListToDtos(List<Payment> payments) {
+        if (payments == null || payments.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Shift> shiftMap = new HashMap<>();
+        if (shiftRepository != null) {
+            Set<UUID> shiftIds = payments.stream()
+                    .map(Payment::getShiftId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!shiftIds.isEmpty()) {
+                shiftRepository.findAllById(shiftIds).forEach(s -> shiftMap.put(s.getShiftId(), s));
+            }
+        }
+
+        Map<UUID, Event> eventMap = new HashMap<>();
+        if (eventRepository != null) {
+            Set<UUID> eventIds = payments.stream()
+                    .map(Payment::getEventId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!eventIds.isEmpty()) {
+                eventRepository.findAllById(eventIds).forEach(e -> eventMap.put(e.getEventId(), e));
+            }
+        }
+
+        return payments.stream()
+                .map(p -> {
+                    Shift shift = p.getShiftId() != null ? shiftMap.get(p.getShiftId()) : null;
+                    Event event = p.getEventId() != null ? eventMap.get(p.getEventId()) : null;
+                    if (event == null && shift != null) {
+                        event = shift.getEvent();
+                    }
+                    return mapToDto(p, shift, event);
+                })
+                .collect(Collectors.toList());
+    }
+
     private PaymentResponseDto mapToDto(Payment p) {
+        Shift shift = (shiftRepository != null && p.getShiftId() != null)
+                ? shiftRepository.findById(p.getShiftId()).orElse(null)
+                : null;
+        Event event = (eventRepository != null && p.getEventId() != null)
+                ? eventRepository.findById(p.getEventId()).orElse(null)
+                : (shift != null ? shift.getEvent() : null);
+        return mapToDto(p, shift, event);
+    }
+
+    private PaymentResponseDto mapToDto(Payment p, Shift shift, Event event) {
         Worker w = p.getWorker();
         String bankCode = w != null ? w.getBankCode() : null;
         String bankAccountNumber = w != null ? w.getBankAccountNumber() : null;
@@ -487,6 +541,9 @@ public class DirectPaymentService {
         if ((bankAccountName == null || bankAccountName.isBlank()) && w != null && w.getUser() != null) {
             bankAccountName = w.getUser().getFullName();
         }
+        String workerName = (w != null && w.getFullName() != null && !w.getFullName().isBlank())
+                ? w.getFullName()
+                : (w != null && w.getUser() != null ? w.getUser().getFullName() : "");
         BigDecimal amount = p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount();
         String workerVietQrUrl = VietQrUtil.buildVietQrUrl(bankCode, bankAccountNumber, bankAccountName, amount);
 
@@ -513,12 +570,17 @@ public class DirectPaymentService {
         return PaymentResponseDto.builder()
                 .paymentId(p.getPaymentId())
                 .eventId(p.getEventId())
+                .eventName(event != null ? event.getName() : null)
                 .shiftId(p.getShiftId())
+                .jobType(shift != null ? shift.getJobType() : null)
+                .shiftStartTime(shift != null ? shift.getStartTime() : null)
+                .shiftEndTime(shift != null ? shift.getEndTime() : null)
                 .assignmentId(p.getAssignmentId())
                 .eoId(p.getEventOrganizer() != null ? p.getEventOrganizer().getEoId() : null)
                 .eoCompanyName(p.getEventOrganizer() != null ? p.getEventOrganizer().getCompanyName() : "")
                 .workerId(w != null ? w.getWorkerId() : null)
-                .workerName(w != null && w.getUser() != null ? w.getUser().getFullName() : "")
+                .workerName(workerName)
+                .workerCccd(w != null ? w.getCccdNumber() : null)
                 .agreedAmount(p.getAgreedAmount())
                 .declaredAmount(p.getDeclaredAmount())
                 .status(p.getStatus())

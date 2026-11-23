@@ -87,7 +87,7 @@ export default function EOModals({
         isOpen={Boolean(disputeModal?.isOpen)}
         onClose={() => setDisputeModal({ isOpen: false, assignment: null })}
         assignment={disputeModal?.assignment}
-        onSuccess={payments?.loadPayments}
+        onSuccess={payments?.loadEoPayments}
       />
 
       <LiveAttendanceModal

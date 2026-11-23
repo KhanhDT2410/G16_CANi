@@ -164,6 +164,13 @@ export default function EOPage() {
     return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
   }, [setSearchQuery]);
 
+  const { loadEoPayments } = payments;
+  useEffect(() => {
+    if (activeTab === 'payments') {
+      loadEoPayments();
+    }
+  }, [activeTab, loadEoPayments]);
+
   // Helper đẩy URL query params vào Browser History để nút Back quay lại đúng màn/bước trước
   const syncUrlRoute = (paramsObj, { replace = false } = {}) => {
     try {
@@ -657,13 +664,11 @@ export default function EOPage() {
             <Suspense fallback={<EOTabFallback />}>
               <EOPaymentsTab
                 payments={payments.payments}
+                events={events.events}
                 loading={payments.loading}
                 error={payments.error}
-                onOpenPaymentModal={(p) => {
-                  payments.setSelectedAssignment(p);
-                  payments.setPaymentForm((prev) => ({ ...prev, assignmentId: p.assignmentId, declaredAmount: p.agreedAmount }));
-                  payments.setShowPaymentModal(true);
-                }}
+                onRefresh={payments.loadEoPayments}
+                onOpenPaymentModal={payments.handleOpenPaymentDeclarationFromAttendance}
                 onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
                 onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
                 onNavigateToDisputes={() => handleNavClick('disputes')}

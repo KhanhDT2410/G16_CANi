@@ -22,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -614,7 +616,7 @@ public class MatchingDispatchService {
         Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
         Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
 
-        // shortcut: cap 50 group, dùng query rank DB khi group > hàng nghìn.
+        // shortcut: lấy 50 group active đầu (không rank trước); upgrade: query top-50 theo avgRating/reliability khi tổng số group > vài trăm.
         List<WorkerGroup> candidateGroups = workerGroupRepository.findAll().stream()
                 .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
                 .limit(50)
@@ -627,12 +629,17 @@ public class MatchingDispatchService {
         List<WorkerGroupMembership> memberships = workerGroupMembershipRepository
                 .findByWorkerGroup_GroupIdInAndStatus(candidateGroups.stream().map(WorkerGroup::getGroupId).toList(), MembershipStatus.ACTIVE);
         Map<UUID, List<WorkerGroupMembership>> membershipsByGroup = memberships.stream()
-                .filter(m -> m.getWorkerGroup() != null && m.getWorker() != null)
+                .filter(m -> m.getWorkerGroup() != null)
                 .collect(Collectors.groupingBy(m -> m.getWorkerGroup().getGroupId()));
 
         List<GroupCandidate> groupCandidates = new ArrayList<>();
         for (WorkerGroup group : candidateGroups) {
             List<WorkerGroupMembership> groupMemberships = membershipsByGroup.getOrDefault(group.getGroupId(), Collections.emptyList());
+            boolean hasGhostMember = groupMemberships.stream().anyMatch(m -> m.getWorker() == null);
+            if (hasGhostMember) {
+                log.warn("Nhóm {} có membership ACTIVE không có worker, loại cả nhóm khỏi dispatch", group.getGroupId());
+                continue;
+            }
             int packSize = groupMemberships.size();
             if (packSize == 0) {
                 continue;
@@ -716,8 +723,8 @@ public class MatchingDispatchService {
             double maxDist = Collections.max(distances);
 
             // Scoring distance pack = 0.6 * normalize(median) + 0.4 * normalize(p90)
-            double normMedian = Math.max(0.0, 100.0 - (medianDist / MAX_DISTANCE_KM) * 100.0);
-            double normP90 = Math.max(0.0, 100.0 - (p90Dist / MAX_DISTANCE_KM) * 100.0);
+            double normMedian = Math.max(0.0, 100.0 - (medianDist / effectiveMaxDist) * 100.0);
+            double normP90 = Math.max(0.0, 100.0 - (p90Dist / effectiveMaxDist) * 100.0);
             double distanceScore = 0.6 * normMedian + 0.4 * normP90;
 
             double groupScore = 0.35 * distanceScore
@@ -798,19 +805,39 @@ public class MatchingDispatchService {
             createdCount++;
 
             if (notificationService != null && candidate.leader().getUser() != null && candidate.leader().getUser().getUserId() != null) {
-                try {
-                    String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
-                    notificationService.createAndSend(
-                            candidate.leader().getUser().getUserId(),
-                            (emergency ? "🚨 GẤP " : "") + "Lời mời ca cho đội " + candidate.group().getName(),
-                            "Đội " + candidate.group().getName() + " (" + packSize + " người) — ca " + shift.getJobType() + " tại " + eventName + ", thù lao " + shift.getHourlyWage() + " đ/giờ — xác nhận trọn đội.",
-                            NotificationType.PROPOSAL,
-                            "PROPOSAL",
-                            savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shiftId,
-                            Map.of("shiftId", shiftId.toString(), "type", emergency ? "EMERGENCY_GROUP_PROPOSAL" : "GROUP_PROPOSAL")
-                    );
-                } catch (Exception ex) {
-                    log.warn("Không thể gửi thông báo FCM cho đội {}: {}", candidate.group().getName(), ex.getMessage());
+                UUID leaderUserId = candidate.leader().getUser().getUserId();
+                String groupName = candidate.group().getName();
+                String eventName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện CANi";
+                String title = (emergency ? "🚨 GẤP " : "") + "Lời mời ca cho đội " + groupName;
+                String body = "Đội " + groupName + " (" + packSize + " người) — ca " + shift.getJobType() + " tại " + eventName + ", thù lao " + shift.getHourlyWage() + " đ/giờ — xác nhận trọn đội.";
+                UUID refId = savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shiftId;
+                Map<String, String> data = Map.of("shiftId", shiftId.toString(), "type", emergency ? "EMERGENCY_GROUP_PROPOSAL" : "GROUP_PROPOSAL");
+
+                Runnable notifyTask = () -> {
+                    try {
+                        notificationService.createAndSend(
+                                leaderUserId,
+                                title,
+                                body,
+                                NotificationType.PROPOSAL,
+                                "PROPOSAL",
+                                refId,
+                                data
+                        );
+                    } catch (Exception ex) {
+                        log.warn("Không thể gửi thông báo FCM cho đội {}: {}", groupName, ex.getMessage());
+                    }
+                };
+
+                if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            notifyTask.run();
+                        }
+                    });
+                } else {
+                    notifyTask.run();
                 }
             }
         }

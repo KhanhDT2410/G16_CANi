@@ -1160,5 +1160,83 @@ class MatchingDispatchServiceTest {
             assertEquals(0, count);
             verify(dispatchProposalRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("SQUAD006: Membership ACTIVE có worker == null (ghost member) -> log cảnh báo và bỏ qua cả nhóm")
+        void dispatch_squad_pack_ghost_member_null_worker_skips_group() {
+            sampleShift.setRemainingWorkers(5);
+            Worker leader = groupWorker("Leader Squad", KycStatus.APPROVED, true, 90);
+            List<Worker> members = List.of(
+                    groupWorker("Member 1", KycStatus.APPROVED, true, 85),
+                    groupWorker("Member 2", KycStatus.APPROVED, true, 80),
+                    groupWorker("Member 3", KycStatus.APPROVED, true, 82),
+                    groupWorker("Member 4", KycStatus.APPROVED, true, 88)
+            );
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Có Ghost Member")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+
+            List<WorkerGroupMembership> memberships = new ArrayList<>(members.stream().map(m -> membership(group, m)).toList());
+            memberships.add(WorkerGroupMembership.builder()
+                    .membershipId(UUID.randomUUID())
+                    .workerGroup(group)
+                    .worker(null)
+                    .status(MembershipStatus.ACTIVE)
+                    .roleInGroup(GroupRole.MEMBER)
+                    .build());
+
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(memberships);
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(0, count);
+            verify(dispatchProposalRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("SQUAD007: Shift có maxDistanceKm tùy chỉnh -> scoring normalization dùng effectiveMaxDist thay vì hằng số 15km")
+        void dispatch_groups_uses_effective_max_distance_for_normalization() {
+            sampleShift.setRemainingWorkers(5);
+            sampleShift.setMaxDistanceKm(10.0);
+
+            Worker leader = groupWorker("Leader Squad", KycStatus.APPROVED, true, 90);
+            List<Worker> members = List.of(
+                    groupWorker("Member 1", KycStatus.APPROVED, true, 85),
+                    groupWorker("Member 2", KycStatus.APPROVED, true, 80),
+                    groupWorker("Member 3", KycStatus.APPROVED, true, 82),
+                    groupWorker("Member 4", KycStatus.APPROVED, true, 88),
+                    groupWorker("Member 5", KycStatus.APPROVED, true, 86)
+            );
+            WorkerGroup group = WorkerGroup.builder()
+                    .groupId(UUID.randomUUID())
+                    .name("Đội Custom Radius")
+                    .leaderWorkerId(leader.getWorkerId())
+                    .isActive(true)
+                    .build();
+            lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+            when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+            when(workerGroupRepository.findAll()).thenReturn(List.of(group));
+
+            when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(), eq(MembershipStatus.ACTIVE)))
+                    .thenReturn(members.stream().map(m -> membership(group, m)).toList());
+
+            when(dispatchProposalRepository.save(any(DispatchProposal.class))).thenAnswer(inv -> {
+                DispatchProposal p = inv.getArgument(0);
+                p.setProposalId(UUID.randomUUID());
+                return p;
+            });
+
+            int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+            assertEquals(1, count);
+            verify(dispatchProposalRepository).save(any(DispatchProposal.class));
+        }
     }
 }

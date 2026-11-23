@@ -14,6 +14,7 @@ import {
   GeneralConfigIcon,
   PricingPlanIcon,
   WageMatrixIcon,
+  SkillReviewIcon,
 } from './AdminSidebarIcons';
 
 // Danh mục phân nhóm menu chức năng Admin thuần tiếng Việt
@@ -50,6 +51,7 @@ export const ADMIN_NAV_GROUPS = [
     groupKey: 'system',
     groupLabel: 'Cấu hình tham số hệ thống',
     items: [
+      { id: 'skills', label: 'Danh Mục Kỹ Năng', icon: <SkillReviewIcon /> },
       { id: 'config_matching', label: 'Thuật Toán Ghép Nối', icon: <MatchingConfigIcon /> },
       { id: 'config_operation', label: 'Vận Hành & Điểm Uy Tín', icon: <OperationConfigIcon /> },
       { id: 'config_financial', label: 'Tài Chính & Hoa Hồng', icon: <FinancialConfigIcon /> },
@@ -121,6 +123,14 @@ export const ADMIN_TAB_METADATA = {
   plans: {
     title: 'Thiết Lập Giá & Hạn Mức Gói Dịch Vụ',
     subtitle: 'Quy định đơn giá (VNĐ), hạn mức sự kiện, ca làm, nhân sự và tính năng Matching cho Ban tổ chức sự kiện',
+  },
+  wage_matrix: {
+    title: 'Biểu Ma Trận Thù Lao Chuẩn',
+    subtitle: 'Thiết lập định mức thù lao thị trường theo khu vực, thời điểm ca và mức độ khẩn cấp',
+  },
+  skills: {
+    title: 'Danh Mục Kỹ Năng Hệ Thống',
+    subtitle: 'Quản lý danh sách kỹ năng chuẩn, phân nhóm nghiệp vụ và kiểm soát trạng thái hiển thị cho sự kiện',
   },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',

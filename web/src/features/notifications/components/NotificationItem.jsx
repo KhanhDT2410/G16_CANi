@@ -1,17 +1,20 @@
-import { NOTIFICATION_TYPE_CONFIG, formatRelativeTime } from '../types/notification.constants';
+import { NOTIFICATION_TYPE_CONFIG, formatRelativeTime, isEmergencyNotification } from '../types/notification.constants';
 
 /**
- * Hiển thị một dòng thông báo đơn lẻ trong danh sách (SRS UC-117)
+ * Hiển thị một dòng thông báo đơn lẻ trong danh sách (SRS UC-117 & Ticket EO-011)
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const NotificationItem = ({ notification, onSelect }) => {
   const { notificationId, title, body, type, isRead, createdAt } = notification;
 
-  const typeConfig = NOTIFICATION_TYPE_CONFIG[type] || {
-    label: 'Thông báo',
-    icon: 'TB',
-    badgeClass: 'notif-type-system',
-  };
+  const isEmergency = isEmergencyNotification(notification);
+  const typeConfig = isEmergency
+    ? NOTIFICATION_TYPE_CONFIG.EMERGENCY
+    : NOTIFICATION_TYPE_CONFIG[type] || {
+        label: 'Thông báo',
+        icon: 'TB',
+        badgeClass: 'notif-type-system',
+      };
 
   const handleClick = () => {
     if (onSelect) {

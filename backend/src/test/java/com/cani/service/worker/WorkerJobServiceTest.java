@@ -394,6 +394,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC011 - rejectProposal() - Normal: Từ chối đề xuất thành công và kích hoạt redispatch")
     void rejectProposal_Success_MarksRejectedAndTriggersRedispatch() {
+        activeShift.setEmergency(false);
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
 
@@ -401,6 +402,20 @@ class WorkerJobServiceTest {
 
         assertThat(pendingProposal.getStatus()).isEqualTo(ProposalStatus.REJECTED);
         verify(matchingDispatchService).dispatchForShift(activeShift.getShiftId());
+    }
+
+    @Test
+    @DisplayName("UTC011B - rejectProposal() - Emergency: Từ chối đề xuất khẩn cấp gọi điều phối khẩn cấp hệ thống và báo EO")
+    void rejectProposal_EmergencyShift_TriggersEmergencyRedispatchAndNotifiesEo() {
+        activeShift.setEmergency(true);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+
+        workerJobService.rejectProposal(userId, pendingProposal.getProposalId(), "Không kịp di chuyển");
+
+        assertThat(pendingProposal.getStatus()).isEqualTo(ProposalStatus.REJECTED);
+        verify(matchingDispatchService).triggerEmergencyDispatchForSystem(activeShift.getShiftId(), null);
+        verify(matchingDispatchService, never()).dispatchForShift(any());
     }
 
     @Test
@@ -418,6 +433,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC013 - rejectProposal() - Boundary: Lỗi redispatch được xử lý mềm không văng ngoại lệ")
     void rejectProposal_Boundary_RedispatchFailureDoesNotBreakRejection() {
+        activeShift.setEmergency(false);
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
         doThrow(new RuntimeException("Redispatch service timeout")).when(matchingDispatchService).dispatchForShift(any());

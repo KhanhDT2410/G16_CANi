@@ -1,4 +1,6 @@
 export { default as SupportTicketsCenterView } from './components/SupportTicketsCenterView';
+export { default as TicketAttachmentUpload } from './components/TicketAttachmentUpload';
+export { default as TicketAttachmentsView } from './components/TicketAttachmentsView';
 export { default as SupportChatWidget } from './components/SupportChatWidget';
 export { default as StaffMessengerDock } from './components/StaffMessengerDock';
 export { default as LiveChatInboxTable } from './components/LiveChatInboxTable';

@@ -20,7 +20,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -591,6 +600,71 @@ public class SupportTicketService {
                 .updatedAt(ticket.getUpdatedAt())
                 .messages(messageDtos)
                 .build();
+    }
+
+    private static final String TICKET_UPLOAD_DIR = "uploads/support-tickets";
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            "jpg", "jpeg", "png", "webp", "gif", "pdf", "doc", "docx", "xls", "xlsx", "txt", "csv", "zip"
+    );
+
+    /**
+     * Tải tệp đính kèm / hình ảnh cho ticket hỗ trợ (UC-105 / UC-106).
+     * Hỗ trợ cả hình ảnh và các tệp tài liệu văn bản (PDF, DOCX, TXT, XLS...).
+     */
+    public String uploadAttachment(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Tệp tải lên không được để trống");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String ext = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        }
+
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            throw new BadRequestException("Chỉ chấp nhận các định dạng tệp: " + String.join(", ", ALLOWED_EXTENSIONS));
+        }
+
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new BadRequestException("Dung lượng tệp không được vượt quá 10MB");
+        }
+
+        try {
+            Path uploadPath = Paths.get(TICKET_UPLOAD_DIR);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            String savedFilename = "tkt_" + UUID.randomUUID().toString().replace("-", "") + "." + ext;
+            Path targetPath = uploadPath.resolve(savedFilename);
+            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+            return "/api/v1/support/tickets/attachments/" + savedFilename;
+        } catch (IOException e) {
+            log.error("Lỗi khi lưu tệp đính kèm ticket: {}", e.getMessage(), e);
+            throw new BadRequestException("Không thể lưu tệp đính kèm: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Tải tài nguyên tệp đính kèm đã lưu theo tên file.
+     */
+    public Resource loadAttachment(String filename) {
+        try {
+            if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                throw new BadRequestException("Tên tệp không hợp lệ");
+            }
+            Path filePath = Paths.get(TICKET_UPLOAD_DIR).resolve(filename).normalize();
+            Resource resource = new UrlResource(filePath.toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            } else {
+                throw new ResourceNotFoundException("Không tìm thấy tệp đính kèm: " + filename);
+            }
+        } catch (MalformedURLException e) {
+            throw new ResourceNotFoundException("Đường dẫn tệp không hợp lệ: " + filename);
+        }
     }
 }
 

@@ -199,9 +199,10 @@ class SupportChatServiceTest {
         @Test
         @DisplayName("6. getStaffUnreadSummary tính toán đúng tổng số tin nhắn chưa đọc")
         void getStaffUnreadSummary_ReturnsCorrectCounts() {
-                when(userRepository.findByRoleIn(any())).thenReturn(List.of(mockUser));
-                when(conversationRepository.findByDisputeIdIsNullOrderByCreatedAtAsc())
-                                .thenReturn(List.of(mockConv));
+                when(conversationRepository.sumUnreadStaffCount()).thenReturn(1);
+                when(conversationRepository.countUnreadStaffConversations()).thenReturn(1);
+                when(conversationRepository.findRecentSupportConversations(any())).thenReturn(List.of(mockConv));
+                when(userRepository.findAllById(any())).thenReturn(List.of(mockUser));
 
                 StaffChatUnreadSummaryDto summary = supportChatService.getStaffUnreadSummary();
 

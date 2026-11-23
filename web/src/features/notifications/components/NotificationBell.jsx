@@ -96,6 +96,8 @@ export const NotificationBell = ({ className = '' }) => {
         eventId: metaEventId || null,
         assignmentId: metaAssignmentId || null,
         workerId: metaWorkerId || null,
+        notificationType: parsedData?.type || item.type,
+        alertType: parsedData?.type || null,
       };
     } else if (item.referenceType === 'PAYMENT') {
       detail = { tab: 'payments' };

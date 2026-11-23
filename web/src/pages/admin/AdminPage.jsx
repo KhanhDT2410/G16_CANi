@@ -12,6 +12,7 @@ import { AdminAccountAppealsTable } from '../../features/account-appeals';
 import { NoShowView } from '../../features/no-shows';
 import { AdminPlansView } from '../../features/admin-plans';
 import { WageMatrixView } from '../../features/admin-wage-matrix';
+import { AdminSkillView } from '../../features/admin-skills';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
 
@@ -75,6 +76,10 @@ const TAB_METADATA = {
   wage_matrix: {
     title: 'Biểu Ma Trận Thù Lao Chuẩn',
     subtitle: 'Thiết lập định mức thù lao thị trường theo khu vực, thời điểm ca và mức độ khẩn cấp',
+  },
+  skills: {
+    title: 'Danh Mục Kỹ Năng Hệ Thống',
+    subtitle: 'Quản lý danh sách kỹ năng chuẩn, phân nhóm nghiệp vụ và kiểm soát trạng thái hiển thị cho sự kiện',
   },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',
@@ -212,6 +217,7 @@ const AdminPage = () => {
           {activeTab === 'config_financial' && <SystemConfigView activeCategory="FINANCIAL" />}
           {activeTab === 'plans' && <AdminPlansView />}
           {activeTab === 'wage_matrix' && <WageMatrixView />}
+          {activeTab === 'skills' && <AdminSkillView />}
           {activeTab === 'config_general' && <SystemConfigView activeCategory="GENERAL" />}
           {activeTab === 'configs' && <SystemConfigView activeCategory="ALL" />}
         </section>

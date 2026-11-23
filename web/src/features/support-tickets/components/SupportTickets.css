@@ -1346,6 +1346,246 @@
   }
 }
 
+/* ========================================================= */
+/* TICKET ATTACHMENT UPLOAD & PREVIEW (UC-105 / UC-106)      */
+/* ========================================================= */
+.ticket-attachment-upload-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.ticket-attachment-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.ticket-btn-link {
+  background: transparent;
+  border: none;
+  color: var(--color-primary, #2563eb);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ticket-btn-link:hover {
+  color: var(--color-primary-dark, #1d4ed8);
+}
+
+.ticket-manual-url-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ticket-attachments-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.ticket-attachment-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.82rem;
+}
+
+.ticket-attachment-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
+.ticket-attachment-file-tag {
+  display: inline-block;
+  padding: 0.2rem 0.45rem;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.ticket-attachment-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-attachment-name {
+  color: #1e293b;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-attachment-size {
+  color: #64748b;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.ticket-attachment-remove-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.ticket-attachment-remove-btn:hover {
+  background: #fef2f2;
+}
+
+/* ========================================================= */
+/* TICKET ATTACHMENTS VIEW (IN DETAIL MODAL)                 */
+/* ========================================================= */
+.ticket-attachments-view-section {
+  margin-top: 0.85rem;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.ticket-attachments-view-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ticket-attachments-view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+
+.ticket-attachment-view-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.ticket-attachment-img-wrapper {
+  flex-shrink: 0;
+}
+
+.ticket-attachment-view-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  display: block;
+}
+
+.ticket-attachment-doc-wrapper {
+  flex-shrink: 0;
+}
+
+.ticket-attachment-doc-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid #bfdbfe;
+}
+
+.ticket-attachment-view-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.ticket-attachment-view-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-attachment-view-link {
+  font-size: 0.75rem;
+  color: #2563eb;
+  text-decoration: underline;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+.ticket-attachment-view-link:hover {
+  color: #1d4ed8;
+}
+
+/* ========================================================= */
+/* TICKET MESSAGE ATTACHMENTS (IN THREAD)                    */
+/* ========================================================= */
+.ticket-message-attachment-box {
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.ticket-message-attachment-thumb {
+  max-width: 220px;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  display: block;
+}
+
+.ticket-message-doc-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.ticket-message-doc-name {
+  color: #1e293b;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
 
 
 

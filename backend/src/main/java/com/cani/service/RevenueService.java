@@ -2,13 +2,16 @@ package com.cani.service;
 
 import com.cani.dto.admin.revenue.*;
 import com.cani.entity.Event;
+import com.cani.entity.PayOSOrder;
 import com.cani.entity.Payment;
 import com.cani.entity.Subscription;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.PaymentStatus;
 import com.cani.entity.enums.PlanType;
+import com.cani.entity.enums.SubscriptionStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.repository.EventRepository;
+import com.cani.repository.PayOSOrderRepository;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +46,7 @@ public class RevenueService {
     private final SubscriptionRepository subscriptionRepository;
     private final PaymentRepository paymentRepository;
     private final EventRepository eventRepository;
+    private final PayOSOrderRepository payOSOrderRepository;
 
     /**
      * Lấy tổng quan doanh thu, so sánh kỳ trước, phân tích theo gói & hình thức sự kiện,
@@ -87,7 +91,8 @@ public class RevenueService {
         // 5. Phân bổ theo hình thức sự kiện (Event Mode)
         List<EventModeRevenueDto> eventModeBreakdown = computeEventModeBreakdown(effectiveFrom, effectiveTo, currentPayments);
 
-        // 6. Tổng hợp giao dịch VNPay
+        // 6. Tổng hợp giao dịch PayOS & VNPay
+        PayOSSummaryDto payosSummary = computePayOSSummary(effectiveFrom, effectiveTo, currentSubs);
         VnPaySummaryDto vnpaySummary = computeVnPaySummary(currentPayments);
 
         // 7. Các giao dịch có cờ cảnh báo (DISPUTED / UNVERIFIED)
@@ -99,6 +104,7 @@ public class RevenueService {
                 .growth(growth)
                 .packageTypeBreakdown(packageBreakdown)
                 .eventModeBreakdown(eventModeBreakdown)
+                .payosSummary(payosSummary)
                 .vnpaySummary(vnpaySummary)
                 .flaggedTransactions(flaggedTransactions)
                 .build();
@@ -379,6 +385,66 @@ public class RevenueService {
         return result;
     }
 
+    private PayOSSummaryDto computePayOSSummary(Instant from, Instant to, List<Subscription> currentSubs) {
+        List<PayOSOrder> orders = (payOSOrderRepository != null)
+                ? payOSOrderRepository.findByCreatedAtBetween(from, to)
+                : Collections.emptyList();
+
+        if (!orders.isEmpty()) {
+            BigDecimal totalAmount = orders.stream()
+                    .filter(o -> "PAID".equalsIgnoreCase(o.getStatus()))
+                    .map(PayOSOrder::getAmount)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            long confirmedCount = orders.stream()
+                    .filter(o -> "PAID".equalsIgnoreCase(o.getStatus()))
+                    .count();
+
+            long pendingCount = orders.stream()
+                    .filter(o -> "PENDING".equalsIgnoreCase(o.getStatus()))
+                    .count();
+
+            long flaggedCount = orders.stream()
+                    .filter(o -> "CANCELLED".equalsIgnoreCase(o.getStatus()) || "FAILED".equalsIgnoreCase(o.getStatus()))
+                    .count();
+
+            return PayOSSummaryDto.builder()
+                    .totalTransactions(orders.size())
+                    .totalAmount(totalAmount)
+                    .confirmedCount(confirmedCount)
+                    .pendingCount(pendingCount)
+                    .flaggedCount(flaggedCount)
+                    .build();
+        }
+
+        // Fallback thông minh: Nếu bảng payos_orders chưa có dữ liệu, tổng hợp từ các gói cước đã mua trong bảng subscriptions
+        List<Subscription> paidSubs = (currentSubs != null) ? currentSubs.stream()
+                .filter(s -> s.getPrice() != null && s.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                .toList() : Collections.emptyList();
+
+        BigDecimal subTotal = paidSubs.stream()
+                .map(Subscription::getPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long activeCount = paidSubs.stream()
+                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE)
+                .count();
+
+        long expiredOrCancelled = paidSubs.stream()
+                .filter(s -> s.getStatus() == SubscriptionStatus.CANCELLED || s.getStatus() == SubscriptionStatus.EXPIRED)
+                .count();
+
+        return PayOSSummaryDto.builder()
+                .totalTransactions(paidSubs.size())
+                .totalAmount(subTotal)
+                .confirmedCount(activeCount)
+                .pendingCount(0)
+                .flaggedCount(expiredOrCancelled)
+                .build();
+    }
+
     private VnPaySummaryDto computeVnPaySummary(List<Payment> payments) {
         List<Payment> vnpayPayments = payments.stream()
                 .filter(p -> (p.getPaymentMethod() != null && p.getPaymentMethod().toUpperCase().contains("VNPAY"))
@@ -424,6 +490,13 @@ public class RevenueService {
                 ? s.getEventOrganizer().getCompanyName()
                 : "Nhà tổ chức sự kiện";
 
+        String payMethod = "PayOS VietQR";
+        if (s.getFeatures() != null && s.getFeatures().contains("DEMO_SANDBOX")) {
+            payMethod = "Sandbox Demo";
+        } else if (s.getPrice() != null && s.getPrice().compareTo(BigDecimal.ZERO) == 0) {
+            payMethod = "Miễn phí (Dùng thử)";
+        }
+
         return RevenueTransactionDto.builder()
                 .id(s.getSubscriptionId())
                 .transactionType("PACKAGE_SALE")
@@ -433,7 +506,7 @@ public class RevenueService {
                 .planName(s.getPlanName())
                 .amount(s.getPrice())
                 .status(s.getStatus() != null ? s.getStatus().name() : "UNKNOWN")
-                .paymentMethod("VNPAY")
+                .paymentMethod(payMethod)
                 .isFlagged(s.getStatus() != null && "CANCELLED".equalsIgnoreCase(s.getStatus().name()))
                 .flagReason(s.getStatus() != null && "CANCELLED".equalsIgnoreCase(s.getStatus().name()) ? "Gói đăng ký đã bị hủy" : null)
                 .createdAt(s.getCreatedAt())

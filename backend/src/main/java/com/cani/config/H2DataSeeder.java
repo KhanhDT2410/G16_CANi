@@ -32,6 +32,7 @@ public class H2DataSeeder implements CommandLineRunner {
         private final PlanRepository planRepository;
         private final SubscriptionRepository subscriptionRepository;
         private final PaymentRepository paymentRepository;
+        private final PayOSOrderRepository payOSOrderRepository;
         private final ReliabilityLogRepository reliabilityLogRepository;
         private final RsAppealRepository rsAppealRepository;
         private final FaqRepository faqRepository;
@@ -310,6 +311,47 @@ public class H2DataSeeder implements CommandLineRunner {
                         paymentRepository.saveAll(samplePayments);
                         log.info("==> [H2 Profile] Seeded {} sample direct payments for UC-108.",
                                         samplePayments.size());
+                }
+
+                // Seed Sample PayOS Orders (UC-108)
+                if (eo != null && payOSOrderRepository.count() == 0) {
+                        Instant now = Instant.now();
+                        List<PayOSOrder> samplePayOSOrders = List.of(
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611001L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.MATCHING_PLUS)
+                                                        .amount(BigDecimal.valueOf(99000))
+                                                        .status("PAID")
+                                                        .createdAt(now.minus(4, ChronoUnit.DAYS))
+                                                        .build(),
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611002L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.ENTERPRISE)
+                                                        .amount(BigDecimal.valueOf(249000))
+                                                        .status("PAID")
+                                                        .createdAt(now.minus(2, ChronoUnit.DAYS))
+                                                        .build(),
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611003L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.MATCHING_PLUS)
+                                                        .amount(BigDecimal.valueOf(99000))
+                                                        .status("PENDING")
+                                                        .createdAt(now.minus(1, ChronoUnit.DAYS))
+                                                        .build(),
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611004L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.INVITE_ONLY)
+                                                        .amount(BigDecimal.valueOf(50000))
+                                                        .status("CANCELLED")
+                                                        .createdAt(now.minus(12, ChronoUnit.HOURS))
+                                                        .build());
+                        payOSOrderRepository.saveAll(samplePayOSOrders);
+                        log.info("==> [H2 Profile] Seeded {} sample PayOS orders for UC-108.",
+                                        samplePayOSOrders.size());
                 }
 
                 // Seed Sample ReliabilityLog & RS Appeal (UC-94)

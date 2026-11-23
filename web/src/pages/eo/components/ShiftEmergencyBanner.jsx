@@ -2,23 +2,23 @@ import React from 'react';
 import { getShiftStaffingSummary } from '../utils/eventHelpers';
 
 /**
- * Hiển thị cảnh báo thiếu nhân sự cho từng ca làm việc tại chỗ kèm thao tác hợp lệ:
- * - Ca ACTIVE (trước giờ bắt đầu) còn thiếu -> nút "Kích hoạt khẩn cấp"
- * - Ca INVITE còn thiếu -> nút "Mời thêm Worker"
- * - Ca đã bật Emergency (do EO hoặc hệ thống tự động khi Worker hủy/No-show) -> nhãn "Đang điều phối khẩn cấp" (ẩn nút tránh kích hoạt trùng)
- * - Ca IN_PROGRESS (đã đến giờ làm) -> ẩn nút kích hoạt thủ công, giải thích cơ chế tự động khi ghi nhận No-show còn đủ thời gian làm việc
- * - Khi vừa bù đủ nhân sự trong phiên -> hiện phản hồi xanh "Đã bù đủ nhân sự" và gỡ cảnh báo thiếu/nút khẩn cấp
+ * ShiftEmergencyBanner (Ticket EO-009)
+ * Hiển thị cảnh báo thiếu nhân sự cho từng ca làm việc tại chỗ:
+ * - Ca đã bật Emergency (do EO hoặc hệ thống tự động khi Worker hủy/No-show) -> nhãn "Đang điều phối khẩn cấp".
+ * - Ca cận giờ thiếu người trước giờ bắt đầu (ACTIVE) -> "Cận giờ · Tự động đề xuất".
+ * - Ca IN_PROGRESS (đã đến giờ làm) -> giải thích đóng kích hoạt thủ công và cơ chế tự động khi ghi nhận No-show còn đủ thời gian.
+ * - Ca INVITE còn thiếu -> nút "Mời thêm Worker".
+ * - Khi vừa bù đủ nhân sự trong phiên -> hiện phản hồi xanh "Đã bù đủ nhân sự" và gỡ cảnh báo thiếu.
  */
 export default function ShiftEmergencyBanner({
   shift,
   event,
-  onTriggerEmergency,
   onOpenInvite,
   localDispatchResult = null,
 }) {
   const summary = getShiftStaffingSummary(shift, event);
 
-  // Khi đã đủ nhân sự -> gỡ cảnh báo thiếu và nút kích hoạt; nếu vừa theo dõi emergency trong phiên thì hiện kết quả đã bù đủ
+  // Khi đã đủ nhân sự -> gỡ cảnh báo thiếu; nếu vừa theo dõi emergency trong phiên thì hiện kết quả đã bù đủ
   if (summary.missing <= 0 || summary.isDraft || summary.isCancelled || summary.isCompleted) {
     if (
       localDispatchResult &&
@@ -67,7 +67,7 @@ export default function ShiftEmergencyBanner({
   return (
     <div
       style={{
-        padding: '0.75rem 0.95rem',
+        padding: '0.75rem 1rem',
         borderRadius: 10,
         backgroundColor: summary.isEmergency ? '#fef2f2' : summary.isInProgress ? '#fff7ed' : '#fff1f2',
         border: `1px solid ${summary.isEmergency ? '#fca5a5' : summary.isInProgress ? '#fdba74' : '#fecdd3'}`,
@@ -86,39 +86,46 @@ export default function ShiftEmergencyBanner({
           <div style={{ fontSize: '0.76rem', color: '#9a3412' }}>
             {summary.isInviteMode
               ? 'Ca đã đến giờ làm việc. Bạn có thể mời thêm Worker hoặc kiểm tra điểm danh ca.'
-              : 'Ca đã đến giờ làm việc (không thể bật điều phối khẩn cấp thủ công). Hệ thống sẽ tự động điều phối khẩn cấp nếu ghi nhận nhân sự vắng mặt (No-show) khi ca còn đủ thời gian làm việc; vui lòng kiểm tra điểm danh hoặc báo cáo vắng mặt nếu cần.'}
+              : 'Ca đã đến giờ làm việc (chức năng kích hoạt khẩn cấp thủ công đã đóng). Hệ thống sẽ tự động điều phối khẩn cấp nếu ghi nhận nhân sự vắng mặt (No-show) khi ca còn đủ thời gian làm việc; vui lòng kiểm tra điểm danh hoặc báo cáo vắng mặt nếu cần.'}
           </div>
         )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {/* Chế độ mời trực tiếp (INVITE) */}
         {summary.isInviteMode && onOpenInvite && (
           <button
             type="button"
             onClick={() => onOpenInvite(shift, event)}
             style={{
+              minHeight: '34px',
               background: '#7c3aed',
               color: '#ffffff',
               border: 'none',
               borderRadius: 8,
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.8rem',
+              padding: '0.45rem 0.9rem',
+              fontSize: '0.82rem',
               fontWeight: 700,
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               whiteSpace: 'nowrap',
+              transition: 'background 0.15s ease',
             }}
           >
             Mời thêm Worker
           </button>
         )}
 
+        {/* Ca đã kích hoạt Emergency Dispatch */}
         {!summary.isInviteMode && summary.isEmergency && (
           <span
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.4rem 0.8rem',
+              gap: '0.4rem',
+              padding: '0.4rem 0.85rem',
               borderRadius: 8,
               fontSize: '0.78rem',
               fontWeight: 700,
@@ -141,25 +148,35 @@ export default function ShiftEmergencyBanner({
           </span>
         )}
 
-        {!summary.isInviteMode && !summary.isEmergency && summary.canTriggerEmergency && onTriggerEmergency && (
-          <button
-            type="button"
-            onClick={() => onTriggerEmergency(shift, event)}
+        {/* Ca cận giờ trước lúc bắt đầu chưa bật Emergency Dispatch (Được quản lý tự động qua Popup) */}
+        {!summary.isInviteMode && !summary.isEmergency && !summary.isInProgress && summary.nearStartUnderstaffed && (
+          <span
             style={{
-              background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-              color: '#ffffff',
-              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.4rem 0.85rem',
               borderRadius: 8,
-              padding: '0.45rem 0.9rem',
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(225, 29, 72, 0.25)',
+              backgroundColor: '#fff1f2',
+              color: '#be123c',
+              border: '1px solid #fecdd3',
               whiteSpace: 'nowrap',
             }}
+            title="Hệ thống tự động đề xuất mở rộng phạm vi tìm kiếm khi cận giờ bắt đầu"
           >
-            Kích hoạt khẩn cấp
-          </button>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: '#e11d48',
+                display: 'inline-block',
+              }}
+            />
+            Cận giờ · Tự động đề xuất
+          </span>
         )}
       </div>
     </div>

@@ -76,7 +76,14 @@ export default function EkycReviewModal({
         const data = await ekycReviewApi.getDetail(targetType, verificationId);
         if (!active) return;
         setDetail(data);
-        if (data?.imagesAvailable !== false) {
+        const imagesUnavailable = data?.imagesAvailable === false || data?.imagesExpired === true;
+        if (imagesUnavailable) {
+          setDecision('REJECTED');
+          setReviewNotes(
+            data?.imagesUnavailableReason ||
+              'Ảnh xác minh đã hết hạn lưu trữ hoặc không còn khả dụng. Vui lòng chụp và nộp lại hồ sơ eKYC.'
+          );
+        } else {
           fetchSignedImages();
         }
       } catch (err) {
@@ -110,6 +117,7 @@ export default function EkycReviewModal({
   if (!item || typeof document === 'undefined') return null;
 
   const record = detail || item;
+  const imagesUnavailable = record.imagesAvailable === false || record.imagesExpired === true;
   const displayName =
     targetType === 'eo'
       ? record.representativeName || record.companyName || 'Nhà tổ chức sự kiện'
@@ -117,6 +125,14 @@ export default function EkycReviewModal({
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
+    if (decision === 'APPROVED' && imagesUnavailable) {
+      showToast(
+        record.imagesUnavailableReason ||
+          'Ảnh xác minh đã hết hạn hoặc không đọc được, không thể phê duyệt thủ công.',
+        'error'
+      );
+      return;
+    }
     if (decision === 'REJECTED' && !reviewNotes.trim()) {
       showToast('Vui lòng nhập lý do từ chối hồ sơ để người dùng biết cách chụp lại.', 'error');
       return;
@@ -210,11 +226,23 @@ export default function EkycReviewModal({
                   <strong className="ekyc-info-value">{record.cccdNumberMasked || 'Chưa trích xuất'}</strong>
                 </div>
                 <div>
-                  <span className="ekyc-info-label">Ngày sinh / Giới tính:</span>
+                  <span className="ekyc-info-label">Điều kiện độ tuổi tối thiểu:</span>
                   <span className="ekyc-info-value">
-                    {[record.dob, record.gender].filter(Boolean).join(' • ') || '—'}
+                    {record.meetsMinimumAge === true
+                      ? 'Đạt độ tuổi quy định'
+                      : record.meetsMinimumAge === false
+                        ? 'Chưa đủ độ tuổi tối thiểu'
+                        : 'Chưa đánh giá được từ OCR'}
                   </span>
                 </div>
+                {(record.dob || record.gender) && (
+                  <div>
+                    <span className="ekyc-info-label">Dữ liệu cũ (nếu có):</span>
+                    <span className="ekyc-info-value">
+                      {[record.dob, record.gender].filter(Boolean).join(' • ')}
+                    </span>
+                  </div>
+                )}
                 <div>
                   <span className="ekyc-info-label">Khớp khuôn mặt (VNPT):</span>
                   <span className="ekyc-info-value">{formatScorePercent(record.faceMatchScore)}</span>
@@ -223,20 +251,26 @@ export default function EkycReviewModal({
                   <span className="ekyc-info-label">Độ tin cậy OCR:</span>
                   <span className="ekyc-info-value">{formatScorePercent(record.ocrConfidence)}</span>
                 </div>
-                <div>
-                  <span className="ekyc-info-label">Quê quán:</span>
-                  <span className="ekyc-info-value">{record.originAddress || '—'}</span>
-                </div>
-                <div>
-                  <span className="ekyc-info-label">Nơi thường trú:</span>
-                  <span className="ekyc-info-value">{record.residenceAddress || '—'}</span>
-                </div>
-                <div>
-                  <span className="ekyc-info-label">Ngày cấp / Hết hạn:</span>
-                  <span className="ekyc-info-value">
-                    {[record.issueDate, record.expiryDate].filter(Boolean).join(' → ') || '—'}
-                  </span>
-                </div>
+                {record.originAddress && (
+                  <div>
+                    <span className="ekyc-info-label">Quê quán (dữ liệu cũ):</span>
+                    <span className="ekyc-info-value">{record.originAddress}</span>
+                  </div>
+                )}
+                {record.residenceAddress && (
+                  <div>
+                    <span className="ekyc-info-label">Nơi thường trú (dữ liệu cũ):</span>
+                    <span className="ekyc-info-value">{record.residenceAddress}</span>
+                  </div>
+                )}
+                {(record.issueDate || record.expiryDate) && (
+                  <div>
+                    <span className="ekyc-info-label">Ngày cấp / Hết hạn (dữ liệu cũ):</span>
+                    <span className="ekyc-info-value">
+                      {[record.issueDate, record.expiryDate].filter(Boolean).join(' → ')}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {record.routingReason && (
@@ -252,15 +286,16 @@ export default function EkycReviewModal({
                     type="button"
                     className="btn-ekyc-secondary"
                     onClick={fetchSignedImages}
-                    disabled={loadingImages || record.imagesAvailable === false}
+                    disabled={loadingImages || imagesUnavailable}
                   >
                     {loadingImages ? 'Đang lấy liên kết...' : 'Làm mới ảnh'}
                   </button>
                 </div>
 
-                {record.imagesAvailable === false ? (
+                {imagesUnavailable ? (
                   <div className="ekyc-images-empty">
-                    Ảnh xác minh không khả dụng hoặc đã hết hạn lưu trữ.
+                    {record.imagesUnavailableReason ||
+                      'Ảnh xác minh không khả dụng, thiếu hoặc đã hết hạn lưu trữ. Vui lòng từ chối để yêu cầu người dùng nộp lại hồ sơ.'}
                   </div>
                 ) : (
                   <div className="ekyc-images-grid">
@@ -284,15 +319,22 @@ export default function EkycReviewModal({
 
               <form onSubmit={handleSubmitReview} className="ekyc-review-form">
                 <div className="ekyc-decision-row">
-                  <label className={`ekyc-decision-option ${decision === 'APPROVED' ? 'selected-approve' : ''}`}>
+                  <label
+                    className={`ekyc-decision-option ${decision === 'APPROVED' ? 'selected-approve' : ''} ${imagesUnavailable ? 'disabled' : ''}`}
+                    title={imagesUnavailable ? 'Không thể phê duyệt khi thiếu hoặc hết hạn ảnh xác minh' : ''}
+                  >
                     <input
                       type="radio"
                       name="ekycDecision"
                       value="APPROVED"
                       checked={decision === 'APPROVED'}
-                      onChange={() => setDecision('APPROVED')}
+                      disabled={imagesUnavailable}
+                      onChange={() => !imagesUnavailable && setDecision('APPROVED')}
                     />
-                    <span>Chấp thuận định danh (APPROVED)</span>
+                    <span>
+                      Chấp thuận định danh (APPROVED)
+                      {imagesUnavailable ? ' — Bị khóa do ảnh không khả dụng' : ''}
+                    </span>
                   </label>
                   <label className={`ekyc-decision-option ${decision === 'REJECTED' ? 'selected-reject' : ''}`}>
                     <input
@@ -302,7 +344,11 @@ export default function EkycReviewModal({
                       checked={decision === 'REJECTED'}
                       onChange={() => setDecision('REJECTED')}
                     />
-                    <span>Từ chối hồ sơ (REJECTED)</span>
+                    <span>
+                      {imagesUnavailable
+                        ? 'Từ chối & yêu cầu nộp lại hồ sơ (REJECTED)'
+                        : 'Từ chối hồ sơ (REJECTED)'}
+                    </span>
                   </label>
                 </div>
 

@@ -16,6 +16,7 @@ import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
+import com.cani.service.ekyc.EkycConsentAndAgeHelper;
 import com.cani.util.VietQrUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -110,6 +111,9 @@ public class EoEventService {
 
     @Autowired(required = false)
     private ShiftStaffingPolicy shiftStaffingPolicy;
+
+    @Autowired(required = false)
+    private SystemConfigRepository systemConfigRepository;
 
     private ShiftStaffingPolicy getStaffingPolicy() {
         if (shiftStaffingPolicy != null) {
@@ -1335,30 +1339,18 @@ public class EoEventService {
         String defaultName = "Worker #" + (worker != null ? worker.getWorkerId().toString().substring(0, 8) : "");
 
         Integer workerAge = null;
-        String workerDob = null;
+        Boolean meetsMinimumAge = null;
         if (worker != null) {
-            Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
-            if (ekycOpt.isPresent() && ekycOpt.get().getDob() != null && !ekycOpt.get().getDob().isBlank()) {
-                workerDob = ekycOpt.get().getDob().trim();
-                try {
-                    LocalDate birthDate = null;
-                    if (workerDob.contains("/")) {
-                        String[] parts = workerDob.split("/");
-                        if (parts.length == 3) {
-                            birthDate = LocalDate.of(Integer.parseInt(parts[2]), Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
-                        }
-                    } else if (workerDob.contains("-")) {
-                        birthDate = LocalDate.parse(workerDob);
-                    }
-                    if (birthDate != null) {
-                        workerAge = Period.between(birthDate, LocalDate.now()).getYears();
-                    }
-                } catch (Exception ignored) {}
-            }
-            if (workerAge == null && worker.getYearsExperience() != null && worker.getYearsExperience() > 0) {
-                workerAge = 18 + worker.getYearsExperience();
-            } else if (workerAge == null) {
-                workerAge = 22;
+            Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository
+                    .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(), List.of("APPROVED"))
+                    .or(() -> workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
+            if (ekycOpt.isPresent()) {
+                WorkerEkycVerification latestEkyc = ekycOpt.get();
+                meetsMinimumAge = latestEkyc.getMeetsMinimumAge() != null
+                        ? latestEkyc.getMeetsMinimumAge()
+                        : EkycConsentAndAgeHelper.evaluateMeetsMinimumAge(latestEkyc.getDob(), systemConfigRepository);
+                // Chỉ tính tuổi từ dữ liệu dob cũ nếu bản ghi cũ còn lưu; không trả dob thô ra DTO và không bịa 22 tuổi.
+                workerAge = EkycConsentAndAgeHelper.calculateAgeFromDob(latestEkyc.getDob());
             }
         }
 
@@ -1396,7 +1388,8 @@ public class EoEventService {
                 .workerReliabilityScore(worker != null ? worker.getReliabilityScore() : MAX_RELIABILITY_SCORE)
                 .workerRatingAvg(worker != null ? worker.getRatingAvg() : DEFAULT_RATING)
                 .workerAge(workerAge)
-                .workerDob(workerDob)
+                .meetsMinimumAge(meetsMinimumAge)
+                .workerDob(null)
                 .assignmentStatus(sa.getStatus() != null ? sa.getStatus().name() : AssignmentStatus.PENDING.name())
                 .checkinTime(attOpt.map(AttendanceLog::getCheckinTime).orElse(null))
                 .checkoutTime(attOpt.map(AttendanceLog::getCheckoutTime).orElse(null))

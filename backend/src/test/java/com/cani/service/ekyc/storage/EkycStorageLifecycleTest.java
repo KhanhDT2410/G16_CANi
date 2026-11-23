@@ -1,6 +1,7 @@
 package com.cani.service.ekyc.storage;
 
 import com.cani.entity.WorkerEkycVerification;
+import com.cani.entity.enums.EkycVerificationStatus;
 import com.cani.repository.EoEkycVerificationRepository;
 import com.cani.repository.WorkerEkycVerificationRepository;
 import org.junit.jupiter.api.Test;
@@ -77,5 +78,37 @@ class EkycStorageLifecycleTest {
         assertThat(expired.getImagesPurgedAt()).isNotNull();
         assertThat(held.getFrontImageUrl()).isEqualTo("hold");
         verify(storage, never()).deleteIfPresent("hold");
+    }
+
+    @Test
+    void zeroRetentionNeverReturnsNullAndInventoryIsCountOnly() {
+        var storage = mock(EkycImageStorage.class);
+        var workers = mock(WorkerEkycVerificationRepository.class);
+        var organizers = mock(EoEkycVerificationRepository.class);
+        var retention = new EkycImageRetentionService(storage, workers, organizers, 0, 0, 3, 14, true);
+
+        Instant now = Instant.now();
+        Instant approvedDeadline = retention.calculateRetentionDeadline(EkycVerificationStatus.APPROVED);
+        Instant rejectedDeadline = retention.calculateRetentionDeadline(EkycVerificationStatus.REJECTED);
+        Instant pendingReviewDeadline = retention.calculateRetentionDeadline(EkycVerificationStatus.PENDING_REVIEW);
+        Instant techFailureDeadline = retention.calculateRetentionDeadline(EkycVerificationStatus.TECHNICAL_FAILURE);
+
+        assertThat(approvedDeadline).isNotNull().isBeforeOrEqualTo(Instant.now().plusSeconds(2));
+        assertThat(rejectedDeadline).isNotNull().isBeforeOrEqualTo(Instant.now().plusSeconds(2));
+        assertThat(pendingReviewDeadline).isAfter(now.plusSeconds(13 * 86400L));
+        assertThat(techFailureDeadline).isAfter(now.plusSeconds(2 * 86400L));
+
+        when(workers.countByImagesPurgedAtIsNullAndImageRetentionUntilIsNull()).thenReturn(4L);
+        when(organizers.countByImagesPurgedAtIsNullAndImageRetentionUntilIsNull()).thenReturn(2L);
+        when(workers.countLegacyNullRetentionByStatus()).thenReturn(List.<Object[]>of(new Object[]{"APPROVED", 4L}));
+        when(organizers.countLegacyNullRetentionByStatus()).thenReturn(List.<Object[]>of(new Object[]{"PENDING_REVIEW", 2L}));
+
+        var inventory = retention.getLegacyNullRetentionInventory();
+        assertThat(inventory.getWorkerLegacyNullRetentionCount()).isEqualTo(4L);
+        assertThat(inventory.getEoLegacyNullRetentionCount()).isEqualTo(2L);
+        assertThat(inventory.getTotalLegacyNullRetentionCount()).isEqualTo(6L);
+        verify(storage, never()).deleteIfPresent(any());
+        verify(workers, never()).save(any());
+        verify(organizers, never()).save(any());
     }
 }

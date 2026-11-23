@@ -40,10 +40,3 @@ cani:
       url: ${SUPABASE_URL:https://hgnilsojrauajmyslhug.supabase.co}
       anon-key: ${SUPABASE_ANON_KEY}
       service-role-key: ${SUPABASE_SERVICE_ROLE_KEY}
-  ai:
-    gemini:
-      api-key: ${GEMINI_API_KEY}
-      model: ${GEMINI_MODEL:gemini-2.5-flash}
-      url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
-      timeout-ms: 20000
-      sandbox-fallback-enabled: false

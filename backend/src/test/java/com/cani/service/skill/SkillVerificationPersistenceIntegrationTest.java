@@ -1,14 +1,9 @@
 package com.cani.service.skill;
 
-import com.cani.client.skill.SkillVisionAiClient;
-import com.cani.dto.skill.ExtractedSkillDto;
-import com.cani.dto.skill.SkillVerificationAiResultDto;
 import com.cani.dto.skill.SkillVerificationResponseDto;
 import com.cani.entity.Skill;
 import com.cani.entity.SkillVerificationRequest;
 import com.cani.entity.Worker;
-import com.cani.entity.enums.IdentityVerificationStatus;
-import com.cani.entity.enums.IssuerVerificationStatus;
 import com.cani.entity.enums.RoutingDecision;
 import com.cani.entity.enums.SkillVerificationStatus;
 import com.cani.exception.AppException;
@@ -28,12 +23,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
 
 /**
  * Integration Test (H2 profile): Xác thực toàn bộ Spring Context V2, JPA mapping các cột V2,
@@ -55,6 +47,9 @@ class SkillVerificationPersistenceIntegrationTest {
     private WorkerRepository workerRepository;
 
     @Autowired
+    private com.cani.repository.UserRepository userRepository;
+
+    @Autowired
     private SkillRepository skillRepository;
 
     @Autowired
@@ -64,9 +59,6 @@ class SkillVerificationPersistenceIntegrationTest {
     private AuditLogRepository auditLogRepository;
 
     @MockitoBean
-    private SkillVisionAiClient skillVisionAiClient;
-
-    @MockitoBean
     private JwtDecoder jwtDecoder;
 
     private static byte[] validJpegBytes(byte marker) {
@@ -74,7 +66,7 @@ class SkillVerificationPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("Persistence & Idempotency: Lưu đầy đủ cột V2 vào DB + AuditLog + chặn nộp trùng SHA-256")
+    @DisplayName("Persistence & Idempotency: Hồ sơ mới vào PENDING_REVIEW duyệt thủ công + AuditLog + chặn nộp trùng SHA-256")
     void submitAndVerifyRealDatabasePersistenceAndDuplicateGuard() {
         Worker worker = workerRepository.findAll().stream().findFirst().orElseThrow();
         Skill barista = skillRepository.findByName("Pha chế (Bartender/Barista)").orElseThrow();
@@ -84,50 +76,18 @@ class SkillVerificationPersistenceIntegrationTest {
         byte[] uniqueImage = validJpegBytes((byte) 0x77);
         MockMultipartFile file = new MockMultipartFile("file", "cert_real_persist.jpg", "image/jpeg", uniqueImage);
 
-        SkillVerificationAiResultDto ai = SkillVerificationAiResultDto.builder()
-                .documentType("CERTIFICATE")
-                .documentReadable(true)
-                .recipientName(worker.getFullName())
-                .institution("Trường Trung cấp Du lịch Saigontourist")
-                .certificateNumber("SGT-INT-001")
-                .issueDate("2025-09-01")
-                .hasSeal(true)
-                .hasSignature(true)
-                .hasSealOrSignature(true)
-                .identityMatch("EXACT")
-                .documentAuthenticity("LIKELY_GENUINE_FORMAT")
-                .skillRelevance("MATCH")
-                .overallConfidence(0.94)
-                .routingDecision(RoutingDecision.AUTO_APPROVE)
-                .routingReason("Chứng chỉ hợp lệ")
-                .extractedSkills(List.of(ExtractedSkillDto.builder()
-                        .skillName("Barista")
-                        .taxonomyRole(barista.getName())
-                        .confidenceScore(0.95)
-                        .build()))
-                .modelName("gemini-2.5-flash")
-                .promptVersion("v2.0.0")
-                .rawAiJson("{\"documentType\":\"CERTIFICATE\"}")
-                .build();
-
-        when(skillVisionAiClient.verifyDocument(any(), eq("image/jpeg"), anyList(), anyString(), eq(worker.getFullName())))
-                .thenReturn(ai);
-
         SkillVerificationResponseDto res = verificationService.submitVerification(
                 worker.getWorkerId(), file, barista.getSkillId(), "Integration test"
         );
 
         // 1. Query trực tiếp DB để xác nhận bền vững (Điều 8)
         SkillVerificationRequest persisted = requestRepository.findById(res.getId()).orElseThrow();
-        assertEquals(SkillVerificationStatus.APPROVED, persisted.getStatus());
-        assertEquals(IdentityVerificationStatus.EXACT_MATCH, persisted.getIdentityVerificationStatus());
-        assertEquals(IssuerVerificationStatus.KNOWN_ISSUER_UNVERIFIED_ONLINE, persisted.getIssuerVerificationStatus());
+        assertEquals(SkillVerificationStatus.PENDING_REVIEW, persisted.getStatus());
+        assertEquals(RoutingDecision.ADMIN_REVIEW, persisted.getRoutingDecision());
+        assertEquals("MANUAL_REVIEW", persisted.getVerificationSource());
+        assertEquals(0, persisted.getSpAwarded());
         assertNotNull(persisted.getDocumentHash());
         assertEquals(64, persisted.getDocumentHash().length());
-        assertNotNull(persisted.getTrustScore());
-        assertTrue(persisted.getTrustScore().doubleValue() >= 85.0);
-        assertEquals("gemini-2.5-flash", persisted.getModelName());
-        assertEquals("v2.0.0", persisted.getPromptVersion());
         assertNotNull(persisted.getVersion());
         assertTrue(auditLogRepository.count() > auditCountBefore);
 
@@ -136,6 +96,38 @@ class SkillVerificationPersistenceIntegrationTest {
         AppException conflict = assertThrows(AppException.class, () ->
                 verificationService.submitVerification(worker.getWorkerId(), dupFile, barista.getSkillId(), "Dup"));
         assertEquals(HttpStatus.CONFLICT, conflict.getStatus());
+    }
+
+    @Test
+    @DisplayName("Legacy Readability & Manual Move: Hồ sơ lỗi cũ đọc được nguyên vẹn và chuyển sang PENDING_REVIEW")
+    void legacyVerificationFailed_ReadableAndMovedToManualReview() {
+        Worker worker = workerRepository.findAll().stream().findFirst().orElseThrow();
+        SkillVerificationRequest legacyFailed = requestRepository.saveAndFlush(SkillVerificationRequest.builder()
+                .worker(worker)
+                .jobType("Pha chế (Bartender/Barista)")
+                .modelName("legacy-ai-model")
+                .promptVersion("v1.0.0")
+                .failureReason("API_TIMEOUT: Legacy timeout")
+                .routingDecision(RoutingDecision.ADMIN_REVIEW)
+                .status(SkillVerificationStatus.VERIFICATION_FAILED)
+                .spAwarded(0)
+                .build());
+
+        com.cani.entity.User adminReviewer = com.cani.entity.User.builder()
+                .userId(UUID.randomUUID())
+                .role(com.cani.entity.enums.UserRole.ADMIN)
+                .build();
+        SkillVerificationResponseDto detail = verificationService.getVerificationDetail(
+                legacyFailed.getId(), adminReviewer);
+        assertEquals("legacy-ai-model", detail.getModelName());
+        assertEquals(SkillVerificationStatus.VERIFICATION_FAILED, detail.getStatus());
+
+        SkillVerificationResponseDto moved = verificationService.moveFailedToManualReview(
+                legacyFailed.getId(), UUID.randomUUID());
+        assertEquals(SkillVerificationStatus.PENDING_REVIEW, moved.getStatus());
+        assertEquals(RoutingDecision.ADMIN_REVIEW, moved.getRoutingDecision());
+        assertEquals("MANUAL_REVIEW", moved.getVerificationSource());
+        assertNull(moved.getFailureReason());
     }
 
     @Test

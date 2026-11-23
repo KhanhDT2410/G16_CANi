@@ -110,6 +110,43 @@ class WorkerProfileServiceTest {
     }
 
     @Test
+    @DisplayName("Hồ sơ trả meetsMinimumAge cho bản ghi eKYC tối giản không lưu dob thô và giữ tương thích bản ghi cũ")
+    void buildWorkerProfile_UsesMeetsMinimumAgeAndPreservesLegacyDobCompatibility() {
+        UUID userId = UUID.randomUUID();
+        UUID workerId = UUID.randomUUID();
+        User owner = User.builder().userId(userId).email("owner@example.invalid").phone("0900000000").build();
+        Worker worker = Worker.builder().workerId(workerId).user(owner).build();
+
+        WorkerEkycVerification minimizedEkyc = WorkerEkycVerification.builder()
+                .worker(worker)
+                .status("APPROVED")
+                .meetsMinimumAge(true)
+                .dob(null)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerEkycVerificationRepository.findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
+                workerId, List.of("APPROVED"))).thenReturn(Optional.of(minimizedEkyc));
+
+        var ownMinimized = workerProfileService.getMyProfile(userId);
+        assertEquals(Boolean.TRUE, ownMinimized.getMeetsMinimumAge());
+        assertNull(ownMinimized.getAge());
+
+        WorkerEkycVerification legacyEkyc = WorkerEkycVerification.builder()
+                .worker(worker)
+                .status("APPROVED")
+                .meetsMinimumAge(null)
+                .dob("15/05/2000")
+                .build();
+        when(workerEkycVerificationRepository.findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
+                workerId, List.of("APPROVED"))).thenReturn(Optional.of(legacyEkyc));
+
+        var ownLegacy = workerProfileService.getMyProfile(userId);
+        assertEquals(Boolean.TRUE, ownLegacy.getMeetsMinimumAge());
+        assertNotNull(ownLegacy.getAge());
+    }
+
+    @Test
     @DisplayName("1. EO không có Event và không có Review")
     void getEoPublicProfile_WhenNoEventsAndNoReviews_ReturnsZeroStats() {
         when(eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eoId))

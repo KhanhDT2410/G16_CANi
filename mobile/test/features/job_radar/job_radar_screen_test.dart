@@ -61,6 +61,9 @@ class _FakeAuthRepository implements AuthRepository {
 
 class _FakeEkycRepository implements EkycRepository {
   @override
+  Future<EkycConsentPolicy> getConsentPolicy({String? token}) async => EkycConsentPolicy.fallback;
+
+  @override
   Future<EkycVerificationItem?> getMyEkycStatus({String? token}) async => EkycVerificationItem(
         verificationId: 'ekyc-1',
         workerId: 'w-1',

@@ -149,7 +149,7 @@ class SkillHubColors {
       case 'PLATFORM_PROVEN':
         return 'Đạt từ tối thiểu 3 ca hoàn thành tốt (≥ 85%), đánh giá thật ≥ 4.5 sao & uy tín ≥ 70.';
       case 'AI_DOCUMENT':
-        return 'Chứng chỉ/tài liệu đã được AI trích xuất và hệ thống phê duyệt.';
+        return 'Chứng chỉ/tài liệu đã được Admin / CSKH kiểm tra và phê duyệt.';
       case 'SELF_DECLARED':
       default:
         return 'Bạn tự thêm kỹ năng vào hồ sơ cá nhân.';

@@ -13,6 +13,7 @@ import { NoShowView } from '../../features/no-shows';
 import { AdminPlansView } from '../../features/admin-plans';
 import { WageMatrixView } from '../../features/admin-wage-matrix';
 import { EkycReviewCenterView } from '../../features/ekyc-review';
+import { SkillReviewCenterView } from '../../features/skill-review';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
 
@@ -32,6 +33,10 @@ const TAB_METADATA = {
   ekyc_review: {
     title: 'Thẩm Định Hồ Sơ eKYC',
     subtitle: 'Đối chiếu CCCD, ảnh chân dung bảo mật và phê duyệt định danh cho Worker & Nhà tổ chức',
+  },
+  skill_review: {
+    title: 'Thẩm Định Chứng Chỉ Kỹ Năng',
+    subtitle: 'Kiểm tra tài liệu chứng chỉ nghề nghiệp Worker nộp lên và phê duyệt thủ công',
   },
   shifts: {
     title: 'Danh Sách Ca Làm Việc',
@@ -126,6 +131,8 @@ const AdminPage = () => {
         setActiveTab('noshows');
       } else if (tab === 'ekyc' || tab === 'ekyc_review') {
         setActiveTab('ekyc_review');
+      } else if (tab === 'skills' || tab === 'skill_review') {
+        setActiveTab('skill_review');
       }
     };
     if (window.__cani_pending_chat) {
@@ -204,6 +211,7 @@ const AdminPage = () => {
           {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
           {activeTab === 'users' && <UserManagementView />}
           {activeTab === 'ekyc_review' && <EkycReviewCenterView canManageLegalHold />}
+          {activeTab === 'skill_review' && <SkillReviewCenterView />}
           {activeTab === 'account_appeals' && <AdminAccountAppealsTable />}
           {activeTab === 'shifts' && <AdminShiftView />}
           {activeTab === 'disputes' && <DisputeCenterView />}

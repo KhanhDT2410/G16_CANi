@@ -51,6 +51,10 @@ public interface EkycImageStorage {
 
     boolean exists(String objectKey);
 
+    default boolean isReadable(String objectKey) {
+        return exists(objectKey);
+    }
+
     boolean deleteIfPresent(String objectKey);
 
     default void deleteQuietly(String objectKey) {

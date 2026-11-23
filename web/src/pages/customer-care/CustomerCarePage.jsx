@@ -5,6 +5,7 @@ import { FaqView } from '../../features/faqs';
 import { RsAppealsView } from '../../features/rs-appeals';
 import { NoShowView } from '../../features/no-shows';
 import { EkycReviewCenterView } from '../../features/ekyc-review';
+import { SkillReviewCenterView } from '../../features/skill-review';
 import CustomerCareSidebar from './components/CustomerCareSidebar';
 import './CustomerCarePage.css';
 
@@ -32,6 +33,10 @@ const TAB_METADATA = {
   ekyc_review: {
     title: 'Thẩm Định Hồ Sơ eKYC',
     subtitle: 'Kiểm tra và xét duyệt hồ sơ định danh CCCD đang chờ thẩm định cho Worker & Nhà tổ chức',
+  },
+  skill_review: {
+    title: 'Thẩm Định Chứng Chỉ Kỹ Năng',
+    subtitle: 'Kiểm tra tài liệu chứng chỉ nghề nghiệp Worker nộp lên và phê duyệt thủ công',
   },
 };
 
@@ -66,6 +71,8 @@ export const CustomerCarePage = () => {
         setActiveTab('faqs');
       } else if (tab === 'ekyc' || tab === 'ekyc_review') {
         setActiveTab('ekyc_review');
+      } else if (tab === 'skills' || tab === 'skill_review') {
+        setActiveTab('skill_review');
       }
     };
     if (window.__cani_pending_chat) {
@@ -148,6 +155,7 @@ export const CustomerCarePage = () => {
           {activeTab === 'appeals' && <RsAppealsView />}
           {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
           {activeTab === 'ekyc_review' && <EkycReviewCenterView />}
+          {activeTab === 'skill_review' && <SkillReviewCenterView />}
         </section>
       </main>
     </div>

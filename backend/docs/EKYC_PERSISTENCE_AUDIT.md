@@ -97,7 +97,7 @@ Môi trường Java 21.0.8, Maven Wrapper, H2 cho các regression test và Postg
 $env:SPRING_PROFILES_ACTIVE = 'h2'
 $env:VNPT_EKYC_ENABLED = 'false'
 $env:FIREBASE_ENABLED = 'false'
-.\mvnw.cmd '-Dtest=*,!SkillVisionAiClientLiveTest' test
+.\mvnw.cmd test
 ~~~
 
 | Kiểm tra | Kết quả |
@@ -114,7 +114,7 @@ $env:FIREBASE_ENABLED = 'false'
 | Quyết định VNPT | `VnptEkycClientTest` | **15 PASS** trong lượt toàn bộ, gồm timeout, thiếu Face Compare, JSON lỗi, HTTP 429, Liveness thiếu/sai/hợp lệ và giấy tờ không hợp lệ |
 | PostgreSQL eKYC và file lifecycle | `.\mvnw.cmd '-Dtest=EkycPostgresPersistenceTest,EkycStorageLifecycleTest' test` với biến môi trường ở trên | **6/6 PASS**, `BUILD SUCCESS`. Đọc User và Worker profile từ giao dịch khác, Worker retry giữ cùng verification ID, đọc lại tệp, EO duyệt và ghi JSONB, rollback giữ tệp cũ, xóa tệp mới, legal hold, orphan cleanup và URL hết hạn |
 
-Regression còn bao gồm `DirectPaymentServiceTest` và `WorkerShiftHistoryAuditTest`. Lớp audit lịch sử đối soát Assignment, Attendance, Payment và Review. Test gọi Gemini live được loại khỏi lượt cuối. Run mới nhất cho hai suite sửa fixture đọc lại trực tiếp PostgreSQL với schema V49.
+Regression còn bao gồm `DirectPaymentServiceTest` và `WorkerShiftHistoryAuditTest`. Lớp audit lịch sử đối soát Assignment, Attendance, Payment và Review. Run mới nhất cho hai suite sửa fixture đọc lại trực tiếp PostgreSQL với schema cập nhật.
 
 ## 7. Remaining Risks
 

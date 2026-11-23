@@ -1,5 +1,7 @@
-# BÁO CÁO KẾT QUẢ KIỂM THỬ (TEST REPORT)
-# HỆ THỐNG THẨM ĐỊNH KỸ NĂNG TỰ ĐỘNG BẰNG AI (UC-43 & UC-46)
+# BÁO CÁO KẾT QUẢ KIỂM THỬ (TEST REPORT) — TÀI LIỆU LỊCH SỬ (ĐÃ CHUYỂN DUYỆT THỦ CÔNG)
+> **Cảnh báo cập nhật:** Kể từ tháng 11/2026, CANi đã gỡ bỏ hoàn toàn Gemini AI khỏi mã nguồn và cấu hình; luồng xác minh chứng chỉ hoạt động 100% theo quy trình Admin / CSKH duyệt thủ công (`SkillVerificationServiceTest`, `SkillVerificationPersistenceIntegrationTest`, `SkillVerificationFlowTest`). Báo cáo bên dưới phản ánh kết quả chạy lịch sử tại thời điểm 19/11/2026.
+
+# HỆ THỐNG THẨM ĐỊNH KỸ NĂNG (UC-43 & UC-46)
 
 **Dự án:** CANi - On-Demand Event Workforce Coordination Platform  
 **Mã tài liệu:** `CANi_Test_Report_AI_Skill_Verification_v1.1`  

@@ -29,6 +29,7 @@ public class WorkerPublicProfileResponseDto {
     private Boolean isOnline;
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Integer age;
+    private Boolean meetsMinimumAge;
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String baseAddress;
 
@@ -42,7 +43,7 @@ public class WorkerPublicProfileResponseDto {
     private Integer totalCancellations;
     private Integer totalNoshows;
 
-    // Danh sách kỹ năng (Phân loại Tier 1, Tier 2 tích xanh AI, Tier 3)
+    // Danh sách kỹ năng (Phân loại Tier 1, Tier 2 chứng chỉ xác minh, Tier 3)
     private List<WorkerSkillProfileDto> skills;
 
     // Lịch sử đánh giá thực tế từ các nhà tổ chức sự kiện

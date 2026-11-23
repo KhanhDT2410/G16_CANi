@@ -140,6 +140,22 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
     }
 
     @Override
+    public boolean isReadable(String objectKey) {
+        if (!isManagedObjectKey(objectKey)) {
+            return false;
+        }
+        try {
+            Path filePath = resolveSafePath(objectKey);
+            return Files.exists(filePath)
+                    && Files.isRegularFile(filePath)
+                    && Files.isReadable(filePath)
+                    && Files.size(filePath) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
     public boolean deleteIfPresent(String objectKey) {
         if (!isManagedObjectKey(objectKey)) {
             return true;

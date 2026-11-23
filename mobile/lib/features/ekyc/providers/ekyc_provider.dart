@@ -81,6 +81,10 @@ class EkycState {
   final String? confirmedResidenceAddress;
   final String? confirmedIssueDate;
 
+  // Đồng ý xử lý dữ liệu sinh trắc học theo Nghị định 13/2023/NĐ-CP
+  final EkycConsentPolicy consentPolicy;
+  final bool consentAccepted;
+
   const EkycState({
     this.isLoading = false,
     this.errorMessage,
@@ -98,12 +102,15 @@ class EkycState {
     this.confirmedGender,
     this.confirmedResidenceAddress,
     this.confirmedIssueDate,
+    this.consentPolicy = EkycConsentPolicy.fallback,
+    this.consentAccepted = false,
   });
 
   bool get hasAllImages =>
       frontBytes != null && backBytes != null && selfieBytes != null;
 
-  bool get isReadyToSubmit => hasAllImages && !isLoading;
+  bool get isReadyToSubmit =>
+      hasAllImages && (!consentPolicy.required || consentAccepted) && !isLoading;
 
   bool get hasConfirmedInfo =>
       confirmedCccd != null && confirmedCccd!.isNotEmpty;
@@ -125,6 +132,8 @@ class EkycState {
     String? confirmedGender,
     String? confirmedResidenceAddress,
     String? confirmedIssueDate,
+    EkycConsentPolicy? consentPolicy,
+    bool? consentAccepted,
     bool clearError = false,
     bool clearResult = false,
   }) {
@@ -145,6 +154,8 @@ class EkycState {
       confirmedGender: confirmedGender ?? this.confirmedGender,
       confirmedResidenceAddress: confirmedResidenceAddress ?? this.confirmedResidenceAddress,
       confirmedIssueDate: confirmedIssueDate ?? this.confirmedIssueDate,
+      consentPolicy: consentPolicy ?? this.consentPolicy,
+      consentAccepted: consentAccepted ?? this.consentAccepted,
     );
   }
 }
@@ -154,16 +165,33 @@ class EkycNotifier extends StateNotifier<EkycState> {
   final Ref _ref;
 
   EkycNotifier(this._repository, this._ref) : super(const EkycState()) {
-    checkStatus();
+    loadInitialData();
     _ref.listen<AuthState>(authStateProvider, (previous, next) {
       if (previous?.user?.id != next.user?.id) {
         // Chỉ xóa state cục bộ khi đổi tài khoản — TUYỆT ĐỐI không gọi API reset xóa dữ liệu server!
         clearLocalForm();
         if (next.isAuthenticated) {
-          checkStatus();
+          loadInitialData();
         }
       }
     });
+  }
+
+  Future<void> loadInitialData() async {
+    await Future.wait([checkStatus(), loadConsentPolicy()]);
+  }
+
+  Future<void> loadConsentPolicy() async {
+    try {
+      final policy = await _repository.getConsentPolicy();
+      state = state.copyWith(consentPolicy: policy);
+    } catch (_) {
+      state = state.copyWith(consentPolicy: EkycConsentPolicy.fallback);
+    }
+  }
+
+  void setConsentAccepted(bool accepted) {
+    state = state.copyWith(consentAccepted: accepted, clearError: true);
   }
 
   Future<void> checkStatus() async {
@@ -258,6 +286,8 @@ class EkycNotifier extends StateNotifier<EkycState> {
         backFileName: state.backFileName ?? 'back.jpg',
         selfieBytes: state.selfieBytes!,
         selfieFileName: state.selfieFileName ?? 'selfie.jpg',
+        consentAccepted: state.consentAccepted,
+        consentNoticeVersion: state.consentPolicy.noticeVersion,
         cccdNumber: state.confirmedCccd,
         fullName: state.confirmedFullName,
         dob: state.confirmedDob,

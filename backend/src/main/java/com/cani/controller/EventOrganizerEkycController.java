@@ -1,6 +1,7 @@
 package com.cani.controller;
 
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
+import com.cani.dto.ekyc.EkycConsentPolicyDto;
 import com.cani.dto.ekyc.EkycLegalHoldRequestDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
@@ -27,6 +28,13 @@ public class EventOrganizerEkycController {
 
     private final EventOrganizerEkycService eoEkycService;
 
+    @GetMapping("/eo/ekyc/consent-policy")
+    public ResponseEntity<ApiResponse<EkycConsentPolicyDto>> getConsentPolicy() {
+        return ResponseEntity.ok(ApiResponse.ok(
+                eoEkycService.getConsentPolicy(),
+                "Lấy thông báo xử lý dữ liệu cá nhân & sinh trắc học eKYC thành công"));
+    }
+
     /**
      * Nhà tổ chức sự kiện nộp hồ sơ định danh eKYC cá nhân
      */
@@ -37,11 +45,13 @@ public class EventOrganizerEkycController {
             @RequestParam("selfieImage") MultipartFile selfieImage,
             @RequestParam(value = "businessLicenseImage", required = false) MultipartFile businessLicenseImage,
             @RequestParam(value = "cccdNumber", required = false) String cccdNumber,
+            @RequestParam(value = "consentAccepted", required = false) Boolean consentAccepted,
+            @RequestParam(value = "consentNoticeVersion", required = false) String consentNoticeVersion,
             Authentication authentication) {
 
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EoEkycVerificationResultDto result = eoEkycService.submitEkyc(
-                userId, frontImage, backImage, selfieImage, cccdNumber);
+                userId, frontImage, backImage, selfieImage, cccdNumber, consentAccepted, consentNoticeVersion);
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {

@@ -59,443 +59,477 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = {AuthController.class, SkillVerificationController.class})
+@WebMvcTest(controllers = { AuthController.class, SkillVerificationController.class })
 @Import({
-        SecurityConfig.class,
-        UserAuthorityFilter.class,
-        RestAuthenticationEntryPoint.class,
-        RestAccessDeniedHandler.class,
-        DocumentAccessTokenService.class
+                SecurityConfig.class,
+                UserAuthorityFilter.class,
+                RestAuthenticationEntryPoint.class,
+                RestAccessDeniedHandler.class,
+                DocumentAccessTokenService.class
 })
 class SkillVerificationFlowTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private DocumentAccessTokenService documentAccessTokenService;
+        @Autowired
+        private DocumentAccessTokenService documentAccessTokenService;
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+        @MockitoBean
+        private JwtDecoder jwtDecoder;
 
-    @MockitoBean
-    private AuthService authService;
+        @MockitoBean
+        private AuthService authService;
 
-    @MockitoBean
-    private com.cani.service.EmailOtpService emailOtpService;
+        @MockitoBean
+        private com.cani.service.EmailOtpService emailOtpService;
 
-    @MockitoBean
-    private SkillVerificationService verificationService;
+        @MockitoBean
+        private SkillVerificationService verificationService;
 
-    @MockitoBean
-    private WorkerRepository workerRepository;
+        @MockitoBean
+        private WorkerRepository workerRepository;
 
-    @MockitoBean
-    private SkillRepository skillRepository;
+        @MockitoBean
+        private SkillRepository skillRepository;
 
-    @MockitoBean
-    private UserRepository userRepository;
+        @MockitoBean
+        private UserRepository userRepository;
 
-    private User workerUser;
-    private User adminUser;
-    private Worker workerEntity;
-    private Skill mockSkill;
-    private UUID workerId;
-    private UUID skillId;
+        private User workerUser;
+        private User adminUser;
+        private Worker workerEntity;
+        private Skill mockSkill;
+        private UUID workerId;
+        private UUID skillId;
 
-    @BeforeEach
-    void setUp() {
-        UUID userId = UUID.randomUUID();
-        workerId = UUID.randomUUID();
-        skillId = UUID.randomUUID();
+        @BeforeEach
+        void setUp() {
+                UUID userId = UUID.randomUUID();
+                workerId = UUID.randomUUID();
+                skillId = UUID.randomUUID();
 
-        workerUser = User.builder()
-                .userId(userId)
-                .email("worker@cani.vn")
-                .fullName("Nguyen Van An")
-                .role(UserRole.WORKER)
-                .status(UserStatus.ACTIVE)
-                .emailVerified(true)
-                .build();
+                workerUser = User.builder()
+                                .userId(userId)
+                                .email("worker@cani.vn")
+                                .fullName("Nguyen Van An")
+                                .role(UserRole.WORKER)
+                                .status(UserStatus.ACTIVE)
+                                .emailVerified(true)
+                                .build();
 
-        adminUser = User.builder()
-                .userId(UUID.randomUUID())
-                .email("admin@cani.vn")
-                .fullName("Admin CANi")
-                .role(UserRole.ADMIN)
-                .status(UserStatus.ACTIVE)
-                .emailVerified(true)
-                .build();
+                adminUser = User.builder()
+                                .userId(UUID.randomUUID())
+                                .email("admin@cani.vn")
+                                .fullName("Admin CANi")
+                                .role(UserRole.ADMIN)
+                                .status(UserStatus.ACTIVE)
+                                .emailVerified(true)
+                                .build();
 
-        workerEntity = Worker.builder()
-                .workerId(workerId)
-                .user(workerUser)
-                .fullName(workerUser.getFullName())
-                .skillTier(SkillTier.STARTER)
-                .build();
+                workerEntity = Worker.builder()
+                                .workerId(workerId)
+                                .user(workerUser)
+                                .fullName(workerUser.getFullName())
+                                .skillTier(SkillTier.STARTER)
+                                .build();
 
-        mockSkill = Skill.builder()
-                .skillId(skillId)
-                .name("Pha chế (Bartender/Barista)")
-                .category("F&B")
-                .isActive(true)
-                .build();
-
-        when(workerRepository.findByUser_UserId(workerUser.getUserId()))
-                .thenReturn(Optional.of(workerEntity));
-
-        when(verificationService.resolveWorkerId(any(User.class), any()))
-                .thenReturn(workerId);
-        when(verificationService.resolveWorkerId(eq(null), any()))
-                .thenAnswer(inv -> inv.getArgument(1));
-        when(verificationService.getTaxonomy())
-                .thenReturn(List.of(mockSkill));
-    }
-
-    private UsernamePasswordAuthenticationToken createAuthToken(User user) {
-        return new UsernamePasswordAuthenticationToken(
-                user,
-                "n/a",
-                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
-        );
-    }
-
-    @Test
-    @DisplayName("Step 1: Worker Login - POST /api/auth/login returns JWT session and worker profile")
-    void step1_workerLogin_Success() throws Exception {
-        LoginRequest loginRequest = LoginRequest.builder()
-                .email("worker@cani.vn")
-                .password("Password123!")
-                .build();
-
-        LoginResponse mockLoginResponse = LoginResponse.builder()
-                .token("mock-jwt-token-worker")
-                .refreshToken("mock-refresh-token")
-                .expiresIn(3600L)
-                .user(UserDto.builder()
-                        .id(workerUser.getUserId())
-                        .email(workerUser.getEmail())
-                        .fullName(workerUser.getFullName())
-                        .role(workerUser.getRole())
-                        .status(workerUser.getStatus())
-                        .build())
-                .build();
-
-        when(authService.login(any(LoginRequest.class))).thenReturn(mockLoginResponse);
-
-        mockMvc.perform(post("/api/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(loginRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Đăng nhập thành công"))
-                .andExpect(jsonPath("$.data.token").value("mock-jwt-token-worker"))
-                .andExpect(jsonPath("$.data.user.email").value("worker@cani.vn"))
-                .andExpect(jsonPath("$.data.user.role").value("WORKER"));
-    }
-
-    @Test
-    @DisplayName("Step 2: Get Skill Taxonomy - GET /api/v1/workers/skills/taxonomy is public and returns skills")
-    void step2_fetchSkillTaxonomy_Public() throws Exception {
-        when(skillRepository.findByIsActiveTrue()).thenReturn(List.of(mockSkill));
-
-        mockMvc.perform(get("/api/v1/workers/skills/taxonomy"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].name").value("Pha chế (Bartender/Barista)"))
-                .andExpect(jsonPath("$.data[0].category").value("F&B"));
-    }
-
-    @Test
-    @DisplayName("Step 2b: Get Tier Config - GET /api/v1/workers/skills/tiers/config is public and returns BR-64 thresholds")
-    void step2b_fetchTierConfigs_Public() throws Exception {
-        when(verificationService.getTierConfigs()).thenReturn(List.of(
-                TierConfigDto.builder().tier(SkillTier.STARTER).minSp(0).nextTierMinSp(100).build(),
-                TierConfigDto.builder().tier(SkillTier.BRONZE).minSp(100).nextTierMinSp(200).build()
-        ));
-
-        mockMvc.perform(get("/api/v1/workers/skills/tiers/config"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].tier").value("STARTER"))
-                .andExpect(jsonPath("$.data[0].minSp").value(0))
-                .andExpect(jsonPath("$.data[1].tier").value("BRONZE"))
-                .andExpect(jsonPath("$.data[1].minSp").value(100));
-    }
-
-    @Test
-    @DisplayName("Step 2c: Worker Declares Skills (Tier 1) - POST /api/v1/workers/skills/declare saves self-declared skills")
-    void step2c_declareSkills_Tier1() throws Exception {
-        DeclareSkillRequestDto request = DeclareSkillRequestDto.builder()
-                .skills(List.of(
-                        DeclareSkillRequestDto.SkillItem.builder()
+                mockSkill = Skill.builder()
                                 .skillId(skillId)
+                                .name("Pha chế (Bartender/Barista)")
+                                .category("F&B")
+                                .isActive(true)
+                                .build();
+
+                when(workerRepository.findByUser_UserId(workerUser.getUserId()))
+                                .thenReturn(Optional.of(workerEntity));
+
+                when(verificationService.resolveWorkerId(any(User.class), any()))
+                                .thenReturn(workerId);
+                when(verificationService.resolveWorkerId(eq(null), any()))
+                                .thenAnswer(inv -> inv.getArgument(1));
+                when(verificationService.getTaxonomy())
+                                .thenReturn(List.of(mockSkill));
+        }
+
+        private UsernamePasswordAuthenticationToken createAuthToken(User user) {
+                return new UsernamePasswordAuthenticationToken(
+                                user,
+                                "n/a",
+                                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
+        }
+
+        @Test
+        @DisplayName("Step 1: Worker Login - POST /api/auth/login returns JWT session and worker profile")
+        void step1_workerLogin_Success() throws Exception {
+                LoginRequest loginRequest = LoginRequest.builder()
+                                .email("worker@cani.vn")
+                                .password("Password123!")
+                                .build();
+
+                LoginResponse mockLoginResponse = LoginResponse.builder()
+                                .token("mock-jwt-token-worker")
+                                .refreshToken("mock-refresh-token")
+                                .expiresIn(3600L)
+                                .user(UserDto.builder()
+                                                .id(workerUser.getUserId())
+                                                .email(workerUser.getEmail())
+                                                .fullName(workerUser.getFullName())
+                                                .role(workerUser.getRole())
+                                                .status(workerUser.getStatus())
+                                                .build())
+                                .build();
+
+                when(authService.login(any(LoginRequest.class))).thenReturn(mockLoginResponse);
+
+                mockMvc.perform(post("/api/auth/login")
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginRequest)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.message").value("Đăng nhập thành công"))
+                                .andExpect(jsonPath("$.data.token").value("mock-jwt-token-worker"))
+                                .andExpect(jsonPath("$.data.user.email").value("worker@cani.vn"))
+                                .andExpect(jsonPath("$.data.user.role").value("WORKER"));
+        }
+
+        @Test
+        @DisplayName("Step 2: Get Skill Taxonomy - GET /api/v1/workers/skills/taxonomy is public and returns skills")
+        void step2_fetchSkillTaxonomy_Public() throws Exception {
+                when(skillRepository.findByIsActiveTrue()).thenReturn(List.of(mockSkill));
+
+                mockMvc.perform(get("/api/v1/workers/skills/taxonomy"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data[0].name").value("Pha chế (Bartender/Barista)"))
+                                .andExpect(jsonPath("$.data[0].category").value("F&B"));
+        }
+
+        @Test
+        @DisplayName("Step 2b: Get Tier Config - GET /api/v1/workers/skills/tiers/config is public and returns BR-64 thresholds")
+        void step2b_fetchTierConfigs_Public() throws Exception {
+                when(verificationService.getTierConfigs()).thenReturn(List.of(
+                                TierConfigDto.builder().tier(SkillTier.STARTER).minSp(0).nextTierMinSp(100).build(),
+                                TierConfigDto.builder().tier(SkillTier.BRONZE).minSp(100).nextTierMinSp(200).build()));
+
+                mockMvc.perform(get("/api/v1/workers/skills/tiers/config"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data[0].tier").value("STARTER"))
+                                .andExpect(jsonPath("$.data[0].minSp").value(0))
+                                .andExpect(jsonPath("$.data[1].tier").value("BRONZE"))
+                                .andExpect(jsonPath("$.data[1].minSp").value(100));
+        }
+
+        @Test
+        @DisplayName("Step 2c: Worker Declares Skills (Tier 1) - POST /api/v1/workers/skills/declare saves self-declared skills")
+        void step2c_declareSkills_Tier1() throws Exception {
+                DeclareSkillRequestDto request = DeclareSkillRequestDto.builder()
+                                .skills(List.of(
+                                                DeclareSkillRequestDto.SkillItem.builder()
+                                                                .skillId(skillId)
+                                                                .proficiency(com.cani.entity.enums.ExperienceLevel.INTERMEDIATE)
+                                                                .build()))
+                                .build();
+
+                WorkerSkillResponseDto dto = WorkerSkillResponseDto.builder()
+                                .id(UUID.randomUUID())
+                                .skillId(skillId)
+                                .skillName("Pha chế (Bartender/Barista)")
                                 .proficiency(com.cani.entity.enums.ExperienceLevel.INTERMEDIATE)
-                                .build()
-                ))
-                .build();
+                                .verificationTier(com.cani.entity.enums.VerificationTier.SELF_DECLARED)
+                                .spVerifyAwarded(0)
+                                .build();
 
-        WorkerSkillResponseDto dto = WorkerSkillResponseDto.builder()
-                .id(UUID.randomUUID())
-                .skillId(skillId)
-                .skillName("Pha chế (Bartender/Barista)")
-                .proficiency(com.cani.entity.enums.ExperienceLevel.INTERMEDIATE)
-                .verificationTier(com.cani.entity.enums.VerificationTier.SELF_DECLARED)
-                .spVerifyAwarded(0)
-                .build();
+                when(verificationService.declareSkills(eq(workerId), any())).thenReturn(List.of(dto));
 
-        when(verificationService.declareSkills(eq(workerId), any())).thenReturn(List.of(dto));
+                mockMvc.perform(post("/api/v1/workers/skills/declare")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(csrf())
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data[0].skillId").value(skillId.toString()))
+                                .andExpect(jsonPath("$.data[0].verificationTier").value("SELF_DECLARED"))
+                                .andExpect(jsonPath("$.data[0].spVerifyAwarded").value(0));
+        }
 
-        mockMvc.perform(post("/api/v1/workers/skills/declare")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request))
-                        .with(csrf())
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].skillId").value(skillId.toString()))
-                .andExpect(jsonPath("$.data[0].verificationTier").value("SELF_DECLARED"))
-                .andExpect(jsonPath("$.data[0].spVerifyAwarded").value(0));
-    }
+        @Test
+        @DisplayName("Step 3: Worker Submits Certificate - POST /api/v1/workers/skills/verify triggers AI verification and awards +25 SP")
+        void step3_workerSubmitsCertificate_AutoApproved() throws Exception {
+                MockMultipartFile certFile = new MockMultipartFile(
+                                "file",
+                                "bartender_cert.png",
+                                MediaType.IMAGE_PNG_VALUE,
+                                "fake-certificate-binary-content".getBytes());
 
-    @Test
-    @DisplayName("Step 3: Worker Submits Certificate - POST /api/v1/workers/skills/verify triggers AI verification and awards +25 SP")
-    void step3_workerSubmitsCertificate_AutoApproved() throws Exception {
-        MockMultipartFile certFile = new MockMultipartFile(
-                "file",
-                "bartender_cert.png",
-                MediaType.IMAGE_PNG_VALUE,
-                "fake-certificate-binary-content".getBytes()
-        );
+                ExtractedSkillDto extractedSkill = ExtractedSkillDto.builder()
+                                .skillName("Bartender Course")
+                                .taxonomyRole("Pha chế (Bartender/Barista)")
+                                .confidenceScore(0.96)
+                                .evidenceSnippet("Completed 40 hours intensive Bartender Masterclass with Excellence")
+                                .build();
 
-        ExtractedSkillDto extractedSkill = ExtractedSkillDto.builder()
-                .skillName("Bartender Course")
-                .taxonomyRole("Pha chế (Bartender/Barista)")
-                .confidenceScore(0.96)
-                .evidenceSnippet("Completed 40 hours intensive Bartender Masterclass with Excellence")
-                .build();
+                SkillVerificationResponseDto responseDto = SkillVerificationResponseDto.builder()
+                                .id(UUID.randomUUID())
+                                .workerId(workerId)
+                                .skillId(skillId)
+                                .skillName("Pha chế (Bartender/Barista)")
+                                .jobType("Pha chế (Bartender/Barista)")
+                                .recipientName("Nguyen Van An")
+                                .institution("Saigon Bartender Academy")
+                                .issueDate("15/08/2024")
+                                .hasSealOrSignature(true)
+                                .overallConfidence(0.96)
+                                .routingDecision(RoutingDecision.AUTO_APPROVE)
+                                .routingReason("Chứng chỉ hợp lệ, đầy đủ con dấu và học phần chuyên môn")
+                                .status(SkillVerificationStatus.APPROVED)
+                                .spAwarded(25)
+                                .currentTotalSp(25)
+                                .currentTier(SkillTier.STARTER)
+                                .createdAt(Instant.now())
+                                .extractedSkills(List.of(extractedSkill))
+                                .build();
 
-        SkillVerificationResponseDto responseDto = SkillVerificationResponseDto.builder()
-                .id(UUID.randomUUID())
-                .workerId(workerId)
-                .skillId(skillId)
-                .skillName("Pha chế (Bartender/Barista)")
-                .jobType("Pha chế (Bartender/Barista)")
-                .recipientName("Nguyen Van An")
-                .institution("Saigon Bartender Academy")
-                .issueDate("15/08/2024")
-                .hasSealOrSignature(true)
-                .overallConfidence(0.96)
-                .routingDecision(RoutingDecision.AUTO_APPROVE)
-                .routingReason("Chứng chỉ hợp lệ, đầy đủ con dấu và học phần chuyên môn")
-                .status(SkillVerificationStatus.APPROVED)
-                .spAwarded(25)
-                .currentTotalSp(25)
-                .currentTier(SkillTier.STARTER)
-                .createdAt(Instant.now())
-                .extractedSkills(List.of(extractedSkill))
-                .build();
+                when(verificationService.submitVerification(eq(workerId), any(), eq(skillId),
+                                eq("Gửi chứng chỉ tốt nghiệp")))
+                                .thenReturn(responseDto);
 
-        when(verificationService.submitVerification(eq(workerId), any(), eq(skillId), eq("Gửi chứng chỉ tốt nghiệp")))
-                .thenReturn(responseDto);
+                mockMvc.perform(multipart("/api/v1/workers/skills/verify")
+                                .file(certFile)
+                                .param("skillId", skillId.toString())
+                                .param("notes", "Gửi chứng chỉ tốt nghiệp")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.message")
+                                                .value("Chứng chỉ kỹ năng đã được phê duyệt và cộng SP_verify."))
+                                .andExpect(jsonPath("$.data.workerId").value(workerId.toString()))
+                                .andExpect(jsonPath("$.data.routingDecision").value("AUTO_APPROVE"))
+                                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(25))
+                                .andExpect(jsonPath("$.data.currentTotalSp").value(25))
+                                .andExpect(jsonPath("$.data.extractedSkills[0].taxonomyRole")
+                                                .value("Pha chế (Bartender/Barista)"))
+                                .andExpect(jsonPath("$.data.hasSealOrSignature").value(true));
+        }
 
-        mockMvc.perform(multipart("/api/v1/workers/skills/verify")
-                        .file(certFile)
-                        .param("skillId", skillId.toString())
-                        .param("notes", "Gửi chứng chỉ tốt nghiệp")
-                        .with(csrf())
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Xác thực AI thành công! Kỹ năng đã được phê duyệt tự động và cộng SP_verify."))
-                .andExpect(jsonPath("$.data.workerId").value(workerId.toString()))
-                .andExpect(jsonPath("$.data.routingDecision").value("AUTO_APPROVE"))
-                .andExpect(jsonPath("$.data.status").value("APPROVED"))
-                .andExpect(jsonPath("$.data.spAwarded").value(25))
-                .andExpect(jsonPath("$.data.currentTotalSp").value(25))
-                .andExpect(jsonPath("$.data.extractedSkills[0].taxonomyRole").value("Pha chế (Bartender/Barista)"))
-                .andExpect(jsonPath("$.data.hasSealOrSignature").value(true));
-    }
+        @Test
+        @DisplayName("Step 4: Worker Queries History - GET /api/v1/workers/skills/history returns verification list")
+        void step4_getWorkerHistory_ReturnsList() throws Exception {
+                SkillVerificationResponseDto item = SkillVerificationResponseDto.builder()
+                                .id(UUID.randomUUID())
+                                .workerId(workerId)
+                                .skillName("Pha chế (Bartender/Barista)")
+                                .jobType("Pha chế (Bartender/Barista)")
+                                .routingDecision(RoutingDecision.AUTO_APPROVE)
+                                .status(SkillVerificationStatus.APPROVED)
+                                .spAwarded(25)
+                                .overallConfidence(0.96)
+                                .build();
 
-    @Test
-    @DisplayName("Step 4: Worker Queries History - GET /api/v1/workers/skills/history returns verification list")
-    void step4_getWorkerHistory_ReturnsList() throws Exception {
-        SkillVerificationResponseDto item = SkillVerificationResponseDto.builder()
-                .id(UUID.randomUUID())
-                .workerId(workerId)
-                .skillName("Pha chế (Bartender/Barista)")
-                .jobType("Pha chế (Bartender/Barista)")
-                .routingDecision(RoutingDecision.AUTO_APPROVE)
-                .status(SkillVerificationStatus.APPROVED)
-                .spAwarded(25)
-                .overallConfidence(0.96)
-                .build();
+                when(verificationService.getWorkerVerificationHistory(workerId)).thenReturn(List.of(item));
 
-        when(verificationService.getWorkerVerificationHistory(workerId)).thenReturn(List.of(item));
+                mockMvc.perform(get("/api/v1/workers/skills/history")
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data[0].workerId").value(workerId.toString()))
+                                .andExpect(jsonPath("$.data[0].spAwarded").value(25))
+                                .andExpect(jsonPath("$.data[0].status").value("APPROVED"));
+        }
 
-        mockMvc.perform(get("/api/v1/workers/skills/history")
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].workerId").value(workerId.toString()))
-                .andExpect(jsonPath("$.data[0].spAwarded").value(25))
-                .andExpect(jsonPath("$.data[0].status").value("APPROVED"));
-    }
+        @Test
+        @DisplayName("Step 5: Worker Queries Skill Points - GET /api/v1/workers/skills/points returns SP breakdown")
+        void step5_getWorkerPoints_ReturnsPoints() throws Exception {
+                WorkerSkillPointDto pointDto = WorkerSkillPointDto.builder()
+                                .id(UUID.randomUUID())
+                                .jobType("Pha chế (Bartender/Barista)")
+                                .spVerify(25)
+                                .spExperience(0)
+                                .spRating(0)
+                                .totalSp(25)
+                                .tier(SkillTier.STARTER)
+                                .build();
 
-    @Test
-    @DisplayName("Step 5: Worker Queries Skill Points - GET /api/v1/workers/skills/points returns SP breakdown")
-    void step5_getWorkerPoints_ReturnsPoints() throws Exception {
-        WorkerSkillPointDto pointDto = WorkerSkillPointDto.builder()
-                .id(UUID.randomUUID())
-                .jobType("Pha chế (Bartender/Barista)")
-                .spVerify(25)
-                .spExperience(0)
-                .spRating(0)
-                .totalSp(25)
-                .tier(SkillTier.STARTER)
-                .build();
+                when(verificationService.getWorkerSkillPoints(workerId)).thenReturn(List.of(pointDto));
 
-        when(verificationService.getWorkerSkillPoints(workerId)).thenReturn(List.of(pointDto));
+                mockMvc.perform(get("/api/v1/workers/skills/points")
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data[0].jobType").value("Pha chế (Bartender/Barista)"))
+                                .andExpect(jsonPath("$.data[0].spVerify").value(25))
+                                .andExpect(jsonPath("$.data[0].totalSp").value(25));
+        }
 
-        mockMvc.perform(get("/api/v1/workers/skills/points")
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].jobType").value("Pha chế (Bartender/Barista)"))
-                .andExpect(jsonPath("$.data[0].spVerify").value(25))
-                .andExpect(jsonPath("$.data[0].totalSp").value(25));
-    }
+        @Test
+        @DisplayName("Step 6: Security Boundary - Worker cannot call adminReview (403 Forbidden)")
+        void step6_adminReview_ForbiddenForWorker() throws Exception {
+                UUID verificationId = UUID.randomUUID();
 
-    @Test
-    @DisplayName("Step 6: Security Boundary - Worker cannot call adminReview (403 Forbidden)")
-    void step6_adminReview_ForbiddenForWorker() throws Exception {
-        UUID verificationId = UUID.randomUUID();
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
+                                .param("approved", "true")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isForbidden());
+        }
 
-        mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
-                        .param("approved", "true")
-                        .with(csrf())
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isForbidden());
-    }
+        @Test
+        @DisplayName("Step 7: Admin Review - Admin user can approve medium-confidence submission")
+        void step7_adminReview_SuccessForAdminUser() throws Exception {
+                UUID verificationId = UUID.randomUUID();
 
-    @Test
-    @DisplayName("Step 7: Admin Review - Admin user can approve medium-confidence submission")
-    void step7_adminReview_SuccessForAdminUser() throws Exception {
-        UUID verificationId = UUID.randomUUID();
+                SkillVerificationResponseDto approvedResponse = SkillVerificationResponseDto.builder()
+                                .id(verificationId)
+                                .workerId(workerId)
+                                .status(SkillVerificationStatus.APPROVED)
+                                .spAwarded(25)
+                                .routingDecision(RoutingDecision.ADMIN_REVIEW)
+                                .routingReason("Admin đã xác minh con dấu mờ")
+                                .build();
 
-        SkillVerificationResponseDto approvedResponse = SkillVerificationResponseDto.builder()
-                .id(verificationId)
-                .workerId(workerId)
-                .status(SkillVerificationStatus.APPROVED)
-                .spAwarded(25)
-                .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                .routingReason("Admin đã xác minh con dấu mờ")
-                .build();
+                when(verificationService.adminReview(eq(verificationId), eq(adminUser.getUserId()), eq(true),
+                                eq("Admin đã xác minh con dấu mờ")))
+                                .thenReturn(approvedResponse);
 
-        when(verificationService.adminReview(eq(verificationId), eq(adminUser.getUserId()), eq(true), eq("Admin đã xác minh con dấu mờ")))
-                .thenReturn(approvedResponse);
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
+                                .param("approved", "true")
+                                .param("reviewNotes", "Admin đã xác minh con dấu mờ")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(adminUser))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.message")
+                                                .value("Admin đã phê duyệt kỹ năng và cộng +25 SP_verify"))
+                                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(25));
+        }
 
-        mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
-                        .param("approved", "true")
-                        .param("reviewNotes", "Admin đã xác minh con dấu mờ")
-                        .with(csrf())
-                        .with(authentication(createAuthToken(adminUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Admin đã phê duyệt kỹ năng và cộng +25 SP_verify"))
-                .andExpect(jsonPath("$.data.status").value("APPROVED"))
-                .andExpect(jsonPath("$.data.spAwarded").value(25));
-    }
+        @Test
+        @DisplayName("Step 8 (Security V2): Unauthenticated request to /documents/{filename} without signed URL returns 401 Unauthorized")
+        void step8_documentDownload_Unauthenticated_Returns401() throws Exception {
+                mockMvc.perform(get("/api/v1/workers/skills/documents/cert_private123.jpg"))
+                                .andExpect(status().isUnauthorized());
+        }
 
-    @Test
-    @DisplayName("Step 8 (Security V2): Unauthenticated request to /documents/{filename} without signed URL returns 401 Unauthorized")
-    void step8_documentDownload_Unauthenticated_Returns401() throws Exception {
-        mockMvc.perform(get("/api/v1/workers/skills/documents/cert_private123.jpg"))
-                .andExpect(status().isUnauthorized());
-    }
+        @Test
+        @DisplayName("Step 9 (Security V2): Expired or tampered signed URL returns 401 Unauthorized")
+        void step9_documentDownload_ExpiredSignedUrl_Returns401() throws Exception {
+                mockMvc.perform(get("/api/v1/workers/skills/documents/cert_private123.jpg")
+                                .param("expires", "1000000")
+                                .param("sig", "invalid-or-expired-signature"))
+                                .andExpect(status().isUnauthorized());
+        }
 
-    @Test
-    @DisplayName("Step 9 (Security V2): Expired or tampered signed URL returns 401 Unauthorized")
-    void step9_documentDownload_ExpiredSignedUrl_Returns401() throws Exception {
-        mockMvc.perform(get("/api/v1/workers/skills/documents/cert_private123.jpg")
-                        .param("expires", "1000000")
-                        .param("sig", "invalid-or-expired-signature"))
-                .andExpect(status().isUnauthorized());
-    }
+        @Test
+        @DisplayName("Step 10 (Security V2): Valid short-lived HMAC signed URL serves document (200 OK)")
+        void step10_documentDownload_ValidSignedUrl_Returns200() throws Exception {
+                String filename = "cert_signed123.jpg";
+                String signedUrl = documentAccessTokenService.generateSignedDocumentUrl(filename);
 
-    @Test
-    @DisplayName("Step 10 (Security V2): Valid short-lived HMAC signed URL serves document (200 OK)")
-    void step10_documentDownload_ValidSignedUrl_Returns200() throws Exception {
-        String filename = "cert_signed123.jpg";
-        String signedUrl = documentAccessTokenService.generateSignedDocumentUrl(filename);
+                when(verificationService.loadAuthorizedCertificateDocument(eq(filename), eq(null), anyString(),
+                                anyString()))
+                                .thenReturn(new ByteArrayResource(
+                                                new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF }) {
+                                        @Override
+                                        public String getFilename() {
+                                                return filename;
+                                        }
+                                });
 
-        when(verificationService.loadAuthorizedCertificateDocument(eq(filename), eq(null), anyString(), anyString()))
-                .thenReturn(new ByteArrayResource(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}) {
-                    @Override
-                    public String getFilename() {
-                        return filename;
-                    }
-                });
+                mockMvc.perform(get(signedUrl))
+                                .andExpect(status().isOk())
+                                .andExpect(header().string("Cache-Control", "private, no-store"));
+        }
 
-        mockMvc.perform(get(signedUrl))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Cache-Control", "private, no-store"));
-    }
+        @Test
+        @DisplayName("Step 11 (Security V2): Worker accessing another worker's certificate document returns 403 Forbidden")
+        void step11_documentDownload_OtherWorker_Returns403() throws Exception {
+                String filename = "cert_other_worker.jpg";
+                when(verificationService.loadAuthorizedCertificateDocument(eq(filename), eq(workerUser), eq(null),
+                                eq(null)))
+                                .thenThrow(new AppException("Bạn không có quyền truy cập tài liệu chứng chỉ này",
+                                                HttpStatus.FORBIDDEN));
 
-    @Test
-    @DisplayName("Step 11 (Security V2): Worker accessing another worker's certificate document returns 403 Forbidden")
-    void step11_documentDownload_OtherWorker_Returns403() throws Exception {
-        String filename = "cert_other_worker.jpg";
-        when(verificationService.loadAuthorizedCertificateDocument(eq(filename), eq(workerUser), eq(null), eq(null)))
-                .thenThrow(new AppException("Bạn không có quyền truy cập tài liệu chứng chỉ này", HttpStatus.FORBIDDEN));
+                mockMvc.perform(get("/api/v1/workers/skills/documents/" + filename)
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isForbidden());
+        }
 
-        mockMvc.perform(get("/api/v1/workers/skills/documents/" + filename)
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isForbidden());
-    }
+        @Test
+        @DisplayName("Step 12 (Security V2): Worker cannot call Admin retry or queue endpoints (403 Forbidden)")
+        void step12_adminRetryAndQueue_ForbiddenForWorker() throws Exception {
+                UUID verificationId = UUID.randomUUID();
+                mockMvc.perform(get("/api/v1/workers/skills/admin/queue")
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isForbidden());
 
-    @Test
-    @DisplayName("Step 12 (Security V2): Worker cannot call Admin retry or queue endpoints (403 Forbidden)")
-    void step12_adminRetryAndQueue_ForbiddenForWorker() throws Exception {
-        UUID verificationId = UUID.randomUUID();
-        mockMvc.perform(get("/api/v1/workers/skills/admin/queue")
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isForbidden());
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/manual-review")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/retry")
-                        .with(csrf())
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isForbidden());
-    }
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/retry")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isForbidden());
+        }
 
-    @Test
-    @DisplayName("Step 13 (Admin V2): Admin requests additional document via decision=NEEDS_MORE_INFO")
-    void step13_adminReview_NeedsMoreInfo_Success() throws Exception {
-        UUID verificationId = UUID.randomUUID();
-        SkillVerificationResponseDto moreInfoDto = SkillVerificationResponseDto.builder()
-                .id(verificationId)
-                .workerId(workerId)
-                .status(SkillVerificationStatus.NEEDS_MORE_INFO)
-                .spAwarded(0)
-                .reviewNotes("Ảnh mờ phần dấu mộc, vui lòng chụp lại")
-                .build();
+        @Test
+        @DisplayName("Step 12b: Admin moves legacy VERIFICATION_FAILED request to manual review via /manual-review")
+        void step12b_adminMoveToManualReview_Success() throws Exception {
+                UUID verificationId = UUID.randomUUID();
+                SkillVerificationResponseDto movedDto = SkillVerificationResponseDto.builder()
+                                .id(verificationId)
+                                .workerId(workerId)
+                                .status(SkillVerificationStatus.PENDING_REVIEW)
+                                .routingDecision(RoutingDecision.ADMIN_REVIEW)
+                                .routingReason("Chờ Admin duyệt thủ công")
+                                .spAwarded(0)
+                                .build();
 
-        when(verificationService.adminReview(
-                eq(verificationId), eq(adminUser.getUserId()), eq(AdminReviewDecision.NEEDS_MORE_INFO),
-                eq("Ảnh mờ phần dấu mộc, vui lòng chụp lại")))
-                .thenReturn(moreInfoDto);
+                when(verificationService.moveFailedToManualReview(eq(verificationId), eq(adminUser.getUserId())))
+                                .thenReturn(movedDto);
 
-        mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
-                        .param("decision", "NEEDS_MORE_INFO")
-                        .param("reviewNotes", "Ảnh mờ phần dấu mộc, vui lòng chụp lại")
-                        .with(csrf())
-                        .with(authentication(createAuthToken(adminUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("NEEDS_MORE_INFO"))
-                .andExpect(jsonPath("$.data.spAwarded").value(0));
-    }
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/manual-review")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(adminUser))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(0));
+        }
+
+        @Test
+        @DisplayName("Step 13 (Admin V2): Admin requests additional document via decision=NEEDS_MORE_INFO")
+        void step13_adminReview_NeedsMoreInfo_Success() throws Exception {
+                UUID verificationId = UUID.randomUUID();
+                SkillVerificationResponseDto moreInfoDto = SkillVerificationResponseDto.builder()
+                                .id(verificationId)
+                                .workerId(workerId)
+                                .status(SkillVerificationStatus.NEEDS_MORE_INFO)
+                                .spAwarded(0)
+                                .reviewNotes("Ảnh mờ phần dấu mộc, vui lòng chụp lại")
+                                .build();
+
+                when(verificationService.adminReview(
+                                eq(verificationId), eq(adminUser.getUserId()), eq(AdminReviewDecision.NEEDS_MORE_INFO),
+                                eq("Ảnh mờ phần dấu mộc, vui lòng chụp lại")))
+                                .thenReturn(moreInfoDto);
+
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
+                                .param("decision", "NEEDS_MORE_INFO")
+                                .param("reviewNotes", "Ảnh mờ phần dấu mộc, vui lòng chụp lại")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(adminUser))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.data.status").value("NEEDS_MORE_INFO"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(0));
+        }
 }

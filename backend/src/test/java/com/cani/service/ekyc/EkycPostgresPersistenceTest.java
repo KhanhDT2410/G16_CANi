@@ -33,8 +33,10 @@ import static org.mockito.Mockito.*;
 
 @org.springframework.boot.autoconfigure.ImportAutoConfiguration(org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration.class)
 @DataJpaTest(showSql = false, properties = {"spring.jpa.hibernate.ddl-auto=none",
-        "spring.flyway.enabled=true", "spring.flyway.target=49", "cani.security.ekyc-hash-pepper=synthetic-test-only",
-        "spring.datasource.driver-class-name=org.postgresql.Driver", "cani.ekyc.strict=false", "cani.ekyc.vnpt.require-liveness-for-auto-approve=true"})
+        "spring.flyway.enabled=true", "spring.flyway.target=58", "cani.security.ekyc-hash-pepper=synthetic-test-only",
+        "spring.datasource.driver-class-name=org.postgresql.Driver", "cani.ekyc.strict=false",
+        "cani.ekyc.vnpt.require-liveness-for-auto-approve=true",
+        "cani.ekyc.retention.approved-image-days=30"})
 @ActiveProfiles("pg-audit")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({WorkerEkycService.class, EventOrganizerEkycService.class, EkycDecisionEngine.class, VnptEkycProperties.class,
@@ -83,14 +85,16 @@ class EkycPostgresPersistenceTest {
                 .livenessStatus(EkycIdentityResultDto.LivenessStatus.PASSED).build();
         when(provider.getProviderName()).thenReturn("VNPT_EKYC");
         when(provider.verifyIdentity(any(),any(),any(),any(),any(),any())).thenReturn(unavailable, approved);
-        var first = service.submitEkyc(id, file, file, file);
+        var first = service.submitEkyc(id, file, file, file,
+                null, null, null, null, null, null, null, null, true, "2026.11-nd13-v1");
         UUID recordId = first.getVerificationId();
         String sql = "select front_image_url from worker_ekyc_verifications where id=?";
         String firstKey = db.queryForObject(sql, String.class, recordId);
         assertThat(images.exists(firstKey)).isTrue();
         assertThat(service.getMyEkycStatus(id).getStatus()).isEqualTo("TECHNICAL_FAILURE");
         assertThat(users.findById(id).orElseThrow().getFullName()).isEqualTo("Synthetic");
-        var retried = service.submitEkyc(id, file, file, file);
+        var retried = service.submitEkyc(id, file, file, file,
+                null, null, null, null, null, null, null, null, true, "2026.11-nd13-v1");
         assertThat(retried.getVerificationId()).isEqualTo(recordId);
         assertThat(service.getMyEkycStatus(id).getStatus()).isEqualTo("APPROVED");
         assertThat(users.findById(id).orElseThrow().getFullName()).isEqualTo("Verified Synthetic");
@@ -113,7 +117,7 @@ class EkycPostgresPersistenceTest {
                 approvedIdentity(id).livenessStatus(EkycIdentityResultDto.LivenessStatus.NOT_EVALUATED)
                         .residenceAddress("Synthetic residential address").build());
         var image = fixture();
-        var pending = eoService.submitEkyc(id, image, image, image);
+        var pending = eoService.submitEkyc(id, image, image, image, null, true, "2026.11-nd13-v1");
         assertThat(pending.getStatus()).isEqualTo("PENDING_REVIEW");
         assertThat(users.findById(id).orElseThrow().getFullName()).isEqualTo("Synthetic EO");
         assertThat(eoService.getPendingReviewDetails(pending.getVerificationId()).getFrontImageUrl()).doesNotContain("sig=");
@@ -136,13 +140,16 @@ class EkycPostgresPersistenceTest {
                 EkycIdentityResultDto.builder().technicalFailure(true).technicalErrorCode("VNPT_TIMEOUT").build(),
                 approvedIdentity(id).build());
         var image = fixture();
-        UUID verification = service.submitEkyc(id, image, image, image).getVerificationId();
+        UUID verification = service.submitEkyc(id, image, image, image,
+                null, null, null, null, null, null, null, null, true, "2026.11-nd13-v1").getVerificationId();
         String sql = "select front_image_url from worker_ekyc_verifications where id=?";
         String key = db.queryForObject(sql, String.class, verification);
         transaction.executeWithoutResult(status ->
                 doThrow(new IllegalStateException("Simulated audit persistence failure")).when(audit)
                         .logEkycAction(eq(id), eq("WORKER_EKYC_SUBMITTED"), anyString(), eq(verification), anyMap()));
-        assertThatThrownBy(() -> service.submitEkyc(id, image, image, image)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.submitEkyc(id, image, image, image,
+                null, null, null, null, null, null, null, null, true, "2026.11-nd13-v1"))
+                .isInstanceOf(IllegalStateException.class);
         assertThat(db.queryForObject(sql, String.class, verification)).isEqualTo(key);
         assertThat(images.exists(key)).isTrue();
         assertThat(service.getMyEkycStatus(id).getStatus()).isEqualTo("TECHNICAL_FAILURE");

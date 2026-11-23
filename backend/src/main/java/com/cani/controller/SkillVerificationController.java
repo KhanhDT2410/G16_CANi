@@ -260,17 +260,18 @@ public class SkillVerificationController {
     }
 
     /**
-     * Admin thực hiện retry có kiểm soát khi AI gặp sự cố kỹ thuật (VERIFICATION_FAILED)
+     * Admin chuyển hồ sơ cũ từng ở trạng thái VERIFICATION_FAILED sang hàng đợi duyệt thủ công (PENDING_REVIEW).
+     * Giữ route /retry tương thích ngược để không gọi AI.
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
-    @PostMapping("/admin/{id}/retry")
-    public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> retryVerification(
+    @PostMapping({"/admin/{id}/manual-review", "/admin/{id}/retry"})
+    public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> moveFailedToManualReview(
             @PathVariable("id") UUID verificationId,
             Authentication authentication
     ) {
         User admin = extractUser(authentication);
         UUID adminUserId = admin != null ? admin.getUserId() : null;
-        SkillVerificationResponseDto response = verificationService.retryFailedVerification(verificationId, adminUserId);
+        SkillVerificationResponseDto response = verificationService.moveFailedToManualReview(verificationId, adminUserId);
         return ResponseEntity.ok(ApiResponse.ok(response, buildVerificationMessage(response)));
     }
 
@@ -293,18 +294,18 @@ public class SkillVerificationController {
 
     private String buildVerificationMessage(SkillVerificationResponseDto response) {
         if (response.getStatus() == SkillVerificationStatus.VERIFICATION_FAILED) {
-            return "Hệ thống AI tạm thời không thể xác minh tài liệu: " + response.getRoutingReason();
+            return "Hồ sơ xử lý thất bại trước đây: " + response.getRoutingReason();
         }
         if (response.getStatus() == SkillVerificationStatus.APPROVED) {
-            return "Xác thực AI thành công! Kỹ năng đã được phê duyệt tự động và cộng SP_verify.";
+            return "Chứng chỉ kỹ năng đã được phê duyệt và cộng SP_verify.";
         }
         if (response.getStatus() == SkillVerificationStatus.PENDING_REVIEW) {
-            return "Hồ sơ đã được chuyển sang hàng đợi Admin kiểm tra thủ công: " + response.getRoutingReason();
+            return "Hồ sơ chứng chỉ đã được chuyển sang hàng đợi Admin kiểm tra thủ công: " + response.getRoutingReason();
         }
         if (response.getStatus() == SkillVerificationStatus.NEEDS_MORE_INFO) {
             return "Yêu cầu bổ sung thêm tài liệu xác minh: " + response.getRoutingReason();
         }
-        return "Tài liệu không đạt chuẩn xác thực AI: " + response.getRoutingReason();
+        return "Tài liệu không đạt yêu cầu xác minh: " + response.getRoutingReason();
     }
 
     private User extractUser(Authentication authentication) {

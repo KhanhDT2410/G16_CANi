@@ -25,7 +25,7 @@ public class EkycOrphanImageCleanup {
 
     public EkycOrphanImageCleanup(LocalPrivateEkycImageStorage storage,
             WorkerEkycVerificationRepository workers, EoEkycVerificationRepository organizers,
-            @Value("${cani.ekyc.retention.orphan-grace-hours:0}") int graceHours) {
+            @Value("${cani.ekyc.retention.orphan-grace-hours:24}") int graceHours) {
         this.storage = storage;
         this.workers = workers;
         this.organizers = organizers;
@@ -53,8 +53,19 @@ public class EkycOrphanImageCleanup {
     }
 
     private boolean canDelete(String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
         String[] segments = key.split("/");
-        UUID ownerId = UUID.fromString(segments[1]);
+        if (segments.length != 3) {
+            return false;
+        }
+        UUID ownerId;
+        try {
+            ownerId = UUID.fromString(segments[1]);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
         String processing = EkycVerificationStatus.PROCESSING.name();
         // Check in-flight submissions before references. Finalization commits the keys and the new status together.
         boolean inFlight = "worker".equals(segments[0])

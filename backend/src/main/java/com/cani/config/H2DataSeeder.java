@@ -441,10 +441,10 @@ public class H2DataSeeder implements CommandLineRunner {
                                                                 "[{\"skillName\":\"Nghiệp vụ Lễ tân Sự kiện\",\"taxonomyRole\":\"Lễ tân / Check-in\",\"confidenceScore\":0.95,\"evidenceSnippet\":\"Hoàn thành khóa đào tạo Nghiệp vụ Lễ tân Sự kiện\"}]")
                                                 .hasSealOrSignature(true)
                                                 .overallConfidence(new BigDecimal("0.92"))
-                                                .routingDecision(RoutingDecision.AUTO_APPROVE)
-                                                .routingReason("AI xác thực chứng chỉ hợp lệ, có dấu mộc đỏ và tên trùng khớp với hồ sơ eKYC.")
+                                                .routingDecision(RoutingDecision.ADMIN_REVIEW)
+                                                .routingReason("Hồ sơ chứng chỉ mẫu đã được Admin thẩm định thủ công hợp lệ.")
                                                 .status(SkillVerificationStatus.APPROVED)
-                                                .spAwarded(50)
+                                                .spAwarded(25)
                                                 .build());
 
                                 skillVerificationRequestRepository.save(SkillVerificationRequest.builder()
@@ -457,12 +457,8 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .recipientName("NGUYỄN VĂN AN")
                                                 .institution("Trung tâm Đào tạo Pha chế Á Âu")
                                                 .issueDate("10/09/2025")
-                                                .extractedSkills(
-                                                                "[{\"skillName\":\"Pha chế Barista Chuyên nghiệp\",\"taxonomyRole\":\"Pha chế (Bartender/Barista)\",\"confidenceScore\":0.82,\"evidenceSnippet\":\"Giấy chứng nhận Khóa học Pha chế Barista\"}]")
-                                                .hasSealOrSignature(true)
-                                                .overallConfidence(new BigDecimal("0.78"))
                                                 .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                                                .routingReason("Độ tin cậy OCR ở ngưỡng trung bình (0.78), chuyển Admin / CSKH duyệt thủ công.")
+                                                .routingReason("Chờ Admin / CSKH kiểm tra tệp chứng chỉ và duyệt thủ công.")
                                                 .status(SkillVerificationStatus.PENDING_REVIEW)
                                                 .spAwarded(0)
                                                 .build());

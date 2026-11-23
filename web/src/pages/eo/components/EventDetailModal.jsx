@@ -1063,7 +1063,13 @@ export default function EventDetailModal({
                                 {w.workerName} ↗
                               </span>
                               <span className="worker-age-badge">
-                                {w.workerAge ? `${w.workerAge} tuổi` : '22 tuổi'} {w.workerDob ? `(${w.workerDob})` : ''}
+                                {w.meetsMinimumAge === true
+                                  ? '✓ Đủ tuổi quy định'
+                                  : w.meetsMinimumAge === false
+                                    ? '⚠ Chưa đủ tuổi tối thiểu'
+                                    : w.workerAge
+                                      ? `${w.workerAge} tuổi`
+                                      : 'Chưa xác minh tuổi'}
                               </span>
                               {w.yearsExperience > 0 && (
                                 <span className="worker-age-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>

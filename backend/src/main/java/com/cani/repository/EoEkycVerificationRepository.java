@@ -20,6 +20,11 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"eventOrganizer", "eventOrganizer.user"})
     Optional<EoEkycVerification> findById(UUID id);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"eventOrganizer", "eventOrganizer.user"})
+    @org.springframework.data.jpa.repository.Query("select v from EoEkycVerification v where v.id = :id")
+    Optional<EoEkycVerification> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") UUID id);
+
     Optional<EoEkycVerification> findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(UUID eoId);
 
     Optional<EoEkycVerification> findTopByEventOrganizer_EoIdAndStatusInOrderByCreatedAtDesc(
@@ -50,8 +55,23 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "eventOrganizer")
     List<EoEkycVerification> findByStatusOrderByCreatedAtAsc(String status);
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     List<EoEkycVerification> findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(Instant cutoff);
+
+    long countByImagesPurgedAtIsNullAndImageRetentionUntilIsNull();
+
+    @org.springframework.data.jpa.repository.Query("""
+            select v.status, count(v) from EoEkycVerification v
+            where v.imagesPurgedAt is null and v.imageRetentionUntil is null
+            group by v.status
+            """)
+    List<Object[]> countLegacyNullRetentionByStatus();
+
+    @org.springframework.data.jpa.repository.Query("""
+            select v.id from EoEkycVerification v
+            where v.status = 'PROCESSING'
+              and coalesce(v.processingStartedAt, v.updatedAt, v.createdAt) < :cutoff
+            """)
+    List<UUID> findExpiredProcessingIds(@org.springframework.data.repository.query.Param("cutoff") Instant cutoff);
 
     /**
      * Đếm số lượng hồ sơ eKYC theo trạng thái

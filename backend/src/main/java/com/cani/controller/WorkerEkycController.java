@@ -1,6 +1,8 @@
 package com.cani.controller;
 
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
+import com.cani.dto.ekyc.EkycConsentPolicyDto;
+import com.cani.dto.ekyc.EkycLegacyRetentionInventoryDto;
 import com.cani.dto.ekyc.EkycLegalHoldRequestDto;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
 import com.cani.dto.response.ApiResponse;
@@ -25,6 +27,13 @@ public class WorkerEkycController {
 
     private final WorkerEkycService ekycService;
 
+    @GetMapping("/ekyc/consent-policy")
+    public ResponseEntity<ApiResponse<EkycConsentPolicyDto>> getConsentPolicy() {
+        return ResponseEntity.ok(ApiResponse.ok(
+                ekycService.getConsentPolicy(),
+                "Lấy thông báo xử lý dữ liệu cá nhân & sinh trắc học eKYC thành công"));
+    }
+
     /**
      * Worker nộp hồ sơ eKYC (Mặt trước CCCD, Mặt sau CCCD, Ảnh chân dung Selfie)
      */
@@ -42,13 +51,16 @@ public class WorkerEkycController {
             @RequestParam(value = "residenceAddress", required = false) String residenceAddress,
             @RequestParam(value = "issueDate", required = false) String issueDate,
             @RequestParam(value = "expiryDate", required = false) String expiryDate,
+            @RequestParam(value = "consentAccepted", required = false) Boolean consentAccepted,
+            @RequestParam(value = "consentNoticeVersion", required = false) String consentNoticeVersion,
             Authentication authentication) {
 
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.submitEkyc(
                 userId, frontImage, backImage, selfieImage,
                 cccdNumber, fullName, dob, gender,
-                originAddress, residenceAddress, issueDate, expiryDate);
+                originAddress, residenceAddress, issueDate, expiryDate,
+                consentAccepted, consentNoticeVersion);
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
@@ -134,5 +146,17 @@ public class WorkerEkycController {
         EkycVerificationResultDto result = ekycService.updateLegalHold(
                 adminUserId, verificationId, Boolean.TRUE.equals(request.getLegalHold()), request.getReason());
         return ResponseEntity.ok(ApiResponse.ok(result, "Cập nhật trạng thái bảo lưu pháp lý hồ sơ eKYC thành công"));
+    }
+
+    /**
+     * Truy vấn kiểm kê chỉ trả số đếm các hồ sơ eKYC cũ có image_retention_until IS NULL.
+     * Tuyệt đối không gán hạn hay xóa tệp thật.
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/ekyc/retention/legacy-inventory")
+    public ResponseEntity<ApiResponse<EkycLegacyRetentionInventoryDto>> getLegacyNullRetentionInventory() {
+        return ResponseEntity.ok(ApiResponse.ok(
+                ekycService.getLegacyNullRetentionInventory(),
+                "Kiểm kê số lượng hồ sơ eKYC cũ chưa có hạn lưu giữ ảnh"));
     }
 }

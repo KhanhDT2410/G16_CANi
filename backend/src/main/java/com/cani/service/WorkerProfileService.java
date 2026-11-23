@@ -13,6 +13,7 @@ import com.cani.entity.enums.VerificationStatus;
 import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
+import com.cani.service.ekyc.EkycConsentAndAgeHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,8 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.Period;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,6 +42,9 @@ public class WorkerProfileService {
 
     @Autowired(required = false)
     private EventRepository eventRepository;
+
+    @Autowired(required = false)
+    private SystemConfigRepository systemConfigRepository;
 
     @Autowired(required = false)
     private ShiftAssignmentRepository shiftAssignmentRepository;
@@ -114,7 +116,19 @@ public class WorkerProfileService {
         UUID actualWorkerId = worker.getWorkerId();
         UUID workerUserId = user != null ? user.getUserId() : null;
 
-        Integer workerAge = owner ? calculateWorkerAge(actualWorkerId) : null;
+        Optional<WorkerEkycVerification> approvedEkycOpt = actualWorkerId == null
+                ? Optional.empty()
+                : workerEkycVerificationRepository
+                        .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(actualWorkerId, List.of("APPROVED"));
+
+        Boolean meetsMinimumAge = approvedEkycOpt
+                .map(ekyc -> ekyc.getMeetsMinimumAge() != null
+                        ? ekyc.getMeetsMinimumAge()
+                        : EkycConsentAndAgeHelper.evaluateMeetsMinimumAge(ekyc.getDob(), systemConfigRepository))
+                .orElse(null);
+
+        // Giữ tương thích dữ liệu cũ cho chính chủ nếu bản ghi eKYC cũ còn lưu dob, không suy đoán/bịa tuổi mới.
+        Integer workerAge = owner ? calculateWorkerAge(approvedEkycOpt) : null;
 
         // 2. Nạp tổng điểm kỹ năng (SP) và index theo skill_id / tên kỹ năng
         List<WorkerSkillPoint> skillPoints = workerSkillPointRepository.findByWorker_WorkerId(actualWorkerId);
@@ -212,6 +226,7 @@ public class WorkerProfileService {
                 .yearsExperience(worker.getYearsExperience() != null ? worker.getYearsExperience() : 0)
                 .isOnline(Boolean.TRUE.equals(worker.getIsOnline()))
                 .age(workerAge)
+                .meetsMinimumAge(meetsMinimumAge)
                 .baseAddress(owner ? worker.getBaseAddress() : null)
                 .skillTier(worker.getSkillTier() != null ? worker.getSkillTier() : SkillTier.STARTER)
                 .totalSp(totalSp)
@@ -605,33 +620,10 @@ public class WorkerProfileService {
                 .collect(Collectors.toList());
     }
 
-    private Integer calculateWorkerAge(UUID workerId) {
-        if (workerId == null) return null;
-
-        Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository
-                .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(workerId, List.of("APPROVED"));
-
-        if (ekycOpt.isPresent() && ekycOpt.get().getDob() != null && !ekycOpt.get().getDob().isBlank()) {
-            String workerDob = ekycOpt.get().getDob().trim();
-            try {
-                LocalDate birthDate = null;
-                if (workerDob.contains("/")) {
-                    String[] parts = workerDob.split("/");
-                    if (parts.length == 3) {
-                        birthDate = LocalDate.of(Integer.parseInt(parts[2]), Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
-                    }
-                } else if (workerDob.contains("-")) {
-                    birthDate = LocalDate.parse(workerDob);
-                }
-                if (birthDate != null) {
-                    int age = Period.between(birthDate, LocalDate.now()).getYears();
-                    return age >= 0 ? age : null;
-                }
-            } catch (Exception ignored) {
-                // Parse fallback
-            }
+    private Integer calculateWorkerAge(Optional<WorkerEkycVerification> approvedEkycOpt) {
+        if (approvedEkycOpt.isEmpty()) {
+            return null;
         }
-
-        return null;
+        return EkycConsentAndAgeHelper.calculateAgeFromDob(approvedEkycOpt.get().getDob());
     }
 }

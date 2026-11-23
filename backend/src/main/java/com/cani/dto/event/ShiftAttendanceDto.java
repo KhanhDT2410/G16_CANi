@@ -24,6 +24,7 @@ public class ShiftAttendanceDto {
     private Integer workerReliabilityScore;
     private BigDecimal workerRatingAvg;
     private Integer workerAge;
+    private Boolean meetsMinimumAge;
     private String workerDob;
     private UUID shiftId;
     private String jobType;

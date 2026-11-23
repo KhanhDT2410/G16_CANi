@@ -12,6 +12,18 @@ export const supportTicketApi = {
     return response.data?.data;
   },
 
+  /** Tải lên hình ảnh hoặc tệp đính kèm (PDF, DOCX, TXT...) cho ticket */
+  uploadAttachment: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/v1/support/tickets/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data?.data;
+  },
+
   /** UC-106: Danh sách ticket của tôi */
   getMyTickets: async () => {
     const response = await apiClient.get('/v1/support/tickets/my');

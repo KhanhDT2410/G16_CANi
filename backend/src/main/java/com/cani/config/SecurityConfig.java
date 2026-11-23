@@ -123,7 +123,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/disputes/**").authenticated()
                 // Module phiếu hỗ trợ (UC-105/106, SCR-25/26): Customer Care & Admin quản lý queue & detail
                 .requestMatchers("/api/v1/admin/support/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
-                .requestMatchers("/api/v1/support/chat/attachments/**").permitAll()
+                .requestMatchers(
+                        "/api/v1/support/chat/attachments/**",
+                        "/api/v1/support/tickets/attachments/**"
+                ).permitAll()
                 .requestMatchers("/api/v1/support/**").authenticated()
                 // Module FAQ (UC-110): Customer Care cùng quyền với Admin
                 // Đặt TRƯỚC wildcard /api/v1/admin/** — nếu không CC sẽ bị 403.

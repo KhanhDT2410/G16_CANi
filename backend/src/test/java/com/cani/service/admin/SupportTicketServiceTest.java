@@ -23,6 +23,8 @@ import com.cani.repository.SupportTicketMessageRepository;
 import com.cani.repository.SupportTicketRepository;
 import com.cani.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.core.io.Resource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -440,5 +442,71 @@ class SupportTicketServiceTest {
         assertThat(staffList.get(0).getAssignedCount()).isEqualTo(3L);
         assertThat(staffList.get(1).getUserId()).isEqualTo(cc2.getUserId());
         assertThat(staffList.get(1).getAssignedCount()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Upload attachment thành công cho định dạng ảnh hoặc tài liệu hợp lệ")
+    void testUploadAttachment_Success() {
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file",
+                "evidence.png",
+                "image/png",
+                "fake image content".getBytes()
+        );
+
+        String url = supportTicketService.uploadAttachment(imageFile);
+        assertThat(url).isNotNull();
+        assertThat(url).startsWith("/api/v1/support/tickets/attachments/tkt_");
+        assertThat(url).endsWith(".png");
+
+        MockMultipartFile docFile = new MockMultipartFile(
+                "file",
+                "contract.pdf",
+                "application/pdf",
+                "fake pdf content".getBytes()
+        );
+
+        String docUrl = supportTicketService.uploadAttachment(docFile);
+        assertThat(docUrl).isNotNull();
+        assertThat(docUrl).startsWith("/api/v1/support/tickets/attachments/tkt_");
+        assertThat(docUrl).endsWith(".pdf");
+    }
+
+    @Test
+    @DisplayName("Upload attachment ném lỗi khi file rỗng")
+    void testUploadAttachment_EmptyFile() {
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "file",
+                "empty.png",
+                "image/png",
+                new byte[0]
+        );
+
+        assertThatThrownBy(() -> supportTicketService.uploadAttachment(emptyFile))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("không được để trống");
+    }
+
+    @Test
+    @DisplayName("Upload attachment ném lỗi khi định dạng tệp không được hỗ trợ (vd .exe)")
+    void testUploadAttachment_InvalidExtension() {
+        MockMultipartFile exeFile = new MockMultipartFile(
+                "file",
+                "virus.exe",
+                "application/octet-stream",
+                "fake binary".getBytes()
+        );
+
+        assertThatThrownBy(() -> supportTicketService.uploadAttachment(exeFile))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ chấp nhận các định dạng tệp");
+    }
+
+    @Test
+    @DisplayName("Load attachment ném lỗi khi tên file chứa ký tự path traversal")
+    void testLoadAttachment_PathTraversal() {
+        assertThatThrownBy(() -> supportTicketService.loadAttachment("../secret.txt"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Tên tệp không hợp lệ");
     }
 }

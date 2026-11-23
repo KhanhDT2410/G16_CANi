@@ -46,6 +46,7 @@ export const VenueLocationPicker = ({
   const [resolvingAddress, setResolvingAddress] = useState(false);
   const [resolveFailedHint, setResolveFailedHint] = useState(false);
   const [mapType, setMapType] = useState('roadmap');
+  const [localLocating, setLocalLocating] = useState(false);
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -189,6 +190,9 @@ export const VenueLocationPicker = ({
       if (Math.abs(currentPos.lat - lat) > 0.0001 || Math.abs(currentPos.lng - lng) > 0.0001) {
         markerRef.current.setLatLng([lat, lng]);
         mapInstanceRef.current.setView([lat, lng], 15, { animate: true });
+        setTimeout(() => {
+          mapInstanceRef.current?.invalidateSize();
+        }, 120);
       }
     }
   }, [lat, lng]);
@@ -297,30 +301,59 @@ export const VenueLocationPicker = ({
     });
   };
 
+  const handleLocateButtonClick = () => {
+    if (onGetCurrentLocation) {
+      onGetCurrentLocation();
+      return;
+    }
+    if (!navigator.geolocation) return;
+    setLocalLocating(true);
+    const onCoords = (pos) => {
+      const newLat = parseFloat(pos.coords.latitude.toFixed(6));
+      const newLng = parseFloat(pos.coords.longitude.toFixed(6));
+      setLocalLocating(false);
+      movePinToCoords(newLat, newLng, 16);
+      handlePinMovedRef.current(newLat, newLng);
+    };
+    navigator.geolocation.getCurrentPosition(
+      onCoords,
+      (err) => {
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+          navigator.geolocation.getCurrentPosition(
+            onCoords,
+            () => setLocalLocating(false),
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+          );
+        } else {
+          setLocalLocating(false);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+    );
+  };
+
   return (
     <div className="venue-picker-container" ref={dropdownRef}>
       <div className="venue-picker-header">
         <label className="venue-picker-label">
           Địa Điểm Tổ Chức Sự Kiện {required && '*'}
         </label>
-        {onGetCurrentLocation && (
-          <button
-            type="button"
-            className="venue-picker-gps-btn"
-            onClick={onGetCurrentLocation}
-            disabled={locating}
-            title="Định vị tọa độ GPS thiết bị hiện tại"
-          >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="7" />
-              <line x1="12" y1="1" x2="12" y2="4" />
-              <line x1="12" y1="20" x2="12" y2="23" />
-              <line x1="1" y1="12" x2="4" y2="12" />
-              <line x1="20" y1="12" x2="23" y2="12" />
-            </svg>
-            <span>{locating ? 'Đang định vị...' : 'Vị trí hiện tại'}</span>
-          </button>
-        )}
+        <button
+          type="button"
+          className="venue-picker-gps-btn"
+          onClick={handleLocateButtonClick}
+          disabled={locating || localLocating}
+          title="Định vị tọa độ GPS thiết bị hiện tại"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="7" />
+            <line x1="12" y1="1" x2="12" y2="4" />
+            <line x1="12" y1="20" x2="12" y2="23" />
+            <line x1="1" y1="12" x2="4" y2="12" />
+            <line x1="20" y1="12" x2="23" y2="12" />
+          </svg>
+          <span>{locating || localLocating ? 'Đang định vị...' : 'Vị trí hiện tại'}</span>
+        </button>
       </div>
 
       <div className="venue-search-wrapper">

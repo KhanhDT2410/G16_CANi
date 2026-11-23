@@ -178,7 +178,9 @@ export default function EOModals({
             onClose={() => setMapModal((prev) => ({ ...prev, isOpen: false }))}
             lat={mapModal.lat}
             lng={mapModal.lng}
-            title={mapModal.eventName}
+            eventName={mapModal.eventName}
+            title={mapModal.eventName || 'Tọa Độ Sự Kiện & Bán Kính Điều Phối'}
+            venueAddress={mapModal.venueAddress}
             address={mapModal.venueAddress}
             radiusKm={mapModal.radiusKm}
           />

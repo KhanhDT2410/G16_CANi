@@ -69,7 +69,7 @@ public class SupabaseAuthClient {
                     .body(SupabaseUser.class);
         } catch (HttpClientErrorException e) {
             log.error("Lỗi khi gọi GoTrue Admin API createUser: {}", e.getStatusCode().value());
-            throw new BadRequestException("Không thể tạo tài khoản trên hệ thống xác thực: " + e.getResponseBodyAsString());
+            throw new BadRequestException("Không thể tạo tài khoản trên hệ thống xác thực");
         }
     }
 
@@ -178,7 +178,7 @@ public class SupabaseAuthClient {
             log.info("Đã cập nhật mật khẩu mới thành công qua GoTrue Admin cho user: {}", userId);
         } catch (HttpClientErrorException e) {
             log.error("Lỗi khi cập nhật mật khẩu qua GoTrue Admin API: {}", e.getStatusCode().value());
-            throw new BadRequestException("Không thể cập nhật mật khẩu mới: " + e.getResponseBodyAsString());
+            throw new BadRequestException("Không thể cập nhật mật khẩu mới");
         }
     }
 }

@@ -442,7 +442,11 @@ public class VnptEkycClient implements EkycProvider {
         }
 
         // Chỉ kiểm tra giới hạn thang điểm nếu đã được cấu hình tường minh theo tài liệu VNPT
-        if (properties.getFaceMatchScoreMax() != null && score > properties.getFaceMatchScoreMax()) {
+        Double scaleMax = properties.getFaceMatchScoreMax();
+        Double threshold = properties.getFaceMatchMinThreshold();
+        if ((scaleMax != null && (!Double.isFinite(scaleMax) || scaleMax <= 0 || score > scaleMax))
+                || (threshold != null && (scaleMax == null || !Double.isFinite(threshold)
+                        || threshold < 0 || threshold > scaleMax))) {
             return new ParsedFaceCompare(FaceCompareStatus.INVALID_FORMAT, null, rawMsg);
         }
 
@@ -452,7 +456,7 @@ public class VnptEkycClient implements EkycProvider {
         }
         if ("MATCH".equals(upperMsg)) {
             // Chỉ áp dụng ngưỡng số nếu ngưỡng đã được xác nhận & cấu hình trong properties
-            if (properties.getFaceMatchMinThreshold() != null && score < properties.getFaceMatchMinThreshold()) {
+            if (threshold != null && score < threshold) {
                 return new ParsedFaceCompare(FaceCompareStatus.BELOW_THRESHOLD, score, upperMsg);
             }
             return new ParsedFaceCompare(FaceCompareStatus.MATCH, score, upperMsg);

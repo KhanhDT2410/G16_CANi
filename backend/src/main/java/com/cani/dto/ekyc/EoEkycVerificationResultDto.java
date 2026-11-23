@@ -43,6 +43,7 @@ public class EoEkycVerificationResultDto {
     private Boolean retryable;
     private Integer retryCount;
     private Boolean imagesAvailable;
+    private Boolean legalHold;
 
     private String routingDecision;
     private String routingReason;

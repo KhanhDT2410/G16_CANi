@@ -326,6 +326,54 @@ class VnptEkycClientTest {
         assertThat(missingCreds.getTechnicalErrorCode()).isEqualTo("VNPT_CONFIG_INCOMPLETE");
     }
 
+    @Test
+    void cardLivenessAloneRoutesToReviewWhenSelfieLivenessIsRequired() throws Exception {
+        properties.setRequireLivenessForAutoApprove(true);
+        var front = (com.fasterxml.jackson.databind.node.ObjectNode) objectMapper.readTree(validFrontOcrJson("15/08/2042")).path("object");
+        front.put("card_liveness", true);
+        var envelope = objectMapper.createObjectNode();
+        envelope.put("message", "IDG-00000000");
+        envelope.set("object", front);
+        var back = objectMapper.readTree(validBackOcrJson());
+        var face = objectMapper.readTree("""
+                {"message":"IDG-00000000","object":{"msg":"MATCH","prob":94.8}}
+                """);
+        var result = vnptEkycClient.parseVnptResults(envelope, back, face);
+        assertThat(decisionEngine.evaluate(result, null, false, false).getStatus()).isEqualTo(EkycVerificationStatus.PENDING_REVIEW);
+        var faceObject = (com.fasterxml.jackson.databind.node.ObjectNode) face.path("object");
+        faceObject.put("liveness", true);
+        assertThat(decisionEngine.evaluate(vnptEkycClient.parseVnptResults(envelope, back, face), null, false, false)
+                .getStatus()).isEqualTo(EkycVerificationStatus.APPROVED);
+        faceObject.put("liveness", false);
+        assertThat(decisionEngine.evaluate(vnptEkycClient.parseVnptResults(envelope, back, face), null, false, false)
+                .getStatus()).isEqualTo(EkycVerificationStatus.REJECTED);
+        faceObject.put("liveness", "unexpected");
+        assertThat(decisionEngine.evaluate(vnptEkycClient.parseVnptResults(envelope, back, face), null, false, false)
+                .getStatus()).isEqualTo(EkycVerificationStatus.TECHNICAL_FAILURE);
+    }
+
+    @Test
+    void malformedJsonIsRetryable() {
+        mockServer.expect(requestTo("https://api.idg.vnpt.vn/file-service/v1/addFile"))
+                .andRespond(withSuccess("{invalid-json", MediaType.APPLICATION_JSON));
+        var result = vnptEkycClient.verifyIdentity(
+                JPEG_BYTES, "image/jpeg", JPEG_BYTES, "image/jpeg", JPEG_BYTES, "image/jpeg");
+        var outcome = decisionEngine.evaluate(result, null, false, false);
+        assertThat(outcome.getStatus()).isEqualTo(EkycVerificationStatus.TECHNICAL_FAILURE);
+        assertThat(outcome.isRetryable()).isTrue();
+    }
+
+    @Test
+    void rateLimitIsRetryable() {
+        mockServer.expect(requestTo("https://api.idg.vnpt.vn/file-service/v1/addFile"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+        var result = vnptEkycClient.verifyIdentity(
+                JPEG_BYTES, "image/jpeg", JPEG_BYTES, "image/jpeg", JPEG_BYTES, "image/jpeg");
+        var outcome = decisionEngine.evaluate(result, null, false, false);
+        assertThat(outcome.getStatus()).isEqualTo(EkycVerificationStatus.TECHNICAL_FAILURE);
+        assertThat(outcome.isRetryable()).isTrue();
+    }
+
     private void stubUpload(String hash) {
         mockServer.expect(requestTo("https://api.idg.vnpt.vn/file-service/v1/addFile"))
                 .andExpect(method(HttpMethod.POST))

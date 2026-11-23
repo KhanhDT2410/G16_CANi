@@ -57,4 +57,11 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
      * Đếm số lượng hồ sơ eKYC theo trạng thái
      */
     long countByStatus(String status);
+    boolean existsByEventOrganizer_EoIdAndStatus(UUID ownerId, String status);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select (count(v) > 0) from EoEkycVerification v
+            where v.frontImageUrl = :key or v.backImageUrl = :key or v.selfieImageUrl = :key
+            """)
+    boolean existsImageReference(String key);
 }

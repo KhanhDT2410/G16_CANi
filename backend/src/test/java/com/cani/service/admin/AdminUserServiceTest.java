@@ -93,6 +93,7 @@ class AdminUserServiceTest {
                                 .email("worker@example.com")
                                 .phone("0901234567")
                                 .fullName("Nguyen Van Worker")
+                                .fcmToken("secret-device-fcm-token")
                                 .role(UserRole.WORKER)
                                 .status(UserStatus.ACTIVE)
                                 .emailVerified(true)
@@ -244,6 +245,8 @@ class AdminUserServiceTest {
                 assertThat(result.getFullName()).isEqualTo("Nguyen Van Worker");
                 assertThat(result.getWorkerProfile()).isNotNull();
                 assertThat(result.getWorkerProfile().getKycStatus()).isEqualTo(KycStatus.APPROVED);
+                assertThat(result.getWorkerProfile().getCccdNumber()).isEqualTo("********8901");
+                assertThat(result.getFcmToken()).isNull();
                 assertThat(result.getWorkerProfile().getSkillStatus()).isEqualTo("NOT_FOUND");
                 assertThat(result.getWorkerProfile().getReliabilityScore()).isEqualTo(98);
                 assertThat(result.getEoProfile()).isNull();

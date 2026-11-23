@@ -5,7 +5,6 @@ import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
 import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.dto.ekyc.EkycUserSubmittedInput;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
-import com.cani.entity.AuditLog;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerEkycVerification;
@@ -122,6 +121,7 @@ public class WorkerEkycService {
             String confirmedExpiryDate) {
 
         // 1. Xác thực tệp ảnh bằng magic bytes, MIME type và dung lượng tối đa
+        cryptoService.requireIndexKey();
         EkycImageValidator.ValidatedEkycImage validatedFront = imageValidator.validate(frontFile, "Ảnh mặt trước CCCD");
         EkycImageValidator.ValidatedEkycImage validatedBack = imageValidator.validate(backFile, "Ảnh mặt sau CCCD");
         EkycImageValidator.ValidatedEkycImage validatedSelfie = imageValidator.validate(selfieFile, "Ảnh chân dung Selfie");
@@ -157,10 +157,11 @@ public class WorkerEkycService {
                     storedBack != null ? storedBack.getObjectKey() : null,
                     storedSelfie != null ? storedSelfie.getObjectKey() : null
             );
-            executeInTransaction(() -> markStorageTechnicalFailure(prepared.verificationId()));
+            executeInTransaction(() -> markTechnicalFailure(prepared.verificationId(), prepared.attempt(), "STORAGE_WRITE_FAILED"));
             throw storageEx;
         }
 
+        boolean finalizationStarted = false;
         try {
             // 4. Gọi VNPT eKYC thực tế (bên ngoài DB transaction)
             EkycIdentityResultDto providerResult = ekycProvider.verifyIdentity(
@@ -180,8 +181,12 @@ public class WorkerEkycService {
             final EkycImageStorage.StoredObject finalSelfie = storedSelfie;
 
             // 5. Transaction ngắn 2 (đồng bộ khóa theo hash CCCD): Check trùng, chấm quyết định & lưu kết quả
+            finalizationStarted = true;
             EkycVerificationResultDto result = cccdLockManager.executeWithCccdLock(primaryHash, () ->
-                    executeInTransaction(() -> finalizeSubmission(
+                    executeInTransaction(() -> {
+                        imageRetentionService.deleteAfterRollback(finalFront.getObjectKey(),
+                                finalBack.getObjectKey(), finalSelfie.getObjectKey());
+                        return finalizeSubmission(
                             userId,
                             prepared.workerId(),
                             prepared.verificationId(),
@@ -193,8 +198,8 @@ public class WorkerEkycService {
                             lookupHashes,
                             finalFront.getObjectKey(),
                             finalBack.getObjectKey(),
-                            finalSelfie.getObjectKey()
-                    ))
+                            finalSelfie.getObjectKey());
+                    })
             );
             if (prepared.isRetry()) {
                 imageRetentionService.deleteStoredImagesQuietly(
@@ -205,8 +210,15 @@ public class WorkerEkycService {
             }
             return result;
         } catch (RuntimeException failure) {
-            imageRetentionService.deleteStoredImagesQuietly(storedFront.getObjectKey(),
-                    storedBack.getObjectKey(), storedSelfie.getObjectKey());
+            if (!finalizationStarted) {
+                imageRetentionService.deleteStoredImagesQuietly(storedFront.getObjectKey(),
+                        storedBack.getObjectKey(), storedSelfie.getObjectKey());
+            }
+            try {
+                executeInTransaction(() -> markTechnicalFailure(prepared.verificationId(), prepared.attempt(), "FINALIZATION_FAILED"));
+            } catch (RuntimeException statusUpdateFailure) {
+                failure.addSuppressed(statusUpdateFailure);
+            }
             throw failure;
         }
     }
@@ -252,15 +264,20 @@ public class WorkerEkycService {
         return new PreparedSubmission(worker.getWorkerId(), record.getId(), record.getRetryCount(), isRetry, prevFront, prevBack, prevSelfie);
     }
 
-    private void markStorageTechnicalFailure(UUID verificationId) {
+    private void markTechnicalFailure(UUID verificationId, Integer attempt, String code) {
         if (verificationId == null) {
             return;
         }
-        ekycVerificationRepository.findById(verificationId).ifPresent(record -> {
+        ekycVerificationRepository.findById(verificationId)
+                .filter(record -> !record.isLegalHold()
+                        && Objects.equals(record.getRetryCount(), attempt)
+                        && EkycVerificationStatus.PROCESSING.name().equals(record.getStatus()))
+                .ifPresent(record -> {
             record.setStatus(EkycVerificationStatus.TECHNICAL_FAILURE.name());
             record.setRoutingDecision(EkycRoutingDecision.TECHNICAL_FAILURE.name());
-            record.setFailureCode("STORAGE_WRITE_FAILED");
-            record.setRoutingReason("Không thể lưu ảnh xác minh vào kho bảo mật. Vui lòng thử lại sau.");
+            record.setFailureCode(code);
+            record.setImageRetentionUntil(imageRetentionService.calculateRetentionDeadline(EkycVerificationStatus.TECHNICAL_FAILURE));
+            record.setRoutingReason("Không thể hoàn tất lưu hồ sơ. Vui lòng thử lại sau.");
             ekycVerificationRepository.save(record);
         });
     }
@@ -471,9 +488,10 @@ public class WorkerEkycService {
         }
 
         Worker worker = verification.getWorker();
-        if (EkycVerificationStatus.APPROVED.name().equals(decision)
-                && verification.getCccdNumberHash() != null
-                && worker != null) {
+        if (EkycVerificationStatus.APPROVED.name().equals(decision)) {
+            if (verification.getCccdNumberHash() == null || worker == null) {
+                throw new BadRequestException("Hồ sơ thiếu số giấy tờ đã đối chiếu. Vui lòng yêu cầu nộp lại hồ sơ.");
+            }
             cccdLockManager.acquireDbTransactionLockIfPostgres(verification.getCccdNumberHash());
             boolean isDup = ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(
                     verification.getCccdNumberHash(), EkycVerificationStatus.APPROVED.name(), worker.getWorkerId());
@@ -516,7 +534,13 @@ public class WorkerEkycService {
         log.info("Admin {} reviewed Worker eKYC [verificationId={}, decision={}]", adminUserId, verificationId, decision);
         recordAudit(adminUserId, "WORKER_EKYC_ADMIN_REVIEWED", verificationId,
                 Map.of("status", decision));
-        return mapToDto(verification);
+        return EkycVerificationResultDto.builder()
+                .verificationId(verificationId)
+                .status(verification.getStatus())
+                .routingDecision(verification.getRoutingDecision())
+                .reviewedBy(adminUserId)
+                .reviewedAt(verification.getReviewedAt())
+                .build();
     }
 
     /**
@@ -544,32 +568,55 @@ public class WorkerEkycService {
         log.info("Reset eKYC completed [workerId={}]", worker.getWorkerId());
     }
 
+    @Transactional
+    public EkycVerificationResultDto updateLegalHold(UUID adminUserId, UUID verificationId, boolean legalHold, String reason) {
+        WorkerEkycVerification verification = ekycVerificationRepository.findById(verificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ eKYC: " + verificationId));
+        verification.setLegalHold(legalHold);
+        verification = ekycVerificationRepository.save(verification);
+        recordAudit(adminUserId, "WORKER_EKYC_LEGAL_HOLD_UPDATED", verificationId,
+                Map.of("legalHold", legalHold, "reason", reason != null ? reason.trim() : ""));
+        log.info("Admin {} updated Worker eKYC legalHold={} [verificationId={}]", adminUserId, legalHold, verificationId);
+        return mapToDto(verification, false);
+    }
+
     /**
      * Danh sách hàng đợi hồ sơ eKYC chờ Admin duyệt
      */
     @Transactional(readOnly = true)
     public List<EkycVerificationResultDto> getPendingEkycQueue() {
         return ekycVerificationRepository.findByStatusOrderByCreatedAtDesc(EkycVerificationStatus.PENDING_REVIEW.name()).stream()
-                .map(row -> EkycVerificationResultDto.builder()
-                        .verificationId(row.getId())
-                        .workerId(row.getWorker().getWorkerId())
-                        .fullName(row.getFullName())
-                        .createdAt(row.getCreatedAt())
-                        .status(row.getStatus())
-                        .routingDecision(row.getRoutingDecision())
-                        .build())
+                .map(row -> {
+                    EkycVerificationResultDto dto = mapToDto(row, false);
+                    dto.setFrontImageUrl(null);
+                    dto.setBackImageUrl(null);
+                    dto.setSelfieImageUrl(null);
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public EkycVerificationResultDto getPendingReviewDetails(UUID verificationId) {
+        WorkerEkycVerification record = ekycVerificationRepository.findById(verificationId)
+                .filter(row -> EkycVerificationStatus.PENDING_REVIEW.name().equals(row.getStatus()))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ eKYC đang chờ duyệt."));
+        return mapToDto(record, false);
+    }
+
     private EkycVerificationResultDto mapToDto(WorkerEkycVerification v) {
+        return mapToDto(v, true);
+    }
+
+    private EkycVerificationResultDto mapToDto(WorkerEkycVerification v, boolean signedLinks) {
         boolean hasManagedImages = v.getImagesPurgedAt() == null
                 && (imageStorage.isManagedObjectKey(v.getFrontImageUrl())
                 || imageStorage.isManagedObjectKey(v.getBackImageUrl())
                 || imageStorage.isManagedObjectKey(v.getSelfieImageUrl()));
 
-        String signedFront = resolveSignedImageUrl(v, v.getFrontImageUrl(), "front");
-        String signedBack = resolveSignedImageUrl(v, v.getBackImageUrl(), "back");
-        String signedSelfie = resolveSignedImageUrl(v, v.getSelfieImageUrl(), "selfie");
+        String signedFront = resolveSignedImageUrl(v, v.getFrontImageUrl(), "front", signedLinks);
+        String signedBack = resolveSignedImageUrl(v, v.getBackImageUrl(), "back", signedLinks);
+        String signedSelfie = resolveSignedImageUrl(v, v.getSelfieImageUrl(), "selfie", signedLinks);
 
         return EkycVerificationResultDto.builder()
                 .verificationId(v.getId())
@@ -596,6 +643,7 @@ public class WorkerEkycService {
                 .retryable(EkycVerificationStatus.TECHNICAL_FAILURE.name().equals(v.getStatus()))
                 .retryCount(v.getRetryCount())
                 .imagesAvailable(hasManagedImages)
+                .legalHold(v.isLegalHold())
                 .routingDecision(v.getRoutingDecision())
                 .routingReason(v.getRoutingReason())
                 .status(v.getStatus())
@@ -607,9 +655,12 @@ public class WorkerEkycService {
                 .build();
     }
 
-    private String resolveSignedImageUrl(WorkerEkycVerification v, String storedKey, String slot) {
+    private String resolveSignedImageUrl(WorkerEkycVerification v, String storedKey, String slot, boolean signedLink) {
         if (v.getId() == null || v.getImagesPurgedAt() != null || !imageStorage.isManagedObjectKey(storedKey)) {
             return null;
+        }
+        if (!signedLink) {
+            return "/api/v1/ekyc/images/worker/" + v.getId() + "/" + slot;
         }
         return imageAccessTokenService.generateSignedImageUrl("worker", v.getId(), slot, storedKey, v.getStatus());
     }
@@ -633,13 +684,7 @@ public class WorkerEkycService {
         if (auditLogService == null) {
             return;
         }
-        auditLogService.logAction(AuditLog.builder()
-                .userId(actorUserId)
-                .action(action)
-                .entityType("WORKER_EKYC")
-                .entityId(entityId)
-                .newValues(metadata != null ? metadata.toString() : null)
-                .build());
+        auditLogService.logEkycAction(actorUserId, action, "WORKER_EKYC", entityId, metadata);
     }
 
     private static BigDecimal scaleOrNull(Double val) {

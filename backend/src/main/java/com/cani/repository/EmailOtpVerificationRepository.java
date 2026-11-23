@@ -4,6 +4,7 @@ import com.cani.entity.EmailOtpVerification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +17,6 @@ public interface EmailOtpVerificationRepository extends JpaRepository<EmailOtpVe
     Optional<EmailOtpVerification> findTopByEmailIgnoreCaseAndOtpTypeAndIsUsedFalseOrderByCreatedAtDesc(
             String email, String otpType
     );
+
+    void deleteByExpiresAtBefore(Instant cutoff);
 }

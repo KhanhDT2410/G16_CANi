@@ -14,8 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Chuẩn hóa, băm bảo mật (HMAC-SHA256 khi có pepper hoặc SHA-256 tương thích ngược)
- * và che số CCCD tuân thủ Nghị định 13/2023/NĐ-CP.
+ * Chuẩn hóa, tạo blind index HMAC và che số giấy tờ.
  */
 @Slf4j
 @Component
@@ -46,20 +45,22 @@ public class EkycIdentityCryptoService {
         return normalizedCccd != null && normalizedCccd.length() >= 9 && normalizedCccd.length() <= 12;
     }
 
-    /**
-     * Tính mã băm chính để lưu vào DB.
-     * Nếu EKYC_HASH_PEPPER được cấu hình -> HMAC-SHA256 chống brute-force rainbow table.
-     * Nếu chưa cấu hình -> SHA-256 tương thích với dữ liệu hiện tại.
-     */
+    public void requireIndexKey() {
+        if (hashPepper.isEmpty()) {
+            throw new com.cani.exception.AppException(
+                    "Hệ thống xác minh danh tính chưa sẵn sàng. Vui lòng thử lại sau.",
+                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /** Blind index for new verifications. */
     public String hashCccd(String rawCccd) {
         String normalized = normalizeCccd(rawCccd);
         if (normalized == null) {
             return null;
         }
-        if (!hashPepper.isEmpty()) {
-            return hmacSha256Hex(normalized, hashPepper);
-        }
-        throw new IllegalStateException("EKYC_HASH_PEPPER is required for identity verification");
+        requireIndexKey();
+        return hmacSha256Hex(normalized, hashPepper);
     }
 
     /**
@@ -83,7 +84,7 @@ public class EkycIdentityCryptoService {
     }
 
     /**
-     * Che số CCCD cho hiển thị UI và API response (ví dụ: 079201******345).
+     * Che số CCCD cho hiển thị UI và API response (ví dụ: ********2345).
      */
     public String maskCccd(String rawCccd) {
         if (rawCccd == null || rawCccd.isBlank()) {

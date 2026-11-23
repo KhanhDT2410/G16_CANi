@@ -8,7 +8,9 @@ import 'package:cani/core/constants/api_constants.dart';
 import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/core/notifications/fcm_service.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
+import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
+import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,8 +34,12 @@ void main() async {
   await FcmService.initialize(
     onForegroundMessage: (_) {
       if (!container.read(authStateProvider).isAuthenticated) return;
+      container.invalidate(proposalsListProvider);
       container.invalidate(assignmentsListProvider);
       container.invalidate(incomeSummaryProvider);
+      if (container.read(ekycProvider).result?.isApproved == true) {
+        container.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
+      }
     },
     onTokenRefresh: (_) {
       final authState = container.read(authStateProvider);
@@ -45,8 +51,12 @@ void main() async {
       debugPrint('[Notification Navigate] Navigating from notification data: $data');
       if (!container.read(authStateProvider).isAuthenticated) return;
 
+      container.invalidate(proposalsListProvider);
       container.invalidate(assignmentsListProvider);
       container.invalidate(incomeSummaryProvider);
+      if (container.read(ekycProvider).result?.isApproved == true) {
+        container.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
+      }
 
       final rawPayload = data['payload'];
       final type = data['type'] ?? (rawPayload is Map ? rawPayload['type'] : null);

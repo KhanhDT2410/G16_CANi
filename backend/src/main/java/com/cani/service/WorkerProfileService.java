@@ -52,7 +52,9 @@ public class WorkerProfileService {
      */
     @Transactional(readOnly = true)
     public WorkerPublicProfileResponseDto getMyProfile(UUID userId) {
-        return getWorkerProfileForEo(null, userId);
+        Worker worker = workerRepository.findByUser_UserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ nhân sự (Worker)", "userId", userId));
+        return buildWorkerProfile(worker, null, true);
     }
 
     /**
@@ -91,7 +93,7 @@ public class WorkerProfileService {
         }
         workerRepository.save(worker);
 
-        return getWorkerProfileForEo(null, userId);
+        return buildWorkerProfile(worker, null, true);
     }
 
     /**
@@ -104,12 +106,15 @@ public class WorkerProfileService {
                 .or(() -> workerRepository.findByUser_UserId(workerId))
                 .orElseThrow(() -> new ResourceNotFoundException("Nhân sự (Worker)", "id", workerId));
 
+        return buildWorkerProfile(worker, eoUserId, false);
+    }
+
+    private WorkerPublicProfileResponseDto buildWorkerProfile(Worker worker, UUID eoUserId, boolean owner) {
         User user = worker.getUser();
         UUID actualWorkerId = worker.getWorkerId();
         UUID workerUserId = user != null ? user.getUserId() : null;
 
-        // 1. Tính tuổi Worker từ eKYC hoặc kinh nghiệm
-        Integer workerAge = calculateWorkerAge(actualWorkerId, worker.getYearsExperience());
+        Integer workerAge = owner ? calculateWorkerAge(actualWorkerId) : null;
 
         // 2. Nạp tổng điểm kỹ năng (SP) và index theo skill_id / tên kỹ năng
         List<WorkerSkillPoint> skillPoints = workerSkillPointRepository.findByWorker_WorkerId(actualWorkerId);
@@ -201,13 +206,13 @@ public class WorkerProfileService {
                 .userId(workerUserId)
                 .fullName(worker.getFullName() != null ? worker.getFullName() : (user != null ? user.getFullName() : "Nhân sự CANi"))
                 .avatarUrl(user != null ? user.getAvatarUrl() : null)
-                .phone(user != null ? user.getPhone() : null)
-                .email(user != null ? user.getEmail() : null)
+                .phone(user != null && (owner || isMyTeamMember) ? user.getPhone() : null)
+                .email(user != null && owner ? user.getEmail() : null)
                 .bio(worker.getBio())
                 .yearsExperience(worker.getYearsExperience() != null ? worker.getYearsExperience() : 0)
                 .isOnline(Boolean.TRUE.equals(worker.getIsOnline()))
                 .age(workerAge)
-                .baseAddress(worker.getBaseAddress())
+                .baseAddress(owner ? worker.getBaseAddress() : null)
                 .skillTier(worker.getSkillTier() != null ? worker.getSkillTier() : SkillTier.STARTER)
                 .totalSp(totalSp)
                 .reliabilityScore(worker.getReliabilityScore() != null ? worker.getReliabilityScore() : 100)
@@ -600,11 +605,11 @@ public class WorkerProfileService {
                 .collect(Collectors.toList());
     }
 
-    private Integer calculateWorkerAge(UUID workerId, Integer yearsExperience) {
-        if (workerId == null) return 22;
+    private Integer calculateWorkerAge(UUID workerId) {
+        if (workerId == null) return null;
 
         Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository
-                .findTopByWorker_WorkerIdOrderByCreatedAtDesc(workerId);
+                .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(workerId, List.of("APPROVED"));
 
         if (ekycOpt.isPresent() && ekycOpt.get().getDob() != null && !ekycOpt.get().getDob().isBlank()) {
             String workerDob = ekycOpt.get().getDob().trim();
@@ -619,16 +624,14 @@ public class WorkerProfileService {
                     birthDate = LocalDate.parse(workerDob);
                 }
                 if (birthDate != null) {
-                    return Period.between(birthDate, LocalDate.now()).getYears();
+                    int age = Period.between(birthDate, LocalDate.now()).getYears();
+                    return age >= 0 ? age : null;
                 }
             } catch (Exception ignored) {
                 // Parse fallback
             }
         }
 
-        if (yearsExperience != null && yearsExperience > 0) {
-            return 18 + yearsExperience;
-        }
-        return 22;
+        return null;
     }
 }

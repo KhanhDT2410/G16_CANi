@@ -680,7 +680,7 @@ class _EkycVerificationScreenState
           'Chúc mừng! Danh tính của bạn đã được VNPT eKYC xác minh thành công.';
     } else if (item.isPendingReview) {
       onboardingSubtitle =
-          'Hồ sơ của bạn đã được tiếp nhận và đang chờ Bộ phận CSKH / Admin kiểm tra.';
+          'Hồ sơ trước đây chưa hoàn tất xác thực tự động. Vui lòng chụp và xác minh lại qua VNPT eKYC.';
     } else if (item.isProcessing) {
       onboardingSubtitle =
           'Hồ sơ đang được hệ thống VNPT eKYC xử lý. Vui lòng kiểm tra lại sau giây lát.';
@@ -1105,7 +1105,7 @@ class _EkycVerificationScreenState
                         )
                       : res.isPendingReview
                           ? (
-                              'Hồ sơ eKYC đã được tiếp nhận và đang chờ Admin / CSKH kiểm tra.',
+                              'Hồ sơ chưa hoàn tất xác thực tự động qua VNPT eKYC. Vui lòng chụp lại và gửi lại.',
                               const Color(0xFFD97706),
                             )
                           : res.isProcessing

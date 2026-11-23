@@ -105,31 +105,24 @@ class EkycPostgresPersistenceTest {
             assertThat(stream.readAllBytes()).isEqualTo(bytes);
         }
     }
-    @Test void eoManualReviewCommitsWithAuditAndPreservesCompanyAddress() {
+    @Test void eoAutomatedRejectCommitsWithAuditAndPreservesCompanyAddress() {
         UUID id = UUID.randomUUID();
         User owner = users.save(User.builder().userId(id).email(id + "@example.invalid")
                 .fullName("Synthetic EO").role(UserRole.EVENT_ORGANIZER).build());
         organizers.save(EventOrganizer.builder().user(owner).companyName("Synthetic Company").build());
-        UUID reviewerId = UUID.randomUUID();
-        users.save(User.builder().userId(reviewerId).email(reviewerId + "@example.invalid").fullName("Synthetic Reviewer").role(UserRole.CUSTOMER_CARE).build());
         when(provider.getProviderName()).thenReturn("VNPT_EKYC");
         when(provider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(
                 approvedIdentity(id).livenessStatus(EkycIdentityResultDto.LivenessStatus.NOT_EVALUATED)
                         .residenceAddress("Synthetic residential address").build());
         var image = fixture();
-        var pending = eoService.submitEkyc(id, image, image, image, null, true, "2026.11-nd13-v1");
-        assertThat(pending.getStatus()).isEqualTo("PENDING_REVIEW");
+        var rejected = eoService.submitEkyc(id, image, image, image, null, true, "2026.11-nd13-v1");
+        assertThat(rejected.getStatus()).isEqualTo("REJECTED");
+        assertThat(rejected.getImagesAvailable()).isFalse();
+        assertThat(db.queryForObject("select images_purged_at from eo_ekyc_verifications where id=?", java.sql.Timestamp.class, rejected.getVerificationId())).isNotNull();
         assertThat(users.findById(id).orElseThrow().getFullName()).isEqualTo("Synthetic EO");
-        assertThat(eoService.getPendingReviewDetails(pending.getVerificationId()).getFrontImageUrl()).doesNotContain("sig=");
-        var decision = EkycAdminReviewRequestDto.builder().decision("APPROVED").build();
-        var reviewed = eoService.adminReviewEkyc(reviewerId, pending.getVerificationId(), decision);
-        assertThat(reviewed.getFrontImageUrl()).isNull();
-        assertThat(reviewed.getReviewedAt()).isNotNull();
-        assertThat(eoService.getMyEkycStatus(id).getReviewedBy()).isEqualTo(reviewerId);
-        assertThat(users.findById(id).orElseThrow().getFullName()).isEqualTo("Verified Synthetic");
         assertThat(db.queryForObject("select address from event_organizers where user_id=?", String.class, id)).isNull();
         assertThat(db.queryForObject("select count(*) from audit_logs where entity_id=? and user_id=?", Long.class,
-                pending.getVerificationId(), reviewerId)).isOne();
+                rejected.getVerificationId(), id)).isOne();
     }
 
     @Test void rollbackPreservesReferencedFilesAndDeletesStagedFiles() throws Exception {

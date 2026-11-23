@@ -199,8 +199,8 @@ class WorkerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Cần Admin review -> PENDING_REVIEW giữ tạm ảnh 14 ngày kèm signed URL")
-    void shouldRouteToPendingReviewWhenExpiryUnreadable() {
+    @DisplayName("Ảnh mờ hoặc thiếu ngày hết hạn -> REJECTED với lý do cụ thể chụp lại và xóa ảnh ngay (không qua Admin)")
+    void shouldRejectWithSpecificReasonWhenExpiryUnreadableAndPurgeImages() {
         EkycIdentityResultDto vnptResult = validVnptMatchResult("079201012345", "TRẦN THỊ HOA");
         vnptResult.setExpiryDate(null);
         vnptResult.setExpiryStatus(ExpiryDateStatus.UNREADABLE);
@@ -210,14 +210,12 @@ class WorkerEkycServiceTest {
 
         EkycVerificationResultDto result = submitWithConsent(workerUser.getUserId(), null, null);
 
-        assertThat(result.getStatus()).isEqualTo("PENDING_REVIEW");
-        assertThat(result.getRoutingDecision()).isEqualTo("MANUAL_REVIEW");
-        assertThat(result.getImagesAvailable()).isTrue();
-        assertThat(result.getImagesExpired()).isFalse();
-        assertThat(result.getFrontImageUrl()).startsWith("/api/v1/ekyc/images/worker/");
-        assertThat(result.getFrontImageUrl()).contains("sig=");
-        assertThat(result.getImageRetentionUntil()).isAfter(Instant.now().plus(13, ChronoUnit.DAYS));
-        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.PENDING);
+        assertThat(result.getStatus()).isEqualTo("REJECTED");
+        assertThat(result.getRoutingDecision()).isEqualTo("REJECTED");
+        assertThat(result.getRoutingReason()).contains("ngày hết hạn");
+        assertThat(result.getImagesAvailable()).isFalse();
+        assertThat(result.getFrontImageUrl()).isNull();
+        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.REJECTED);
     }
 
     @Test
@@ -261,7 +259,7 @@ class WorkerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Dữ liệu QR / nhập tay từ client KHÔNG được ghi đè kết quả VNPT OCR — lệch thông tin chuyển PENDING_REVIEW")
+    @DisplayName("Dữ liệu QR / nhập tay từ client KHÔNG được ghi đè kết quả VNPT OCR — lệch thông tin trả REJECTED")
     void shouldNotOverwriteVnptOcrWithClientQrOrManualInput() {
         EkycIdentityResultDto vnptResult = validVnptMatchResult("079201012345", "TRẦN THỊ HOA");
 
@@ -273,9 +271,10 @@ class WorkerEkycServiceTest {
 
         assertThat(result.getCccdNumberMasked()).isEqualTo("********2345");
         assertThat(result.getFullName()).isEqualTo("TRẦN THỊ HOA");
-        assertThat(result.getStatus()).isEqualTo("PENDING_REVIEW");
+        assertThat(result.getStatus()).isEqualTo("REJECTED");
+        assertThat(result.getRoutingReason()).contains("không trùng khớp");
         assertThat(result.getFraudFlags()).containsEntry("userInputMismatch", true);
-        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.PENDING);
+        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.REJECTED);
     }
 
     @Test
@@ -344,66 +343,7 @@ class WorkerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Admin approve yêu cầu đủ 3 ảnh còn hạn đọc được; chặn APPROVED nếu ảnh hết hạn/thiếu/đã xóa")
-    void shouldAdminApproveWhenAllImagesValidAndBlockWhenImagesUnavailableOrExpired() {
-        UUID verificationId = UUID.randomUUID();
-        UUID adminId = UUID.randomUUID();
-
-        EkycImageStorage.StoredObject storedFront = imageStorage.store("worker", worker.getWorkerId(), "front", VALID_JPEG, "jpg", "image/jpeg");
-        EkycImageStorage.StoredObject storedBack = imageStorage.store("worker", worker.getWorkerId(), "back", VALID_JPEG, "jpg", "image/jpeg");
-        EkycImageStorage.StoredObject storedSelfie = imageStorage.store("worker", worker.getWorkerId(), "selfie", VALID_JPEG, "jpg", "image/jpeg");
-
-        WorkerEkycVerification pending = WorkerEkycVerification.builder()
-                .id(verificationId)
-                .worker(worker)
-                .status("PENDING_REVIEW")
-                .cccdNumberMasked("********2345")
-                .cccdNumberHash(cryptoService.hashCccd("079201012345"))
-                .frontImageUrl(storedFront.getObjectKey())
-                .backImageUrl(storedBack.getObjectKey())
-                .selfieImageUrl(storedSelfie.getObjectKey())
-                .imageRetentionUntil(Instant.now().plus(7, ChronoUnit.DAYS))
-                .build();
-
-        when(ekycVerificationRepository.findByIdForUpdate(verificationId)).thenReturn(Optional.of(pending));
-        lenient().when(ekycVerificationRepository.findById(verificationId)).thenReturn(Optional.of(pending));
-        when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> i.getArgument(0));
-
-        // 1. Ảnh hết hạn -> chặn APPROVED
-        pending.setImageRetentionUntil(Instant.now().minusSeconds(60));
-        assertThatThrownBy(() -> workerEkycService.adminReviewEkyc(
-                adminId, verificationId,
-                EkycAdminReviewRequestDto.builder().decision("APPROVED").build()))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("hết hạn");
-
-        // 2. Đủ 3 ảnh còn hạn & đọc được -> APPROVED thành công + xóa ảnh ngay
-        pending.setImageRetentionUntil(Instant.now().plus(7, ChronoUnit.DAYS));
-        EkycVerificationResultDto approved = workerEkycService.adminReviewEkyc(
-                adminId, verificationId,
-                EkycAdminReviewRequestDto.builder().decision("APPROVED").reviewNotes("Hợp lệ").build());
-
-        assertThat(approved.getStatus()).isEqualTo("APPROVED");
-        assertThat(approved.getRoutingDecision()).isEqualTo("MANUAL_APPROVED");
-        assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
-        assertThat(imageStorage.exists(storedFront.getObjectKey())).isFalse();
-
-        // 3. Hồ sơ hết hạn vẫn được REJECT để yêu cầu người dùng nộp lại
-        Worker unverifiedWorker = Worker.builder().workerId(UUID.randomUUID()).user(workerUser).kycStatus(KycStatus.PENDING).build();
-        UUID rejectId = UUID.randomUUID();
-        WorkerEkycVerification expiredPending = WorkerEkycVerification.builder()
-                .id(rejectId).worker(unverifiedWorker).status("PENDING_REVIEW")
-                .imagesPurgedAt(Instant.now().minusSeconds(10)).build();
-        when(ekycVerificationRepository.findByIdForUpdate(rejectId)).thenReturn(Optional.of(expiredPending));
-
-        EkycVerificationResultDto rejected = workerEkycService.adminReviewEkyc(
-                adminId, rejectId, EkycAdminReviewRequestDto.builder().decision("REJECTED").reviewNotes("Ảnh hết hạn, vui lòng nộp lại").build());
-        assertThat(rejected.getStatus()).isEqualTo("REJECTED");
-        assertThat(unverifiedWorker.getKycStatus()).isEqualTo(KycStatus.REJECTED);
-    }
-
-    @Test
-    @DisplayName("Chặn 409 CONFLICT khi PROCESSING đang chạy; thu hồi PROCESSING quá hạn và cho phép nộp lại sau PENDING_REVIEW hết hạn")
+    @DisplayName("Chặn 409 CONFLICT khi PROCESSING đang chạy; thu hồi PROCESSING quá hạn và cho phép nộp lại sau hồ sơ cũ hết hạn")
     void shouldBlockActiveProcessingAndRecoverExpiredProcessingAndAllowExpiredPendingResubmit() {
         WorkerEkycVerification activeProcessing = WorkerEkycVerification.builder()
                 .id(UUID.randomUUID())

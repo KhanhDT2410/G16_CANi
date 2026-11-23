@@ -625,9 +625,10 @@ public class MatchingDispatchService {
             return 0;
         }
 
-        if (policy.resolveEffectiveShiftStatus(shift, now) != ShiftStatus.ACTIVE) {
-            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE (status={}, startTime={})",
-                    shiftId, shift.getStatus(), shift.getStartTime());
+        ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, now);
+        if (effectiveStatus != ShiftStatus.ACTIVE && effectiveStatus != ShiftStatus.IN_PROGRESS) {
+            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE/IN_PROGRESS (status={}, effective={}, startTime={})",
+                    shiftId, shift.getStatus(), effectiveStatus, shift.getStartTime());
             return 0;
         }
 

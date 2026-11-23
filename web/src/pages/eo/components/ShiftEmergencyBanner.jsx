@@ -3,10 +3,9 @@ import { getShiftStaffingSummary } from '../utils/eventHelpers';
 
 /**
  * Hiển thị cảnh báo thiếu nhân sự cho từng ca làm việc tại chỗ kèm thao tác hợp lệ:
- * - Ca MATCHING + ACTIVE còn thiếu -> nút "Kích hoạt khẩn cấp"
+ * - Ca ACTIVE hoặc IN_PROGRESS (trước giờ kết thúc) còn thiếu -> nút "Kích hoạt khẩn cấp"
  * - Ca INVITE còn thiếu -> nút "Mời thêm Worker"
  * - Ca đã bật Emergency -> nhãn "Đang điều phối khẩn cấp" hoặc "Đã bật điều phối · Chưa tìm được Worker phù hợp"
- * - Ca IN_PROGRESS -> ẩn nút kích hoạt khẩn cấp, hiển thị hướng dẫn thao tác thực tế
  */
 export default function ShiftEmergencyBanner({
   shift,
@@ -58,7 +57,7 @@ export default function ShiftEmergencyBanner({
           <div style={{ fontSize: '0.76rem', color: '#9a3412' }}>
             {summary.isInviteMode
               ? 'Ca đã đến giờ làm việc. Bạn có thể mời thêm Worker hoặc kiểm tra điểm danh ca.'
-              : 'Ca đã đến giờ làm việc (không thể bật điều phối khẩn cấp thủ công). Vui lòng kiểm tra điểm danh hoặc báo cáo vắng mặt nếu cần.'}
+              : 'Ca đã đến giờ làm việc và vẫn còn thiếu nhân sự. Bạn có thể bật điều phối khẩn cấp để tìm người bù ca hoặc kiểm tra điểm danh.'}
           </div>
         )}
       </div>

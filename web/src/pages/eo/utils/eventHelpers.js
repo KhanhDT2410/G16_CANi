@@ -331,7 +331,6 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     !isCancelled &&
     !isCompleted &&
     !isSuspended &&
-    !isInProgress &&
     missing > 0 &&
     !isEmergency &&
     (typeof shift?.canTriggerEmergency === 'boolean' ? shift.canTriggerEmergency : true);

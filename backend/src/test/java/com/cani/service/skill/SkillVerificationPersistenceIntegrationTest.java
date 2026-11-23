@@ -66,7 +66,7 @@ class SkillVerificationPersistenceIntegrationTest {
     }
 
     @Test
-    @DisplayName("Persistence & Idempotency: Hồ sơ mới vào PENDING_REVIEW duyệt thủ công + AuditLog + chặn nộp trùng SHA-256")
+    @DisplayName("Persistence & Honest Lookup: Boot không cần GEMINI_API_KEY, nguồn chưa tích hợp -> REJECTED ('Chưa thể xác minh tự động', 0 SP)")
     void submitAndVerifyRealDatabasePersistenceAndDuplicateGuard() {
         Worker worker = workerRepository.findAll().stream().findFirst().orElseThrow();
         Skill barista = skillRepository.findByName("Pha chế (Bartender/Barista)").orElseThrow();
@@ -80,27 +80,31 @@ class SkillVerificationPersistenceIntegrationTest {
                 worker.getWorkerId(), file, barista.getSkillId(), "Integration test"
         );
 
-        // 1. Query trực tiếp DB để xác nhận bền vững (Điều 8)
+        // 1. Query trực tiếp DB để xác nhận bền vững và tuyệt đối không tự duyệt khi thiếu nguồn tra cứu
         SkillVerificationRequest persisted = requestRepository.findById(res.getId()).orElseThrow();
-        assertEquals(SkillVerificationStatus.PENDING_REVIEW, persisted.getStatus());
-        assertEquals(RoutingDecision.ADMIN_REVIEW, persisted.getRoutingDecision());
-        assertEquals("MANUAL_REVIEW", persisted.getVerificationSource());
+        assertEquals(SkillVerificationStatus.REJECTED, persisted.getStatus());
+        assertEquals(RoutingDecision.REJECT, persisted.getRoutingDecision());
+        assertEquals("UNSUPPORTED_SOURCE", persisted.getVerificationSource());
+        assertTrue(persisted.getRoutingReason().contains("Chưa thể xác minh tự động"));
         assertEquals(0, persisted.getSpAwarded());
         assertNotNull(persisted.getDocumentHash());
         assertEquals(64, persisted.getDocumentHash().length());
         assertNotNull(persisted.getVersion());
         assertTrue(auditLogRepository.count() > auditCountBefore);
 
-        // 2. Nộp lại y hệt file đó -> DB phát hiện trùng SHA-256 -> 409 CONFLICT
-        MockMultipartFile dupFile = new MockMultipartFile("file", "cert_dup.jpg", "image/jpeg", uniqueImage);
-        AppException conflict = assertThrows(AppException.class, () ->
-                verificationService.submitVerification(worker.getWorkerId(), dupFile, barista.getSkillId(), "Dup"));
-        assertEquals(HttpStatus.CONFLICT, conflict.getStatus());
+        // 2. Nộp lại tệp mới qua resubmitVerification -> vẫn kiểm tra trung thực và cập nhật DB
+        byte[] secondImage = validJpegBytes((byte) 0x88);
+        MockMultipartFile secondFile = new MockMultipartFile("file", "cert_resubmit.jpg", "image/jpeg", secondImage);
+        SkillVerificationResponseDto resubmitted = verificationService.resubmitVerification(
+                persisted.getId(), worker.getWorkerId(), secondFile, "Resubmit");
+        assertEquals(SkillVerificationStatus.REJECTED, resubmitted.getStatus());
+        assertEquals(0, resubmitted.getSpAwarded());
+        assertTrue(resubmitted.getRoutingReason().contains("Chưa thể xác minh tự động"));
     }
 
     @Test
-    @DisplayName("Legacy Readability & Manual Move: Hồ sơ lỗi cũ đọc được nguyên vẹn và chuyển sang PENDING_REVIEW")
-    void legacyVerificationFailed_ReadableAndMovedToManualReview() {
+    @DisplayName("Legacy Readability & Retry: Hồ sơ VERIFICATION_FAILED cũ đọc được nguyên vẹn và Worker thử lại không qua Admin")
+    void legacyVerificationFailed_ReadableAndRetryable() {
         Worker worker = workerRepository.findAll().stream().findFirst().orElseThrow();
         SkillVerificationRequest legacyFailed = requestRepository.saveAndFlush(SkillVerificationRequest.builder()
                 .worker(worker)
@@ -122,12 +126,13 @@ class SkillVerificationPersistenceIntegrationTest {
         assertEquals("legacy-ai-model", detail.getModelName());
         assertEquals(SkillVerificationStatus.VERIFICATION_FAILED, detail.getStatus());
 
-        SkillVerificationResponseDto moved = verificationService.moveFailedToManualReview(
-                legacyFailed.getId(), UUID.randomUUID());
-        assertEquals(SkillVerificationStatus.PENDING_REVIEW, moved.getStatus());
-        assertEquals(RoutingDecision.ADMIN_REVIEW, moved.getRoutingDecision());
-        assertEquals("MANUAL_REVIEW", moved.getVerificationSource());
-        assertNull(moved.getFailureReason());
+        byte[] newImage = validJpegBytes((byte) 0x99);
+        MockMultipartFile replacement = new MockMultipartFile("file", "cert_legacy_resubmit.jpg", "image/jpeg", newImage);
+        SkillVerificationResponseDto resubmitted = verificationService.resubmitVerification(
+                legacyFailed.getId(), worker.getWorkerId(), replacement, "Nộp lại hồ sơ cũ");
+        assertEquals(SkillVerificationStatus.REJECTED, resubmitted.getStatus());
+        assertEquals("UNSUPPORTED_SOURCE", resubmitted.getVerificationSource());
+        assertEquals(0, resubmitted.getSpAwarded());
     }
 
     @Test

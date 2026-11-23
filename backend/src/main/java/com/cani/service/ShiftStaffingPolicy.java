@@ -222,12 +222,10 @@ public class ShiftStaffingPolicy {
             blockReason = "Ca làm việc đang bị tạm đình chỉ.";
         } else if (effectiveStatus == ShiftStatus.COMPLETED) {
             blockReason = "Ca làm việc đã kết thúc, không thể kích hoạt điều phối khẩn cấp.";
-        } else if (effectiveStatus == ShiftStatus.IN_PROGRESS) {
-            blockReason = "Ca làm việc đã đến giờ bắt đầu (IN_PROGRESS), chưa hỗ trợ bật điều phối khẩn cấp thủ công.";
         } else if (missing <= 0 || effectiveStatus == ShiftStatus.FULLY_STAFFED) {
             blockReason = "Ca làm việc đã tuyển đủ nhân sự, không cần kích hoạt điều phối khẩn cấp.";
-        } else if (effectiveStatus != ShiftStatus.ACTIVE) {
-            blockReason = "Chỉ có thể kích hoạt điều phối khẩn cấp cho ca làm việc đang ACTIVE.";
+        } else if (effectiveStatus != ShiftStatus.ACTIVE && effectiveStatus != ShiftStatus.IN_PROGRESS) {
+            blockReason = "Chỉ có thể kích hoạt điều phối khẩn cấp cho ca làm việc đang mở tuyển hoặc đang diễn ra.";
         } else if (Boolean.TRUE.equals(shift.getEmergency())) {
             blockReason = "Ca làm việc đã được bật điều phối khẩn cấp trước đó.";
         }

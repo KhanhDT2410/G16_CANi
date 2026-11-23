@@ -285,14 +285,12 @@ export default function EoProfileTab() {
       setEkycData(result);
       if (result?.status === 'APPROVED') {
         showToast('Xác thực định danh eKYC thành công!', 'success');
-      } else if (result?.status === 'PENDING_REVIEW') {
-        showToast(result.routingReason || 'Đã nộp hồ sơ eKYC! Đang chờ Admin thẩm định.', 'info');
       } else if (result?.status === 'PROCESSING' || result?.status === 'PENDING') {
         showToast(result.routingReason || 'Hồ sơ eKYC đang được xử lý.', 'info');
       } else if (result?.status === 'TECHNICAL_FAILURE') {
         showToast(result.routingReason || 'Lỗi kết nối VNPT eKYC tạm thời. Hồ sơ chưa bị từ chối, vui lòng thử lại.', 'error');
       } else {
-        showToast(result?.routingReason || 'Hồ sơ định danh eKYC chưa đạt yêu cầu hoặc bị trùng CCCD!', 'error');
+        showToast(result?.routingReason || 'Hồ sơ định danh eKYC chưa đạt yêu cầu. Vui lòng chụp lại rõ nét và nộp lại.', 'error');
       }
       await loadData();
       try {
@@ -433,7 +431,7 @@ export default function EoProfileTab() {
                   Đã Xác Thực eKYC
                 </span>
               ) : ekycStatus === 'PENDING_REVIEW' ? (
-                <span className="status-pill pending">Chờ Thẩm Định eKYC</span>
+                <span className="status-pill pending">Cần Xác Thực Lại eKYC</span>
               ) : (
                 <span className="status-pill none">Chưa Xác Thực eKYC</span>
               )}
@@ -783,7 +781,7 @@ export default function EoProfileTab() {
                 <span className="status-pill approved">ĐÃ XÁC THỰC UY TÍN</span>
               )}
               {ekycStatus === 'PENDING_REVIEW' && (
-                <span className="status-pill pending">ĐANG CHỜ DUYỆT</span>
+                <span className="status-pill pending">CẦN XÁC THỰC LẠI</span>
               )}
               {(ekycStatus === 'PROCESSING' || ekycStatus === 'PENDING') && (
                 <span className="status-pill pending">ĐANG XÁC MINH</span>
@@ -857,13 +855,13 @@ export default function EoProfileTab() {
                 <div style={{ backgroundColor: '#fefce8', border: '1px solid #fef08a', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
                   <div style={{ fontWeight: 700, color: '#854d0e', marginBottom: '0.25rem' }}>
                     {ekycData?.imagesExpired || ekycData?.imagesAvailable === false
-                      ? 'Hồ sơ chờ duyệt đã hết hạn lưu trữ ảnh — Vui lòng nộp lại'
-                      : 'Hồ sơ eKYC đang chờ Admin / CSKH thẩm định'}
+                      ? 'Hồ sơ eKYC cũ đã hết hạn lưu trữ ảnh — Vui lòng nộp lại'
+                      : 'Hồ sơ eKYC cũ chưa hoàn tất xác thực tự động'}
                   </div>
                   <div style={{ fontSize: '0.875rem', color: '#a16207', marginBottom: '0.75rem' }}>
                     {(ekycData?.imagesExpired || ekycData?.imagesAvailable === false)
                       ? (ekycData?.imagesUnavailableReason || 'Ảnh xác minh trước đó đã hết hạn lưu trữ tạm thời. Bạn có thể chụp và gửi lại hồ sơ mới ngay bên dưới.')
-                      : (ekycData?.routingReason || 'Hệ thống đã tiếp nhận hồ sơ từ VNPT eKYC và đang chờ Admin phê duyệt.')}
+                      : (ekycData?.routingReason || 'Hệ thống đã chuyển sang xác thực tự động qua VNPT eKYC. Vui lòng chụp lại ảnh rõ nét và nộp lại bên dưới.')}
                   </div>
                   {ekycData && (
                     <div className="info-grid" style={{ marginTop: '0.75rem' }}>

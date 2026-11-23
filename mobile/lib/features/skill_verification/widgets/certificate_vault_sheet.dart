@@ -96,27 +96,30 @@ class CertificateVaultSheet extends ConsumerWidget {
     final isExpired = statusUpper == 'EXPIRED';
     final isNeedsInfo = statusUpper == 'NEEDS_MORE_INFO';
     final isFailed = statusUpper == 'VERIFICATION_FAILED';
-    final isPending = statusUpper == 'PENDING_REVIEW' ||
-        (!isApproved &&
-            !isRevoked &&
-            !isExpired &&
-            !isNeedsInfo &&
-            !isFailed &&
-            (item.routingDecision == 'MANUAL_REVIEW' || item.routingDecision == 'ADMIN_REVIEW'));
+    final isLegacyPending = statusUpper == 'PENDING_REVIEW';
+    final isUnsupported = !isApproved &&
+        !isRevoked &&
+        !isExpired &&
+        !isNeedsInfo &&
+        !isFailed &&
+        (item.verificationSource == 'UNSUPPORTED_SOURCE' ||
+            item.routingReason.contains('Chưa thể xác minh tự động'));
     final statusColor = isApproved
         ? SkillHubColors.successText
-        : ((isPending || isNeedsInfo) ? SkillHubColors.warningText : SkillHubColors.dangerText);
+        : ((isFailed || isNeedsInfo || isLegacyPending) ? SkillHubColors.warningText : SkillHubColors.dangerText);
     final statusText = isApproved
-        ? 'Đã duyệt (+${item.spAwarded} SP)'
+        ? 'Đã xác minh (+${item.spAwarded} SP)'
         : (isRevoked
             ? 'Đã thu hồi'
             : (isExpired
                 ? 'Hết hạn'
                 : (isNeedsInfo
-                    ? 'Cần bổ sung'
+                    ? 'Cần nộp lại'
                     : (isFailed
-                        ? 'Chờ nộp lại / chuyển duyệt'
-                        : (isPending ? 'Chờ duyệt thủ công' : 'Từ chối')))));
+                        ? 'Lỗi tạm thời — thử lại'
+                        : (isLegacyPending
+                            ? 'Chưa xác minh tự động'
+                            : (isUnsupported ? 'Chưa thể xác minh tự động' : 'Không hợp lệ'))))));
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -165,7 +168,9 @@ class CertificateVaultSheet extends ConsumerWidget {
             ),
           const SizedBox(height: 4),
           Text(
-            item.routingReason.isNotEmpty ? item.routingReason : 'Hồ sơ chờ Admin / CSKH kiểm tra thủ công',
+            item.routingReason.isNotEmpty
+                ? item.routingReason
+                : 'Chưa thể xác minh tự động. Vui lòng nộp chứng chỉ có nguồn tra cứu hợp lệ.',
             style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
           ),
           if (item.createdAt != null) ...[

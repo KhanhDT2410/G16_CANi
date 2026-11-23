@@ -93,7 +93,7 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
     assert.equal(summary.canTriggerEmergency, false);
   });
 
-  it('Ca IN_PROGRESS: vẫn cảnh báo thiếu người nhưng ẩn nút kích hoạt khẩn cấp', () => {
+  it('Ca IN_PROGRESS còn thiếu người trước giờ kết thúc: vẫn cho phép bật kích hoạt khẩn cấp để bù người', () => {
     const sRunning = {
       shiftId: 's-run',
       jobType: 'Bảo vệ',
@@ -109,7 +109,7 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
 
     assert.equal(summary.isInProgress, true);
     assert.equal(summary.nearStartUnderstaffed, true);
-    assert.equal(summary.canTriggerEmergency, false);
+    assert.equal(summary.canTriggerEmergency, true);
   });
 
   it('Ca đã bật Emergency với 0 ứng viên vs có ứng viên', () => {

@@ -602,12 +602,29 @@ public class WorkerJobService {
         }
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+        Instant now = Instant.now();
+        List<Shift> candidateShifts = new ArrayList<>();
         List<Shift> activeShifts = shiftRepository.findByStatus(ShiftStatus.ACTIVE);
+        if (activeShifts != null) {
+            candidateShifts.addAll(activeShifts);
+        }
+        List<Shift> inProgressShifts = shiftRepository.findByStatus(ShiftStatus.IN_PROGRESS);
+        if (inProgressShifts != null) {
+            for (Shift s : inProgressShifts) {
+                if (Boolean.TRUE.equals(s.getEmergency())
+                        && (s.getEndTime() == null || !now.isAfter(s.getEndTime()))) {
+                    candidateShifts.add(s);
+                }
+            }
+        }
         List<NearbyShiftResponseDto> nearbyList = new ArrayList<>();
 
-        for (Shift s : activeShifts) {
-            // Chỉ hiển thị các ca còn cần tuyển người (remainingWorkers > 0)
+        for (Shift s : candidateShifts) {
+            // Chỉ hiển thị các ca còn cần tuyển người (remainingWorkers > 0) và chưa hết giờ làm
             if (s.getRemainingWorkers() == null || s.getRemainingWorkers() <= 0) {
+                continue;
+            }
+            if (s.getEndTime() != null && now.isAfter(s.getEndTime())) {
                 continue;
             }
 

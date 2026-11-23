@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -28,10 +29,13 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,12 +70,21 @@ class CustomerCareQueueSecurityTest {
     @MockitoBean
     private SkillVerificationService skillVerificationService;
 
+    private User adminUser;
     private User ccUser;
     private User workerUser;
     private User eoUser;
 
     @BeforeEach
     void setUp() {
+        adminUser = User.builder()
+                .userId(UUID.randomUUID())
+                .email("admin@cani.vn")
+                .fullName("Admin Hệ thống")
+                .role(UserRole.ADMIN)
+                .status(UserStatus.ACTIVE)
+                .build();
+
         ccUser = User.builder()
                 .userId(UUID.randomUUID())
                 .email("cc@cani.vn")
@@ -96,9 +109,7 @@ class CustomerCareQueueSecurityTest {
                 .status(UserStatus.ACTIVE)
                 .build();
 
-        when(workerEkycService.getPendingEkycQueue()).thenReturn(Collections.emptyList());
-        when(eoEkycService.getPendingEkycQueue()).thenReturn(Collections.emptyList());
-        when(skillVerificationService.getPendingVerificationQueue()).thenReturn(Collections.emptyList());
+        when(skillVerificationService.getAllVerificationsForAdmin(any())).thenReturn(Collections.emptyList());
     }
 
     private UsernamePasswordAuthenticationToken createAuthToken(User user) {
@@ -110,145 +121,72 @@ class CustomerCareQueueSecurityTest {
     }
 
     @Test
-    @DisplayName("CUSTOMER_CARE truy cập hàng đợi eKYC Worker thành công (200 OK)")
-    void customerCare_canAccessWorkerEkycQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/ekyc/queue")
+    @DisplayName("CUSTOMER_CARE đọc được lịch sử chứng chỉ kỹ năng (200 OK); WORKER & EO bị chặn 403")
+    void historicalSkillAuditReadAuthorization() throws Exception {
+        mockMvc.perform(get("/api/v1/workers/skills/admin/all")
                         .with(authentication(createAuthToken(ccUser))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
-    }
 
-    @Test
-    @DisplayName("CUSTOMER_CARE truy cập hàng đợi eKYC Doanh nghiệp thành công (200 OK)")
-    void customerCare_canAccessEoEkycQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/eo-ekyc/queue")
-                        .with(authentication(createAuthToken(ccUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
-    @DisplayName("CUSTOMER_CARE truy cập hàng đợi Thẩm định kỹ năng thành công (200 OK)")
-    void customerCare_canAccessSkillQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/workers/skills/admin/queue")
-                        .with(authentication(createAuthToken(ccUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
-
-    @Test
-    @DisplayName("WORKER bị chặn 403 Forbidden khi truy cập hàng đợi eKYC Worker")
-    void worker_forbiddenFromWorkerEkycQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/ekyc/queue")
+        mockMvc.perform(get("/api/v1/workers/skills/admin/all")
                         .with(authentication(createAuthToken(workerUser))))
                 .andExpect(status().isForbidden());
-    }
 
-    @Test
-    @DisplayName("WORKER bị chặn 403 Forbidden khi truy cập hàng đợi eKYC Doanh nghiệp")
-    void worker_forbiddenFromEoEkycQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/eo-ekyc/queue")
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("WORKER bị chặn 403 Forbidden khi truy cập hàng đợi Thẩm định kỹ năng")
-    void worker_forbiddenFromSkillQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/workers/skills/admin/queue")
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("EVENT_ORGANIZER bị chặn 403 Forbidden khi truy cập hàng đợi eKYC Worker")
-    void eo_forbiddenFromWorkerEkycQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/ekyc/queue")
+        mockMvc.perform(get("/api/v1/workers/skills/admin/all")
                         .with(authentication(createAuthToken(eoUser))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("EVENT_ORGANIZER bị chặn 403 Forbidden khi truy cập hàng đợi Thẩm định kỹ năng")
-    void eo_forbiddenFromSkillQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/workers/skills/admin/queue")
-                        .with(authentication(createAuthToken(eoUser))))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("Người dùng chưa đăng nhập bị chặn 401 Unauthorized")
-    void anonymous_unauthorizedFromQueue() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/ekyc/queue"))
+    @DisplayName("Người dùng chưa đăng nhập bị chặn 401 Unauthorized trên endpoint quản trị")
+    void anonymous_unauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/workers/skills/admin/all"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("CUSTOMER_CARE duyệt hồ sơ eKYC Worker thành công (200 OK)")
-    void customerCare_canReviewWorkerEkyc() throws Exception {
+    @DisplayName("Legal Hold chỉ cho phép ADMIN; CUSTOMER_CARE và WORKER bị chặn 403 Forbidden")
+    void legalHold_AdminOnly() throws Exception {
         UUID verificationId = UUID.randomUUID();
-        when(workerEkycService.adminReviewEkyc(eq(ccUser.getUserId()), eq(verificationId), any()))
+        when(workerEkycService.updateLegalHold(eq(adminUser.getUserId()), eq(verificationId), anyBoolean(), any()))
                 .thenReturn(com.cani.dto.ekyc.EkycVerificationResultDto.builder()
                         .verificationId(verificationId)
-                        .status("APPROVED")
+                        .legalHold(true)
                         .build());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/admin/ekyc/" + verificationId + "/review")
-                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content("{\"decision\":\"APPROVED\",\"reviewNotes\":\"Duyệt hợp lệ\"}")
-                        .with(authentication(createAuthToken(ccUser))))
+        mockMvc.perform(patch("/api/v1/admin/ekyc/" + verificationId + "/legal-hold")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"legalHold\":true,\"reason\":\"Đối soát tranh chấp\"}")
+                        .with(authentication(createAuthToken(adminUser))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
-    }
 
-    @Test
-    @DisplayName("CUSTOMER_CARE duyệt chứng chỉ kỹ năng thành công (200 OK)")
-    void customerCare_canReviewSkill() throws Exception {
-        UUID skillRequestId = UUID.randomUUID();
-        when(skillVerificationService.adminReview(eq(skillRequestId), eq(ccUser.getUserId()), eq(true), any()))
-                .thenReturn(com.cani.dto.skill.SkillVerificationResponseDto.builder()
-                        .id(skillRequestId)
-                        .status(com.cani.entity.enums.SkillVerificationStatus.APPROVED)
-                        .spAwarded(25)
-                        .build());
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/workers/skills/admin/" + skillRequestId + "/review")
-                        .param("approved", "true")
-                        .param("reviewNotes", "Chứng chỉ hợp lệ")
+        mockMvc.perform(patch("/api/v1/admin/ekyc/" + verificationId + "/legal-hold")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"legalHold\":true}")
                         .with(authentication(createAuthToken(ccUser))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
+                .andExpect(status().isForbidden());
 
-    @Test
-    @DisplayName("WORKER bị chặn 403 Forbidden khi duyệt hồ sơ eKYC Worker")
-    void worker_forbiddenFromReviewingWorkerEkyc() throws Exception {
-        UUID verificationId = UUID.randomUUID();
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/admin/ekyc/" + verificationId + "/review")
-                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content("{\"decision\":\"APPROVED\",\"reviewNotes\":\"Duyệt hợp lệ\"}")
+        mockMvc.perform(patch("/api/v1/admin/ekyc/" + verificationId + "/legal-hold")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"legalHold\":true}")
                         .with(authentication(createAuthToken(workerUser))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("WORKER bị chặn 403 Forbidden khi duyệt chứng chỉ kỹ năng")
-    void worker_forbiddenFromReviewingSkill() throws Exception {
-        UUID skillRequestId = UUID.randomUUID();
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/workers/skills/admin/" + skillRequestId + "/review")
-                        .param("approved", "true")
-                        .with(authentication(createAuthToken(workerUser))))
-                .andExpect(status().isForbidden());
-    }
+    @DisplayName("Các endpoint duyệt thủ công của Admin/CSKH cho eKYC & Skill đã bị gỡ bỏ khỏi API")
+    void removedManualReviewEndpointsAreNoLongerMapped() throws Exception {
+        UUID id = UUID.randomUUID();
+        mockMvc.perform(post("/api/v1/admin/ekyc/" + id + "/review")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"APPROVED\"}")
+                        .with(authentication(createAuthToken(adminUser))))
+                .andExpect(status().is5xxServerError()); // NoResourceFoundException caught by GlobalExceptionHandler when handler does not exist
 
-    @Test
-    @DisplayName("CUSTOMER_CARE bị chặn 403 Forbidden khi thay đổi Legal Hold hồ sơ eKYC")
-    void customerCare_forbiddenFromUpdatingLegalHold() throws Exception {
-        UUID verificationId = UUID.randomUUID();
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/v1/admin/ekyc/" + verificationId + "/legal-hold")
-                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content("{\"legalHold\":true,\"reason\":\"Test\"}")
-                        .with(authentication(createAuthToken(ccUser))))
-                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/workers/skills/admin/" + id + "/review")
+                        .param("approved", "true")
+                        .with(authentication(createAuthToken(adminUser))))
+                .andExpect(status().is5xxServerError());
     }
 }

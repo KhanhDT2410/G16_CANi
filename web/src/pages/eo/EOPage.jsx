@@ -443,8 +443,8 @@ export default function EOPage() {
                       <strong>Tài khoản chưa hoàn tất định danh eKYC</strong>
                       <p>
                         {ekycStatus === 'PENDING_REVIEW'
-                          ? 'Hồ sơ eKYC của bạn đang trong quá trình thẩm định. Bạn cần được phê duyệt để mở khóa tạo sự kiện.'
-                          : 'Bạn cần hoàn tất xác thực định danh (CCCD/ĐKKD) để được phép tạo sự kiện và tuyển dụng nhân sự trên CANi.'}
+                          ? 'Hồ sơ eKYC cũ của bạn chưa được xác thực tự động. Vui lòng thực hiện xác thực định danh VNPT eKYC để mở khóa tạo sự kiện.'
+                          : 'Bạn cần hoàn tất xác thực định danh tự động qua VNPT eKYC để được phép tạo sự kiện và tuyển dụng nhân sự trên CANi.'}
                       </p>
                     </div>
                   </div>
@@ -453,7 +453,7 @@ export default function EOPage() {
                     className="btn-verify-ekyc-now"
                     onClick={() => switchTab('profile')}
                   >
-                    {ekycStatus === 'PENDING_REVIEW' ? 'Xem Trạng Thái eKYC →' : 'Xác Thực Định Danh Ngay →'}
+                    {ekycStatus === 'PENDING_REVIEW' ? 'Xác Thực Lại eKYC →' : 'Xác Thực Định Danh Ngay →'}
                   </button>
                 </div>
               )}

@@ -206,7 +206,7 @@ public class ShiftLifecycleService {
             title = "Cảnh báo thiếu nhân sự khi vào ca: " + s.getJobType();
             actionHint = inviteMode
                     ? "Ca đã bắt đầu, bạn có thể mời thêm Worker hoặc kiểm tra điểm danh."
-                    : "Ca đã bắt đầu, vui lòng kiểm tra điểm danh hoặc báo cáo vắng mặt nếu cần.";
+                    : "Ca đã bắt đầu, bạn có thể bật điều phối khẩn cấp để bù người hoặc kiểm tra điểm danh/báo cáo vắng mặt.";
         } else {
             title = "Thiếu nhân sự sát giờ: " + s.getJobType();
             actionHint = inviteMode

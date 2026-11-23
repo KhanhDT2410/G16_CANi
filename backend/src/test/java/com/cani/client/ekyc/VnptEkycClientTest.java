@@ -223,8 +223,8 @@ class VnptEkycClientTest {
     }
 
     @Test
-    @DisplayName("CCCD không đọc được ngày hết hạn -> expiryStatus=UNREADABLE và chuyển PENDING_REVIEW (không mặc định hợp lệ)")
-    void shouldRouteToPendingReviewWhenExpiryDateUnreadable() throws Exception {
+    @DisplayName("CCCD không đọc được ngày hết hạn -> expiryStatus=UNREADABLE và REJECTED kèm hướng dẫn chụp lại")
+    void shouldRejectWhenExpiryDateUnreadable() throws Exception {
         JsonNode frontNode = objectMapper.readTree(validFrontOcrJson("-"));
         JsonNode backNode = objectMapper.readTree(validBackOcrJson());
         JsonNode faceNode = objectMapper.readTree("""
@@ -237,8 +237,8 @@ class VnptEkycClientTest {
         assertThat(result.isExpired()).isFalse();
 
         EkycDecisionEngine.DecisionOutcome outcome = decisionEngine.evaluate(result, null, false, false);
-        assertThat(outcome.getStatus()).isEqualTo(EkycVerificationStatus.PENDING_REVIEW);
-        assertThat(outcome.getRoutingDecision()).isEqualTo(EkycRoutingDecision.MANUAL_REVIEW);
+        assertThat(outcome.getStatus()).isEqualTo(EkycVerificationStatus.REJECTED);
+        assertThat(outcome.getRoutingDecision()).isEqualTo(EkycRoutingDecision.REJECTED);
         assertThat(outcome.getRoutingReason()).contains("ngày hết hạn");
     }
 
@@ -339,7 +339,7 @@ class VnptEkycClientTest {
                 {"message":"IDG-00000000","object":{"msg":"MATCH","prob":94.8}}
                 """);
         var result = vnptEkycClient.parseVnptResults(envelope, back, face);
-        assertThat(decisionEngine.evaluate(result, null, false, false).getStatus()).isEqualTo(EkycVerificationStatus.PENDING_REVIEW);
+        assertThat(decisionEngine.evaluate(result, null, false, false).getStatus()).isEqualTo(EkycVerificationStatus.REJECTED);
         var faceObject = (com.fasterxml.jackson.databind.node.ObjectNode) face.path("object");
         faceObject.put("liveness", true);
         assertThat(decisionEngine.evaluate(vnptEkycClient.parseVnptResults(envelope, back, face), null, false, false)

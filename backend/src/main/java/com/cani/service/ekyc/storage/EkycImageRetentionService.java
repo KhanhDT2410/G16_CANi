@@ -28,8 +28,8 @@ import java.util.UUID;
 /**
  * Chính sách vòng đời & xóa ảnh CCCD / Selfie riêng tư theo trạng thái hồ sơ:
  * - APPROVED / REJECTED: mặc định (0 ngày) xóa ngay sau khi commit kết quả trừ khi legal_hold = true.
- * - PENDING_REVIEW: giữ tạm có thời hạn (mặc định 14 ngày, luôn > 0) để Admin / CSKH duyệt tay.
- * - TECHNICAL_FAILURE: giữ tạm có thời hạn (mặc định 3 ngày, luôn > 0) phục vụ đối soát sự cố.
+ * - TECHNICAL_FAILURE: giữ tạm có thời hạn (mặc định 3 ngày, luôn > 0) phục vụ đối soát sự cố & retry.
+ * - PENDING_REVIEW (chỉ dữ liệu lịch sử cũ): giữ có thời hạn để không bao giờ giữ vô hạn.
  * - Tuyệt đối không biến thời hạn 0 thành NULL giữ vô hạn.
  * - Chỉ ghi images_purged_at sau khi xóa file thành công; nếu lỗi xóa thì giữ nguyên key để retry.
  */

@@ -4,7 +4,6 @@ import com.cani.dto.response.ApiResponse;
 import com.cani.dto.skill.*;
 import com.cani.entity.Skill;
 import com.cani.entity.User;
-import com.cani.entity.enums.AdminReviewDecision;
 import com.cani.entity.enums.SkillVerificationStatus;
 import com.cani.service.SkillVerificationService;
 import jakarta.validation.Valid;
@@ -92,7 +91,7 @@ public class SkillVerificationController {
     }
 
     /**
-     * Worker bổ sung hoặc thay thế tài liệu khi trạng thái NEEDS_MORE_INFO / VERIFICATION_FAILED / REJECTED
+     * Worker bổ sung hoặc thay thế tài liệu khi chưa xác minh thành công
      */
     @PostMapping(value = "/verifications/{id}/resubmit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> resubmitVerification(
@@ -104,6 +103,20 @@ public class SkillVerificationController {
     ) {
         UUID workerId = resolveWorkerId(authentication, explicitWorkerId);
         SkillVerificationResponseDto response = verificationService.resubmitVerification(verificationId, workerId, file, notes);
+        return ResponseEntity.ok(ApiResponse.ok(response, buildVerificationMessage(response)));
+    }
+
+    /**
+     * Worker thử lại xác minh tự động khi nguồn tra cứu gặp lỗi kết nối tạm thời (VERIFICATION_FAILED)
+     */
+    @PostMapping("/verifications/{id}/retry")
+    public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> retryVerification(
+            @PathVariable("id") UUID verificationId,
+            @RequestParam(value = "workerId", required = false) UUID explicitWorkerId,
+            Authentication authentication
+    ) {
+        UUID workerId = resolveWorkerId(authentication, explicitWorkerId);
+        SkillVerificationResponseDto response = verificationService.retryVerification(verificationId, workerId);
         return ResponseEntity.ok(ApiResponse.ok(response, buildVerificationMessage(response)));
     }
 
@@ -191,16 +204,6 @@ public class SkillVerificationController {
     }
 
     /**
-     * Admin / Customer Care queue for Medium-confidence submissions (UC-47)
-     */
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
-    @GetMapping("/admin/queue")
-    public ResponseEntity<ApiResponse<List<SkillVerificationResponseDto>>> getPendingQueue() {
-        List<SkillVerificationResponseDto> queue = verificationService.getPendingVerificationQueue();
-        return ResponseEntity.ok(ApiResponse.ok(queue, "Lấy danh sách hồ sơ thẩm định kỹ năng chờ duyệt thành công"));
-    }
-
-    /**
      * Admin Skill Audit Log: Lấy toàn bộ lịch sử thẩm định của tất cả Worker để thanh tra, hậu kiểm
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
@@ -213,7 +216,7 @@ public class SkillVerificationController {
     }
 
     /**
-     * Admin xem chi tiết một yêu cầu thẩm định (kèm TrustScore breakdown và trạng thái xác minh)
+     * Admin xem chi tiết một yêu cầu thẩm định (kèm trạng thái xác minh lịch sử)
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
     @GetMapping("/admin/{id}")
@@ -223,56 +226,6 @@ public class SkillVerificationController {
     ) {
         SkillVerificationResponseDto detail = verificationService.getVerificationDetail(verificationId, extractUser(authentication));
         return ResponseEntity.ok(ApiResponse.ok(detail, "Lấy chi tiết hồ sơ thẩm định thành công"));
-    }
-
-    /**
-     * Admin / Customer Care manual review (UC-47 V2):
-     * Hỗ trợ cả param `decision` (APPROVE | REJECT | NEEDS_MORE_INFO) lẫn param `approved` (tương thích ngược V1).
-     */
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
-    @PostMapping("/admin/{id}/review")
-    public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> adminReview(
-            @PathVariable("id") UUID verificationId,
-            @RequestParam(value = "approved", required = false) Boolean approved,
-            @RequestParam(value = "decision", required = false) AdminReviewDecision decision,
-            @RequestParam(value = "reviewNotes", required = false) String reviewNotes,
-            Authentication authentication
-    ) {
-        User admin = extractUser(authentication);
-        UUID adminUserId = admin != null ? admin.getUserId() : null;
-
-        SkillVerificationResponseDto response;
-        AdminReviewDecision effectiveDecision = decision;
-        if (effectiveDecision != null) {
-            response = verificationService.adminReview(verificationId, adminUserId, effectiveDecision, reviewNotes);
-        } else {
-            boolean isApproved = Boolean.TRUE.equals(approved);
-            effectiveDecision = isApproved ? AdminReviewDecision.APPROVE : AdminReviewDecision.REJECT;
-            response = verificationService.adminReview(verificationId, adminUserId, isApproved, reviewNotes);
-        }
-
-        String msg = switch (effectiveDecision) {
-            case APPROVE -> "Admin đã phê duyệt kỹ năng và cộng +25 SP_verify";
-            case NEEDS_MORE_INFO -> "Admin đã yêu cầu Worker bổ sung tài liệu rõ nét hơn";
-            case REJECT -> "Admin đã từ chối yêu cầu xác thực";
-        };
-        return ResponseEntity.ok(ApiResponse.ok(response, msg));
-    }
-
-    /**
-     * Admin chuyển hồ sơ cũ từng ở trạng thái VERIFICATION_FAILED sang hàng đợi duyệt thủ công (PENDING_REVIEW).
-     * Giữ route /retry tương thích ngược để không gọi AI.
-     */
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
-    @PostMapping({"/admin/{id}/manual-review", "/admin/{id}/retry"})
-    public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> moveFailedToManualReview(
-            @PathVariable("id") UUID verificationId,
-            Authentication authentication
-    ) {
-        User admin = extractUser(authentication);
-        UUID adminUserId = admin != null ? admin.getUserId() : null;
-        SkillVerificationResponseDto response = verificationService.moveFailedToManualReview(verificationId, adminUserId);
-        return ResponseEntity.ok(ApiResponse.ok(response, buildVerificationMessage(response)));
     }
 
     /**
@@ -294,18 +247,17 @@ public class SkillVerificationController {
 
     private String buildVerificationMessage(SkillVerificationResponseDto response) {
         if (response.getStatus() == SkillVerificationStatus.VERIFICATION_FAILED) {
-            return "Hồ sơ xử lý thất bại trước đây: " + response.getRoutingReason();
+            return "Nguồn tra cứu chứng chỉ đang gặp lỗi tạm thời: " + response.getRoutingReason();
         }
         if (response.getStatus() == SkillVerificationStatus.APPROVED) {
-            return "Chứng chỉ kỹ năng đã được phê duyệt và cộng SP_verify.";
-        }
-        if (response.getStatus() == SkillVerificationStatus.PENDING_REVIEW) {
-            return "Hồ sơ chứng chỉ đã được chuyển sang hàng đợi Admin kiểm tra thủ công: " + response.getRoutingReason();
+            return "Chứng chỉ kỹ năng đã được xác minh tự động thành công và cộng SP_verify.";
         }
         if (response.getStatus() == SkillVerificationStatus.NEEDS_MORE_INFO) {
             return "Yêu cầu bổ sung thêm tài liệu xác minh: " + response.getRoutingReason();
         }
-        return "Tài liệu không đạt yêu cầu xác minh: " + response.getRoutingReason();
+        return response.getRoutingReason() != null && !response.getRoutingReason().isBlank()
+                ? response.getRoutingReason()
+                : "Chứng chỉ chưa đạt yêu cầu xác minh tự động.";
     }
 
     private User extractUser(Authentication authentication) {

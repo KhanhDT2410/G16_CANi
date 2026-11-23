@@ -2017,26 +2017,45 @@ class EoEventServiceTest {
     }
 
     @Test
-    @DisplayName("UTC075 - triggerEmergencyDispatch() - Ca IN_PROGRESS (đã đến giờ làm) -> từ chối nhất quán với UI")
-    void triggerEmergencyDispatch_InProgressShift_ThrowsBadRequest() {
+    @DisplayName("UTC075 - triggerEmergencyDispatch() - Ca IN_PROGRESS (đã đến giờ làm, chưa kết thúc) vẫn cho phép bật khẩn cấp bù người; COMPLETED vẫn bị chặn")
+    void triggerEmergencyDispatch_InProgressShift_AllowedUntilEndTime() {
         UUID shiftId = UUID.randomUUID();
-        Event activeEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).mode(EventMode.MATCHING).status(EventStatus.ONGOING).build();
+        Event ongoingEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).mode(EventMode.MATCHING).status(EventStatus.ONGOING).build();
         Shift inProgressShift = Shift.builder()
                 .shiftId(shiftId)
-                .status(ShiftStatus.ACTIVE)
+                .status(ShiftStatus.IN_PROGRESS)
                 .startTime(Instant.now().minus(10, ChronoUnit.MINUTES))
                 .endTime(Instant.now().plus(3, ChronoUnit.HOURS))
                 .requiredWorkers(4)
                 .confirmedWorkers(2)
-                .event(activeEvent)
+                .emergency(false)
+                .event(ongoingEvent)
                 .build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
-        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(inProgressShift));
+        when(shiftRepository.findByIdForUpdate(shiftId)).thenReturn(Optional.of(inProgressShift));
+        when(matchingDispatchService.triggerEmergencyDispatch(shiftId, 25.0)).thenReturn(3);
 
-        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.triggerEmergencyDispatch(userId, shiftId, 25.0));
-        assertTrue(ex.getMessage().contains("IN_PROGRESS"));
-        verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+        int count = eoEventService.triggerEmergencyDispatch(userId, shiftId, 25.0);
+        assertEquals(3, count);
+        assertTrue(Boolean.TRUE.equals(inProgressShift.getEmergency()));
+        verify(matchingDispatchService).triggerEmergencyDispatch(shiftId, 25.0);
+
+        UUID endedShiftId = UUID.randomUUID();
+        Shift endedShift = Shift.builder()
+                .shiftId(endedShiftId)
+                .status(ShiftStatus.IN_PROGRESS)
+                .startTime(Instant.now().minus(4, ChronoUnit.HOURS))
+                .endTime(Instant.now().minus(5, ChronoUnit.MINUTES))
+                .requiredWorkers(4)
+                .confirmedWorkers(2)
+                .event(ongoingEvent)
+                .build();
+        when(shiftRepository.findByIdForUpdate(endedShiftId)).thenReturn(Optional.of(endedShift));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> eoEventService.triggerEmergencyDispatch(userId, endedShiftId, 25.0));
+        assertTrue(ex.getMessage().contains("kết thúc"));
     }
 
     @Test

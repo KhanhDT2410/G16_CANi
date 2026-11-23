@@ -182,6 +182,15 @@ public class WorkerShiftEligibilityService {
                 return EligibilityResult.fail("SHIFT_NOT_AVAILABLE",
                         "Ca làm việc này hiện không còn mở đăng ký qua mã mời.");
             }
+        } else if (channel == MatchingChannel.EMERGENCY_DISPATCH
+                || channel == MatchingChannel.EMERGENCY_APPLY
+                || channel == MatchingChannel.PROPOSAL_ACCEPTANCE) {
+            boolean inProgressEmergency = shift.getStatus() == ShiftStatus.IN_PROGRESS
+                    && (channel == MatchingChannel.EMERGENCY_DISPATCH || Boolean.TRUE.equals(shift.getEmergency()));
+            if (shift.getStatus() != ShiftStatus.ACTIVE && !inProgressEmergency) {
+                return EligibilityResult.fail("SHIFT_NOT_ACTIVE",
+                        "Ca làm việc này hiện không còn mở tuyển nhân sự (Trạng thái: " + shift.getStatus() + ").");
+            }
         } else {
             if (shift.getStatus() != ShiftStatus.ACTIVE) {
                 return EligibilityResult.fail("SHIFT_NOT_ACTIVE",

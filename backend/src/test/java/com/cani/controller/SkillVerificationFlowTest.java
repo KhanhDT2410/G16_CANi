@@ -48,7 +48,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import org.springframework.context.annotation.Import;
 import com.cani.config.SecurityConfig;
-import com.cani.entity.enums.AdminReviewDecision;
 import com.cani.exception.AppException;
 import com.cani.service.skill.DocumentAccessTokenService;
 import org.springframework.core.io.ByteArrayResource;
@@ -309,7 +308,7 @@ class SkillVerificationFlowTest {
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.success").value(true))
                                 .andExpect(jsonPath("$.message")
-                                                .value("Chứng chỉ kỹ năng đã được phê duyệt và cộng SP_verify."))
+                                                .value("Chứng chỉ kỹ năng đã được xác minh tự động thành công và cộng SP_verify."))
                                 .andExpect(jsonPath("$.data.workerId").value(workerId.toString()))
                                 .andExpect(jsonPath("$.data.routingDecision").value("AUTO_APPROVE"))
                                 .andExpect(jsonPath("$.data.status").value("APPROVED"))
@@ -318,6 +317,43 @@ class SkillVerificationFlowTest {
                                 .andExpect(jsonPath("$.data.extractedSkills[0].taxonomyRole")
                                                 .value("Pha chế (Bartender/Barista)"))
                                 .andExpect(jsonPath("$.data.hasSealOrSignature").value(true));
+        }
+
+        @Test
+        @DisplayName("Step 3b: Worker Submits Unsupported Certificate -> REJECTED ('Chưa thể xác minh tự động', 0 SP)")
+        void step3b_workerSubmitsUnsupportedCertificate_ReturnsUnverifiedMessage() throws Exception {
+                MockMultipartFile certFile = new MockMultipartFile(
+                                "file",
+                                "plain_cert.png",
+                                MediaType.IMAGE_PNG_VALUE,
+                                "plain-image-bytes".getBytes());
+
+                SkillVerificationResponseDto unsupportedDto = SkillVerificationResponseDto.builder()
+                                .id(UUID.randomUUID())
+                                .workerId(workerId)
+                                .skillId(skillId)
+                                .skillName("Pha chế (Bartender/Barista)")
+                                .jobType("Pha chế (Bartender/Barista)")
+                                .verificationSource("UNSUPPORTED_SOURCE")
+                                .routingDecision(RoutingDecision.REJECT)
+                                .routingReason("Chưa thể xác minh tự động: Chứng chỉ không có nguồn tra cứu chính thức được hỗ trợ.")
+                                .status(SkillVerificationStatus.REJECTED)
+                                .spAwarded(0)
+                                .build();
+
+                when(verificationService.submitVerification(eq(workerId), any(), eq(skillId), eq("Nộp thử")))
+                                .thenReturn(unsupportedDto);
+
+                mockMvc.perform(multipart("/api/v1/workers/skills/verify")
+                                .file(certFile)
+                                .param("skillId", skillId.toString())
+                                .param("notes", "Nộp thử")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.data.status").value("REJECTED"))
+                                .andExpect(jsonPath("$.data.verificationSource").value("UNSUPPORTED_SOURCE"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(0));
         }
 
         @Test
@@ -370,46 +406,41 @@ class SkillVerificationFlowTest {
         }
 
         @Test
-        @DisplayName("Step 6: Security Boundary - Worker cannot call adminReview (403 Forbidden)")
-        void step6_adminReview_ForbiddenForWorker() throws Exception {
+        @DisplayName("Step 6: Security Boundary - Worker cannot call Admin revoke endpoint (403 Forbidden)")
+        void step6_adminRevoke_ForbiddenForWorker() throws Exception {
                 UUID verificationId = UUID.randomUUID();
 
-                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
-                                .param("approved", "true")
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/revoke")
+                                .param("reason", "Thử thu hồi trái phép")
                                 .with(csrf())
                                 .with(authentication(createAuthToken(workerUser))))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("Step 7: Admin Review - Admin user can approve medium-confidence submission")
-        void step7_adminReview_SuccessForAdminUser() throws Exception {
+        @DisplayName("Step 7: Admin Audit Revoke - Admin user can revoke fraud certificate and deduct SP")
+        void step7_adminRevoke_SuccessForAdminUser() throws Exception {
                 UUID verificationId = UUID.randomUUID();
 
-                SkillVerificationResponseDto approvedResponse = SkillVerificationResponseDto.builder()
+                SkillVerificationResponseDto revokedResponse = SkillVerificationResponseDto.builder()
                                 .id(verificationId)
                                 .workerId(workerId)
-                                .status(SkillVerificationStatus.APPROVED)
-                                .spAwarded(25)
-                                .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                                .routingReason("Admin đã xác minh con dấu mờ")
+                                .status(SkillVerificationStatus.REVOKED)
+                                .spAwarded(0)
                                 .build();
 
-                when(verificationService.adminReview(eq(verificationId), eq(adminUser.getUserId()), eq(true),
-                                eq("Admin đã xác minh con dấu mờ")))
-                                .thenReturn(approvedResponse);
+                when(verificationService.revokeVerification(eq(verificationId), eq(adminUser.getUserId()),
+                                eq("Chứng chỉ không hợp lệ")))
+                                .thenReturn(revokedResponse);
 
-                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
-                                .param("approved", "true")
-                                .param("reviewNotes", "Admin đã xác minh con dấu mờ")
+                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/revoke")
+                                .param("reason", "Chứng chỉ không hợp lệ")
                                 .with(csrf())
                                 .with(authentication(createAuthToken(adminUser))))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.success").value(true))
-                                .andExpect(jsonPath("$.message")
-                                                .value("Admin đã phê duyệt kỹ năng và cộng +25 SP_verify"))
-                                .andExpect(jsonPath("$.data.status").value("APPROVED"))
-                                .andExpect(jsonPath("$.data.spAwarded").value(25));
+                                .andExpect(jsonPath("$.data.status").value("REVOKED"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(0));
         }
 
         @Test
@@ -464,72 +495,36 @@ class SkillVerificationFlowTest {
         }
 
         @Test
-        @DisplayName("Step 12 (Security V2): Worker cannot call Admin retry or queue endpoints (403 Forbidden)")
-        void step12_adminRetryAndQueue_ForbiddenForWorker() throws Exception {
-                UUID verificationId = UUID.randomUUID();
-                mockMvc.perform(get("/api/v1/workers/skills/admin/queue")
-                                .with(authentication(createAuthToken(workerUser))))
-                                .andExpect(status().isForbidden());
-
-                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/manual-review")
-                                .with(csrf())
-                                .with(authentication(createAuthToken(workerUser))))
-                                .andExpect(status().isForbidden());
-
-                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/retry")
-                                .with(csrf())
+        @DisplayName("Step 12: Worker cannot call Admin all audit log endpoint (403 Forbidden)")
+        void step12_adminAll_ForbiddenForWorker() throws Exception {
+                mockMvc.perform(get("/api/v1/workers/skills/admin/all")
                                 .with(authentication(createAuthToken(workerUser))))
                                 .andExpect(status().isForbidden());
         }
 
         @Test
-        @DisplayName("Step 12b: Admin moves legacy VERIFICATION_FAILED request to manual review via /manual-review")
-        void step12b_adminMoveToManualReview_Success() throws Exception {
+        @DisplayName("Step 13: Worker retries temporary lookup failure via POST /verifications/{id}/retry -> APPROVED (+25 SP)")
+        void step13_workerRetriesVerification_Success() throws Exception {
                 UUID verificationId = UUID.randomUUID();
-                SkillVerificationResponseDto movedDto = SkillVerificationResponseDto.builder()
+                SkillVerificationResponseDto approvedDto = SkillVerificationResponseDto.builder()
                                 .id(verificationId)
                                 .workerId(workerId)
-                                .status(SkillVerificationStatus.PENDING_REVIEW)
-                                .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                                .routingReason("Chờ Admin duyệt thủ công")
-                                .spAwarded(0)
+                                .status(SkillVerificationStatus.APPROVED)
+                                .routingDecision(RoutingDecision.AUTO_APPROVE)
+                                .verificationSource("ISSUER_API")
+                                .spAwarded(25)
+                                .retryCount(1)
                                 .build();
 
-                when(verificationService.moveFailedToManualReview(eq(verificationId), eq(adminUser.getUserId())))
-                                .thenReturn(movedDto);
+                when(verificationService.retryVerification(eq(verificationId), eq(workerId)))
+                                .thenReturn(approvedDto);
 
-                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/manual-review")
+                mockMvc.perform(post("/api/v1/workers/skills/verifications/" + verificationId + "/retry")
                                 .with(csrf())
-                                .with(authentication(createAuthToken(adminUser))))
+                                .with(authentication(createAuthToken(workerUser))))
                                 .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"))
-                                .andExpect(jsonPath("$.data.spAwarded").value(0));
-        }
-
-        @Test
-        @DisplayName("Step 13 (Admin V2): Admin requests additional document via decision=NEEDS_MORE_INFO")
-        void step13_adminReview_NeedsMoreInfo_Success() throws Exception {
-                UUID verificationId = UUID.randomUUID();
-                SkillVerificationResponseDto moreInfoDto = SkillVerificationResponseDto.builder()
-                                .id(verificationId)
-                                .workerId(workerId)
-                                .status(SkillVerificationStatus.NEEDS_MORE_INFO)
-                                .spAwarded(0)
-                                .reviewNotes("Ảnh mờ phần dấu mộc, vui lòng chụp lại")
-                                .build();
-
-                when(verificationService.adminReview(
-                                eq(verificationId), eq(adminUser.getUserId()), eq(AdminReviewDecision.NEEDS_MORE_INFO),
-                                eq("Ảnh mờ phần dấu mộc, vui lòng chụp lại")))
-                                .thenReturn(moreInfoDto);
-
-                mockMvc.perform(post("/api/v1/workers/skills/admin/" + verificationId + "/review")
-                                .param("decision", "NEEDS_MORE_INFO")
-                                .param("reviewNotes", "Ảnh mờ phần dấu mộc, vui lòng chụp lại")
-                                .with(csrf())
-                                .with(authentication(createAuthToken(adminUser))))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.data.status").value("NEEDS_MORE_INFO"))
-                                .andExpect(jsonPath("$.data.spAwarded").value(0));
+                                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(25))
+                                .andExpect(jsonPath("$.data.retryCount").value(1));
         }
 }

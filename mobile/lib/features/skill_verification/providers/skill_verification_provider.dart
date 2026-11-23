@@ -155,6 +155,31 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
     }
   }
 
+  Future<bool> retryVerification(String verificationId) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final result = await _repository.retryVerification(verificationId);
+      final points = await _repository.getSkillPoints().catchError((_) => state.skillPoints);
+      final history = await _repository.getHistory().catchError((_) => state.history);
+      final mySkills = await _repository.getMySkills().catchError((_) => state.mySkills);
+
+      state = state.copyWith(
+        isSubmitting: false,
+        lastResult: result,
+        skillPoints: points,
+        history: history,
+        mySkills: mySkills,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
   void clearLastResult() {
     state = state.copyWith(clearResult: true);
   }

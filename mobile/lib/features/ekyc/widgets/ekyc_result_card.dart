@@ -193,7 +193,7 @@ class EkycResultCard extends StatelessWidget {
 
   String _resolveVerificationSummaryLabel() {
     if (item.isApproved) return 'Đã xác minh';
-    if (item.isPendingReview) return 'Chờ Admin duyệt';
+    if (item.isPendingReview) return 'Cần xác minh lại';
     if (item.isProcessing) return 'Đang xử lý';
     if (item.isTechnicalFailure) return 'Lỗi kỹ thuật';
     return 'Chưa đạt';

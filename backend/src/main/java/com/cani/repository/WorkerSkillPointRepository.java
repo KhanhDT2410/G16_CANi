@@ -11,7 +11,11 @@ import java.util.UUID;
 @Repository
 public interface WorkerSkillPointRepository extends JpaRepository<WorkerSkillPoint, UUID> {
 
+    Optional<WorkerSkillPoint> findByWorker_WorkerIdAndSkill_SkillId(UUID workerId, UUID skillId);
+
     Optional<WorkerSkillPoint> findByWorker_WorkerIdAndJobType(UUID workerId, String jobType);
+
+    Optional<WorkerSkillPoint> findFirstByWorker_WorkerIdAndJobTypeIgnoreCase(UUID workerId, String jobType);
 
     List<WorkerSkillPoint> findByWorker_WorkerId(UUID workerId);
 }

@@ -123,6 +123,28 @@ export const DisputeQueueSidebar = ({
                   <span className="item-card-id">{item.displayId || `#${item.id?.substring(0, 8)}`}</span>
                   <span className={`dispute-badge ${statusCfg.badgeClass}`}>{statusCfg.label}</span>
                 </div>
+
+                {/* Chỉ báo bên đang nhắn và số tin mới */}
+                {(item.workerUnreadCount > 0 || item.eoUnreadCount > 0 || item.unreadCount > 0) && (
+                  <div className="item-card-unread-row">
+                    {item.workerUnreadCount > 0 && (
+                      <span className="unread-sender-pill worker">
+                        Nhân sự: {item.workerUnreadCount}
+                      </span>
+                    )}
+                    {item.eoUnreadCount > 0 && (
+                      <span className="unread-sender-pill eo">
+                        Nhà tổ chức: {item.eoUnreadCount}
+                      </span>
+                    )}
+                    {!item.workerUnreadCount && !item.eoUnreadCount && item.unreadCount > 0 && (
+                      <span className="unread-sender-pill default">
+                        {item.unreadCount} tin mới
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <h4 className="item-card-title">{item.title}</h4>
                 <div className="item-card-bottom">
                   <span className="item-card-type">{typeLabel}</span>

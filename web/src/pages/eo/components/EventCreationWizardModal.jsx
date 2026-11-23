@@ -12,13 +12,22 @@ import {
 import {
   isGibberishOrSpam,
   validateJobType,
+  resolveWageRegionInfo,
+  validateShiftWageAgainstFloor,
   detectCityFromAddress,
   STATUTORY_HOURLY_FLOORS,
 } from '../utils/shiftValidation';
+import {
+  toDateTimeLocalInput,
+  validateEventTimeRange,
+  validateShiftTimeRange,
+  validateShiftArrivalTime,
+} from '../utils/eventHelpers';
 import { getCoordinatesFromAddress } from '../utils/geoUtils';
 import VenueLocationPicker from './VenueLocationPicker';
 import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
+import ShiftArrivalTimeField from './ShiftArrivalTimeField';
 import WageBenchmarkBox from './WageBenchmarkBox';
 import './EventCreatePage.css';
 
@@ -32,6 +41,8 @@ import './EventCreatePage.css';
 const EventCreationWizardModal = ({
   isOpen = true,
   asPage = false,
+  controlledStep = null,
+  onStepChange,
   onClose,
   onSuccess,
   onEventCreated,
@@ -49,7 +60,12 @@ const EventCreationWizardModal = ({
     return map;
   }, [skillTaxonomy]);
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [internalStep, setInternalStep] = useState(1);
+  const currentStep = controlledStep != null ? controlledStep : internalStep;
+  const setCurrentStep = (nextStep) => {
+    setInternalStep(nextStep);
+    onStepChange?.(nextStep);
+  };
   const [submitting, setSubmitting] = useState(false);
   const [createdEvent, setCreatedEvent] = useState(null);
   const [step1Errors, setStep1Errors] = useState({});
@@ -65,6 +81,7 @@ const EventCreationWizardModal = ({
   const [editingShiftIndex, setEditingShiftIndex] = useState(null);
   const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
   const [shiftPackageWage, setShiftPackageWage] = useState(200000);
+  const [currentShiftBenchmark, setCurrentShiftBenchmark] = useState(null);
 
   const toDateTimeInputVal = (date) => {
     if (!date) return '';
@@ -96,30 +113,43 @@ const EventCreationWizardModal = ({
     }
   };
 
-  const [currentShift, setCurrentShift] = useState({
+  const [currentShift, setCurrentShift] = useState(() => ({
     jobType: ROLES[0],
     description: 'Hỗ trợ công tác đón tiếp khách, hướng dẫn vị trí và điều phối sự kiện theo phân công.',
-    startTime: newEvent.startTime || '2026-11-20T08:00',
-    endTime: '2026-11-20T12:00',
-    requiredWorkers: 4,
+    startTime: newEvent.startTime || '',
+    endTime: newEvent.endTime || '',
+    arrivalTime: '',
+    requiredWorkers: 1,
     hourlyWage: 50000,
-    allowance: 20000,
+    allowance: 0,
     maxDistanceKm: 15,
     imageUrl: '',
+    performedSkillId: null,
     requiredSkills: [],
+    skillRequirements: [],
+    customSkillNotes: '',
     checklistItems: [
       { id: 'chk_1', title: 'Có mặt trước 20 phút nhận thẻ và vị trí', isRequiredEvidence: false },
       { id: 'chk_2', title: 'Đồng phục chỉn chu theo quy định', isRequiredEvidence: true },
       { id: 'chk_3', title: 'Quét mã QR Check-in đầu ca', isRequiredEvidence: false },
       { id: 'chk_4', title: 'Báo cáo quản lý trước khi kết thúc ca', isRequiredEvidence: false },
     ],
-  });
+  }));
 
   if (!isOpen) return null;
 
   const activeAddress = newEvent.venueAddress || createdEvent?.venueAddress || '';
-  const detectedCity = detectCityFromAddress(activeAddress);
-  const floorInfo = STATUTORY_HOURLY_FLOORS[detectedCity] || STATUTORY_HOURLY_FLOORS.TP_HCM;
+  const activeLat = newEvent.venueLat ?? createdEvent?.venueLat ?? null;
+  const activeLng = newEvent.venueLng ?? createdEvent?.venueLng ?? null;
+  const regionInfo = resolveWageRegionInfo(
+    activeAddress,
+    activeLat,
+    activeLng,
+    Boolean(newEvent.locationPicked || createdEvent?.eventId)
+  );
+  const floorInfo = regionInfo.isResolved
+    ? { wage: regionInfo.wage, regionLabel: regionInfo.regionLabel }
+    : { wage: 25500, regionLabel: 'Chưa xác định khu vực' };
 
   const handleEventImageUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -172,11 +202,16 @@ const EventCreationWizardModal = ({
   };
 
   const handleStartEditShift = (shift, index) => {
-    const sTime = toDateTimeInputVal(shift.startTime) || newEvent.startTime || '2026-11-20T08:00';
-    const eTime = toDateTimeInputVal(shift.endTime) || '2026-11-20T12:00';
+    const sTime = toDateTimeInputVal(shift.startTime) || newEvent.startTime || '';
+    const eTime = toDateTimeInputVal(shift.endTime) || newEvent.endTime || '';
     const dur = getDurationHours(sTime, eTime);
     const hWage = Number(shift.hourlyWage || 50000);
     const parsedChecklist = normalizeChecklistItems(shift.checklistItems || shift.checklist);
+    const customArrival =
+      shift.arrivalTime && shift.startTime &&
+      new Date(shift.arrivalTime).getTime() !== new Date(shift.startTime).getTime()
+        ? toDateTimeInputVal(shift.arrivalTime)
+        : '';
 
     setEditingShiftIndex(index);
     setShiftErrors({});
@@ -187,12 +222,16 @@ const EventCreationWizardModal = ({
       description: shift.description || '',
       startTime: sTime,
       endTime: eTime,
+      arrivalTime: customArrival,
       requiredWorkers: Number(shift.requiredWorkers || 2),
       hourlyWage: hWage,
       allowance: Number(shift.allowance || 0),
       maxDistanceKm: Number(shift.maxDistanceKm || 15),
       imageUrl: shift.imageUrl || '',
+      performedSkillId: shift.performedSkillId || null,
       requiredSkills: Array.isArray(shift.requiredSkills) ? shift.requiredSkills : [],
+      skillRequirements: Array.isArray(shift.skillRequirements) ? shift.skillRequirements : [],
+      customSkillNotes: shift.customSkillNotes || '',
       checklistItems: parsedChecklist,
     });
     setIsAddingShift(true);
@@ -232,7 +271,10 @@ const EventCreationWizardModal = ({
           allowance: safeAllowance,
           maxDistanceKm: Number(currentShift.maxDistanceKm || 15),
           imageUrl: null,
+          performedSkillId: null,
           requiredSkills: [],
+          skillRequirements: [],
+          customSkillNotes: '',
           checklist: '[]',
           startTime: slotStart.toISOString(),
           endTime: slotEnd.toISOString(),
@@ -275,7 +317,7 @@ const EventCreationWizardModal = ({
       Math.max(0, Number(currentShift.hourlyWage || 0)) +
     Math.max(0, Number(currentShift.allowance || 0));
 
-  const riskAnalysis = calculateShiftRiskAnalysis(currentShift, activeAddress);
+  const riskAnalysis = calculateShiftRiskAnalysis(currentShift, activeAddress, activeLat, activeLng);
 
   const handleRoleChange = (role) => {
     const rec = WAGE_RECOMMENDATIONS_MAP[role];
@@ -301,9 +343,10 @@ const EventCreationWizardModal = ({
   };
 
   const handlePackageWageChange = (val) => {
-    const pkg = Math.max(0, parseFloat(val) || 0);
+    let raw = typeof val === 'string' ? val.replace(/^0+(?=\d)/, '') : String(val ?? '');
+    const pkg = raw === '' ? '' : Math.max(0, parseFloat(raw) || 0);
     setShiftPackageWage(pkg);
-    const computedHourly = Math.max(0, Math.round(pkg / Math.max(0.5, currentDurationHours)));
+    const computedHourly = Math.max(0, Math.round((Number(pkg) || 0) / Math.max(0.5, currentDurationHours)));
     setCurrentShift((prev) => ({
       ...prev,
       hourlyWage: computedHourly,
@@ -314,17 +357,33 @@ const EventCreationWizardModal = ({
     const nextStart = field === 'startTime' ? value : currentShift.startTime;
     const nextEnd = field === 'endTime' ? value : currentShift.endTime;
     const nextDur = getDurationHours(nextStart, nextEnd);
+
+    let nextArrival = currentShift.arrivalTime;
+    if (field === 'startTime' && currentShift.arrivalTime && currentShift.startTime) {
+      const oldS = new Date(currentShift.startTime);
+      const oldA = new Date(currentShift.arrivalTime);
+      const newS = new Date(value);
+      if (!isNaN(oldS.getTime()) && !isNaN(oldA.getTime()) && !isNaN(newS.getTime())) {
+        const offsetMs = oldS.getTime() - oldA.getTime();
+        if (offsetMs >= 0 && offsetMs <= 120 * 60 * 1000) {
+          nextArrival = toDateTimeLocalInput(new Date(newS.getTime() - offsetMs));
+        }
+      }
+    }
+
     if (wageMode === 'PER_SHIFT') {
       const computedHourly = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, nextDur)));
       setCurrentShift((prev) => ({
         ...prev,
         [field]: value,
+        arrivalTime: nextArrival,
         hourlyWage: computedHourly,
       }));
     } else {
       setCurrentShift((prev) => ({
         ...prev,
         [field]: value,
+        arrivalTime: nextArrival,
       }));
       setShiftPackageWage(Math.round(Number(currentShift.hourlyWage || 0) * nextDur));
     }
@@ -352,20 +411,8 @@ const EventCreationWizardModal = ({
       }
     }
 
-    if (!data.startTime) errs.startTime = 'Vui lòng chọn thời gian bắt đầu sự kiện.';
-    if (!data.endTime) errs.endTime = 'Vui lòng chọn thời gian kết thúc sự kiện.';
-
-    if (data.startTime && data.endTime) {
-      const start = new Date(data.startTime);
-      const end = new Date(data.endTime);
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        errs.time = 'Thời gian sự kiện không hợp lệ.';
-      } else if (start >= end) {
-        errs.time = 'Thời gian kết thúc phải diễn ra sau thời gian bắt đầu sự kiện.';
-      } else if (end.getTime() - start.getTime() < 30 * 60 * 1000) {
-        errs.time = 'Thời lượng sự kiện tối thiểu phải từ 30 phút trở lên.';
-      }
-    }
+    const timeErrs = validateEventTimeRange(data.startTime, data.endTime, { allowPastStart: false });
+    Object.assign(errs, timeErrs);
 
     if (!data.venueAddress?.trim()) {
       errs.venueAddress = 'Vui lòng chọn hoặc nhập địa chỉ tổ chức cụ thể.';
@@ -429,6 +476,7 @@ const EventCreationWizardModal = ({
           ...prev,
           startTime: defaultShiftStart,
           endTime: defaultShiftEnd,
+          arrivalTime: '',
         }));
       }
 
@@ -474,8 +522,17 @@ const EventCreationWizardModal = ({
       return;
     }
 
-    if (Number(currentShift.hourlyWage || 0) < 20000) {
-      showToast('Mức thù lao giờ tối thiểu trên hệ thống là 20.000 VNĐ/giờ!', 'error');
+    const wageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: currentShift.hourlyWage,
+      benchmark: currentShiftBenchmark,
+      city: regionInfo.city,
+      venueAddress: activeAddress,
+      venueLat: activeLat,
+      venueLng: activeLng,
+    });
+    if (!wageCheck.isValid) {
+      setShiftErrors((prev) => ({ ...prev, hourlyWage: wageCheck.error }));
+      showToast(wageCheck.error, 'error');
       return;
     }
 
@@ -489,19 +546,20 @@ const EventCreationWizardModal = ({
     const eStart = new Date(createdEvent?.startTime || newEvent.startTime);
     const eEnd = new Date(createdEvent?.endTime || newEvent.endTime);
 
-    if (isNaN(sStart.getTime()) || isNaN(sEnd.getTime())) {
-      showToast('Vui lòng chọn thời gian bắt đầu và kết thúc ca làm hợp lệ', 'error');
+    const shiftTimeErr = validateShiftTimeRange(
+      currentShift.startTime,
+      currentShift.endTime,
+      createdEvent?.startTime || newEvent.startTime,
+      createdEvent?.endTime || newEvent.endTime,
+      { allowPastStart: false }
+    );
+    if (shiftTimeErr) {
+      showToast(shiftTimeErr, 'error');
       return;
     }
-    if (sStart >= sEnd) {
-      showToast('Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu ca', 'error');
-      return;
-    }
-    if (sStart < eStart || sEnd > eEnd) {
-      showToast(
-        `Ca làm việc (${formatDateTimeDisplay(sStart)} - ${formatDateTimeDisplay(sEnd)}) phải nằm trọn trong thời gian sự kiện (${formatDateTimeDisplay(eStart)} - ${formatDateTimeDisplay(eEnd)})!`,
-        'error'
-      );
+    const arrivalErr = validateShiftArrivalTime(currentShift.arrivalTime, currentShift.startTime);
+    if (arrivalErr) {
+      showToast(arrivalErr, 'error');
       return;
     }
 
@@ -517,8 +575,12 @@ const EventCreationWizardModal = ({
         hourlyWage: Math.max(20000, Number(currentShift.hourlyWage || 50000)),
         allowance: Math.max(0, Number(currentShift.allowance || 0)),
         imageUrl: currentShift.imageUrl?.trim() || null,
+        performedSkillId: currentShift.performedSkillId || null,
         requiredSkills: Array.isArray(currentShift.requiredSkills) ? currentShift.requiredSkills : [],
+        skillRequirements: Array.isArray(currentShift.skillRequirements) ? currentShift.skillRequirements : [],
+        customSkillNotes: currentShift.customSkillNotes?.trim() || null,
         checklist: checklistJson,
+        arrivalTime: currentShift.arrivalTime ? new Date(currentShift.arrivalTime).toISOString() : null,
         startTime: sStart.toISOString(),
         endTime: sEnd.toISOString(),
       };
@@ -597,12 +659,16 @@ const EventCreationWizardModal = ({
         description: 'Phối hợp thực hiện nhiệm vụ theo kế hoạch tổ chức sự kiện.',
         startTime: toDateTimeInputVal(nextStart),
         endTime: toDateTimeInputVal(nextEnd),
-        requiredWorkers: 2,
+        arrivalTime: '',
+        requiredWorkers: 1,
         hourlyWage: nextWage,
         allowance: 0,
         maxDistanceKm: 15,
         imageUrl: '',
+        performedSkillId: null,
         requiredSkills: [],
+        skillRequirements: [],
+        customSkillNotes: '',
         checklistItems: [
           { id: 'chk_1', title: 'Có mặt đúng giờ quy định', isRequiredEvidence: false },
           { id: 'chk_2', title: 'Quét mã QR Check-in', isRequiredEvidence: false },
@@ -646,6 +712,32 @@ const EventCreationWizardModal = ({
       showToast('Vui lòng thêm ít nhất một ca làm việc trước khi tiếp tục!', 'warning');
       return;
     }
+
+    const invalidShift = shiftsList.find((s) => {
+      const check = validateShiftWageAgainstFloor({
+        hourlyWage: s.hourlyWage,
+        city: regionInfo.city,
+        venueAddress: activeAddress,
+        venueLat: activeLat,
+        venueLng: activeLng,
+      });
+      return !check.isValid;
+    });
+    if (invalidShift) {
+      const check = validateShiftWageAgainstFloor({
+        hourlyWage: invalidShift.hourlyWage,
+        city: regionInfo.city,
+        venueAddress: activeAddress,
+        venueLat: activeLat,
+        venueLng: activeLng,
+      });
+      showToast(
+        `Ca "${invalidShift.jobType}": ${check.error} Vui lòng điều chỉnh trước khi tiếp tục.`,
+        'error'
+      );
+      return;
+    }
+
     setCurrentStep(3);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -705,13 +797,37 @@ const EventCreationWizardModal = ({
   };
 
   const handleClose = () => {
-    setCurrentStep(1);
+    setInternalStep(1);
     setCreatedEvent(null);
     setShiftsList([]);
     setIsAddingShift(true);
     setStep1Errors({});
     setShiftErrors({});
     onClose?.();
+  };
+
+  const handleRequestCancelWizard = async () => {
+    if (createdEvent?.eventId && shiftsList.length === 0) {
+      const discardEmpty = await showConfirm({
+        title: 'Sự kiện chưa có ca làm việc',
+        description: `Sự kiện "${createdEvent.name}" vừa lưu nháp ở Bước 1 nhưng chưa có ca làm việc nào. Bạn muốn xóa bản nháp trống này hay giữ lại trong danh sách?`,
+        type: 'warning',
+        confirmText: 'Xóa bản nháp trống',
+        cancelText: 'Giữ lại bản nháp',
+      });
+      if (discardEmpty) {
+        try {
+          await eoService.deleteEvent(createdEvent.eventId);
+          await onSuccess?.();
+          showToast('Đã xóa bản nháp sự kiện chưa có ca làm việc.', 'info');
+        } catch {
+          // Bỏ qua nếu không xóa được
+        }
+      } else {
+        await onSuccess?.();
+      }
+    }
+    handleClose();
   };
 
   const canJumpToStep = (targetStep) => {
@@ -806,6 +922,7 @@ const EventCreationWizardModal = ({
               <label>Thời Gian Bắt Đầu Sự Kiện *</label>
               <input
                 type="datetime-local"
+                min={toDateTimeLocalInput(new Date())}
                 required
                 className="eo-form-input"
                 style={{
@@ -813,10 +930,16 @@ const EventCreationWizardModal = ({
                 }}
                 value={newEvent.startTime || ''}
                 onChange={(e) => {
-                  setNewEvent({ ...newEvent, startTime: e.target.value });
-                  if (step1Errors.startTime || step1Errors.time) {
-                    setStep1Errors((prev) => ({ ...prev, startTime: null, time: null }));
-                  }
+                  const nextStart = e.target.value;
+                  const nextData = { ...newEvent, startTime: nextStart };
+                  setNewEvent(nextData);
+                  const tErrs = validateEventTimeRange(nextStart, nextData.endTime, { allowPastStart: false });
+                  setStep1Errors((prev) => ({
+                    ...prev,
+                    startTime: tErrs.startTime || null,
+                    endTime: tErrs.endTime || null,
+                    time: tErrs.time || null,
+                  }));
                 }}
               />
             </div>
@@ -824,6 +947,7 @@ const EventCreationWizardModal = ({
               <label>Thời Gian Kết Thúc Sự Kiện *</label>
               <input
                 type="datetime-local"
+                min={newEvent.startTime || toDateTimeLocalInput(new Date())}
                 required
                 className="eo-form-input"
                 style={{
@@ -831,17 +955,23 @@ const EventCreationWizardModal = ({
                 }}
                 value={newEvent.endTime || ''}
                 onChange={(e) => {
-                  setNewEvent({ ...newEvent, endTime: e.target.value });
-                  if (step1Errors.endTime || step1Errors.time) {
-                    setStep1Errors((prev) => ({ ...prev, endTime: null, time: null }));
-                  }
+                  const nextEnd = e.target.value;
+                  const nextData = { ...newEvent, endTime: nextEnd };
+                  setNewEvent(nextData);
+                  const tErrs = validateEventTimeRange(nextData.startTime, nextEnd, { allowPastStart: false });
+                  setStep1Errors((prev) => ({
+                    ...prev,
+                    startTime: tErrs.startTime || null,
+                    endTime: tErrs.endTime || null,
+                    time: tErrs.time || null,
+                  }));
                 }}
               />
             </div>
           </div>
-          {step1Errors.time && (
+          {(step1Errors.time || step1Errors.startTime || step1Errors.endTime) && (
             <div className="ecw-field-error" style={{ marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
-              {step1Errors.time}
+              {step1Errors.time || step1Errors.startTime || step1Errors.endTime}
             </div>
           )}
 
@@ -926,12 +1056,13 @@ const EventCreationWizardModal = ({
             address={newEvent.venueAddress}
             lat={newEvent.venueLat}
             lng={newEvent.venueLng}
-            onLocationChange={({ address, lat, lng }) => {
+            onLocationChange={({ address, lat, lng, locationPicked }) => {
               setNewEvent((prev) => ({
                 ...prev,
                 venueAddress: address,
                 venueLat: lat,
                 venueLng: lng,
+                locationPicked: locationPicked !== undefined ? locationPicked : prev.locationPicked,
               }));
               if (step1Errors.venueAddress) {
                 setStep1Errors((prev) => ({ ...prev, venueAddress: null }));
@@ -944,7 +1075,7 @@ const EventCreationWizardModal = ({
           {step1Errors.venueAddress && <div className="ecw-field-error">{step1Errors.venueAddress}</div>}
 
           <div className="eo-modal-footer">
-            <button type="button" className="eo-btn-secondary" onClick={handleClose}>
+            <button type="button" className="eo-btn-secondary" onClick={handleRequestCancelWizard}>
               Hủy Bỏ
             </button>
             <button type="submit" disabled={submitting} className="eo-btn-primary">
@@ -1092,30 +1223,71 @@ const EventCreationWizardModal = ({
                             {new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{' '}
                             {new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
                           </span>
+                          {shift.arrivalTime &&
+                            new Date(shift.arrivalTime).getTime() !== new Date(shift.startTime).getTime() && (
+                              <span style={{ color: '#b45309', fontWeight: 600 }}>
+                                Có mặt từ {new Date(shift.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
                           <span>
                             Dự toán ca: <strong>{computeShiftCost(shift).toLocaleString('vi-VN')} đ</strong>
                           </span>
                           {shift.allowance > 0 && <span>Phụ cấp: {Number(shift.allowance).toLocaleString('vi-VN')} đ</span>}
                         </div>
 
-                        {Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0 && (
+                        {((shift.performedSkillId || shift.performedSkillName) ||
+                          (Array.isArray(shift.skillRequirements) && shift.skillRequirements.length > 0) ||
+                          (Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0)) && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
-                            {shift.requiredSkills.map((skillId) => (
+                            {(shift.performedSkillName || skillNameMap[shift.performedSkillId]) && (
                               <span
-                                key={skillId}
                                 style={{
                                   fontSize: '0.72rem',
                                   padding: '0.15rem 0.5rem',
                                   borderRadius: '999px',
-                                  backgroundColor: '#eff6ff',
-                                  color: '#1d4ed8',
-                                  border: '1px solid #bfdbfe',
-                                  fontWeight: 600,
+                                  backgroundColor: '#ecfdf5',
+                                  color: '#047857',
+                                  border: '1px solid #a7f3d0',
+                                  fontWeight: 700,
                                 }}
                               >
-                                {skillNameMap[skillId] || 'Kỹ năng yêu cầu'}
+                                Kỹ năng chính: {shift.performedSkillName || skillNameMap[shift.performedSkillId]}
                               </span>
-                            ))}
+                            )}
+                            {Array.isArray(shift.skillRequirements) && shift.skillRequirements.length > 0
+                              ? shift.skillRequirements.map((req) => (
+                                  <span
+                                    key={req.skillId}
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: '999px',
+                                      backgroundColor: req.requirementType === 'PREFERRED' ? '#f8fafc' : '#eff6ff',
+                                      color: req.requirementType === 'PREFERRED' ? '#475569' : '#1d4ed8',
+                                      border: req.requirementType === 'PREFERRED' ? '1px solid #cbd5e1' : '1px solid #bfdbfe',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {req.requirementType === 'PREFERRED' ? 'Ưu tiên' : 'Bắt buộc'}:{' '}
+                                    {req.skillName || skillNameMap[req.skillId] || 'Kỹ năng'}
+                                  </span>
+                                ))
+                              : (shift.requiredSkills || []).map((skillId) => (
+                                  <span
+                                    key={skillId}
+                                    style={{
+                                      fontSize: '0.72rem',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: '999px',
+                                      backgroundColor: '#eff6ff',
+                                      color: '#1d4ed8',
+                                      border: '1px solid #bfdbfe',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Bắt buộc: {skillNameMap[skillId] || 'Kỹ năng yêu cầu'}
+                                  </span>
+                                ))}
                           </div>
                         )}
 
@@ -1337,6 +1509,7 @@ const EventCreationWizardModal = ({
                   <label>Thời Gian Bắt Đầu *</label>
                   <input
                     type="datetime-local"
+                    min={toDateTimeLocalInput(new Date())}
                     required
                     className="eo-form-input"
                     value={currentShift.startTime}
@@ -1347,6 +1520,7 @@ const EventCreationWizardModal = ({
                   <label>Thời Gian Kết Thúc *</label>
                   <input
                     type="datetime-local"
+                    min={currentShift.startTime || toDateTimeLocalInput(new Date())}
                     required
                     className="eo-form-input"
                     value={currentShift.endTime}
@@ -1356,17 +1530,14 @@ const EventCreationWizardModal = ({
               </div>
 
               {(() => {
-                const sS = new Date(currentShift.startTime);
-                const sE = new Date(currentShift.endTime);
-                const evS = new Date(createdEvent?.startTime || newEvent.startTime);
-                const evE = new Date(createdEvent?.endTime || newEvent.endTime);
-                const isOutOfRange =
-                  !isNaN(sS.getTime()) &&
-                  !isNaN(sE.getTime()) &&
-                  !isNaN(evS.getTime()) &&
-                  !isNaN(evE.getTime()) &&
-                  (sS < evS || sE > evE);
-                if (!isOutOfRange) return null;
+                const liveShiftTimeErr = validateShiftTimeRange(
+                  currentShift.startTime,
+                  currentShift.endTime,
+                  createdEvent?.startTime || newEvent.startTime,
+                  createdEvent?.endTime || newEvent.endTime,
+                  { allowPastStart: false }
+                );
+                if (!liveShiftTimeErr) return null;
                 return (
                   <div
                     style={{
@@ -1380,10 +1551,17 @@ const EventCreationWizardModal = ({
                       fontWeight: 600,
                     }}
                   >
-                    Chú ý: Thời gian ca làm phải nằm trọn trong khung giờ sự kiện ({formatDateTimeDisplay(evS)} - {formatDateTimeDisplay(evE)})
+                    {liveShiftTimeErr}
                   </div>
                 );
               })()}
+
+              <ShiftArrivalTimeField
+                startTime={currentShift.startTime}
+                arrivalTime={currentShift.arrivalTime}
+                onChange={(val) => setCurrentShift({ ...currentShift, arrivalTime: val })}
+                error={validateShiftArrivalTime(currentShift.arrivalTime, currentShift.startTime)}
+              />
 
               <div className="eo-form-group" style={{ marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -1432,16 +1610,29 @@ const EventCreationWizardModal = ({
                       min="1"
                       required
                       className="eo-form-input"
-                      value={currentShift.requiredWorkers}
+                      value={currentShift.requiredWorkers ?? ''}
+                      onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => {
                         if (e.key === '-' || e.key === 'e') e.preventDefault();
                       }}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                        if (e.target.value !== raw) e.target.value = raw;
+                        if (raw === '') {
+                          setCurrentShift({ ...currentShift, requiredWorkers: '' });
+                          return;
+                        }
+                        const parsed = parseInt(raw, 10);
                         setCurrentShift({
                           ...currentShift,
-                          requiredWorkers: Math.max(1, parseInt(e.target.value, 10) || 1),
-                        })
-                      }
+                          requiredWorkers: isNaN(parsed) ? '' : Math.max(0, parsed),
+                        });
+                      }}
+                      onBlur={() => {
+                        if (!currentShift.requiredWorkers || Number(currentShift.requiredWorkers) < 1) {
+                          setCurrentShift((prev) => ({ ...prev, requiredWorkers: 1 }));
+                        }
+                      }}
                     />
                   </div>
 
@@ -1454,19 +1645,40 @@ const EventCreationWizardModal = ({
                         step="5000"
                         required
                         className="eo-form-input"
-                        value={currentShift.hourlyWage}
+                        style={{
+                          borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
+                          boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
+                        }}
+                        value={currentShift.hourlyWage ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
                         }}
                         onChange={(e) => {
-                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                          let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== raw) e.target.value = raw;
+                          const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
                           setCurrentShift({ ...currentShift, hourlyWage: val });
-                          setShiftPackageWage(Math.round(val * currentDurationHours));
+                          setShiftPackageWage(Math.round((Number(val) || 0) * currentDurationHours));
+                          if (shiftErrors.hourlyWage) {
+                            setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (currentShift.hourlyWage === '' || isNaN(currentShift.hourlyWage)) {
+                            setCurrentShift((prev) => ({ ...prev, hourlyWage: 0 }));
+                          }
                         }}
                       />
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                        = {Math.round(Number(currentShift.hourlyWage || 0) * currentDurationHours).toLocaleString('vi-VN')}đ / ca ({currentDurationHours} giờ)
-                      </div>
+                      {shiftErrors.hourlyWage ? (
+                        <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {shiftErrors.hourlyWage}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          = {Math.round(Number(currentShift.hourlyWage || 0) * currentDurationHours).toLocaleString('vi-VN')}đ / ca ({currentDurationHours} giờ)
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="eo-form-group" style={{ marginBottom: 0 }}>
@@ -1477,15 +1689,38 @@ const EventCreationWizardModal = ({
                         step="10000"
                         required
                         className="eo-form-input"
-                        value={shiftPackageWage}
+                        style={{
+                          borderColor: shiftErrors.hourlyWage ? '#ef4444' : undefined,
+                          boxShadow: shiftErrors.hourlyWage ? '0 0 0 1px #ef4444' : undefined,
+                        }}
+                        value={shiftPackageWage ?? ''}
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => {
                           if (e.key === '-' || e.key === 'e') e.preventDefault();
                         }}
-                        onChange={(e) => handlePackageWageChange(e.target.value)}
+                        onChange={(e) => {
+                          let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                          if (e.target.value !== raw) e.target.value = raw;
+                          handlePackageWageChange(raw);
+                          if (shiftErrors.hourlyWage) {
+                            setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (shiftPackageWage === '' || isNaN(shiftPackageWage)) {
+                            setShiftPackageWage(0);
+                          }
+                        }}
                       />
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                        Quy đổi tương đương: ~{Number(currentShift.hourlyWage || 0).toLocaleString('vi-VN')}đ/giờ ({currentDurationHours} giờ/ca)
-                      </div>
+                      {shiftErrors.hourlyWage ? (
+                        <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                          {shiftErrors.hourlyWage}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                          Quy đổi tương đương: ~{Number(currentShift.hourlyWage || 0).toLocaleString('vi-VN')}đ/giờ ({currentDurationHours} giờ/ca)
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1499,10 +1734,16 @@ const EventCreationWizardModal = ({
                 startTime={currentShift.startTime}
                 endTime={currentShift.endTime}
                 venueAddress={activeAddress}
+                venueLat={activeLat}
+                venueLng={activeLng}
                 onSelectWage={(chosenWage) => {
                   setCurrentShift((prev) => ({ ...prev, hourlyWage: chosenWage }));
                   setShiftPackageWage(Math.round(chosenWage * currentDurationHours));
+                  if (shiftErrors.hourlyWage) {
+                    setShiftErrors((prev) => ({ ...prev, hourlyWage: null }));
+                  }
                 }}
+                onBenchmarkLoaded={(bm) => setCurrentShiftBenchmark(bm)}
               />
 
               <div className="eo-form-row">
@@ -1513,13 +1754,21 @@ const EventCreationWizardModal = ({
                     min="0"
                     step="10000"
                     className="eo-form-input"
-                    value={currentShift.allowance}
+                    value={currentShift.allowance ?? ''}
+                    onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
                     onChange={(e) => {
-                      const rawVal = parseFloat(e.target.value);
-                      setCurrentShift({ ...currentShift, allowance: isNaN(rawVal) ? 0 : Math.max(0, rawVal) });
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
+                      setCurrentShift({ ...currentShift, allowance: val });
+                    }}
+                    onBlur={() => {
+                      if (currentShift.allowance === '' || isNaN(currentShift.allowance)) {
+                        setCurrentShift((prev) => ({ ...prev, allowance: 0 }));
+                      }
                     }}
                   />
                 </div>
@@ -1530,16 +1779,28 @@ const EventCreationWizardModal = ({
                     min="1"
                     max="50"
                     className="eo-form-input"
-                    value={currentShift.maxDistanceKm}
+                    value={currentShift.maxDistanceKm ?? ''}
+                    onFocus={(e) => e.target.select()}
                     onKeyDown={(e) => {
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      if (raw === '') {
+                        setCurrentShift({ ...currentShift, maxDistanceKm: '' });
+                        return;
+                      }
                       setCurrentShift({
                         ...currentShift,
-                        maxDistanceKm: Math.max(1, Math.min(50, parseFloat(e.target.value) || 15)),
-                      })
-                    }
+                        maxDistanceKm: Math.max(1, Math.min(50, parseFloat(raw) || 15)),
+                      });
+                    }}
+                    onBlur={() => {
+                      if (!currentShift.maxDistanceKm || Number(currentShift.maxDistanceKm) < 1) {
+                        setCurrentShift((prev) => ({ ...prev, maxDistanceKm: 15 }));
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -1618,8 +1879,15 @@ const EventCreationWizardModal = ({
               </div>
 
               <ShiftSkillSelector
+                jobType={currentShift.jobType}
                 selectedSkillIds={currentShift.requiredSkills}
-                onChange={(nextSkills) => setCurrentShift({ ...currentShift, requiredSkills: nextSkills })}
+                onChange={(nextSkills) => setCurrentShift((prev) => ({ ...prev, requiredSkills: nextSkills }))}
+                performedSkillId={currentShift.performedSkillId}
+                onPerformedSkillChange={(nextId) => setCurrentShift((prev) => ({ ...prev, performedSkillId: nextId }))}
+                skillRequirements={currentShift.skillRequirements}
+                onSkillRequirementsChange={(nextReqs) => setCurrentShift((prev) => ({ ...prev, skillRequirements: nextReqs }))}
+                customSkillNotes={currentShift.customSkillNotes}
+                onCustomSkillNotesChange={(nextNotes) => setCurrentShift((prev) => ({ ...prev, customSkillNotes: nextNotes }))}
                 taxonomy={skillTaxonomy}
               />
 
@@ -1631,6 +1899,7 @@ const EventCreationWizardModal = ({
                     checklistItems: updatedItems,
                   }))
                 }
+                jobType={currentShift.jobType}
               />
 
               <div
@@ -1826,7 +2095,7 @@ const EventCreationWizardModal = ({
         <header className="ecw-header-card">
           <div className="ecw-header-top">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <button type="button" className="ecw-back-btn" onClick={handleClose}>
+              <button type="button" className="ecw-back-btn" onClick={handleRequestCancelWizard}>
                 &larr; Quay lại danh sách sự kiện
               </button>
               <div className="ecw-header-titles">
@@ -1904,10 +2173,12 @@ const EventCreationWizardModal = ({
               <div className="ecw-summary-row">
                 <span className="ecw-summary-label">Địa điểm &amp; Vùng lương</span>
                 <span className="ecw-summary-val">
-                  {activeAddress || 'Chưa chọn địa chỉ'}
+                  {activeAddress || (regionInfo.isResolved ? 'Đã ghim vị trí trên bản đồ (chưa nhập tên đường)' : 'Chưa chọn địa chỉ')}
                 </span>
-                <span style={{ fontSize: '0.73rem', color: '#0369a1', fontWeight: 600 }}>
-                  {floorInfo.regionLabel} • Sàn {floorInfo.wage.toLocaleString('vi-VN')}đ/h
+                <span style={{ fontSize: '0.73rem', color: regionInfo.isResolved ? '#0369a1' : '#64748b', fontWeight: 600 }}>
+                  {regionInfo.isResolved
+                    ? `${regionInfo.regionLabel} • Sàn ${regionInfo.wage.toLocaleString('vi-VN')}đ/h`
+                    : 'Chưa xác định khu vực (chọn địa điểm để áp dụng sàn lương)'}
                 </span>
               </div>
             </div>

@@ -35,8 +35,24 @@ class _EkycVerificationScreenState
     super.initState();
     if (widget.isOnboarding) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(ekycProvider.notifier).resetForm();
+        ref.read(ekycProvider.notifier).clearLocalForm();
       });
+    }
+  }
+
+  void _handleImageSelected(
+    String? Function(Uint8List, String) setter,
+    Uint8List bytes,
+    String fileName,
+  ) {
+    final err = setter(bytes, fileName);
+    if (err != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(err),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
     }
   }
 
@@ -44,7 +60,7 @@ class _EkycVerificationScreenState
     try {
       final result = await FilePickerPlatform.instance.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png'],
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
       );
 
       if (result.isNotEmpty) {
@@ -468,31 +484,37 @@ class _EkycVerificationScreenState
         EkycCaptureBox(
           step: '1',
           title: 'Mặt trước CCCD',
-          subtitle: 'Chụp rõ nét, đủ 4 góc, không lóa sáng',
+          subtitle: 'Chụp rõ nét, đủ 4 góc, không lóa sáng (tối đa 5MB)',
           icon: Icons.credit_card,
           bytes: state.frontBytes,
           fileName: state.frontFileName,
-          onTap: () => _selectImageSource(
-            context: context,
-            title: 'Mặt Trước Thẻ CCCD',
-            scanType: ScanType.cccdFront,
-            onPicked: notifier.setFrontImage,
-          ),
+          onTap: state.isLoading
+              ? () {}
+              : () => _selectImageSource(
+                    context: context,
+                    title: 'Mặt Trước Thẻ CCCD',
+                    scanType: ScanType.cccdFront,
+                    onPicked: (b, n) =>
+                        _handleImageSelected(notifier.setFrontImage, b, n),
+                  ),
         ),
         const SizedBox(height: 12),
         EkycCaptureBox(
           step: '2',
           title: 'Mặt sau CCCD',
-          subtitle: 'Chụp rõ đặc điểm nhận dạng và ngày cấp',
+          subtitle: 'Chụp rõ đặc điểm nhận dạng và ngày cấp (tối đa 5MB)',
           icon: Icons.flip_to_back,
           bytes: state.backBytes,
           fileName: state.backFileName,
-          onTap: () => _selectImageSource(
-            context: context,
-            title: 'Mặt Sau Thẻ CCCD',
-            scanType: ScanType.cccdBack,
-            onPicked: notifier.setBackImage,
-          ),
+          onTap: state.isLoading
+              ? () {}
+              : () => _selectImageSource(
+                    context: context,
+                    title: 'Mặt Sau Thẻ CCCD',
+                    scanType: ScanType.cccdBack,
+                    onPicked: (b, n) =>
+                        _handleImageSelected(notifier.setBackImage, b, n),
+                  ),
         ),
         const SizedBox(height: 12),
         EkycCaptureBox(
@@ -502,13 +524,94 @@ class _EkycVerificationScreenState
           icon: Icons.face_retouching_natural,
           bytes: state.selfieBytes,
           fileName: state.selfieFileName,
-          onTap: () => _selectImageSource(
-            context: context,
-            title: 'Ảnh Chân Dung Selfie',
-            scanType: ScanType.selfie,
-            onPicked: notifier.setSelfieImage,
-          ),
+          onTap: state.isLoading
+              ? () {}
+              : () => _selectImageSource(
+                    context: context,
+                    title: 'Ảnh Chân Dung Selfie',
+                    scanType: ScanType.selfie,
+                    onPicked: (b, n) =>
+                        _handleImageSelected(notifier.setSelfieImage, b, n),
+                  ),
         ),
+        if (state.isLoading) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: Color(0xFF0077FF),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Đang gửi ảnh và xác minh danh tính với VNPT eKYC. Vui lòng không thoát ứng dụng...',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E40AF),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else if (state.errorMessage != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: state.isTechnicalError
+                  ? const Color(0xFFFFF7ED)
+                  : const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: state.isTechnicalError
+                    ? const Color(0xFFFED7AA)
+                    : const Color(0xFFFECACA),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  state.isTechnicalError
+                      ? Icons.cloud_off_rounded
+                      : Icons.error_outline,
+                  color: state.isTechnicalError
+                      ? const Color(0xFFEA580C)
+                      : const Color(0xFFDC2626),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    state.errorMessage!,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: state.isTechnicalError
+                          ? const Color(0xFF9A3412)
+                          : const Color(0xFF991B1B),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         _buildSubmitButton(state, notifier),
         const SizedBox(height: 20),
@@ -522,6 +625,24 @@ class _EkycVerificationScreenState
     EkycNotifier notifier,
   ) {
     final item = state.result!;
+    final String onboardingSubtitle;
+    if (item.isApproved) {
+      onboardingSubtitle =
+          'Chúc mừng! Danh tính của bạn đã được VNPT eKYC xác minh thành công.';
+    } else if (item.isPendingReview) {
+      onboardingSubtitle =
+          'Hồ sơ của bạn đã được tiếp nhận và đang chờ Bộ phận CSKH / Admin kiểm tra.';
+    } else if (item.isProcessing) {
+      onboardingSubtitle =
+          'Hồ sơ đang được hệ thống VNPT eKYC xử lý. Vui lòng kiểm tra lại sau giây lát.';
+    } else if (item.isTechnicalFailure) {
+      onboardingSubtitle =
+          'Kết nối tới VNPT eKYC đang tạm thời gián đoạn. Hồ sơ của bạn chưa bị từ chối, hãy thử lại.';
+    } else {
+      onboardingSubtitle =
+          'Xác minh danh tính chưa thành công, vui lòng kiểm tra lý do và chụp lại ảnh rõ nét.';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -531,11 +652,7 @@ class _EkycVerificationScreenState
           const RegistrationStepper(currentStep: 3),
           const SizedBox(height: 12),
           Text(
-            item.isApproved
-                ? 'Chúc mừng! Hồ sơ của bạn đã được AI phê duyệt thành công.'
-                : (item.isPending
-                    ? 'Hồ sơ của bạn đã được tiếp nhận và đang chờ Bộ phận CSKH thẩm định.'
-                    : 'Định danh chưa đạt chuẩn nhận diện, vui lòng chụp lại ảnh.'),
+            onboardingSubtitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,
@@ -549,17 +666,18 @@ class _EkycVerificationScreenState
         const SizedBox(height: 16),
         EkycResultCard(item: item),
         const SizedBox(height: 24),
-        _buildResultActions(item, notifier),
+        _buildResultActions(state, item, notifier),
         const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _buildResultActions(EkycVerificationItem item, EkycNotifier notifier) {
-    final isApproved = item.isApproved;
-    final isPending = item.isPending;
-
-    if (isApproved) {
+  Widget _buildResultActions(
+    EkycState state,
+    EkycVerificationItem item,
+    EkycNotifier notifier,
+  ) {
+    if (item.isApproved) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -612,9 +730,42 @@ class _EkycVerificationScreenState
               ),
             ),
           ),
+        ],
+      );
+    }
+
+    if (item.isProcessing) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ElevatedButton.icon(
+            onPressed: state.isLoading ? null : () => notifier.checkStatus(),
+            icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+            label: const Text(
+              'Kiểm tra lại trạng thái',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0077FF),
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: () => notifier.resetForm(),
+            onPressed: () {
+              if (widget.isOnboarding) {
+                _navigateToHome();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
@@ -623,7 +774,7 @@ class _EkycVerificationScreenState
               ),
             ),
             child: const Text(
-              'Cập nhật lại ảnh thẻ CCCD',
+              'Về trang chủ',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -635,7 +786,7 @@ class _EkycVerificationScreenState
       );
     }
 
-    if (isPending) {
+    if (item.isPendingReview) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -688,7 +839,7 @@ class _EkycVerificationScreenState
           ),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: () => notifier.resetForm(),
+            onPressed: () => notifier.clearLocalForm(),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
@@ -709,7 +860,92 @@ class _EkycVerificationScreenState
       );
     }
 
-    // Rejected / Failure
+    if (item.isTechnicalFailure) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF97316), Color(0xFFEA580C)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFEA580C).withValues(alpha: 0.32),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ElevatedButton.icon(
+              onPressed: state.isLoading
+                  ? null
+                  : () async {
+                      if (state.hasAllImages) {
+                        await notifier.retryVerification();
+                      } else {
+                        notifier.clearLocalResultOnly();
+                      }
+                    },
+              icon: state.isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.refresh, color: Colors.white, size: 20),
+              label: Text(
+                state.isLoading
+                    ? 'Đang thử lại xác minh...'
+                    : (state.hasAllImages
+                        ? 'Thử lại xác minh ngay'
+                        : 'Chọn ảnh và thử lại'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => notifier.clearLocalForm(),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Chụp lại ảnh khác',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Rejected
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -731,7 +967,7 @@ class _EkycVerificationScreenState
             ],
           ),
           child: ElevatedButton.icon(
-            onPressed: () => notifier.resetForm(),
+            onPressed: () => notifier.clearLocalForm(),
             icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
             label: const Text(
               'Thực hiện lại định danh',
@@ -812,25 +1048,47 @@ class _EkycVerificationScreenState
                 if (!mounted) return;
                 final currentState = ref.read(ekycProvider);
                 final res = currentState.result;
-                if (success && res != null && !res.isRejected) {
+                if (success && res != null) {
+                  final (msg, bgColor) = res.isApproved
+                      ? (
+                          'Xác thực định danh VNPT eKYC thành công! Đã cấp tích xanh.',
+                          const Color(0xFF10B981),
+                        )
+                      : res.isPendingReview
+                          ? (
+                              'Hồ sơ eKYC đã được tiếp nhận và đang chờ Admin / CSKH kiểm tra.',
+                              const Color(0xFFD97706),
+                            )
+                          : res.isProcessing
+                              ? (
+                                  'Hồ sơ eKYC đang được xử lý tại hệ thống VNPT eKYC.',
+                                  const Color(0xFF0077FF),
+                                )
+                              : res.isTechnicalFailure
+                                  ? (
+                                      res.routingReason.isNotEmpty
+                                          ? res.routingReason
+                                          : 'Lỗi kỹ thuật tạm thời khi kết nối VNPT eKYC. Bạn có thể thử lại ngay.',
+                                      const Color(0xFFEA580C),
+                                    )
+                                  : (
+                                      res.routingReason.isNotEmpty
+                                          ? res.routingReason
+                                          : 'Xác minh danh tính chưa đạt yêu cầu. Vui lòng chụp lại ảnh rõ nét.',
+                                      const Color(0xFFDC2626),
+                                    );
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        res.isApproved
-                            ? 'Xác thực định danh eKYC thành công! Đã cấp tích xanh.'
-                            : 'Định danh chưa đạt chuẩn: ${res.routingReason.isNotEmpty ? res.routingReason : "Vui lòng chụp lại ảnh"}',
-                      ),
-                      backgroundColor: res.isApproved ? const Color(0xFF10B981) : const Color(0xFFDC2626),
-                    ),
+                    SnackBar(content: Text(msg), backgroundColor: bgColor),
                   );
                 } else {
-                  final err = (res != null && res.isRejected)
-                      ? (res.routingReason.isNotEmpty ? res.routingReason : 'Hồ sơ eKYC bị từ chối hoặc số CCCD đã được sử dụng.')
-                      : (currentState.errorMessage ?? 'Không thể gửi hồ sơ eKYC. Vui lòng thử lại.');
+                  final err = currentState.errorMessage ??
+                      'Không thể kết nối máy chủ eKYC. Vui lòng thử lại.';
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(err),
-                      backgroundColor: const Color(0xFFDC2626),
+                      backgroundColor: currentState.isTechnicalError
+                          ? const Color(0xFFEA580C)
+                          : const Color(0xFFDC2626),
                     ),
                   );
                 }
@@ -845,26 +1103,40 @@ class _EkycVerificationScreenState
           ),
         ),
         child: state.isLoading
-            ? const SizedBox(
-                height: 22,
-                width: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    'Đang xác minh VNPT eKYC...',
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                ],
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.verified_user,
+                    state.isTechnicalError ? Icons.refresh : Icons.verified_user,
                     color: isReady ? Colors.white : const Color(0xFF94A3B8),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    state.isLoading
-                        ? 'Đang gửi hồ sơ xác thực...'
+                    state.isTechnicalError
+                        ? 'Thử Lại Gửi Hồ Sơ eKYC'
                         : 'Gửi Hồ Sơ Xác Thực eKYC',
                     style: TextStyle(
                       fontSize: 16,

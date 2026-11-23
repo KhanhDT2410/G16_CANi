@@ -20,12 +20,24 @@ public class ShiftAssignmentResponseDto {
     private UUID shiftId;
     private UUID eventId;
     private String eventName;
+    private UUID eoId;
+    private String eoName;
+    private Boolean eoVerified;
+    private BigDecimal eoRatingAvg;
     private String venueAddress;
     private String jobType;
     private Instant startTime;
     private Instant endTime;
     private Instant arrivalTime;
     private java.util.List<String> requiredSkillNames;
+    private UUID performedSkillId;
+    private String performedSkillName;
+    private UUID confirmedPerformedSkillId;
+    private String confirmedPerformedSkillName;
+    private Boolean spExperienceAwarded;
+    private Instant spExperienceAwardedAt;
+    private Boolean spRatingAwarded;
+    private String inviteOverrideReason;
     private BigDecimal hourlyWage;
     private BigDecimal totalPay;
     private AssignmentStatus status;
@@ -46,6 +58,13 @@ public class ShiftAssignmentResponseDto {
     private String paymentMethod;
     private String workerConfirmStatus;
     private String paymentProofUrl;
+    private String externalRef;
+    private Instant declaredAt;
+    private String workerComment;
+    private String bankCode;
+    private String bankAccountNumber;
+    private String bankAccountName;
+    private String vietQrUrl;
 
     // Bổ sung thông tin đánh giá 2 chiều (EO <-> Worker) sau ca làm
     private Integer eoRating;

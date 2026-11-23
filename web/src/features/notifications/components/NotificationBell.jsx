@@ -70,8 +70,19 @@ export const NotificationBell = ({ className = '' }) => {
     }
     closeDropdown();
 
-    const metaShiftId = item.metadata?.shiftId;
-    const metaEventId = item.metadata?.eventId;
+    let parsedData = {};
+    if (item.data) {
+      try {
+        parsedData = typeof item.data === 'string' ? JSON.parse(item.data) : item.data;
+      } catch (e) {
+        console.warn('Lỗi parse notification data:', e);
+      }
+    }
+
+    const metaShiftId = parsedData?.shiftId || item.metadata?.shiftId;
+    const metaEventId = parsedData?.eventId || item.metadata?.eventId;
+    const metaAssignmentId = parsedData?.assignmentId || (item.referenceType === 'ASSIGNMENT' ? item.referenceId : null);
+    const metaWorkerId = parsedData?.workerId || null;
     let detail = null;
 
     if (item.referenceType === 'SUPPORT_TICKET') {
@@ -83,6 +94,8 @@ export const NotificationBell = ({ className = '' }) => {
         tab: 'events',
         shiftId: metaShiftId || (item.referenceType === 'SHIFT' ? item.referenceId : null),
         eventId: metaEventId || null,
+        assignmentId: metaAssignmentId || null,
+        workerId: metaWorkerId || null,
       };
     } else if (item.referenceType === 'PAYMENT') {
       detail = { tab: 'payments' };

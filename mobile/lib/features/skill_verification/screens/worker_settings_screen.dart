@@ -284,8 +284,9 @@ class _WorkerSettingsScreenState extends ConsumerState<WorkerSettingsScreen> {
         repo.updateAvailability(availSlots),
       ]);
 
-      // 4. Đồng bộ bán kính với Job Radar
-      ref.read(jobRadarProvider.notifier).setRadius(_maxDistanceKm);
+      // 4. Đồng bộ lại Preferences (tâm khu vực + bán kính + danh sách đề xuất) với Job Radar
+      await ref.read(jobRadarProvider.notifier).reloadPreferences();
+      ref.invalidate(proposalsListProvider);
 
       if (mounted) {
         setState(() => _isSaving = false);

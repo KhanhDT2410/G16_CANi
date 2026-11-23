@@ -20,6 +20,7 @@ public class EoReviewResponseDto {
     private UUID assignmentId;
     private String eventName;
     private String shiftName;
+    private UUID reviewerUserId;
     private UUID reviewerWorkerId;
     private String reviewerWorkerName;
     private String workerAvatarUrl;

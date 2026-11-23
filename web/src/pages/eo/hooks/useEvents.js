@@ -4,8 +4,7 @@ import { showToast } from '../../../components/common/Toast';
 import { showConfirm } from '../../../components/common/PromptModal';
 import { getAddressFromCoordinates, getCoordinatesFromAddress } from '../utils/geoUtils';
 import {
-  DEFAULT_NEW_EVENT,
-  DEMO_EVENTS,
+  createDefaultNewEvent,
   filterAndSortEvents,
   calculateEventMetrics,
 } from '../utils/eventHelpers';
@@ -13,6 +12,7 @@ import {
 export function useEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
@@ -26,22 +26,27 @@ export function useEvents() {
   const [locating, setLocating] = useState(false);
   const [cancelModal, setCancelModal] = useState({ isOpen: false, event: null, loading: false });
 
-  const [newEvent, setNewEvent] = useState(DEFAULT_NEW_EVENT);
+  const [newEvent, setNewEvent] = useState(() => createDefaultNewEvent());
 
   const loadEvents = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
-      const deletedIds = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
       const data = await eoService.getMyEvents();
-      const raw = data && data.length > 0 ? data : (import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : []);
-      const visible = raw.filter((e) => !deletedIds.includes(e.eventId) && !e.deletedAt);
+      let deletedIds = [];
+      try {
+        const stored = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
+        if (Array.isArray(stored)) deletedIds = stored;
+      } catch {
+        // Local preferences are optional.
+      }
+      const visible = data.filter((e) => !deletedIds.includes(e.eventId) && !e.deletedAt);
       setEvents(visible);
       return visible;
     } catch (e) {
       console.error(e);
-      const fallback = import.meta.env.VITE_DEMO === 'true' ? DEMO_EVENTS : [];
-      setEvents(fallback);
-      return fallback;
+      setLoadError(true);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -68,11 +73,12 @@ export function useEvents() {
             venueAddress: addr || prev.venueAddress,
             venueLat: lat,
             venueLng: lng,
+            locationPicked: true,
           }));
           if (addr) {
-            showToast('Đã xác định địa chỉ tổ chức thành công!', 'success');
+            showToast('Đã xác định địa chỉ tổ chức từ GPS!', 'success');
           } else {
-            showToast('Đã ghim vị trí trên bản đồ. Vui lòng nhập rõ địa chỉ số nhà, tên đường cụ thể.', 'info');
+            showToast('Đã định vị tọa độ GPS trên bản đồ. Vui lòng nhập thêm tên địa điểm/số nhà cụ thể.', 'info');
           }
         } finally {
           setLocating(false);
@@ -221,6 +227,7 @@ export function useEvents() {
     events,
     setEvents,
     loading,
+    loadError,
     loadEvents,
     searchQuery,
     setSearchQuery,

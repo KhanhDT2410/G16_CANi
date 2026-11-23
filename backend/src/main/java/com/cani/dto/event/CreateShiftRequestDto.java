@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -51,6 +52,12 @@ public class CreateShiftRequestDto {
     private Double locationLng;
 
     private UUID[] requiredSkills;
+
+    private UUID performedSkillId;
+
+    private List<ShiftSkillRequirementDto> skillRequirements;
+
+    private String customSkillNotes;
 
     @Builder.Default
     private Integer minReliabilityScore = 60;

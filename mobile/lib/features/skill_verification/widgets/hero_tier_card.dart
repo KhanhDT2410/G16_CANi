@@ -14,14 +14,14 @@ class HeroTierCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tierColor = SkillHubColors.getTierColor(currentTier);
+    final tierColor = SkillHubColors.getDevelopmentLevelColor(currentTier);
     final tierIcon = SkillHubColors.getTierIcon(currentTier);
-    final tierTitle = SkillHubColors.getTierTitle(currentTier);
+    final devLabel = SkillHubColors.getDevelopmentLevelLabel(currentTier);
+    final rankLabel = SkillHubColors.getTierTitle(currentTier);
     final tierBenefit = SkillHubColors.getTierBenefit(currentTier);
     final nextThreshold = SkillHubColors.getNextTierThreshold(totalSp);
     final nextTierName = SkillHubColors.getNextTierName(totalSp);
 
-    // Calculate progress clamped between 0.0 and 1.0
     final double progress = (totalSp / nextThreshold).clamp(0.0, 1.0);
 
     return Container(
@@ -43,61 +43,66 @@ class HeroTierCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Tier Icon Badge Container
               Container(
-                width: 60,
-                height: 60,
+                width: 58,
+                height: 58,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   gradient: LinearGradient(
                     colors: [
-                      tierColor.withValues(alpha: 0.20),
-                      tierColor.withValues(alpha: 0.85),
+                      tierColor.withValues(alpha: 0.25),
+                      tierColor.withValues(alpha: 0.90),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   border: Border.all(color: SkillHubColors.borderSoft, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: tierColor.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Center(
-                  child: Icon(
-                    tierIcon,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+                  child: Icon(tierIcon, color: Colors.white, size: 28),
                 ),
               ),
               const SizedBox(width: 14),
-              // Dynamic tier info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      tierTitle,
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: SkillHubColors.textPrimary,
-                        letterSpacing: -0.3,
-                      ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: SkillHubColors.getDevelopmentLevelBg(currentTier),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            devLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: tierColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Hạng $rankLabel',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: SkillHubColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 6),
                     Text(
                       tierBenefit,
                       style: const TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w500,
                         color: SkillHubColors.textSecondary,
-                        height: 1.3,
+                        height: 1.35,
                       ),
                     ),
                   ],
@@ -106,39 +111,34 @@ class HeroTierCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          // Progress bar and labels
-          Column(
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 9,
+              backgroundColor: const Color(0xFFE0F2FE),
+              valueColor: const AlwaysStoppedAnimation<Color>(SkillHubColors.ctaPrimary),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 9,
-                  backgroundColor: const Color(0xFFCAF0F8),
-                  valueColor: const AlwaysStoppedAnimation<Color>(SkillHubColors.ctaPrimary),
+              Text(
+                totalSp >= 900 ? 'Đã đạt hạng cao nhất' : 'Tiến độ lên $nextTierName',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: SkillHubColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Tiến độ lên $nextTierName',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: SkillHubColors.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    '$totalSp / $nextThreshold SP',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: SkillHubColors.textPrimary,
-                    ),
-                  ),
-                ],
+              Text(
+                '$totalSp / $nextThreshold SP',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: SkillHubColors.textPrimary,
+                ),
               ),
             ],
           ),

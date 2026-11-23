@@ -69,7 +69,7 @@ class ProfileTrustSkillStrip extends StatelessWidget {
                         border: Border.all(color: tierColor),
                       ),
                       child: Text(
-                        SkillHubColors.getTierTitle(tier),
+                        SkillHubColors.getDevelopmentAndTierLabel(tier),
                         style: Theme.of(context)
                             .textTheme
                             .labelSmall
@@ -93,14 +93,14 @@ class ProfileTrustSkillStrip extends StatelessWidget {
                     Column(
                       children: [
                         Text(
-                          avgRating.toStringAsFixed(1),
+                          avgRating > 0 ? avgRating.toStringAsFixed(1) : '—',
                           style: Theme.of(context)
                               .textTheme
                               .headlineMedium
                               ?.copyWith(color: t.accentDeep, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          'Đánh giá TB',
+                          avgRating > 0 ? 'Đánh giá TB' : 'Chưa có đánh giá',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.muted),
                         ),
                       ],

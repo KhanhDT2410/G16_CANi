@@ -18,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -127,6 +128,7 @@ class WorkerJobServiceTest {
                 .venueAddress("77 Võ Văn Tần, Q3, TP.HCM")
                 .venueLat(10.7769)
                 .venueLng(106.7009)
+                .status(com.cani.entity.enums.EventStatus.ACTIVE)
                 .totalConfirmedWorkers(2)
                 .build();
 
@@ -187,6 +189,24 @@ class WorkerJobServiceTest {
         assertThat(result.getBaseLat()).isEqualTo(10.7769);
         assertThat(result.getBaseLng()).isEqualTo(106.7009);
         verify(workerRepository).save(worker);
+    }
+
+    @Test
+    @DisplayName("UTC001b - setOnlineStatus() - Protection: Không ghi đè tọa độ Preferences đã lưu khi bật Online từ vị trí khác")
+    void setOnlineStatus_DoesNotOverwriteSavedPreferencesCoordinates() {
+        worker.setBaseAddress("Huyện Đông Anh, Hà Nội");
+        worker.setBaseLat(21.1389);
+        worker.setBaseLng(105.8473);
+        WorkerOnlineStatusRequestDto dto = WorkerOnlineStatusRequestDto.builder()
+                .isOnline(true).currentLat(10.7769).currentLng(106.7009).build();
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerRepository.save(any(Worker.class))).thenAnswer(i -> i.getArgument(0));
+
+        Worker result = workerJobService.setOnlineStatus(userId, dto);
+
+        assertThat(result.getIsOnline()).isTrue();
+        assertThat(result.getBaseLat()).isEqualTo(21.1389);
+        assertThat(result.getBaseLng()).isEqualTo(105.8473);
     }
 
     @Test
@@ -612,6 +632,24 @@ class WorkerJobServiceTest {
         assertThat(res.getIsOnTime()).isTrue();
     }
 
+    @Test
+    @DisplayName("UTC019e - checkinAssignment() - Abnormal: Ca làm việc đã quá giờ kết thúc ném BadRequestException")
+    void checkinAssignment_Abnormal_ExpiredShiftThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        activeShift.setStartTime(Instant.now().minus(5, ChronoUnit.HOURS));
+        activeShift.setEndTime(Instant.now().minus(1, ChronoUnit.HOURS));
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+        AttendanceCheckRequestDto req = AttendanceCheckRequestDto.builder()
+                .qrContent(makeValidQr("CANI_CHECKIN:", activeShift.getShiftId())).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        assertThatThrownBy(() -> workerJobService.checkinAssignment(userId, assignmentId, req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("đã kết thúc");
+    }
+
     // =========================================================================
     // 7. checkoutAssignment() - UTC020 to UTC023
     // =========================================================================
@@ -649,12 +687,12 @@ class WorkerJobServiceTest {
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
         when(paymentRepository.findByAssignmentId(assignmentId)).thenReturn(Optional.of(
-                Payment.builder().status(PaymentStatus.NOT_DECLARED).workerConfirmStatus(null).build()
+                Payment.builder().status(PaymentStatus.DECLARED_PENDING_WORKER).workerConfirmStatus(null).build()
         ));
 
         assertThatThrownBy(() -> workerJobService.checkoutAssignment(userId, assignmentId, req))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Hãy xác nhận tình trạng thanh toán thù lao trước khi kết ca");
+                .hasMessageContaining("Ban tổ chức đã khai báo thanh toán");
     }
 
     @Test
@@ -1001,12 +1039,15 @@ class WorkerJobServiceTest {
                 .minWage(BigDecimal.valueOf(45000)).maxDistanceKm(10.0).build();
 
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerRepository.save(any(Worker.class))).thenAnswer(i -> i.getArgument(0));
 
         WorkerPreferencesDto res = workerJobService.updateWorkerPreferences(userId, req);
 
         verify(workerRepository).save(worker);
+        verify(matchingDispatchService).dispatchActiveShiftsForWorker(worker);
         assertThat(res.getBaseAddress()).isEqualTo("Quận 1");
         assertThat(res.getMinWage()).isEqualTo(BigDecimal.valueOf(45000));
+        assertThat(res.getIsOnline()).isTrue();
     }
 
     @Test
@@ -1147,6 +1188,28 @@ class WorkerJobServiceTest {
         assertThat(items).isEmpty();
     }
 
+    @Test
+    @DisplayName("UTC046b - getShiftChecklist() - Normal: Trạng thái CONFIRMED vẫn trả danh sách đầu việc ở chế độ xem trước")
+    void getShiftChecklist_ConfirmedStatus_ReturnsTemplateItemsReadOnly() {
+        UUID assignmentId = UUID.randomUUID();
+        activeShift.setChecklist("[\"Đến trước 15 phút\", \"Mặc đồng phục đen\"]");
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId).shift(activeShift).worker(worker)
+                .status(AssignmentStatus.CONFIRMED)
+                .checklistProgress("{\"chk_1\":{\"isCompleted\":true}}").build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        List<ShiftChecklistItemDto> items = workerJobService.getShiftChecklist(userId, assignmentId);
+
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0).getTitle()).isEqualTo("Đến trước 15 phút");
+        assertThat(items.get(0).getIsCompleted()).isFalse();
+        assertThat(items.get(1).getTitle()).isEqualTo("Mặc đồng phục đen");
+        assertThat(items.get(1).getIsCompleted()).isFalse();
+    }
+
     // =========================================================================
     // 16. updateShiftChecklist() - UTC047 to UTC049
     // =========================================================================
@@ -1166,7 +1229,7 @@ class WorkerJobServiceTest {
 
         List<ShiftChecklistItemDto> res = workerJobService.updateShiftChecklist(userId, assignmentId, req);
 
-        verify(shiftAssignmentRepository).save(sa);
+        verify(shiftAssignmentRepository, atLeastOnce()).save(sa);
         verify(shiftRepository, never()).save(any());
         assertThat(res.get(0).getIsCompleted()).isTrue();
     }
@@ -1699,4 +1762,130 @@ class WorkerJobServiceTest {
         verify(workerGroupMembershipRepository, never()).findByWorkerGroup_GroupIdAndWorker_WorkerId(any(), any());
     }
 
+    @Test
+    @DisplayName("UTC102 - acceptProposal() - Abnormal: Chặn nhận việc khi Shift CANCELLED/FULLY_STAFFED hoặc Event không ACTIVE")
+    void acceptProposal_Abnormal_InactiveShiftOrEventThrowsBadRequest() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+
+        activeShift.setStatus(ShiftStatus.CANCELLED);
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("không còn mở tuyển");
+
+        activeShift.setStatus(ShiftStatus.ACTIVE);
+        mockEvent.setStatus(EventStatus.CANCELLED);
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Sự kiện của ca làm việc này không còn hoạt động");
+
+        verify(shiftRepository, never()).incrementConfirmedWorkersAtomic(any());
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("UTC103 - acceptProposal() - Abnormal: Chặn khi User bị khóa hoặc RS giảm dưới ngưỡng tối thiểu")
+    void acceptProposal_Abnormal_LockedUserOrLowRsThrowsBadRequest() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        workerUser.setStatus(UserStatus.LOCKED);
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("không ở trạng thái hoạt động");
+
+        workerUser.setStatus(UserStatus.ACTIVE);
+        worker.setReliabilityScore(40);
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Điểm uy tín");
+
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("UTC104 - acceptProposal() - Abnormal: Chặn nếu đã có Assignment hoạt động cho cùng ca")
+    void acceptProposal_Abnormal_DuplicateAssignmentThrowsBadRequest() {
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+        when(shiftAssignmentRepository.findByShift_ShiftIdAndWorker_WorkerId(activeShift.getShiftId(), worker.getWorkerId()))
+                .thenReturn(Optional.of(ShiftAssignment.builder().status(AssignmentStatus.CONFIRMED).build()));
+
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("đã xác nhận tham gia");
+
+        verify(shiftRepository, never()).incrementConfirmedWorkersAtomic(any());
+    }
+
+    @Test
+    @DisplayName("UTC105 - rejectProposal() & cancelAssignment() - INVITE mode: Không gọi lại Matching")
+    void rejectAndCancel_InviteMode_DoNotTriggerRedispatch() {
+        mockEvent.setMode(EventMode.INVITE);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+
+        workerJobService.rejectProposal(userId, pendingProposal.getProposalId(), "Không phù hợp");
+
+        ShiftAssignment assignment = ShiftAssignment.builder()
+                .assignmentId(UUID.randomUUID())
+                .shift(activeShift)
+                .worker(worker)
+                .status(AssignmentStatus.CONFIRMED)
+                .build();
+        when(shiftAssignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+
+        workerJobService.cancelAssignment(userId, assignment.getAssignmentId(), "Bận đột xuất");
+
+        verify(matchingDispatchService, never()).dispatchForShift(any());
+    }
+
+    @Test
+    @DisplayName("Skill V3 - applyForShift() emergency: Không bypass kỹ năng/RS qua WorkerShiftEligibilityService")
+    void applyForShift_SkillV3_EmergencyDoesNotBypassEligibility() {
+        activeShift.setEmergency(true);
+        WorkerShiftEligibilityService mockEligibility = mock(WorkerShiftEligibilityService.class);
+        ReflectionTestUtils.setField(workerJobService, "workerShiftEligibilityService", mockEligibility);
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftRepository.findById(activeShift.getShiftId())).thenReturn(Optional.of(activeShift));
+        when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(activeShift.getShiftId(), worker.getWorkerId()))
+                .thenReturn(false);
+        when(mockEligibility.evaluate(worker, activeShift, WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_APPLY))
+                .thenReturn(WorkerShiftEligibilityService.EligibilityResult.fail(
+                        "MISSING_REQUIRED_SKILL",
+                        "Hồ sơ của bạn chưa có hoặc đã hết hạn kỹ năng bắt buộc: \"Phục vụ\"."
+                ));
+
+        assertThatThrownBy(() -> workerJobService.applyForShift(userId, activeShift.getShiftId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("kỹ năng bắt buộc");
+
+        verify(shiftRepository, never()).incrementConfirmedWorkersAtomic(any());
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Skill V3 - acceptProposal(): Re-check eligibility khi chứng chỉ hết hạn sau lúc gửi đề xuất")
+    void acceptProposal_SkillV3_RechecksStaleProposalWhenCertificateExpired() {
+        WorkerShiftEligibilityService mockEligibility = mock(WorkerShiftEligibilityService.class);
+        ReflectionTestUtils.setField(workerJobService, "workerShiftEligibilityService", mockEligibility);
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+        when(shiftAssignmentRepository.findByShift_ShiftIdAndWorker_WorkerId(activeShift.getShiftId(), worker.getWorkerId()))
+                .thenReturn(Optional.empty());
+        when(mockEligibility.evaluate(worker, activeShift, WorkerShiftEligibilityService.MatchingChannel.PROPOSAL_ACCEPTANCE))
+                .thenReturn(WorkerShiftEligibilityService.EligibilityResult.fail(
+                        "CERTIFICATE_REQUIRED_OR_EXPIRED",
+                        "Ca làm việc yêu cầu chứng chỉ còn hiệu lực cho kỹ năng \"An toàn PCCC\"."
+                ));
+
+        assertThatThrownBy(() -> workerJobService.acceptProposal(userId, pendingProposal.getProposalId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("chứng chỉ còn hiệu lực");
+
+        verify(shiftRepository, never()).incrementConfirmedWorkersAtomic(any());
+        verify(shiftAssignmentRepository, never()).save(any());
+    }
 }

@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -20,13 +21,23 @@ public class JobProposalResponseDto {
     private UUID shiftId;
     private UUID eventId;
     private String eventName;
+    private UUID eoId;
+    private String eoName;
+    private Boolean eoVerified;
+    private BigDecimal eoRatingAvg;
     private String venueAddress;
     private String jobType;
     private String description;
     private Instant startTime;
     private Instant endTime;
     private Instant arrivalTime;
-    private java.util.List<String> requiredSkillNames;
+    private List<String> requiredSkillNames;
+    private List<String> preferredSkillNames;
+    private List<String> matchedSkillNames;
+    private UUID performedSkillId;
+    private String performedSkillName;
+    private String recommendationReasonVi;
+    private List<com.cani.dto.event.ShiftSkillRequirementDto> skillRequirements;
     private BigDecimal hourlyWage;
     private BigDecimal allowance;
     private BigDecimal totalEstimatedPay;

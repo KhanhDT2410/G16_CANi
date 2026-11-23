@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -35,6 +36,12 @@ public class UpdateShiftRequestDto {
     private Instant arrivalTime;
 
     private UUID[] requiredSkills;
+
+    private UUID performedSkillId;
+
+    private List<ShiftSkillRequirementDto> skillRequirements;
+
+    private String customSkillNotes;
 
     @NotNull(message = "Số lượng nhân sự không được để trống")
     @Min(value = 1, message = "Cần tối thiểu 1 nhân sự")

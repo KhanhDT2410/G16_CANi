@@ -3,6 +3,7 @@ import 'package:cani/app/cani_tokens.dart';
 import 'package:flutter/material.dart';
 
 import '../models/proposal_models.dart';
+import 'eo_public_profile_sheet.dart';
 
 class JobProposalInviteCard extends StatefulWidget {
   final JobProposalItem proposal;
@@ -22,18 +23,27 @@ class JobProposalInviteCard extends StatefulWidget {
 
 class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
   Timer? _timer;
-  int _secondsLeft = 525; // Mặc định 08:45
+  int _secondsLeft = 0;
 
   @override
   void initState() {
     super.initState();
-    // Tạo thời gian đếm ngược giả lập demo nếu không có deadline cụ thể
-    _secondsLeft = 525 + (widget.proposal.proposalId.hashCode % 300).abs();
+    _syncSecondsLeft();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_secondsLeft > 0 && mounted) {
-        setState(() => _secondsLeft--);
+      if (mounted) {
+        setState(_syncSecondsLeft);
       }
     });
+  }
+
+  void _syncSecondsLeft() {
+    final expiresAt = widget.proposal.expiresAt;
+    if (expiresAt == null) {
+      _secondsLeft = -1;
+      return;
+    }
+    final diff = expiresAt.difference(DateTime.now()).inSeconds;
+    _secondsLeft = diff > 0 ? diff : 0;
   }
 
   @override
@@ -43,10 +53,15 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
   }
 
   String _formatCountdown() {
-    if (_secondsLeft <= 0) return 'Hết hạn';
-    final m = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
-    final s = (_secondsLeft % 60).toString().padLeft(2, '0');
-    return '$m:$s';
+    if (_secondsLeft < 0) return 'Đang mở';
+    if (_secondsLeft == 0) return 'Đã hết hạn';
+    final hours = _secondsLeft ~/ 3600;
+    final mins = (_secondsLeft % 3600) ~/ 60;
+    final secs = _secondsLeft % 60;
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    }
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -98,9 +113,11 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   color: const Color(0xFF10B981).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text(
-                  'Phù hợp kỹ năng',
-                  style: TextStyle(
+                child: Text(
+                  p.matchedSkillNames.isNotEmpty
+                      ? 'Khớp ${p.matchedSkillNames.length} kỹ năng'
+                      : 'Đề xuất cho bạn',
+                  style: const TextStyle(
                     color: Color(0xFF059669),
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,
@@ -111,14 +128,57 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           ),
           const SizedBox(height: 5),
 
-          // Tên sự kiện
-          Text(
-            p.eventName,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF1E293B),
-            ),
+          // Tên sự kiện & Hồ sơ Ban tổ chức
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  p.eventName,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+              if (p.eoId != null && p.eoId!.isNotEmpty)
+                InkWell(
+                  onTap: () => EoPublicProfileSheet.show(
+                    context,
+                    eoId: p.eoId!,
+                    fallbackName: p.eoName,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: cani.brandSoft,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          p.eoVerified ? Icons.verified_rounded : Icons.apartment_rounded,
+                          size: 13,
+                          color: cani.brand,
+                        ),
+                        const SizedBox(width: 4),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 120),
+                          child: Text(
+                            p.eoName ?? 'Hồ sơ BTC',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: cani.brand),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded, size: 14, color: cani.brand),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 10),
 
@@ -183,22 +243,46 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
             ],
           ),
 
-          // Kỹ năng bắt buộc (chips) — worker cần biết trước khi accept
-          if (p.requiredSkillNames.isNotEmpty)
+          if (p.recommendationReasonVi != null && p.recommendationReasonVi!.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                p.recommendationReasonVi!,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF047857),
+                ),
+              ),
+            ),
+
+          // Kỹ năng yêu cầu (bắt buộc) & ưu tiên thêm
+          if (p.requiredSkillNames.isNotEmpty || p.preferredSkillNames.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Wrap(
                 spacing: 6,
                 runSpacing: 4,
-                children: p.requiredSkillNames.map((n) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
-                  ),
-                  child: Text('Kỹ năng: $n', style: TextStyle(fontSize: 10.5, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
-                )).toList(),
+                children: [
+                  ...p.requiredSkillNames.map((n) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                    ),
+                    child: Text('Bắt buộc: $n', style: TextStyle(fontSize: 10.5, color: isDark ? Colors.lightBlueAccent : const Color(0xFF1D4ED8), fontWeight: FontWeight.w600)),
+                  )),
+                  ...p.preferredSkillNames.map((n) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBBF7D0)),
+                    ),
+                    child: Text('Ưu tiên: $n', style: TextStyle(fontSize: 10.5, color: isDark ? Colors.greenAccent : const Color(0xFF15803D), fontWeight: FontWeight.w600)),
+                  )),
+                ],
               ),
             ),
           const SizedBox(height: 12),
@@ -240,7 +324,11 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                     const Icon(Icons.timer_outlined, size: 13, color: Color(0xFFB45309)),
                     const SizedBox(width: 4),
                     Text(
-                      'Hết hạn sau ${_formatCountdown()}',
+                      _secondsLeft < 0
+                          ? 'Đang mở nhận'
+                          : (_secondsLeft == 0
+                              ? 'Đã hết hạn'
+                              : 'Hết hạn sau ${_formatCountdown()}'),
                       style: const TextStyle(
                         color: Color(0xFFB45309),
                         fontSize: 11,

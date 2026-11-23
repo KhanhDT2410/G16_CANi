@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import SkeletonCard from '../../../components/common/SkeletonLoader';
-import EventShiftsDrawer from './EventShiftsDrawer';
+import EOEventDataState from './EOEventDataState';
 import {
   getEventStatusPriority,
   getDynamicEventStatus,
   getDynamicShiftStatus,
+  getEventUnderstaffedSummary,
+  resolveEventEstimatedCost,
 } from '../utils/eventHelpers';
 import './EOEventsTab.css';
 
@@ -70,24 +71,9 @@ function EventThumb({ imageUrl, name }) {
   );
 }
 
-function resolveEventEstimatedCost(evt, activeShifts) {
-  if (Number(evt?.totalEstimatedCost) > 0) return Number(evt.totalEstimatedCost);
-  if (!Array.isArray(activeShifts) || activeShifts.length === 0) return 0;
-  return activeShifts.reduce((sum, sh) => {
-    if (Number(sh?.totalCost) > 0) return sum + Number(sh.totalCost);
-    const s = new Date(sh?.startTime);
-    const e = new Date(sh?.endTime);
-    const hrs = !isNaN(s.getTime()) && !isNaN(e.getTime()) && e > s ? (e - s) / 3600000 : 0;
-    return (
-      sum +
-      hrs * Math.max(1, Number(sh?.requiredWorkers || 1)) * Math.max(0, Number(sh?.hourlyWage || 0)) +
-      Math.max(0, Number(sh?.allowance || 0))
-    );
-  }, 0);
-}
-
 export default function EOEventsTab({
   loading,
+  loadError,
   allEvents = [],
   filteredEvents,
   searchQuery,
@@ -200,13 +186,6 @@ export default function EOEventsTab({
   };
 
   const handleSelectSubTab = (subKey) => {
-    if (subKey === 'detail') {
-      const target = nonCancelledEvents[0] || allEvents[0];
-      if (target && onOpenEventDetail) {
-        onOpenEventDetail(target);
-        return;
-      }
-    }
     onSubTabChange?.(subKey);
     if (subKey === 'cancelled') {
       setStatusFilter('CANCELLED');
@@ -216,24 +195,36 @@ export default function EOEventsTab({
   };
 
   const archivedCount = cancelledEventsList.length + cancelledShiftsFromActiveEvents.length;
+  const hasEventData = !loading && !loadError;
 
   return (
     <div className="ev-page-stack" onClick={closeMenu}>
+      <header className="ev-page-heading">
+        <div>
+          <h1>Quản lý sự kiện</h1>
+          <p>Theo dõi lịch tổ chức, ca làm và tiến độ tuyển nhân sự.</p>
+        </div>
+        <button type="button" className="eo-workspace-create" onClick={onOpenCreateEvent}>
+          <span aria-hidden="true">+</span> Tạo sự kiện
+        </button>
+      </header>
       {/* Thanh Điều Hướng Phân Khu Sự Kiện */}
-      <div className="ev-subnav-card">
+      <nav className="ev-subnav-card" aria-label="Các mục quản lý sự kiện">
         <div className="ev-subnav-tabs">
           <button
             type="button"
             className={`ev-subnav-btn ${activeSubTab === 'list' ? 'is-active' : ''}`}
+            aria-current={activeSubTab === 'list' ? 'page' : undefined}
             onClick={() => handleSelectSubTab('list')}
           >
             <span>Danh sách sự kiện</span>
-            <span className="ev-subnav-count">{nonCancelledEvents.length}</span>
+            {hasEventData && <span className="ev-subnav-count">{nonCancelledEvents.length}</span>}
           </button>
 
           <button
             type="button"
             className={`ev-subnav-btn ${activeSubTab === 'detail' ? 'is-active' : ''}`}
+            disabled={!hasEventData || allEvents.length === 0}
             onClick={() => handleSelectSubTab('detail')}
           >
             <span>Chi tiết sự kiện &amp; Điểm danh</span>
@@ -242,25 +233,20 @@ export default function EOEventsTab({
           <button
             type="button"
             className={`ev-subnav-btn is-danger ${activeSubTab === 'cancelled' ? 'is-active' : ''}`}
+            aria-current={activeSubTab === 'cancelled' ? 'page' : undefined}
             onClick={() => handleSelectSubTab('cancelled')}
           >
             <span>Sự kiện đã hủy</span>
-            {archivedCount > 0 && <span className="ev-subnav-count">{archivedCount}</span>}
+            {hasEventData && archivedCount > 0 && <span className="ev-subnav-count">{archivedCount}</span>}
           </button>
         </div>
 
-        <button
-          type="button"
-          className="table-btn-create-event"
-          onClick={onOpenCreateEvent}
-        >
-          <span>+</span>
-          <span>Tạo sự kiện mới</span>
-        </button>
-      </div>
+      </nav>
+
+      {!hasEventData && <EOEventDataState loading={loading} onRetry={onReloadEvents} />}
 
       {/* PHÂN KHU LƯU TRỮ SỰ KIỆN ĐÃ HỦY */}
-      {activeSubTab === 'cancelled' && (
+      {hasEventData && activeSubTab === 'cancelled' && (
         <div className="eo-widget-card animate-fade-in-up" style={{ padding: '1.5rem' }}>
           <div style={{ marginBottom: '1.25rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#991b1b' }}>
@@ -368,7 +354,7 @@ export default function EOEventsTab({
       )}
 
       {/* PHÂN KHU CHÍNH: DANH SÁCH SỰ KIỆN */}
-      {activeSubTab === 'list' && (
+      {hasEventData && activeSubTab === 'list' && (
         <>
           {/* Dải chỉ số tổng quan nhanh từ dữ liệu thật */}
           <div className="ev-kpi-grid">
@@ -404,8 +390,9 @@ export default function EOEventsTab({
             <div className="table-card-header-bar">
               <div className="table-header-title-group">
                 <h3 className="table-card-heading">
-                  Danh sách sự kiện ({filteredEvents.length})
+                  Danh sách sự kiện
                 </h3>
+                <span className="ev-result-count" aria-live="polite">{filteredEvents.length} kết quả</span>
               </div>
 
               <div className="table-header-actions-group">
@@ -424,6 +411,7 @@ export default function EOEventsTab({
                   </svg>
                   <input
                     type="text"
+                    aria-label="Tìm theo tên hoặc địa điểm sự kiện"
                     placeholder="Tìm theo tên hoặc địa điểm..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -455,6 +443,7 @@ export default function EOEventsTab({
                     key={f.key}
                     type="button"
                     className={`ev-filter-chip ${active ? 'is-active' : ''}`}
+                    aria-pressed={active}
                     onClick={() => setStatusFilter(f.key)}
                   >
                     {f.label}
@@ -465,11 +454,7 @@ export default function EOEventsTab({
 
             {/* Bảng Danh Sách Sự Kiện */}
             <div className="table-responsive-wrapper">
-              {loading ? (
-                <div style={{ padding: '1.5rem' }}>
-                  <SkeletonCard count={3} height="80px" />
-                </div>
-              ) : filteredEvents.length === 0 ? (
+              {filteredEvents.length === 0 ? (
                 <div className="eo-empty-state-card">
                   <div className="empty-calendar-icon">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
@@ -519,7 +504,6 @@ export default function EOEventsTab({
                   </thead>
                   <tbody>
                     {filteredEvents.map((evt) => {
-                      const isExpanded = expandedEventId === evt.eventId;
                       const isMenuOpen = activeMenuEventId === evt.eventId;
                       const activeShifts = Array.isArray(evt.shifts)
                         ? evt.shifts.filter((s) => s.status !== 'CANCELLED')
@@ -536,133 +520,207 @@ export default function EOEventsTab({
                       const confirmedTotal = Math.max(Number(evt.totalConfirmedWorkers || 0), shiftConfirmedSum);
                       const fillPct =
                         requiredTotal > 0 ? Math.min(100, Math.round((confirmedTotal / requiredTotal) * 100)) : 0;
-                      const estCost = resolveEventEstimatedCost(evt, activeShifts);
+                      const estCost = resolveEventEstimatedCost(evt);
+                      const understaffedSummary = getEventUnderstaffedSummary(evt);
 
                       return (
-                        <React.Fragment key={evt.eventId}>
-                          <tr
-                            className={`event-table-row ${isExpanded ? 'row-expanded' : ''}`}
-                            onClick={() => setExpandedEventId(isExpanded ? null : evt.eventId)}
-                          >
-                            {/* Cột 1: Poster nhỏ gọn + Tên + Thời gian */}
-                            <td>
-                              <div
-                                className="ev-info-cell"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenEventDetail?.(evt);
-                                }}
-                                title="Nhấn để xem chi tiết sự kiện & nhân sự"
-                              >
-                                <EventThumb imageUrl={evt.imageUrl} name={evt.name} />
+                        <tr
+                          key={evt.eventId}
+                          className="event-table-row"
+                          onClick={() => onOpenEventDetail?.(evt)}
+                          title="Nhấn để xem chi tiết sự kiện &amp; quản lý ca"
+                        >
+                          {/* Cột 1: Poster nhỏ gọn + Tên + Thời gian */}
+                          <td>
+                            <div
+                              className="ev-info-cell"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenEventDetail?.(evt);
+                              }}
+                              title="Nhấn để xem chi tiết sự kiện & nhân sự"
+                            >
+                              <EventThumb key={evt.imageUrl} imageUrl={evt.imageUrl} name={evt.name} />
 
-                                <div className="ev-title-stack">
-                                  <span className="ev-title-link" title={evt.name}>
-                                    {evt.name}
-                                  </span>
-                                  <span className="ev-time-line">
-                                    {formatEventTimeRange(evt)}
-                                  </span>
-                                  <span className="ev-detail-hint">
-                                    Mở chi tiết &amp; quản lý ca &rarr;
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Cột 2: Địa điểm */}
-                            <td>
-                              <div className="table-venue-cell" style={{ alignItems: 'flex-start' }}>
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="#64748b"
-                                  strokeWidth="2"
-                                  style={{ flexShrink: 0, marginTop: '2px' }}
-                                >
-                                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                  <circle cx="12" cy="10" r="3"></circle>
-                                </svg>
-                                <span className="ev-venue-clamp" title={evt.venueAddress}>
-                                  {evt.venueAddress || 'Chưa cập nhật địa chỉ'}
+                              <div className="ev-title-stack">
+                                <span className="ev-title-link" title={evt.name}>
+                                  {evt.name}
+                                </span>
+                                <span className="ev-time-line">
+                                  {formatEventTimeRange(evt)}
+                                </span>
+                                <span className="ev-detail-hint">
+                                  Mở chi tiết &amp; quản lý ca &rarr;
                                 </span>
                               </div>
-                            </td>
+                            </div>
+                          </td>
 
-                            {/* Cột 3: Tiến độ nhân sự & từng ca */}
-                            <td>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                <div className="table-workers-cell" style={{ justifyContent: 'space-between' }}>
-                                  <span className="workers-count" style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
-                                    {confirmedTotal}/{requiredTotal} người
-                                  </span>
-                                  <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#2563eb' }}>
-                                    {fillPct}%
-                                  </span>
-                                </div>
-
-                                <div className="ev-fill-bar-track">
-                                  <div className="ev-fill-bar-progress" style={{ width: `${fillPct}%` }} />
-                                </div>
-
-                                {activeShifts.length > 0 ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                    {activeShifts.slice(0, 3).map((sh, sIdx) => {
-                                      const shStatus = getDynamicShiftStatus(sh, evt.status);
-                                      return (
-                                        <div
-                                          key={sh.shiftId || sIdx}
-                                          style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            gap: '0.4rem',
-                                            fontSize: '0.72rem',
-                                            padding: '0.18rem 0.45rem',
-                                            borderRadius: '6px',
-                                            backgroundColor: shStatus.bg,
-                                            border: `1px solid ${shStatus.border}`,
-                                            color: shStatus.color,
-                                            fontWeight: 600,
-                                          }}
-                                        >
-                                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            Ca {sIdx + 1} ({sh.jobType}): <strong>{sh.confirmedWorkers || 0}/{sh.requiredWorkers || 0}</strong>
-                                          </span>
-                                          <span style={{ fontSize: '0.68rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
-                                            • {shStatus.label}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                    {activeShifts.length > 3 && (
-                                      <span style={{ fontSize: '0.71rem', color: '#64748b', fontWeight: 600 }}>
-                                        +{activeShifts.length - 3} ca khác (bấm dòng để mở rộng)
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span style={{ fontSize: '0.73rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                    {evt.totalShifts ? `${evt.totalShifts} ca làm việc` : 'Chưa thiết lập ca'}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* Cột 4: Dự toán thực tế (không hardcode 1020000) */}
-                            <td>
-                              <span className="table-cost-amount">
-                                {estCost.toLocaleString('vi-VN')} đ
+                          {/* Cột 2: Địa điểm */}
+                          <td>
+                            <div className="table-venue-cell" style={{ alignItems: 'flex-start' }}>
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#64748b"
+                                strokeWidth="2"
+                                style={{ flexShrink: 0, marginTop: '2px' }}
+                              >
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                              </svg>
+                              <span className="ev-venue-clamp" title={evt.venueAddress}>
+                                {evt.venueAddress || 'Chưa cập nhật địa chỉ'}
                               </span>
-                            </td>
+                            </div>
+                          </td>
 
-                            {/* Cột 5: Trạng thái & Đăng tuyển nhanh */}
-                            <td onClick={(e) => e.stopPropagation()}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
-                                {formatStatusBadge(evt)}
-                                {evt.status === 'DRAFT' && (
+                          {/* Cột 3: Tiến độ nhân sự & từng ca */}
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <div className="table-workers-cell" style={{ justifyContent: 'space-between' }}>
+                                <span className="workers-count" style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
+                                  {confirmedTotal}/{requiredTotal} người
+                                </span>
+                                <span style={{ fontSize: '0.73rem', fontWeight: 700, color: '#2563eb' }}>
+                                  {fillPct}%
+                                </span>
+                              </div>
+
+                              <div className="ev-fill-bar-track">
+                                <div className="ev-fill-bar-progress" style={{ width: `${fillPct}%` }} />
+                              </div>
+
+                              {activeShifts.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                  {activeShifts.slice(0, 3).map((sh, sIdx) => {
+                                    const shStatus = getDynamicShiftStatus(sh, evt.status);
+                                    return (
+                                      <div
+                                        key={sh.shiftId || sIdx}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          gap: '0.4rem',
+                                          fontSize: '0.72rem',
+                                          padding: '0.18rem 0.45rem',
+                                          borderRadius: '6px',
+                                          backgroundColor: shStatus.bg,
+                                          border: `1px solid ${shStatus.border}`,
+                                          color: shStatus.color,
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          Ca {sIdx + 1} ({sh.jobType}): <strong>{sh.confirmedWorkers || 0}/{sh.requiredWorkers || 0}</strong>
+                                        </span>
+                                        <span style={{ fontSize: '0.68rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
+                                          • {shStatus.label}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                  {activeShifts.length > 3 && (
+                                    <span style={{ fontSize: '0.71rem', color: '#64748b', fontWeight: 600 }}>
+                                      +{activeShifts.length - 3} ca khác
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.73rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  {evt.totalShifts ? `${evt.totalShifts} ca làm việc` : 'Chưa thiết lập ca'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Cột 4: Dự toán thực tế (không hardcode 1020000) */}
+                          <td>
+                            <span className="table-cost-amount">
+                              {estCost.toLocaleString('vi-VN')} đ
+                            </span>
+                          </td>
+
+                          {/* Cột 5: Trạng thái & Đăng tuyển nhanh */}
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
+                              {formatStatusBadge(evt)}
+                              {understaffedSummary.count > 0 && (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    backgroundColor: '#fff1f2',
+                                    color: '#be123c',
+                                    border: '1px solid #fda4af',
+                                    borderRadius: '999px',
+                                    padding: '0.18rem 0.55rem',
+                                    fontSize: '0.71rem',
+                                    fontWeight: 700,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={`Có ${understaffedSummary.count} ca đang thiếu nhân sự sát giờ`}
+                                >
+                                  Thiếu nhân sự sát giờ ({understaffedSummary.count} ca)
+                                </span>
+                              )}
+                              {(() => {
+                                if (evt.status !== 'DRAFT') return null;
+                                const dyn = getDynamicEventStatus(evt);
+                                const shiftCnt = activeShifts.length || Number(evt.totalShifts || 0);
+                                if (dyn.isExpiredDraft) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenEditEvent?.(evt);
+                                      }}
+                                      style={{
+                                        background: '#fff7ed',
+                                        color: '#c2410c',
+                                        border: '1px solid #fed7aa',
+                                        borderRadius: '6px',
+                                        padding: '0.28rem 0.65rem',
+                                        fontSize: '0.73rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      Sửa lại thời gian
+                                    </button>
+                                  );
+                                }
+                                if (shiftCnt === 0) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenAddShift?.(evt.eventId);
+                                      }}
+                                      style={{
+                                        background: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #bfdbfe',
+                                        borderRadius: '6px',
+                                        padding: '0.28rem 0.65rem',
+                                        fontSize: '0.73rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      + Thêm ca làm
+                                    </button>
+                                  );
+                                }
+                                return (
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -683,68 +741,61 @@ export default function EOEventsTab({
                                   >
                                     Đăng Tuyển Ngay
                                   </button>
-                                )}
-                              </div>
-                            </td>
+                                );
+                              })()}
+                            </div>
+                          </td>
 
-                            {/* Cột 6: Thao tác trực tiếp + Menu Kebab */}
-                            <td style={{ textAlign: 'center', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-                              <div className="ev-actions-cell">
+                          {/* Cột 6: Thao tác trực tiếp + Menu Kebab */}
+                          <td style={{ textAlign: 'center', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+                            <div className="ev-actions-cell">
+                              <button
+                                type="button"
+                                className="ev-quick-detail-btn"
+                                onClick={() => onOpenEventDetail?.(evt, 'SHIFTS')}
+                              >
+                                Chi tiết
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-kebab-menu"
+                                onClick={(e) => toggleKebabMenu(e, evt.eventId)}
+                                title="Thêm tùy chọn"
+                                aria-expanded={isMenuOpen}
+                              >
+                                ⋮
+                              </button>
+                            </div>
+
+                            {isMenuOpen && (
+                              <div className="table-kebab-dropdown" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   type="button"
-                                  className="ev-quick-detail-btn"
-                                  onClick={() => onOpenEventDetail?.(evt, 'SHIFTS')}
+                                  className="dropdown-item"
+                                  style={{ color: '#2563eb', fontWeight: 700 }}
+                                  onClick={() => {
+                                    onOpenEventDetail?.(evt, 'SHIFTS');
+                                    closeMenu();
+                                  }}
                                 >
-                                  Chi tiết
+                                  <span>Chi tiết sự kiện &amp; nhân sự</span>
                                 </button>
+
                                 <button
                                   type="button"
-                                  className="btn-kebab-menu"
-                                  onClick={(e) => toggleKebabMenu(e, evt.eventId)}
-                                  title="Thêm tùy chọn"
+                                  className="dropdown-item"
+                                  style={{ color: '#0d9488', fontWeight: 700 }}
+                                  onClick={() => {
+                                    onOpenEventDetail?.(evt, 'QR_ATTENDANCE');
+                                    closeMenu();
+                                  }}
                                 >
-                                  ⋮
+                                  <span>Điểm danh &amp; Mã QR ca</span>
                                 </button>
-                              </div>
 
-                              {isMenuOpen && (
-                                <div className="table-kebab-dropdown" onClick={(e) => e.stopPropagation()}>
-                                  <button
-                                    type="button"
-                                    className="dropdown-item"
-                                    style={{ color: '#2563eb', fontWeight: 700 }}
-                                    onClick={() => {
-                                      onOpenEventDetail?.(evt, 'SHIFTS');
-                                      closeMenu();
-                                    }}
-                                  >
-                                    <span>Chi tiết sự kiện &amp; nhân sự</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className="dropdown-item"
-                                    style={{ color: '#0d9488', fontWeight: 700 }}
-                                    onClick={() => {
-                                      onOpenEventDetail?.(evt, 'QR_ATTENDANCE');
-                                      closeMenu();
-                                    }}
-                                  >
-                                    <span>Điểm danh &amp; Mã QR ca</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className="dropdown-item"
-                                    onClick={() => {
-                                      setExpandedEventId(isExpanded ? null : evt.eventId);
-                                      closeMenu();
-                                    }}
-                                  >
-                                    <span>{isExpanded ? 'Thu gọn ca làm' : `Mở nhanh ${evt.totalShifts || 0} ca`}</span>
-                                  </button>
-
-                                  {evt.status === 'DRAFT' && (
+                                {evt.status === 'DRAFT' &&
+                                  !getDynamicEventStatus(evt).isExpiredDraft &&
+                                  (activeShifts.length > 0 || Number(evt.totalShifts || 0) > 0) && (
                                     <button
                                       type="button"
                                       className="dropdown-item text-blue"
@@ -757,80 +808,57 @@ export default function EOEventsTab({
                                     </button>
                                   )}
 
+                                <button
+                                  type="button"
+                                  className="dropdown-item"
+                                  onClick={() => {
+                                    onOpenAddShift(evt.eventId);
+                                    closeMenu();
+                                  }}
+                                >
+                                  <span>Thêm ca làm</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className="dropdown-item"
+                                  onClick={() => {
+                                    onOpenEditEvent(evt);
+                                    closeMenu();
+                                  }}
+                                >
+                                  <span>Chỉnh sửa sự kiện</span>
+                                </button>
+
+                                {(evt.status === 'ACTIVE' || evt.status === 'UPCOMING') && (
                                   <button
                                     type="button"
-                                    className="dropdown-item"
+                                    className="dropdown-item text-danger"
                                     onClick={() => {
-                                      onOpenAddShift(evt.eventId);
+                                      onCancelEvent(evt);
                                       closeMenu();
                                     }}
                                   >
-                                    <span>Thêm ca làm</span>
+                                    <span>Hủy sự kiện</span>
                                   </button>
+                                )}
 
+                                {evt.status === 'DRAFT' && (
                                   <button
                                     type="button"
-                                    className="dropdown-item"
+                                    className="dropdown-item text-danger"
                                     onClick={() => {
-                                      onOpenEditEvent(evt);
+                                      onDeleteEvent?.(evt);
                                       closeMenu();
                                     }}
                                   >
-                                    <span>Chỉnh sửa sự kiện</span>
+                                    <span>Xóa bản nháp</span>
                                   </button>
-
-                                  {(evt.status === 'ACTIVE' || evt.status === 'UPCOMING') && (
-                                    <button
-                                      type="button"
-                                      className="dropdown-item text-danger"
-                                      onClick={() => {
-                                        onCancelEvent(evt);
-                                        closeMenu();
-                                      }}
-                                    >
-                                      <span>Hủy sự kiện</span>
-                                    </button>
-                                  )}
-
-                                  {evt.status === 'DRAFT' && (
-                                    <button
-                                      type="button"
-                                      className="dropdown-item text-danger"
-                                      onClick={() => {
-                                        onDeleteEvent?.(evt);
-                                        closeMenu();
-                                      }}
-                                    >
-                                      <span>Xóa bản nháp</span>
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-
-                          {isExpanded && (
-                            <tr className="drawer-expanded-row">
-                              <td colSpan={6} style={{ padding: 0 }}>
-                                <div className="drawer-container-inside-table">
-                                  <EventShiftsDrawer
-                                    event={evt}
-                                    onOpenDetail={onOpenEventDetail}
-                                    onOpenShiftWorkspace={onOpenShiftWorkspace}
-                                    onAddShift={onOpenAddShift}
-                                    onOpenQr={onOpenQr}
-                                    onOpenInvite={onOpenInvite}
-                                    onOpenAttendance={onOpenAttendance}
-                                    onEditShift={onEditShift}
-                                    onCancelShift={onCancelShift}
-                                    onReloadEvents={onReloadEvents}
-                                    onOpenPaymentDeclaration={onOpenPaymentDeclaration}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
                       );
                     })}
                   </tbody>

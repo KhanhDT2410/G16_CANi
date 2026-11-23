@@ -1,3 +1,7 @@
+import React, { useState } from 'react';
+import DisputeResolutionDetailModal from './DisputeResolutionDetailModal';
+import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
+
 export default function EOPaymentsTab({
   payments = [],
   loading = false,
@@ -5,22 +9,83 @@ export default function EOPaymentsTab({
   onOpenPaymentModal,
   onOpenDisputeModal,
   onOpenVoucherModal,
+  onNavigateToDisputes,
 }) {
+  const [selectedDisputePayment, setSelectedDisputePayment] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  const renderStatusBadge = (p) => {
+    const isDisputeResolved = p.disputeStatus === 'RESOLVED' || p.disputeStatus === 'FINAL_RESOLVED';
+    const isDisputeActive = p.status === 'DISPUTED' ||
+      (p.disputeStatus && p.disputeStatus !== 'RESOLVED' && p.disputeStatus !== 'FINAL_RESOLVED');
+
+    if (isDisputeResolved) {
+      return (
+        <div>
+          <span className="payment-status-badge badge-resolved">Đã phân xử</span>
+          {p.disputeOutcome === 'EO_FAULT' && <div className="dispute-outcome-pill pill-eo-fault">Lỗi EO (Cần trả)</div>}
+          {p.disputeOutcome === 'WORKER_FAULT' && <div className="dispute-outcome-pill pill-worker-fault">Lỗi Worker (-10 RS)</div>}
+          {p.disputeOutcome === 'PARTIAL' && <div className="dispute-outcome-pill pill-partial">Chia sẻ 2 bên</div>}
+          {p.disputeOutcome === 'UNVERIFIED' && <div className="dispute-outcome-pill pill-unverified">Không xác minh</div>}
+        </div>
+      );
+    }
+    if (isDisputeActive) return <span className="payment-status-badge badge-disputed">Đang tranh chấp</span>;
+    if (p.status === 'CONFIRMED_FULL') return <span className="payment-status-badge badge-confirmed">Đã hoàn tất</span>;
+    if (p.status === 'DECLARED_PENDING_WORKER') return <span className="payment-status-badge badge-pending">Chờ Worker xác nhận</span>;
+    if (p.status === 'CONFIRMED_PARTIAL') return <span className="payment-status-badge badge-partial">Xác nhận một phần</span>;
+    if (p.status === 'UNVERIFIED') return <span className="payment-status-badge badge-unverified">Chưa xác minh</span>;
+    return <span className="payment-status-badge badge-unpaid">Chưa khai báo</span>;
+  };
+
+  const renderActions = (p, isDisputeActive, isDisputeResolved) => (
+    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+      {isDisputeActive && (
+        <>
+          <button type="button" className="btn-dispute-track" onClick={() => setSelectedDisputePayment(p)}>
+            Theo Dõi Tranh Chấp
+          </button>
+          {onNavigateToDisputes && (
+            <button type="button" className="btn-dispute-nav" onClick={() => onNavigateToDisputes(p.disputeId || p.assignmentId)}>
+              Đến CSKH &rarr;
+            </button>
+          )}
+        </>
+      )}
+      {isDisputeResolved && (
+        <>
+          <button type="button" className="btn-dispute-result" onClick={() => setSelectedDisputePayment(p)}>
+            Xem Phán Quyết
+          </button>
+          {p.disputeOutcome === 'EO_FAULT' && (
+            <button type="button" className="btn-declare-payment" onClick={() => onOpenPaymentModal(p)}>
+              Trả Lương Bổ Sung
+            </button>
+          )}
+        </>
+      )}
+      {!isDisputeActive && !isDisputeResolved && (
+        <>
+          {p.status !== 'CONFIRMED_FULL' && (
+            <button type="button" className="btn-declare-payment" onClick={() => onOpenPaymentModal(p)}>
+              Khai Báo Trả Lương
+            </button>
+          )}
+          <button
+            type="button"
+            style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+            onClick={() => onOpenDisputeModal && onOpenDisputeModal(p)}
+          >
+            Khiếu Nại
+          </button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <section className="eo-payments-section animate-fade-in-up">
-      {/* Thanh Tiêu Đề & Thao Tác Xuất Phiếu Chi Kế Toán */}
-      <div
-        className="eo-widget-card"
-        style={{
-          padding: '1.25rem',
-          marginBottom: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-        }}
-      >
+      <div className="eo-widget-card" style={{ padding: '1.25rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
             Khai Báo Lương & Quyết Toán Thù Lao Nhân Sự
@@ -29,25 +94,10 @@ export default function EOPaymentsTab({
             Đối soát chấm công GPS QR, thanh toán trực tiếp sau ca và xuất chứng từ chi chuẩn kế toán.
           </p>
         </div>
-
         <button
           type="button"
           onClick={onOpenVoucherModal}
-          style={{
-            backgroundColor: '#059669',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: 8,
-            padding: '0.55rem 1.25rem',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
-          }}
-          title="Xuất phiếu chi thù lao Mẫu số 02-TT / NĐ 52/2024/NĐ-CP"
+          style={{ backgroundColor: '#059669', color: '#ffffff', border: 'none', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)' }}
         >
           Xuất Phiếu Chi Thù Lao (PDF / In)
         </button>
@@ -70,102 +120,113 @@ export default function EOPaymentsTab({
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>
-                  Đang tải dữ liệu thanh toán ca làm việc...
-                </td>
-              </tr>
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>Đang tải dữ liệu thanh toán...</td></tr>
             ) : error ? (
-              <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#dc2626', fontWeight: 600 }}>
-                  {error}
-                </td>
-              </tr>
+              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#dc2626', fontWeight: 600 }}>{error}</td></tr>
             ) : payments.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ textAlign: 'center', padding: '2.75rem 1rem', color: '#64748b' }}>
-                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                    Chưa có khoản thanh toán nào được ghi nhận
-                  </div>
-                  <div style={{ fontSize: '0.84rem' }}>
-                    Mở một ca làm việc đã có nhân sự điểm danh để khai báo và đối soát thù lao trực tiếp.
-                  </div>
+                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Chưa có khoản thanh toán nào được ghi nhận</div>
+                  <div style={{ fontSize: '0.84rem' }}>Mở một ca làm việc đã có nhân sự điểm danh để khai báo và đối soát thù lao trực tiếp.</div>
                 </td>
               </tr>
             ) : (
-              payments.map((p) => (
-              <tr key={p.paymentId}>
-                <td
-                  style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }}
-                  title={p.assignmentId}
-                >
-                  {p.assignmentId?.length > 14 ? `${p.assignmentId.substring(0, 8)}...` : p.assignmentId}
-                </td>
-                <td>{p.workerName}</td>
-                <td>{p.jobType}</td>
-                <td style={{ fontWeight: 600 }}>
-                  {(p.agreedAmount != null ? p.agreedAmount : 0).toLocaleString()} đ
-                </td>
-                <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
-                  {p.declaredAmount > 0 ? `${(p.declaredAmount || 0).toLocaleString()} đ` : 'Chưa trả'}
-                </td>
-                <td>{p.paymentMethod || '—'}</td>
-                <td style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                  {p.externalRef || 'Chưa có'}
-                </td>
-                <td>
-                  <span
-                    className={`payment-status-badge ${
-                      p.status === 'CONFIRMED_FULL'
-                        ? 'badge-confirmed'
-                        : p.status === 'DECLARED_PENDING_WORKER'
-                        ? 'badge-pending'
-                        : 'badge-unpaid'
-                    }`}
-                  >
-                    {p.status === 'CONFIRMED_FULL'
-                      ? 'Đã hoàn tất'
-                      : p.status === 'DECLARED_PENDING_WORKER'
-                      ? 'Chờ Worker xác nhận'
-                      : 'Chưa khai báo'}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    {p.status !== 'CONFIRMED_FULL' && (
-                      <button
-                        type="button"
-                        className="btn-declare-payment"
-                        onClick={() => onOpenPaymentModal(p)}
-                      >
-                        Khai Báo Trả Lương
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      style={{
-                        background: '#fee2e2',
-                        color: '#b91c1c',
-                        border: '1px solid #fca5a5',
-                        borderRadius: 6,
-                        padding: '4px 8px',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => onOpenDisputeModal && onOpenDisputeModal(p)}
-                      title="Gửi khiếu nại tranh chấp lên bộ phận CSKH"
-                    >
-                      Khiếu Nại
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              ))
+              payments.map((p) => {
+                const isDisputeResolved = p.disputeStatus === 'RESOLVED' || p.disputeStatus === 'FINAL_RESOLVED';
+                const isDisputeActive = p.status === 'DISPUTED' ||
+                  (p.disputeStatus && p.disputeStatus !== 'RESOLVED' && p.disputeStatus !== 'FINAL_RESOLVED');
+                return (
+                  <tr key={p.paymentId}>
+                    <td style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }} title={p.assignmentId}>
+                      {p.assignmentId?.length > 14 ? `${p.assignmentId.substring(0, 8)}...` : p.assignmentId}
+                    </td>
+                    <td>{p.workerName}</td>
+                    <td>{p.jobType}</td>
+                    <td style={{ fontWeight: 600 }}>{(p.agreedAmount != null ? p.agreedAmount : 0).toLocaleString()} đ</td>
+                    <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
+                      {p.declaredAmount > 0 ? `${(p.declaredAmount || 0).toLocaleString()} đ` : 'Chưa trả'}
+                    </td>
+                    <td>{p.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : p.paymentMethod === 'CASH' ? 'Tiền mặt' : (p.paymentMethod || '—')}</td>
+                    <td style={{ fontSize: '0.82rem', color: '#475569' }}>
+                      <div>{p.externalRef || 'Chưa có'}</div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                        {p.paymentProofUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage({
+                              url: resolveAssetUrl(p.paymentProofUrl),
+                              title: `Chứng từ thanh toán cho ${p.workerName}${p.externalRef ? ' (' + p.externalRef + ')' : ''}`,
+                            })}
+                            style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            🧾 Xem chứng từ
+                          </button>
+                        )}
+                        {buildWorkerVietQrUrl(p) && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage({
+                              url: buildWorkerVietQrUrl(p),
+                              title: `Mã VietQR nhận lương của ${p.workerName}`,
+                            })}
+                            style={{ background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            📱 QR
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td>{renderStatusBadge(p)}</td>
+                    <td>{renderActions(p, isDisputeActive, isDisputeResolved)}</td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+
+      <DisputeResolutionDetailModal
+        isOpen={Boolean(selectedDisputePayment)}
+        payment={selectedDisputePayment}
+        onClose={() => setSelectedDisputePayment(null)}
+        onNavigateToDisputes={onNavigateToDisputes}
+        onOpenPaymentDeclaration={onOpenPaymentModal}
+      />
+
+      {previewImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            zIndex: 10000,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem',
+          }}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div style={{ color: '#ffffff', fontWeight: 700, marginBottom: '1rem', fontSize: '1.05rem' }}>
+            {previewImage.title}
+          </div>
+          <img
+            src={previewImage.url}
+            alt={previewImage.title}
+            style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', backgroundColor: '#ffffff' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            style={{ marginTop: '1rem', background: '#ffffff', color: '#0f172a', border: 'none', borderRadius: '8px', padding: '0.5rem 1.25rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Đóng ảnh
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,13 +1,21 @@
 .event-detail-modal-overlay {
   position: fixed;
   inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background-color: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1100;
+  z-index: 99999;
   padding: 1.25rem;
+  box-sizing: border-box;
   animation: fadeIn 0.15s ease-out;
 }
 
@@ -31,6 +39,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.event-detail-workspace .event-detail-modal-header {
+  padding: clamp(1rem, 3vw, 1.75rem);
+  background: linear-gradient(112deg, var(--color-surface-card), var(--color-primary-50));
+  border-color: var(--color-primary-100);
+}
+
+.event-detail-workspace .event-detail-title {
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
 }
 
 .event-detail-header-left {
@@ -61,6 +81,10 @@
   margin: 0.2rem 0 0;
   font-size: 0.8rem;
   color: #64748b;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .event-detail-sub code {
@@ -68,6 +92,7 @@
   padding: 1px 6px;
   border-radius: 4px;
   font-family: monospace;
+  overflow-wrap: anywhere;
 }
 
 .event-detail-close-btn {

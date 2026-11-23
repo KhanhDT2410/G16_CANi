@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -42,6 +43,22 @@ public class ShiftResponseDto {
     private String checklist;
     /** Kỹ năng bắt buộc của ca (matching hard filter + hiển thị web) */
     private UUID[] requiredSkills;
+    private UUID performedSkillId;
+    private String performedSkillName;
+    private List<ShiftSkillRequirementDto> skillRequirements;
+    private String customSkillNotes;
     /** Cờ điều phối khẩn cấp (Emergency Dispatch) cho phép radar free-pick */
     private Boolean emergency;
+    /** Số nhân sự còn thiếu thực tế (= max(0, requiredWorkers - confirmedWorkers)) */
+    private Integer missingWorkers;
+    /** Ca đang thiếu nhân sự trong khung cảnh báo sát giờ (<= N giờ trước giờ bắt đầu) */
+    private Boolean nearStartUnderstaffed;
+    /** Có được phép bấm Kích hoạt điều phối khẩn cấp thủ công hay không (Single Source of Truth với API) */
+    private Boolean canTriggerEmergency;
+    /** Lý do không thể kích hoạt khẩn cấp thủ công (nếu canTriggerEmergency = false) */
+    private String emergencyBlockReason;
+    /** Số lượng đề xuất (proposal) đang chờ Worker phản hồi cho ca này */
+    private Integer pendingProposalCount;
+    /** Bán kính tìm kiếm khẩn cấp mặc định sẽ áp dụng (km) */
+    private Double defaultEmergencyRadiusKm;
 }

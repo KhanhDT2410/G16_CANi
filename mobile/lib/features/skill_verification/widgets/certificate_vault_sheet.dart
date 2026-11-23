@@ -90,16 +90,25 @@ class CertificateVaultSheet extends ConsumerWidget {
   }
 
   Widget _buildVaultCard(SkillVerificationResult item) {
-    final isApproved = item.status == 'APPROVED';
-    final isPending = item.status == 'PENDING_REVIEW' ||
-        item.routingDecision == 'MANUAL_REVIEW' ||
-        item.routingDecision == 'ADMIN_REVIEW';
+    final statusUpper = item.status.toUpperCase();
+    final isApproved = statusUpper == 'APPROVED';
+    final isRevoked = statusUpper == 'REVOKED';
+    final isExpired = statusUpper == 'EXPIRED';
+    final isPending = statusUpper == 'PENDING_REVIEW' ||
+        (!isApproved &&
+            !isRevoked &&
+            !isExpired &&
+            (item.routingDecision == 'MANUAL_REVIEW' || item.routingDecision == 'ADMIN_REVIEW'));
     final statusColor = isApproved
-        ? Colors.green
-        : (isPending ? const Color(0xFFD97706) : Colors.red);
+        ? SkillHubColors.successText
+        : (isPending ? SkillHubColors.warningText : SkillHubColors.dangerText);
     final statusText = isApproved
         ? 'Đã duyệt (+${item.spAwarded} SP)'
-        : (isPending ? 'Đang chờ duyệt' : 'Không đạt chuẩn');
+        : (isRevoked
+            ? 'Đã thu hồi'
+            : (isExpired
+                ? 'Hết hạn'
+                : (isPending ? 'Đang chờ duyệt' : 'Từ chối')));
 
     return Container(
       padding: const EdgeInsets.all(14),

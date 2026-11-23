@@ -88,6 +88,12 @@ public class Shift {
     @Column(name = "required_skills")
     private UUID[] requiredSkills;
 
+    @Column(name = "performed_skill_id")
+    private UUID performedSkillId;
+
+    @Column(name = "custom_skill_notes", columnDefinition = "TEXT")
+    private String customSkillNotes;
+
     @Column(name = "min_reliability_score")
     @Builder.Default
     private Integer minReliabilityScore = 0;
@@ -117,6 +123,22 @@ public class Shift {
     @Column(name = "emergency", nullable = false)
     @Builder.Default
     private Boolean emergency = false;
+
+    @Column(name = "understaffed_alert_sent", nullable = false)
+    @Builder.Default
+    private Boolean understaffedAlertSent = false;
+
+    @Column(name = "admin_note", columnDefinition = "TEXT")
+    private String adminNote;
+
+    @Column(name = "cancelled_by")
+    private UUID cancelledBy;
+
+    @Column(name = "cancellation_reason", columnDefinition = "TEXT")
+    private String cancellationReason;
+
+    @Column(name = "suspended_at")
+    private Instant suspendedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -66,6 +66,42 @@ public class SupportChatController {
         return ResponseEntity.ok(ApiResponse.ok(dto, "Gửi tin nhắn thành công"));
     }
 
+    /**
+     * Tải tệp đính kèm / hình ảnh cho phiên chat hỗ trợ.
+     * POST /api/v1/support/chat/upload
+     */
+    @PostMapping(value = "/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> uploadAttachment(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        String url = supportChatService.uploadChatAttachment(file);
+        String name = file.getOriginalFilename() != null ? file.getOriginalFilename() : "tệp đính kèm";
+        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of("url", url, "name", name), "Tải tệp đính kèm thành công"));
+    }
+
+    /**
+     * Tải / xem tệp đính kèm phiên chat trực tuyến.
+     * GET /api/v1/support/chat/attachments/{filename}
+     */
+    @GetMapping("/attachments/{filename:.+}")
+    public ResponseEntity<org.springframework.core.io.Resource> getAttachment(
+            @PathVariable("filename") String filename
+    ) {
+        org.springframework.core.io.Resource resource = supportChatService.loadChatAttachment(filename);
+        String lower = filename.toLowerCase();
+        String contentType = "application/octet-stream";
+        if (lower.endsWith(".png")) contentType = "image/png";
+        else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) contentType = "image/jpeg";
+        else if (lower.endsWith(".webp")) contentType = "image/webp";
+        else if (lower.endsWith(".gif")) contentType = "image/gif";
+        else if (lower.endsWith(".pdf")) contentType = "application/pdf";
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                .body(resource);
+    }
+
     private UUID currentUserId(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof User u)) {
             return null;

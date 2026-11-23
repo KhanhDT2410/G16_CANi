@@ -6,5 +6,6 @@ public enum ShiftStatus {
     FULLY_STAFFED,
     IN_PROGRESS,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    SUSPENDED
 }

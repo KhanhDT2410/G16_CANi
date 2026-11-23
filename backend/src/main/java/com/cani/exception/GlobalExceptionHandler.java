@@ -16,6 +16,26 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleAccountLockedException(AccountLockedException ex) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("code", "ACCOUNT_LOCKED");
+        details.put("email", ex.getEmail());
+        details.put("role", ex.getRole());
+        details.put("status", ex.getStatusName());
+        details.put("lockReason", ex.getLockReason());
+        details.put("appealToken", ex.getAppealToken());
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.<Map<String, Object>>builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .data(details)
+                        .timestamp(java.time.LocalDateTime.now())
+                        .build());
+    }
+
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {
         return ResponseEntity

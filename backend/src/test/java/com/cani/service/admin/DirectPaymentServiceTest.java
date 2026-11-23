@@ -42,6 +42,12 @@ class DirectPaymentServiceTest {
     @Mock
     private DisputeService disputeService;
 
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private EmailService emailService;
+
     @InjectMocks
     private DirectPaymentService directPaymentService;
 
@@ -185,6 +191,39 @@ class DirectPaymentServiceTest {
     }
 
     @Test
+    @DisplayName("Không cho Worker xác nhận thanh toán khi EO chưa khai báo (NOT_DECLARED)")
+    void shouldThrowWhenPaymentNotDeclaredYet() {
+        ConfirmPaymentRequestDto request = ConfirmPaymentRequestDto.builder()
+                .confirmStatus("RECEIVED_FULL")
+                .build();
+
+        when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(initialPayment));
+
+        assertThatThrownBy(() -> directPaymentService.confirmPayment(worker.getWorkerId(), assignment.getAssignmentId(), request))
+                .isInstanceOf(com.cani.exception.BadRequestException.class)
+                .hasMessageContaining("chưa khai báo thanh toán");
+    }
+
+    @Test
+    @DisplayName("Không cho Worker xác nhận thanh toán khi đang CHECKED_IN nhưng EO chưa Duyệt công (Bước 3)")
+    void shouldThrowWhenWorkerConfirmsBeforeEoApprovedWork() {
+        initialPayment.setStatus(PaymentStatus.DECLARED_PENDING_WORKER);
+        assignment.setStatus(com.cani.entity.enums.AssignmentStatus.CHECKED_IN);
+        assignment.setEoConfirmed(false);
+
+        ConfirmPaymentRequestDto request = ConfirmPaymentRequestDto.builder()
+                .confirmStatus("RECEIVED_FULL")
+                .build();
+
+        when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(initialPayment));
+        when(assignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+
+        assertThatThrownBy(() -> directPaymentService.confirmPayment(worker.getWorkerId(), assignment.getAssignmentId(), request))
+                .isInstanceOf(com.cani.exception.BadRequestException.class)
+                .hasMessageContaining("Duyệt công hoàn thành");
+    }
+
+    @Test
     @DisplayName("Worker khác không thể xác nhận thanh toán của Worker trong ca")
     void shouldThrowWhenUnauthorizedWorkerConfirms() {
         UUID strangerWorkerId = UUID.randomUUID();
@@ -235,5 +274,103 @@ class DirectPaymentServiceTest {
                 assignment.getAssignmentId(), strangerUserId, false))
                 .isInstanceOf(AppException.class)
                 .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("EO khai báo thanh toán gửi đồng thời thông báo thiết bị (In-App/FCM) và Email kèm chứng từ tới Worker")
+    void shouldSendNotificationAndEmailWhenEoDeclaresPayment() {
+        org.springframework.test.util.ReflectionTestUtils.setField(directPaymentService, "notificationService", notificationService);
+        org.springframework.test.util.ReflectionTestUtils.setField(directPaymentService, "emailService", emailService);
+
+        User workerUser = User.builder()
+                .userId(UUID.randomUUID())
+                .fullName("Nguyễn Văn An")
+                .email("worker@cani.vn")
+                .build();
+        worker.setUser(workerUser);
+
+        DeclarePaymentRequestDto request = DeclarePaymentRequestDto.builder()
+                .assignmentId(assignment.getAssignmentId())
+                .declaredAmount(new BigDecimal("220000"))
+                .paymentMethod("BANK_TRANSFER")
+                .externalRef("VCB-999888")
+                .paymentProofUrl("/api/v1/eo/events/images/receipt_1.jpg")
+                .build();
+
+        when(assignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(initialPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        directPaymentService.declarePayment(eo.getEoId(), request);
+
+        verify(notificationService, times(1)).createAndSend(
+                eq(workerUser.getUserId()),
+                anyString(),
+                contains("220.000 VNĐ"),
+                eq(com.cani.entity.enums.NotificationType.PAYMENT),
+                eq("ASSIGNMENT"),
+                eq(assignment.getAssignmentId()),
+                argThat(map -> "PAYMENT_DECLARED".equals(map.get("type")))
+        );
+        verify(emailService, times(1)).sendPaymentEmail(
+                eq("worker@cani.vn"),
+                contains("Lễ tân"),
+                anyString(),
+                anyString(),
+                argThat(details -> "VCB-999888".equals(details.get("Mã giao dịch"))),
+                eq("/api/v1/eo/events/images/receipt_1.jpg"),
+                anyString()
+        );
+    }
+
+    @Test
+    @DisplayName("Worker phản hồi thanh toán gửi đồng thời thông báo và Email chứng từ tới EO")
+    void shouldSendNotificationAndEmailToEoWhenWorkerConfirmsPayment() {
+        org.springframework.test.util.ReflectionTestUtils.setField(directPaymentService, "notificationService", notificationService);
+        org.springframework.test.util.ReflectionTestUtils.setField(directPaymentService, "emailService", emailService);
+
+        User eoUser = User.builder()
+                .userId(UUID.randomUUID())
+                .fullName("EO Sao Mai")
+                .email("eo@cani.vn")
+                .build();
+        eo.setUser(eoUser);
+        assignment.setStatus(com.cani.entity.enums.AssignmentStatus.CHECKED_IN);
+        assignment.setEoConfirmed(true);
+        initialPayment.setStatus(PaymentStatus.DECLARED_PENDING_WORKER);
+        initialPayment.setDeclaredAmount(new BigDecimal("220000"));
+        initialPayment.setPaymentMethod("BANK_TRANSFER");
+        initialPayment.setExternalRef("VCB-999888");
+        initialPayment.setPaymentProofUrl("/api/v1/eo/events/images/receipt_1.jpg");
+
+        ConfirmPaymentRequestDto request = ConfirmPaymentRequestDto.builder()
+                .confirmStatus("RECEIVED_FULL")
+                .comment("Đã nhận đủ")
+                .build();
+
+        when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(initialPayment));
+        when(assignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        directPaymentService.confirmPayment(worker.getWorkerId(), assignment.getAssignmentId(), request);
+
+        verify(notificationService, times(1)).createAndSend(
+                eq(eoUser.getUserId()),
+                contains("đã nhận đủ"),
+                anyString(),
+                eq(com.cani.entity.enums.NotificationType.PAYMENT),
+                eq("SHIFT"),
+                eq(shift.getShiftId()),
+                anyMap()
+        );
+        verify(emailService, times(1)).sendPaymentEmail(
+                eq("eo@cani.vn"),
+                contains("đã nhận đủ"),
+                anyString(),
+                anyString(),
+                argThat(details -> "Đã nhận đủ".equals(details.get("Trạng thái phản hồi"))),
+                eq("/api/v1/eo/events/images/receipt_1.jpg"),
+                anyString()
+        );
     }
 }

@@ -14,5 +14,7 @@ public class JoinInviteRequestDto {
 
     @NotBlank(message = "Mã mời không được để trống")
     private String code;
+
+    private String overrideReason;
 }
 

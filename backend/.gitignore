@@ -16,6 +16,9 @@ release.properties
 *.log
 logs/
 
+# Private uploaded files (eKYC / certificates / proofs)
+uploads/
+
 # IDE
 .idea/
 *.iml

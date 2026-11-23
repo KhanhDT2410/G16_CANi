@@ -28,6 +28,12 @@ public class SupportConversation {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Column(name = "dispute_id")
+    private UUID disputeId;
+
+    @Column(name = "dispute_party", length = 20)
+    private String disputeParty;
+
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = "ACTIVE";

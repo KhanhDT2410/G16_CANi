@@ -17,7 +17,11 @@ export default function WageBenchmarkBox({
   startTime,
   endTime,
   venueAddress = '',
+  venueLat = null,
+  venueLng = null,
   onSelectWage,
+  onBenchmarkLoaded,
+  onValidationChange,
 }) {
   const roleError = useMemo(
     () => jobTypeError || validateJobType(jobType),
@@ -26,11 +30,10 @@ export default function WageBenchmarkBox({
 
   const [apiBenchmark, setApiBenchmark] = useState(null);
   const [loadingApi, setLoadingApi] = useState(false);
-  const [showEvidence, setShowEvidence] = useState(true);
   const cacheRef = useRef({});
 
   const trimmedRole = String(jobType || '').trim();
-  const city = detectCityFromAddress(venueAddress);
+  const city = detectCityFromAddress(venueAddress, venueLat, venueLng);
 
   useEffect(() => {
     if (roleError || !trimmedRole || !startTime) {
@@ -90,125 +93,124 @@ export default function WageBenchmarkBox({
       jobType: trimmedRole,
       startTime,
       venueAddress,
+      venueLat,
+      venueLng,
       apiBenchmark,
     });
-  }, [roleError, trimmedRole, startTime, venueAddress, apiBenchmark]);
+  }, [roleError, trimmedRole, startTime, venueAddress, venueLat, venueLng, apiBenchmark]);
+
+  useEffect(() => {
+    onBenchmarkLoaded?.(benchmark);
+  }, [benchmark, onBenchmarkLoaded]);
 
   if (roleError || !benchmark) {
-    return (
-      <div className="ecw-wage-placeholder">
-        <div className="ecw-wage-placeholder-title">Khung thù lao tham chiếu</div>
-        <p className="ecw-wage-placeholder-desc">
-          {roleError
-            ? 'Vui lòng nhập tên vị trí hợp lệ để hệ thống đối chiếu dữ liệu thị trường và sàn pháp lý theo khu vực.'
-            : 'Chọn hoặc nhập vị trí công việc để xem khung thù lao tham chiếu.'}
-        </p>
-      </div>
-    );
+    return null;
   }
 
   const numericWage = Number(hourlyWage || 0);
   const isBelowLegalFloor = numericWage > 0 && numericWage < benchmark.legalFloorWage;
+  const isBelowAdminFloor = numericWage > 0 && numericWage < benchmark.minWage;
 
   return (
-    <div className="ecw-wage-benchmark-card">
-      <div className="ecw-wage-benchmark-top">
-        <div className="ecw-wage-benchmark-info">
-          <div className="ecw-wage-source-row">
-            <span
-              className={`ecw-wage-source-badge ${
-                benchmark.catalogMatched ? 'is-matched' : 'is-custom'
-              }`}
-            >
-              {benchmark.sourceLabel}
-            </span>
-            {loadingApi && (
-              <span className="ecw-wage-sync-hint">Đang đối chiếu dữ liệu máy chủ...</span>
-            )}
-          </div>
-
-          <div className="ecw-wage-range-title">
-            {benchmark.catalogMatched
-              ? `Khung tham chiếu (${trimmedRole}): `
-              : 'Khung tham chiếu chung ngành Sự kiện: '}
-            <strong>
-              {benchmark.minWage.toLocaleString('vi-VN')}đ –{' '}
-              {benchmark.maxWage.toLocaleString('vi-VN')}đ/giờ
-            </strong>
-          </div>
-
-          <div className="ecw-wage-optimal-line">
-            Mức đề xuất tối ưu:{' '}
-            <strong>{benchmark.suggestedWage.toLocaleString('vi-VN')}đ/giờ</strong>
-            {benchmark.platformSampleCount > 0 && benchmark.platformAvgWage ? (
-              <span className="ecw-wage-sample-note">
-                {' '}
-                (Trung bình {benchmark.platformSampleCount} ca trên CANi:{' '}
-                {benchmark.platformAvgWage.toLocaleString('vi-VN')}đ/h)
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="ecw-wage-preset-actions">
+    <div className="ecw-wage-benchmark-container" style={{ margin: '0.25rem 0 0.75rem' }}>
+      <div
+        className="ecw-wage-benchmark-line"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.45rem',
+        }}
+      >
+        <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>
+          Gợi ý:
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
           <button
             type="button"
-            className={`ecw-wage-preset-btn ${
-              numericWage === benchmark.minWage ? 'is-selected' : ''
-            }`}
+            className={`ecw-wage-chip ${numericWage === benchmark.minWage ? 'is-selected' : ''}`}
             onClick={() => onSelectWage?.(benchmark.minWage)}
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '6px',
+              border: numericWage === benchmark.minWage ? '1px solid #2563eb' : '1px solid #cbd5e1',
+              backgroundColor: numericWage === benchmark.minWage ? '#2563eb' : '#ffffff',
+              color: numericWage === benchmark.minWage ? '#ffffff' : '#334155',
+              fontWeight: numericWage === benchmark.minWage ? 700 : 500,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
           >
             Sàn: {benchmark.minWage.toLocaleString('vi-VN')}đ
           </button>
           <button
             type="button"
-            className={`ecw-wage-preset-btn is-recommended ${
-              numericWage === benchmark.suggestedWage ? 'is-selected' : ''
-            }`}
+            className={`ecw-wage-chip is-recommended ${numericWage === benchmark.suggestedWage ? 'is-selected' : ''}`}
             onClick={() => onSelectWage?.(benchmark.suggestedWage)}
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '6px',
+              border: numericWage === benchmark.suggestedWage ? '1px solid #2563eb' : '1px solid #93c5fd',
+              backgroundColor: numericWage === benchmark.suggestedWage ? '#2563eb' : '#eff6ff',
+              color: numericWage === benchmark.suggestedWage ? '#ffffff' : '#1d4ed8',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
           >
             Khuyên dùng: {benchmark.suggestedWage.toLocaleString('vi-VN')}đ
           </button>
           <button
             type="button"
-            className={`ecw-wage-preset-btn ${
-              numericWage === benchmark.maxWage ? 'is-selected' : ''
-            }`}
+            className={`ecw-wage-chip ${numericWage === benchmark.maxWage ? 'is-selected' : ''}`}
             onClick={() => onSelectWage?.(benchmark.maxWage)}
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '6px',
+              border: numericWage === benchmark.maxWage ? '1px solid #2563eb' : '1px solid #cbd5e1',
+              backgroundColor: numericWage === benchmark.maxWage ? '#2563eb' : '#ffffff',
+              color: numericWage === benchmark.maxWage ? '#ffffff' : '#334155',
+              fontWeight: numericWage === benchmark.maxWage ? 700 : 500,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
           >
             Thu hút nhanh: {benchmark.maxWage.toLocaleString('vi-VN')}đ
           </button>
         </div>
       </div>
 
-      {isBelowLegalFloor && (
-        <div className="ecw-wage-legal-warning">
-          Cảnh báo tuân thủ: Mức thù lao đang nhập ({numericWage.toLocaleString('vi-VN')}đ/giờ)
-          thấp hơn mức lương tối thiểu giờ của <strong>{benchmark.legalRegionLabel}</strong> (
-          {benchmark.legalFloorWage.toLocaleString('vi-VN')}đ/giờ theo {benchmark.legalReference}).
+      {isBelowAdminFloor && (
+        <div
+          style={{
+            fontSize: '0.76rem',
+            color: isBelowLegalFloor ? '#dc2626' : '#d97706',
+            fontWeight: 600,
+            marginTop: '0.25rem',
+          }}
+        >
+          Mức thù lao thấp hơn sàn tối thiểu ({benchmark.minWage.toLocaleString('vi-VN')}đ/h).{' '}
+          <button
+            type="button"
+            onClick={() => onSelectWage?.(benchmark.minWage)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#2563eb',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              padding: 0,
+              fontWeight: 700,
+              fontSize: '0.76rem',
+            }}
+          >
+            Áp dụng mức sàn
+          </button>
         </div>
       )}
-
-      <div className="ecw-wage-evidence-block">
-        <button
-          type="button"
-          className="ecw-wage-evidence-toggle"
-          onClick={() => setShowEvidence((prev) => !prev)}
-        >
-          <span>
-            Căn cứ & dẫn chứng tính toán ({benchmark.evidenceFactors.length} yếu tố)
-          </span>
-          <span>{showEvidence ? 'Thu gọn' : 'Xem chi tiết'}</span>
-        </button>
-
-        {showEvidence && (
-          <ul className="ecw-wage-evidence-list">
-            {benchmark.evidenceFactors.map((factor, idx) => (
-              <li key={idx}>{factor}</li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }

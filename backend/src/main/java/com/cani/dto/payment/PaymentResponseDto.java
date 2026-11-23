@@ -39,4 +39,12 @@ public class PaymentResponseDto {
     private String bankAccountNumber;
     private String bankAccountName;
     private String workerVietQrUrl;
+
+    // Thông tin Tranh chấp & Kết quả phân xử (SRS FE-09 ↔ FE-11: UC-87, UC-96, UC-100, UC-102)
+    private UUID disputeId;
+    private String disputeStatus;
+    private String disputeOutcome;
+    private String disputeRationale;
+    private String disputeResolution;
+    private Instant disputeResolvedAt;
 }

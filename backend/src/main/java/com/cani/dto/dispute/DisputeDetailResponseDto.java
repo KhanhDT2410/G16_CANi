@@ -55,6 +55,12 @@ public class DisputeDetailResponseDto {
     private Instant createdAt;
     private Instant updatedAt;
 
+    private Integer unreadCount;
+    private Integer workerUnreadCount;
+    private Integer eoUnreadCount;
+    private String lastMessageSenderParty;
+    private Instant lastMessageAt;
+
     private List<EvidenceDto> evidences;
 
     @Data

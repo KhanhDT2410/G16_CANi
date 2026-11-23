@@ -1,0 +1,184 @@
+/* SupportChatFaqModal.css - Bảng chọn câu hỏi thường gặp FAQ trong hội thoại Chat */
+
+.support-faq-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.support-faq-modal-panel {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28), 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.support-faq-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.support-faq-modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.support-faq-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.support-faq-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.support-faq-search-wrap {
+  padding: 0.85rem 1.25rem 0.5rem;
+  flex-shrink: 0;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.support-faq-search-input {
+  width: 100%;
+  padding: 0.65rem 0.95rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.support-faq-search-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.support-faq-category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.35rem 1.25rem 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.support-faq-cat-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.38rem 0.8rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.support-faq-cat-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+.support-faq-cat-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.support-faq-items-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.85rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.support-faq-item-row {
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
+}
+
+.support-faq-item-row:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px -2px rgba(37, 99, 235, 0.1);
+}
+
+.support-faq-item-q {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.45;
+}
+
+.support-faq-item-summary {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 0.35rem;
+  line-height: 1.4;
+}
+
+.support-faq-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  padding: 2.5rem 1rem;
+}

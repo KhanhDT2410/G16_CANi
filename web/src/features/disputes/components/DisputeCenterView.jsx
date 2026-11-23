@@ -35,11 +35,7 @@ export const DisputeCenterView = () => {
   const [queueFilter, setQueueFilter] = useState('ALL');
   const [queueScope, setQueueScope] = useState('ALL');
 
-  const scopedList = !isArbitrator
-    ? myDisputes
-    : queueScope === 'MINE'
-    ? myQueue
-    : queue;
+  const scopedList = !isArbitrator ? myDisputes : queueScope === 'MINE' ? myQueue : queue;
   const riskCount = useMemo(() => scopedList.filter((item) => item.slaAtRisk).length, [scopedList]);
   const handleRefreshDisputes = () => (isArbitrator ? loadQueue() : loadMyDisputes());
 
@@ -67,10 +63,9 @@ export const DisputeCenterView = () => {
   // Chi tiết đơn đang hiển thị trong khung hội thoại
   const currentDispute = useMemo(() => {
     if (!activeDisputeId) return null;
-    if (selectedDisputeDetail && selectedDisputeDetail.id === activeDisputeId) {
-      return selectedDisputeDetail;
-    }
-    return filteredQueue.find((i) => i.id === activeDisputeId) || null;
+    return selectedDisputeDetail?.id === activeDisputeId
+      ? selectedDisputeDetail
+      : (filteredQueue.find((i) => i.id === activeDisputeId) || null);
   }, [selectedDisputeDetail, activeDisputeId, filteredQueue]);
 
   const handleSelectDispute = async (id) => {
@@ -102,33 +97,25 @@ export const DisputeCenterView = () => {
 
   return (
     <div className="disputes-container">
-      {/* Top Bar Switcher */}
+      {/* Thanh công cụ chuyển đổi chế độ & thao tác */}
       <div className="disputes-header">
-        <div>
-          <h1 className="disputes-title">
-            Trung Tâm Xử Lý Tranh Chấp & Khiếu Nại
-          </h1>
-          <p className="disputes-subtitle">
-            Không gian đối thoại trực tiếp giữa Người lao động, Nhà tổ chức sự kiện và Trọng tài viên CSKH.
-          </p>
+        <div className="view-mode-toggle">
+          <button
+            type="button"
+            className={`toggle-btn ${viewMode === 'SPLIT' ? 'active' : ''}`}
+            onClick={() => setViewMode('SPLIT')}
+          >
+            Không gian hội thoại
+          </button>
+          <button
+            type="button"
+            className={`toggle-btn ${viewMode === 'TABLE' ? 'active' : ''}`}
+            onClick={() => setViewMode('TABLE')}
+          >
+            Bảng hàng đợi
+          </button>
         </div>
         <div className="disputes-actions-group">
-          <div className="view-mode-toggle">
-            <button
-              type="button"
-              className={`toggle-btn ${viewMode === 'SPLIT' ? 'active' : ''}`}
-              onClick={() => setViewMode('SPLIT')}
-            >
-              Không gian hội thoại
-            </button>
-            <button
-              type="button"
-              className={`toggle-btn ${viewMode === 'TABLE' ? 'active' : ''}`}
-              onClick={() => setViewMode('TABLE')}
-            >
-              Bảng hàng đợi
-            </button>
-          </div>
           <button type="button" className="dispute-btn-secondary" onClick={handleRefreshDisputes}>
             Làm mới
           </button>
@@ -177,11 +164,7 @@ export const DisputeCenterView = () => {
               />
             ) : (
               <div className="empty-workspace-state">
-                <span>
-                  {filteredQueue.length === 0
-                    ? 'Hiện không có đơn khiếu nại nào trong hàng đợi.'
-                    : 'Chọn một đơn khiếu nại từ danh sách bên trái để xem nội dung trao đổi.'}
-                </span>
+                <span>{filteredQueue.length === 0 ? 'Hiện không có đơn khiếu nại nào.' : 'Chọn một đơn khiếu nại từ danh sách bên trái.'}</span>
               </div>
             )}
           </div>
@@ -192,10 +175,7 @@ export const DisputeCenterView = () => {
           queue={filteredQueue}
           loading={loading}
           isArbitrator={isArbitrator}
-          onSelect={(id) => {
-            handleSelectDispute(id);
-            setViewMode('SPLIT');
-          }}
+          onSelect={(id) => { handleSelectDispute(id); setViewMode('SPLIT'); }}
           onAssign={assignDispute}
           onDecide={openDecision}
           onTransfer={openTransfer}

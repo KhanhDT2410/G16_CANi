@@ -19,7 +19,7 @@ const toDateKey = (dateInput) => {
  * EORightSidebar
  * Cột tiện ích bên phải tích hợp:
  * 1. Lịch Hoạt Động & Sự Kiện Hợp Nhất (Monthly Calendar + Upcoming Schedule)
- *    - Tông màu Indigo / Violet hoàng gia sang trọng (#6366f1 / #4f46e5)
+ *    - Tông màu Indigo / Violet hoàng gia sang trọng (var(--color-primary-active) / var(--color-primary-active))
  *    - Điểm nhấn chấm tròn Coral (#f43f5e) cho ngày có lịch sự kiện
  *    - Đồng bộ chọn ngày và hiển thị sự kiện tương ứng, nút thao tác tinh gọn duy nhất.
  * 2. Biểu Đồ Tròn Tỷ Lệ Lấp Đầy Nhân Sự (Donut Chart)
@@ -162,8 +162,7 @@ export default function EORightSidebar({
   const confirmed = metrics?.totalConfirmedWorkers ?? 0;
   const required = metrics?.totalRequiredWorkers ?? 0;
   const pending = Math.max(0, required - confirmed);
-  const shortage = 0;
-  const total = (confirmed + pending + shortage);
+  const total = confirmed + pending;
   const fillRate = required > 0 ? (metrics?.fillRate ?? Math.round((confirmed / required) * 100)) : 0;
 
   const radius = 38;
@@ -190,14 +189,14 @@ export default function EORightSidebar({
     <aside className="eo-right-sidebar eo-widget-panel">
       {/* =========================================================================
           WIDGET 1: LỊCH HOẠT ĐỘNG & SỰ KIỆN HỢP NHẤT (CALENDAR + UPCOMING SCHEDULE)
-          Bảng màu: Indigo / Violet hoàng gia (#6366f1) + Coral Accent (#f43f5e)
+          Bảng màu: Indigo / Violet hoàng gia (var(--color-primary-active)) + Coral Accent (#f43f5e)
           ========================================================================= */}
       <div className="eo-widget-card" style={{ padding: '1.15rem' }}>
         {/* Header Lịch & Nút Điều Hướng Tháng */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
           <div>
-            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#6366f1', display: 'inline-block' }} />
+            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--color-primary-active)', display: 'inline-block' }} />
               Tháng {month + 1}/{year}
             </h4>
             <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
@@ -210,14 +209,14 @@ export default function EORightSidebar({
               type="button"
               onClick={handleCurrentMonth}
               style={{
-                background: '#f5f3ff',
-                border: '1px solid #ddd6fe',
+                background: 'var(--color-primary-50)',
+                border: '1px solid var(--color-primary-200)',
                 borderRadius: 6,
                 padding: '2px 7px',
                 fontSize: '0.7rem',
                 fontWeight: 600,
                 cursor: 'pointer',
-                color: '#6366f1',
+                color: 'var(--color-primary-active)',
               }}
               title="Về tháng hiện tại"
             >
@@ -274,7 +273,7 @@ export default function EORightSidebar({
               style={{
                 fontSize: '0.68rem',
                 fontWeight: 700,
-                color: idx >= 5 ? '#6366f1' : '#94a3b8',
+                color: idx >= 5 ? 'var(--color-primary-active)' : '#94a3b8',
               }}
             >
               {w}
@@ -303,14 +302,14 @@ export default function EORightSidebar({
                   justifyContent: 'center',
                   minHeight: '34px',
                   backgroundColor: isSelected
-                    ? '#6366f1'
+                    ? 'var(--color-primary-active)'
                     : isToday
                     ? '#eef2ff'
                     : 'transparent',
                   border: isToday && !isSelected
                     ? '1px solid #c7d2fe'
                     : isSelected
-                    ? '1px solid #4f46e5'
+                    ? '1px solid var(--color-primary-active)'
                     : '1px solid transparent',
                   color: isSelected
                     ? '#ffffff'
@@ -355,7 +354,7 @@ export default function EORightSidebar({
                 ? `Lịch ngày ${formatDisplayDate(selectedDateKey)}`
                 : 'Sự kiện sắp tới'}
             </span>
-            <span style={{ fontSize: '0.68rem', color: '#6366f1', fontWeight: 600 }}>
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-primary-active)', fontWeight: 600 }}>
               {selectedDayEvents.length > 0 ? `${selectedDayEvents.length} sự kiện` : `${upcomingEvents.length} sắp tới`}
             </span>
           </div>
@@ -382,14 +381,14 @@ export default function EORightSidebar({
                   title="Nhấn để mở chi tiết sự kiện"
                 >
                   <div style={{ minWidth: 0, paddingRight: '0.5rem' }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {evt.name || 'Sự kiện không tên'}
                     </div>
                     <div style={{ fontSize: '0.68rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {evt.venueAddress || 'Chưa cập nhật địa điểm'}
                     </div>
                   </div>
-                  <span style={{ color: '#6366f1', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
+                  <span style={{ color: 'var(--color-primary-active)', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
                     &rarr;
                   </span>
                 </div>
@@ -512,7 +511,7 @@ export default function EORightSidebar({
                   strokeDasharray={`${pendingLen} ${circumference}`}
                   strokeDashoffset={-confirmedLen}
                   transform="rotate(-90 50 50)"
-                  strokeLinecap={confirmed === 0 && shortage === 0 ? 'butt' : 'round'}
+                  strokeLinecap={confirmed === 0 ? 'butt' : 'round'}
                 />
               )}
 
@@ -552,15 +551,10 @@ export default function EORightSidebar({
 
             <div className="donut-legend-item">
               <span className="legend-bullet pending" />
-              <span className="legend-label">Đang xử lý:</span>
+              <span className="legend-label">Còn thiếu:</span>
               <span className="legend-value">{pending}</span>
             </div>
 
-            <div className="donut-legend-item">
-              <span className="legend-bullet shortage" />
-              <span className="legend-label">Còn thiếu:</span>
-              <span className="legend-value">{shortage}</span>
-            </div>
           </div>
         </div>
 

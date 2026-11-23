@@ -1,67 +1,57 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { SHIFT_STATUS_CONFIG, PAYMENT_STATUS_CONFIG } from '../types/adminShift.constants';
+import { resolveShiftStatus, PAYMENT_STATUS_CONFIG } from '../types/adminShift.constants';
+import { parseTemplateChecklist } from '../utils/shiftModalHelpers';
+import ShiftInfoGrid from './ShiftInfoGrid';
 import ShiftWorkerTable from './ShiftWorkerTable';
+import ShiftActionModal from './ShiftActionModal';
 import './ShiftDetailModal.css';
 
 /**
  * Modal Xem Chi Tiết Ca Làm Việc (Căn giữa tuyệt đối qua createPortal).
- * Đầy đủ thông tin đối soát tiến độ Worker & trách nhiệm EO.
+ * Hiển thị đầy đủ quyền can thiệp của Quản trị viên (Cảnh báo EO, Tạm đình chỉ, Hủy ca).
+ * Không sử dụng icon/emoji theo quy chuẩn dự án.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
-export const ShiftDetailModal = ({ shift, loading, onClose }) => {
+export const ShiftDetailModal = ({
+  shift, loading, actionLoading, onClose, onCancelShift, onSuspendShift, onWarnEo,
+}) => {
+  const [activeAction, setActiveAction] = useState(null);
+
   useEffect(() => {
     if (!shift && !loading) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !activeAction) onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
-    const originalOverflow = document.body.style.overflow;
+    const orig = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = originalOverflow;
+      document.body.style.overflow = orig;
     };
-  }, [shift, loading, onClose]);
+  }, [shift, loading, onClose, activeAction]);
 
   if ((!shift && !loading) || typeof document === 'undefined') return null;
 
-  const formatDateTime = (isoStr) => {
-    if (!isoStr) return '—';
-    try {
-      return new Date(isoStr).toLocaleString('vi-VN', {
-        hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
-      });
-    } catch {
-      return '—';
-    }
-  };
-
-  const parseTemplateChecklist = (rawChecklist) => {
-    if (!rawChecklist) return [];
-    try {
-      const list = typeof rawChecklist === 'string' ? JSON.parse(rawChecklist) : rawChecklist;
-      if (Array.isArray(list)) {
-        return list.map((item, idx) => {
-          if (typeof item === 'string') return { id: `chk_${idx + 1}`, title: item };
-          return { id: item.id || `chk_${idx + 1}`, title: item.title || item.name || `Nhiệm vụ ${idx + 1}` };
-        });
-      }
-    } catch (e) {
-      console.warn('Lỗi phân tích checklist template:', e);
-    }
-    return [];
-  };
-
   const templateChecklist = shift ? parseTemplateChecklist(shift.checklist) : [];
-  const statusCfg = shift ? (SHIFT_STATUS_CONFIG[shift.status] || {
-    label: shift.status || 'Chưa rõ', bg: '#f1f5f9', color: '#475569',
-  }) : null;
-
+  const statusCfg = shift ? resolveShiftStatus(shift) : null;
   const paymentCfg = shift?.paymentStatus ? (PAYMENT_STATUS_CONFIG[shift.paymentStatus] || {
     label: shift.paymentStatus, bg: '#f1f5f9', color: '#475569',
   }) : null;
+
+  const isFinished = statusCfg?.label === 'Hoàn Thành' || shift?.status === 'COMPLETED';
+  const canSuspend = shift && !isFinished && shift.status !== 'CANCELLED' && shift.status !== 'SUSPENDED';
+  const canCancel = shift && !isFinished && shift.status !== 'CANCELLED';
+
+  const handleActionConfirm = async (reason) => {
+    if (!shift) return;
+    let ok = false;
+    if (activeAction === 'CANCEL' && onCancelShift) ok = await onCancelShift(shift.shiftId, reason);
+    else if (activeAction === 'SUSPEND' && onSuspendShift) ok = await onSuspendShift(shift.shiftId, reason);
+    else if (activeAction === 'WARN' && onWarnEo) ok = await onWarnEo(shift.shiftId, reason);
+    if (ok) setActiveAction(null);
+  };
 
   const modalContent = (
     <div className="shift-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
@@ -76,7 +66,7 @@ export const ShiftDetailModal = ({ shift, loading, onClose }) => {
             )}
             {paymentCfg && (
               <span className="shift-payment-pill" style={{ background: paymentCfg.bg, color: paymentCfg.color }}>
-                💳 {paymentCfg.label}
+                {paymentCfg.label}
               </span>
             )}
           </div>
@@ -90,42 +80,21 @@ export const ShiftDetailModal = ({ shift, loading, onClose }) => {
             <div className="ticket-empty-state">Đang tải dữ liệu chi tiết ca làm...</div>
           ) : shift ? (
             <>
-              {/* Lưới thông tin Sự kiện & EO */}
-              <div className="shift-info-grid">
-                <div>
-                  <div className="grid-label">Sự Kiện & Vị Trí</div>
-                  <div className="grid-main-val">{shift.eventName}</div>
-                  <div className="grid-sub-val" style={{ color: '#2563eb' }}>Vị trí: {shift.jobType}</div>
+              {shift.status === 'SUSPENDED' && shift.adminNote && (
+                <div className="shift-intervention-box box-suspended">
+                  <div className="shift-intervention-title">Ca làm việc đang bị Tạm đình chỉ:</div>
+                  <div className="shift-intervention-reason">{shift.adminNote}</div>
                 </div>
-
-                <div>
-                  <div className="grid-label">Nhà Tổ Chức (EO)</div>
-                  <div className="grid-main-val">{shift.eoName}</div>
-                  <div className="grid-sub-val">SĐT: {shift.eoPhone} • {shift.eoEmail}</div>
-                  {shift.companyName && <div className="grid-company-val">{shift.companyName}</div>}
+              )}
+              {shift.status === 'CANCELLED' && shift.cancellationReason && (
+                <div className="shift-intervention-box box-cancelled">
+                  <div className="shift-intervention-title">Lý do hủy ca từ Ban quản trị:</div>
+                  <div className="shift-intervention-reason">{shift.cancellationReason}</div>
                 </div>
+              )}
 
-                <div>
-                  <div className="grid-label">Thời Gian & Địa Điểm</div>
-                  <div className="grid-main-val" style={{ fontSize: '0.85rem' }}>
-                    {formatDateTime(shift.startTime)} — {formatDateTime(shift.endTime)}
-                  </div>
-                  <div className="grid-sub-val">{shift.venueAddress || '—'}</div>
-                </div>
+              <ShiftInfoGrid shift={shift} />
 
-                <div>
-                  <div className="grid-label">Nhân Sự & Thù Lao</div>
-                  <div className="grid-main-val" style={{ color: '#059669' }}>
-                    {Number(shift.hourlyWage || 0).toLocaleString()} đ / giờ
-                  </div>
-                  <div className="grid-sub-val">
-                    Tuyển: <strong>{shift.confirmedWorkers || 0}</strong> / {shift.requiredWorkers || 0} người
-                  </div>
-                  {shift.dressCode && <div className="grid-dress-val">Đồng phục: {shift.dressCode}</div>}
-                </div>
-              </div>
-
-              {/* Mô tả & Đầu việc EO đã giao */}
               <div className="shift-task-assignment-section">
                 <div className="section-title-sm">Nhiệm Vụ & Đầu Việc EO Đã Giao:</div>
                 {shift.description && (
@@ -148,7 +117,6 @@ export const ShiftDetailModal = ({ shift, loading, onClose }) => {
                 )}
               </div>
 
-              {/* Bảng nhân sự & Tiến độ làm việc */}
               <div className="shift-workers-section">
                 <div className="section-title-md">
                   <span>Tiến Độ Nhân Viên Nhận Ca ({shift.workers?.length || 0})</span>
@@ -161,11 +129,64 @@ export const ShiftDetailModal = ({ shift, loading, onClose }) => {
         </div>
 
         <div className="shift-modal-footer">
-          <button type="button" className="ticket-btn ticket-btn-secondary" onClick={onClose}>
+          <button
+            type="button"
+            className="ticket-btn ticket-btn-secondary"
+            onClick={() => setActiveAction('WARN')}
+            disabled={actionLoading}
+            title="Gửi cảnh báo hoặc yêu cầu chấn chỉnh trực tiếp tới Nhà tổ chức"
+          >
+            Cảnh Báo EO
+          </button>
+
+          <button
+            type="button"
+            className="ticket-btn ticket-btn-warning"
+            onClick={() => canSuspend && setActiveAction('SUSPEND')}
+            disabled={actionLoading || !canSuspend}
+            style={{ opacity: canSuspend ? 1 : 0.45, cursor: canSuspend ? 'pointer' : 'not-allowed' }}
+            title={
+              isFinished
+                ? 'Ca làm việc đã kết thúc hoàn thành, không thể đình chỉ'
+                : shift?.status === 'CANCELLED'
+                ? 'Ca làm việc đã bị hủy trước đó, không thể đình chỉ'
+                : 'Tạm đình chỉ ca làm việc này'
+            }
+          >
+            Tạm Đình Chỉ Ca
+          </button>
+
+          <button
+            type="button"
+            className="ticket-btn ticket-btn-danger"
+            onClick={() => canCancel && setActiveAction('CANCEL')}
+            disabled={actionLoading || !canCancel}
+            style={{ opacity: canCancel ? 1 : 0.45, cursor: canCancel ? 'pointer' : 'not-allowed' }}
+            title={
+              isFinished
+                ? 'Ca làm việc đã kết thúc hoàn thành, không thể hủy'
+                : shift?.status === 'CANCELLED'
+                ? 'Ca làm việc đã bị hủy trước đó'
+                : 'Hủy ca làm việc cưỡng chế'
+            }
+          >
+            Hủy Ca Cưỡng Chế
+          </button>
+
+          <button type="button" className="ticket-btn ticket-btn-secondary" onClick={onClose} disabled={actionLoading}>
             Đóng
           </button>
         </div>
       </div>
+
+      <ShiftActionModal
+        isOpen={Boolean(activeAction)}
+        actionType={activeAction}
+        shiftCode={shift?.shiftCode}
+        loading={actionLoading}
+        onClose={() => setActiveAction(null)}
+        onConfirm={handleActionConfirm}
+      />
     </div>
   );
 

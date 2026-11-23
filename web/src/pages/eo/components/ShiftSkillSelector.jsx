@@ -1,24 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { eoService } from '../../../services/eoService';
+import {
+  VERIFICATION_TIER_OPTIONS,
+  normalizeVietnameseText,
+  suggestSkillsForQuery,
+} from '../utils/skillDisplayUtils';
 
 /**
- * ShiftSkillSelector
- * Cho phép EO nhập tay kỹ năng mới tự do (Dynamic Custom Skill)
- * hoặc chọn nhanh từ danh mục hệ thống (Taxonomy Suggestions).
- * Đảm bảo cấp UUID chuẩn cho CSDL để Matching Dispatch Engine hoạt động chính xác.
+ * ShiftSkillSelector V3:
+ * 1. Chọn kỹ năng thực hiện chính (nhận +20 SP kinh nghiệm/ca).
+ * 2. Chọn kỹ năng Bắt buộc / Ưu tiên từ danh mục chuẩn, kèm mức xác minh & chứng chỉ còn hạn.
+ * 3. Gợi ý chuẩn hóa/alias khi nhập tự do, không tự ý tạo skill active tràn lan vào taxonomy chính.
  */
 const ShiftSkillSelector = ({
+  jobType = '',
   selectedSkillIds = [],
   onChange,
+  performedSkillId = null,
+  onPerformedSkillChange,
+  skillRequirements = [],
+  onSkillRequirementsChange,
+  customSkillNotes = '',
+  onCustomSkillNotesChange,
   taxonomy = [],
   onSkillCreated,
 }) => {
-  const [inputVal, setInputVal] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [searchVal, setSearchVal] = useState('');
+  const [proposalSubmitting, setProposalSubmitting] = useState(false);
   const [localTaxonomy, setLocalTaxonomy] = useState(taxonomy || []);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Đồng bộ localTaxonomy khi taxonomy prop thay đổi
   useEffect(() => {
     if (Array.isArray(taxonomy) && taxonomy.length > 0) {
       setLocalTaxonomy((prev) => {
@@ -34,230 +45,457 @@ const ShiftSkillSelector = ({
     }
   }, [taxonomy]);
 
-  const selectedIds = Array.isArray(selectedSkillIds) ? selectedSkillIds : [];
+  const activeTaxonomy = useMemo(
+    () => (Array.isArray(localTaxonomy) ? localTaxonomy.filter((s) => s && s.skillId && s.isActive !== false) : []),
+    [localTaxonomy]
+  );
 
-  // Tạo map tra cứu tên nhanh theo ID
-  const skillMap = new Map();
-  localTaxonomy.forEach((sk) => {
-    if (sk && sk.skillId) {
-      skillMap.set(sk.skillId, sk);
+  const skillMap = useMemo(() => {
+    const m = new Map();
+    activeTaxonomy.forEach((sk) => m.set(sk.skillId, sk));
+    (Array.isArray(localTaxonomy) ? localTaxonomy : []).forEach((sk) => {
+      if (sk?.skillId && !m.has(sk.skillId)) m.set(sk.skillId, sk);
+    });
+    return m;
+  }, [activeTaxonomy, localTaxonomy]);
+
+  // Chuẩn hóa danh sách requirement thống nhất từ skillRequirements hoặc selectedSkillIds fallback
+  const normalizedRequirements = useMemo(() => {
+    if (Array.isArray(skillRequirements) && skillRequirements.length > 0) {
+      const seen = new Set();
+      return skillRequirements
+        .filter((r) => r && r.skillId && !seen.has(r.skillId) && seen.add(r.skillId))
+        .map((r) => ({
+          skillId: r.skillId,
+          skillName: r.skillName || skillMap.get(r.skillId)?.name || '',
+          requirementType: r.requirementType === 'PREFERRED' ? 'PREFERRED' : 'REQUIRED',
+          minVerificationTier: r.minVerificationTier || 'SELF_DECLARED',
+          requiresValidCertificate: Boolean(r.requiresValidCertificate),
+        }));
     }
-  });
+    const ids = Array.isArray(selectedSkillIds) ? selectedSkillIds : [];
+    return [...new Set(ids.filter(Boolean))].map((id) => ({
+      skillId: id,
+      skillName: skillMap.get(id)?.name || '',
+      requirementType: 'REQUIRED',
+      minVerificationTier: 'SELF_DECLARED',
+      requiresValidCertificate: false,
+    }));
+  }, [skillRequirements, selectedSkillIds, skillMap]);
 
-  const handleAddSkill = async () => {
-    const trimmed = inputVal.trim();
+  const emitRequirements = (nextReqs) => {
+    const requiredOnlyIds = nextReqs
+      .filter((r) => r.requirementType !== 'PREFERRED')
+      .map((r) => r.skillId);
+    if (typeof onSkillRequirementsChange === 'function') {
+      onSkillRequirementsChange(nextReqs);
+    }
+    if (typeof onChange === 'function') {
+      onChange(requiredOnlyIds);
+    }
+  };
+
+  // Gợi ý kỹ năng theo jobType
+  const jobSuggestedSkills = useMemo(
+    () => suggestSkillsForQuery(jobType, activeTaxonomy),
+    [jobType, activeTaxonomy]
+  );
+
+  // Tự động gợi ý kỹ năng thực hiện chính nếu chưa chọn và khớp jobType duy nhất
+  useEffect(() => {
+    if (!performedSkillId && typeof onPerformedSkillChange === 'function' && jobSuggestedSkills.length === 1) {
+      onPerformedSkillChange(jobSuggestedSkills[0].skillId);
+    }
+  }, [jobType, performedSkillId, jobSuggestedSkills, onPerformedSkillChange]);
+
+  const selectedReqIds = new Set(normalizedRequirements.map((r) => r.skillId));
+
+  const filteredTaxonomy = useMemo(() => {
+    const q = searchVal.trim();
+    if (!q) {
+      return activeTaxonomy.filter((sk) => !selectedReqIds.has(sk.skillId));
+    }
+    const qNorm = normalizeVietnameseText(q);
+    const aliasMatched = suggestSkillsForQuery(q, activeTaxonomy);
+    const directMatched = activeTaxonomy.filter((sk) =>
+      normalizeVietnameseText(sk.name).includes(qNorm)
+    );
+    const combined = [...directMatched];
+    aliasMatched.forEach((a) => {
+      if (!combined.some((c) => c.skillId === a.skillId)) combined.push(a);
+    });
+    return combined.filter((sk) => !selectedReqIds.has(sk.skillId));
+  }, [searchVal, activeTaxonomy, normalizedRequirements]);
+
+  const addRequirement = (skill, requirementType = 'REQUIRED') => {
+    if (!skill?.skillId) return;
+    setErrorMsg('');
+    if (selectedReqIds.has(skill.skillId)) return;
+
+    const nextReqs = [
+      ...normalizedRequirements,
+      {
+        skillId: skill.skillId,
+        skillName: skill.name,
+        requirementType,
+        minVerificationTier: 'SELF_DECLARED',
+        requiresValidCertificate: false,
+      },
+    ];
+    emitRequirements(nextReqs);
+
+    if (requirementType === 'REQUIRED' && !performedSkillId && typeof onPerformedSkillChange === 'function') {
+      onPerformedSkillChange(skill.skillId);
+    }
+    setSearchVal('');
+  };
+
+  const updateRequirement = (skillId, patch) => {
+    const nextReqs = normalizedRequirements.map((r) =>
+      r.skillId === skillId ? { ...r, ...patch } : r
+    );
+    emitRequirements(nextReqs);
+  };
+
+  const removeRequirement = (skillId) => {
+    const nextReqs = normalizedRequirements.filter((r) => r.skillId !== skillId);
+    emitRequirements(nextReqs);
+  };
+
+  const handleSaveCustomNoteOrPropose = async () => {
+    const trimmed = searchVal.trim();
     if (!trimmed) return;
     setErrorMsg('');
 
-    // 1. Kiểm tra xem kỹ năng đã tồn tại trong localTaxonomy chưa (không phân biệt hoa/thường)
-    const existing = localTaxonomy.find(
-      (s) => s.name && s.name.trim().toLowerCase() === trimmed.toLowerCase()
-    );
-
-    if (existing) {
-      if (!selectedIds.includes(existing.skillId)) {
-        onChange([...selectedIds, existing.skillId]);
-      }
-      setInputVal('');
+    const matched = suggestSkillsForQuery(trimmed, activeTaxonomy);
+    if (matched.length > 0 && normalizeVietnameseText(matched[0].name) === normalizeVietnameseText(trimmed)) {
+      addRequirement(matched[0], 'REQUIRED');
       return;
     }
 
-    // 2. Nếu chưa có, gọi API tạo kỹ năng tự do mới
-    setSubmitting(true);
+    // Lưu vào custom_skill_notes trên Shift + gửi đề xuất is_active=false thay vì làm ô nhiễm taxonomy
+    const nextNotes = customSkillNotes
+      ? (customSkillNotes.includes(trimmed) ? customSkillNotes : `${customSkillNotes}, ${trimmed}`)
+      : trimmed;
+    if (typeof onCustomSkillNotesChange === 'function') {
+      onCustomSkillNotesChange(nextNotes);
+    }
+
+    setProposalSubmitting(true);
     try {
-      const created = await eoService.createCustomSkill(trimmed, 'Tự chọn');
-      if (created && created.skillId) {
-        // Cập nhật localTaxonomy
-        setLocalTaxonomy((prev) => [...prev, created]);
-        if (typeof onSkillCreated === 'function') {
-          onSkillCreated(created);
-        }
-        // Thêm vào selectedIds
-        onChange([...selectedIds, created.skillId]);
+      const res = await eoService.createCustomSkill(trimmed, 'Đề xuất');
+      if (res && res.skillId && res.isActive !== false) {
+        setLocalTaxonomy((prev) => [...prev, res]);
+        if (typeof onSkillCreated === 'function') onSkillCreated(res);
+        addRequirement(res, 'REQUIRED');
       }
-      setInputVal('');
+      setSearchVal('');
     } catch (err) {
-      console.error('Lỗi khi tạo kỹ năng nhập tay:', err);
-      setErrorMsg(err.response?.data?.message || 'Không thể tạo kỹ năng mới. Vui lòng thử lại.');
+      setErrorMsg(err.response?.data?.message || 'Đã ghi nhận vào ghi chú kỹ năng bổ sung.');
     } finally {
-      setSubmitting(false);
+      setProposalSubmitting(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddSkill();
-    }
-  };
-
-  const handleRemoveSkill = (skillIdToRemove) => {
-    onChange(selectedIds.filter((id) => id !== skillIdToRemove));
-  };
-
-  const handleToggleSuggestion = (skillId) => {
-    if (selectedIds.includes(skillId)) {
-      handleRemoveSkill(skillId);
-    } else {
-      onChange([...selectedIds, skillId]);
-    }
-  };
-
-  // Danh sách các kỹ năng gợi ý chưa được chọn
-  const unselectedSuggestions = localTaxonomy.filter(
-    (sk) => sk && sk.skillId && !selectedIds.includes(sk.skillId)
-  );
+  const requiredCount = normalizedRequirements.filter((r) => r.requirementType === 'REQUIRED').length;
+  const preferredCount = normalizedRequirements.filter((r) => r.requirementType === 'PREFERRED').length;
+  const certCount = normalizedRequirements.filter((r) => r.requiresValidCertificate).length;
+  const performedSkillObj = performedSkillId ? skillMap.get(performedSkillId) : null;
 
   return (
-    <div className="eo-form-group" style={{ marginBottom: '1.25rem' }}>
-      <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', marginBottom: '0.35rem' }}>
-        Kỹ Năng Bắt Buộc Yêu Cầu Cho Ca (Nhập tay hoặc chọn nhanh)
-      </label>
+    <div
+      className="eo-form-group"
+      style={{
+        marginBottom: '1.25rem',
+        padding: '0.9rem 1rem',
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
+        borderRadius: '0.75rem',
+      }}
+    >
+      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a', marginBottom: '0.75rem' }}>
+        Yêu Cầu Kỹ Năng &amp; Nghiệp Vụ Cho Ca Làm
+      </div>
 
-      {/* 1. KHU VỰC KỸ NĂNG ĐÃ CHỌN */}
-      {selectedIds.length > 0 ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginBottom: '0.65rem' }}>
-          {selectedIds.map((id) => {
-            const skillObj = skillMap.get(id);
-            const name = skillObj ? skillObj.name : `Kỹ năng (${id.slice(0, 6)}...)`;
+      {/* 1. KỸ NĂNG THỰC HIỆN CHÍNH */}
+      {typeof onPerformedSkillChange === 'function' && (
+        <div style={{ marginBottom: '0.9rem' }}>
+          <label style={{ display: 'block', fontWeight: 600, fontSize: '0.82rem', color: '#1e293b', marginBottom: '0.3rem' }}>
+            Kỹ năng thực hiện chính (cộng +20 SP kinh nghiệm khi hoàn thành)
+          </label>
+          <select
+            className="eo-form-input"
+            value={performedSkillId || ''}
+            onChange={(e) => onPerformedSkillChange(e.target.value || null)}
+            style={{ backgroundColor: '#ffffff', fontSize: '0.83rem' }}
+          >
+            <option value="">-- Chọn 1 kỹ năng thực hiện chính --</option>
+            {activeTaxonomy.map((sk) => {
+              const isSuggested = jobSuggestedSkills.some((js) => js.skillId === sk.skillId);
+              return (
+                <option key={sk.skillId} value={sk.skillId}>
+                  {sk.name}{isSuggested ? ' (Gợi ý theo vị trí)' : ''}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      )}
+
+      {/* 2. DANH SÁCH YÊU CẦU ĐÃ CHỌN */}
+      {normalizedRequirements.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.85rem' }}>
+          {normalizedRequirements.map((req) => {
+            const sk = skillMap.get(req.skillId);
+            const name = req.skillName || sk?.name || `Kỹ năng (${req.skillId.slice(0, 6)})`;
+            const isRequired = req.requirementType !== 'PREFERRED';
             return (
-              <span
-                key={id}
+              <div
+                key={req.skillId}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.3rem 0.65rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                  border: '1.5px solid #93c5fd',
-                  borderRadius: '0.5rem',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  background: '#ffffff',
+                  border: `1.2px solid ${isRequired ? '#93c5fd' : '#bbf7d0'}`,
+                  borderRadius: '0.6rem',
+                  padding: '0.55rem 0.75rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.45rem',
                 }}
               >
-                <span>✓ {name}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveSkill(id)}
-                  title="Xóa kỹ năng này"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '18px',
-                    height: '18px',
-                    padding: 0,
-                    border: 'none',
-                    background: '#dbeafe',
-                    color: '#1e40af',
-                    borderRadius: '50%',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold',
-                    lineHeight: 1,
-                  }}
-                >
-                  ✕
-                </button>
-              </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.84rem', color: '#0f172a' }}>{name}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRequirement(req.skillId, {
+                          requirementType: isRequired ? 'PREFERRED' : 'REQUIRED',
+                        })
+                      }
+                      style={{
+                        border: 'none',
+                        borderRadius: '999px',
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        backgroundColor: isRequired ? '#dbeafe' : '#dcfce7',
+                        color: isRequired ? '#1d4ed8' : '#15803d',
+                      }}
+                      title="Nhấn để chuyển đổi giữa Bắt buộc và Ưu tiên thêm"
+                    >
+                      {isRequired ? 'Bắt buộc' : 'Ưu tiên thêm'}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeRequirement(req.skillId)}
+                    style={{
+                      border: 'none',
+                      background: '#fee2e2',
+                      color: '#b91c1c',
+                      borderRadius: '0.35rem',
+                      padding: '2px 7px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Xóa
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                  <select
+                    value={req.minVerificationTier}
+                    onChange={(e) =>
+                      updateRequirement(req.skillId, { minVerificationTier: e.target.value })
+                    }
+                    style={{
+                      fontSize: '0.76rem',
+                      padding: '0.25rem 0.45rem',
+                      borderRadius: '0.4rem',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#f8fafc',
+                    }}
+                  >
+                    {VERIFICATION_TIER_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        Mức xác minh: {opt.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: '#334155', margin: 0, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(req.requiresValidCertificate)}
+                      onChange={(e) =>
+                        updateRequirement(req.skillId, {
+                          requiresValidCertificate: e.target.checked,
+                          minVerificationTier:
+                            e.target.checked && req.minVerificationTier === 'SELF_DECLARED'
+                              ? 'AI_DOCUMENT'
+                              : req.minVerificationTier,
+                        })
+                      }
+                    />
+                    Yêu cầu chứng chỉ còn hiệu lực
+                  </label>
+                </div>
+              </div>
             );
           })}
         </div>
       ) : (
-        <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', marginBottom: '0.5rem' }}>
-          Chưa chọn kỹ năng nào (Ca phổ thông, hệ thống sẽ mở rộng tìm kiếm ứng viên tự do).
+        <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', marginBottom: '0.65rem' }}>
+          Chưa chọn yêu cầu kỹ năng cụ thể (ca phổ thông).
         </div>
       )}
 
-      {/* 2. THANH NHẬP TAY KỸ NĂNG MỚI */}
+      {/* 3. GỢI Ý NHANH THEO VỊ TRÍ & TÌM KIẾM TRONG TAXONOMY */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
         <input
           type="text"
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Nhập tên kỹ năng cần cho ca (vd: Pha chế Latte Art, Lái xe nâng, Tiếng Trung HSK 4...)"
-          disabled={submitting}
+          value={searchVal}
+          onChange={(e) => setSearchVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (filteredTaxonomy.length > 0) {
+                addRequirement(filteredTaxonomy[0], 'REQUIRED');
+              } else {
+                handleSaveCustomNoteOrPropose();
+              }
+            }
+          }}
+          placeholder="Tìm trong danh mục chuẩn (vd: phục vụ, bartender, thu ngân, an ninh)..."
           style={{
             flex: 1,
-            padding: '0.45rem 0.75rem',
-            fontSize: '0.82rem',
+            padding: '0.45rem 0.7rem',
+            fontSize: '0.8rem',
             border: '1px solid #cbd5e1',
             borderRadius: '0.45rem',
-            outline: 'none',
             backgroundColor: '#ffffff',
           }}
         />
-        <button
-          type="button"
-          onClick={handleAddSkill}
-          disabled={submitting || !inputVal.trim()}
-          style={{
-            padding: '0.45rem 0.9rem',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            color: '#ffffff',
-            backgroundColor: inputVal.trim() && !submitting ? '#2563eb' : '#94a3b8',
-            border: 'none',
-            borderRadius: '0.45rem',
-            cursor: inputVal.trim() && !submitting ? 'pointer' : 'not-allowed',
-            whiteSpace: 'nowrap',
-            transition: 'background-color 0.15s ease',
-          }}
-        >
-          {submitting ? 'Đang thêm...' : '+ Thêm kỹ năng'}
-        </button>
+        {searchVal.trim() && filteredTaxonomy.length === 0 && (
+          <button
+            type="button"
+            disabled={proposalSubmitting}
+            onClick={handleSaveCustomNoteOrPropose}
+            style={{
+              padding: '0.4rem 0.75rem',
+              fontSize: '0.76rem',
+              fontWeight: 600,
+              color: '#0369a1',
+              background: '#e0f2fe',
+              border: '1px solid #bae6fd',
+              borderRadius: '0.45rem',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {proposalSubmitting ? 'Đang ghi...' : '+ Thêm ghi chú ngoài danh mục'}
+          </button>
+        )}
       </div>
 
       {errorMsg && (
-        <div style={{ fontSize: '0.76rem', color: '#dc2626', marginBottom: '0.4rem' }}>
-          {errorMsg}
-        </div>
+        <div style={{ fontSize: '0.75rem', color: '#b45309', marginBottom: '0.4rem' }}>{errorMsg}</div>
       )}
 
-      {/* 3. GỢI Ý NHANH TỪ HỆ THỐNG */}
-      {unselectedSuggestions.length > 0 && (
-        <div style={{ marginTop: '0.4rem' }}>
+      {filteredTaxonomy.length > 0 && (
+        <div style={{ marginTop: '0.35rem' }}>
           <div style={{ fontSize: '0.74rem', color: '#64748b', marginBottom: '0.3rem', fontWeight: 500 }}>
-            Gợi ý nhanh từ danh mục (click để thêm):
+            Chọn từ danh mục chuẩn (+ Bắt buộc | ☆ Ưu tiên):
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-            {unselectedSuggestions.map((sk) => (
-              <button
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {filteredTaxonomy.map((sk) => (
+              <div
                 key={sk.skillId}
-                type="button"
-                onClick={() => handleToggleSuggestion(sk.skillId)}
                 style={{
-                  fontSize: '0.76rem',
-                  padding: '0.25rem 0.55rem',
-                  borderRadius: '0.4rem',
-                  border: '1px dashed #cbd5e1',
-                  backgroundColor: '#f8fafc',
-                  color: '#475569',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#e2e8f0';
-                  e.currentTarget.style.borderColor = '#94a3b8';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8fafc';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '0.45rem',
+                  background: '#ffffff',
+                  overflow: 'hidden',
                 }}
               >
-                + {sk.name}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => addRequirement(sk, 'REQUIRED')}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    padding: '0.24rem 0.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: '#1e293b',
+                    cursor: 'pointer',
+                  }}
+                  title="Thêm làm kỹ năng BẮT BUỘC"
+                >
+                  + {sk.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addRequirement(sk, 'PREFERRED')}
+                  style={{
+                    border: 'none',
+                    borderLeft: '1px solid #e2e8f0',
+                    background: '#f0fdf4',
+                    padding: '0.24rem 0.42rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: '#15803d',
+                    cursor: 'pointer',
+                  }}
+                  title="Thêm làm kỹ năng ƯU TIÊN THÊM"
+                >
+                  ☆ Ưu tiên
+                </button>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* GHI CHÚ NGHIỆP VỤ */}
-      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.45rem', lineHeight: 1.4 }}>
-        Hệ thống chỉ mời ứng viên có đúng kỹ năng này (bộ lọc cứng trong thuật toán Matching). Bạn có thể tự nhập bất kỳ kỹ năng nào theo nhu cầu thực tế của ca làm việc.
+      {/* GHI CHÚ KỸ NĂNG NGOÀI DANH MỤC (KHÔNG LÀM LỆCH MATCHING TAXONOMY) */}
+      {typeof onCustomSkillNotesChange === 'function' && (
+        <div style={{ marginTop: '0.7rem' }}>
+          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+            Ghi chú yêu cầu bổ sung (nếu kỹ năng chưa có trong danh mục chuẩn)
+          </label>
+          <input
+            type="text"
+            className="eo-form-input"
+            value={customSkillNotes || ''}
+            onChange={(e) => onCustomSkillNotesChange(e.target.value)}
+            placeholder="VD: Biết pha Latte Art cơ bản hoặc giao tiếp tiếng Nhật..."
+            style={{ backgroundColor: '#ffffff', fontSize: '0.78rem', padding: '0.4rem 0.65rem' }}
+          />
+        </div>
+      )}
+
+      {/* 4. TÓM TẮT YÊU CẦU TRƯỚC KHI LƯU */}
+      <div
+        style={{
+          marginTop: '0.75rem',
+          padding: '0.55rem 0.75rem',
+          background: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          borderRadius: '0.5rem',
+          fontSize: '0.75rem',
+          color: '#1e3a8a',
+          lineHeight: 1.45,
+        }}
+      >
+        <strong>Tóm tắt yêu cầu:</strong>{' '}
+        Kỹ năng chính: <strong>{performedSkillObj ? performedSkillObj.name : 'Chưa chọn'}</strong> •{' '}
+        <strong>{requiredCount}</strong> bắt buộc • <strong>{preferredCount}</strong> ưu tiên thêm
+        {certCount > 0 ? ` • ${certCount} yêu cầu chứng chỉ còn hiệu lực` : ''}
       </div>
     </div>
   );

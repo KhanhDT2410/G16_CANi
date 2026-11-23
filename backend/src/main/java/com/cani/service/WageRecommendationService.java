@@ -43,6 +43,7 @@ public class WageRecommendationService {
     private static final Map<String, BigDecimal> INDUSTRY_ROLE_BASELINES = Map.ofEntries(
             Map.entry("lễ tân / check-in", new BigDecimal("50000")),
             Map.entry("phục vụ bàn", new BigDecimal("40000")),
+            Map.entry("pha chế", new BigDecimal("70000")),
             Map.entry("pha chế (bartender/barista)", new BigDecimal("70000")),
             Map.entry("thu ngân", new BigDecimal("45000")),
             Map.entry("điều phối sự kiện", new BigDecimal("80000")),

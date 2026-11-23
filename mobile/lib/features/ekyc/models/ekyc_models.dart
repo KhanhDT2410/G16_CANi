@@ -12,11 +12,16 @@ class EkycVerificationItem {
   final String? frontImageUrl;
   final String? backImageUrl;
   final String? selfieImageUrl;
-  final double faceMatchScore;
-  final double ocrConfidence;
+  final double? faceMatchScore;
+  final double? ocrConfidence;
+  final String? provider;
+  final String? failureCode;
+  final bool retryable;
+  final int retryCount;
+  final bool imagesAvailable;
   final String routingDecision;
   final String routingReason;
-  final String status; // APPROVED, PENDING_REVIEW, REJECTED
+  final String status; // PENDING, PROCESSING, PENDING_REVIEW, APPROVED, REJECTED, TECHNICAL_FAILURE
   final DateTime createdAt;
 
   EkycVerificationItem({
@@ -33,8 +38,13 @@ class EkycVerificationItem {
     this.frontImageUrl,
     this.backImageUrl,
     this.selfieImageUrl,
-    required this.faceMatchScore,
-    required this.ocrConfidence,
+    this.faceMatchScore,
+    this.ocrConfidence,
+    this.provider,
+    this.failureCode,
+    this.retryable = false,
+    this.retryCount = 0,
+    this.imagesAvailable = false,
     required this.routingDecision,
     required this.routingReason,
     required this.status,
@@ -42,30 +52,46 @@ class EkycVerificationItem {
   });
 
   factory EkycVerificationItem.fromJson(Map<String, dynamic> json) {
+    final parsedStatus = (json['status'] ?? 'PENDING').toString().toUpperCase();
     return EkycVerificationItem(
-      verificationId: json['verificationId'] ?? '',
-      workerId: json['workerId'] ?? '',
-      workerName: json['workerName'] ?? '',
-      cccdNumberMasked: json['cccdNumberMasked'] ?? '',
-      fullName: json['fullName'] ?? '',
-      dob: json['dob'],
-      gender: json['gender'],
-      nationality: json['nationality'],
-      residenceAddress: json['residenceAddress'],
-      expiryDate: json['expiryDate'],
-      frontImageUrl: json['frontImageUrl'],
-      backImageUrl: json['backImageUrl'],
-      selfieImageUrl: json['selfieImageUrl'],
-      faceMatchScore: (json['faceMatchScore'] is num) ? (json['faceMatchScore'] as num).toDouble() : 0.0,
-      ocrConfidence: (json['ocrConfidence'] is num) ? (json['ocrConfidence'] as num).toDouble() : 0.0,
-      routingDecision: json['routingDecision'] ?? 'MANUAL_REVIEW',
-      routingReason: json['routingReason'] ?? '',
-      status: json['status'] ?? 'PENDING_REVIEW',
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'])?.toLocal() ?? DateTime.now() : DateTime.now(),
+      verificationId: json['verificationId']?.toString() ?? '',
+      workerId: json['workerId']?.toString() ?? '',
+      workerName: json['workerName']?.toString() ?? '',
+      cccdNumberMasked: json['cccdNumberMasked']?.toString() ?? '',
+      fullName: json['fullName']?.toString() ?? '',
+      dob: json['dob']?.toString(),
+      gender: json['gender']?.toString(),
+      nationality: json['nationality']?.toString(),
+      residenceAddress: json['residenceAddress']?.toString(),
+      expiryDate: json['expiryDate']?.toString(),
+      frontImageUrl: json['frontImageUrl']?.toString(),
+      backImageUrl: json['backImageUrl']?.toString(),
+      selfieImageUrl: json['selfieImageUrl']?.toString(),
+      faceMatchScore: (json['faceMatchScore'] is num)
+          ? (json['faceMatchScore'] as num).toDouble()
+          : null,
+      ocrConfidence: (json['ocrConfidence'] is num)
+          ? (json['ocrConfidence'] as num).toDouble()
+          : null,
+      provider: json['provider']?.toString(),
+      failureCode: json['failureCode']?.toString(),
+      retryable: json['retryable'] == true || parsedStatus == 'TECHNICAL_FAILURE',
+      retryCount: (json['retryCount'] is num) ? (json['retryCount'] as num).toInt() : 0,
+      imagesAvailable: json['imagesAvailable'] == true,
+      routingDecision: json['routingDecision']?.toString() ?? 'MANUAL_REVIEW',
+      routingReason: json['routingReason']?.toString() ?? '',
+      status: parsedStatus,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())?.toLocal() ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 
   bool get isApproved => status == 'APPROVED';
-  bool get isPending => status == 'PENDING_REVIEW';
+  bool get isPendingReview => status == 'PENDING_REVIEW';
+  bool get isProcessing => status == 'PROCESSING' || status == 'PENDING';
+  bool get isPending => isPendingReview || isProcessing;
+  bool get isTechnicalFailure => status == 'TECHNICAL_FAILURE';
   bool get isRejected => status == 'REJECTED';
+  bool get canRetry => isTechnicalFailure || isRejected || retryable;
 }

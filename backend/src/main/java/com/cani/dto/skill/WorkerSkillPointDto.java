@@ -16,6 +16,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class WorkerSkillPointDto {
     private UUID id;
+    private UUID skillId;
     private String jobType;
     private Integer spVerify;
     private Integer spExperience;
@@ -24,5 +25,6 @@ public class WorkerSkillPointDto {
     private SkillTier tier;
     private Integer totalShiftsCompleted;
     private BigDecimal avgRating;
+    private Integer ratingCount;
     private Instant updatedAt;
 }

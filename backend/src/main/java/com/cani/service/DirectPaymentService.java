@@ -7,6 +7,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.PaymentStatus;
 import com.cani.exception.AppException;
+import com.cani.repository.DisputeRepository;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.util.VietQrUtil;
@@ -51,6 +52,12 @@ public class DirectPaymentService {
     @org.springframework.context.annotation.Lazy
     @Autowired(required = false)
     private DisputeService disputeService;
+
+    @Autowired(required = false)
+    private DisputeRepository disputeRepository;
+
+    @Autowired(required = false)
+    private EmailService emailService;
 
     /**
      * Khởi tạo bản ghi Payment khi Worker được gán vào ca làm việc
@@ -135,22 +142,111 @@ public class DirectPaymentService {
 
         if (notificationService != null && payment.getWorker() != null
                 && payment.getWorker().getUser() != null && payment.getWorker().getUser().getUserId() != null) {
+            Shift shift = assignment.getShift();
+            Event event = shift != null ? shift.getEvent() : null;
+            String shiftLabel = describeShift(shift, event);
+            String amountText = formatVnd(dto.getDeclaredAmount());
+            String methodText = describeMethod(dto.getPaymentMethod());
+            boolean hasProof = dto.getPaymentProofUrl() != null && !dto.getPaymentProofUrl().isBlank();
             try {
                 notificationService.createAndSend(
                         payment.getWorker().getUser().getUserId(),
-                        "Thù lao ca làm đã được khai báo",
-                        "Ban tổ chức đã khai báo thanh toán " + dto.getDeclaredAmount() + " VNĐ. Vui lòng kiểm tra và xác nhận!",
+                        "Ban tổ chức đã thanh toán thù lao",
+                        "Ban tổ chức đã khai báo trả " + amountText + " (" + methodText + ") cho ca " + shiftLabel
+                                + (hasProof ? ", kèm chứng từ." : ".") + " Vui lòng kiểm tra và phản hồi số tiền đã nhận.",
                         NotificationType.PAYMENT,
                         "ASSIGNMENT",
                         dto.getAssignmentId(),
-                        Map.of("assignmentId", dto.getAssignmentId().toString(), "type", "PAYMENT_DECLARED")
+                        buildPaymentPayload(dto.getAssignmentId(), shift, event, "PAYMENT_DECLARED")
                 );
             } catch (Exception ex) {
                 log.warn("Không thể gửi thông báo thanh toán tới Worker: {}", ex.getMessage());
             }
+
+            Map<String, String> details = new java.util.LinkedHashMap<>();
+            details.put("Ca làm việc", shiftLabel);
+            details.put("Số tiền đã khai trả", amountText);
+            details.put("Thù lao thỏa thuận", formatVnd(payment.getAgreedAmount()));
+            details.put("Phương thức", methodText);
+            details.put("Mã giao dịch", dto.getExternalRef());
+            details.put("Thời điểm khai báo", formatInstant(saved.getDeclaredAt()));
+            sendEmailAfterCommit(
+                    payment.getWorker().getUser().getEmail(),
+                    "[CANi] Ban tổ chức đã thanh toán thù lao ca " + shiftLabel,
+                    "Ban tổ chức đã khai báo thanh toán thù lao",
+                    "Xin chào " + safe(payment.getWorker().getFullName())
+                            + ", Ban tổ chức vừa khai báo đã trả thù lao cho bạn. Vui lòng kiểm tra số tiền thực nhận "
+                            + "và phản hồi trên ứng dụng CANi (Đã nhận đủ / Chỉ nhận một phần / Chưa nhận được).",
+                    details,
+                    dto.getPaymentProofUrl(),
+                    "CANi ghi nhận thanh toán trực tiếp giữa Ban tổ chức và Nhân sự, không giữ tiền hộ. "
+                            + "Nếu chưa nhận đủ, hãy phản hồi trên ứng dụng để hệ thống mở đối soát."
+            );
         }
 
         return mapToDto(saved);
+    }
+
+    private static final java.time.ZoneId VN_ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final java.time.format.DateTimeFormatter VN_DATE_TIME =
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(VN_ZONE);
+    private static final String METHOD_BANK_TRANSFER = "BANK_TRANSFER";
+    private static final String METHOD_CASH = "CASH";
+
+    private String formatVnd(BigDecimal amount) {
+        if (amount == null) return "—";
+        java.text.NumberFormat nf = java.text.NumberFormat.getIntegerInstance(java.util.Locale.forLanguageTag("vi-VN"));
+        return nf.format(amount.setScale(0, RoundingMode.HALF_UP)) + " VNĐ";
+    }
+
+    private String formatInstant(Instant instant) {
+        return instant != null ? VN_DATE_TIME.format(instant) : "—";
+    }
+
+    private String describeMethod(String method) {
+        if (METHOD_BANK_TRANSFER.equals(method)) return "Chuyển khoản ngân hàng";
+        if (METHOD_CASH.equals(method)) return "Tiền mặt trực tiếp";
+        return method != null ? method : "—";
+    }
+
+    private String describeShift(Shift shift, Event event) {
+        String job = shift != null && shift.getJobType() != null ? shift.getJobType() : "ca làm";
+        return event != null && event.getName() != null ? "\"" + job + "\" (" + event.getName() + ")" : "\"" + job + "\"";
+    }
+
+    private String safe(String value) {
+        return value != null && !value.isBlank() ? value : "bạn";
+    }
+
+    private Map<String, String> buildPaymentPayload(UUID assignmentId, Shift shift, Event event, String type) {
+        Map<String, String> payload = new java.util.HashMap<>();
+        payload.put("assignmentId", assignmentId.toString());
+        payload.put("type", type);
+        if (shift != null && shift.getShiftId() != null) payload.put("shiftId", shift.getShiftId().toString());
+        if (event != null && event.getEventId() != null) payload.put("eventId", event.getEventId().toString());
+        return payload;
+    }
+
+    /**
+     * Gửi email sau khi transaction commit thành công: tránh gửi mail cho thao tác bị rollback
+     * và không kéo dài thời gian giữ transaction vì chờ SMTP. Mọi dữ liệu đã được tính sẵn
+     * thành chuỗi trước khi đăng ký callback để không chạm lazy entity ngoài session.
+     */
+    private void sendEmailAfterCommit(String toEmail, String subject, String heading, String intro,
+                                      Map<String, String> details, String proofImage, String footerNote) {
+        if (emailService == null) return;
+        Runnable task = () -> emailService.sendPaymentEmail(toEmail, subject, heading, intro, details, proofImage, footerNote);
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            task.run();
+                        }
+                    });
+        } else {
+            task.run();
+        }
     }
 
     /**
@@ -165,13 +261,24 @@ public class DirectPaymentService {
             throw new IllegalStateException("Bạn không có quyền xác nhận thanh toán này");
         }
 
+        if (payment.getStatus() == PaymentStatus.NOT_DECLARED) {
+            throw new com.cani.exception.BadRequestException(
+                    "Ban tổ chức chưa khai báo thanh toán thù lao (Bước 4) cho ca làm việc này.");
+        }
+
         if (assignmentRepository != null) {
             ShiftAssignment assignment = assignmentRepository.findById(assignmentId).orElse(null);
-            if (assignment != null && assignment.getStatus() != null
-                    && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.CHECKED_IN
-                    && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.COMPLETED) {
-                throw new com.cani.exception.BadRequestException(
-                        "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca (trạng thái hiện tại: " + assignment.getStatus() + ")");
+            if (assignment != null && assignment.getStatus() != null) {
+                if (assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.CHECKED_IN
+                        && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.COMPLETED) {
+                    throw new com.cani.exception.BadRequestException(
+                            "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca (trạng thái hiện tại: " + assignment.getStatus() + ")");
+                }
+                if (assignment.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN
+                        && !Boolean.TRUE.equals(assignment.getEoConfirmed())) {
+                    throw new com.cani.exception.BadRequestException(
+                            "Ban tổ chức cần Duyệt công hoàn thành (Bước 3) trước khi xác nhận thanh toán thù lao.");
+                }
             }
         }
 
@@ -220,47 +327,75 @@ public class DirectPaymentService {
 
         log.info("Worker {} xác nhận thanh toán: {} cho Assignment {}", workerId, normalizedConfirmStatus, assignmentId);
 
-        if (notificationService != null && assignmentRepository != null) {
+        if (assignmentRepository != null) {
             assignmentRepository.findById(assignmentId).ifPresent(sa -> {
                 Shift shift = sa.getShift();
                 Event ev = shift != null ? shift.getEvent() : null;
                 if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
                         && ev.getEventOrganizer().getUser().getUserId() != null) {
-                    try {
-                        UUID eoUserId = ev.getEventOrganizer().getUser().getUserId();
-                        String workerName = sa.getWorker() != null ? sa.getWorker().getFullName() : "Nhân sự";
-                        String title;
-                        String body;
-                        NotificationType nType;
-                        if ("RECEIVED_FULL".equals(normalizedConfirmStatus)) {
-                            title = "Nhân sự xác nhận đã nhận đủ thù lao";
-                            body = workerName + " đã xác nhận nhận đủ tiền công cho ca \"" + shift.getJobType() + "\" (" + ev.getName() + ").";
-                            nType = NotificationType.PAYMENT;
-                        } else if ("RECEIVED_PARTIAL".equals(normalizedConfirmStatus)) {
-                            title = "Nhân sự báo mới nhận một phần thù lao";
-                            body = workerName + " phản hồi mới nhận một phần thù lao ca \"" + shift.getJobType() + "\" (" + ev.getName() + "). Vui lòng kiểm tra lại.";
-                            nType = NotificationType.PAYMENT;
-                        } else {
-                            title = "Khiếu nại chưa nhận được thù lao";
-                            body = workerName + " báo chưa nhận được thù lao ca \"" + shift.getJobType() + "\" (" + ev.getName() + "). Hệ thống đã mở hồ sơ tranh chấp.";
-                            nType = NotificationType.DISPUTE;
-                        }
-                        notificationService.createAndSend(
-                                eoUserId,
-                                title,
-                                body,
-                                nType,
-                                "SHIFT",
-                                shift.getShiftId(),
-                                Map.of(
-                                        "eventId", ev.getEventId().toString(),
-                                        "shiftId", shift.getShiftId().toString(),
-                                        "assignmentId", assignmentId.toString()
-                                )
-                        );
-                    } catch (Exception ex) {
-                        log.warn("Không thể gửi thông báo xác nhận thanh toán cho EO: {}", ex.getMessage());
+                    User eoUser = ev.getEventOrganizer().getUser();
+                    UUID eoUserId = eoUser.getUserId();
+                    String workerName = sa.getWorker() != null ? sa.getWorker().getFullName() : "Nhân sự";
+                    String shiftLabel = describeShift(shift, ev);
+                    String title;
+                    String body;
+                    String statusLabel;
+                    NotificationType nType;
+                    if ("RECEIVED_FULL".equals(normalizedConfirmStatus)) {
+                        title = "Nhân sự xác nhận đã nhận đủ thù lao";
+                        body = workerName + " đã xác nhận nhận đủ tiền công cho ca " + shiftLabel + ".";
+                        statusLabel = "Đã nhận đủ";
+                        nType = NotificationType.PAYMENT;
+                    } else if ("RECEIVED_PARTIAL".equals(normalizedConfirmStatus)) {
+                        title = "Nhân sự báo mới nhận một phần thù lao";
+                        body = workerName + " phản hồi mới nhận một phần thù lao ca " + shiftLabel + ". Vui lòng kiểm tra lại.";
+                        statusLabel = "Chỉ nhận một phần";
+                        nType = NotificationType.PAYMENT;
+                    } else {
+                        title = "Khiếu nại chưa nhận được thù lao";
+                        body = workerName + " báo chưa nhận được thù lao ca " + shiftLabel + ". Hệ thống đã mở hồ sơ tranh chấp.";
+                        statusLabel = "Chưa nhận được (Mở tranh chấp)";
+                        nType = NotificationType.DISPUTE;
                     }
+                    if (notificationService != null) {
+                        try {
+                            notificationService.createAndSend(
+                                    eoUserId,
+                                    title,
+                                    body,
+                                    nType,
+                                    "SHIFT",
+                                    shift.getShiftId(),
+                                    Map.of(
+                                            "eventId", ev.getEventId().toString(),
+                                            "shiftId", shift.getShiftId().toString(),
+                                            "assignmentId", assignmentId.toString()
+                                    )
+                            );
+                        } catch (Exception ex) {
+                            log.warn("Không thể gửi thông báo xác nhận thanh toán cho EO: {}", ex.getMessage());
+                        }
+                    }
+
+                    Map<String, String> details = new java.util.LinkedHashMap<>();
+                    details.put("Ca làm việc", shiftLabel);
+                    details.put("Nhân sự", workerName);
+                    details.put("Trạng thái phản hồi", statusLabel);
+                    details.put("Số tiền đã khai trả", formatVnd(saved.getDeclaredAmount()));
+                    details.put("Thù lao thỏa thuận", formatVnd(saved.getAgreedAmount()));
+                    details.put("Phương thức", describeMethod(saved.getPaymentMethod()));
+                    details.put("Mã giao dịch", saved.getExternalRef());
+                    details.put("Ghi chú nhân sự", dto.getComment());
+                    details.put("Thời điểm phản hồi", formatInstant(saved.getWorkerConfirmedAt()));
+                    sendEmailAfterCommit(
+                            eoUser.getEmail(),
+                            "[CANi] " + title + " — " + shiftLabel,
+                            title,
+                            body,
+                            details,
+                            saved.getPaymentProofUrl(),
+                            "Bạn có thể xem lại chứng từ và trạng thái đối soát trực tiếp trong màn Quản lý ca làm việc trên CANi Web."
+                    );
                 }
             });
         }
@@ -355,6 +490,26 @@ public class DirectPaymentService {
         BigDecimal amount = p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount();
         String workerVietQrUrl = VietQrUtil.buildVietQrUrl(bankCode, bankAccountNumber, bankAccountName, amount);
 
+        UUID disputeId = null;
+        String disputeStatus = null;
+        String disputeOutcome = null;
+        String disputeRationale = null;
+        String disputeResolution = null;
+        Instant disputeResolvedAt = null;
+
+        if (disputeRepository != null && p.getAssignmentId() != null) {
+            List<Dispute> disputes = disputeRepository.findByAssignmentIdOrderByCreatedAtDesc(p.getAssignmentId());
+            if (disputes != null && !disputes.isEmpty()) {
+                Dispute d = disputes.get(0);
+                disputeId = d.getDisputeId();
+                disputeStatus = d.getStatus() != null ? d.getStatus().name() : null;
+                disputeOutcome = d.getOutcome() != null ? d.getOutcome().name() : null;
+                disputeRationale = d.getFinalDecisionRationale() != null ? d.getFinalDecisionRationale() : d.getDecisionRationale();
+                disputeResolution = d.getResolution();
+                disputeResolvedAt = d.getFinalDecidedAt() != null ? d.getFinalDecidedAt() : d.getResolvedAt();
+            }
+        }
+
         return PaymentResponseDto.builder()
                 .paymentId(p.getPaymentId())
                 .eventId(p.getEventId())
@@ -379,6 +534,12 @@ public class DirectPaymentService {
                 .bankAccountNumber(bankAccountNumber)
                 .bankAccountName(bankAccountName)
                 .workerVietQrUrl(workerVietQrUrl)
+                .disputeId(disputeId)
+                .disputeStatus(disputeStatus)
+                .disputeOutcome(disputeOutcome)
+                .disputeRationale(disputeRationale)
+                .disputeResolution(disputeResolution)
+                .disputeResolvedAt(disputeResolvedAt)
                 .build();
     }
 }

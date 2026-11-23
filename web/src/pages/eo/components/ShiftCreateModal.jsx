@@ -2,10 +2,16 @@ import React, { useState, useRef } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { calculateShiftRiskAnalysis } from '../hooks/useShifts';
-import { validateJobType } from '../utils/shiftValidation';
+import { validateJobType, validateShiftWageAgainstFloor } from '../utils/shiftValidation';
+import {
+  toDateTimeLocalInput,
+  validateShiftArrivalTime,
+  validateShiftTimeRange,
+} from '../utils/eventHelpers';
 import WageBenchmarkBox from './WageBenchmarkBox';
 import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
+import ShiftArrivalTimeField from './ShiftArrivalTimeField';
 import './EventCreatePage.css';
 
 /**
@@ -23,9 +29,14 @@ const ShiftCreateModal = ({
   shiftDurationHours = 4,
   calculateShiftTotal,
   skillTaxonomy = [],
+  venueAddress = '',
+  venueLat = null,
+  venueLng = null,
 }) => {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [jobTypeError, setJobTypeError] = useState(null);
+  const [wageError, setWageError] = useState(null);
+  const [wageBenchmark, setWageBenchmark] = useState(null);
   const [wageMode, setWageMode] = useState('HOURLY'); // 'HOURLY' | 'PER_SHIFT'
   const [shiftPackageWage, setShiftPackageWage] = useState(
     Math.round(Number(newShift?.hourlyWage || 50000) * Math.max(0.5, Number(shiftDurationHours || 4)))
@@ -70,9 +81,10 @@ const ShiftCreateModal = ({
   };
 
   const handlePackageWageChange = (val) => {
-    const pkg = Math.max(0, parseFloat(val) || 0);
+    let raw = typeof val === 'string' ? val.replace(/^0+(?=\d)/, '') : String(val ?? '');
+    const pkg = raw === '' ? '' : Math.max(0, parseFloat(raw) || 0);
     setShiftPackageWage(pkg);
-    const computedHourly = Math.max(0, Math.round(pkg / safeHours));
+    const computedHourly = Math.max(0, Math.round((Number(pkg) || 0) / safeHours));
     setNewShift((prev) => ({
       ...prev,
       hourlyWage: computedHourly,
@@ -81,6 +93,10 @@ const ShiftCreateModal = ({
 
   const riskInfo = calculateShiftRiskAnalysis(newShift);
   const wageRec = riskInfo.recommendation;
+  const liveTimeError = validateShiftTimeRange(newShift.startTime, newShift.endTime, null, null, {
+    allowPastStart: false,
+  });
+  const liveArrivalError = validateShiftArrivalTime(newShift.arrivalTime, newShift.startTime);
 
   const handleFormSubmit = (e) => {
     const err = validateJobType(newShift.jobType);
@@ -90,7 +106,31 @@ const ShiftCreateModal = ({
       showToast(err, 'error');
       return;
     }
+    const wageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: newShift.hourlyWage,
+      benchmark: wageBenchmark,
+      venueAddress,
+      venueLat,
+      venueLng,
+    });
+    if (!wageCheck.isValid) {
+      e.preventDefault();
+      setWageError(wageCheck.error);
+      showToast(wageCheck.error, 'error');
+      return;
+    }
+    if (liveTimeError) {
+      e.preventDefault();
+      showToast(liveTimeError, 'error');
+      return;
+    }
+    if (liveArrivalError) {
+      e.preventDefault();
+      showToast(liveArrivalError, 'error');
+      return;
+    }
     setJobTypeError(null);
+    setWageError(null);
     onSubmit?.(e);
   };
 
@@ -242,19 +282,32 @@ const ShiftCreateModal = ({
               <label>Thời Gian Bắt Đầu *</label>
               <input
                 type="datetime-local"
+                min={toDateTimeLocalInput(new Date())}
                 required
                 className="eo-form-input"
+                style={{ borderColor: liveTimeError ? '#ef4444' : undefined }}
                 value={newShift.startTime}
                 onChange={(e) => {
                   const val = e.target.value;
                   const s = new Date(val);
                   const en = new Date(newShift.endTime);
                   const dur = !isNaN(s.getTime()) && !isNaN(en.getTime()) && en > s ? parseFloat(((en - s) / 3600000).toFixed(1)) : safeHours;
+                  let nextArrival = newShift.arrivalTime;
+                  if (newShift.arrivalTime && newShift.startTime && !isNaN(s.getTime())) {
+                    const oldS = new Date(newShift.startTime);
+                    const oldA = new Date(newShift.arrivalTime);
+                    if (!isNaN(oldS.getTime()) && !isNaN(oldA.getTime())) {
+                      const offsetMs = oldS.getTime() - oldA.getTime();
+                      if (offsetMs >= 0 && offsetMs <= 120 * 60 * 1000) {
+                        nextArrival = toDateTimeLocalInput(new Date(s.getTime() - offsetMs));
+                      }
+                    }
+                  }
                   if (wageMode === 'PER_SHIFT') {
                     const computed = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
-                    setNewShift({ ...newShift, startTime: val, hourlyWage: computed });
+                    setNewShift({ ...newShift, startTime: val, arrivalTime: nextArrival, hourlyWage: computed });
                   } else {
-                    setNewShift({ ...newShift, startTime: val });
+                    setNewShift({ ...newShift, startTime: val, arrivalTime: nextArrival });
                   }
                 }}
               />
@@ -263,8 +316,10 @@ const ShiftCreateModal = ({
               <label>Thời Gian Kết Thúc *</label>
               <input
                 type="datetime-local"
+                min={newShift.startTime || toDateTimeLocalInput(new Date())}
                 required
                 className="eo-form-input"
+                style={{ borderColor: liveTimeError ? '#ef4444' : undefined }}
                 value={newShift.endTime}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -281,25 +336,24 @@ const ShiftCreateModal = ({
               />
             </div>
           </div>
-
-          {/* Giờ mở cửa điểm danh (check-in gate) */}
-          <div className="eo-form-group">
-            <label>Thời Gian Mở Điểm Danh (Tùy chọn)</label>
-            <input
-              type="datetime-local"
-              className="eo-form-input"
-              value={newShift.arrivalTime || ''}
-              onChange={(e) => setNewShift({ ...newShift, arrivalTime: e.target.value })}
-            />
-            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.25rem' }}>
-              Người lao động chỉ được điểm danh từ thời điểm này. Để trống = mở cùng giờ bắt đầu ca.
+          {liveTimeError && (
+            <div className="ecw-field-error" style={{ marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
+              {liveTimeError}
             </div>
-          </div>
+          )}
+
+          {/* Giờ yêu cầu có mặt trước ca (Arrival Time) */}
+          <ShiftArrivalTimeField
+            startTime={newShift.startTime}
+            arrivalTime={newShift.arrivalTime}
+            onChange={(val) => setNewShift({ ...newShift, arrivalTime: val })}
+            error={liveArrivalError}
+          />
 
           {/* Trang phục + Kỹ năng bắt buộc */}
           <div className="eo-form-row">
             <div className="eo-form-group">
-              <label>Trang Phục (Dress Code)</label>
+              <label>Trang Phục Yêu Cầu</label>
               <input
                 type="text"
                 className="eo-form-input"
@@ -310,10 +364,17 @@ const ShiftCreateModal = ({
             </div>
           </div>
 
-          {/* KỸ NĂNG BẮT BUỘC CHO CA NÀY (DYNAMIC CUSTOM SKILLS + TAXONOMY) */}
+          {/* KỸ NĂNG BẮT BUỘC / ƯU TIÊN & KỸ NĂNG CHÍNH */}
           <ShiftSkillSelector
+            jobType={newShift.jobType}
             selectedSkillIds={newShift.requiredSkills}
             onChange={(nextSkills) => setNewShift({ ...newShift, requiredSkills: nextSkills })}
+            performedSkillId={newShift.performedSkillId}
+            onPerformedSkillChange={(nextId) => setNewShift((prev) => ({ ...prev, performedSkillId: nextId }))}
+            skillRequirements={newShift.skillRequirements}
+            onSkillRequirementsChange={(nextReqs) => setNewShift((prev) => ({ ...prev, skillRequirements: nextReqs }))}
+            customSkillNotes={newShift.customSkillNotes}
+            onCustomSkillNotesChange={(notes) => setNewShift((prev) => ({ ...prev, customSkillNotes: notes }))}
             taxonomy={skillTaxonomy}
           />
 
@@ -365,10 +426,29 @@ const ShiftCreateModal = ({
                   min="1"
                   required
                   className="eo-form-input"
-                  value={newShift.requiredWorkers}
-                  onChange={(e) =>
-                    setNewShift({ ...newShift, requiredWorkers: Math.max(1, parseInt(e.target.value, 10) || 1) })
-                  }
+                  value={newShift.requiredWorkers ?? ''}
+                  onFocus={(e) => e.target.select()}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === 'e') e.preventDefault();
+                  }}
+                  onChange={(e) => {
+                    let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                    if (e.target.value !== raw) e.target.value = raw;
+                    if (raw === '') {
+                      setNewShift({ ...newShift, requiredWorkers: '' });
+                      return;
+                    }
+                    const parsed = parseInt(raw, 10);
+                    setNewShift({
+                      ...newShift,
+                      requiredWorkers: isNaN(parsed) ? '' : Math.max(0, parsed),
+                    });
+                  }}
+                  onBlur={() => {
+                    if (!newShift.requiredWorkers || Number(newShift.requiredWorkers) < 1) {
+                      setNewShift((prev) => ({ ...prev, requiredWorkers: 1 }));
+                    }
+                  }}
                 />
               </div>
 
@@ -381,16 +461,38 @@ const ShiftCreateModal = ({
                     step="5000"
                     required
                     className="eo-form-input"
-                    value={newShift.hourlyWage}
+                    style={{
+                      borderColor: wageError ? '#ef4444' : undefined,
+                      boxShadow: wageError ? '0 0 0 1px #ef4444' : undefined,
+                    }}
+                    value={newShift.hourlyWage ?? ''}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e') e.preventDefault();
+                    }}
                     onChange={(e) => {
-                      const val = Math.max(0, parseFloat(e.target.value) || 0);
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
                       setNewShift({ ...newShift, hourlyWage: val });
-                      setShiftPackageWage(Math.round(val * safeHours));
+                      setShiftPackageWage(Math.round((Number(val) || 0) * safeHours));
+                      if (wageError) setWageError(null);
+                    }}
+                    onBlur={() => {
+                      if (newShift.hourlyWage === '' || isNaN(newShift.hourlyWage)) {
+                        setNewShift((prev) => ({ ...prev, hourlyWage: 0 }));
+                      }
                     }}
                   />
-                  <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                    = {Math.round(Number(newShift.hourlyWage || 0) * safeHours).toLocaleString()}đ / ca ({safeHours}h)
-                  </div>
+                  {wageError ? (
+                    <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                      {wageError}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                      = {Math.round(Number(newShift.hourlyWage || 0) * safeHours).toLocaleString()}đ / ca ({safeHours}h)
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="eo-form-group" style={{ marginBottom: 0 }}>
@@ -401,12 +503,36 @@ const ShiftCreateModal = ({
                     step="10000"
                     required
                     className="eo-form-input"
-                    value={shiftPackageWage}
-                    onChange={(e) => handlePackageWageChange(e.target.value)}
+                    style={{
+                      borderColor: wageError ? '#ef4444' : undefined,
+                      boxShadow: wageError ? '0 0 0 1px #ef4444' : undefined,
+                    }}
+                    value={shiftPackageWage ?? ''}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e') e.preventDefault();
+                    }}
+                    onChange={(e) => {
+                      let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                      if (e.target.value !== raw) e.target.value = raw;
+                      handlePackageWageChange(raw);
+                      if (wageError) setWageError(null);
+                    }}
+                    onBlur={() => {
+                      if (shiftPackageWage === '' || isNaN(shiftPackageWage)) {
+                        setShiftPackageWage(0);
+                      }
+                    }}
                   />
-                  <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
-                    Quy đổi: ~{Number(newShift.hourlyWage || 0).toLocaleString()}đ/giờ ({safeHours}h)
-                  </div>
+                  {wageError ? (
+                    <div className="ecw-field-error" style={{ marginTop: '0.25rem', color: '#dc2626', fontSize: '0.78rem', fontWeight: 600 }}>
+                      {wageError}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#2563eb', marginTop: '0.25rem', fontWeight: 600 }}>
+                      Quy đổi: ~{Number(newShift.hourlyWage || 0).toLocaleString()}đ/giờ ({safeHours}h)
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -420,10 +546,15 @@ const ShiftCreateModal = ({
               hourlyWage={newShift.hourlyWage}
               startTime={newShift.startTime}
               endTime={newShift.endTime}
+              venueAddress={venueAddress}
+              venueLat={venueLat}
+              venueLng={venueLng}
               onSelectWage={(chosenWage) => {
                 setNewShift({ ...newShift, hourlyWage: chosenWage });
                 setShiftPackageWage(Math.round(chosenWage * safeHours));
+                if (wageError) setWageError(null);
               }}
+              onBenchmarkLoaded={setWageBenchmark}
             />
 
             <div
@@ -508,15 +639,23 @@ const ShiftCreateModal = ({
                 min="0"
                 step="10000"
                 className="eo-form-input"
-                value={newShift.allowance}
+                value={newShift.allowance ?? ''}
+                onFocus={(e) => e.target.select()}
                 onKeyDown={(e) => {
                   if (e.key === '-' || e.key === 'e' || e.key === 'E') {
                     e.preventDefault();
                   }
                 }}
                 onChange={(e) => {
-                  const raw = parseFloat(e.target.value);
-                  setNewShift({ ...newShift, allowance: isNaN(raw) || raw < 0 ? 0 : raw });
+                  let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                  if (e.target.value !== raw) e.target.value = raw;
+                  const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
+                  setNewShift({ ...newShift, allowance: val });
+                }}
+                onBlur={() => {
+                  if (newShift.allowance === '' || isNaN(newShift.allowance)) {
+                    setNewShift((prev) => ({ ...prev, allowance: 0 }));
+                  }
                 }}
               />
             </div>
@@ -527,10 +666,28 @@ const ShiftCreateModal = ({
                 min="1"
                 max="50"
                 className="eo-form-input"
-                value={newShift.maxDistanceKm}
-                onChange={(e) =>
-                  setNewShift({ ...newShift, maxDistanceKm: Math.max(1, parseFloat(e.target.value) || 15) })
-                }
+                value={newShift.maxDistanceKm ?? ''}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e') e.preventDefault();
+                }}
+                onChange={(e) => {
+                  let raw = e.target.value.replace(/^0+(?=\d)/, '');
+                  if (e.target.value !== raw) e.target.value = raw;
+                  if (raw === '') {
+                    setNewShift({ ...newShift, maxDistanceKm: '' });
+                    return;
+                  }
+                  setNewShift({
+                    ...newShift,
+                    maxDistanceKm: Math.max(1, Math.min(50, parseFloat(raw) || 15)),
+                  });
+                }}
+                onBlur={() => {
+                  if (!newShift.maxDistanceKm || Number(newShift.maxDistanceKm) < 1) {
+                    setNewShift((prev) => ({ ...prev, maxDistanceKm: 15 }));
+                  }
+                }}
               />
             </div>
           </div>
@@ -539,6 +696,7 @@ const ShiftCreateModal = ({
           <ShiftChecklistEditor
             items={newShift.checklistItems || []}
             onChange={(updatedItems) => setNewShift((prev) => ({ ...prev, checklistItems: updatedItems }))}
+            jobType={newShift.jobType}
           />
 
           {/* Chi phí ước tính hiển thị realtime */}

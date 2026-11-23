@@ -55,6 +55,12 @@ public class AdminShiftDetailDto {
     private Instant createdAt;
     private PaymentStatus paymentStatus;
 
+    // Thông tin can thiệp quản trị
+    private String adminNote;
+    private String cancellationReason;
+    private UUID cancelledBy;
+    private Instant suspendedAt;
+
     // Danh sách nhân sự tham gia ca
     private List<AdminShiftWorkerDto> workers;
 }

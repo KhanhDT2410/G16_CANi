@@ -657,6 +657,9 @@ public class SkillVerificationService {
         for (DeclareSkillRequestDto.SkillItem item : request.getSkills()) {
             Skill skill = skillRepository.findById(item.getSkillId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy kỹ năng: " + item.getSkillId()));
+            if (Boolean.FALSE.equals(skill.getIsActive())) {
+                throw new BadRequestException("Kỹ năng '" + skill.getName() + "' chưa được kích hoạt trong danh mục chuẩn.");
+            }
 
             WorkerSkill ws = workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, skill.getSkillId())
                     .orElseGet(() -> WorkerSkill.builder()
@@ -678,7 +681,7 @@ public class SkillVerificationService {
             WorkerSkill saved = workerSkillRepository.save(ws);
             resultList.add(saved);
 
-            ensureWorkerSkillPoint(worker, skill.getName());
+            ensureWorkerSkillPoint(worker, skill);
         }
 
         return resultList.stream().map(this::mapToWorkerSkillDto).collect(Collectors.toList());
@@ -732,19 +735,35 @@ public class SkillVerificationService {
     @Transactional(readOnly = true)
     public List<WorkerSkillPointDto> getWorkerSkillPoints(UUID workerId) {
         List<WorkerSkillPoint> points = workerSkillPointRepository.findByWorker_WorkerId(workerId);
-        return points.stream().map(p -> WorkerSkillPointDto.builder()
-                .id(p.getSpId())
-                .jobType(p.getJobType())
-                .spVerify(p.getSpVerify())
-                .spExperience(p.getSpExperience())
-                .spRating(p.getSpRating())
-                .totalSp(p.getTotalSp())
-                .tier(p.getTier())
-                .totalShiftsCompleted(p.getTotalShiftsCompleted())
-                .avgRating(p.getAvgRating())
-                .updatedAt(p.getUpdatedAt())
-                .build()
-        ).collect(Collectors.toList());
+        return points.stream().map(p -> {
+            UUID resolvedSkillId = p.getSkill() != null ? p.getSkill().getSkillId() : null;
+            if (resolvedSkillId == null && p.getJobType() != null && !p.getJobType().isBlank()) {
+                resolvedSkillId = skillRepository.findByNameIgnoreCase(p.getJobType().trim())
+                        .map(Skill::getSkillId)
+                        .orElse(null);
+            }
+            int ratingCount = p.getRatingCount() != null ? p.getRatingCount() : 0;
+            int spRating = p.getSpRating() != null ? p.getSpRating() : 0;
+            BigDecimal rawAvg = p.getAvgRating() != null ? p.getAvgRating() : BigDecimal.ZERO;
+            BigDecimal safeAvg = (ratingCount == 0 && spRating == 0 && rawAvg.compareTo(new BigDecimal("5.00")) == 0)
+                    ? BigDecimal.ZERO
+                    : rawAvg;
+
+            return WorkerSkillPointDto.builder()
+                    .id(p.getSpId())
+                    .skillId(resolvedSkillId)
+                    .jobType(p.getJobType())
+                    .spVerify(p.getSpVerify())
+                    .spExperience(p.getSpExperience())
+                    .spRating(p.getSpRating())
+                    .totalSp(p.getTotalSp())
+                    .tier(p.getTier())
+                    .totalShiftsCompleted(p.getTotalShiftsCompleted())
+                    .avgRating(safeAvg)
+                    .ratingCount(ratingCount)
+                    .updatedAt(p.getUpdatedAt())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -865,10 +884,9 @@ public class SkillVerificationService {
 
         Worker worker = req.getWorker();
         int spToDeduct = req.getSpAwarded() != null ? req.getSpAwarded() : VerificationTier.AI_DOCUMENT.getSpVerify();
-        Set<String> affectedJobTypes = new LinkedHashSet<>();
-        if (req.getJobType() != null && !req.getJobType().isBlank()) {
-            affectedJobTypes.add(req.getJobType());
-        }
+        Map<UUID, Skill> affectedSkills = new LinkedHashMap<>();
+        Map<UUID, WorkerSkill> updatedBySkillId = new LinkedHashMap<>();
+        Set<String> fallbackJobTypes = new LinkedHashSet<>();
 
         // Hoàn tác tất cả WorkerSkill được cấp từ yêu cầu này
         List<WorkerSkill> linkedSkills = new ArrayList<>(workerSkillRepository.findByEvidenceRequestId(req.getId()));
@@ -878,8 +896,8 @@ public class SkillVerificationService {
         }
 
         for (WorkerSkill ws : linkedSkills) {
-            if (ws.getSkill() != null && ws.getSkill().getName() != null) {
-                affectedJobTypes.add(ws.getSkill().getName());
+            if (ws.getSkill() != null && ws.getSkill().getSkillId() != null) {
+                affectedSkills.put(ws.getSkill().getSkillId(), ws.getSkill());
             }
             if (ws.getVerificationTier() == VerificationTier.AI_DOCUMENT) {
                 ws.setVerificationTier(VerificationTier.SELF_DECLARED);
@@ -889,10 +907,61 @@ public class SkillVerificationService {
                 ws.setEvidenceRequestId(null);
                 workerSkillRepository.save(ws);
             }
+            if (ws.getSkill() != null && ws.getSkill().getSkillId() != null) {
+                updatedBySkillId.put(ws.getSkill().getSkillId(), ws);
+            }
         }
 
-        // Tính lại SP_verify cho các jobType bị ảnh hưởng (khấu trừ chuẩn xác, không bị âm)
-        for (String jobType : affectedJobTypes) {
+        if (req.getSkill() != null && req.getSkill().getSkillId() != null) {
+            affectedSkills.putIfAbsent(req.getSkill().getSkillId(), req.getSkill());
+        }
+        if (affectedSkills.isEmpty() && req.getJobType() != null && !req.getJobType().isBlank()) {
+            Optional<Skill> matched = skillRepository.findByNameIgnoreCase(req.getJobType().trim());
+            if (matched.isPresent()) {
+                affectedSkills.put(matched.get().getSkillId(), matched.get());
+            } else {
+                fallbackJobTypes.add(req.getJobType().trim());
+            }
+        }
+
+        // Tính lại chính xác SP_verify theo từng Skill ID bị ảnh hưởng (không trừ nhầm toàn phần sang từng kỹ năng)
+        for (Skill skill : affectedSkills.values()) {
+            WorkerSkillPoint sp = findSkillPointForSkill(worker.getWorkerId(), skill).orElse(null);
+            if (sp == null) {
+                continue;
+            }
+            if (sp.getSkill() == null) {
+                sp.setSkill(skill);
+            }
+            WorkerSkill currentWs = updatedBySkillId.get(skill.getSkillId());
+            if (currentWs == null) {
+                currentWs = workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(worker.getWorkerId(), skill.getSkillId())
+                        .orElse(null);
+            }
+            int newVerify;
+            if (currentWs != null) {
+                int remaining = currentWs.getSpVerifyAwarded() != null ? currentWs.getSpVerifyAwarded() : 0;
+                if (currentWs.getVerificationTier() == VerificationTier.PLATFORM_PROVEN) {
+                    remaining = Math.max(remaining, VerificationTier.PLATFORM_PROVEN.getSpVerify());
+                } else if (currentWs.getVerificationTier() == VerificationTier.SELF_DECLARED) {
+                    remaining = 0;
+                }
+                newVerify = Math.max(0, remaining);
+            } else {
+                int currentVerify = sp.getSpVerify() != null ? sp.getSpVerify() : 0;
+                int deductForSkill = Math.min(spToDeduct, VerificationTier.AI_DOCUMENT.getSpVerify());
+                newVerify = Math.max(0, currentVerify - deductForSkill);
+            }
+
+            int exp = sp.getSpExperience() != null ? sp.getSpExperience() : 0;
+            int rating = sp.getSpRating() != null ? sp.getSpRating() : 0;
+            sp.setSpVerify(newVerify);
+            sp.setTotalSp(Math.max(0, newVerify + exp + rating));
+            sp.setTier(SkillTier.fromTotalSp(sp.getTotalSp()));
+            workerSkillPointRepository.save(sp);
+        }
+
+        for (String jobType : fallbackJobTypes) {
             workerSkillPointRepository.findByWorker_WorkerIdAndJobType(worker.getWorkerId(), jobType)
                     .ifPresent(sp -> {
                         int currentVerify = sp.getSpVerify() != null ? sp.getSpVerify() : 0;
@@ -1013,6 +1082,9 @@ public class SkillVerificationService {
             }
         }
 
+        Map<UUID, Skill> managedSkillMap = new LinkedHashMap<>();
+        Map<UUID, WorkerSkill> updatedWorkerSkills = new LinkedHashMap<>();
+
         for (Skill s : skills) {
             Skill managedSkill = (s.getSkillId() != null)
                     ? skillRepository.findById(s.getSkillId()).orElse(s)
@@ -1036,58 +1108,80 @@ public class SkillVerificationService {
             ws.setVerifiedAt(now);
             ws.setExpiresAt(effectiveExpiry);
             ws.setEvidenceRequestId(requestId);
-            workerSkillRepository.save(ws);
+            WorkerSkill savedWs = workerSkillRepository.save(ws);
+            if (managedSkill.getSkillId() != null) {
+                managedSkillMap.put(managedSkill.getSkillId(), managedSkill);
+                updatedWorkerSkills.put(managedSkill.getSkillId(), savedWs);
+            }
         }
 
-        String effectiveJobType = (jobType != null && !jobType.isBlank() && !DEFAULT_UNSPECIFIED_JOB_TYPE.equals(jobType))
-                ? jobType
-                : (!skills.isEmpty() ? skills.get(0).getName() : DEFAULT_UNSPECIFIED_JOB_TYPE);
+        SkillTier highestSyncedTier = worker.getSkillTier() != null ? worker.getSkillTier() : SkillTier.STARTER;
 
-        if (DEFAULT_UNSPECIFIED_JOB_TYPE.equals(effectiveJobType)) {
-            return;
-        }
+        if (!managedSkillMap.isEmpty()) {
+            for (Skill managedSkill : managedSkillMap.values()) {
+                WorkerSkillPoint wsp = findOrCreateSkillPoint(worker, managedSkill);
+                WorkerSkill wsForSkill = updatedWorkerSkills.get(managedSkill.getSkillId());
+                int skillVerifySp = (wsForSkill != null && wsForSkill.getSpVerifyAwarded() != null)
+                        ? wsForSkill.getSpVerifyAwarded()
+                        : VerificationTier.AI_DOCUMENT.getSpVerify();
 
-        WorkerSkillPoint wsp = workerSkillPointRepository.findByWorker_WorkerIdAndJobType(worker.getWorkerId(), effectiveJobType)
-                .orElseGet(() -> WorkerSkillPoint.builder()
-                        .worker(worker)
-                        .jobType(effectiveJobType)
-                        .spVerify(0)
-                        .spExperience(0)
-                        .spRating(0)
-                        .totalSp(0)
-                        .tier(SkillTier.STARTER)
-                        .build()
+                // Đồng bộ sp_verify theo đúng Skill ID (idempotent, không cộng dồn khi retry)
+                wsp.setSpVerify(skillVerifySp);
+                int exp = wsp.getSpExperience() != null ? wsp.getSpExperience() : 0;
+                int rating = wsp.getSpRating() != null ? wsp.getSpRating() : 0;
+                wsp.setTotalSp(skillVerifySp + exp + rating);
+
+                SkillTier calculatedTier = SkillTier.fromTotalSp(wsp.getTotalSp());
+                wsp.setTier(calculatedTier);
+                workerSkillPointRepository.save(wsp);
+
+                if (calculatedTier.ordinal() > highestSyncedTier.ordinal()) {
+                    highestSyncedTier = calculatedTier;
+                }
+            }
+        } else {
+            String effectiveJobType = (jobType != null && !jobType.isBlank() && !DEFAULT_UNSPECIFIED_JOB_TYPE.equals(jobType))
+                    ? jobType.trim()
+                    : DEFAULT_UNSPECIFIED_JOB_TYPE;
+            if (!DEFAULT_UNSPECIFIED_JOB_TYPE.equals(effectiveJobType)) {
+                WorkerSkillPoint wsp = workerSkillPointRepository.findByWorker_WorkerIdAndJobType(worker.getWorkerId(), effectiveJobType)
+                        .orElseGet(() -> WorkerSkillPoint.builder()
+                                .worker(worker)
+                                .jobType(effectiveJobType)
+                                .spVerify(0)
+                                .spExperience(0)
+                                .spRating(0)
+                                .totalSp(0)
+                                .tier(SkillTier.STARTER)
+                                .avgRating(BigDecimal.ZERO)
+                                .ratingCount(0)
+                                .build()
+                        );
+                int totalSpVerifyForJob = Math.max(
+                        wsp.getSpVerify() != null ? wsp.getSpVerify() : 0,
+                        VerificationTier.AI_DOCUMENT.getSpVerify()
                 );
+                wsp.setSpVerify(totalSpVerifyForJob);
+                int exp = wsp.getSpExperience() != null ? wsp.getSpExperience() : 0;
+                int rating = wsp.getSpRating() != null ? wsp.getSpRating() : 0;
+                wsp.setTotalSp(totalSpVerifyForJob + exp + rating);
+                SkillTier calculatedTier = SkillTier.fromTotalSp(wsp.getTotalSp());
+                wsp.setTier(calculatedTier);
+                workerSkillPointRepository.save(wsp);
 
-        // Tính lại sp_verify idempotent từ bảng worker_skills (chống cộng dồn trùng lặp)
-        int totalSpVerifyForJob = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId()).stream()
-                .filter(ws -> ws.getSkill() != null && ws.getSkill().getName().equalsIgnoreCase(effectiveJobType))
-                .mapToInt(ws -> ws.getSpVerifyAwarded() != null ? ws.getSpVerifyAwarded() : 0)
-                .sum();
-
-        if (totalSpVerifyForJob == 0 && !skills.isEmpty()) {
-            totalSpVerifyForJob = Math.max(
-                    wsp.getSpVerify() != null ? wsp.getSpVerify() : 0,
-                    VerificationTier.AI_DOCUMENT.getSpVerify()
-            );
+                if (calculatedTier.ordinal() > highestSyncedTier.ordinal()) {
+                    highestSyncedTier = calculatedTier;
+                }
+            }
         }
 
-        wsp.setSpVerify(totalSpVerifyForJob);
-        int exp = wsp.getSpExperience() != null ? wsp.getSpExperience() : 0;
-        int rating = wsp.getSpRating() != null ? wsp.getSpRating() : 0;
-        wsp.setTotalSp(totalSpVerifyForJob + exp + rating);
-
-        SkillTier calculatedTier = SkillTier.fromTotalSp(wsp.getTotalSp());
-        wsp.setTier(calculatedTier);
-        workerSkillPointRepository.save(wsp);
-
-        if (worker.getSkillTier() == null || calculatedTier.ordinal() > worker.getSkillTier().ordinal()) {
-            worker.setSkillTier(calculatedTier);
+        if (worker.getSkillTier() == null || highestSyncedTier.ordinal() > worker.getSkillTier().ordinal()) {
+            worker.setSkillTier(highestSyncedTier);
             workerRepository.save(worker);
         }
 
-        log.info("Worker {} approved for jobType '{}', total SP: {}, Tier: {}",
-                worker.getWorkerId(), effectiveJobType, wsp.getTotalSp(), calculatedTier);
+        log.info("Worker {} approved for {} skill(s), highest Tier: {}",
+                worker.getWorkerId(), managedSkillMap.size(), highestSyncedTier);
     }
 
     private void recomputeWorkerOverallTier(Worker worker) {
@@ -1124,21 +1218,80 @@ public class SkillVerificationService {
         return skills;
     }
 
-    private void ensureWorkerSkillPoint(Worker worker, String jobType) {
-        if (jobType == null || jobType.isBlank()) {
-            return;
+    private Optional<WorkerSkillPoint> findSkillPointForSkill(UUID workerId, Skill skill) {
+        if (workerId == null || skill == null) {
+            return Optional.empty();
         }
-        workerSkillPointRepository.findByWorker_WorkerIdAndJobType(worker.getWorkerId(), jobType)
-                .orElseGet(() -> workerSkillPointRepository.save(WorkerSkillPoint.builder()
+        if (skill.getSkillId() != null) {
+            Optional<WorkerSkillPoint> bySkillId = workerSkillPointRepository
+                    .findByWorker_WorkerIdAndSkill_SkillId(workerId, skill.getSkillId());
+            if (bySkillId.isPresent()) {
+                return bySkillId;
+            }
+        }
+        if (skill.getName() != null && !skill.getName().isBlank()) {
+            Optional<WorkerSkillPoint> byName = workerSkillPointRepository
+                    .findByWorker_WorkerIdAndJobType(workerId, skill.getName());
+            if (byName.isEmpty()) {
+                byName = workerSkillPointRepository.findFirstByWorker_WorkerIdAndJobTypeIgnoreCase(workerId, skill.getName().trim());
+            }
+            if (byName.isPresent()) {
+                WorkerSkillPoint found = byName.get();
+                if (found.getSkill() == null) {
+                    found.setSkill(skill);
+                }
+                return Optional.of(found);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private WorkerSkillPoint findOrCreateSkillPoint(Worker worker, Skill skill) {
+        return findSkillPointForSkill(worker.getWorkerId(), skill)
+                .orElseGet(() -> WorkerSkillPoint.builder()
                         .worker(worker)
-                        .jobType(jobType)
+                        .skill(skill)
+                        .jobType(skill.getName())
                         .spVerify(0)
                         .spExperience(0)
                         .spRating(0)
                         .totalSp(0)
                         .tier(SkillTier.STARTER)
+                        .totalShiftsCompleted(0)
+                        .totalShiftsCancelled(0)
+                        .avgRating(BigDecimal.ZERO)
+                        .ratingCount(0)
                         .build()
-                ));
+                );
+    }
+
+    private void ensureWorkerSkillPoint(Worker worker, Skill skill) {
+        if (worker == null || skill == null || skill.getName() == null || skill.getName().isBlank()) {
+            return;
+        }
+        Optional<WorkerSkillPoint> existing = findSkillPointForSkill(worker.getWorkerId(), skill);
+        if (existing.isPresent()) {
+            WorkerSkillPoint wsp = existing.get();
+            if (wsp.getSkill() == null) {
+                wsp.setSkill(skill);
+                workerSkillPointRepository.save(wsp);
+            }
+            return;
+        }
+        workerSkillPointRepository.save(WorkerSkillPoint.builder()
+                .worker(worker)
+                .skill(skill)
+                .jobType(skill.getName())
+                .spVerify(0)
+                .spExperience(0)
+                .spRating(0)
+                .totalSp(0)
+                .tier(SkillTier.STARTER)
+                .totalShiftsCompleted(0)
+                .totalShiftsCancelled(0)
+                .avgRating(BigDecimal.ZERO)
+                .ratingCount(0)
+                .build());
     }
 
     private Skill resolveLinkedSkill(
@@ -1366,18 +1519,90 @@ public class SkillVerificationService {
             return existing.get();
         }
 
+        Optional<Skill> matchedTaxonomy = matchActiveSkillByAlias(trimmedName);
+        if (matchedTaxonomy.isPresent()) {
+            return matchedTaxonomy.get();
+        }
+
         String category = (rawCategory != null && !rawCategory.trim().isEmpty())
                 ? rawCategory.trim()
-                : "Tự chọn";
+                : "Đề xuất";
 
-        Skill newSkill = Skill.builder()
+        // Không tự tạo Skill active tràn lan vào taxonomy chính; lưu ở trạng thái đề xuất (is_active = false)
+        Skill proposalSkill = Skill.builder()
                 .name(trimmedName)
                 .category(category)
-                .description("Kỹ năng bổ sung do người dùng nhập")
-                .isActive(true)
+                .description("Đề xuất kỹ năng mới do EO/Worker nhập - chờ chuẩn hóa vào danh mục")
+                .isActive(false)
                 .build();
 
-        return skillRepository.save(newSkill);
+        return skillRepository.save(proposalSkill);
+    }
+
+    private Optional<Skill> matchActiveSkillByAlias(String rawName) {
+        String normalizedInput = SkillTrustScoringEngine.normalizeName(rawName);
+        if (normalizedInput.isBlank()) {
+            return Optional.empty();
+        }
+        List<Skill> activeSkills = skillRepository.findByIsActiveTrue();
+        if (activeSkills == null || activeSkills.isEmpty()) {
+            return Optional.empty();
+        }
+
+        for (Skill skill : activeSkills) {
+            if (skill.getName() == null) {
+                continue;
+            }
+            String normSkill = SkillTrustScoringEngine.normalizeName(skill.getName());
+            if (normSkill.equals(normalizedInput)) {
+                return Optional.of(skill);
+            }
+        }
+
+        // Alias chuẩn cho các tên gọi phổ biến tại Việt Nam -> ánh xạ về Skill chuẩn đang active
+        Map<String, String> aliasHints = Map.ofEntries(
+                Map.entry("waiter", "phuc vu ban"),
+                Map.entry("waitress", "phuc vu ban"),
+                Map.entry("chay ban", "phuc vu ban"),
+                Map.entry("phuc vu", "phuc vu ban"),
+                Map.entry("bartender", "pha che"),
+                Map.entry("barista", "pha che"),
+                Map.entry("pha che", "pha che"),
+                Map.entry("check in", "le tan"),
+                Map.entry("checkin", "le tan"),
+                Map.entry("le tan", "le tan"),
+                Map.entry("cashier", "thu ngan"),
+                Map.entry("thu ngan", "thu ngan"),
+                Map.entry("security", "bao ve"),
+                Map.entry("bao ve", "bao ve"),
+                Map.entry("setup", "hau can"),
+                Map.entry("hau can", "hau can"),
+                Map.entry("logistics", "hau can"),
+                Map.entry("coordinator", "dieu phoi su kien"),
+                Map.entry("dieu phoi", "dieu phoi su kien"),
+                Map.entry("sound", "ky thuat am thanh"),
+                Map.entry("lighting", "ky thuat am thanh"),
+                Map.entry("am thanh", "ky thuat am thanh"),
+                Map.entry("anh sang", "ky thuat am thanh"),
+                Map.entry("phu bep", "phu bep"),
+                Map.entry("pg", "pg / pb"),
+                Map.entry("pb", "pg / pb")
+        );
+
+        String targetHint = null;
+        for (Map.Entry<String, String> entry : aliasHints.entrySet()) {
+            if (normalizedInput.equals(entry.getKey()) || normalizedInput.contains(entry.getKey())) {
+                targetHint = entry.getValue();
+                break;
+            }
+        }
+        if (targetHint != null) {
+            final String hint = targetHint;
+            return activeSkills.stream()
+                    .filter(s -> s.getName() != null && SkillTrustScoringEngine.normalizeName(s.getName()).contains(hint))
+                    .findFirst();
+        }
+        return Optional.empty();
     }
 
     @Transactional(readOnly = true)

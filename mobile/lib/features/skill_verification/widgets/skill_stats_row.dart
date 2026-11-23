@@ -16,7 +16,9 @@ class SkillStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int activeCount = mySkills.length;
-    final int verifiedCount = mySkills.where((s) => s.isTier2AiVerified || s.isTier3PlatformProven).length;
+    final int verifiedCount = mySkills
+        .where((s) => (s.isTier2AiVerified && !s.isExpired) || s.isTier3PlatformProven)
+        .length;
 
     return Row(
       children: [
@@ -25,11 +27,11 @@ class SkillStatsRow extends StatelessWidget {
           value: '$totalSp SP',
           icon: Icons.bolt_rounded,
           iconColor: SkillHubColors.ctaHover,
-          bgColor: const Color(0xFFE8F9FD),
+          bgColor: SkillHubColors.infoBg,
         ),
         const SizedBox(width: 10),
         _buildStatCard(
-          label: 'Kỹ năng khả dụng',
+          label: 'Kỹ năng hồ sơ',
           value: '$activeCount',
           icon: Icons.checklist_rounded,
           iconColor: SkillHubColors.textPrimary,
@@ -37,11 +39,11 @@ class SkillStatsRow extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         _buildStatCard(
-          label: 'Huy hiệu đã duyệt',
+          label: 'Đã xác minh',
           value: '$verifiedCount',
           icon: Icons.verified_rounded,
-          iconColor: Colors.green.shade700,
-          bgColor: const Color(0xFFE8F8F0),
+          iconColor: SkillHubColors.successText,
+          bgColor: SkillHubColors.successBg,
         ),
       ],
     );
@@ -73,10 +75,7 @@ class SkillStatsRow extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: bgColor,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
               child: Icon(icon, color: iconColor, size: 18),
             ),
             const SizedBox(height: 6),

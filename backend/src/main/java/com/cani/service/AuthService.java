@@ -9,6 +9,7 @@ import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
+import com.cani.exception.AccountLockedException;
 import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
@@ -47,6 +48,9 @@ public class AuthService {
     private final NotificationService notificationService;
     private final org.springframework.core.env.Environment environment;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AccountAppealService accountAppealService;
+
     @Transactional
     public UserDto register(RegisterRequest request) {
         // 0. Xác thực mã OTP 6 số đã gửi tới email người dùng
@@ -79,7 +83,7 @@ public class AuthService {
                     assignedRole.name(),
                     request.getCompanyName());
         } catch (Exception e) {
-            log.warn("Không thể tạo user qua Supabase GoTrue (fallback local registration): {}", e.getMessage());
+            log.warn("Không thể tạo user qua Supabase GoTrue (fallback local registration): {}", e.getClass().getSimpleName());
         }
 
         UUID userId = (supabaseUser != null && supabaseUser.getId() != null)
@@ -149,12 +153,12 @@ public class AuthService {
                             "EKYC",
                             finalUser.getUserId());
                 } catch (Exception e) {
-                    log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getMessage());
+                    log.warn("Không thể gửi thông báo chào mừng eKYC: {}", e.getClass().getSimpleName());
                 }
             }
         }
 
-        log.info("Đã đăng ký tài khoản thành công cho user: {}, role: {}", savedUser.getEmail(), assignedRole);
+        log.info("Đã đăng ký tài khoản thành công cho user: {}, role: {}", savedUser.getUserId(), assignedRole);
         return toUserDto(savedUser);
     }
 
@@ -168,7 +172,7 @@ public class AuthService {
             // Re-throw lỗi xác thực sai mật khẩu từ GoTrue, không nuốt thành lỗi kết nối
             throw e;
         } catch (Exception e) {
-            log.warn("Supabase GoTrue auth failed or unreachable: {}. Falling back to local check...", e.getMessage());
+            log.warn("Supabase GoTrue auth failed or unreachable: {}. Falling back to local check...", e.getClass().getSimpleName());
         }
 
         UUID userId;
@@ -208,9 +212,7 @@ public class AuthService {
                 .or(() -> userRepository.findByEmail(email))
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy thông tin tài khoản trong hệ thống"));
 
-        if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
-            throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
-        }
+        checkUserNotLocked(user);
 
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
@@ -333,9 +335,7 @@ public class AuthService {
                 }
             }
 
-            if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
-                throw new BadRequestException("Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động");
-            }
+            checkUserNotLocked(user);
 
             // Đảm bảo hồ sơ EventOrganizer luôn sẵn sàng nếu user là EVENT_ORGANIZER
             if (user.getRole() == UserRole.EVENT_ORGANIZER) {
@@ -358,7 +358,7 @@ public class AuthService {
                     .user(toUserDto(finalSavedUser))
                     .build();
         } catch (JwtException e) {
-            log.error("Token Supabase Google không hợp lệ: {}", e.getMessage());
+            log.error("Token Supabase Google không hợp lệ: {}", e.getClass().getSimpleName());
             throw new BadRequestException("Token xác thực Google không hợp lệ hoặc đã hết hạn");
         }
     }
@@ -444,6 +444,23 @@ public class AuthService {
                 .expiresIn(session.getExpiresIn())
                 .user(toUserDto(user))
                 .build();
+    }
+
+    private void checkUserNotLocked(User user) {
+        if (user.getStatus() == UserStatus.LOCKED || user.getStatus() == UserStatus.SUSPENDED) {
+            String lockReason = accountAppealService != null
+                    ? accountAppealService.findLatestLockReason(user.getUserId())
+                    : "Tài khoản bị tạm khóa do vi phạm chính sách hoặc điều khoản hoạt động của hệ thống CANi.";
+            String appealToken = "appeal-token-" + user.getUserId() + "-" + System.currentTimeMillis();
+            throw new AccountLockedException(
+                    "Tài khoản của bạn đã bị khóa hoặc tạm ngưng hoạt động",
+                    user.getEmail(),
+                    user.getRole() != null ? user.getRole().name() : "EVENT_ORGANIZER",
+                    user.getStatus().name(),
+                    lockReason,
+                    appealToken
+            );
+        }
     }
 
     private UserDto toUserDto(User user) {

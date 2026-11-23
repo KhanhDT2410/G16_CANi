@@ -126,21 +126,23 @@ class _SkillPointPolicyDialogState extends State<SkillPointPolicyDialog> {
                           'Điểm Kỹ Năng (Skill Points - SP) định lượng năng lực chuyên môn và độ tin cậy của bạn trên nền tảng CANi. Điểm SP trực tiếp quyết định cấp bậc hạng tài khoản và quyền ưu tiên nhận các ca sự kiện có thù lao cao.',
                         ),
                         _buildSection(
-                          '2. Cơ Chế Tính Điểm Minh Bạch',
-                          'Tổng SP = SP Thẩm định + SP Thực chiến + SP Đánh giá\n\n'
-                          '• SP Thẩm định (+25 SP/kỹ năng): Nhận khi chứng chỉ hoặc chứng chỉ nghề được AI/Quản trị viên phê duyệt (thời hạn 24 tháng theo quy chuẩn).\n'
-                          '• SP Thực chiến (+2 SP/ca): Tự động tích lũy sau mỗi ca sự kiện hoàn thành và được xác nhận.\n'
-                          '• SP Đánh giá: Điểm thưởng tích lũy từ các đánh giá 5 sao của Nhà tổ chức sự kiện.',
+                          '2. Cơ Chế Tính Điểm Minh Bạch Theo Từng Kỹ Năng',
+                          'Tổng SP kỹ năng = SP Xác minh + SP Kinh nghiệm + SP Đánh giá\n\n'
+                          '• SP Xác minh: +25 SP khi chứng chỉ được AI hỗ trợ đọc và Admin/hệ thống phê duyệt; nâng lên +50 SP khi kỹ năng được chứng minh qua ca làm thực tế.\n'
+                          '• SP Kinh nghiệm (+20 SP/ca): Tự động tích lũy cho đúng kỹ năng thực hiện chính sau mỗi ca hoàn thành và được Ban tổ chức xác nhận.\n'
+                          '• SP Đánh giá (+15 SP cho 5 sao, +5 SP cho 4 sao): Chỉ tính từ đánh giá thật do Ban tổ chức gửi sau ca làm.',
                         ),
                         _buildSection(
-                          '3. 7 Hạng Bậc & Quyền Lợi Ca Làm',
-                          '• Hạng Khởi Đầu (0 - 99 SP): Tiếp cận các ca sự kiện cơ bản.\n'
-                          '• Hạng Đồng (100 - 199 SP): Ưu tiên nhận đề xuất ca gần vị trí hiện tại.\n'
-                          '• Hạng Bạc (200 - 349 SP): Tự động ghép nối nhanh với các đối tác tổ chức uy tín.\n'
-                          '• Hạng Vàng (350 - 499 SP): Ưu tiên ứng tuyển ca VIP với mức thù lao cao hơn.\n'
-                          '• Hạng Bạch Kim (500 - 699 SP): Nhận thông báo ca khẩn cấp sớm hơn 15 phút.\n'
-                          '• Hạng Kim Cương (700 - 899 SP): Hồ sơ hiển thị nổi bật trên bản đồ Radar việc làm.\n'
-                          '• Hạng Tinh Anh - Master (900+ SP): Nhân sự sự kiện cao cấp, ưu tiên tuyệt đối.',
+                          '3. Phân Biệt Mức Phát Triển & Mức Xác Minh',
+                          'Hai khái niệm này hoạt động độc lập cho từng kỹ năng:\n\n'
+                          'A. 3 Mức phát triển trên giao diện (quy đổi từ 7 hạng SP):\n'
+                          '• Mới bắt đầu (Khởi đầu 0-99 SP · Đồng 100-199 SP)\n'
+                          '• Có kinh nghiệm (Bạc 200-349 SP · Vàng 350-499 SP · Bạch kim 500-699 SP)\n'
+                          '• Thành thạo (Kim cương 700-899 SP · Tinh anh 900+ SP)\n\n'
+                          'B. 3 Mức xác minh bằng chứng:\n'
+                          '• Tự khai báo: Bạn tự thêm kỹ năng vào hồ sơ.\n'
+                          '• Đã xác thực tài liệu: AI hỗ trợ trích xuất thông tin chứng chỉ và được phê duyệt (hiệu lực tối đa 24 tháng).\n'
+                          '• Đã chứng minh qua ca làm: Từ 3 ca hoàn thành trở lên, tỷ lệ hoàn thành ≥ 85%, điểm uy tín ≥ 70, tỷ lệ vắng mặt ≤ 5% và đánh giá thật ≥ 4.5 sao.',
                         ),
                         _buildSection(
                           '4. Chế Tài Kỷ Luật (Chính Sách Bỏ Ca - No-Show)',

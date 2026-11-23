@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { CollapseToggleIcon, ChevronDownIcon } from './AdminSidebarIcons';
 import { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS } from './adminSidebar.constants';
 import { useStaffChatAlerts } from '../../../features/support-tickets';
+import { usePendingAccountAppeals } from '../../../features/account-appeals';
+import { useDisputeChatAlerts } from '../../../features/disputes';
 
 export { ADMIN_NAV_GROUPS, TICKET_SUB_ITEMS };
 
@@ -19,6 +21,8 @@ export const AdminSidebar = ({
 }) => {
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
   const { totalUnread } = useStaffChatAlerts();
+  const { pendingCount } = usePendingAccountAppeals();
+  const { unreadDisputes } = useDisputeChatAlerts();
 
   const renderExpandableItem = (item, isExpanded, onToggleExpand, subItems, activeKey, onSubClick) => {
     const isActive = activeTab === item.id;
@@ -131,16 +135,57 @@ export const AdminSidebar = ({
                 }
 
                 const isActive = activeTab === item.id;
+                const isAccountAppeals = item.id === 'account_appeals';
+                const isDisputes = item.id === 'disputes';
+                const showAppealBadge = isAccountAppeals && pendingCount > 0;
+                const showDisputeBadge = isDisputes && unreadDisputes > 0;
+                const hasBadge = showAppealBadge || showDisputeBadge;
+                const badgeCount = showAppealBadge ? pendingCount : unreadDisputes;
+
                 return (
                   <button
                     key={item.id}
                     type="button"
                     className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => onSelectTab(item.id)}
-                    title={item.label}
+                    title={
+                      showAppealBadge
+                        ? `${item.label} (${pendingCount} đơn chờ duyệt)`
+                        : showDisputeBadge
+                        ? `${item.label} (${unreadDisputes} vụ việc có tin mới)`
+                        : item.label
+                    }
                   >
-                    <span className="sidebar-item-icon">{item.icon}</span>
-                    {!collapsed && <span className="sidebar-item-label">{item.label}</span>}
+                    <span className="sidebar-item-icon" style={{ position: 'relative' }}>
+                      {item.icon}
+                      {hasBadge && (
+                        <span
+                          className="sidebar-item-dot-badge"
+                          title={
+                            showAppealBadge
+                              ? `${pendingCount} đơn giải trình chờ duyệt`
+                              : `${unreadDisputes} vụ việc có tin nhắn mới`
+                          }
+                        />
+                      )}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="sidebar-item-label">{item.label}</span>
+                        {hasBadge && (
+                          <span
+                            className="sidebar-sub-badge"
+                            title={
+                              showAppealBadge
+                                ? `${pendingCount} đơn giải trình đang chờ Admin xét duyệt`
+                                : `${unreadDisputes} vụ việc có tin nhắn mới`
+                            }
+                          >
+                            {badgeCount > 99 ? '99+' : badgeCount}
+                          </span>
+                        )}
+                      </>
+                    )}
                     {isActive && <span className="sidebar-active-indicator" />}
                   </button>
                 );

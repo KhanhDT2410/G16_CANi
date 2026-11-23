@@ -77,7 +77,7 @@ public class InviteController {
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        JoinInviteResponseDto response = inviteService.joinViaInviteCode(userId, request.getCode());
+        JoinInviteResponseDto response = inviteService.joinViaInviteCode(userId, request.getCode(), request.getOverrideReason());
         return ResponseEntity.ok(ApiResponse.ok(response, response.getMessage()));
     }
 }

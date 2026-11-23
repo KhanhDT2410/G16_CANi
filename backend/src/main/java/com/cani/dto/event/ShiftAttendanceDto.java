@@ -29,6 +29,14 @@ public class ShiftAttendanceDto {
     private UUID shiftId;
     private String jobType;
     private String shiftName;
+    private UUID performedSkillId;
+    private String performedSkillName;
+    private UUID confirmedPerformedSkillId;
+    private String confirmedPerformedSkillName;
+    private Boolean spExperienceAwarded;
+    private Instant spExperienceAwardedAt;
+    private Boolean spRatingAwarded;
+    private String inviteOverrideReason;
     private String assignmentStatus;
     private Instant checkinTime;
     private Instant checkoutTime;
@@ -43,7 +51,13 @@ public class ShiftAttendanceDto {
     private String proofImageUrl;
     private String paymentStatus;
     private String paymentProofUrl;
+    private String externalRef;
+    private Instant declaredAt;
     private BigDecimal agreedWage;
+    private BigDecimal declaredAmount;
+    private String paymentMethod;
+    private String workerConfirmStatus;
+    private String workerComment;
     private String workerBio;
     private Integer yearsExperience;
 

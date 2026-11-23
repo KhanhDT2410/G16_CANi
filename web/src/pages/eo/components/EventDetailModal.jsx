@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
-import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
+import { showPrompt } from '../../../components/common/PromptModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import { getDynamicEventStatus, getDynamicShiftStatus, getShiftStaffingAlerts } from '../utils/eventHelpers';
+import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
+import ShiftEmergencyBanner from './ShiftEmergencyBanner';
+import {
+  getDynamicEventStatus,
+  getDynamicShiftStatus,
+  getShiftStaffingAlerts,
+  getShiftStaffingSummary,
+  resolveEventEstimatedCost,
+} from '../utils/eventHelpers';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import './EventDetailModal.css';
@@ -36,6 +45,8 @@ export default function EventDetailModal({
   const workerProfile = useWorkerProfile();
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
+  const [emergencyConfirmShift, setEmergencyConfirmShift] = useState(null);
+  const [dispatchResultsByShiftId, setDispatchResultsByShiftId] = useState({});
 
   useEffect(() => {
     if (initialTab) {
@@ -97,32 +108,6 @@ export default function EventDetailModal({
     }
   };
 
-  const handleToggleEmergency = async (shift, enable) => {
-    const confirmed = await showConfirm({
-      title: enable ? `Bật điều phối khẩn cấp (${shift.jobType})` : `Tắt điều phối khẩn cấp (${shift.jobType})`,
-      description: enable
-        ? 'Hệ thống sẽ phát thông báo khẩn cấp đến nhân sự trong bán kính tối đa 15km để chủ động nhận ca trực tiếp trên bản đồ.'
-        : `Bạn có chắc chắn muốn TẮT chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
-      type: enable ? 'warning' : 'info',
-      confirmText: enable ? 'Bật khẩn cấp' : 'Tắt chế độ',
-    });
-    if (!confirmed) return;
-
-    try {
-      if (enable) {
-        await eoService.enableEmergencyDispatch(shift.shiftId, 15);
-        showToast(`Đã bật chế độ khẩn cấp cho ca "${shift.jobType}".`, 'success');
-      } else {
-        await eoService.disableEmergencyDispatch(shift.shiftId);
-        showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
-      }
-      onReloadEvents?.();
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Lỗi thao tác điều phối khẩn cấp';
-      showToast(msg, 'error');
-    }
-  };
-
   const rawShifts = event?.shifts || [];
   const activeAndDraftShifts = rawShifts
     .filter((sh) => sh.status !== 'CANCELLED')
@@ -133,7 +118,7 @@ export default function EventDetailModal({
     });
   const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
   const shifts = activeAndDraftShifts;
-  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts), [shifts]);
+  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts, event), [shifts, event]);
 
   // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
   const skillNameMap = useMemo(() => {
@@ -166,10 +151,7 @@ export default function EventDetailModal({
   const totalConfirmed = event.totalConfirmedWorkers || shifts.reduce((s, sh) => s + (sh.confirmedWorkers || 0), 0);
   const fillRate = totalRequired > 0 ? Math.round((totalConfirmed / totalRequired) * 100) : 0;
   const hasStaffingShortage = staffingAlerts.length > 0 || (totalRequired > 0 && fillRate < 50);
-  const totalCost = event.totalEstimatedCost || shifts.reduce((s, sh) => {
-    const hours = sh.startTime && sh.endTime ? Math.max(0.5, (new Date(sh.endTime) - new Date(sh.startTime)) / 3600000) : 4;
-    return s + (hours * (sh.requiredWorkers || 1) * (sh.hourlyWage || 50000) + (sh.allowance || 0));
-  }, 0);
+  const totalCost = resolveEventEstimatedCost(event);
 
   const formatTime = (timeStr, fallback = '--:--') => {
     if (!timeStr) return fallback;
@@ -180,10 +162,25 @@ export default function EventDetailModal({
     }
   };
 
-  const skillNames = (shift) =>
-    Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0
-      ? (shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') || `${shift.requiredSkills.length} kỹ năng`)
-      : '';
+  const skillNames = (shift) => {
+    const parts = [];
+    const performedName = shift.performedSkillName || skillNameMap[shift.performedSkillId];
+    if (performedName) {
+      parts.push(`Chính: ${performedName}`);
+    }
+    if (Array.isArray(shift.skillRequirements) && shift.skillRequirements.length > 0) {
+      const reqNames = shift.skillRequirements
+        .map((r) => `${r.requirementType === 'PREFERRED' ? 'Ưu tiên' : 'Bắt buộc'}: ${r.skillName || skillNameMap[r.skillId] || 'Kỹ năng'}`)
+        .join(', ');
+      parts.push(reqNames);
+    } else if (Array.isArray(shift.requiredSkills) && shift.requiredSkills.length > 0) {
+      parts.push(
+        shift.requiredSkills.map((id) => skillNameMap[id]).filter(Boolean).join(', ') ||
+          `${shift.requiredSkills.length} kỹ năng`
+      );
+    }
+    return parts.join(' • ');
+  };
 
   const hasCustomArrival = (shift) =>
     shift.arrivalTime && shift.startTime &&
@@ -236,7 +233,7 @@ export default function EventDetailModal({
 
   const contentBox = (
     <div
-      className={asPage ? 'eo-widget-card animate-fade-in-up' : 'event-detail-modal-box'}
+      className={asPage ? 'eo-widget-card event-detail-workspace' : 'event-detail-modal-box'}
       style={
         asPage
           ? {
@@ -320,47 +317,68 @@ export default function EventDetailModal({
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            {event.status === 'DRAFT' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    showToast('Đã lưu sự kiện ở trạng thái Bản nháp!', 'success');
-                    onReloadEvents?.();
-                  }}
-                  style={{
-                    background: '#ffffff',
-                    color: '#334155',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    padding: '0.45rem 0.95rem',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Lưu Bản Nháp
-                </button>
-                {onOpenConfirmPublish && (
+            {event.status === 'DRAFT' && (() => {
+              const dynEvt = getDynamicEventStatus(event);
+              const activeShiftCnt = shifts.length || Number(event.totalShifts || 0);
+              if (dynEvt.isExpiredDraft) {
+                return (
+                  <span
+                    style={{
+                      background: '#fef2f2',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      padding: '0.4rem 0.8rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Bản nháp đã qua giờ — hãy sửa lại thời gian
+                  </span>
+                );
+              }
+              return (
+                <>
                   <button
                     type="button"
-                    onClick={() => onOpenConfirmPublish(event)}
+                    onClick={() => {
+                      showToast('Đã lưu sự kiện ở trạng thái Bản nháp!', 'success');
+                      onReloadEvents?.();
+                    }}
                     style={{
-                      background: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
+                      background: '#ffffff',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
                       borderRadius: '8px',
-                      padding: '0.45rem 1rem',
+                      padding: '0.45rem 0.95rem',
                       fontSize: '0.82rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                     }}
                   >
-                    Đăng Tuyển Ngay
+                    Lưu Bản Nháp
                   </button>
-                )}
-              </>
-            )}
+                  {onOpenConfirmPublish && activeShiftCnt > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenConfirmPublish(event)}
+                      style={{
+                        background: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '0.45rem 1rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Đăng Tuyển Ngay
+                    </button>
+                  )}
+                </>
+              );
+            })()}
             {onOpenEditEvent && (
               <button
                 type="button"
@@ -411,11 +429,16 @@ export default function EventDetailModal({
             )}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                <h3 className="event-detail-title">{event.name}</h3>
+                {asPage ? (
+                  <h1 className="event-detail-title">{event.name}</h1>
+                ) : (
+                  <h3 className="event-detail-title">{event.name}</h3>
+                )}
                 {getStatusBadge(event.status)}
               </div>
               <p className="event-detail-sub">
-                Mã sự kiện: <code>{event.eventId}</code> • Ngày tạo: {formatDate(event.createdAt || event.eventDate)}
+                {event.createdAt && <span>Ngày tạo {formatDate(event.createdAt)}</span>}
+                {event.eventId && <code title="Mã sự kiện">{event.eventId}</code>}
               </p>
             </div>
           </div>
@@ -534,15 +557,13 @@ export default function EventDetailModal({
             >
               Chi Tiết Ca Làm Việc ({shifts.length})
             </button>
-            {!onOpenShiftWorkspace && (
-              <button
-                type="button"
-                className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
-                onClick={() => setActiveTab('QR_ATTENDANCE')}
-              >
-                Trạm Điểm Danh & Mã QR Ca
-              </button>
-            )}
+            <button
+              type="button"
+              className={`event-detail-tab-btn ${activeTab === 'QR_ATTENDANCE' ? 'active' : ''}`}
+              onClick={() => setActiveTab('QR_ATTENDANCE')}
+            >
+              Trạm Điểm Danh & Mã QR Ca
+            </button>
             <button
               type="button"
               className={`event-detail-tab-btn ${activeTab === 'WORKERS' ? 'active' : ''}`}
@@ -571,36 +592,29 @@ export default function EventDetailModal({
                 </button>
               </div>
 
-              {/* Banner cảnh báo thiếu hụt nhân sự khẩn cấp */}
+              {/* Cảnh báo thiếu nhân sự sát giờ riêng cho từng ca */}
               {staffingAlerts.length > 0 && (
                 <div
                   style={{
                     marginBottom: '1.15rem',
-                    padding: '0.9rem 1.15rem',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(90deg, #fff1f2 0%, #fff7ed 100%)',
-                    border: '1.5px solid #fda4af',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    flexWrap: 'wrap',
-                    boxShadow: '0 2px 8px rgba(225, 29, 72, 0.08)',
+                    flexDirection: 'column',
+                    gap: '0.6rem',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    <div>
-                      <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#be123c' }}>
-                        CẢNH BÁO THIẾU HỤT NHÂN SỰ ({staffingAlerts.length} ca làm đang hoặc sắp diễn ra thiếu người)
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#881337', marginTop: 3 }}>
-                        {staffingAlerts
-                          .map((s) => `"${s.jobType}" (thiếu ${Math.max(0, (s.requiredWorkers || 1) - (s.confirmedWorkers || 0))} người)`)
-                          .join(', ')}
-                        . Hãy bấm <strong>"Bật Khẩn Cấp"</strong> tại ca để mở rộng phạm vi và cho phép nhân sự nhận ca trực tiếp trên bản đồ.
-                      </div>
-                    </div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#be123c' }}>
+                    Thiếu nhân sự sát giờ ({staffingAlerts.length} ca)
                   </div>
+                  {staffingAlerts.map((alertSummary) => (
+                    <ShiftEmergencyBanner
+                      key={alertSummary.shift.shiftId}
+                      shift={alertSummary.shift}
+                      event={event}
+                      localDispatchResult={dispatchResultsByShiftId[alertSummary.shift.shiftId]}
+                      onTriggerEmergency={(sh) => setEmergencyConfirmShift(sh)}
+                      onOpenInvite={onOpenInvite}
+                    />
+                  ))}
                 </div>
               )}
 
@@ -625,6 +639,7 @@ export default function EventDetailModal({
                     const shiftRequired = shift.requiredWorkers || 1;
                     const shiftRate = Math.round((shiftConfirmed / shiftRequired) * 100);
                     const shDynStatus = getDynamicShiftStatus(shift, event.status);
+                    const isDraft = event?.status === 'DRAFT' || shift?.status === 'DRAFT';
 
                     return (
                       <div key={shift.shiftId || sIdx} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -636,7 +651,7 @@ export default function EventDetailModal({
                                 {formatTime(shift.startTime, '08:00')} - {formatTime(shift.endTime, '12:00')}
                                 {hasCustomArrival(shift) && (
                                   <span style={{ marginLeft: 6, color: '#b45309', fontWeight: 600 }}>
-                                    (Mở điểm danh {formatTime(shift.arrivalTime, '')})
+                                    (Có mặt từ {formatTime(shift.arrivalTime, '')})
                                   </span>
                                 )}
                               </span>
@@ -728,45 +743,47 @@ export default function EventDetailModal({
 
                             {/* Thao tác ca */}
                             <div className="shift-card-actions">
-                              {shift.status !== 'CANCELLED' && shift.status !== 'COMPLETED' && (
+                              {/* Trạng thái mở rộng khẩn cấp */}
+                              {shift.emergency && shiftRequired > shiftConfirmed && (() => {
+                                const summary = getShiftStaffingSummary(shift, event);
+                                const localRes = dispatchResultsByShiftId[shift.shiftId];
+                                const hasCandidates =
+                                  localRes && typeof localRes.hasCandidates === 'boolean'
+                                    ? localRes.hasCandidates
+                                    : summary.hasCandidates;
+                                return (
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      background: '#fff1f2',
+                                      color: '#e11d48',
+                                      border: '1.5px solid #fecdd3',
+                                      borderRadius: '8px',
+                                      padding: '0.35rem 0.65rem',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {hasCandidates ? 'Đang điều phối khẩn cấp' : 'Đã bật điều phối · Chưa tìm được Worker phù hợp'}
+                                  </span>
+                                );
+                              })()}
+
+                              {/* Mã mời nhân sự: Ẩn khi sự kiện hoặc ca là Bản nháp (DRAFT) */}
+                              {!isDraft && onOpenInvite && (
                                 <button
                                   type="button"
-                                  onClick={() => handleToggleEmergency(shift, !shift.emergency)}
-                                  style={{
-                                    background: shift.emergency ? '#fef2f2' : 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-                                    color: shift.emergency ? '#b91c1c' : '#ffffff',
-                                    border: shift.emergency ? '1.5px solid #f87171' : 'none',
-                                    borderRadius: '8px',
-                                    padding: '0.4rem 0.85rem',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    boxShadow: shift.emergency ? 'none' : '0 2px 6px rgba(225, 29, 72, 0.25)',
+                                  className="btn-shift-action purple"
+                                  onClick={() => {
+                                    if (!asPage) onClose();
+                                    onOpenInvite(shift, event);
                                   }}
-                                  title={
-                                    shift.emergency
-                                      ? 'Nhấn để tắt điều phối khẩn cấp'
-                                      : 'Bật điều phối khẩn cấp: Cho phép ứng tuyển tự do trên Radar và mở rộng bán kính 15km'
-                                  }
+                                  title="Lấy link & mã mời trực tiếp cho nhân sự"
                                 >
-                                  {shift.emergency ? 'Tắt Khẩn Cấp' : 'Bật Khẩn Cấp'}
+                                  Mã Mời Nhân Sự
                                 </button>
                               )}
-
-                              <button
-                                type="button"
-                                className="btn-shift-action purple"
-                                onClick={() => {
-                                  if (!asPage) onClose();
-                                  onOpenInvite(shift, event);
-                                }}
-                                title="Lấy link & mã mời trực tiếp cho nhân sự"
-                              >
-                                Mã Mời Nhân Sự
-                              </button>
 
                               {onEditShift && (
                                 <button
@@ -790,21 +807,24 @@ export default function EventDetailModal({
                                 </button>
                               )}
 
-                              <button
-                                type="button"
-                                className="btn-shift-action emerald"
-                                onClick={() => {
-                                  if (onOpenShiftWorkspace) {
-                                    onOpenShiftWorkspace(shift);
-                                  } else {
-                                    setActiveWorkspaceShiftId(shift.shiftId);
-                                    setActiveTab('QR_ATTENDANCE');
-                                  }
-                                }}
-                                title="Mở trang quản lý chi tiết riêng cho ca làm việc này"
-                              >
-                                Quản Lý Ca & Nhân Sự
-                              </button>
+                              {/* Quản lý ca & nhân sự: Ẩn khi sự kiện hoặc ca là Bản nháp (DRAFT) */}
+                              {!isDraft && (
+                                <button
+                                  type="button"
+                                  className="btn-shift-action emerald"
+                                  onClick={() => {
+                                    if (onOpenShiftWorkspace) {
+                                      onOpenShiftWorkspace(shift);
+                                    } else {
+                                      setActiveWorkspaceShiftId(shift.shiftId);
+                                      setActiveTab('QR_ATTENDANCE');
+                                    }
+                                  }}
+                                  title="Mở trang quản lý chi tiết riêng cho ca làm việc này"
+                                >
+                                  Quản Lý Ca & Nhân Sự
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -954,6 +974,7 @@ export default function EventDetailModal({
                     <ShiftQrAndAttendancePanel
                       shift={selectedQrShift}
                       event={event}
+                      skillTaxonomy={skillTaxonomy}
                       onSelectShift={(nextShift) => setActiveWorkspaceShiftId(nextShift.shiftId)}
                       onReloadEvents={onReloadEvents}
                       onOpenPaymentDeclaration={onOpenPaymentDeclaration}
@@ -1199,6 +1220,21 @@ export default function EventDetailModal({
           profile={workerProfile.profile}
           onClose={workerProfile.closeProfile}
         />
+
+        {/* Modal Xác Nhận Kích Hoạt Điều Phối Khẩn Cấp (chỉ mở khi EO bấm nút) */}
+        <EmergencyDispatchConfirmModal
+          isOpen={Boolean(emergencyConfirmShift)}
+          shift={emergencyConfirmShift}
+          event={event}
+          onClose={() => setEmergencyConfirmShift(null)}
+          onSuccess={(shiftId, res) =>
+            setDispatchResultsByShiftId((prev) => ({
+              ...prev,
+              [shiftId]: res,
+            }))
+          }
+          onReloadEvents={onReloadEvents}
+        />
     </div>
   );
 
@@ -1206,9 +1242,11 @@ export default function EventDetailModal({
     return contentBox;
   }
 
-  return (
-    <div className="event-detail-modal-overlay" onClick={onClose}>
+  const modalNode = (
+    <div className="event-detail-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       {contentBox}
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : null;
 }

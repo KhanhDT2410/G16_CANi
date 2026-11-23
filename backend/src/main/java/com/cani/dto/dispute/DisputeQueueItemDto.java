@@ -39,4 +39,10 @@ public class DisputeQueueItemDto {
      * true nếu còn dưới 24h đến hạn SLA (rủi ro, BR-57).
      */
     private boolean slaAtRisk;
+
+    private Integer unreadCount;
+    private Integer workerUnreadCount;
+    private Integer eoUnreadCount;
+    private String lastMessageSenderParty;
+    private Instant lastMessageAt;
 }

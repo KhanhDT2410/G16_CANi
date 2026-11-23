@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 
@@ -88,9 +89,31 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
 
   if (!isOpen) return null;
 
-  return (
-    <div className="eo-modal-overlay">
-      <div className="eo-modal-box" style={{ maxWidth: 640 }}>
+  return createPortal(
+    <div
+      className="eo-modal-overlay"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '1rem',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        className="eo-modal-box animate-scale-up"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 640, margin: 'auto', position: 'relative' }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, color: '#0f172a' }}>
             Khiếu Nại & Tranh Chấp 3 Bên (FE-11)
@@ -284,7 +307,8 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

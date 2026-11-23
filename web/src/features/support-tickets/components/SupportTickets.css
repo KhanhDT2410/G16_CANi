@@ -360,24 +360,32 @@
   font-size: 0.8rem;
 }
 
-/* Modals */
+/* Modals - Căn giữa tuyệt đối trên toàn màn hình */
 .ticket-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 99999;
   padding: 1.5rem;
+  box-sizing: border-box;
 }
 
 .ticket-modal {
+  position: relative;
   background: var(--color-surface-card, #ffffff);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
+  box-shadow: var(--shadow-modal, 0 25px 50px -12px rgba(0, 0, 0, 0.25));
   width: 100%;
   max-width: 650px;
   max-height: 90vh;
@@ -385,6 +393,7 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--color-border);
+  margin: auto;
 }
 
 .ticket-modal-lg {
@@ -854,6 +863,50 @@
   padding: 0 0.25rem;
 }
 
+/* Attachment in dock chat bubbles */
+.dock-attachment-wrap {
+  margin-top: 0.35rem;
+}
+
+.dock-attachment-thumb {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 6px;
+  display: block;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: opacity 0.2s;
+}
+
+.dock-attachment-thumb:hover {
+  opacity: 0.9;
+}
+
+.dock-attachment-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.6rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Pending attachment bar */
+.dock-pending-attachment-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.75rem;
+  background: #eff6ff;
+  border-top: 1px solid #bae6fd;
+  font-size: 0.75rem;
+  color: #0369a1;
+}
+
 .dock-footer {
   background: #ffffff;
   padding: 0.65rem 0.75rem;
@@ -862,6 +915,81 @@
   align-items: center;
   gap: 0.5rem;
   border-radius: 0 0 16px 16px;
+}
+
+/* 3-Line Menu Button & Popover in Dock */
+.dock-menu-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dock-menu-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.dock-menu-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.dock-menu-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.2);
+  padding: 0.35rem;
+  min-width: 210px;
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.dock-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  background: transparent;
+  color: #1e293b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dock-menu-row:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.dock-menu-row svg {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.dock-menu-row:hover svg {
+  color: #2563eb;
 }
 
 .dock-input {

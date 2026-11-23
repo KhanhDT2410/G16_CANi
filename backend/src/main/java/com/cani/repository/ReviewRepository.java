@@ -9,6 +9,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
@@ -19,4 +23,11 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     List<Review> findByRevieweeIdOrderByCreatedAtDesc(UUID revieweeId);
 
     List<Review> findByReviewerIdOrderByCreatedAtDesc(UUID reviewerId);
+
+    @Query("SELECT r FROM Review r WHERE r.revieweeId IN :revieweeIds " +
+           "ORDER BY CASE WHEN r.createdAt IS NULL THEN 1 ELSE 0 END ASC, r.createdAt DESC")
+    List<Review> findLatestByRevieweeIds(@Param("revieweeIds") Collection<UUID> revieweeIds, Pageable pageable);
+
+    @Query("SELECT r.rating FROM Review r WHERE r.revieweeId IN :revieweeIds AND r.rating IS NOT NULL AND r.rating BETWEEN 1 AND 5")
+    List<Integer> findValidRatingsByRevieweeIds(@Param("revieweeIds") Collection<UUID> revieweeIds);
 }

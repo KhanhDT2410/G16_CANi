@@ -2,6 +2,22 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../models/ekyc_models.dart';
 
+/// Ngoại lệ phân biệt lỗi kết nối / kỹ thuật (cho phép retry) với lỗi dữ liệu đầu vào.
+class EkycSubmitException implements Exception {
+  final String message;
+  final bool isTechnicalError;
+  final bool isUnauthorized;
+
+  const EkycSubmitException(
+    this.message, {
+    this.isTechnicalError = false,
+    this.isUnauthorized = false,
+  });
+
+  @override
+  String toString() => message;
+}
+
 class EkycRepository {
   final Dio _dio;
 
@@ -22,7 +38,6 @@ class EkycRepository {
     required Uint8List selfieBytes,
     required String selfieFileName,
     String? token,
-    String? userId,
     String? cccdNumber,
     String? fullName,
     String? dob,
@@ -50,7 +65,7 @@ class EkycRepository {
           contentType: _imageMediaType(selfieFileName),
         ),
       };
-      if (userId != null && userId.isNotEmpty) formDataMap['userId'] = userId;
+      // Các trường dưới đây chỉ phục vụ đối chiếu chéo phía backend, không ghi đè dữ liệu VNPT eKYC
       if (cccdNumber != null && cccdNumber.isNotEmpty) formDataMap['cccdNumber'] = cccdNumber;
       if (fullName != null && fullName.isNotEmpty) formDataMap['fullName'] = fullName;
       if (dob != null && dob.isNotEmpty) formDataMap['dob'] = dob;
@@ -62,37 +77,64 @@ class EkycRepository {
 
       final formData = FormData.fromMap(formDataMap);
 
-      final queryParams = <String, dynamic>{};
-      if (userId != null && userId.isNotEmpty) {
-        queryParams['userId'] = userId;
-      }
-
       final options = Options(
         headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-        receiveTimeout: const Duration(seconds: 90), // AI Multimodal cần thời gian phân tích ảnh
+        receiveTimeout: const Duration(seconds: 60),
       );
 
       final response = await _dio.post(
         '/v1/workers/ekyc/submit',
         data: formData,
-        queryParameters: queryParams,
         options: options,
       );
 
       if (response.data != null && response.data['data'] != null) {
-        return EkycVerificationItem.fromJson(response.data['data']);
+        return EkycVerificationItem.fromJson(
+          Map<String, dynamic>.from(response.data['data'] as Map),
+        );
       }
-      throw Exception('Không nhận được dữ liệu phản hồi từ máy chủ eKYC');
+      throw const EkycSubmitException(
+        'Máy chủ không trả về dữ liệu phản hồi eKYC. Vui lòng thử lại.',
+        isTechnicalError: true,
+      );
+    } on EkycSubmitException {
+      rethrow;
     } on DioException catch (de) {
-      if (de.response?.statusCode == 401) {
-        throw Exception('Phiên đăng nhập đã hết hạn (401). Vui lòng đăng nhập lại để tiếp tục.');
+      final statusCode = de.response?.statusCode;
+      if (statusCode == 401) {
+        throw const EkycSubmitException(
+          'Phiên đăng nhập đã hết hạn (401). Vui lòng đăng nhập lại để tiếp tục.',
+          isUnauthorized: true,
+        );
+      }
+      final isConnectionOrTimeout = de.type == DioExceptionType.connectionTimeout ||
+          de.type == DioExceptionType.sendTimeout ||
+          de.type == DioExceptionType.receiveTimeout ||
+          de.type == DioExceptionType.connectionError;
+      if (isConnectionOrTimeout) {
+        throw const EkycSubmitException(
+          'Không thể kết nối tới máy chủ xác thực (lỗi mạng hoặc quá thời gian chờ). Hồ sơ của bạn chưa bị từ chối — vui lòng thử lại.',
+          isTechnicalError: true,
+        );
+      }
+      if (statusCode != null && statusCode >= 500) {
+        throw const EkycSubmitException(
+          'Hệ thống xác thực đang gặp sự cố kỹ thuật tạm thời. Hồ sơ chưa bị từ chối — vui lòng thử lại sau.',
+          isTechnicalError: true,
+        );
       }
       final serverMsg = (de.response?.data is Map)
           ? de.response?.data['message']?.toString()
           : null;
-      throw Exception(serverMsg ?? 'Lỗi kết nối máy chủ eKYC (${de.message})');
-    } catch (e) {
-      throw Exception('Lỗi xử lý eKYC: $e');
+      throw EkycSubmitException(
+        serverMsg ?? 'Yêu cầu tải ảnh eKYC không hợp lệ. Vui lòng kiểm tra ảnh và thử lại.',
+        isTechnicalError: false,
+      );
+    } catch (_) {
+      throw const EkycSubmitException(
+        'Đã xảy ra sự cố kết nối tạm thời khi gửi hồ sơ eKYC. Vui lòng thử lại.',
+        isTechnicalError: true,
+      );
     }
   }
 
@@ -102,10 +144,12 @@ class EkycRepository {
 
       final response = await _dio.get('/v1/workers/ekyc/status', options: options);
       if (response.data != null && response.data['data'] != null) {
-        return EkycVerificationItem.fromJson(response.data['data']);
+        return EkycVerificationItem.fromJson(
+          Map<String, dynamic>.from(response.data['data'] as Map),
+        );
       }
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
@@ -115,7 +159,7 @@ class EkycRepository {
       final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
       final response = await _dio.post('/v1/workers/ekyc/reset', options: options);
       return response.statusCode == 200;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }

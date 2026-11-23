@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
+import { toDateTimeLocalInput, validateEventTimeRange } from '../utils/eventHelpers';
+import { getCoordinatesFromAddress } from '../utils/geoUtils';
 
 /**
  * EditEventModal
@@ -84,18 +86,35 @@ const EditEventModal = ({
     }
   };
 
-  const handleSubmit = (e) => {
+  const timeErrs = validateEventTimeRange(formData.startTime, formData.endTime, {
+    allowPastStart: event.status !== 'DRAFT',
+  });
+  const liveTimeError = timeErrs.time || timeErrs.startTime || timeErrs.endTime || null;
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.startTime && formData.endTime) {
-      const s = new Date(formData.startTime);
-      const end = new Date(formData.endTime);
-      if (s >= end) {
-        showToast('Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu!', 'error');
-        return;
+    if (liveTimeError) {
+      showToast(liveTimeError, 'error');
+      return;
+    }
+    let nextLat = formData.venueLat;
+    let nextLng = formData.venueLng;
+    if (formData.venueAddress && formData.venueAddress.trim() !== (event.venueAddress || '').trim()) {
+      try {
+        const coords = await getCoordinatesFromAddress(formData.venueAddress);
+        if (coords?.lat && coords?.lng) {
+          nextLat = coords.lat;
+          nextLng = coords.lng;
+        }
+      } catch {
+        // Giữ nguyên tọa độ cũ nếu geocoding lỗi
       }
     }
     const payload = {
       ...formData,
+      venueLat: nextLat,
+      venueLng: nextLng,
+      eventDate: formData.startTime ? formData.startTime.substring(0, 10) : formData.eventDate,
       startTime: formData.startTime ? new Date(formData.startTime).toISOString() : null,
       endTime: formData.endTime ? new Date(formData.endTime).toISOString() : null,
       imageUrl: formData.imageUrl?.trim() || null,
@@ -162,7 +181,9 @@ const EditEventModal = ({
               <label>Thời Gian Bắt Đầu</label>
               <input
                 type="datetime-local"
+                min={event.status === 'DRAFT' ? toDateTimeLocalInput(new Date()) : undefined}
                 className="eo-form-input"
+                style={{ borderColor: liveTimeError ? '#ef4444' : undefined }}
                 value={formData.startTime}
                 onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
               />
@@ -172,12 +193,19 @@ const EditEventModal = ({
               <label>Thời Gian Kết Thúc</label>
               <input
                 type="datetime-local"
+                min={formData.startTime || undefined}
                 className="eo-form-input"
+                style={{ borderColor: liveTimeError ? '#ef4444' : undefined }}
                 value={formData.endTime}
                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
               />
             </div>
           </div>
+          {liveTimeError && (
+            <div className="ecw-field-error" style={{ marginTop: '-0.5rem', marginBottom: '0.75rem' }}>
+              {liveTimeError}
+            </div>
+          )}
 
           {/* ẢNH POSTER / BANNER SỰ KIỆN - CHỈ TẢI ẢNH TỪ MÁY TÍNH */}
           <div className="eo-form-group">

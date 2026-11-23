@@ -119,6 +119,7 @@ class SkillVerificationResult {
 
 class WorkerSkillPointModel {
   final String id;
+  final String? skillId;
   final String jobType;
   final int spVerify;
   final int spExperience;
@@ -127,9 +128,11 @@ class WorkerSkillPointModel {
   final String tier;
   final int totalShiftsCompleted;
   final double avgRating;
+  final int ratingCount;
 
   const WorkerSkillPointModel({
     required this.id,
+    this.skillId,
     required this.jobType,
     required this.spVerify,
     required this.spExperience,
@@ -138,19 +141,29 @@ class WorkerSkillPointModel {
     required this.tier,
     required this.totalShiftsCompleted,
     required this.avgRating,
+    this.ratingCount = 0,
   });
 
+  bool get hasRealRating => avgRating > 0 && (ratingCount > 0 || spRating > 0);
+
   factory WorkerSkillPointModel.fromJson(Map<String, dynamic> json) {
+    final spRating = json['spRating'] as int? ?? 0;
+    final ratingCount = json['ratingCount'] as int? ?? 0;
+    final parsedAvg = (json['avgRating'] as num?)?.toDouble() ?? 0.0;
+    final safeAvg = (ratingCount == 0 && spRating == 0 && parsedAvg == 5.0) ? 0.0 : parsedAvg;
+
     return WorkerSkillPointModel(
       id: json['id'] as String? ?? '',
+      skillId: json['skillId'] as String?,
       jobType: json['jobType'] as String? ?? '',
       spVerify: json['spVerify'] as int? ?? 0,
       spExperience: json['spExperience'] as int? ?? 0,
-      spRating: json['spRating'] as int? ?? 0,
+      spRating: spRating,
       totalSp: json['totalSp'] as int? ?? 0,
       tier: json['tier'] as String? ?? 'STARTER',
       totalShiftsCompleted: json['totalShiftsCompleted'] as int? ?? 0,
-      avgRating: (json['avgRating'] as num?)?.toDouble() ?? 5.0,
+      avgRating: safeAvg,
+      ratingCount: ratingCount,
     );
   }
 }
@@ -200,11 +213,14 @@ class WorkerSkillItem {
   bool get isTier3PlatformProven => verificationTier == 'PLATFORM_PROVEN';
 
   String get tierBadgeLabel {
+    if (isExpired && isTier2AiVerified) {
+      return 'Chứng chỉ hết hạn';
+    }
     switch (verificationTier) {
       case 'PLATFORM_PROVEN':
-        return 'Platform-Proven ★';
+        return 'Đã chứng minh qua ca làm';
       case 'AI_DOCUMENT':
-        return 'AI Verified ✓';
+        return 'Đã xác thực tài liệu';
       case 'SELF_DECLARED':
       default:
         return 'Tự khai báo';

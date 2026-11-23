@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useDisputeChatAlerts } from '../../../features/disputes';
 
 export default function EOSidebar({
   activeNav,
@@ -10,6 +11,7 @@ export default function EOSidebar({
   unreadMessagesCount = 0,
 }) {
   const [isEventsSubMenuOpen, setIsEventsSubMenuOpen] = useState(true);
+  const { unreadDisputes } = useDisputeChatAlerts();
 
   const navItems = [
     {
@@ -39,7 +41,7 @@ export default function EOSidebar({
       subItems: [
         { key: 'list', label: 'Danh sách sự kiện' },
         { key: 'detail', label: 'Chi tiết sự kiện' },
-        { key: 'cancelled', label: 'Sự kiện đã xóa' },
+        { key: 'cancelled', label: 'Sự kiện đã hủy' },
       ],
     },
     {
@@ -55,6 +57,7 @@ export default function EOSidebar({
     {
       key: 'disputes',
       label: 'Tranh chấp & khiếu nại',
+      badge: unreadDisputes > 0 ? unreadDisputes : null,
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -119,220 +122,74 @@ export default function EOSidebar({
 
   return (
     <aside className={`eo-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      <nav className="eo-sidebar-nav">
-        {/* Nút thu gọn / mở rộng menu */}
+      <nav className="eo-sidebar-nav" aria-label="Điều hướng ban tổ chức">
         <div className="eo-sidebar-toggle-header">
-          {!isCollapsed && <span className="eo-sidebar-heading">Menu Điều Hướng</span>}
+          {!isCollapsed && <span className="eo-sidebar-heading">Ban tổ chức</span>}
           <button
             type="button"
             className="eo-collapse-btn"
             onClick={onToggleCollapse}
-            title={isCollapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
-            aria-label={isCollapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
+            aria-label={isCollapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn thanh điều hướng'}
+            aria-expanded={!isCollapsed}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              {isCollapsed ? (
-                <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
-              ) : (
-                <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
-              )}
-            </svg>
+            <span aria-hidden="true">{isCollapsed ? '»' : '«'}</span>
           </button>
         </div>
 
         {navItems.map((item) => {
           const isActive = activeNav === item.key;
+          const showSubmenu = !isCollapsed && item.hasSubMenu && isActive && isEventsSubMenuOpen;
           return (
-            <React.Fragment key={item.key}>
-              <button
-                type="button"
-                className={`eo-nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  onNavClick(item.key);
-                  if (item.hasSubMenu) {
-                    setIsEventsSubMenuOpen(true);
-                  }
-                }}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <span className="nav-svg-icon" style={{ position: 'relative' }}>
-                  {item.icon}
-                  {isCollapsed && item.badge != null && item.badge > 0 && (
-                    <span style={{
-                      position: 'absolute',
-                      top: -2,
-                      right: -2,
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: '#ef4444',
-                    }} />
-                  )}
-                </span>
-                {!isCollapsed && (
-                  <>
-                    <span className="nav-label">{item.label}</span>
-                    {item.badge != null && item.badge > 0 && (
-                      <span style={{
-                        background: '#ef4444',
-                        color: '#ffffff',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        padding: '1px 6px',
-                        borderRadius: '9999px',
-                        marginLeft: 'auto',
-                      }}>
-                        +{item.badge}
-                      </span>
-                    )}
-                    {item.hasSubMenu && (
-                      <span
-                        className="nav-chevron-right"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsEventsSubMenuOpen((prev) => !prev);
-                        }}
-                        title={isEventsSubMenuOpen ? 'Thu gọn menu con' : 'Mở rộng menu con'}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 24,
-                          height: 24,
-                          borderRadius: 6,
-                          transition: 'transform 0.2s ease',
-                          transform: isEventsSubMenuOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        ›
-                      </span>
-                    )}
-                  </>
-                )}
-              </button>
-
-              {/* Sub-menu mở rộng của Quản lý sự kiện */}
-              {!isCollapsed && item.hasSubMenu && isEventsSubMenuOpen && (
-                <div
-                  className="eo-nav-submenu"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2px',
-                    paddingLeft: '2.1rem',
-                    marginTop: '2px',
-                    marginBottom: '6px',
+            <div className="eo-nav-group" key={item.key}>
+              <div className="eo-nav-row">
+                <button
+                  type="button"
+                  className={`eo-nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    onNavClick(item.key);
+                    if (item.hasSubMenu) setIsEventsSubMenuOpen(true);
                   }}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-label={item.badge > 0 ? `${item.label}, ${item.badge} chưa đọc` : item.label}
+                  title={isCollapsed ? item.label : undefined}
                 >
-                  {item.subItems.map((sub) => {
-                    const isSubActive = isActive && activeEventSubTab === sub.key;
-                    return (
-                      <button
-                        key={sub.key}
-                        type="button"
-                        onClick={() => {
-                          onNavClick('events');
-                          onEventSubTabClick?.(sub.key);
-                        }}
-                        style={{
-                          textAlign: 'left',
-                          background: isSubActive ? '#eff6ff' : 'transparent',
-                          color: isSubActive ? '#2563eb' : '#64748b',
-                          fontWeight: isSubActive ? 700 : 500,
-                          border: 'none',
-                          borderLeft: isSubActive ? '2.5px solid #2563eb' : '2.5px solid #e2e8f0',
-                          padding: '0.45rem 0.75rem',
-                          fontSize: '0.82rem',
-                          borderRadius: '0 6px 6px 0',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {sub.label}
-                      </button>
-                    );
-                  })}
+                  <span className="nav-svg-icon" aria-hidden="true">{item.icon}</span>
+                  <span className="nav-label">{item.label}</span>
+                  {item.badge > 0 && <span className="eo-nav-badge" aria-hidden="true">{item.badge}</span>}
+                </button>
+
+                {!isCollapsed && item.hasSubMenu && isActive && (
+                  <button
+                    type="button"
+                    className="eo-nav-submenu-toggle"
+                    onClick={() => setIsEventsSubMenuOpen((open) => !open)}
+                    aria-expanded={showSubmenu}
+                    aria-controls="eo-event-nav"
+                    aria-label={showSubmenu ? 'Thu gọn mục sự kiện' : 'Mở rộng mục sự kiện'}
+                  >
+                    <span aria-hidden="true">{showSubmenu ? '−' : '+'}</span>
+                  </button>
+                )}
+              </div>
+
+              {!isCollapsed && item.hasSubMenu && isActive && (
+                <div className="eo-nav-submenu" id="eo-event-nav" hidden={!showSubmenu}>
+                  {item.subItems.map((sub) => (
+                    <button
+                      key={sub.key}
+                      type="button"
+                      aria-current={activeEventSubTab === sub.key ? 'page' : undefined}
+                      onClick={() => onEventSubTabClick(sub.key)}
+                    >
+                      {sub.label}
+                    </button>
+                  ))}
                 </div>
               )}
-            </React.Fragment>
+            </div>
           );
         })}
       </nav>
-
-      {/* Promo Card: Nâng Cấp Gói Dịch Vụ Chuẩn Mockup Ảnh 2 */}
-      {!isCollapsed && (
-        <div
-          className="eo-sidebar-promo-card animate-fade-in-up"
-          style={{
-            margin: '1rem 0.85rem 0.75rem',
-            padding: '1.25rem 1rem 1rem',
-            background: '#ffffff',
-            borderRadius: '18px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.05)',
-            textAlign: 'center',
-            position: 'relative',
-          }}
-        >
-          {/* Icon Crown & Lotus Badge */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.65rem' }}>
-            <img
-              src="/assets/eo-crown-badge.png"
-              alt="VIP Subscription"
-              style={{ width: 56, height: 'auto', display: 'block' }}
-            />
-          </div>
-
-          <h4
-            style={{
-              margin: '0 0 0.35rem',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              color: '#0f172a',
-            }}
-          >
-            Nâng cấp gói dịch vụ
-          </h4>
-
-          <p
-            style={{
-              margin: '0 0 0.85rem',
-              fontSize: '0.78rem',
-              color: '#64748b',
-              lineHeight: 1.45,
-            }}
-          >
-            Mở khóa nhiều tính năng nâng cao và tối ưu vận hành sự kiện.
-          </p>
-
-          <button
-            type="button"
-            onClick={() => onNavClick('subscription')}
-            style={{
-              width: '100%',
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '0.6rem 0.85rem',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
-            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
-          >
-            Xem các gói dịch vụ &rarr;
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

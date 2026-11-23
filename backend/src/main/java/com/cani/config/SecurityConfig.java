@@ -3,6 +3,7 @@ package com.cani.config;
 import com.cani.security.RestAccessDeniedHandler;
 import com.cani.security.RestAuthenticationEntryPoint;
 import com.cani.security.UserAuthorityFilter;
+import com.cani.service.ekyc.storage.EkycImageAccessTokenService;
 import com.cani.service.skill.DocumentAccessTokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final ObjectProvider<DocumentAccessTokenService> documentAccessTokenServiceProvider;
+    private final ObjectProvider<EkycImageAccessTokenService> ekycImageAccessTokenServiceProvider;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -59,7 +61,8 @@ public class SecurityConfig {
                     "/api/v1/workers/skills/tiers/config",
                     "/api/v1/eo/subscriptions/payos-webhook",
                     "/api/v1/eo/events/images/**",
-                    "/api/v1/workers/proof/**"
+                    "/api/v1/workers/proof/**",
+                    "/api/v1/public/account-appeals/**"
                 ).permitAll()
                 // Tài liệu chứng chỉ cá nhân (PII): TUYỆT ĐỐI KHÔNG permitAll.
                 // Chỉ cho phép user đã đăng nhập (kiểm tra ownership tại Controller/Service)
@@ -87,6 +90,31 @@ public class SecurityConfig {
                         );
                         return new AuthorizationDecision(validSigned);
                     })
+                // Ảnh eKYC CCCD / Selfie riêng tư (PII đặc biệt nhạy cảm): TUYỆT ĐỐI KHÔNG permitAll.
+                // Chỉ cho phép user đã đăng nhập (kiểm tra vai trò Admin/CSKH hoặc đúng chủ sở hữu tại Controller)
+                // HOẶC Signed URL HMAC-SHA256 còn hiệu lực cho đúng targetType + verificationId + slot.
+                .requestMatchers(HttpMethod.GET, "/api/v1/ekyc/images/*/*/*")
+                    .access((authenticationSupplier, context) -> {
+                        Authentication authentication = authenticationSupplier.get();
+                        boolean authenticated = authentication != null
+                                && authentication.isAuthenticated()
+                                && !(authentication instanceof AnonymousAuthenticationToken);
+                        if (authenticated) {
+                            return new AuthorizationDecision(true);
+                        }
+                        EkycImageAccessTokenService ekycTokenService = ekycImageAccessTokenServiceProvider.getIfAvailable();
+                        if (ekycTokenService == null) {
+                            return new AuthorizationDecision(false);
+                        }
+                        HttpServletRequest request = context.getRequest();
+                        boolean validSigned = ekycTokenService.isValidRequestUri(
+                                request.getRequestURI(),
+                                request.getParameter("expires"),
+                                request.getParameter("sig")
+                        );
+                        return new AuthorizationDecision(validSigned);
+                    })
+                .requestMatchers("/api/v1/ekyc/images/**").authenticated()
                 // Thẩm định chứng chỉ kỹ năng (UC-47): Customer Care cùng quyền kiểm duyệt với Admin
                 .requestMatchers("/api/v1/workers/skills/admin/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Module tranh chấp (UC-99/100/102/109): Customer Care cùng quyền với Admin
@@ -95,6 +123,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/disputes/**").authenticated()
                 // Module phiếu hỗ trợ (UC-105/106, SCR-25/26): Customer Care & Admin quản lý queue & detail
                 .requestMatchers("/api/v1/admin/support/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
+                .requestMatchers("/api/v1/support/chat/attachments/**").permitAll()
                 .requestMatchers("/api/v1/support/**").authenticated()
                 // Module FAQ (UC-110): Customer Care cùng quyền với Admin
                 // Đặt TRƯỚC wildcard /api/v1/admin/** — nếu không CC sẽ bị 403.
@@ -104,6 +133,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/ekyc/**", "/api/v1/admin/eo-ekyc/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Module Kháng cáo điểm uy tín Worker (UC-94, SRS FE-10): Customer Care cùng quyền xử lý với Admin
                 // ĐẶT TRƯỚC wildcard /api/v1/admin/** để Customer Care không bị 403 Forbidden.
+                .requestMatchers("/api/v1/admin/account-appeals/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 .requestMatchers("/api/v1/admin/appeals/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 .requestMatchers("/api/v1/workers/appeals/**").hasRole("WORKER")
                 // Module Quản lý vi phạm No-show (UC-88, SRS FE-09): Customer Care cùng quyền xử lý với Admin

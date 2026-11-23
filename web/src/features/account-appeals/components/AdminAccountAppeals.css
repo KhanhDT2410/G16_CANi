@@ -1,0 +1,641 @@
+/* AdminAccountAppeals.css - Phong cách chuẩn Enterprise CANi Design System */
+
+.admin-appeals-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Thanh công cụ Bộ lọc & Nút Làm mới (Toolbar) */
+.admin-appeals-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #ffffff;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* Các tab trạng thái dạng pills */
+.admin-status-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.status-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+}
+
+.status-tab-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.status-tab-btn.active {
+  background: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+  box-shadow: 0 2px 4px rgba(30, 41, 59, 0.15);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-all { background: #94a3b8; }
+.dot-submitted { background: #f59e0b; }
+.dot-under-review { background: #0284c7; }
+.dot-approved { background: #10b981; }
+.dot-rejected { background: #ef4444; }
+
+.status-tab-btn.active .dot-all { background: #e2e8f0; }
+
+/* Khu vực thao tác bên phải */
+.admin-appeals-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-appeals-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.admin-appeals-search-icon {
+  position: absolute;
+  left: 10px;
+  width: 15px;
+  height: 15px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.admin-appeals-search-input {
+  padding: 7px 12px 7px 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #1e293b;
+  background: #ffffff;
+  outline: none;
+  min-width: 220px;
+  transition: all 0.15s ease;
+}
+
+.admin-appeals-search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+/* Nút Làm mới chuẩn CANi */
+.btn-appeals-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-appeals-refresh:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.btn-appeals-refresh:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.3s ease;
+}
+
+.refresh-icon.spinning {
+  animation: appealSpin 0.8s linear infinite;
+}
+
+@keyframes appealSpin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Bảng danh sách giải trình */
+.admin-appeals-table-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.admin-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-appeals-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.admin-appeals-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  font-size: 0.775rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.admin-appeals-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  color: #1e293b;
+}
+
+.admin-appeals-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* Cột đối tượng & Role badge */
+.appeal-user-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.appeal-user-name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.875rem;
+}
+
+.appeal-user-email {
+  font-size: 0.775rem;
+  color: #64748b;
+}
+
+.appeal-role-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  width: fit-content;
+  margin-top: 2px;
+}
+
+.appeal-role-badge.eo {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.appeal-role-badge.worker {
+  background: #f5f3ff;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
+}
+
+/* Cột lý do khóa */
+.appeal-lock-snippet {
+  max-width: 200px;
+  font-size: 0.8rem;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #fee2e2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Cột nội dung giải trình */
+.appeal-content-snippet {
+  max-width: 260px;
+  font-size: 0.825rem;
+  color: #334155;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+/* Status Badge */
+.appeal-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Nút Thao tác thẩm định */
+.btn-review-appeal {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #2563eb;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-review-appeal:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.btn-review-appeal.action-primary {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+.btn-review-appeal.action-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+/* Empty State & Loading State */
+.admin-appeals-empty {
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.admin-appeals-empty-icon {
+  width: 44px;
+  height: 44px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.admin-appeals-empty-title {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.admin-appeals-empty-sub {
+  font-size: 0.825rem;
+  color: #94a3b8;
+}
+
+.admin-appeals-loading {
+  padding: 3.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+/* Modal Thẩm Định Đơn Giải Trình - Căn giữa tuyệt đối trên toàn màn hình */
+.appeal-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  animation: appealFadeIn 0.2s ease-out;
+}
+
+.appeal-modal-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 14px;
+  max-width: 680px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+  animation: appealScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes appealScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.appeal-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.appeal-modal-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.appeal-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+
+.appeal-modal-close:hover {
+  color: #0f172a;
+}
+
+.appeal-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.appeal-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: #f8fafc;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.appeal-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.appeal-detail-label {
+  font-size: 0.775rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.appeal-detail-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.appeal-lock-box {
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #dc2626;
+  line-height: 1.5;
+}
+
+.appeal-content-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #334155;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.appeal-evidence-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.appeal-evidence-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.825rem;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 6px 12px;
+  border-radius: 6px;
+  width: fit-content;
+  transition: all 0.15s ease;
+}
+
+.appeal-evidence-item:hover {
+  background: #dbeafe;
+  text-decoration: underline;
+}
+
+.appeal-radio-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.appeal-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.appeal-radio-label.selected-approve {
+  border-color: #10b981;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.appeal-radio-label.selected-reject {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.appeal-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  resize: vertical;
+}
+
+.appeal-textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.appeal-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-cancel {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background: #f1f5f9;
+}
+
+.btn-approve-confirm {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #10b981;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-approve-confirm:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-reject-confirm {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #ef4444;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-reject-confirm:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.appeal-resolved-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@keyframes appealFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}

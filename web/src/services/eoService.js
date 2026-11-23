@@ -3,47 +3,8 @@ import { apiClient } from './api';
 export const eoService = {
   // Lấy danh sách sự kiện của EO
   getMyEvents: async () => {
-    try {
-      const response = await apiClient.get('/v1/eo/events');
-      return response.data?.data || [];
-    } catch (error) {
-      if (import.meta.env.VITE_DEMO === 'true') {
-        console.warn('Lỗi getMyEvents, sử dụng dữ liệu mẫu demo:', error);
-        return [
-          {
-            eventId: 'evt-01',
-            name: 'Triển lãm Công nghệ Quốc tế TechExpo 2026',
-            description: 'Sự kiện công nghệ quy mô 5.000 khách tại SECC',
-            venueAddress: '799 Nguyễn Văn Linh, Quận 7, TP.HCM',
-            venueLat: 10.7328,
-            venueLng: 106.7214,
-            eventDate: '2026-11-15T08:00:00Z',
-            mode: 'MATCHING',
-            status: 'ACTIVE',
-            totalShifts: 3,
-            totalRequiredWorkers: 15,
-            totalConfirmedWorkers: 11,
-            totalEstimatedCost: 18500000,
-          },
-          {
-            eventId: 'evt-02',
-            name: 'Đêm Nhạc Hội Tri Ân Khách Hàng',
-            description: 'Gala Dinner tại Gem Center',
-            venueAddress: '8 Nguyễn Bỉnh Khiêm, Đa Kao, Quận 1, TP.HCM',
-            venueLat: 10.7877,
-            venueLng: 106.7003,
-            eventDate: '2026-11-20T17:00:00Z',
-            mode: 'MATCHING',
-            status: 'DRAFT',
-            totalShifts: 2,
-            totalRequiredWorkers: 8,
-            totalConfirmedWorkers: 0,
-            totalEstimatedCost: 9600000,
-          },
-        ];
-      }
-      throw error;
-    }
+    const response = await apiClient.get('/v1/eo/events');
+    return response.data?.data || [];
   },
 
   // Chi tiết sự kiện
@@ -224,9 +185,12 @@ export const eoService = {
     return response.data?.data || [];
   },
 
-  // UC-49: EO xác nhận hoàn thành ca & duyệt công cho Worker
-  verifyAttendance: async (assignmentId) => {
-    const response = await apiClient.post(`/v1/eo/events/assignments/${assignmentId}/verify`);
+  // UC-49 + Skill V3: EO xác nhận hoàn thành ca, duyệt công và xác nhận kỹ năng thực hiện chính
+  verifyAttendance: async (assignmentId, payload = null) => {
+    const response = await apiClient.post(
+      `/v1/eo/events/assignments/${assignmentId}/verify`,
+      payload || undefined
+    );
     return response.data?.data;
   },
 
@@ -406,23 +370,18 @@ export const eoService = {
   },
 
   // ==========================================
-  // BONUS 1: EMERGENCY BROADCAST POOL (SECTION 11 CANi_Flow_v8.txt)
+  // ĐIỀU PHỐI KHẨN CẤP (EMERGENCY DISPATCH - UC-59)
   // ==========================================
   triggerEmergencyBroadcast: async (shiftId, emergencyData = {}) => {
-    try {
-      const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, emergencyData);
-      return response.data?.data;
-    } catch {
-      // Fallback tự động gọi dispatch chuẩn kèm metadata
-      const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`, emergencyData);
-      return response.data?.data;
-    }
+    const radiusKm = emergencyData?.radiusKm ?? emergencyData?.expandedRadiusKm;
+    return eoService.enableEmergencyDispatch(shiftId, radiusKm);
   },
 
   // Bật điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
-  enableEmergencyDispatch: async (shiftId, radiusKm = 15) => {
+  enableEmergencyDispatch: async (shiftId, radiusKm = 25) => {
+    const params = radiusKm != null && Number(radiusKm) > 0 ? { radiusKm: Number(radiusKm) } : undefined;
     const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, null, {
-      params: { radiusKm },
+      params,
     });
     return response.data?.data;
   },

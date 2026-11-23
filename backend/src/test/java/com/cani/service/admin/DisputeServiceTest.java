@@ -43,6 +43,7 @@ class DisputeServiceTest {
     @Mock private ReliabilityLogRepository reliabilityLogRepository;
     @Mock private NotificationRepository notificationRepository;
     @Mock private AuditLogService auditLogService;
+    @Mock private SupportConversationRepository supportConversationRepository;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
@@ -181,6 +182,38 @@ class DisputeServiceTest {
         verify(reliabilityLogRepository).save(logCaptor.capture());
         assertThat(logCaptor.getValue().getChangeAmount()).isEqualTo(-10);
         assertThat(logCaptor.getValue().getReferenceType()).isEqualTo("DISPUTE");
+    }
+
+    @Test
+    @DisplayName("SRS FE-09 ↔ FE-11: Phán quyết WORKER_FAULT -> Đồng bộ Payment sang CONFIRMED_FULL")
+    void shouldSyncPaymentStatusOnWorkerFaultDecision() {
+        UUID ccUserId = UUID.randomUUID();
+        Dispute dispute = openDispute();
+        dispute.setStatus(DisputeStatus.INVESTIGATING);
+        dispute.setAssignmentId(assignment.getAssignmentId());
+
+        Payment disputedPayment = Payment.builder()
+                .paymentId(UUID.randomUUID())
+                .assignmentId(assignment.getAssignmentId())
+                .status(PaymentStatus.DISPUTED)
+                .build();
+
+        when(disputeRepository.findById(dispute.getDisputeId())).thenReturn(Optional.of(dispute));
+        when(userRepository.findById(ccUserId)).thenReturn(
+                Optional.of(User.builder().userId(ccUserId).role(UserRole.CUSTOMER_CARE).build()));
+        when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(worker));
+        when(disputeRepository.save(any(Dispute.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByAssignmentId(assignment.getAssignmentId())).thenReturn(Optional.of(disputedPayment));
+
+        IssueDecisionRequestDto request = IssueDecisionRequestDto.builder()
+                .outcome(DisputeOutcome.WORKER_FAULT)
+                .rationale("Qua đối chiếu nhật ký điểm danh QR và bằng chứng thanh toán, xác nhận worker bỏ ca không thông báo, lý do quyết định đã đủ 100 ký tự theo quy định của hệ thống.")
+                .build();
+
+        disputeService.issueDecision(ccUserId, dispute.getDisputeId(), request);
+
+        assertThat(disputedPayment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED_FULL);
+        verify(paymentRepository).save(disputedPayment);
     }
 
     @Test

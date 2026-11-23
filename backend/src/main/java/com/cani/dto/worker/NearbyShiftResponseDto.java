@@ -18,6 +18,10 @@ public class NearbyShiftResponseDto {
     private UUID shiftId;
     private UUID eventId;
     private String eventName;
+    private UUID eoId;
+    private String eoName;
+    private Boolean eoVerified;
+    private BigDecimal eoRatingAvg;
     private String jobType;
     private String description;
     private String locationAddress;
@@ -30,6 +34,11 @@ public class NearbyShiftResponseDto {
     private Instant arrivalTime;
     private UUID[] requiredSkills;
     private List<String> requiredSkillNames;
+    private List<String> preferredSkillNames;
+    private UUID performedSkillId;
+    private String performedSkillName;
+    private List<com.cani.dto.event.ShiftSkillRequirementDto> skillRequirements;
+    private String customSkillNotes;
     private Double distanceKm;
     private Integer requiredWorkers;
     private Integer confirmedWorkers;

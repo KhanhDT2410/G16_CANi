@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   TICKET_STATUS_CONFIG,
   TICKET_CATEGORY_CONFIG,
@@ -24,7 +25,22 @@ export const TicketDetailModal = ({
   const [isInternal, setIsInternal] = useState(false);
   const [submittingReply, setSubmittingReply] = useState(false);
 
-  if (!isOpen || !ticket) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !ticket || typeof document === 'undefined') return null;
 
   const handleSendReply = async (e) => {
     e.preventDefault();
@@ -57,9 +73,9 @@ export const TicketDetailModal = ({
     });
   };
 
-  return (
-    <div className="ticket-modal-overlay">
-      <div className="ticket-modal ticket-modal-lg">
+  const modalNode = (
+    <div className="ticket-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="ticket-modal ticket-modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="ticket-modal-header">
           <div>
             <h3 style={{ display: 'inline', marginRight: '0.75rem' }}>
@@ -192,6 +208,8 @@ export const TicketDetailModal = ({
       </div>
     </div>
   );
+
+  return createPortal(modalNode, document.body);
 };
 
 export default TicketDetailModal;

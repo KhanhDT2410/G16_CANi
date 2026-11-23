@@ -74,5 +74,34 @@ export const disputeApi = {
     const response = await apiClient.post(`/v1/admin/disputes/${id}/decision`, payload);
     return response.data?.data;
   },
+
+  // === Endpoints cho Kênh Chat Phân Xử Tranh Chấp (Dispute Dual Chat) ===
+
+  /** Lấy dữ liệu hội thoại tranh chấp đa bên theo phân quyền */
+  getDisputeChat: async (disputeId) => {
+    const response = await apiClient.get(`/v1/disputes/${disputeId}/chat`);
+    return response.data?.data;
+  },
+
+  /** Gửi tin nhắn trong phiên phân xử tranh chấp */
+  sendDisputeChatMessage: async (disputeId, payload) => {
+    const response = await apiClient.post(`/v1/disputes/${disputeId}/chat/messages`, payload);
+    return response.data?.data;
+  },
+
+  /** Đánh dấu đã đọc tin nhắn trong phiên tranh chấp */
+  markDisputeChatRead: async (disputeId, party = null) => {
+    const url = party
+      ? `/v1/disputes/${disputeId}/chat/read?party=${party}`
+      : `/v1/disputes/${disputeId}/chat/read`;
+    const response = await apiClient.post(url);
+    return response.data?.data;
+  },
+
+  /** Lấy thống kê tổng số đơn có tin nhắn mới cho Sidebar */
+  getDisputeUnreadSummary: async () => {
+    const response = await apiClient.get('/v1/disputes/unread-summary');
+    return response.data?.data || { totalUnreadDisputes: 0, totalUnreadMessages: 0 };
+  },
 };
 

@@ -43,7 +43,7 @@ void main() {
     expect(find.text('Nguyễn Văn A'), findsOneWidget);
     expect(find.text('4.8'), findsOneWidget);
     expect(find.text('Đánh giá TB'), findsOneWidget);
-    expect(find.text('Hạng Vàng'), findsOneWidget);
+    expect(find.text('Có kinh nghiệm (Vàng)'), findsOneWidget);
     // Logout footer is the last lazy-ListView item — scroll it into view.
     await tester.scrollUntilVisible(find.text('Đăng xuất'), 200);
     expect(find.text('Đăng xuất'), findsOneWidget);

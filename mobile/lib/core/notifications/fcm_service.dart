@@ -23,6 +23,8 @@ class FcmService {
   /// Khởi tạo Firebase và cấu hình lắng nghe 3 trạng thái ứng dụng
   static Future<void> initialize({
     void Function(Map<String, dynamic> data)? onNotificationNavigate,
+    void Function(Map<String, dynamic> data)? onForegroundMessage,
+    void Function(String newToken)? onTokenRefresh,
   }) async {
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
       debugPrint('[FcmService] FCM is skipped on this non-mobile platform.');
@@ -76,11 +78,18 @@ class FcmService {
         if (noti != null) {
           LocalNotificationService.showNotification(
             id: message.hashCode,
-            title: noti.title ?? 'CANi - Lời mời việc làm',
+            title: noti.title ?? 'CANi - Thông báo mới',
             body: noti.body ?? 'Bạn có thông báo mới từ hệ thống CANi',
             payload: jsonEncode(message.data),
           );
         }
+        onForegroundMessage?.call(message.data);
+      });
+
+      // Đồng bộ lại token nếu FCM tự xoay vòng token mới
+      messaging.onTokenRefresh.listen((newToken) {
+        _cachedToken = newToken;
+        onTokenRefresh?.call(newToken);
       });
 
       // 7. Lắng nghe khi người dùng bấm vào thông báo từ khay hệ thống (Background)

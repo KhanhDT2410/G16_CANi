@@ -9,12 +9,13 @@ import { usePayments } from './hooks/usePayments';
 
 import EOSidebar from './components/EOSidebar';
 import EORightSidebar from './components/EORightSidebar';
+import EOEventDataState from './components/EOEventDataState';
 import EOMetricsGrid from './components/EOMetricsGrid';
 import EOOverviewAnalytics from './components/EOOverviewAnalytics';
 import EOModals from './components/EOModals';
 import EkycRequiredModal from './components/EkycRequiredModal';
 import { eoService } from '../../services/eoService';
-import { DEFAULT_NEW_EVENT } from './utils/eventHelpers';
+import { createDefaultNewEvent } from './utils/eventHelpers';
 import { useDirectChat, DirectMessengerDock } from '../../features/direct-chat';
 import EOMessagesTab from './components/EOMessagesTab';
 import './EOPage.css';
@@ -56,6 +57,7 @@ export default function EOPage() {
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('overview');
   const [activeEventSubTab, setActiveEventSubTab] = useState('list');
+  const [highlightAssignmentId, setHighlightAssignmentId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('cani_eo_sidebar_collapsed') === 'true';
@@ -85,6 +87,11 @@ export default function EOPage() {
       const targetTab = e.detail?.tab;
       const targetShiftId = e.detail?.shiftId;
       const targetEventId = e.detail?.eventId;
+      const targetAssignmentId = e.detail?.assignmentId;
+
+      if (targetAssignmentId) {
+        setHighlightAssignmentId(targetAssignmentId);
+      }
 
       if (targetTab) {
         if (targetTab === 'recruitment') {
@@ -104,19 +111,33 @@ export default function EOPage() {
 
         // Deep-link trực tiếp vào trang quản lý ca từ thông báo
         const currentEvents = eventsRef.current;
-        if (targetTab === 'events' && targetShiftId && Array.isArray(currentEvents?.events)) {
-          const foundEvent =
-            (targetEventId && currentEvents.events.find((ev) => ev.eventId === targetEventId)) ||
-            currentEvents.events.find((ev) => (ev.shifts || []).some((sh) => sh.shiftId === targetShiftId));
-          if (foundEvent) {
-            setDetailEvent(foundEvent);
+        const resolvedEvent =
+          targetTab === 'events' && Array.isArray(currentEvents?.events)
+            ? (targetEventId && currentEvents.events.find((ev) => ev.eventId === targetEventId)) ||
+              (targetShiftId &&
+                currentEvents.events.find((ev) => (ev.shifts || []).some((sh) => sh.shiftId === targetShiftId))) ||
+              null
+            : null;
+        const resolvedEventId = targetEventId || resolvedEvent?.eventId || null;
+
+        if (targetTab === 'events' && resolvedEvent) {
+          setDetailEvent(resolvedEvent);
+          if (targetShiftId) {
             setWorkspaceShiftId(targetShiftId);
-            currentEvents.loadEvents?.();
+          } else {
+            setWorkspaceShiftId(null);
           }
+          setActiveEventSubTab('detail');
+          currentEvents?.loadEvents?.();
+        } else if (targetTab === 'events' && (targetEventId || targetShiftId)) {
+          currentEvents?.loadEvents?.();
         }
 
         try {
-          setSearchParams({ tab: targetTab }, { replace: true });
+          const nextParams = { tab: targetTab };
+          if (targetTab === 'events' && resolvedEventId) nextParams.eventId = String(resolvedEventId);
+          if (targetTab === 'events' && targetShiftId) nextParams.shiftId = String(targetShiftId);
+          setSearchParams(nextParams, { replace: true });
         } catch (err) {
           console.warn('Lỗi setSearchParams:', err);
         }
@@ -143,9 +164,29 @@ export default function EOPage() {
     return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
   }, [setSearchQuery]);
 
-  // Kiểm tra nếu có redirect từ VNPay / PayOS (?tab=subscription hoặc chứa param vnp_, payos, orderCode) hoặc điều hướng tab (?tab=profile)
+  // Helper đẩy URL query params vào Browser History để nút Back quay lại đúng màn/bước trước
+  const syncUrlRoute = (paramsObj, { replace = false } = {}) => {
+    try {
+      const next = {};
+      Object.entries(paramsObj || {}).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          next[k] = String(v);
+        }
+      });
+      setSearchParams(next, { replace });
+    } catch (err) {
+      console.warn('Lỗi setSearchParams:', err);
+    }
+  };
+
+  // Đồng bộ state từ URL searchParams (hỗ trợ redirect PayOS/tab & nút Back/Forward trình duyệt)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
+    const viewParam = searchParams.get('view');
+    const stepParam = Number(searchParams.get('step'));
+    const eventIdParam = searchParams.get('eventId');
+    const shiftIdParam = searchParams.get('shiftId');
+
     if (
       tabParam === 'subscription' ||
       searchParams.has('vnp_ResponseCode') ||
@@ -167,8 +208,36 @@ export default function EOPage() {
     } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'messages', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
+    } else if (!tabParam) {
+      setActiveTab('overview');
+      setActiveNav('overview');
     }
-  }, [searchParams]);
+
+    if (tabParam === 'events') {
+      if (viewParam === 'create') {
+        setActiveEventSubTab('create');
+        setDetailEvent(null);
+        setWorkspaceShiftId(null);
+        if (stepParam >= 1 && stepParam <= 3) {
+          setWizardStep(stepParam);
+        }
+      } else if (eventIdParam) {
+        const matched = Array.isArray(events.events)
+          ? events.events.find((e) => e.eventId === eventIdParam)
+          : null;
+        if (matched) setDetailEvent(matched);
+        setWorkspaceShiftId(shiftIdParam || null);
+        setActiveEventSubTab('detail');
+      } else {
+        setDetailEvent(null);
+        setWorkspaceShiftId(null);
+        setActiveEventSubTab(viewParam || 'list');
+      }
+    } else {
+      setDetailEvent(null);
+      setWorkspaceShiftId(null);
+    }
+  }, [searchParams, events.events]);
 
   const [mapModal, setMapModal] = useState({
     isOpen: false,
@@ -194,6 +263,7 @@ export default function EOPage() {
   const [detailEvent, setDetailEvent] = useState(null);
   const [detailInitialTab, setDetailInitialTab] = useState('SHIFTS');
   const [workspaceShiftId, setWorkspaceShiftId] = useState(null);
+  const [wizardStep, setWizardStep] = useState(1);
   const [ekycStatus, setEkycStatus] = useState(null);
   const [showEkycModal, setShowEkycModal] = useState(false);
 
@@ -214,6 +284,8 @@ export default function EOPage() {
     setDetailInitialTab(initialTab);
     setActiveTab('events');
     setActiveNav('events');
+    setActiveEventSubTab('detail');
+    syncUrlRoute({ tab: 'events', eventId: evt.eventId });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -247,12 +319,14 @@ export default function EOPage() {
       setShowEkycModal(true);
       return;
     }
-    events.setNewEvent({ ...DEFAULT_NEW_EVENT });
+    events.setNewEvent(createDefaultNewEvent());
     setDetailEvent(null);
     setWorkspaceShiftId(null);
+    setWizardStep(1);
     setActiveTab('events');
     setActiveNav('events');
     setActiveEventSubTab('create');
+    syncUrlRoute({ tab: 'events', view: 'create', step: 1 });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -265,6 +339,7 @@ export default function EOPage() {
       target = 'overview';
     } else if (navKey === 'events') {
       target = 'events';
+      if (events.statusFilter === 'CANCELLED') events.setStatusFilter('ALL');
     } else if (navKey === 'recruitment') {
       target = 'events';
       setActiveNav('events');
@@ -286,11 +361,7 @@ export default function EOPage() {
     }
 
     setActiveTab(target);
-    try {
-      setSearchParams({ tab: target }, { replace: true });
-    } catch (err) {
-      console.warn('Lỗi setSearchParams:', err);
-    }
+    syncUrlRoute({ tab: target });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -299,21 +370,13 @@ export default function EOPage() {
       setActiveTab('events');
       setActiveNav('events');
       setActiveEventSubTab('list');
-      try {
-        setSearchParams({ tab: 'events' }, { replace: true });
-      } catch (err) {
-        console.warn('Lỗi setSearchParams:', err);
-      }
+      syncUrlRoute({ tab: 'events' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     setActiveTab(tabKey);
     setActiveNav(tabKey);
-    try {
-      setSearchParams({ tab: tabKey }, { replace: true });
-    } catch (err) {
-      console.warn('Lỗi setSearchParams:', err);
-    }
+    syncUrlRoute({ tab: tabKey });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -323,6 +386,7 @@ export default function EOPage() {
       setDetailEvent(target);
       setDetailInitialTab('SHIFTS');
       setActiveEventSubTab('detail');
+      syncUrlRoute(target?.eventId ? { tab: 'events', eventId: target.eventId } : { tab: 'events' });
       return;
     }
     setDetailEvent(null);
@@ -333,6 +397,7 @@ export default function EOPage() {
     } else if (events.statusFilter === 'CANCELLED') {
       events.setStatusFilter('ALL');
     }
+    syncUrlRoute(subKey && subKey !== 'list' ? { tab: 'events', view: subKey } : { tab: 'events' });
   };
 
   const displayName = user?.fullName || user?.username || 'Ban Tổ Chức';
@@ -354,73 +419,18 @@ export default function EOPage() {
           {/* TRANG TỔNG QUAN (Gộp Báo Cáo & Thống Kê Tài Chính + Uy Tín vào Tổng Quan) */}
           {activeTab === 'overview' && (
             <>
-              <section
-                className="eo-hero-banner-clean"
-                style={{
-                  background: 'linear-gradient(90deg, #dbeafe 0%, #edf5ff 35%, #daebfe 70%, #dbeafe 100%)',
-                  border: '1px solid #bfdbfe',
-                  borderRadius: '20px',
-                  padding: '1.4rem 2rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  minHeight: '110px',
-                  boxShadow: '0 4px 18px rgba(37, 99, 235, 0.06)',
-                }}
-              >
-                {/* 1. Phần chữ bên trái */}
-                <div className="eo-hero-banner-text">
-                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#334155', marginBottom: '2px' }}>
-                    Chào mừng trở lại,
+              <section className="eo-workspace-hero" aria-labelledby="eo-overview-title">
+                <div className="eo-workspace-hero-copy">
+                  <p>Xin chào, {displayName}</p>
+                  <h1 id="eo-overview-title">Tổng quan điều hành</h1>
+                  <div className="eo-workspace-actions">
+                    <button type="button" className="eo-workspace-create" onClick={handleOpenCreateEvent}>
+                      <span aria-hidden="true">+</span> Tạo sự kiện
+                    </button>
+                    <button type="button" className="eo-workspace-secondary" onClick={() => handleNavClick('events')}>
+                      Xem sự kiện <span aria-hidden="true">→</span>
+                    </button>
                   </div>
-                  <h1
-                    style={{
-                      fontSize: '1.75rem',
-                      fontWeight: 900,
-                      color: '#0f172a',
-                      margin: '0 0 0.35rem',
-                      letterSpacing: '-0.025em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {displayName}
-                  </h1>
-                  <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, fontWeight: 500 }}>
-                    Quản lý sự kiện, tuyển dụng nhân sự và theo dõi vận hành trên CANi.
-                  </p>
-                </div>
-
-                {/* 2. Ảnh minh họa sân khấu sự kiện & lịch 3D bên phải (Chuẩn 100% Mockup Ảnh 1) */}
-                <div
-                  className="eo-hero-banner-art"
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    pointerEvents: 'none',
-                    zIndex: 1,
-                  }}
-                >
-                  <img
-                    src="/assets/eo-banner-stage.png"
-                    alt="CANi Event Stage & Calendar"
-                    style={{
-                      height: '100%',
-                      width: 'auto',
-                      objectFit: 'cover',
-                      objectPosition: 'right center',
-                      display: 'block',
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
                 </div>
               </section>
 
@@ -448,21 +458,23 @@ export default function EOPage() {
                 </div>
               )}
 
-              <EOMetricsGrid
-                metrics={events.metrics}
-                onOpenActiveEventDetail={() => {
-                  const active = events.events.find((e) => e.status === 'ACTIVE' || e.status === 'APPROVED') || events.events[0];
-                  if (active) {
-                    handleOpenEventDetailPage(active);
-                  }
-                }}
-              />
-
-              {/* Bảng Số Liệu Vận Hành & Thống Kê Tổng Quát (Pure Analytics & Operational Metrics) */}
-              <EOOverviewAnalytics
-                events={events.events}
-                onSelectEvent={(evt) => handleOpenEventDetailPage(evt)}
-              />
+              {events.loading || events.loadError ? (
+                <EOEventDataState loading={events.loading} onRetry={events.loadEvents} />
+              ) : (
+                <>
+                  <EOMetricsGrid
+                    metrics={events.metrics}
+                    onOpenActiveEventDetail={() => {
+                      const active = events.events.find((event) => event.status === 'ACTIVE' || event.status === 'APPROVED');
+                      if (active) handleOpenEventDetailPage(active);
+                    }}
+                  />
+                  <EOOverviewAnalytics
+                    events={events.events}
+                    onSelectEvent={handleOpenEventDetailPage}
+                  />
+                </>
+              )}
             </>
           )}
 
@@ -475,6 +487,11 @@ export default function EOPage() {
                 <EventCreationWizardModal
                   isOpen={true}
                   asPage={true}
+                  controlledStep={wizardStep}
+                  onStepChange={(nextStep) => {
+                    setWizardStep(nextStep);
+                    syncUrlRoute({ tab: 'events', view: 'create', step: nextStep });
+                  }}
                   onClose={() => handleEventSubTabChange('list')}
                   onSuccess={events.loadEvents}
                   onEventCreated={async (createdEvt) => {
@@ -508,12 +525,15 @@ export default function EOPage() {
                 <ShiftWorkspacePage
                   shift={workspaceShift}
                   event={resolvedEvent}
+                  targetAssignmentId={highlightAssignmentId}
                   onSelectShift={(nextShift) => {
                     setWorkspaceShiftId(nextShift.shiftId);
+                    syncUrlRoute({ tab: 'events', eventId: resolvedEvent.eventId, shiftId: nextShift.shiftId });
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   onBackToEvent={() => {
                     setWorkspaceShiftId(null);
+                    syncUrlRoute({ tab: 'events', eventId: resolvedEvent.eventId });
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   onEditShift={shifts.setEditingShift}
@@ -536,6 +556,9 @@ export default function EOPage() {
                   onSelectEvent={(nextEvt) => {
                     setWorkspaceShiftId(null);
                     setDetailEvent(nextEvt);
+                    if (nextEvt?.eventId) {
+                      syncUrlRoute({ tab: 'events', eventId: nextEvt.eventId });
+                    }
                   }}
                   onClose={() => {
                     setDetailEvent(null);
@@ -547,6 +570,9 @@ export default function EOPage() {
                   onOpenShiftWorkspace={(sh) => {
                     if (sh?.shiftId) {
                       setWorkspaceShiftId(sh.shiftId);
+                      if (resolvedEvent?.eventId) {
+                        syncUrlRoute({ tab: 'events', eventId: resolvedEvent.eventId, shiftId: sh.shiftId });
+                      }
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                   }}
@@ -575,6 +601,7 @@ export default function EOPage() {
             return (
               <EOEventsTab
                 loading={events.loading}
+                loadError={events.loadError}
                 allEvents={events.events}
                 filteredEvents={events.filteredEvents}
                 searchQuery={events.searchQuery}
@@ -591,6 +618,9 @@ export default function EOPage() {
                 onOpenShiftWorkspace={(sh, evt) => {
                   if (evt) setDetailEvent(evt);
                   if (sh?.shiftId) setWorkspaceShiftId(sh.shiftId);
+                  if (evt?.eventId && sh?.shiftId) {
+                    syncUrlRoute({ tab: 'events', eventId: evt.eventId, shiftId: sh.shiftId });
+                  }
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 onDeleteEvent={events.handleDeleteEvent}
@@ -636,6 +666,7 @@ export default function EOPage() {
                 }}
                 onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
                 onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
+                onNavigateToDisputes={() => handleNavClick('disputes')}
               />
             </Suspense>
           )}
@@ -693,7 +724,7 @@ export default function EOPage() {
           )}
         </main>
 
-        {activeTab === 'overview' && (
+        {activeTab === 'overview' && !events.loading && !events.loadError && (
           <EORightSidebar
             metrics={events.metrics}
             events={events.events}
@@ -711,7 +742,8 @@ export default function EOPage() {
             }}
             onOpenRecruitment={() => {
               handleNavClick('events');
-              handleEventSubTabChange('recruitment');
+              handleEventSubTabChange('list');
+              events.setStatusFilter('RECRUITING');
             }}
             onOpenSubscription={() => switchTab('subscription')}
             onViewAllEvents={() => {

@@ -36,6 +36,37 @@ const DEMO_PAYMENTS = [
     externalRef: '',
     status: 'NOT_DECLARED',
   },
+  {
+    paymentId: 'pay-04',
+    assignmentId: 'assign-104',
+    workerName: 'Phạm Minh Đức',
+    jobType: 'An ninh / Bảo vệ',
+    agreedAmount: 300000,
+    declaredAmount: 200000,
+    paymentMethod: 'BANK_TRANSFER',
+    externalRef: 'VCB-11223344',
+    status: 'DISPUTED',
+    disputeId: 'disp-01',
+    disputeStatus: 'INVESTIGATING',
+    disputeOutcome: null,
+    disputeRationale: 'Worker phản hồi chưa nhận đủ phụ cấp làm thêm giờ sau ca. Chuyên viên CSKH đang thu thập đối soát thẻ chấm công.',
+  },
+  {
+    paymentId: 'pay-05',
+    assignmentId: 'assign-105',
+    workerName: 'Hoàng Thị Mai',
+    jobType: 'PG / Giới thiệu sản phẩm',
+    agreedAmount: 350000,
+    declaredAmount: 350000,
+    paymentMethod: 'BANK_TRANSFER',
+    externalRef: 'MB-55667788',
+    status: 'CONFIRMED_FULL',
+    disputeId: 'disp-02',
+    disputeStatus: 'RESOLVED',
+    disputeOutcome: 'WORKER_FAULT',
+    disputeRationale: 'Qua đối chiếu nhật ký điểm danh GPS QR, Worker tự ý rời sự kiện sớm 2 tiếng không thông báo. Trừ 10 điểm RS và bảo lưu quyết toán cho EO.',
+    disputeResolvedAt: '2026-11-20T10:30:00Z',
+  },
 ];
 
 export function usePayments() {
@@ -84,6 +115,10 @@ export function usePayments() {
 
   const handleDeclarePayment = async (e) => {
     e.preventDefault();
+    if (paymentForm.paymentMethod === 'BANK_TRANSFER' && !paymentForm.paymentProofUrl) {
+      showToast('Vui lòng tải lên ảnh chụp biên lai chuyển khoản làm bằng chứng đối soát!', 'warning');
+      return;
+    }
     try {
       await eoService.declarePayment(paymentForm);
       setShowPaymentModal(false);
@@ -95,12 +130,18 @@ export function usePayments() {
                 declaredAmount: paymentForm.declaredAmount,
                 paymentMethod: paymentForm.paymentMethod,
                 externalRef: paymentForm.externalRef,
+                paymentProofUrl: paymentForm.paymentProofUrl,
                 status: 'DECLARED_PENDING_WORKER',
               }
             : p
         )
       );
-      showToast('Khai báo thanh toán thành công! Hệ thống đã gửi thông báo đến Worker để xác nhận.', 'success');
+      window.dispatchEvent(
+        new CustomEvent('cani_payment_updated', {
+          detail: { assignmentId: paymentForm.assignmentId },
+        })
+      );
+      showToast('Khai báo thanh toán thành công! Hệ thống đã gửi thông báo & email chứng từ đến Worker.', 'success');
     } catch (error) {
       if (import.meta.env.VITE_DEMO === 'true') {
         setPayments((prev) =>
@@ -126,12 +167,13 @@ export function usePayments() {
 
   const handleOpenPaymentDeclarationFromAttendance = (attendanceItem) => {
     setSelectedAssignment(attendanceItem);
+    const hasBank = Boolean(attendanceItem.bankCode && attendanceItem.bankAccountNumber);
     setPaymentForm({
       assignmentId: attendanceItem.assignmentId,
-      declaredAmount: attendanceItem.agreedWage || 200000,
-      paymentMethod: 'BANK_TRANSFER',
-      externalRef: `VCB-${Date.now().toString().slice(-6)}`,
-      paymentProofUrl: '',
+      declaredAmount: attendanceItem.declaredAmount ?? attendanceItem.agreedWage ?? attendanceItem.agreedAmount ?? 200000,
+      paymentMethod: attendanceItem.paymentMethod || (hasBank ? 'BANK_TRANSFER' : 'CASH'),
+      externalRef: attendanceItem.externalRef || `VCB-${Date.now().toString().slice(-6)}`,
+      paymentProofUrl: attendanceItem.paymentProofUrl || '',
     });
     setShowPaymentModal(true);
   };

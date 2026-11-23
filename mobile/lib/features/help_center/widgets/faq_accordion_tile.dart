@@ -75,11 +75,13 @@ class _FaqAccordionTileState extends State<FaqAccordionTile> {
                     style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '${widget.faq.viewCount} lượt xem',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                ),
+                if (widget.faq.viewCount > 0) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '${widget.faq.viewCount} lượt xem',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                  ),
+                ],
               ],
             ),
           ),

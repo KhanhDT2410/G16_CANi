@@ -167,10 +167,11 @@ public class EoEventController {
     @PostMapping("/assignments/{assignmentId}/verify")
     public ResponseEntity<ApiResponse<ShiftAttendanceDto>> verifyAttendance(
             @PathVariable("assignmentId") UUID assignmentId,
+            @RequestBody(required = false) VerifyAttendanceRequestDto request,
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        ShiftAttendanceDto verified = eoEventService.verifyAttendance(userId, assignmentId);
+        ShiftAttendanceDto verified = eoEventService.verifyAttendance(userId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.ok(verified, "Xác nhận hoàn thành ca và duyệt công cho Worker thành công!"));
     }
 
@@ -296,14 +297,32 @@ public class EoEventController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> triggerEmergencyDispatch(
             @PathVariable("shiftId") UUID shiftId,
             @RequestParam(required = false) Double radiusKm,
+            @RequestBody(required = false) Map<String, Object> body,
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        int dispatched = eoEventService.triggerEmergencyDispatch(userId, shiftId, radiusKm);
-        return ResponseEntity.ok(ApiResponse.ok(
-                Map.of("shiftId", shiftId, "dispatchedCount", dispatched, "emergency", true),
-                "Kích hoạt điều phối khẩn cấp thành công! Đã gửi " + dispatched + " đề xuất khẩn cấp đến Worker xung quanh."
-        ));
+        Double resolvedRadiusKm = radiusKm;
+        if (resolvedRadiusKm == null && body != null) {
+            Object raw = body.get("radiusKm") != null ? body.get("radiusKm") : body.get("expandedRadiusKm");
+            if (raw instanceof Number n) {
+                resolvedRadiusKm = n.doubleValue();
+            } else if (raw != null) {
+                try {
+                    resolvedRadiusKm = Double.parseDouble(raw.toString().trim());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        Map<String, Object> result = eoEventService.triggerEmergencyDispatchWithDetails(userId, shiftId, resolvedRadiusKm);
+        int dispatched = ((Number) result.get("dispatchedCount")).intValue();
+        double effectiveRadius = ((Number) result.get("effectiveRadiusKm")).doubleValue();
+        String radiusLabel = (effectiveRadius == Math.rint(effectiveRadius))
+                ? String.valueOf((long) effectiveRadius)
+                : String.valueOf(effectiveRadius);
+        String msg = dispatched > 0
+                ? "Kích hoạt điều phối khẩn cấp thành công (" + radiusLabel + " km)! Đã gửi " + dispatched + " đề xuất khẩn cấp đến Worker phù hợp."
+                : "Đã bật điều phối khẩn cấp (" + radiusLabel + " km) · Chưa tìm được Worker phù hợp.";
+        return ResponseEntity.ok(ApiResponse.ok(result, msg));
     }
 
     /**

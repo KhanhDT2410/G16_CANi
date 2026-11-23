@@ -2,6 +2,10 @@ class NearbyShiftItem {
   final String shiftId;
   final String? eventId;
   final String eventName;
+  final String? eoId;
+  final String? eoName;
+  final bool eoVerified;
+  final double? eoRatingAvg;
   final String jobType;
   final String? description;
   final String locationAddress;
@@ -13,6 +17,9 @@ class NearbyShiftItem {
   final DateTime? endTime;
   final DateTime? arrivalTime;
   final List<String> requiredSkillNames;
+  final List<String> preferredSkillNames;
+  final String? performedSkillName;
+  final String? customSkillNotes;
   final double distanceKm;
   final int requiredWorkers;
   final int confirmedWorkers;
@@ -26,6 +33,10 @@ class NearbyShiftItem {
     required this.shiftId,
     this.eventId,
     required this.eventName,
+    this.eoId,
+    this.eoName,
+    this.eoVerified = false,
+    this.eoRatingAvg,
     required this.jobType,
     this.description,
     required this.locationAddress,
@@ -37,6 +48,9 @@ class NearbyShiftItem {
     this.endTime,
     this.arrivalTime,
     this.requiredSkillNames = const [],
+    this.preferredSkillNames = const [],
+    this.performedSkillName,
+    this.customSkillNotes,
     required this.distanceKm,
     required this.requiredWorkers,
     required this.confirmedWorkers,
@@ -52,6 +66,10 @@ class NearbyShiftItem {
       shiftId: json['shiftId'] as String? ?? '',
       eventId: json['eventId'] as String?,
       eventName: json['eventName'] as String? ?? 'Sự kiện',
+      eoId: json['eoId']?.toString(),
+      eoName: json['eoName'] as String?,
+      eoVerified: json['eoVerified'] == true,
+      eoRatingAvg: (json['eoRatingAvg'] as num?)?.toDouble(),
       jobType: json['jobType'] as String? ?? 'Nhân sự',
       description: json['description'] as String?,
       locationAddress: json['locationAddress'] as String? ?? '',
@@ -63,6 +81,9 @@ class NearbyShiftItem {
       endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'] as String)?.toLocal() : null,
       arrivalTime: json['arrivalTime'] != null ? DateTime.tryParse(json['arrivalTime'] as String)?.toLocal() : null,
       requiredSkillNames: (json['requiredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
+      preferredSkillNames: (json['preferredSkillNames'] as List<dynamic>? ?? []).cast<String>(),
+      performedSkillName: json['performedSkillName'] as String?,
+      customSkillNotes: json['customSkillNotes'] as String?,
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
       requiredWorkers: (json['requiredWorkers'] as num?)?.toInt() ?? 1,
       confirmedWorkers: (json['confirmedWorkers'] as num?)?.toInt() ?? 0,

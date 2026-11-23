@@ -19,6 +19,7 @@ export const useAdminShifts = () => {
   const [selectedShift, setSelectedShift] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchShifts = useCallback(async () => {
     try {
@@ -82,6 +83,60 @@ export const useAdminShifts = () => {
     setSelectedShift(null);
   };
 
+  const handleCancelShift = async (shiftId, reason) => {
+    try {
+      setActionLoading(true);
+      const updated = await adminShiftApi.cancelShift(shiftId, reason);
+      if (updated) setSelectedShift(updated);
+      showToast('Đã hủy ca làm việc cưỡng chế thành công', 'success');
+      fetchShifts();
+      return true;
+    } catch (err) {
+      console.error('Lỗi khi hủy ca cưỡng chế:', err);
+      const msg = err.response?.data?.message || 'Không thể hủy ca làm việc';
+      showToast(msg, 'error');
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSuspendShift = async (shiftId, reason) => {
+    try {
+      setActionLoading(true);
+      const updated = await adminShiftApi.suspendShift(shiftId, reason);
+      if (updated) setSelectedShift(updated);
+      showToast('Đã tạm đình chỉ ca làm việc thành công', 'success');
+      fetchShifts();
+      return true;
+    } catch (err) {
+      console.error('Lỗi khi tạm đình chỉ ca:', err);
+      const msg = err.response?.data?.message || 'Không thể tạm đình chỉ ca làm việc';
+      showToast(msg, 'error');
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleWarnEo = async (shiftId, reason) => {
+    try {
+      setActionLoading(true);
+      const updated = await adminShiftApi.warnEo(shiftId, reason);
+      if (updated) setSelectedShift(updated);
+      showToast('Đã gửi cảnh báo tới Nhà tổ chức sự kiện thành công', 'success');
+      fetchShifts();
+      return true;
+    } catch (err) {
+      console.error('Lỗi khi gửi cảnh báo tới EO:', err);
+      const msg = err.response?.data?.message || 'Không thể gửi cảnh báo tới EO';
+      showToast(msg, 'error');
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return {
     shifts,
     loading,
@@ -93,12 +148,16 @@ export const useAdminShifts = () => {
     selectedShift,
     detailLoading,
     isDetailOpen,
+    actionLoading,
     setPage,
     handleSearchChange,
     handleStatusChange,
     fetchShifts,
     openDetailModal,
     closeDetailModal,
+    handleCancelShift,
+    handleSuspendShift,
+    handleWarnEo,
   };
 };
 

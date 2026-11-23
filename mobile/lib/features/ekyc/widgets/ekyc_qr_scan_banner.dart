@@ -43,7 +43,7 @@ class EkycQrScanBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Bóc Tách Thông Tin Thẻ Chuẩn 100%',
+                      'Đối Chiếu Thông Tin Từ Mã QR (Tùy Chọn)',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -53,7 +53,7 @@ class EkycQrScanBanner extends StatelessWidget {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Quét QR góc thẻ hoặc tự chỉnh sửa thông tin (Không dùng AI)',
+                      'Dùng để đối chiếu chéo với kết quả VNPT eKYC (không thay thế bước chụp ảnh)',
                       style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                   ],

@@ -1,13 +1,30 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { formatDateTime, REASON_CODE_LABELS } from '../types/rsAppeal.constants';
 import { RsAppealStatusBadge } from './RsAppealStatusBadge';
 
 export const RsAppealDetailModal = ({ appeal, isOpen, onClose, onReview }) => {
-  if (!isOpen || !appeal) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !appeal || typeof document === 'undefined') return null;
 
   const isPending = appeal.status === 'SUBMITTED' || appeal.status === 'UNDER_REVIEW';
 
-  return (
-    <div className="appeal-modal-overlay" onClick={onClose}>
+  const modalNode = (
+    <div className="appeal-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="appeal-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="appeal-modal-header">
           <div>
@@ -96,5 +113,7 @@ export const RsAppealDetailModal = ({ appeal, isOpen, onClose, onReview }) => {
       </div>
     </div>
   );
+
+  return createPortal(modalNode, document.body);
 };
 

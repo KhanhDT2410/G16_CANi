@@ -14,9 +14,11 @@ export const ShiftFilterBar = ({
 }) => {
   const FILTER_TABS = [
     { id: 'ALL', label: 'Tất Cả' },
+    { id: 'IN_PROGRESS', label: 'Đang Diễn Ra' },
     { id: 'ACTIVE', label: 'Đang Tuyển' },
     { id: 'FULLY_STAFFED', label: 'Đã Đủ Người' },
     { id: 'COMPLETED', label: 'Hoàn Thành' },
+    { id: 'SUSPENDED', label: 'Tạm Đình Chỉ' },
     { id: 'CANCELLED', label: 'Đã Hủy' },
   ];
 

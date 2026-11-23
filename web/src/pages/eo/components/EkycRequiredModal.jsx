@@ -13,6 +13,21 @@ export default function EkycRequiredModal({ isOpen, onClose, onNavigateToEkyc, e
           badgeColor: '#b45309',
           badgeBg: '#fef3c7',
         };
+      case 'PROCESSING':
+      case 'PENDING':
+        return {
+          title: 'Hồ sơ eKYC đang xử lý',
+          desc: 'Hồ sơ định danh của bạn đang được hệ thống VNPT eKYC xử lý. Vui lòng kiểm tra lại sau giây lát.',
+          badgeColor: '#1d4ed8',
+          badgeBg: '#dbeafe',
+        };
+      case 'TECHNICAL_FAILURE':
+        return {
+          title: 'Lỗi kết nối VNPT eKYC tạm thời',
+          desc: 'Hệ thống xác thực gặp sự cố kết nối tạm thời. Hồ sơ của bạn chưa bị từ chối — vui lòng mở mục eKYC để thử lại.',
+          badgeColor: '#c2410c',
+          badgeBg: '#ffedd5',
+        };
       case 'REJECTED':
         return {
           title: 'Hồ sơ eKYC trước đó bị từ chối',

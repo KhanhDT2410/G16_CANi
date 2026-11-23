@@ -519,7 +519,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
           onConfirmPayment: () => _openPaymentScreen(item),
           onOpenChecklist: () => _openExecutionScreen(item),
           onCancelAssignment: () => _openCancelDialog(item),
-          onRateOrganizer: () => _openRateScreen(item),
+          onRateOrganizer: item.hasWorkerReviewed == true ? null : () => _openRateScreen(item),
         );
       },
     );

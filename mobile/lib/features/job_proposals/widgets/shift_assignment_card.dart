@@ -341,7 +341,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                 ],
 
                 // Hàng nút phụ: Checklist việc / Hủy ca / Đánh giá BTC
-                if (onOpenChecklist != null || onCancelAssignment != null || onRateOrganizer != null) ...[
+                if (onOpenChecklist != null ||
+                    (isNotStarted && onCancelAssignment != null) ||
+                    (isCompleted && onRateOrganizer != null && a.hasWorkerReviewed != true)) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -361,7 +363,9 @@ class ShiftAssignmentCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                      if (onOpenChecklist != null && (isNotStarted && onCancelAssignment != null || isCompleted && onRateOrganizer != null))
+                      if (onOpenChecklist != null &&
+                          ((isNotStarted && onCancelAssignment != null) ||
+                              (isCompleted && onRateOrganizer != null && a.hasWorkerReviewed != true)))
                         const SizedBox(width: 8),
                       if (isNotStarted && onCancelAssignment != null)
                         Expanded(
@@ -381,7 +385,7 @@ class ShiftAssignmentCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                      if (isCompleted && onRateOrganizer != null)
+                      if (isCompleted && onRateOrganizer != null && a.hasWorkerReviewed != true)
                         Expanded(
                           child: TextButton.icon(
                             onPressed: onRateOrganizer,

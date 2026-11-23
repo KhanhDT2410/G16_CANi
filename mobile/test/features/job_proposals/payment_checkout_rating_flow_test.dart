@@ -177,4 +177,31 @@ void main() {
     expect(find.text('4.1 giờ'), findsOneWidget);
     expect(find.text('Gửi Đánh Giá & Hoàn Tất'), findsOneWidget);
   });
+
+  testWidgets('RateEoScreen hides submit button when already reviewed', (tester) async {
+    final reviewedItem = _makeAssignment(
+      status: 'COMPLETED',
+      eoConfirmed: true,
+      paymentStatus: 'CONFIRMED_FULL',
+      workerConfirmStatus: 'RECEIVED_FULL',
+      checkoutTime: DateTime(2026, 11, 20, 16, 5),
+      hasWorkerReviewed: true,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          proposalRepositoryProvider.overrideWithValue(_FakeProposalRepository([reviewedItem])),
+        ],
+        child: MaterialApp(
+          home: RateEoScreen(assignment: reviewedItem, checkoutHoursWorked: 4.1),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức rồi.'), findsOneWidget);
+    expect(find.text('Gửi Đánh Giá & Hoàn Tất'), findsNothing);
+    expect(find.text('Để sau'), findsNothing);
+  });
 }

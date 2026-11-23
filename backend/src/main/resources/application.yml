@@ -140,6 +140,10 @@ cani:
   sla-scan:
     enabled: ${SLA_SCAN_ENABLED:true}
     cron: ${SLA_SCAN_CRON:0 */15 * * * *}
+  shift-lifecycle:
+    cron: ${SHIFT_LIFECYCLE_CRON:0 */1 * * * *}
+    understaffed-alert-hours: ${SHIFT_UNDERSTAFFED_ALERT_HOURS:4}
+    emergency-default-radius-km: ${SHIFT_EMERGENCY_DEFAULT_RADIUS_KM:25}
 
 springdoc:
   api-docs:

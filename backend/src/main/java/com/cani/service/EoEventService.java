@@ -105,6 +105,22 @@ public class EoEventService {
     @Autowired(required = false)
     private ShiftSkillRequirementRepository shiftSkillRequirementRepository;
 
+    @Autowired(required = false)
+    private DispatchProposalRepository dispatchProposalRepository;
+
+    @Autowired(required = false)
+    private ShiftStaffingPolicy shiftStaffingPolicy;
+
+    private ShiftStaffingPolicy getStaffingPolicy() {
+        if (shiftStaffingPolicy != null) {
+            return shiftStaffingPolicy;
+        }
+        return ShiftStaffingPolicy.withFallbackDependencies(
+                shiftAssignmentRepository,
+                dispatchProposalRepository
+        );
+    }
+
     /**
      * EO tạo Sự kiện mới (Trạng thái DRAFT)
      */
@@ -438,8 +454,17 @@ public class EoEventService {
             shift.setCustomSkillNotes(skillConfig.customSkillNotes());
         }
         shift.setRequiredWorkers(workers);
-        int confirmed = shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0;
+        int confirmed = getStaffingPolicy().resolveConfirmedWorkersCount(shift);
         shift.setRemainingWorkers(Math.max(0, workers - confirmed));
+        if (confirmed >= workers) {
+            if (shift.getStatus() == ShiftStatus.ACTIVE) {
+                shift.setStatus(ShiftStatus.FULLY_STAFFED);
+            }
+            shift.setEmergency(false);
+            shift.setUnderstaffedAlertSent(false);
+        } else if (shift.getStatus() == ShiftStatus.FULLY_STAFFED) {
+            shift.setStatus(ShiftStatus.ACTIVE);
+        }
         shift.setHourlyWage(dto.getHourlyWage());
         shift.setAllowance(allowance);
         shift.setTotalCost(newShiftCost);
@@ -941,23 +966,47 @@ public class EoEventService {
      */
     @Transactional
     public int triggerEmergencyDispatch(UUID userId, UUID shiftId, Double customRadiusKm) {
+        Map<String, Object> details = triggerEmergencyDispatchWithDetails(userId, shiftId, customRadiusKm);
+        return ((Number) details.get("dispatchedCount")).intValue();
+    }
+
+    /**
+     * UC-59: EO kích hoạt điều phối khẩn cấp (Emergency Dispatch) có khóa dòng + trả chi tiết bán kính & ứng viên
+     */
+    @Transactional
+    public Map<String, Object> triggerEmergencyDispatchWithDetails(UUID userId, UUID shiftId, Double customRadiusKm) {
         EventOrganizer eo = getEoOrThrow(userId);
-        Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
+        Shift shift = shiftRepository.findByIdForUpdate(shiftId)
+                .orElseGet(() -> shiftRepository.findById(shiftId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Ca làm việc", "id", shiftId)));
 
-        if (isInviteMode(shift.getEvent())) {
-            throw new BadRequestException("Sự kiện đang ở chế độ Mời trực tiếp (INVITE), không hỗ trợ điều phối tự động khẩn cấp (Matching Engine).");
+        if (shift.getEvent() == null || shift.getEvent().getEventOrganizer() == null
+                || !shift.getEvent().getEventOrganizer().getEoId().equals(eo.getEoId())) {
+            throw new BadRequestException("Bạn không có quyền thao tác trên ca làm việc này");
         }
 
-        if (shift.getStatus() != ShiftStatus.ACTIVE) {
-            throw new BadRequestException("Chỉ có thể kích hoạt điều phối khẩn cấp cho ca làm việc đang ACTIVE");
+        ShiftStaffingPolicy policy = getStaffingPolicy();
+        ShiftStaffingPolicy.EmergencyEligibility eligibility = policy.evaluateEmergencyEligibility(shift, Instant.now());
+        if (!eligibility.canTriggerEmergency()) {
+            throw new BadRequestException(eligibility.blockReason());
         }
 
+        double effectiveRadiusKm = policy.resolveEffectiveEmergencyRadiusKm(customRadiusKm);
         shift.setEmergency(true);
         shiftRepository.save(shift);
 
-        int dispatched = matchingDispatchService.triggerEmergencyDispatch(shiftId, customRadiusKm);
-        log.info("EO {} kích hoạt Emergency Dispatch cho ca {}: Đã gửi {} đề xuất", eo.getEoId(), shiftId, dispatched);
-        return dispatched;
+        int dispatched = matchingDispatchService.triggerEmergencyDispatch(shiftId, effectiveRadiusKm);
+        log.info("EO {} kích hoạt Emergency Dispatch cho ca {} (radius={}km): Đã gửi {} đề xuất",
+                eo.getEoId(), shiftId, effectiveRadiusKm, dispatched);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("shiftId", shiftId);
+        result.put("dispatchedCount", dispatched);
+        result.put("emergency", true);
+        result.put("effectiveRadiusKm", effectiveRadiusKm);
+        result.put("hasCandidates", dispatched > 0);
+        result.put("missingWorkers", eligibility.missingWorkers());
+        return result;
     }
 
     private boolean isInviteMode(Event event) {
@@ -1509,19 +1558,14 @@ public class EoEventService {
     }
 
     private ShiftResponseDto mapToShiftResponseDto(Shift s) {
-        ShiftStatus resolvedStatus = s.getStatus();
-        if (resolvedStatus != ShiftStatus.CANCELLED && resolvedStatus != ShiftStatus.DRAFT) {
-            Instant now = Instant.now();
-            if (s.getEndTime() != null && now.isAfter(s.getEndTime())) {
-                resolvedStatus = ShiftStatus.COMPLETED;
-                if (s.getStatus() != ShiftStatus.COMPLETED) {
-                    s.setStatus(ShiftStatus.COMPLETED);
-                }
-            } else if (s.getStartTime() != null && !now.isBefore(s.getStartTime())) {
-                resolvedStatus = ShiftStatus.IN_PROGRESS;
-                if (s.getStatus() == ShiftStatus.ACTIVE || s.getStatus() == ShiftStatus.FULLY_STAFFED) {
-                    s.setStatus(ShiftStatus.IN_PROGRESS);
-                }
+        ShiftStaffingPolicy.EmergencyEligibility eligibility = getStaffingPolicy().evaluateEmergencyEligibility(s, Instant.now());
+        ShiftStatus resolvedStatus = eligibility.effectiveStatus();
+        if (s.getStatus() != ShiftStatus.CANCELLED && s.getStatus() != ShiftStatus.DRAFT) {
+            if (resolvedStatus == ShiftStatus.COMPLETED && s.getStatus() != ShiftStatus.COMPLETED) {
+                s.setStatus(ShiftStatus.COMPLETED);
+            } else if (resolvedStatus == ShiftStatus.IN_PROGRESS
+                    && (s.getStatus() == ShiftStatus.ACTIVE || s.getStatus() == ShiftStatus.FULLY_STAFFED)) {
+                s.setStatus(ShiftStatus.IN_PROGRESS);
             }
         }
 
@@ -1534,9 +1578,9 @@ public class EoEventService {
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())
                 .arrivalTime(s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
-                .requiredWorkers(s.getRequiredWorkers())
-                .confirmedWorkers(s.getConfirmedWorkers())
-                .remainingWorkers(s.getRemainingWorkers())
+                .requiredWorkers(eligibility.requiredWorkers())
+                .confirmedWorkers(eligibility.confirmedWorkers())
+                .remainingWorkers(eligibility.missingWorkers())
                 .hourlyWage(s.getHourlyWage())
                 .allowance(s.getAllowance())
                 .totalCost(s.getTotalCost())
@@ -1556,6 +1600,12 @@ public class EoEventService {
                 .skillRequirements(reqDtos)
                 .customSkillNotes(s.getCustomSkillNotes())
                 .emergency(Boolean.TRUE.equals(s.getEmergency()))
+                .missingWorkers(eligibility.missingWorkers())
+                .nearStartUnderstaffed(eligibility.nearStartUnderstaffed())
+                .canTriggerEmergency(eligibility.canTriggerEmergency())
+                .emergencyBlockReason(eligibility.blockReason())
+                .pendingProposalCount(eligibility.pendingProposalCount())
+                .defaultEmergencyRadiusKm(eligibility.defaultEmergencyRadiusKm())
                 .build();
     }
 

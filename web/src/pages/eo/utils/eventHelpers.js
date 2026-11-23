@@ -258,24 +258,137 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
   };
 }
 
+export const DEFAULT_UNDERSTAFFED_ALERT_HOURS = 4;
+export const DEFAULT_EMERGENCY_RADIUS_KM = 25;
+
+export function formatShiftStartTime(timeStr, fallback = '--:--') {
+  if (!timeStr) return fallback;
+  try {
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return fallback;
+    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return fallback;
+  }
+}
+
 /**
- * Lọc danh sách các ca làm việc đang bị thiếu hụt nhân sự khẩn cấp hoặc sát giờ
+ * Đánh giá thống nhất trạng thái thiếu nhân sự & quyền kích hoạt Emergency Dispatch của một ca làm việc.
+ * Dùng chung quy tắc với Backend ShiftStaffingPolicy.
  */
-export function getShiftStaffingAlerts(shifts = []) {
-  const now = new Date();
-  return (shifts || []).filter((s) => {
-    if (!s || s.status === 'CANCELLED') return false;
-    const start = s.startTime ? new Date(s.startTime) : null;
-    const end = s.endTime ? new Date(s.endTime) : null;
-    if (end && !isNaN(end.getTime()) && now > end) return false; // Đã kết thúc
-    const confirmed = Number(s.confirmedWorkers || 0);
-    const required = Math.max(1, Number(s.requiredWorkers || 1));
-    if (confirmed >= required) return false; // Đã đủ người
-    if (s.emergency) return true; // Đang bật emergency
-    if (start && !isNaN(start.getTime()) && now >= start) return true; // Đang diễn ra mà thiếu người
-    if (start && !isNaN(start.getTime()) && (start.getTime() - now.getTime()) <= 4 * 3600 * 1000) return true; // Sát giờ < 4h
-    return false;
-  });
+export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date(), alertHours = DEFAULT_UNDERSTAFFED_ALERT_HOURS) {
+  const rawStatus = (shift?.status || '').toUpperCase();
+  const evtStatus = (event?.status || shift?.eventStatus || 'ACTIVE').toUpperCase();
+  const mode = (event?.mode || shift?.eventMode || 'MATCHING').toUpperCase();
+  const isInviteMode = mode === 'INVITE' || mode === 'INVITE_ONLY';
+
+  const start = shift?.startTime ? new Date(shift.startTime) : null;
+  const end = shift?.endTime ? new Date(shift.endTime) : null;
+  const startValid = Boolean(start && !isNaN(start.getTime()));
+  const endValid = Boolean(end && !isNaN(end.getTime()));
+
+  const isDraft = rawStatus === 'DRAFT' || evtStatus === 'DRAFT';
+  const isCancelled = rawStatus === 'CANCELLED' || evtStatus === 'CANCELLED';
+  const isSuspended = rawStatus === 'SUSPENDED' || evtStatus === 'SUSPENDED';
+  const isCompleted =
+    rawStatus === 'COMPLETED' ||
+    evtStatus === 'COMPLETED' ||
+    (endValid && now.getTime() > end.getTime());
+
+  const isInProgress =
+    !isDraft &&
+    !isCancelled &&
+    !isCompleted &&
+    !isSuspended &&
+    (rawStatus === 'IN_PROGRESS' ||
+      rawStatus === 'ONGOING' ||
+      (startValid && now.getTime() >= start.getTime()));
+
+  const required = Math.max(1, Number(shift?.requiredWorkers ?? 1));
+  const confirmed = Math.max(0, Number(shift?.confirmedWorkers ?? 0));
+  const missing =
+    shift?.missingWorkers !== undefined && shift?.missingWorkers !== null
+      ? Math.max(0, Number(shift.missingWorkers))
+      : Math.max(0, required - confirmed);
+
+  const hoursWindow = Math.max(1, Number(alertHours || DEFAULT_UNDERSTAFFED_ALERT_HOURS));
+  const withinAlertWindow =
+    !isDraft &&
+    !isCancelled &&
+    !isCompleted &&
+    !isSuspended &&
+    startValid &&
+    now.getTime() >= start.getTime() - hoursWindow * 3600 * 1000;
+
+  const nearStartUnderstaffed =
+    missing > 0 &&
+    (typeof shift?.nearStartUnderstaffed === 'boolean' ? shift.nearStartUnderstaffed : withinAlertWindow);
+
+  const isEmergency = Boolean(shift?.emergency);
+  const canTriggerEmergency =
+    !isInviteMode &&
+    !isDraft &&
+    !isCancelled &&
+    !isCompleted &&
+    !isSuspended &&
+    !isInProgress &&
+    missing > 0 &&
+    !isEmergency &&
+    (typeof shift?.canTriggerEmergency === 'boolean' ? shift.canTriggerEmergency : true);
+
+  const hasCandidates =
+    shift?.pendingProposalCount !== undefined && shift?.pendingProposalCount !== null
+      ? Number(shift.pendingProposalCount) > 0
+      : true;
+
+  const defaultRadiusKm = Number(shift?.defaultEmergencyRadiusKm) > 0
+    ? Number(shift.defaultEmergencyRadiusKm)
+    : DEFAULT_EMERGENCY_RADIUS_KM;
+
+  const startTimeText = formatShiftStartTime(shift?.startTime);
+  const summaryLine = `Ca ${shift?.jobType || 'Nhân sự'} bắt đầu lúc ${startTimeText} · Đã chốt ${confirmed}/${required} · Còn thiếu ${missing} người`;
+
+  return {
+    shift,
+    required,
+    confirmed,
+    missing,
+    isInviteMode,
+    isDraft,
+    isCancelled,
+    isSuspended,
+    isCompleted,
+    isInProgress,
+    isEmergency,
+    withinAlertWindow,
+    nearStartUnderstaffed,
+    canTriggerEmergency,
+    emergencyBlockReason: shift?.emergencyBlockReason || null,
+    hasCandidates,
+    defaultRadiusKm,
+    startTimeText,
+    summaryLine,
+  };
+}
+
+/**
+ * Lọc danh sách các ca làm việc đang bị thiếu hụt nhân sự sát giờ (mặc định <= 4h trước startTime đến trước endTime)
+ */
+export function getShiftStaffingAlerts(shifts = [], event = {}, now = new Date(), alertHours = DEFAULT_UNDERSTAFFED_ALERT_HOURS) {
+  return (shifts || [])
+    .map((s) => getShiftStaffingSummary(s, event, now, alertHours))
+    .filter((summary) => summary.nearStartUnderstaffed);
+}
+
+/**
+ * Đếm số ca thiếu nhân sự sát giờ cho một sự kiện trên danh sách sự kiện
+ */
+export function getEventUnderstaffedSummary(evt = {}, now = new Date(), alertHours = DEFAULT_UNDERSTAFFED_ALERT_HOURS) {
+  const alerts = getShiftStaffingAlerts(evt?.shifts || [], evt, now, alertHours);
+  return {
+    count: alerts.length,
+    alerts,
+  };
 }
 
 /**

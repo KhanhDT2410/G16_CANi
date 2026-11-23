@@ -3,9 +3,17 @@ import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
-import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
+import { showPrompt } from '../../../components/common/PromptModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import { getDynamicEventStatus, getDynamicShiftStatus, getShiftStaffingAlerts, resolveEventEstimatedCost } from '../utils/eventHelpers';
+import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
+import ShiftEmergencyBanner from './ShiftEmergencyBanner';
+import {
+  getDynamicEventStatus,
+  getDynamicShiftStatus,
+  getShiftStaffingAlerts,
+  getShiftStaffingSummary,
+  resolveEventEstimatedCost,
+} from '../utils/eventHelpers';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import './EventDetailModal.css';
@@ -37,6 +45,8 @@ export default function EventDetailModal({
   const workerProfile = useWorkerProfile();
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
+  const [emergencyConfirmShift, setEmergencyConfirmShift] = useState(null);
+  const [dispatchResultsByShiftId, setDispatchResultsByShiftId] = useState({});
 
   useEffect(() => {
     if (initialTab) {
@@ -98,58 +108,6 @@ export default function EventDetailModal({
     }
   };
 
-  // Tự động quét ca sát giờ thiếu người để gợi ý mở rộng tìm kiếm khẩn cấp (Emergency Dispatch)
-  useEffect(() => {
-    if (!isOpen || !event?.eventId || event?.status === 'DRAFT') return;
-
-    const urgentShift = (event.shifts || []).find((s) => {
-      if (!s || s.status === 'CANCELLED' || s.emergency) return false;
-      const confirmed = Number(s.confirmedWorkers || 0);
-      const required = Math.max(1, Number(s.requiredWorkers || 1));
-      if (confirmed >= required) return false;
-
-      const now = new Date();
-      const start = s.startTime ? new Date(s.startTime) : null;
-      if (!start || isNaN(start.getTime())) return false;
-
-      // Sát giờ: còn <= 4 tiếng trước ca hoặc đang diễn ra
-      const diffMs = start.getTime() - now.getTime();
-      const isUrgent = diffMs <= 4 * 3600 * 1000 && diffMs >= -2 * 3600 * 1000;
-      if (!isUrgent) return false;
-
-      const prompted = sessionStorage.getItem(`cani_emergency_prompted_${s.shiftId}`);
-      return !prompted;
-    });
-
-    if (urgentShift) {
-      sessionStorage.setItem(`cani_emergency_prompted_${urgentShift.shiftId}`, '1');
-      const startStr = urgentShift.startTime
-        ? new Date(urgentShift.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-        : 'sắp tới';
-      const confirmed = Number(urgentShift.confirmedWorkers || 0);
-      const required = Number(urgentShift.requiredWorkers || 1);
-
-      showConfirm({
-        title: `Cảnh báo thiếu nhân sự sát giờ: Ca "${urgentShift.jobType}"`,
-        description: `Ca làm việc sắp bắt đầu lúc ${startStr} nhưng hiện mới có ${confirmed}/${required} nhân sự.\n\nBạn có muốn hệ thống kích hoạt chế độ Điều Phối Khẩn Cấp (mở rộng bán kính tìm kiếm lên 15km và ưu tiên phát sóng trên Radar tìm việc của Worker gần đây) không?`,
-        type: 'warning',
-        confirmText: 'Mở rộng tìm kiếm khẩn cấp',
-        cancelText: 'Để sau',
-      }).then(async (agreed) => {
-        if (agreed) {
-          try {
-            await eoService.enableEmergencyDispatch(urgentShift.shiftId, 15);
-            showToast(`Đã kích hoạt điều phối khẩn cấp (15km) cho ca "${urgentShift.jobType}".`, 'success');
-            onReloadEvents?.();
-          } catch (err) {
-            const msg = err.response?.data?.message || err.message || 'Lỗi khi kích hoạt điều phối khẩn cấp';
-            showToast(msg, 'error');
-          }
-        }
-      });
-    }
-  }, [isOpen, event?.eventId, event?.status, event?.shifts, onReloadEvents]);
-
   const rawShifts = event?.shifts || [];
   const activeAndDraftShifts = rawShifts
     .filter((sh) => sh.status !== 'CANCELLED')
@@ -160,7 +118,7 @@ export default function EventDetailModal({
     });
   const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
   const shifts = activeAndDraftShifts;
-  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts), [shifts]);
+  const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts, event), [shifts, event]);
 
   // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
   const skillNameMap = useMemo(() => {
@@ -634,36 +592,29 @@ export default function EventDetailModal({
                 </button>
               </div>
 
-              {/* Banner cảnh báo thiếu hụt nhân sự khẩn cấp */}
+              {/* Cảnh báo thiếu nhân sự sát giờ riêng cho từng ca */}
               {staffingAlerts.length > 0 && (
                 <div
                   style={{
                     marginBottom: '1.15rem',
-                    padding: '0.9rem 1.15rem',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(90deg, #fff1f2 0%, #fff7ed 100%)',
-                    border: '1.5px solid #fda4af',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    flexWrap: 'wrap',
-                    boxShadow: '0 2px 8px rgba(225, 29, 72, 0.08)',
+                    flexDirection: 'column',
+                    gap: '0.6rem',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    <div>
-                      <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#be123c' }}>
-                        CẢNH BÁO THIẾU HỤT NHÂN SỰ ({staffingAlerts.length} ca làm đang hoặc sắp diễn ra thiếu người)
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#881337', marginTop: 3 }}>
-                        {staffingAlerts
-                          .map((s) => `"${s.jobType}" (thiếu ${Math.max(0, (s.requiredWorkers || 1) - (s.confirmedWorkers || 0))} người)`)
-                          .join(', ')}
-                        . Hệ thống đang tự động theo dõi và hỗ trợ mở rộng bán kính tìm kiếm cho các ca sát giờ.
-                      </div>
-                    </div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#be123c' }}>
+                    Thiếu nhân sự sát giờ ({staffingAlerts.length} ca)
                   </div>
+                  {staffingAlerts.map((alertSummary) => (
+                    <ShiftEmergencyBanner
+                      key={alertSummary.shift.shiftId}
+                      shift={alertSummary.shift}
+                      event={event}
+                      localDispatchResult={dispatchResultsByShiftId[alertSummary.shift.shiftId]}
+                      onTriggerEmergency={(sh) => setEmergencyConfirmShift(sh)}
+                      onOpenInvite={onOpenInvite}
+                    />
+                  ))}
                 </div>
               )}
 
@@ -793,24 +744,31 @@ export default function EventDetailModal({
                             {/* Thao tác ca */}
                             <div className="shift-card-actions">
                               {/* Trạng thái mở rộng khẩn cấp */}
-                              {shift.emergency && (
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    background: '#fff1f2',
-                                    color: '#e11d48',
-                                    border: '1.5px solid #fecdd3',
-                                    borderRadius: '8px',
-                                    padding: '0.35rem 0.65rem',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 700,
-                                  }}
-                                  title="Hệ thống đang mở rộng tìm kiếm 15km và phát sóng trên Radar của Worker"
-                                >
-                                  Đang tìm kiếm khẩn cấp (15km)
-                                </span>
-                              )}
+                              {shift.emergency && shiftRequired > shiftConfirmed && (() => {
+                                const summary = getShiftStaffingSummary(shift, event);
+                                const localRes = dispatchResultsByShiftId[shift.shiftId];
+                                const hasCandidates =
+                                  localRes && typeof localRes.hasCandidates === 'boolean'
+                                    ? localRes.hasCandidates
+                                    : summary.hasCandidates;
+                                return (
+                                  <span
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      background: '#fff1f2',
+                                      color: '#e11d48',
+                                      border: '1.5px solid #fecdd3',
+                                      borderRadius: '8px',
+                                      padding: '0.35rem 0.65rem',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {hasCandidates ? 'Đang điều phối khẩn cấp' : 'Đã bật điều phối · Chưa tìm được Worker phù hợp'}
+                                  </span>
+                                );
+                              })()}
 
                               {/* Mã mời nhân sự: Ẩn khi sự kiện hoặc ca là Bản nháp (DRAFT) */}
                               {!isDraft && onOpenInvite && (
@@ -1261,6 +1219,21 @@ export default function EventDetailModal({
           error={workerProfile.error}
           profile={workerProfile.profile}
           onClose={workerProfile.closeProfile}
+        />
+
+        {/* Modal Xác Nhận Kích Hoạt Điều Phối Khẩn Cấp (chỉ mở khi EO bấm nút) */}
+        <EmergencyDispatchConfirmModal
+          isOpen={Boolean(emergencyConfirmShift)}
+          shift={emergencyConfirmShift}
+          event={event}
+          onClose={() => setEmergencyConfirmShift(null)}
+          onSuccess={(shiftId, res) =>
+            setDispatchResultsByShiftId((prev) => ({
+              ...prev,
+              [shiftId]: res,
+            }))
+          }
+          onReloadEvents={onReloadEvents}
         />
     </div>
   );

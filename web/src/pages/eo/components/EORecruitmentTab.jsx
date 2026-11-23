@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { showToast } from '../../../components/common/Toast';
 import { eoService } from '../../../services/eoService';
-import EmergencyBroadcastModal from './EmergencyBroadcastModal';
+import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import { getEventStatusPriority } from '../utils/eventHelpers';
+import { getEventStatusPriority, getShiftStaffingSummary } from '../utils/eventHelpers';
 
 /**
  * EORecruitmentTab
@@ -49,6 +49,7 @@ export default function EORecruitmentTab({
             eventName: evt.name,
             venueAddress: evt.venueAddress,
             eventStatus: evt.status,
+            eventMode: evt.mode,
           });
         });
       }
@@ -319,20 +320,17 @@ export default function EORecruitmentTab({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {activeAndDraftShifts.map((shift) => {
-            const confirmed = shift.confirmedWorkers || 0;
-            const required = shift.requiredWorkers || 1;
+            const summary = getShiftStaffingSummary(shift, {
+              mode: shift.eventMode,
+              status: shift.eventStatus,
+            });
+            const confirmed = summary.confirmed;
+            const required = summary.required;
             const percent = Math.min(100, Math.round((confirmed / required) * 100));
             const isFull = confirmed >= required;
-            const isDraftShift = shift.status === 'DRAFT' || shift.eventStatus === 'DRAFT';
+            const isDraftShift = summary.isDraft;
             const isWorkspaceOpen = activeWorkspaceShiftId === shift.shiftId;
-
-            const now = new Date();
-            const shiftStart = shift.startTime ? new Date(shift.startTime) : null;
-            const shiftEnd = shift.endTime ? new Date(shift.endTime) : null;
-            const isNotEnded = shiftEnd ? now < shiftEnd : true;
-            const hoursUntilStart = shiftStart ? (shiftStart.getTime() - now.getTime()) / (1000 * 60 * 60) : 999;
-            const isNearShift = isNotEnded && (hoursUntilStart <= 4 || (shiftStart && now >= shiftStart));
-            const canTriggerEmergency = !isFull && isNearShift;
+            const canTriggerEmergency = summary.nearStartUnderstaffed && summary.canTriggerEmergency;
 
             return (
               <div key={shift.shiftId} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -634,11 +632,13 @@ export default function EORecruitmentTab({
       )}
 
       {/* Modal Cứu Trợ Ca Khẩn Cấp (Emergency Dispatch Pool - Section 11) */}
-      <EmergencyBroadcastModal
+      <EmergencyDispatchConfirmModal
         isOpen={emergencyModal.isOpen}
         shift={emergencyModal.shift}
+        event={events.find((e) => e.eventId === emergencyModal.shift?.eventId)}
         onClose={() => setEmergencyModal({ isOpen: false, shift: null })}
         onSuccess={handleEmergencySuccess}
+        onReloadEvents={onReloadEvents}
       />
     </div>
   );

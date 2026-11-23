@@ -7,6 +7,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentSource;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.InviteTargetType;
+import com.cani.entity.enums.ShiftStatus;
 import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
@@ -278,7 +279,17 @@ public class InviteService {
 
         // Cập nhật số lượng nhân sự đã xác nhận trong ca
         int currentConfirmed = shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0;
-        shift.setConfirmedWorkers(currentConfirmed + 1);
+        int nextConfirmed = currentConfirmed + 1;
+        int required = shift.getRequiredWorkers() != null ? shift.getRequiredWorkers() : 1;
+        shift.setConfirmedWorkers(nextConfirmed);
+        shift.setRemainingWorkers(Math.max(0, required - nextConfirmed));
+        if (nextConfirmed >= required) {
+            if (shift.getStatus() == ShiftStatus.ACTIVE) {
+                shift.setStatus(ShiftStatus.FULLY_STAFFED);
+            }
+            shift.setEmergency(false);
+            shift.setUnderstaffedAlertSent(false);
+        }
         shiftRepository.save(shift);
 
         if (notificationService != null && shift.getEvent() != null

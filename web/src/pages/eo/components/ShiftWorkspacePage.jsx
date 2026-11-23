@@ -4,10 +4,12 @@ import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
-import { getDynamicShiftStatus } from '../utils/eventHelpers';
+import { getDynamicShiftStatus, getShiftStaffingSummary } from '../utils/eventHelpers';
 import RateWorkerModal from './RateWorkerModal';
 import ConfirmVerifySkillModal from './ConfirmVerifySkillModal';
 import ReportNoShowModal from './ReportNoShowModal';
+import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
+import ShiftEmergencyBanner from './ShiftEmergencyBanner';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
@@ -33,6 +35,8 @@ export default function ShiftWorkspacePage({
   const [attendanceList, setAttendanceList] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
+  const [emergencyConfirmOpen, setEmergencyConfirmOpen] = useState(false);
+  const [emergencyDispatchResult, setEmergencyDispatchResult] = useState(null);
   const [selectedForVerify, setSelectedForVerify] = useState(null);
   const [selectedForReview, setSelectedForReview] = useState(null);
   const [selectedForNoShow, setSelectedForNoShow] = useState(null);
@@ -222,8 +226,9 @@ export default function ShiftWorkspacePage({
   if (!shift || !event) return null;
 
   const dynStatus = getDynamicShiftStatus(shift, event.status);
-  const shiftConfirmed = shift.confirmedWorkers || attendanceList.length || 0;
-  const shiftRequired = Math.max(1, shift.requiredWorkers || 1);
+  const staffingSummary = getShiftStaffingSummary(shift, event);
+  const shiftConfirmed = staffingSummary.confirmed;
+  const shiftRequired = staffingSummary.required;
   const fillRate = Math.round((shiftConfirmed / shiftRequired) * 100);
   const isShortage = dynStatus.isCritical || dynStatus.isEmergency || dynStatus.isUrgent || shiftConfirmed < shiftRequired;
 
@@ -456,7 +461,7 @@ export default function ShiftWorkspacePage({
             <span>📤</span> Mở QR Check-out (Kết ca)
           </button>
 
-          {shift.emergency && (
+          {shift.emergency && staffingSummary.missing > 0 && (
             <span
               style={{
                 display: 'inline-flex',
@@ -469,9 +474,13 @@ export default function ShiftWorkspacePage({
                 fontSize: '0.82rem',
                 fontWeight: 700,
               }}
-              title="Hệ thống đang mở rộng tìm kiếm 15km và phát sóng trên Radar tìm việc của Worker"
+              title="Trạng thái điều phối khẩn cấp hiện tại"
             >
-              Đang tìm kiếm khẩn cấp (15km)
+              {(emergencyDispatchResult && typeof emergencyDispatchResult.hasCandidates === 'boolean'
+                ? emergencyDispatchResult.hasCandidates
+                : staffingSummary.hasCandidates)
+                ? 'Đang điều phối khẩn cấp'
+                : 'Đã bật điều phối · Chưa tìm được Worker phù hợp'}
             </span>
           )}
 
@@ -514,6 +523,24 @@ export default function ShiftWorkspacePage({
           )}
         </div>
       </div>
+
+      {/* Cảnh báo thiếu nhân sự sát giờ / nút kích hoạt khẩn cấp hoặc mời thêm */}
+      <ShiftEmergencyBanner
+        shift={shift}
+        event={event}
+        localDispatchResult={emergencyDispatchResult}
+        onTriggerEmergency={() => setEmergencyConfirmOpen(true)}
+        onOpenInvite={onOpenInvite}
+      />
+
+      <EmergencyDispatchConfirmModal
+        isOpen={emergencyConfirmOpen}
+        shift={shift}
+        event={event}
+        onClose={() => setEmergencyConfirmOpen(false)}
+        onSuccess={(_, res) => setEmergencyDispatchResult(res)}
+        onReloadEvents={onReloadEvents}
+      />
 
       {/* 2. THÔNG TIN CHUNG CỦA CA */}
       <div

@@ -1638,6 +1638,7 @@ public class WorkerJobService {
         if (confirmed >= required) {
             shift.setStatus(ShiftStatus.FULLY_STAFFED);
             shift.setEmergency(false);
+            shift.setUnderstaffedAlertSent(false);
         }
         if (entityManager != null) {
             try {

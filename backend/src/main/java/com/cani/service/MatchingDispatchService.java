@@ -64,6 +64,19 @@ public class MatchingDispatchService {
     @Autowired(required = false)
     private WorkerShiftEligibilityService workerShiftEligibilityService;
 
+    @Autowired(required = false)
+    private ShiftStaffingPolicy shiftStaffingPolicy;
+
+    private ShiftStaffingPolicy getStaffingPolicy() {
+        if (shiftStaffingPolicy != null) {
+            return shiftStaffingPolicy;
+        }
+        return ShiftStaffingPolicy.withFallbackDependencies(
+                shiftAssignmentRepository,
+                dispatchProposalRepository
+        );
+    }
+
     private WorkerShiftEligibilityService getEligibilityService() {
         if (workerShiftEligibilityService != null) {
             return workerShiftEligibilityService;
@@ -482,25 +495,25 @@ public class MatchingDispatchService {
      */
     @Transactional
     public int triggerEmergencyDispatch(UUID shiftId, Double customRadiusKm) {
-        Shift shift = shiftRepository.findById(shiftId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca làm việc ID: " + shiftId));
+        Shift shift = shiftRepository.findByIdForUpdate(shiftId)
+                .orElseGet(() -> shiftRepository.findById(shiftId)
+                        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca làm việc ID: " + shiftId)));
+
+        ShiftStaffingPolicy policy = getStaffingPolicy();
+        Instant now = Instant.now();
 
         if (!isDispatchAllowedForEvent(shift)) {
             log.warn("Từ chối Emergency Dispatch: Sự kiện của ca {} đang ở chế độ INVITE hoặc không hợp lệ.", shiftId);
             return 0;
         }
 
-        if (shift.getStatus() != ShiftStatus.ACTIVE) {
-            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE", shiftId);
+        if (policy.resolveEffectiveShiftStatus(shift, now) != ShiftStatus.ACTIVE) {
+            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE (status={}, startTime={})",
+                    shiftId, shift.getStatus(), shift.getStartTime());
             return 0;
         }
 
-        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
-            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} đã qua giờ kết thúc.", shiftId);
-            return 0;
-        }
-
-        int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
+        int needed = Math.max(0, policy.resolveRequiredWorkers(shift) - policy.resolveConfirmedWorkersCount(shift));
         if (needed <= 0) {
             return 0;
         }
@@ -517,8 +530,7 @@ public class MatchingDispatchService {
             shiftRepository.save(shift);
         }
 
-        double rawRadius = (customRadiusKm != null && customRadiusKm > 0) ? customRadiusKm : 25.0;
-        double emergencyRadius = Math.min(Math.max(rawRadius, 1.0), 50.0);
+        double emergencyRadius = policy.resolveEffectiveEmergencyRadiusKm(customRadiusKm);
         log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km (Capped max 50km)", shiftId, emergencyRadius);
 
         List<Worker> onlineWorkers = workerRepository.findByIsOnlineTrue();

@@ -111,19 +111,33 @@ export default function EOPage() {
 
         // Deep-link trực tiếp vào trang quản lý ca từ thông báo
         const currentEvents = eventsRef.current;
-        if (targetTab === 'events' && targetShiftId && Array.isArray(currentEvents?.events)) {
-          const foundEvent =
-            (targetEventId && currentEvents.events.find((ev) => ev.eventId === targetEventId)) ||
-            currentEvents.events.find((ev) => (ev.shifts || []).some((sh) => sh.shiftId === targetShiftId));
-          if (foundEvent) {
-            setDetailEvent(foundEvent);
+        const resolvedEvent =
+          targetTab === 'events' && Array.isArray(currentEvents?.events)
+            ? (targetEventId && currentEvents.events.find((ev) => ev.eventId === targetEventId)) ||
+              (targetShiftId &&
+                currentEvents.events.find((ev) => (ev.shifts || []).some((sh) => sh.shiftId === targetShiftId))) ||
+              null
+            : null;
+        const resolvedEventId = targetEventId || resolvedEvent?.eventId || null;
+
+        if (targetTab === 'events' && resolvedEvent) {
+          setDetailEvent(resolvedEvent);
+          if (targetShiftId) {
             setWorkspaceShiftId(targetShiftId);
-            currentEvents.loadEvents?.();
+          } else {
+            setWorkspaceShiftId(null);
           }
+          setActiveEventSubTab('detail');
+          currentEvents?.loadEvents?.();
+        } else if (targetTab === 'events' && (targetEventId || targetShiftId)) {
+          currentEvents?.loadEvents?.();
         }
 
         try {
-          setSearchParams({ tab: targetTab }, { replace: true });
+          const nextParams = { tab: targetTab };
+          if (targetTab === 'events' && resolvedEventId) nextParams.eventId = String(resolvedEventId);
+          if (targetTab === 'events' && targetShiftId) nextParams.shiftId = String(targetShiftId);
+          setSearchParams(nextParams, { replace: true });
         } catch (err) {
           console.warn('Lỗi setSearchParams:', err);
         }

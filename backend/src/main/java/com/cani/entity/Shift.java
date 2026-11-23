@@ -124,6 +124,10 @@ public class Shift {
     @Builder.Default
     private Boolean emergency = false;
 
+    @Column(name = "understaffed_alert_sent", nullable = false)
+    @Builder.Default
+    private Boolean understaffedAlertSent = false;
+
     @Column(name = "admin_note", columnDefinition = "TEXT")
     private String adminNote;
 

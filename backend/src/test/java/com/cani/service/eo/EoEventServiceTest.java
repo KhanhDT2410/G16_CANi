@@ -1895,7 +1895,9 @@ class EoEventServiceTest {
         Shift mockShift = Shift.builder()
                 .shiftId(shiftId)
                 .status(ShiftStatus.ACTIVE)
-                .event(Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).build())
+                .requiredWorkers(2)
+                .confirmedWorkers(0)
+                .event(Event.builder().eventId(UUID.randomUUID()).status(EventStatus.ACTIVE).mode(EventMode.MATCHING).eventOrganizer(mockEo).build())
                 .build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
@@ -1997,6 +1999,97 @@ class EoEventServiceTest {
 
         assertThrows(BadRequestException.class, () -> eoEventService.triggerEmergencyDispatch(userId, shiftId, 20.0));
         verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+    }
+
+    @Test
+    @DisplayName("UTC074 - triggerEmergencyDispatch() - Ca đã đủ người ngay trước khi bấm -> từ chối")
+    void triggerEmergencyDispatch_FullShift_ThrowsBadRequest() {
+        UUID shiftId = UUID.randomUUID();
+        Event activeEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).mode(EventMode.MATCHING).status(EventStatus.ACTIVE).build();
+        Shift fullShift = Shift.builder().shiftId(shiftId).status(ShiftStatus.ACTIVE).requiredWorkers(4).confirmedWorkers(4).event(activeEvent).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(fullShift));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.triggerEmergencyDispatch(userId, shiftId, 25.0));
+        assertTrue(ex.getMessage().contains("đủ nhân sự"));
+        verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+    }
+
+    @Test
+    @DisplayName("UTC075 - triggerEmergencyDispatch() - Ca IN_PROGRESS (đã đến giờ làm) -> từ chối nhất quán với UI")
+    void triggerEmergencyDispatch_InProgressShift_ThrowsBadRequest() {
+        UUID shiftId = UUID.randomUUID();
+        Event activeEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).mode(EventMode.MATCHING).status(EventStatus.ONGOING).build();
+        Shift inProgressShift = Shift.builder()
+                .shiftId(shiftId)
+                .status(ShiftStatus.ACTIVE)
+                .startTime(Instant.now().minus(10, ChronoUnit.MINUTES))
+                .endTime(Instant.now().plus(3, ChronoUnit.HOURS))
+                .requiredWorkers(4)
+                .confirmedWorkers(2)
+                .event(activeEvent)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(inProgressShift));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.triggerEmergencyDispatch(userId, shiftId, 25.0));
+        assertTrue(ex.getMessage().contains("IN_PROGRESS"));
+        verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+    }
+
+    @Test
+    @DisplayName("UTC076 - triggerEmergencyDispatch() - Bấm lần 2 hoặc đã bật Emergency -> chặn chống điều phối trùng")
+    void triggerEmergencyDispatch_AlreadyEmergencyEnabled_ThrowsBadRequest() {
+        UUID shiftId = UUID.randomUUID();
+        Event activeEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).mode(EventMode.MATCHING).status(EventStatus.ACTIVE).build();
+        Shift alreadyEmergency = Shift.builder()
+                .shiftId(shiftId)
+                .status(ShiftStatus.ACTIVE)
+                .startTime(Instant.now().plus(1, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(5, ChronoUnit.HOURS))
+                .requiredWorkers(4)
+                .confirmedWorkers(1)
+                .emergency(true)
+                .event(activeEvent)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(alreadyEmergency));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.triggerEmergencyDispatch(userId, shiftId, 25.0));
+        assertTrue(ex.getMessage().contains("đã được bật điều phối khẩn cấp"));
+        verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+    }
+
+    @Test
+    @DisplayName("UTC077 - triggerEmergencyDispatchWithDetails() - Không có ứng viên phù hợp -> vẫn bật emergency & trả hasCandidates=false")
+    void triggerEmergencyDispatchWithDetails_ZeroCandidates_ReturnsHasCandidatesFalse() {
+        UUID shiftId = UUID.randomUUID();
+        Event activeEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).mode(EventMode.MATCHING).status(EventStatus.ACTIVE).build();
+        Shift shift = Shift.builder()
+                .shiftId(shiftId)
+                .status(ShiftStatus.ACTIVE)
+                .startTime(Instant.now().plus(1, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(5, ChronoUnit.HOURS))
+                .requiredWorkers(4)
+                .confirmedWorkers(2)
+                .emergency(false)
+                .event(activeEvent)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+        when(matchingDispatchService.triggerEmergencyDispatch(shiftId, 25.0)).thenReturn(0);
+
+        Map<String, Object> result = eoEventService.triggerEmergencyDispatchWithDetails(userId, shiftId, null);
+
+        assertEquals(true, result.get("emergency"));
+        assertEquals(0, result.get("dispatchedCount"));
+        assertEquals(false, result.get("hasCandidates"));
+        assertEquals(25.0, result.get("effectiveRadiusKm"));
+        assertTrue(Boolean.TRUE.equals(shift.getEmergency()));
     }
 
     @Test

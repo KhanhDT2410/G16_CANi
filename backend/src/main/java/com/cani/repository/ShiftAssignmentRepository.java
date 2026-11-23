@@ -27,6 +27,8 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
     List<ShiftAssignment> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
     List<ShiftAssignment> findByWorker_WorkerIdAndStatusIn(UUID workerId, List<AssignmentStatus> statuses);
     Optional<ShiftAssignment> findByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
+    boolean existsByShift_ShiftId(UUID shiftId);
+    long countByShift_ShiftIdAndStatusIn(UUID shiftId, List<AssignmentStatus> statuses);
     boolean existsByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
 
     @Query(value = "SELECT sa FROM ShiftAssignment sa " +

@@ -4,6 +4,7 @@ import {
   getEventStatusPriority,
   getDynamicEventStatus,
   getDynamicShiftStatus,
+  getEventUnderstaffedSummary,
   resolveEventEstimatedCost,
 } from '../utils/eventHelpers';
 import './EOEventsTab.css';
@@ -520,6 +521,7 @@ export default function EOEventsTab({
                       const fillPct =
                         requiredTotal > 0 ? Math.min(100, Math.round((confirmedTotal / requiredTotal) * 100)) : 0;
                       const estCost = resolveEventEstimatedCost(evt);
+                      const understaffedSummary = getEventUnderstaffedSummary(evt);
 
                       return (
                         <tr
@@ -646,6 +648,26 @@ export default function EOEventsTab({
                           <td onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
                               {formatStatusBadge(evt)}
+                              {understaffedSummary.count > 0 && (
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    backgroundColor: '#fff1f2',
+                                    color: '#be123c',
+                                    border: '1px solid #fda4af',
+                                    borderRadius: '999px',
+                                    padding: '0.18rem 0.55rem',
+                                    fontSize: '0.71rem',
+                                    fontWeight: 700,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={`Có ${understaffedSummary.count} ca đang thiếu nhân sự sát giờ`}
+                                >
+                                  Thiếu nhân sự sát giờ ({understaffedSummary.count} ca)
+                                </span>
+                              )}
                               {(() => {
                                 if (evt.status !== 'DRAFT') return null;
                                 const dyn = getDynamicEventStatus(evt);

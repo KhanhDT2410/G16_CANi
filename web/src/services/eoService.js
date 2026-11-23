@@ -370,23 +370,18 @@ export const eoService = {
   },
 
   // ==========================================
-  // BONUS 1: EMERGENCY BROADCAST POOL (SECTION 11 CANi_Flow_v8.txt)
+  // ĐIỀU PHỐI KHẨN CẤP (EMERGENCY DISPATCH - UC-59)
   // ==========================================
   triggerEmergencyBroadcast: async (shiftId, emergencyData = {}) => {
-    try {
-      const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, emergencyData);
-      return response.data?.data;
-    } catch {
-      // Fallback tự động gọi dispatch chuẩn kèm metadata
-      const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`, emergencyData);
-      return response.data?.data;
-    }
+    const radiusKm = emergencyData?.radiusKm ?? emergencyData?.expandedRadiusKm;
+    return eoService.enableEmergencyDispatch(shiftId, radiusKm);
   },
 
   // Bật điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
-  enableEmergencyDispatch: async (shiftId, radiusKm = 15) => {
+  enableEmergencyDispatch: async (shiftId, radiusKm = 25) => {
+    const params = radiusKm != null && Number(radiusKm) > 0 ? { radiusKm: Number(radiusKm) } : undefined;
     const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, null, {
-      params: { radiusKm },
+      params,
     });
     return response.data?.data;
   },

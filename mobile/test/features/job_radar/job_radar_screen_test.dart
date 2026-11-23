@@ -298,7 +298,8 @@ void main() {
     expect(find.text('Trần Minh Khang'), findsOneWidget);
     expect(find.textContaining('Chào buổi'), findsNothing);
     expect(find.text('Nhận việc'), findsOneWidget);
-    expect(find.textContaining('300 SP'), findsOneWidget);
+    expect(find.textContaining('Hạng'), findsNothing);
+    expect(find.textContaining('SP'), findsNothing);
 
     // Filter toolbar chips present cleanly
     expect(find.text('Mã mời'), findsOneWidget);

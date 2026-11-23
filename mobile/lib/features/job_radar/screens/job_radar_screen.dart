@@ -16,8 +16,6 @@ import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import 'package:cani/features/job_radar/widgets/job_detail_bottom_sheet.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_map_painter.dart';
 import 'package:cani/features/job_radar/widgets/radar_sliding_job_card.dart';
-import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
-import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 
 class JobRadarScreen extends ConsumerStatefulWidget {
   const JobRadarScreen({super.key});
@@ -340,7 +338,6 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     final state = ref.watch(jobRadarProvider);
     final notifier = ref.read(jobRadarProvider.notifier);
     final authState = ref.watch(authStateProvider);
-    final skillState = ref.watch(skillVerificationProvider);
     final ekycState = ref.watch(ekycProvider);
     final proposalsAsync = ref.watch(proposalsListProvider);
 
@@ -349,8 +346,6 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     final user = authState.user;
     final userName = user?.fullName.trim().isNotEmpty == true ? user!.fullName.trim() : 'Nhân Sự';
     final initialChar = userName.isNotEmpty ? userName[0].toUpperCase() : 'N';
-    final totalSp = skillState.skillPoints.fold<int>(0, (sum, p) => sum + p.totalSp);
-    final currentTier = SkillHubColors.resolveHighestTier(skillState.skillPoints);
 
     final now = DateTime.now();
     final activeProposals = (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
@@ -391,8 +386,6 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
               context: context,
               userName: userName,
               initialChar: initialChar,
-              currentTier: currentTier,
-              totalSp: totalSp,
               isEkycApproved: isEkycApproved,
               state: state,
               notifier: notifier,
@@ -452,15 +445,12 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
     required BuildContext context,
     required String userName,
     required String initialChar,
-    required String currentTier,
-    required int totalSp,
     required bool isEkycApproved,
     required JobRadarState state,
     required JobRadarNotifier notifier,
     required CaniTokens cani,
     required bool isDark,
   }) {
-    final tierTitle = SkillHubColors.getTierTitle(currentTier);
     final isReceiving = isEkycApproved && state.isOnline;
 
     return Container(
@@ -509,41 +499,16 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
           const SizedBox(width: 10),
 
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  userName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    color: cani.textMain,
-                    letterSpacing: -0.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 1),
-                Row(
-                  children: [
-                    Icon(Icons.star_rounded, size: 13, color: cani.warning),
-                    const SizedBox(width: 3),
-                    Flexible(
-                      child: Text(
-                        'Hạng $tierTitle · $totalSp SP',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: cani.textMuted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: Text(
+              userName,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                color: cani.textMain,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),

@@ -29,6 +29,13 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
   final Set<String> _selectedTags = {'Chuyên nghiệp', 'Đúng mô tả'};
   final TextEditingController _commentCtrl = TextEditingController();
   bool _isSubmitting = false;
+  late bool _isAlreadyReviewed;
+
+  @override
+  void initState() {
+    super.initState();
+    _isAlreadyReviewed = widget.assignment.hasWorkerReviewed == true;
+  }
 
   static const List<String> _allTags = [
     'Chuyên nghiệp',
@@ -47,7 +54,7 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
 
   Future<void> _submit() async {
     final cani = Theme.of(context).cani;
-    if (widget.assignment.hasWorkerReviewed == true) {
+    if (_isAlreadyReviewed) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Bạn đã gửi đánh giá cho ca làm việc này trước đó rồi.'),
@@ -72,6 +79,7 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
       ref.invalidate(assignmentsListProvider);
       ref.invalidate(incomeSummaryProvider);
       if (mounted) {
+        setState(() => _isAlreadyReviewed = true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Cảm ơn bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức!'),
@@ -82,12 +90,27 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gửi đánh giá thất bại: ${e.toString().replaceFirst('Exception: ', '')}'),
-            backgroundColor: cani.danger,
-          ),
-        );
+        final cleanMsg = e is RepositoryException
+            ? e.message
+            : e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        if (cleanMsg.toLowerCase().contains('đã gửi đánh giá')) {
+          setState(() => _isAlreadyReviewed = true);
+          ref.invalidate(assignmentsListProvider);
+          ref.invalidate(incomeSummaryProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(cleanMsg),
+              backgroundColor: cani.warning,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Gửi đánh giá thất bại: $cleanMsg'),
+              backgroundColor: cani.danger,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -199,7 +222,9 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Check-out thành công! Hãy gửi đánh giá để hoàn tất trọn vẹn ca làm.',
+                                  _isAlreadyReviewed
+                                      ? 'Bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức rồi.'
+                                      : 'Check-out thành công! Hãy gửi đánh giá để hoàn tất trọn vẹn ca làm.',
                                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.success),
                                 ),
                               ),
@@ -214,7 +239,7 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
                           isEoConfirmed: true,
                           isPaymentConfirmed: isAssignmentPaymentConfirmed(a),
                           isCompleted: true,
-                          isReviewed: a.hasWorkerReviewed == true,
+                          isReviewed: _isAlreadyReviewed,
                           forcedCurrentStep: 6,
                         ),
                       ],
@@ -382,50 +407,49 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
               ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-            decoration: BoxDecoration(
-              color: cani.surface,
-              border: Border(top: BorderSide(color: cani.border)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isSubmitting ? null : () => Navigator.pop(context, true),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: cani.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text('Để sau', style: TextStyle(fontWeight: FontWeight.w700, color: cani.textMuted)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: (_isSubmitting || widget.assignment.hasWorkerReviewed == true) ? null : _submit,
-                      icon: Icon(widget.assignment.hasWorkerReviewed == true ? Icons.check_circle_rounded : Icons.send_rounded, size: 18),
-                      label: Text(
-                        widget.assignment.hasWorkerReviewed == true
-                            ? 'Đã Gửi Đánh Giá'
-                            : (_isSubmitting ? 'Đang gửi...' : 'Gửi Đánh Giá & Hoàn Tất'),
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: widget.assignment.hasWorkerReviewed == true ? cani.success : cani.brand,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          if (!_isAlreadyReviewed)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              decoration: BoxDecoration(
+                color: cani.surface,
+                border: Border(top: BorderSide(color: cani.border)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isSubmitting ? null : () => Navigator.pop(context, true),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: cani.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text('Để sau', style: TextStyle(fontWeight: FontWeight.w700, color: cani.textMuted)),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton.icon(
+                        onPressed: _isSubmitting ? null : _submit,
+                        icon: const Icon(Icons.send_rounded, size: 18),
+                        label: Text(
+                          _isSubmitting ? 'Đang gửi...' : 'Gửi Đánh Giá & Hoàn Tất',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: cani.brand,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

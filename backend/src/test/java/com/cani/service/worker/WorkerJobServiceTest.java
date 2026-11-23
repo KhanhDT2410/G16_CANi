@@ -394,6 +394,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC011 - rejectProposal() - Normal: Từ chối đề xuất thành công và kích hoạt redispatch")
     void rejectProposal_Success_MarksRejectedAndTriggersRedispatch() {
+        activeShift.setEmergency(false);
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
 
@@ -401,6 +402,20 @@ class WorkerJobServiceTest {
 
         assertThat(pendingProposal.getStatus()).isEqualTo(ProposalStatus.REJECTED);
         verify(matchingDispatchService).dispatchForShift(activeShift.getShiftId());
+    }
+
+    @Test
+    @DisplayName("UTC011B - rejectProposal() - Emergency: Từ chối đề xuất khẩn cấp gọi điều phối khẩn cấp hệ thống và báo EO")
+    void rejectProposal_EmergencyShift_TriggersEmergencyRedispatchAndNotifiesEo() {
+        activeShift.setEmergency(true);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
+
+        workerJobService.rejectProposal(userId, pendingProposal.getProposalId(), "Không kịp di chuyển");
+
+        assertThat(pendingProposal.getStatus()).isEqualTo(ProposalStatus.REJECTED);
+        verify(matchingDispatchService).triggerEmergencyDispatchForSystem(activeShift.getShiftId(), null);
+        verify(matchingDispatchService, never()).dispatchForShift(any());
     }
 
     @Test
@@ -418,6 +433,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC013 - rejectProposal() - Boundary: Lỗi redispatch được xử lý mềm không văng ngoại lệ")
     void rejectProposal_Boundary_RedispatchFailureDoesNotBreakRejection() {
+        activeShift.setEmergency(false);
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(dispatchProposalRepository.findById(pendingProposal.getProposalId())).thenReturn(Optional.of(pendingProposal));
         doThrow(new RuntimeException("Redispatch service timeout")).when(matchingDispatchService).dispatchForShift(any());
@@ -438,13 +454,22 @@ class WorkerJobServiceTest {
                 .assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId())).thenReturn(List.of(sa));
-        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)).thenReturn(Optional.empty());
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(any())).thenReturn(List.of());
+        when(reviewRepository.findByAssignmentIdIn(any())).thenReturn(List.of(
+                com.cani.entity.Review.builder()
+                        .assignmentId(assignmentId)
+                        .reviewerId(userId)
+                        .revieweeId(UUID.randomUUID())
+                        .rating(5)
+                        .build()
+        ));
 
         List<ShiftAssignmentResponseDto> list = workerJobService.getMyAssignments(userId);
 
         assertThat(list).hasSize(1);
         assertThat(list.get(0).getAssignmentId()).isEqualTo(assignmentId);
         assertThat(list.get(0).getAttendanceStatus()).isEqualTo("NOT_CHECKED_IN");
+        assertThat(list.get(0).getHasWorkerReviewed()).isTrue();
     }
 
     @Test
@@ -1073,6 +1098,7 @@ class WorkerJobServiceTest {
     void cancelAssignment_Success_EarlyCancellationSmallPenalty() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setStartTime(Instant.now().plus(48, ChronoUnit.HOURS));
+        activeShift.setEmergency(false);
         ShiftAssignment sa = ShiftAssignment.builder()
                 .assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
 
@@ -1083,8 +1109,31 @@ class WorkerJobServiceTest {
 
         assertThat(sa.getStatus()).isEqualTo(AssignmentStatus.CANCELLED);
         assertThat(worker.getReliabilityScore()).isEqualTo(85); // 90 - 5 = 85
+        assertThat(activeShift.getEmergency()).isTrue();
         verify(shiftRepository).decrementConfirmedWorkersAtomic(eq(activeShift.getShiftId()));
-        verify(matchingDispatchService).dispatchForShift(activeShift.getShiftId());
+        verify(matchingDispatchService).triggerEmergencyDispatchForSystem(activeShift.getShiftId(), null);
+    }
+
+    @Test
+    @DisplayName("UTC040b - cancelAssignment() - Ca vẫn đủ người sau khi hủy -> không bật emergency và không dispatch")
+    void cancelAssignment_StillFullyStaffed_DoesNotTriggerEmergency() {
+        UUID assignmentId = UUID.randomUUID();
+        activeShift.setRequiredWorkers(1);
+        activeShift.setConfirmedWorkers(2);
+        activeShift.setRemainingWorkers(0);
+        activeShift.setEmergency(false);
+        activeShift.setStartTime(Instant.now().plus(24, ChronoUnit.HOURS));
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.CONFIRMED).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        workerJobService.cancelAssignment(userId, assignmentId, "Hủy khi ca dư người");
+
+        assertThat(sa.getStatus()).isEqualTo(AssignmentStatus.CANCELLED);
+        assertThat(activeShift.getEmergency()).isFalse();
+        verify(matchingDispatchService, never()).triggerEmergencyDispatchForSystem(any(), any());
     }
 
     @Test
@@ -1838,6 +1887,7 @@ class WorkerJobServiceTest {
         workerJobService.cancelAssignment(userId, assignment.getAssignmentId(), "Bận đột xuất");
 
         verify(matchingDispatchService, never()).dispatchForShift(any());
+        verify(matchingDispatchService, never()).triggerEmergencyDispatchForSystem(any(), any());
     }
 
     @Test

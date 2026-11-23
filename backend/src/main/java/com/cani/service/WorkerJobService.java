@@ -102,6 +102,19 @@ public class WorkerJobService {
     @Autowired(required = false)
     private WorkerShiftEligibilityService workerShiftEligibilityService;
 
+    @Autowired(required = false)
+    private ShiftStaffingPolicy shiftStaffingPolicy;
+
+    private ShiftStaffingPolicy getStaffingPolicy() {
+        if (shiftStaffingPolicy != null) {
+            return shiftStaffingPolicy;
+        }
+        return ShiftStaffingPolicy.withFallbackDependencies(
+                shiftAssignmentRepository,
+                dispatchProposalRepository
+        );
+    }
+
     private WorkerShiftEligibilityService getEligibilityService() {
         if (workerShiftEligibilityService != null) {
             return workerShiftEligibilityService;
@@ -277,12 +290,33 @@ public class WorkerJobService {
         log.info("Worker {} đã từ chối đề xuất {}. Lý do: {}", userId, proposalId, reason);
 
         Shift rejectedShift = proposal.getShift();
-        if (rejectedShift != null && (rejectedShift.getEvent() == null
-                || rejectedShift.getEvent().getMode() != com.cani.entity.enums.EventMode.INVITE)) {
-            try {
-                matchingDispatchService.dispatchForShift(rejectedShift.getShiftId());
-            } catch (Exception e) {
-                log.warn("Lỗi khi dispatch lại sau khi reject: {}", e.getMessage());
+        if (rejectedShift != null) {
+            // Ticket EO-011: Thông báo cho EO khi Worker từ chối đề xuất ca khẩn cấp
+            if (Boolean.TRUE.equals(rejectedShift.getEmergency())) {
+                Event ev = rejectedShift.getEvent();
+                String evName = ev != null ? ev.getName() : "Sự kiện";
+                sendEoShiftNotification(
+                        rejectedShift,
+                        "⚠️ [CỨU TRỢ KHẨN CẤP] Worker từ chối lời mời nhận ca",
+                        String.format("Worker %s đã từ chối đề xuất khẩn cấp ca \"%s\" (%s). Hệ thống tiếp tục điều phối ứng viên tiếp theo.",
+                                worker.getFullName(), rejectedShift.getJobType(), evName),
+                        com.cani.entity.enums.NotificationType.REMINDER,
+                        null,
+                        worker.getWorkerId(),
+                        "EMERGENCY_PROPOSAL_REJECTED"
+                );
+            }
+
+            if (rejectedShift.getEvent() == null || rejectedShift.getEvent().getMode() != com.cani.entity.enums.EventMode.INVITE) {
+                try {
+                    if (Boolean.TRUE.equals(rejectedShift.getEmergency())) {
+                        matchingDispatchService.triggerEmergencyDispatchForSystem(rejectedShift.getShiftId(), null);
+                    } else {
+                        matchingDispatchService.dispatchForShift(rejectedShift.getShiftId());
+                    }
+                } catch (Exception e) {
+                    log.warn("Lỗi khi dispatch lại sau khi reject: {}", e.getMessage());
+                }
             }
         }
     }
@@ -294,7 +328,7 @@ public class WorkerJobService {
     public List<ShiftAssignmentResponseDto> getMyAssignments(UUID userId) {
         Worker worker = getWorkerOrThrow(userId);
         List<ShiftAssignment> assignments = shiftAssignmentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
-        return assignments.stream().map(this::mapToAssignmentDto).collect(Collectors.toList());
+        return enrichAssignmentDtos(worker, assignments);
     }
 
     /**
@@ -320,9 +354,18 @@ public class WorkerJobService {
             return Page.empty(pageable);
         }
 
-        List<ShiftAssignment> assignments = assignmentPage.getContent();
+        List<ShiftAssignmentResponseDto> dtoList = enrichAssignmentDtos(worker, assignmentPage.getContent());
+
+        return new PageImpl<>(dtoList, pageable, assignmentPage.getTotalElements());
+    }
+
+    private List<ShiftAssignmentResponseDto> enrichAssignmentDtos(Worker worker, List<ShiftAssignment> assignments) {
+        if (assignments == null || assignments.isEmpty()) {
+            return Collections.emptyList();
+        }
         Set<UUID> assignmentIds = assignments.stream()
                 .map(ShiftAssignment::getAssignmentId)
+                .filter(id -> id != null)
                 .collect(Collectors.toSet());
 
         // 1. Batch Fetching: Chấm công (O(1) thay vì N query)
@@ -346,13 +389,17 @@ public class WorkerJobService {
                         .collect(Collectors.groupingBy(Review::getAssignmentId))
                 : Collections.emptyMap();
 
-        UUID workerUserId = (worker.getUser() != null) ? worker.getUser().getUserId() : null;
+        UUID workerUserId = (worker != null && worker.getUser() != null) ? worker.getUser().getUserId() : null;
 
-        List<ShiftAssignmentResponseDto> dtoList = assignments.stream()
-                .map(a -> mapToEnrichedAssignmentDto(a, attendanceMap.get(a.getAssignmentId()), paymentMap.get(a.getAssignmentId()), reviewMap.get(a.getAssignmentId()), workerUserId))
+        return assignments.stream()
+                .map(a -> mapToEnrichedAssignmentDto(
+                        a,
+                        attendanceMap.get(a.getAssignmentId()),
+                        paymentMap.get(a.getAssignmentId()),
+                        reviewMap.get(a.getAssignmentId()),
+                        workerUserId
+                ))
                 .collect(Collectors.toList());
-
-        return new PageImpl<>(dtoList, pageable, assignmentPage.getTotalElements());
     }
 
     /**
@@ -602,12 +649,29 @@ public class WorkerJobService {
         }
 
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+        Instant now = Instant.now();
+        List<Shift> candidateShifts = new ArrayList<>();
         List<Shift> activeShifts = shiftRepository.findByStatus(ShiftStatus.ACTIVE);
+        if (activeShifts != null) {
+            candidateShifts.addAll(activeShifts);
+        }
+        List<Shift> inProgressShifts = shiftRepository.findByStatus(ShiftStatus.IN_PROGRESS);
+        if (inProgressShifts != null) {
+            for (Shift s : inProgressShifts) {
+                if (Boolean.TRUE.equals(s.getEmergency())
+                        && (s.getEndTime() == null || !now.isAfter(s.getEndTime()))) {
+                    candidateShifts.add(s);
+                }
+            }
+        }
         List<NearbyShiftResponseDto> nearbyList = new ArrayList<>();
 
-        for (Shift s : activeShifts) {
-            // Chỉ hiển thị các ca còn cần tuyển người (remainingWorkers > 0)
+        for (Shift s : candidateShifts) {
+            // Chỉ hiển thị các ca còn cần tuyển người (remainingWorkers > 0) và chưa hết giờ làm
             if (s.getRemainingWorkers() == null || s.getRemainingWorkers() <= 0) {
+                continue;
+            }
+            if (s.getEndTime() != null && now.isAfter(s.getEndTime())) {
                 continue;
             }
 
@@ -985,6 +1049,10 @@ public class WorkerJobService {
             throw new BadRequestException("Bạn đã điểm danh vào ca, không thể hủy nữa. Vui lòng liên hệ bộ phận CSKH để hỗ trợ.");
         }
 
+        if (assignment.getStatus() == AssignmentStatus.NO_SHOW) {
+            throw new BadRequestException("Ca làm việc này đã bị ghi nhận vắng mặt (No-show), không thể hủy.");
+        }
+
         Shift shift = assignment.getShift();
         Instant now = Instant.now();
         Instant startTime = shift != null ? shift.getStartTime() : null;
@@ -1017,6 +1085,20 @@ public class WorkerJobService {
 
         if (shift != null) {
             shiftRepository.decrementConfirmedWorkersAtomic(shift.getShiftId());
+            if (shift.getConfirmedWorkers() != null && shift.getConfirmedWorkers() > 0) {
+                shift.setConfirmedWorkers(shift.getConfirmedWorkers() - 1);
+            }
+            if (shift.getRemainingWorkers() != null) {
+                shift.setRemainingWorkers(shift.getRemainingWorkers() + 1);
+            }
+
+            ShiftStaffingPolicy policy = getStaffingPolicy();
+            ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, now);
+            if (shift.getStatus() == ShiftStatus.FULLY_STAFFED) {
+                shift.setStatus(effectiveStatus == ShiftStatus.IN_PROGRESS ? ShiftStatus.IN_PROGRESS : ShiftStatus.ACTIVE);
+            } else if (effectiveStatus == ShiftStatus.IN_PROGRESS && shift.getStatus() == ShiftStatus.ACTIVE) {
+                shift.setStatus(ShiftStatus.IN_PROGRESS);
+            }
 
             Event event = shift.getEvent();
             if (event != null && event.getTotalConfirmedWorkers() != null && event.getTotalConfirmedWorkers() > 0) {
@@ -1024,25 +1106,58 @@ public class WorkerJobService {
                 eventRepository.save(event);
             }
 
-            if (event == null || event.getMode() != com.cani.entity.enums.EventMode.INVITE) {
-                try {
-                    matchingDispatchService.dispatchForShift(shift.getShiftId());
-                } catch (Exception e) {
-                    log.warn("Không thể kích hoạt dispatch tìm người thay thế: {}", e.getMessage());
-                }
-            } else {
-                log.info("Bỏ qua re-dispatch Matching sau khi hủy ca {} vì sự kiện thuộc chế độ INVITE", shift.getShiftId());
-            }
-
+            ShiftStaffingPolicy.AutoEmergencyEligibility autoEligibility =
+                    policy.evaluateAutoEmergencyEligibility(shift, now);
             String evName = (event != null) ? event.getName() : "Sự kiện";
             String reasonText = (reason != null && !reason.isBlank()) ? reason : "Không nêu lý do";
-            sendEoShiftNotification(
-                    shift,
-                    "Cảnh báo: Nhân sự hủy ca",
-                    worker.getFullName() + " vừa hủy nhận ca \"" + shift.getJobType() + "\" (" + evName + "). Lý do: " + reasonText,
-                    com.cani.entity.enums.NotificationType.REMINDER,
-                    assignmentId
-            );
+
+            if (autoEligibility.eligible()) {
+                shift.setEmergency(true);
+                shift.setUnderstaffedAlertSent(true);
+                shiftRepository.save(shift);
+
+                int dispatched = 0;
+                try {
+                    dispatched = matchingDispatchService.triggerEmergencyDispatchForSystem(shift.getShiftId(), null);
+                } catch (Exception e) {
+                    log.warn("Không thể kích hoạt emergency dispatch tìm người thay thế: {}", e.getMessage());
+                }
+
+                sendEoShiftNotification(
+                        shift,
+                        "Thiếu nhân sự · Đã bật điều phối khẩn cấp: " + shift.getJobType(),
+                        worker.getFullName() + " vừa hủy nhận ca \"" + shift.getJobType() + "\" (" + evName
+                                + "). Hiện chốt " + autoEligibility.confirmedWorkers() + "/" + autoEligibility.requiredWorkers()
+                                + " · Còn thiếu " + autoEligibility.missingWorkers()
+                                + " người. Hệ thống đã tự động bật điều phối khẩn cấp tìm người thay thế"
+                                + (dispatched > 0 ? " (đã gửi " + dispatched + " đề xuất)." : "."),
+                        com.cani.entity.enums.NotificationType.REMINDER,
+                        assignmentId
+                );
+            } else {
+                if (autoEligibility.missingWorkers() <= 0
+                        || effectiveStatus == ShiftStatus.COMPLETED
+                        || effectiveStatus == ShiftStatus.CANCELLED) {
+                    if (Boolean.TRUE.equals(shift.getEmergency())) {
+                        shift.setEmergency(false);
+                        shift.setUnderstaffedAlertSent(false);
+                        shiftRepository.save(shift);
+                    }
+                }
+                if (event != null && event.getMode() == com.cani.entity.enums.EventMode.INVITE) {
+                    log.info("Bỏ qua re-dispatch Matching sau khi hủy ca {} vì sự kiện thuộc chế độ INVITE", shift.getShiftId());
+                } else {
+                    log.info("Không kích hoạt Emergency Dispatch sau khi hủy ca {}: {}",
+                            shift.getShiftId(), autoEligibility.blockReason());
+                }
+                sendEoShiftNotification(
+                        shift,
+                        "Cảnh báo: Nhân sự hủy ca",
+                        worker.getFullName() + " vừa hủy nhận ca \"" + shift.getJobType() + "\" (" + evName + "). Lý do: " + reasonText,
+                        com.cani.entity.enums.NotificationType.REMINDER,
+                        assignmentId
+                );
+            }
         }
 
         log.info("Worker {} đã hủy ca {} (Bị trừ {} điểm uy tín, điểm mới: {})",
@@ -1655,20 +1770,34 @@ public class WorkerJobService {
         if (shift == null || worker == null || assignment == null) return;
         Event ev = shift.getEvent();
         String evName = ev != null ? ev.getName() : "Sự kiện";
+        boolean isEmergency = Boolean.TRUE.equals(shift.getEmergency());
+        String title = isEmergency
+                ? "🚨 [CỨU TRỢ KHẨN CẤP] Nhân sự nhận ca thành công: " + shift.getJobType()
+                : "Nhân sự nhận ca làm việc: " + shift.getJobType();
+        String body = isEmergency
+                ? String.format("Worker %s đã tiếp nhận ca cứu trợ khẩn cấp \"%s\" (%s).",
+                        worker.getFullName(), shift.getJobType(), evName)
+                : worker.getFullName() + " đã tham gia ca \"" + shift.getJobType() + "\" trong sự kiện \"" + evName + "\".";
         sendEoShiftNotification(
                 shift,
-                "Nhân sự nhận ca làm việc",
-                worker.getFullName() + " đã tham gia ca \"" + shift.getJobType() + "\" trong sự kiện \"" + evName + "\".",
+                title,
+                body,
                 com.cani.entity.enums.NotificationType.ASSIGNMENT,
-                assignment.getAssignmentId()
+                assignment.getAssignmentId(),
+                worker.getWorkerId(),
+                isEmergency ? "EMERGENCY_ASSIGNMENT_ACCEPTED" : "ASSIGNMENT_ACCEPTED"
         );
     }
 
     private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId) {
-        sendEoShiftNotification(shift, title, body, type, assignmentId, null);
+        sendEoShiftNotification(shift, title, body, type, assignmentId, null, null);
     }
 
     private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId, UUID workerId) {
+        sendEoShiftNotification(shift, title, body, type, assignmentId, workerId, null);
+    }
+
+    private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId, UUID workerId, String alertType) {
         if (notificationService == null || shift == null) return;
         Event ev = shift.getEvent();
         if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
@@ -1683,6 +1812,9 @@ public class WorkerJobService {
                 }
                 if (workerId != null) {
                     metadata.put("workerId", workerId.toString());
+                }
+                if (alertType != null) {
+                    metadata.put("type", alertType);
                 }
                 notificationService.createAndSend(
                         eoUserId,
@@ -1700,89 +1832,19 @@ public class WorkerJobService {
     }
 
     private ShiftAssignmentResponseDto mapToAssignmentDto(ShiftAssignment a) {
-        Shift s = a.getShift();
-        Event e = s != null ? s.getEvent() : null;
-        EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
-        String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
-                ? eo.getCompanyName()
-                : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
-
-        Double venueLat = s != null && s.getLocationLat() != null ? s.getLocationLat()
-                : (e != null && e.getVenueLat() != null ? e.getVenueLat() : DEFAULT_CENTER_LAT);
-        Double venueLng = s != null && s.getLocationLng() != null ? s.getLocationLng()
-                : (e != null && e.getVenueLng() != null ? e.getVenueLng() : DEFAULT_CENTER_LNG);
-
-        Optional<AttendanceLog> attendanceOpt = attendanceLogRepository != null
-                ? attendanceLogRepository.findByShiftAssignment_AssignmentId(a.getAssignmentId())
-                : Optional.empty();
-
-        Optional<Payment> paymentOpt = (paymentRepository != null && a.getAssignmentId() != null)
-                ? paymentRepository.findByAssignmentId(a.getAssignmentId())
-                : Optional.empty();
-
-        BigDecimal totalPay = calculateSingleWorkerShiftPay(s);
-        BigDecimal declaredAmt = paymentOpt.map(Payment::getDeclaredAmount).orElse(BigDecimal.ZERO);
-        BigDecimal qrAmount = (declaredAmt != null && declaredAmt.compareTo(BigDecimal.ZERO) > 0) ? declaredAmt : totalPay;
-        Worker workerEntity = a.getWorker();
-        String bCode = workerEntity != null ? workerEntity.getBankCode() : null;
-        String bAccNum = workerEntity != null ? workerEntity.getBankAccountNumber() : null;
-        String bAccName = workerEntity != null ? workerEntity.getBankAccountName() : null;
-        if ((bAccName == null || bAccName.isBlank()) && workerEntity != null && workerEntity.getUser() != null) {
-            bAccName = workerEntity.getUser().getFullName();
-        }
-        String vietQr = VietQrUtil.buildVietQrUrl(bCode, bAccNum, bAccName, qrAmount);
-
-        return ShiftAssignmentResponseDto.builder()
-                .assignmentId(a.getAssignmentId())
-                .shiftId(s != null ? s.getShiftId() : null)
-                .eventId(e != null ? e.getEventId() : null)
-                .eventName(e != null ? e.getName() : "Sự kiện")
-                .eoId(eo != null ? eo.getEoId() : null)
-                .eoName(eoName)
-                .eoVerified(eo != null && eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED)
-                .eoRatingAvg(eo != null ? eo.getRatingAvg() : null)
-                .venueAddress(s != null && s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
-                .jobType(s != null ? s.getJobType() : "")
-                .startTime(s != null ? s.getStartTime() : null)
-                .endTime(s != null ? s.getEndTime() : null)
-                .arrivalTime(s != null ? (s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime()) : null)
-                .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList())
-                .performedSkillId(s != null ? s.getPerformedSkillId() : null)
-                .performedSkillName(s != null ? resolveSingleSkillName(s.getPerformedSkillId()) : null)
-                .confirmedPerformedSkillId(a.getConfirmedPerformedSkillId())
-                .confirmedPerformedSkillName(resolveSingleSkillName(a.getConfirmedPerformedSkillId()))
-                .spExperienceAwarded(Boolean.TRUE.equals(a.getSpExperienceAwarded()))
-                .spExperienceAwardedAt(a.getSpExperienceAwardedAt())
-                .spRatingAwarded(Boolean.TRUE.equals(a.getSpRatingAwarded()))
-                .inviteOverrideReason(a.getInviteOverrideReason())
-                .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
-                .totalPay(totalPay)
-                .status(a.getStatus())
-                .source(a.getSource())
-                .eoConfirmed(a.getEoConfirmed())
-                .venueLat(venueLat)
-                .venueLng(venueLng)
-                .attendanceStatus(attendanceOpt.map(att -> att.getAttendanceStatus().name()).orElse("NOT_CHECKED_IN"))
-                .checkinTime(attendanceOpt.map(AttendanceLog::getCheckinTime).orElse(null))
-                .checkoutTime(attendanceOpt.map(AttendanceLog::getCheckoutTime).orElse(null))
-                .hoursWorked(attendanceOpt.map(AttendanceLog::getHoursWorked).orElse(BigDecimal.ZERO))
-                .createdAt(a.getCreatedAt())
-                .imageUrl(s != null ? s.getImageUrl() : null)
-                .proofImageUrl(attendanceOpt.map(AttendanceLog::getProofImageUrl).orElse(null))
-                .proofSubmittedAt(attendanceOpt.map(AttendanceLog::getProofSubmittedAt).orElse(null))
-                .paymentStatus(paymentOpt.map(p -> p.getStatus() != null ? p.getStatus().name() : "NOT_DECLARED").orElse("NOT_DECLARED"))
-                .declaredAmount(declaredAmt)
-                .paymentMethod(paymentOpt.map(Payment::getPaymentMethod).orElse(null))
-                .workerConfirmStatus(paymentOpt.map(Payment::getWorkerConfirmStatus).orElse(null))
-                .paymentProofUrl(paymentOpt.map(Payment::getPaymentProofUrl).orElse(null))
-                .externalRef(paymentOpt.map(Payment::getExternalRef).orElse(null))
-                .declaredAt(paymentOpt.map(Payment::getDeclaredAt).orElse(null))
-                .workerComment(paymentOpt.map(Payment::getWorkerComment).orElse(null))
-                .bankCode(bCode)
-                .bankAccountNumber(bAccNum)
-                .bankAccountName(bAccName)
-                .vietQrUrl(vietQr)
-                .build();
+        AttendanceLog att = (attendanceLogRepository != null && a.getAssignmentId() != null)
+                ? attendanceLogRepository.findByShiftAssignment_AssignmentId(a.getAssignmentId()).orElse(null)
+                : null;
+        Payment payment = (paymentRepository != null && a.getAssignmentId() != null)
+                ? paymentRepository.findByAssignmentId(a.getAssignmentId()).orElse(null)
+                : null;
+        List<Review> reviews = (reviewRepository != null && a.getAssignmentId() != null)
+                ? reviewRepository.findByAssignmentIdIn(List.of(a.getAssignmentId()))
+                : Collections.emptyList();
+        UUID workerUserId = (a.getWorker() != null && a.getWorker().getUser() != null)
+                ? a.getWorker().getUser().getUserId()
+                : null;
+        return mapToEnrichedAssignmentDto(a, att, payment, reviews, workerUserId);
     }
 
     private ShiftAssignmentResponseDto mapToEnrichedAssignmentDto(

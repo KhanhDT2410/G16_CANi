@@ -63,6 +63,21 @@ public class DirectPaymentController {
     }
 
     /**
+     * Lấy toàn bộ danh sách khoản thanh toán của Nhà tổ chức (Dành cho màn Khai báo lương EO)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/eo/history")
+    public ResponseEntity<ApiResponse<List<PaymentResponseDto>>> getEoPaymentHistory(
+            Authentication authentication) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(userId)
+                .orElseThrow(() -> new IllegalStateException("Tài khoản chưa đăng ký hồ sơ Nhà tổ chức sự kiện (EO)"));
+
+        List<PaymentResponseDto> payments = directPaymentService.getPaymentsByEo(eo.getEoId());
+        return ResponseEntity.ok(ApiResponse.ok(payments, "Lấy danh sách quyết toán thù lao của EO thành công"));
+    }
+
+    /**
      * Lấy danh sách thanh toán theo Ca làm việc (Dành cho EO)
      */
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")

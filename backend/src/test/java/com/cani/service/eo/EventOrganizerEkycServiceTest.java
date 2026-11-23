@@ -182,22 +182,23 @@ class EventOrganizerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Khi EKYC_STRICT=true -> PENDING_REVIEW giữ tạm ảnh 14 ngày kèm Signed URL")
-    void submitEkyc_StrictEnabled_ManualReview() {
+    @DisplayName("Ảnh mờ hoặc chế độ strict -> không chuyển hàng đợi Admin; ảnh mờ trả REJECTED kèm lý do chụp lại")
+    void submitEkyc_BlurryRejectedWithReasonAndNoAdminQueue() {
         ReflectionTestUtils.setField(eventOrganizerEkycService, "ekycStrict", true);
         stubHappyEoFlow();
+        EkycIdentityResultDto blurry = validVnptResult("001201012345", "NGUYỄN VĂN EO");
+        blurry.setHasBlurryWarning(true);
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any()))
-                .thenReturn(validVnptResult("001201012345", "NGUYỄN VĂN EO"));
+                .thenReturn(blurry);
 
         EoEkycVerificationResultDto result = eventOrganizerEkycService.submitEkyc(
                 user.getUserId(), frontFile, backFile, selfieFile, null, true, CONSENT_VERSION);
 
-        assertEquals("PENDING_REVIEW", result.getStatus());
-        assertEquals("MANUAL_REVIEW", result.getRoutingDecision());
-        assertEquals(Boolean.TRUE, result.getImagesAvailable());
-        assertEquals(Boolean.FALSE, result.getImagesExpired());
-        assertTrue(result.getFrontImageUrl().startsWith("/api/v1/ekyc/images/eo/"));
-        assertEquals(VerificationStatus.PENDING, eo.getVerificationStatus());
+        assertEquals("REJECTED", result.getStatus());
+        assertEquals("REJECTED", result.getRoutingDecision());
+        assertTrue(result.getRoutingReason().contains("chụp lại"));
+        assertEquals(Boolean.FALSE, result.getImagesAvailable());
+        assertEquals(VerificationStatus.REJECTED, eo.getVerificationStatus());
     }
 
     @Test
@@ -260,7 +261,7 @@ class EventOrganizerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("confirmedCccd từ client KHÔNG được ghi đè kết quả VNPT OCR -> lệch thì chuyển PENDING_REVIEW")
+    @DisplayName("confirmedCccd từ client KHÔNG được ghi đè kết quả VNPT OCR -> lệch thì trả REJECTED")
     void submitEkyc_ClientCccdDoesNotOverwriteVnptOcr() {
         stubHappyEoFlow();
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any()))
@@ -270,9 +271,9 @@ class EventOrganizerEkycServiceTest {
                 user.getUserId(), frontFile, backFile, selfieFile, "099999999999", true, CONSENT_VERSION);
 
         assertEquals("********2345", result.getCccdNumberMasked());
-        assertEquals("PENDING_REVIEW", result.getStatus());
+        assertEquals("REJECTED", result.getStatus());
         assertEquals(Boolean.TRUE, result.getFraudFlags().get("userInputMismatch"));
-        assertEquals(VerificationStatus.PENDING, eo.getVerificationStatus());
+        assertEquals(VerificationStatus.REJECTED, eo.getVerificationStatus());
     }
 
     @Test
@@ -314,47 +315,7 @@ class EventOrganizerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Admin duyệt thủ công EO yêu cầu đủ 3 ảnh đọc được; chặn APPROVED nếu thiếu/hết hạn ảnh")
-    void adminReviewEkyc_RequiresReadableImagesAndBlocksExpired() {
-        UUID verificationId = UUID.randomUUID();
-        UUID adminId = UUID.randomUUID();
-        User admin = User.builder().userId(adminId).fullName("Admin Hệ Thống").build();
-
-        EkycImageStorage.StoredObject frontObj = imageStorage.store("eo", eo.getEoId(), "front", VALID_JPEG, "jpg", "image/jpeg");
-        EkycImageStorage.StoredObject backObj = imageStorage.store("eo", eo.getEoId(), "back", VALID_JPEG, "jpg", "image/jpeg");
-        EkycImageStorage.StoredObject selfieObj = imageStorage.store("eo", eo.getEoId(), "selfie", VALID_JPEG, "jpg", "image/jpeg");
-
-        EoEkycVerification pending = EoEkycVerification.builder()
-                .id(verificationId)
-                .eventOrganizer(eo)
-                .cccdNumberHash("synthetic-index")
-                .frontImageUrl(frontObj.getObjectKey())
-                .backImageUrl(backObj.getObjectKey())
-                .selfieImageUrl(selfieObj.getObjectKey())
-                .imageRetentionUntil(Instant.now().minusSeconds(60))
-                .status("PENDING_REVIEW")
-                .build();
-
-        when(eoEkycVerificationRepository.findByIdForUpdate(verificationId)).thenReturn(Optional.of(pending));
-        when(userRepository.findById(adminId)).thenReturn(Optional.of(admin));
-
-        assertThrows(BadRequestException.class, () -> eventOrganizerEkycService.adminReviewEkyc(
-                adminId, verificationId,
-                EkycAdminReviewRequestDto.builder().decision("APPROVED").build()));
-
-        pending.setImageRetentionUntil(Instant.now().plus(7, ChronoUnit.DAYS));
-        when(eoEkycVerificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-        EoEkycVerificationResultDto result = eventOrganizerEkycService.adminReviewEkyc(
-                adminId, verificationId,
-                EkycAdminReviewRequestDto.builder().decision("APPROVED").reviewNotes("Giấy tờ hợp lệ").build());
-
-        assertEquals("APPROVED", result.getStatus());
-        assertEquals(VerificationStatus.APPROVED, eo.getVerificationStatus());
-        assertFalse(imageStorage.exists(frontObj.getObjectKey()));
-    }
-
-    @Test
-    @DisplayName("EO có thể nộp lại sau khi PENDING_REVIEW trước đó hết hạn và bị chặn 409 nếu đang PROCESSING")
+    @DisplayName("EO có thể nộp lại sau khi hồ sơ cũ hết hạn và bị chặn 409 nếu đang PROCESSING")
     void submitEkyc_BlocksActiveProcessingAndAllowsExpiredPendingResubmit() {
         EoEkycVerification active = EoEkycVerification.builder()
                 .id(UUID.randomUUID())

@@ -106,7 +106,6 @@ export default function ShiftArrivalTimeField({
 
       {error ? (
         <div className="eo-field-error ecw-field-error">
-          <span aria-hidden="true">⚠️</span>
           <span>{error}</span>
         </div>
       ) : (

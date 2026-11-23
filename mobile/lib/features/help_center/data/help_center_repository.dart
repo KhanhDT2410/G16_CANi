@@ -159,7 +159,21 @@ class HelpCenterRepository {
       }
       return const [];
     } catch (e) {
-      throw Exception('Không thể tải lịch sử trò chuyện với CSKH: $e');
+      if (e is DioException) {
+        final errData = e.response?.data;
+        if (errData is Map && errData['message'] != null) {
+          final msg = errData['message'].toString().trim();
+          if (msg.isNotEmpty) {
+            throw Exception(msg);
+          }
+        }
+        final statusCode = e.response?.statusCode;
+        if (statusCode != null && statusCode >= 500) {
+          throw Exception('Máy chủ hỗ trợ đang gặp sự cố ($statusCode). Vui lòng thử lại sau.');
+        }
+        throw Exception('Không thể kết nối đến máy chủ hỗ trợ. Vui lòng kiểm tra mạng và thử lại.');
+      }
+      throw Exception('Không thể tải lịch sử trò chuyện với CSKH. Vui lòng thử lại.');
     }
   }
 

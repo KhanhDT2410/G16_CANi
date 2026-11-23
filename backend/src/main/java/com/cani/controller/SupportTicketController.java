@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -96,6 +97,48 @@ public class SupportTicketController {
         UUID userId = currentUserId(authentication);
         SupportTicketResponseDto response = supportTicketService.markResolved(id, userId);
         return ResponseEntity.ok(ApiResponse.ok(response, "Đã đóng ticket thành công"));
+    }
+
+    /**
+     * Tải tệp đính kèm / hình ảnh cho ticket hỗ trợ.
+     * POST /api/v1/support/tickets/upload
+     */
+    @PostMapping(value = "/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadAttachment(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        String url = supportTicketService.uploadAttachment(file);
+        String name = file.getOriginalFilename() != null ? file.getOriginalFilename() : "tệp đính kèm";
+        long size = file.getSize();
+        return ResponseEntity.ok(ApiResponse.ok(
+                Map.of("url", url, "name", name, "size", size),
+                "Tải tệp đính kèm thành công"
+        ));
+    }
+
+    /**
+     * Tải / xem tệp đính kèm ticket hỗ trợ.
+     * GET /api/v1/support/tickets/attachments/{filename}
+     */
+    @GetMapping("/attachments/{filename:.+}")
+    public ResponseEntity<org.springframework.core.io.Resource> getAttachment(
+            @PathVariable("filename") String filename
+    ) {
+        org.springframework.core.io.Resource resource = supportTicketService.loadAttachment(filename);
+        String lower = filename.toLowerCase();
+        String contentType = "application/octet-stream";
+        if (lower.endsWith(".png")) contentType = "image/png";
+        else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) contentType = "image/jpeg";
+        else if (lower.endsWith(".webp")) contentType = "image/webp";
+        else if (lower.endsWith(".gif")) contentType = "image/gif";
+        else if (lower.endsWith(".pdf")) contentType = "application/pdf";
+        else if (lower.endsWith(".txt")) contentType = "text/plain; charset=UTF-8";
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                .body(resource);
     }
 
     private UUID currentUserId(Authentication authentication) {

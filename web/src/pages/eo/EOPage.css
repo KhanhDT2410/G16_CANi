@@ -1570,6 +1570,11 @@
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.2);
 }
 
+.eo-modal-overlay .eo-modal-box.eo-modal-box--wide {
+  max-width: min(1060px, 95vw) !important;
+  width: 100% !important;
+}
+
 .eo-modal-box h3 {
   margin: 0 0 1.25rem;
   font-size: 1.35rem;
@@ -3455,7 +3460,8 @@
   }
 
   .eo-modal-box,
-  .eo-modal-box[style] {
+  .eo-modal-box[style],
+  .eo-modal-overlay .eo-modal-box.eo-modal-box--wide {
     max-width: 100% !important;
     max-height: 92dvh;
     border-radius: 16px;

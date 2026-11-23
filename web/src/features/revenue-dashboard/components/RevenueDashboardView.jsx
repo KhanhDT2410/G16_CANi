@@ -1,7 +1,7 @@
 import { useRevenueDashboard } from '../hooks/useRevenueDashboard';
 import { RevenueMetricsCards } from './RevenueMetricsCards';
 import { RevenuePackageBreakdown } from './RevenuePackageBreakdown';
-import { RevenueVnPaySummary } from './RevenueVnPaySummary';
+import { RevenuePayOSSummary } from './RevenueVnPaySummary';
 import { RevenueFlaggedTable } from './RevenueFlaggedTable';
 import { RevenueTransactionsTable } from './RevenueTransactionsTable';
 import './RevenueDashboard.css';
@@ -95,8 +95,11 @@ export const RevenueDashboardView = () => {
         eventModeBreakdown={summary?.eventModeBreakdown}
       />
 
-      {/* Tóm tắt giao dịch VNPay */}
-      <RevenueVnPaySummary vnpaySummary={summary?.vnpaySummary} />
+      {/* Tóm tắt giao dịch PayOS */}
+      <RevenuePayOSSummary
+        payosSummary={summary?.payosSummary}
+        vnpaySummary={summary?.vnpaySummary}
+      />
 
       {/* Giao dịch cần theo dõi (Disputed / Unverified) */}
       <RevenueFlaggedTable flaggedTransactions={summary?.flaggedTransactions} />

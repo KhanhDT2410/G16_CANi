@@ -203,15 +203,17 @@ public class ShiftLifecycleService {
         String title;
         String actionHint;
         if (effectiveStatus == ShiftStatus.IN_PROGRESS) {
-            title = "Cảnh báo thiếu nhân sự khi vào ca: " + s.getJobType();
+            title = "⚠️ Cảnh báo thiếu nhân sự khi vào ca: " + s.getJobType();
             actionHint = inviteMode
                     ? "Ca đã bắt đầu, bạn có thể mời thêm Worker hoặc kiểm tra điểm danh."
-                    : "Ca đã bắt đầu, vui lòng kiểm tra điểm danh hoặc báo cáo vắng mặt nếu cần.";
+                    : "Ca đã bắt đầu (chức năng kích hoạt khẩn cấp thủ công đã đóng). Hệ thống sẽ tự động tìm nhân sự thay thế nếu ghi nhận vắng mặt (No-show) khi ca còn đủ thời gian làm việc; vui lòng kiểm tra điểm danh hoặc báo cáo vắng mặt.";
         } else {
-            title = "Thiếu nhân sự sát giờ: " + s.getJobType();
+            title = inviteMode
+                    ? "Thiếu nhân sự sát giờ: " + s.getJobType()
+                    : "🚨 [ĐỀ XUẤT KHẨN CẤP] Thiếu nhân sự sát giờ: " + s.getJobType();
             actionHint = inviteMode
                     ? "Vui lòng mở sự kiện để mời thêm Worker."
-                    : "Mở sự kiện để xem chi tiết hoặc bật điều phối khẩn cấp.";
+                    : "Hệ thống tự động đề xuất mở rộng tìm kiếm khẩn cấp (Emergency Dispatch). Nhấp để xem và xác nhận.";
         }
 
         String body = String.format(
@@ -225,7 +227,10 @@ public class ShiftLifecycleService {
                 actionHint
         );
 
-        notifyEoShiftLifecycle(s, title, body, NotificationType.REMINDER, "UNDERSTAFFED_NEAR_START");
+        String alertType = (!inviteMode && effectiveStatus != ShiftStatus.IN_PROGRESS)
+                ? "EMERGENCY_PROPOSAL"
+                : "UNDERSTAFFED_NEAR_START";
+        notifyEoShiftLifecycle(s, title, body, NotificationType.REMINDER, alertType);
     }
 
     private String getEventName(Shift s) {

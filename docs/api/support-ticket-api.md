@@ -144,6 +144,36 @@ OPEN ──CC nhận/gán (SCR-25/26)──> IN_PROGRESS ──CC/Admin đóng k
 
 ---
 
+### 2.6. Tải tệp đính kèm / hình ảnh cho ticket (UC-105 / UC-106)
+* **Endpoint:** `POST /api/v1/support/tickets/upload`
+* **Quyền:** Đã đăng nhập (`.authenticated()`)
+* **Content-Type:** `multipart/form-data`
+* **Request Param:** `file` (MultipartFile)
+* **Ràng buộc:**
+  - Dung lượng tối đa: **10MB**
+  - Định dạng hỗ trợ: Hình ảnh (`jpg`, `jpeg`, `png`, `webp`, `gif`) và Văn bản/Tài liệu (`pdf`, `doc`, `docx`, `xls`, `xlsx`, `txt`, `csv`, `zip`)
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Tải tệp đính kèm thành công",
+  "data": {
+    "url": "/api/v1/support/tickets/attachments/tkt_e7b8f9a0c1d2.pdf",
+    "name": "hop_dong_su_kien.pdf",
+    "size": 1542000
+  }
+}
+```
+
+---
+
+### 2.7. Tải / xem tệp đính kèm ticket
+* **Endpoint:** `GET /api/v1/support/tickets/attachments/{filename}`
+* **Quyền:** Công khai (`permitAll()`)
+* **Mô tả:** Phục vụ trực tiếp tài nguyên tệp tĩnh đính kèm (ảnh hiển thị inline, tệp PDF hiển thị trên trình duyệt, các tệp khác cho phép tải về).
+
+---
+
 ## 3. Endpoints Dành Cho Customer Care & Admin (SCR-25 / SCR-26)
 
 ### 3.1. Hàng đợi ticket cần xử lý (SCR-25)

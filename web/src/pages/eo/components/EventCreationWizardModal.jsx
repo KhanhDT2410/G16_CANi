@@ -254,7 +254,7 @@ const EventCreationWizardModal = ({
 
     setSubmitting(true);
     try {
-      const safeWage = Math.max(floorInfo.wage, Number(currentShift.hourlyWage || 50000));
+      const safeWage = Number(currentShift.hourlyWage || 0) > 0 ? Number(currentShift.hourlyWage) : 50000;
       const safeAllowance = Math.max(0, Number(currentShift.allowance || 0));
       const safeWorkers = Math.max(1, Number(currentShift.requiredWorkers || 2));
 
@@ -372,7 +372,7 @@ const EventCreationWizardModal = ({
     }
 
     if (wageMode === 'PER_SHIFT') {
-      const computedHourly = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, nextDur)));
+      const computedHourly = Math.max(1, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, nextDur)));
       setCurrentShift((prev) => ({
         ...prev,
         [field]: value,
@@ -572,7 +572,7 @@ const EventCreationWizardModal = ({
         jobType: currentShift.jobType.trim(),
         description: descTrimmed,
         requiredWorkers: Math.max(1, Number(currentShift.requiredWorkers || 1)),
-        hourlyWage: Math.max(20000, Number(currentShift.hourlyWage || 50000)),
+        hourlyWage: Number(currentShift.hourlyWage || 0),
         allowance: Math.max(0, Number(currentShift.allowance || 0)),
         imageUrl: currentShift.imageUrl?.trim() || null,
         performedSkillId: currentShift.performedSkillId || null,
@@ -1641,8 +1641,8 @@ const EventCreationWizardModal = ({
                       <label>Mức Thù Lao Theo Giờ (VNĐ/giờ) *</label>
                       <input
                         type="number"
-                        min="20000"
-                        step="5000"
+                        min="1"
+                        step="any"
                         required
                         className="eo-form-input"
                         style={{
@@ -1685,8 +1685,8 @@ const EventCreationWizardModal = ({
                       <label>Mức Thù Lao Trọn Gói Theo Ca (VNĐ/ca) *</label>
                       <input
                         type="number"
-                        min="20000"
-                        step="10000"
+                        min="1"
+                        step="any"
                         required
                         className="eo-form-input"
                         style={{
@@ -2224,7 +2224,7 @@ const EventCreationWizardModal = ({
   // ========================================================================
   return (
     <div className="eo-modal-overlay">
-      <div className="eo-modal-box" style={{ maxWidth: '820px', maxHeight: '92vh', overflowY: 'auto' }}>
+      <div className="eo-modal-box eo-modal-box--wide" style={{ maxWidth: '1060px', maxHeight: '92vh', overflowY: 'auto' }}>
         <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

@@ -373,4 +373,30 @@ class DirectPaymentServiceTest {
                 anyString()
         );
     }
+
+    @Test
+    @DisplayName("getPaymentsByEo batch-enriches jobType, eventName, workerName và workerCccd")
+    void getPaymentsByEo_EnrichesShiftAndEventMetadata() {
+        com.cani.repository.ShiftRepository shiftRepo = mock(com.cani.repository.ShiftRepository.class);
+        com.cani.repository.EventRepository eventRepo = mock(com.cani.repository.EventRepository.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(directPaymentService, "shiftRepository", shiftRepo);
+        org.springframework.test.util.ReflectionTestUtils.setField(directPaymentService, "eventRepository", eventRepo);
+
+        worker.setCccdNumber("********2345");
+        when(paymentRepository.findByEventOrganizer_EoIdOrderByCreatedAtDesc(eo.getEoId()))
+                .thenReturn(java.util.List.of(initialPayment));
+        when(shiftRepo.findAllById(anyCollection())).thenReturn(java.util.List.of(shift));
+        when(eventRepo.findAllById(anyCollection())).thenReturn(java.util.List.of(shift.getEvent()));
+
+        java.util.List<PaymentResponseDto> result = directPaymentService.getPaymentsByEo(eo.getEoId());
+
+        assertThat(result).hasSize(1);
+        PaymentResponseDto dto = result.get(0);
+        assertThat(dto.getJobType()).isEqualTo("Lễ tân (Receptionist)");
+        assertThat(dto.getEventName()).isEqualTo("Triển lãm Tech Fair 2026");
+        assertThat(dto.getWorkerName()).isEqualTo("Nguyễn Văn An");
+        assertThat(dto.getWorkerCccd()).isEqualTo("********2345");
+        verify(shiftRepo, times(1)).findAllById(anyCollection());
+        verify(eventRepo, times(1)).findAllById(anyCollection());
+    }
 }

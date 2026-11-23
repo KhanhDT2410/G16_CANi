@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import DisputeResolutionDetailModal from './DisputeResolutionDetailModal';
 import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
 
 export default function EOPaymentsTab({
   payments = [],
+  events = [],
   loading = false,
   error = null,
+  onRefresh,
   onOpenPaymentModal,
   onOpenDisputeModal,
   onOpenVoucherModal,
@@ -13,6 +15,19 @@ export default function EOPaymentsTab({
 }) {
   const [selectedDisputePayment, setSelectedDisputePayment] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [eventFilter, setEventFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter((p) => {
+      if (eventFilter !== 'ALL' && p.eventId !== eventFilter) return false;
+      if (statusFilter === 'ALL') return true;
+      const isDisputeActive = p.status === 'DISPUTED' ||
+        (p.disputeStatus && p.disputeStatus !== 'RESOLVED' && p.disputeStatus !== 'FINAL_RESOLVED');
+      if (statusFilter === 'DISPUTED') return isDisputeActive;
+      return p.status === statusFilter;
+    });
+  }, [payments, eventFilter, statusFilter]);
 
   const renderStatusBadge = (p) => {
     const isDisputeResolved = p.disputeStatus === 'RESOLVED' || p.disputeStatus === 'FINAL_RESOLVED';
@@ -94,13 +109,53 @@ export default function EOPaymentsTab({
             Đối soát chấm công GPS QR, thanh toán trực tiếp sau ca và xuất chứng từ chi chuẩn kế toán.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onOpenVoucherModal}
-          style={{ backgroundColor: '#059669', color: '#ffffff', border: 'none', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)' }}
-        >
-          Xuất Phiếu Chi Thù Lao (PDF / In)
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <select
+            className="filter-select"
+            value={eventFilter}
+            onChange={(e) => setEventFilter(e.target.value)}
+            aria-label="Lọc theo sự kiện"
+          >
+            <option value="ALL">Tất cả sự kiện ({payments.length})</option>
+            {events.map((evt) => (
+              <option key={evt.eventId} value={evt.eventId}>
+                {evt.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Lọc theo trạng thái thanh toán"
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="NOT_DECLARED">Chưa khai báo</option>
+            <option value="DECLARED_PENDING_WORKER">Chờ Worker xác nhận</option>
+            <option value="CONFIRMED_FULL">Đã hoàn tất</option>
+            <option value="CONFIRMED_PARTIAL">Xác nhận một phần</option>
+            <option value="DISPUTED">Đang tranh chấp</option>
+          </select>
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              style={{ background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: 8, padding: '0.52rem 0.9rem', fontSize: '0.84rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              {loading ? 'Đang tải...' : 'Làm Mới'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onOpenVoucherModal}
+            disabled={filteredPayments.length === 0}
+            title={filteredPayments.length === 0 ? 'Cần có ít nhất 1 khoản thanh toán để xuất phiếu chi' : 'Xuất Phiếu Chi Thù Lao (PDF / In)'}
+            style={{ backgroundColor: filteredPayments.length === 0 ? '#94a3b8' : '#059669', color: '#ffffff', border: 'none', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: filteredPayments.length === 0 ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', boxShadow: filteredPayments.length === 0 ? 'none' : '0 2px 8px rgba(5, 150, 105, 0.25)' }}
+          >
+            Xuất Phiếu Chi Thù Lao (PDF / In)
+          </button>
+        </div>
       </div>
 
       <div className="eo-table-container">
@@ -122,16 +177,33 @@ export default function EOPaymentsTab({
             {loading ? (
               <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>Đang tải dữ liệu thanh toán...</td></tr>
             ) : error ? (
-              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#dc2626', fontWeight: 600 }}>{error}</td></tr>
-            ) : payments.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#dc2626', fontWeight: 600 }}>
+                  <div>{error}</div>
+                  {onRefresh && (
+                    <button type="button" onClick={onRefresh} style={{ marginTop: '0.6rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 6, padding: '0.35rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
+                      Thử lại
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ) : filteredPayments.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ textAlign: 'center', padding: '2.75rem 1rem', color: '#64748b' }}>
-                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Chưa có khoản thanh toán nào được ghi nhận</div>
-                  <div style={{ fontSize: '0.84rem' }}>Mở một ca làm việc đã có nhân sự điểm danh để khai báo và đối soát thù lao trực tiếp.</div>
+                  <div style={{ fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                    {payments.length === 0
+                      ? 'Chưa có khoản thanh toán nào được ghi nhận'
+                      : 'Không có khoản thanh toán phù hợp bộ lọc'}
+                  </div>
+                  <div style={{ fontSize: '0.84rem' }}>
+                    {payments.length === 0
+                      ? 'Khoản thanh toán sẽ tự động được tạo khi Worker xác nhận nhận ca hoặc điểm danh làm việc.'
+                      : 'Thử chọn lại sự kiện hoặc trạng thái khác để xem các khoản thanh toán hiện có.'}
+                  </div>
                 </td>
               </tr>
             ) : (
-              payments.map((p) => {
+              filteredPayments.map((p) => {
                 const isDisputeResolved = p.disputeStatus === 'RESOLVED' || p.disputeStatus === 'FINAL_RESOLVED';
                 const isDisputeActive = p.status === 'DISPUTED' ||
                   (p.disputeStatus && p.disputeStatus !== 'RESOLVED' && p.disputeStatus !== 'FINAL_RESOLVED');
@@ -141,7 +213,12 @@ export default function EOPaymentsTab({
                       {p.assignmentId?.length > 14 ? `${p.assignmentId.substring(0, 8)}...` : p.assignmentId}
                     </td>
                     <td>{p.workerName}</td>
-                    <td>{p.jobType}</td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: '#0f172a' }}>{p.jobType || 'Nhân sự sự kiện'}</div>
+                      {p.eventName && (
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>{p.eventName}</div>
+                      )}
+                    </td>
                     <td style={{ fontWeight: 600 }}>{(p.agreedAmount != null ? p.agreedAmount : 0).toLocaleString()} đ</td>
                     <td style={{ color: p.declaredAmount > 0 ? '#059669' : '#9ca3af', fontWeight: 600 }}>
                       {p.declaredAmount > 0 ? `${(p.declaredAmount || 0).toLocaleString()} đ` : 'Chưa trả'}

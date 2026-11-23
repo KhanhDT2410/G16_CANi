@@ -128,7 +128,7 @@ class _SkillPointPolicyDialogState extends State<SkillPointPolicyDialog> {
                         _buildSection(
                           '2. Cơ Chế Tính Điểm Minh Bạch Theo Từng Kỹ Năng',
                           'Tổng SP kỹ năng = SP Xác minh + SP Kinh nghiệm + SP Đánh giá\n\n'
-                          '• SP Xác minh: +25 SP khi chứng chỉ hợp lệ được Admin / CSKH kiểm tra và phê duyệt thủ công; nâng lên +50 SP khi kỹ năng được chứng minh qua ca làm thực tế.\n'
+                          '• SP Xác minh: +25 SP khi chứng chỉ hợp lệ được xác minh tự động qua nguồn tra cứu chính thức và khớp hồ sơ; nâng lên +50 SP khi kỹ năng được chứng minh qua ca làm thực tế.\n'
                           '• SP Kinh nghiệm (+20 SP/ca): Tự động tích lũy cho đúng kỹ năng thực hiện chính sau mỗi ca hoàn thành và được Ban tổ chức xác nhận.\n'
                           '• SP Đánh giá (+15 SP cho 5 sao, +5 SP cho 4 sao): Chỉ tính từ đánh giá thật do Ban tổ chức gửi sau ca làm.',
                         ),
@@ -141,7 +141,7 @@ class _SkillPointPolicyDialogState extends State<SkillPointPolicyDialog> {
                           '• Thành thạo (Kim cương 700-899 SP · Tinh anh 900+ SP)\n\n'
                           'B. 3 Mức xác minh bằng chứng:\n'
                           '• Tự khai báo: Bạn tự thêm kỹ năng vào hồ sơ.\n'
-                          '• Đã xác thực tài liệu: Chứng chỉ được Admin / CSKH kiểm tra và phê duyệt thủ công (hiệu lực tối đa 24 tháng).\n'
+                          '• Đã xác thực tài liệu: Chứng chỉ được xác minh tự động qua nguồn tra cứu chính thức (hiệu lực tối đa 24 tháng).\n'
                           '• Đã chứng minh qua ca làm: Từ 3 ca hoàn thành trở lên, tỷ lệ hoàn thành ≥ 85%, điểm uy tín ≥ 70, tỷ lệ vắng mặt ≤ 5% và đánh giá thật ≥ 4.5 sao.',
                         ),
                         _buildSection(

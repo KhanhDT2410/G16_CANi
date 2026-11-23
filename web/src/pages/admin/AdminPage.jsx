@@ -12,15 +12,14 @@ import { AdminAccountAppealsTable } from '../../features/account-appeals';
 import { NoShowView } from '../../features/no-shows';
 import { AdminPlansView } from '../../features/admin-plans';
 import { WageMatrixView } from '../../features/admin-wage-matrix';
-import { EkycReviewCenterView } from '../../features/ekyc-review';
-import { SkillReviewCenterView } from '../../features/skill-review';
+import { AdminSkillView } from '../../features/admin-skills';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
 
 const TAB_METADATA = {
   dashboard: {
     title: 'Bảng Điều Khiển & Chỉ Số',
-    subtitle: 'Tổng hợp số liệu người dùng, thẩm định và hoạt động vận hành thời gian thực',
+    subtitle: 'Tổng hợp số liệu người dùng và hoạt động vận hành thời gian thực',
   },
   revenue: {
     title: 'Doanh Thu & Tài Chính',
@@ -29,14 +28,6 @@ const TAB_METADATA = {
   users: {
     title: 'Quản Trị Người Dùng',
     subtitle: 'Tra cứu danh sách, kiểm tra hồ sơ chi tiết và phân quyền khóa hoặc mở tài khoản',
-  },
-  ekyc_review: {
-    title: 'Thẩm Định Hồ Sơ eKYC',
-    subtitle: 'Đối chiếu CCCD, ảnh chân dung bảo mật và phê duyệt định danh cho Worker & Nhà tổ chức',
-  },
-  skill_review: {
-    title: 'Thẩm Định Chứng Chỉ Kỹ Năng',
-    subtitle: 'Kiểm tra tài liệu chứng chỉ nghề nghiệp Worker nộp lên và phê duyệt thủ công',
   },
   shifts: {
     title: 'Danh Sách Ca Làm Việc',
@@ -86,6 +77,10 @@ const TAB_METADATA = {
     title: 'Biểu Ma Trận Thù Lao Chuẩn',
     subtitle: 'Thiết lập định mức thù lao thị trường theo khu vực, thời điểm ca và mức độ khẩn cấp',
   },
+  skills: {
+    title: 'Danh Mục Kỹ Năng Hệ Thống',
+    subtitle: 'Quản lý danh sách kỹ năng chuẩn, phân nhóm nghiệp vụ và kiểm soát trạng thái hiển thị cho sự kiện',
+  },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',
     subtitle: 'Quy định độ tuổi lao động tối thiểu, phiên bản ứng dụng di động bắt buộc và hộp thư CSKH',
@@ -129,10 +124,6 @@ const AdminPage = () => {
         setActiveTab('appeals');
       } else if (tab === 'noshows') {
         setActiveTab('noshows');
-      } else if (tab === 'ekyc' || tab === 'ekyc_review') {
-        setActiveTab('ekyc_review');
-      } else if (tab === 'skills' || tab === 'skill_review') {
-        setActiveTab('skill_review');
       }
     };
     if (window.__cani_pending_chat) {
@@ -210,8 +201,6 @@ const AdminPage = () => {
           {activeTab === 'appeals' && <RsAppealsView />}
           {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
           {activeTab === 'users' && <UserManagementView />}
-          {activeTab === 'ekyc_review' && <EkycReviewCenterView canManageLegalHold />}
-          {activeTab === 'skill_review' && <SkillReviewCenterView />}
           {activeTab === 'account_appeals' && <AdminAccountAppealsTable />}
           {activeTab === 'shifts' && <AdminShiftView />}
           {activeTab === 'disputes' && <DisputeCenterView />}
@@ -228,6 +217,7 @@ const AdminPage = () => {
           {activeTab === 'config_financial' && <SystemConfigView activeCategory="FINANCIAL" />}
           {activeTab === 'plans' && <AdminPlansView />}
           {activeTab === 'wage_matrix' && <WageMatrixView />}
+          {activeTab === 'skills' && <AdminSkillView />}
           {activeTab === 'config_general' && <SystemConfigView activeCategory="GENERAL" />}
           {activeTab === 'configs' && <SystemConfigView activeCategory="ALL" />}
         </section>

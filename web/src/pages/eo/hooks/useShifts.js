@@ -262,8 +262,8 @@ export function useShifts({ onReloadEvents }) {
       showToast('Phụ cấp thêm không được là số âm!', 'error');
       return;
     }
-    if (Number(newShift.hourlyWage || 0) < 20000) {
-      showToast('Mức thù lao giờ tối thiểu trên hệ thống là 20.000 VNĐ/giờ!', 'error');
+    if (Number(newShift.hourlyWage || 0) <= 0) {
+      showToast('Vui lòng nhập mức thù lao theo giờ lớn hơn 0!', 'error');
       return;
     }
     if (Number(newShift.requiredWorkers || 0) < 1) {
@@ -290,7 +290,7 @@ export function useShifts({ onReloadEvents }) {
       await eoService.addShiftToEvent(selectedEventId, {
         ...newShift,
         requiredWorkers: Math.max(1, Number(newShift.requiredWorkers || 1)),
-        hourlyWage: Math.max(20000, Number(newShift.hourlyWage || 20000)),
+        hourlyWage: Number(newShift.hourlyWage || 0),
         allowance: Math.max(0, Number(newShift.allowance || 0)),
         checklist: checklistStr,
         arrivalTime: newShift.arrivalTime ? new Date(newShift.arrivalTime).toISOString() : null,
@@ -324,7 +324,7 @@ export function useShifts({ onReloadEvents }) {
       await eoService.updateShift(shiftId, {
         ...shiftData,
         requiredWorkers: Math.max(1, Number(shiftData.requiredWorkers || 1)),
-        hourlyWage: Math.max(20000, Number(shiftData.hourlyWage || 20000)),
+        hourlyWage: Number(shiftData.hourlyWage || 0),
         allowance: Math.max(0, Number(shiftData.allowance || 0)),
         ...(checklistStr !== undefined ? { checklist: checklistStr } : {}),
       });

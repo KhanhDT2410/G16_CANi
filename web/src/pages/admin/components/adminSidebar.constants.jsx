@@ -14,7 +14,6 @@ import {
   GeneralConfigIcon,
   PricingPlanIcon,
   WageMatrixIcon,
-  EkycIcon,
   SkillReviewIcon,
 } from './AdminSidebarIcons';
 
@@ -33,8 +32,6 @@ export const ADMIN_NAV_GROUPS = [
     groupLabel: 'Quản trị & Vận hành',
     items: [
       { id: 'users', label: 'Quản Trị Người Dùng', icon: <UsersIcon /> },
-      { id: 'ekyc_review', label: 'Thẩm Định eKYC', icon: <EkycIcon /> },
-      { id: 'skill_review', label: 'Thẩm Định Chứng Chỉ', icon: <SkillReviewIcon /> },
       { id: 'account_appeals', label: 'Giải Trình Khóa Tài Khoản', icon: <AppealIcon /> },
       { id: 'shifts', label: 'Danh Sách Ca Làm Việc', icon: <ShiftIcon /> },
       { id: 'noshows', label: 'Xử Lý Vi Phạm Vắng Mặt', icon: <NoShowIcon /> },
@@ -54,6 +51,7 @@ export const ADMIN_NAV_GROUPS = [
     groupKey: 'system',
     groupLabel: 'Cấu hình tham số hệ thống',
     items: [
+      { id: 'skills', label: 'Danh Mục Kỹ Năng', icon: <SkillReviewIcon /> },
       { id: 'config_matching', label: 'Thuật Toán Ghép Nối', icon: <MatchingConfigIcon /> },
       { id: 'config_operation', label: 'Vận Hành & Điểm Uy Tín', icon: <OperationConfigIcon /> },
       { id: 'config_financial', label: 'Tài Chính & Hoa Hồng', icon: <FinancialConfigIcon /> },
@@ -85,14 +83,6 @@ export const ADMIN_TAB_METADATA = {
   users: {
     title: 'Quản Trị Người Dùng',
     subtitle: 'Tra cứu danh sách, kiểm tra hồ sơ chi tiết và phân quyền khóa hoặc mở tài khoản',
-  },
-  ekyc_review: {
-    title: 'Thẩm Định Hồ Sơ eKYC',
-    subtitle: 'Đối chiếu CCCD, ảnh chân dung bảo mật và phê duyệt định danh cho Worker & Nhà tổ chức',
-  },
-  skill_review: {
-    title: 'Thẩm Định Chứng Chỉ Kỹ Năng',
-    subtitle: 'Kiểm tra tài liệu chứng chỉ nghề nghiệp Worker nộp lên và phê duyệt thủ công',
   },
   shifts: {
     title: 'Danh Sách Ca Làm Việc',
@@ -133,6 +123,14 @@ export const ADMIN_TAB_METADATA = {
   plans: {
     title: 'Thiết Lập Giá & Hạn Mức Gói Dịch Vụ',
     subtitle: 'Quy định đơn giá (VNĐ), hạn mức sự kiện, ca làm, nhân sự và tính năng Matching cho Ban tổ chức sự kiện',
+  },
+  wage_matrix: {
+    title: 'Biểu Ma Trận Thù Lao Chuẩn',
+    subtitle: 'Thiết lập định mức thù lao thị trường theo khu vực, thời điểm ca và mức độ khẩn cấp',
+  },
+  skills: {
+    title: 'Danh Mục Kỹ Năng Hệ Thống',
+    subtitle: 'Quản lý danh sách kỹ năng chuẩn, phân nhóm nghiệp vụ và kiểm soát trạng thái hiển thị cho sự kiện',
   },
   config_general: {
     title: 'Hệ Thống & Tài Khoản',

@@ -124,7 +124,7 @@ public class EkycImageController {
     }
 
     private void enforceAuthenticatedAuthorization(User currentUser, ResolvedImageRecord record) {
-        if (currentUser.getRole() == UserRole.ADMIN || (currentUser.getRole() == UserRole.CUSTOMER_CARE && "PENDING_REVIEW".equals(record.status()))) {
+        if (currentUser.getRole() == UserRole.ADMIN) {
             return;
         }
         if (record.ownerUserId() != null && record.ownerUserId().equals(currentUser.getUserId())) {

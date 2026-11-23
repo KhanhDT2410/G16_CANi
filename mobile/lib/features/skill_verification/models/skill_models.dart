@@ -62,6 +62,7 @@ class SkillVerificationResult {
   final int spAwarded;
   final int currentTotalSp;
   final String currentTier;
+  final String? verificationSource;
   final String? createdAt;
   final List<ExtractedSkillItem> extractedSkills;
 
@@ -83,6 +84,7 @@ class SkillVerificationResult {
     required this.spAwarded,
     required this.currentTotalSp,
     required this.currentTier,
+    this.verificationSource,
     this.createdAt,
     required this.extractedSkills,
   });
@@ -105,12 +107,13 @@ class SkillVerificationResult {
       issueDate: json['issueDate'] as String?,
       hasSealOrSignature: json['hasSealOrSignature'] as bool? ?? false,
       overallConfidence: (json['overallConfidence'] as num?)?.toDouble() ?? 0.0,
-      routingDecision: json['routingDecision'] as String? ?? 'ADMIN_REVIEW',
+      routingDecision: json['routingDecision'] as String? ?? 'REJECT',
       routingReason: json['routingReason'] as String? ?? '',
-      status: json['status'] as String? ?? 'PENDING_REVIEW',
+      status: json['status'] as String? ?? 'REJECTED',
       spAwarded: json['spAwarded'] as int? ?? 0,
       currentTotalSp: json['currentTotalSp'] as int? ?? 0,
       currentTier: json['currentTier'] as String? ?? 'STARTER',
+      verificationSource: json['verificationSource'] as String?,
       createdAt: json['createdAt'] as String?,
       extractedSkills: skills,
     );

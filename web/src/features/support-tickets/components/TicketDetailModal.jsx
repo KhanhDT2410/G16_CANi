@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   TICKET_STATUS_CONFIG,
   TICKET_CATEGORY_CONFIG,
   TICKET_PRIORITY_CONFIG,
 } from '../types/ticket.constants';
-import TicketMessageThread from './TicketMessageThread';
 import TicketInfoGrid from './TicketInfoGrid';
-import { showToast } from '../../../components/common/Toast';
+import TicketAttachmentsView from './TicketAttachmentsView';
+import TicketMessageThread from './TicketMessageThread';
+import TicketReplyForm from './TicketReplyForm';
+import TicketDetailFooter from './TicketDetailFooter';
 
 export const TicketDetailModal = ({
   isOpen,
@@ -21,8 +23,6 @@ export const TicketDetailModal = ({
   onResolve,
   loading,
 }) => {
-  const [replyBody, setReplyBody] = useState('');
-  const [isInternal, setIsInternal] = useState(false);
   const [submittingReply, setSubmittingReply] = useState(false);
 
   useEffect(() => {
@@ -42,24 +42,11 @@ export const TicketDetailModal = ({
 
   if (!isOpen || !ticket || typeof document === 'undefined') return null;
 
-  const handleSendReply = async (e) => {
-    e.preventDefault();
-    if (!replyBody.trim()) {
-      showToast('Vui lòng nhập nội dung tin nhắn', 'warning');
-      return;
-    }
-
+  const handleSendReply = async (payload) => {
     setSubmittingReply(true);
-    const res = await onReply(ticket.id, {
-      body: replyBody.trim(),
-      isInternal: isStaff ? isInternal : false,
-    }, isStaff);
-
+    const res = await onReply(ticket.id, payload, isStaff);
     setSubmittingReply(false);
-    if (res) {
-      setReplyBody('');
-      setIsInternal(false);
-    }
+    return Boolean(res);
   };
 
   const statusConfig = TICKET_STATUS_CONFIG[ticket.status] || { label: ticket.status, badgeClass: '' };
@@ -118,6 +105,8 @@ export const TicketDetailModal = ({
             </div>
           </div>
 
+          <TicketAttachmentsView attachments={ticket.attachments} />
+
           <TicketMessageThread
             messages={ticket.messages}
             ticketUserId={ticket.userId}
@@ -125,86 +114,24 @@ export const TicketDetailModal = ({
           />
 
           {ticket.canReply && (
-            <form onSubmit={handleSendReply} className="ticket-reply-box">
-              <label className="ticket-form-label">
-                {isStaff ? 'Gửi Phản Hồi Hoặc Ghi Chú' : 'Gửi Phản Hồi'}
-              </label>
-              <textarea
-                className="ticket-form-textarea"
-                placeholder={isInternal ? 'Nhập ghi chú nội bộ (chỉ CC/Admin thấy)...' : 'Nhập tin nhắn phản hồi...'}
-                value={replyBody}
-                onChange={(e) => setReplyBody(e.target.value)}
-                rows={3}
-                required
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                {isStaff ? (
-                  <label className="ticket-checkbox-group">
-                    <input
-                      type="checkbox"
-                      checked={isInternal}
-                      onChange={(e) => setIsInternal(e.target.checked)}
-                    />
-                    Đặt làm ghi chú nội bộ (Người dùng không nhìn thấy)
-                  </label>
-                ) : <div />}
-                <button
-                  type="submit"
-                  className="ticket-btn ticket-btn-primary ticket-btn-sm"
-                  disabled={submittingReply}
-                >
-                  {submittingReply ? 'Đang gửi...' : 'Gửi Tin Nhắn'}
-                </button>
-              </div>
-            </form>
+            <TicketReplyForm
+              isStaff={isStaff}
+              onSubmit={handleSendReply}
+              submitting={submittingReply}
+            />
           )}
         </div>
 
-        <div className="ticket-modal-footer">
-          {isStaff && ticket.status === 'OPEN' && (
-            <button
-              type="button"
-              className="ticket-btn ticket-btn-secondary"
-              onClick={() => onAssign(ticket.id)}
-              disabled={loading}
-            >
-              Tiếp Nhận Phiếu (Tự Gán)
-            </button>
-          )}
-          {isStaff && ticket.status !== 'CLOSED' && onOpenTransferModal && (
-            <button
-              type="button"
-              className="ticket-btn ticket-btn-secondary"
-              onClick={() => onOpenTransferModal(ticket)}
-              disabled={loading}
-            >
-              Chuyển Phiếu Cho CC Khác
-            </button>
-          )}
-          {isStaff && ticket.status !== 'CLOSED' && (
-            <button
-              type="button"
-              className="ticket-btn ticket-btn-danger"
-              onClick={() => onOpenCloseModal(ticket)}
-              disabled={loading}
-            >
-              Đóng Phiếu Kèm Kết Luận
-            </button>
-          )}
-          {!isStaff && ticket.status !== 'CLOSED' && (
-            <button
-              type="button"
-              className="ticket-btn ticket-btn-success"
-              onClick={() => onResolve(ticket.id)}
-              disabled={loading}
-            >
-              Vấn Đề Đã Được Giải Quyết
-            </button>
-          )}
-          <button type="button" className="ticket-btn ticket-btn-secondary" onClick={onClose}>
-            Đóng Cửa Sổ
-          </button>
-        </div>
+        <TicketDetailFooter
+          ticket={ticket}
+          isStaff={isStaff}
+          loading={loading}
+          onAssign={onAssign}
+          onOpenTransferModal={onOpenTransferModal}
+          onOpenCloseModal={onOpenCloseModal}
+          onResolve={onResolve}
+          onClose={onClose}
+        />
       </div>
     </div>
   );

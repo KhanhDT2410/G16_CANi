@@ -123,12 +123,17 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/disputes/**").authenticated()
                 // Module phiếu hỗ trợ (UC-105/106, SCR-25/26): Customer Care & Admin quản lý queue & detail
                 .requestMatchers("/api/v1/admin/support/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
-                .requestMatchers("/api/v1/support/chat/attachments/**").permitAll()
+                .requestMatchers(
+                        "/api/v1/support/chat/attachments/**",
+                        "/api/v1/support/tickets/attachments/**"
+                ).permitAll()
                 .requestMatchers("/api/v1/support/**").authenticated()
                 // Module FAQ (UC-110): Customer Care cùng quyền với Admin
                 // Đặt TRƯỚC wildcard /api/v1/admin/** — nếu không CC sẽ bị 403.
                 .requestMatchers("/api/v1/admin/faqs/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 .requestMatchers("/api/v1/faqs/**").permitAll()
+                // Module Quản trị danh mục kỹ năng (Skills): Admin & Customer Care
+                .requestMatchers("/api/v1/admin/skills/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Thẩm định hồ sơ eKYC Worker và Doanh nghiệp: Customer Care cùng quyền kiểm duyệt với Admin
                 .requestMatchers("/api/v1/admin/ekyc/**", "/api/v1/admin/eo-ekyc/**").hasAnyRole("ADMIN", "CUSTOMER_CARE")
                 // Module Kháng cáo điểm uy tín Worker (UC-94, SRS FE-10): Customer Care cùng quyền xử lý với Admin

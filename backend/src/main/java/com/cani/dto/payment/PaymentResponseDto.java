@@ -16,12 +16,17 @@ public class PaymentResponseDto {
 
     private UUID paymentId;
     private UUID eventId;
+    private String eventName;
     private UUID shiftId;
+    private String jobType;
+    private Instant shiftStartTime;
+    private Instant shiftEndTime;
     private UUID assignmentId;
     private UUID eoId;
     private String eoCompanyName;
     private UUID workerId;
     private String workerName;
+    private String workerCccd;
     private BigDecimal agreedAmount;
     private BigDecimal declaredAmount;
     private PaymentStatus status;

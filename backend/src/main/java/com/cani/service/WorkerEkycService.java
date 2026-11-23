@@ -49,14 +49,14 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * Service quản lý luồng định danh eKYC cho Worker thông qua VNPT eKYC thực tế.
+ * Service quản lý luồng định danh eKYC tự động cho Worker thông qua VNPT eKYC.
  *
  * Nguyên tắc bảo mật & toàn vẹn dữ liệu:
  * - Không giữ transaction DB trong lúc gọi HTTP sang VNPT eKYC.
  * - Tuyệt đối không cho dữ liệu QR/nhập tay từ client ghi đè kết quả OCR của VNPT.
- * - Tách bạch rõ lỗi kỹ thuật (TECHNICAL_FAILURE - cho phép retry) khỏi lỗi nghiệp vụ (REJECTED)
- *   và hồ sơ cần kiểm tra (PENDING_REVIEW).
- * - Lưu ảnh CCCD/Selfie vào private storage, DB chỉ lưu objectKey nội bộ; cấp signed URL ngắn hạn khi trả API.
+ * - Tách bạch rõ lỗi kỹ thuật (TECHNICAL_FAILURE - cho phép retry) khỏi từ chối nghiệp vụ (REJECTED - chụp/nộp lại)
+ *   và phê duyệt tự động (APPROVED). Không đưa hồ sơ sang hàng đợi Admin duyệt thủ công.
+ * - Lưu ảnh CCCD/Selfie vào private storage trong lúc xử lý/sự cố; xóa ngay khi hết mục đích (APPROVED/REJECTED).
  * - Không hạ trạng thái tài khoản đã APPROVED khi lần xác minh mới gặp lỗi kỹ thuật.
  * - Retry cập nhật trực tiếp bản ghi TECHNICAL_FAILURE/PENDING gần nhất để tránh sinh bản ghi rác.
  * - Không ghi CCCD đầy đủ, họ tên hay ảnh vào log.
@@ -67,8 +67,7 @@ import java.util.stream.Collectors;
 public class WorkerEkycService {
 
     private static final List<String> ACTIVE_DUPLICATE_STATUSES = List.of(
-            EkycVerificationStatus.APPROVED.name(),
-            EkycVerificationStatus.PENDING_REVIEW.name()
+            EkycVerificationStatus.APPROVED.name()
     );
 
     private static final List<String> RETRYABLE_RECORD_STATUSES = List.of(
@@ -307,8 +306,8 @@ public class WorkerEkycService {
                     && !latest.isLegalHold()
                     && EkycConsentAndAgeHelper.isExpired(latest.getImageRetentionUntil(), latest.getImagesPurgedAt(), now)) {
                 latest.setStatus(EkycVerificationStatus.REJECTED.name());
-                latest.setRoutingDecision(EkycRoutingDecision.MANUAL_REJECTED.name());
-                latest.setRoutingReason("Hồ sơ chờ duyệt trước đó đã hết hạn lưu trữ ảnh. Người dùng nộp lại hồ sơ mới.");
+                latest.setRoutingDecision(EkycRoutingDecision.REJECTED.name());
+                latest.setRoutingReason("Hồ sơ trước đó đã hết hạn lưu trữ ảnh. Vui lòng chụp lại và xác minh tự động lại.");
                 latest.setImageRetentionUntil(imageRetentionService.calculateRetentionDeadline(EkycVerificationStatus.REJECTED));
                 ekycVerificationRepository.save(latest);
             }
@@ -335,7 +334,7 @@ public class WorkerEkycService {
             int nextRetry = (record.getRetryCount() != null ? record.getRetryCount() : 0) + 1;
             record.setRetryCount(nextRetry);
             record.setStatus(EkycVerificationStatus.PROCESSING.name());
-            record.setRoutingDecision(EkycRoutingDecision.MANUAL_REVIEW.name());
+            record.setRoutingDecision(EkycRoutingDecision.REJECTED.name());
             record.setRoutingReason("Đang thử lại xác minh hồ sơ với VNPT eKYC...");
             record.setFailureCode(null);
             record.setProvider(ekycProvider.getProviderName());
@@ -349,7 +348,7 @@ public class WorkerEkycService {
                     .worker(worker)
                     .provider(ekycProvider.getProviderName())
                     .status(EkycVerificationStatus.PROCESSING.name())
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW.name())
+                    .routingDecision(EkycRoutingDecision.REJECTED.name())
                     .routingReason("Đang gửi hồ sơ xác minh tới VNPT eKYC...")
                     .retryCount(0)
                     .processingStartedAt(now)
@@ -663,92 +662,6 @@ public class WorkerEkycService {
     }
 
     /**
-     * Admin / Customer Care duyệt thủ công hồ sơ eKYC (Human-in-the-loop)
-     */
-    @Transactional
-    public EkycVerificationResultDto adminReviewEkyc(UUID adminUserId, UUID verificationId, EkycAdminReviewRequestDto dto) {
-        WorkerEkycVerification verification = ekycVerificationRepository.findByIdForUpdate(verificationId)
-                .or(() -> ekycVerificationRepository.findById(verificationId))
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ eKYC: " + verificationId));
-
-        if (!EkycVerificationStatus.PENDING_REVIEW.name().equals(verification.getStatus())) {
-            throw new BadRequestException("Chỉ được thẩm định hồ sơ đang ở trạng thái PENDING_REVIEW (hiện tại: " + verification.getStatus() + ")");
-        }
-
-        String decision = dto.getDecision().toUpperCase().trim();
-        if (!EkycVerificationStatus.APPROVED.name().equals(decision)
-                && !EkycVerificationStatus.REJECTED.name().equals(decision)) {
-            throw new BadRequestException("Quyết định duyệt chỉ chấp nhận APPROVED hoặc REJECTED");
-        }
-
-        Worker worker = verification.getWorker();
-        if (EkycVerificationStatus.APPROVED.name().equals(decision)) {
-            EkycConsentAndAgeHelper.ImageAvailability availability = EkycConsentAndAgeHelper.evaluateImageAvailability(
-                    imageStorage,
-                    verification.getFrontImageUrl(),
-                    verification.getBackImageUrl(),
-                    verification.getSelfieImageUrl(),
-                    verification.getImageRetentionUntil(),
-                    verification.getImagesPurgedAt());
-            if (!availability.allThreePresentAndReadable()) {
-                throw new BadRequestException("Không thể phê duyệt thủ công: " + availability.unavailableReason());
-            }
-            if (verification.getCccdNumberHash() == null || worker == null) {
-                throw new BadRequestException("Hồ sơ thiếu số giấy tờ đã đối chiếu. Vui lòng yêu cầu nộp lại hồ sơ.");
-            }
-            cccdLockManager.acquireDbTransactionLockIfPostgres(verification.getCccdNumberHash());
-            boolean isDup = ekycVerificationRepository.existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(
-                    verification.getCccdNumberHash(), EkycVerificationStatus.APPROVED.name(), worker.getWorkerId());
-            if (!isDup && eoEkycVerificationRepository != null && worker.getUser() != null) {
-                isDup = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_User_UserIdNot(
-                        verification.getCccdNumberHash(), List.of(EkycVerificationStatus.APPROVED.name()), worker.getUser().getUserId());
-            }
-            if (isDup) {
-                throw new BadRequestException("Số CCCD này đã được phê duyệt cho một tài khoản khác trong hệ thống! Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
-            }
-        }
-
-        EkycVerificationStatus targetStatus = EkycVerificationStatus.valueOf(decision);
-        verification.setStatus(targetStatus.name());
-        verification.setRoutingDecision(targetStatus == EkycVerificationStatus.APPROVED
-                ? EkycRoutingDecision.MANUAL_APPROVED.name()
-                : EkycRoutingDecision.MANUAL_REJECTED.name());
-        verification.setReviewedAt(Instant.now());
-        verification.setReviewedBy(adminUserId);
-        verification.setReviewNotes(dto.getReviewNotes());
-        verification.setImageRetentionUntil(imageRetentionService.calculateRetentionDeadline(targetStatus));
-        verification = ekycVerificationRepository.save(verification);
-        imageRetentionService.scheduleImmediatePurgeIfEligible("worker", verification.getId(), targetStatus);
-
-        if (worker != null) {
-            if (targetStatus == EkycVerificationStatus.APPROVED) {
-                worker.setKycStatus(KycStatus.APPROVED);
-                if (verification.getFullName() != null && !verification.getFullName().isBlank()) {
-                    worker.setFullName(verification.getFullName().trim());
-                    if (worker.getUser() != null) worker.getUser().setFullName(worker.getFullName());
-                }
-                if (verification.getCccdNumberMasked() != null) {
-                    worker.setCccdNumber(verification.getCccdNumberMasked());
-                }
-            } else if (worker.getKycStatus() != KycStatus.APPROVED) {
-                worker.setKycStatus(KycStatus.REJECTED);
-            }
-            workerRepository.save(worker);
-        }
-
-        log.info("Admin {} reviewed Worker eKYC [verificationId={}, decision={}]", adminUserId, verificationId, decision);
-        recordAudit(adminUserId, "WORKER_EKYC_ADMIN_REVIEWED", verificationId,
-                Map.of("status", decision));
-        return EkycVerificationResultDto.builder()
-                .verificationId(verificationId)
-                .status(verification.getStatus())
-                .routingDecision(verification.getRoutingDecision())
-                .reviewedBy(adminUserId)
-                .reviewedAt(verification.getReviewedAt())
-                .build();
-    }
-
-    /**
      * Reset hồ sơ eKYC của Worker về trạng thái chưa định danh (xóa kèm ảnh riêng tư trong kho lưu trữ).
      */
     @Transactional
@@ -784,30 +697,6 @@ public class WorkerEkycService {
                 Map.of("legalHold", legalHold, "reason", reason != null ? reason.trim() : ""));
         log.info("Admin {} updated Worker eKYC legalHold={} [verificationId={}]", adminUserId, legalHold, verificationId);
         return mapToDto(verification, false);
-    }
-
-    /**
-     * Danh sách hàng đợi hồ sơ eKYC chờ Admin duyệt
-     */
-    @Transactional(readOnly = true)
-    public List<EkycVerificationResultDto> getPendingEkycQueue() {
-        return ekycVerificationRepository.findByStatusOrderByCreatedAtDesc(EkycVerificationStatus.PENDING_REVIEW.name()).stream()
-                .map(row -> {
-                    EkycVerificationResultDto dto = mapToDto(row, false);
-                    dto.setFrontImageUrl(null);
-                    dto.setBackImageUrl(null);
-                    dto.setSelfieImageUrl(null);
-                    return dto;
-                })
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    public EkycVerificationResultDto getPendingReviewDetails(UUID verificationId) {
-        WorkerEkycVerification record = ekycVerificationRepository.findById(verificationId)
-                .filter(row -> EkycVerificationStatus.PENDING_REVIEW.name().equals(row.getStatus()))
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ eKYC đang chờ duyệt."));
-        return mapToDto(record, false);
     }
 
     private EkycVerificationResultDto mapToDto(WorkerEkycVerification v) {

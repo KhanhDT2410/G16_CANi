@@ -8,8 +8,8 @@ export default function EkycRequiredModal({ isOpen, onClose, onNavigateToEkyc, e
     switch (ekycStatus) {
       case 'PENDING_REVIEW':
         return {
-          title: 'Hồ sơ eKYC đang chờ duyệt',
-          desc: 'Hồ sơ định danh của bạn đã được gửi và đang được đội ngũ kiểm duyệt xem xét. Vui lòng quay lại sau ít phút hoặc kiểm tra lại hồ sơ.',
+          title: 'Hồ sơ eKYC chưa hoàn tất xác thực tự động',
+          desc: 'Hồ sơ eKYC cũ của bạn chưa hoàn tất xác thực tự động qua VNPT. Vui lòng mở mục eKYC để chụp và gửi lại hồ sơ mới.',
           badgeColor: '#b45309',
           badgeBg: '#fef3c7',
         };

@@ -88,6 +88,19 @@ class SkillVerificationRepository {
     }
   }
 
+  Future<SkillVerificationResult> retryVerification(String verificationId) async {
+    try {
+      final response = await _dio.post('/v1/workers/skills/verifications/$verificationId/retry');
+      final data = response.data['data'] as Map<String, dynamic>;
+      return SkillVerificationResult.fromJson(data);
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data?['message'] ?? e.message ?? 'Lỗi khi thử lại xác minh chứng chỉ';
+      throw Exception(errorMsg);
+    } catch (e) {
+      throw Exception('Không thể thử lại xác minh chứng chỉ: $e');
+    }
+  }
+
   Future<List<WorkerSkillItem>> getMySkills() async {
     try {
       final response = await _dio.get('/v1/workers/skills/my-skills');

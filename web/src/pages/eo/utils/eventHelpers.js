@@ -320,11 +320,16 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     startValid &&
     now.getTime() >= start.getTime() - hoursWindow * 3600 * 1000;
 
+  const isEmergency = Boolean(shift?.emergency) && missing > 0;
   const nearStartUnderstaffed =
     missing > 0 &&
-    (typeof shift?.nearStartUnderstaffed === 'boolean' ? shift.nearStartUnderstaffed : withinAlertWindow);
+    !isDraft &&
+    !isCancelled &&
+    !isCompleted &&
+    !isSuspended &&
+    (isEmergency ||
+      (typeof shift?.nearStartUnderstaffed === 'boolean' ? shift.nearStartUnderstaffed : withinAlertWindow));
 
-  const isEmergency = Boolean(shift?.emergency);
   const canTriggerEmergency =
     !isInviteMode &&
     !isDraft &&
@@ -335,6 +340,8 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     missing > 0 &&
     !isEmergency &&
     (typeof shift?.canTriggerEmergency === 'boolean' ? shift.canTriggerEmergency : true);
+
+  const isFullyStaffed = !isDraft && !isCancelled && !isCompleted && !isSuspended && missing === 0 && required > 0;
 
   const hasCandidates =
     shift?.pendingProposalCount !== undefined && shift?.pendingProposalCount !== null
@@ -360,6 +367,7 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     isCompleted,
     isInProgress,
     isEmergency,
+    isFullyStaffed,
     withinAlertWindow,
     nearStartUnderstaffed,
     canTriggerEmergency,

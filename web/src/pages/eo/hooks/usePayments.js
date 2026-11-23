@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 
@@ -87,6 +87,30 @@ export function usePayments() {
     import.meta.env.VITE_DEMO === 'true' ? DEMO_PAYMENTS : []
   );
 
+  const loadEoPayments = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await eoService.getEoPayments();
+      if (Array.isArray(data) && data.length > 0) {
+        setPayments(data);
+      } else if (import.meta.env.VITE_DEMO === 'true') {
+        setPayments(DEMO_PAYMENTS);
+      } else {
+        setPayments([]);
+      }
+    } catch (err) {
+      if (import.meta.env.VITE_DEMO === 'true') {
+        setPayments(DEMO_PAYMENTS);
+      } else {
+        const msg = err.response?.data?.message || 'Không thể tải danh sách thanh toán';
+        setError(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const fetchShiftPayments = useCallback(async (shiftId) => {
     if (!shiftId) return;
     setLoading(true);
@@ -165,7 +189,7 @@ export function usePayments() {
     }
   };
 
-  const handleOpenPaymentDeclarationFromAttendance = (attendanceItem) => {
+  const handleOpenPaymentDeclarationFromAttendance = useCallback((attendanceItem) => {
     setSelectedAssignment(attendanceItem);
     const hasBank = Boolean(attendanceItem.bankCode && attendanceItem.bankAccountNumber);
     setPaymentForm({
@@ -176,13 +200,22 @@ export function usePayments() {
       paymentProofUrl: attendanceItem.paymentProofUrl || '',
     });
     setShowPaymentModal(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const handlePaymentUpdated = () => {
+      loadEoPayments();
+    };
+    window.addEventListener('cani_payment_updated', handlePaymentUpdated);
+    return () => window.removeEventListener('cani_payment_updated', handlePaymentUpdated);
+  }, [loadEoPayments]);
 
   return {
     payments,
     loading,
     error,
     setPayments,
+    loadEoPayments,
     fetchShiftPayments,
     showPaymentModal,
     setShowPaymentModal,

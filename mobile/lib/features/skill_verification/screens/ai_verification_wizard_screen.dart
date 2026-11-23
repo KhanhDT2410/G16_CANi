@@ -221,7 +221,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('Để trống để CSKH phân loại từ chứng chỉ', overflow: TextOverflow.ellipsis)),
+                    const DropdownMenuItem(value: null, child: Text('Để trống để nhận diện từ nguồn tra cứu', overflow: TextOverflow.ellipsis)),
                     ...state.taxonomy.map((s) => DropdownMenuItem(value: s.skillId, child: Text(s.name, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (val) => setState(() => _selectedSkillId = val),
@@ -256,7 +256,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
               backgroundColor: SkillHubColors.ctaPrimary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('GỬI HỒ SƠ CHỜ THẨM ĐỊNH', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+            child: const Text('KIỂM TRA & XÁC MINH TỰ ĐỘNG', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
           ),
         ),
       ],
@@ -321,14 +321,14 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
             ),
             SizedBox(width: 10),
             Text(
-              'Đang tải chứng chỉ và tạo hồ sơ chờ duyệt...',
+              'Đang đối chiếu chứng chỉ với nguồn tra cứu...',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SkillHubColors.textPrimary),
             ),
           ],
         ),
         const SizedBox(height: 6),
         const Text(
-          'Hệ thống đang lưu trữ tệp bảo mật cho Admin / CSKH kiểm tra...',
+          'Hệ thống đang kiểm tra nguồn xác thực chính thức của chứng chỉ...',
           style: TextStyle(fontSize: 11, color: SkillHubColors.textSecondary),
         ),
       ],
@@ -357,15 +357,17 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
   }
 
   Widget _buildStep3Result() {
-    final result = ref.watch(skillVerificationProvider).lastResult;
-    final isAutoApprove = result?.routingDecision == 'AUTO_APPROVE' || result?.status == 'APPROVED';
-    final isPendingReview = !isAutoApprove &&
-        (result?.status == 'PENDING_REVIEW' ||
-            result?.routingDecision == 'MANUAL_REVIEW' ||
-            result?.routingDecision == 'ADMIN_REVIEW');
-    final accentColor = isAutoApprove
+    final skillState = ref.watch(skillVerificationProvider);
+    final result = skillState.lastResult;
+    final isApproved = result?.status == 'APPROVED';
+    final isTempFailure = result?.status == 'VERIFICATION_FAILED';
+    final isUnsupported = !isApproved &&
+        !isTempFailure &&
+        (result?.verificationSource == 'UNSUPPORTED_SOURCE' ||
+            (result?.routingReason.contains('Chưa thể xác minh tự động') ?? false));
+    final accentColor = isApproved
         ? Colors.green
-        : (isPendingReview ? const Color(0xFFD97706) : Colors.red);
+        : (isTempFailure ? const Color(0xFFD97706) : Colors.red);
 
     return Column(
       children: [
@@ -385,33 +387,35 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     width: 58,
                     height: 58,
                     decoration: BoxDecoration(
-                      color: isAutoApprove
+                      color: isApproved
                           ? const Color(0xFFECFDF5)
-                          : (isPendingReview ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2)),
+                          : (isTempFailure ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2)),
                       shape: BoxShape.circle,
                       border: Border.all(color: accentColor, width: 2),
                     ),
                     child: Icon(
-                      isAutoApprove
+                      isApproved
                           ? Icons.check_circle_outline
-                          : (isPendingReview ? Icons.hourglass_top_rounded : Icons.cancel_outlined),
+                          : (isTempFailure ? Icons.sync_problem_rounded : Icons.info_outline_rounded),
                       color: accentColor,
                       size: 32,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    isAutoApprove
-                        ? 'Đã duyệt - Đạt mức xác thực tài liệu'
-                        : (isPendingReview
-                            ? 'Đang chờ duyệt'
-                            : 'Từ chối - Cần bổ sung tài liệu rõ nét hơn'),
+                    isApproved
+                        ? 'Đã xác minh tự động thành công'
+                        : (isTempFailure
+                            ? 'Nguồn tra cứu gặp lỗi tạm thời'
+                            : (isUnsupported
+                                ? 'Chưa thể xác minh tự động'
+                                : 'Chưa đạt xác minh tự động')),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: isAutoApprove
+                      color: isApproved
                           ? const Color(0xFF047857)
-                          : (isPendingReview ? const Color(0xFFB45309) : const Color(0xFFB91C1C)),
+                          : (isTempFailure ? const Color(0xFFB45309) : const Color(0xFFB91C1C)),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -419,60 +423,64 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isAutoApprove
+                      color: isApproved
                           ? const Color(0xFFE8F9FD)
-                          : (isPendingReview ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                          : (isTempFailure ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
                       borderRadius: BorderRadius.circular(99),
                       border: Border.all(
-                        color: isAutoApprove
+                        color: isApproved
                             ? SkillHubColors.ctaPrimary
-                            : (isPendingReview ? const Color(0xFFF59E0B) : Colors.redAccent),
+                            : (isTempFailure ? const Color(0xFFF59E0B) : Colors.redAccent),
                       ),
                     ),
                     child: Text(
-                      isAutoApprove
+                      isApproved
                           ? '+${result?.spAwarded ?? 0} SP đã cộng'
-                          : (isPendingReview ? 'Chờ thẩm định thủ công' : 'Chưa đủ điều kiện cấp SP'),
+                          : (isTempFailure ? 'Cho phép thử lại · 0 SP' : 'Chưa cộng điểm SP'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: isAutoApprove
+                        color: isApproved
                             ? SkillHubColors.ctaHover
-                            : (isPendingReview ? const Color(0xFF92400E) : const Color(0xFFDC2626)),
+                            : (isTempFailure ? const Color(0xFF92400E) : const Color(0xFFDC2626)),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (!isAutoApprove && result?.routingReason != null && result!.routingReason.isNotEmpty) ...[
+                  if (!isApproved && result?.routingReason != null && result!.routingReason.isNotEmpty) ...[
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
-                        color: isPendingReview ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2),
+                        color: isTempFailure ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isPendingReview ? const Color(0xFFFDE68A) : const Color(0xFFFECACA),
+                          color: isTempFailure ? const Color(0xFFFDE68A) : const Color(0xFFFECACA),
                         ),
                       ),
                       child: Text(
                         result.routingReason,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isPendingReview ? const Color(0xFF92400E) : const Color(0xFF991B1B),
+                          color: isTempFailure ? const Color(0xFF92400E) : const Color(0xFF991B1B),
                           height: 1.4,
                         ),
                       ),
                     ),
                   ],
-                  _buildResultRow('Kỹ năng đăng ký:', result?.skillName ?? result?.jobType ?? 'Chờ phân loại'),
-                  _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Chờ thẩm định từ tài liệu'),
-                  _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Chờ thẩm định thủ công'),
+                  _buildResultRow('Kỹ năng đăng ký:', result?.skillName ?? result?.jobType ?? 'Chưa xác định'),
+                  _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Chưa có dữ liệu tra cứu'),
+                  _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Chưa đối chiếu được'),
                   _buildResultRow(
-                    'Quy trình thẩm định:',
-                    isAutoApprove
-                        ? 'Đã phê duyệt'
-                        : (isPendingReview ? 'Chờ Admin / CSKH duyệt thủ công' : 'Cần nộp lại tài liệu'),
+                    'Kết quả xử lý:',
+                    isApproved
+                        ? 'Xác minh tự động hợp lệ'
+                        : (isTempFailure
+                            ? 'Lỗi nguồn tra cứu tạm thời — thử lại'
+                            : (isUnsupported
+                                ? 'Nộp lại chứng chỉ có thể tra cứu'
+                                : 'Thông tin chưa khớp / chưa hợp lệ')),
                   ),
                 ],
               ),
@@ -484,21 +492,23 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
           width: double.infinity,
           height: 48,
           child: ElevatedButton(
-            onPressed: isAutoApprove
-                ? () => setState(() => _step = 4)
-                : isPendingReview
-                    ? () => Navigator.of(context).pop()
-                    : () => setState(() => _step = 1),
+            onPressed: skillState.isSubmitting
+                ? null
+                : (isApproved
+                    ? () => setState(() => _step = 4)
+                    : (isTempFailure && result != null
+                        ? () => ref.read(skillVerificationProvider.notifier).retryVerification(result.id)
+                        : () => setState(() => _step = 1))),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isAutoApprove
+              backgroundColor: isApproved
                   ? SkillHubColors.ctaPrimary
-                  : (isPendingReview ? const Color(0xFFD97706) : const Color(0xFFEF4444)),
+                  : (isTempFailure ? const Color(0xFFD97706) : const Color(0xFFEF4444)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
-              isAutoApprove
+              isApproved
                   ? 'TIẾP TỤC CẬP NHẬT HỒ SƠ'
-                  : (isPendingReview ? 'HOÀN TẤT & QUAY LẠI' : 'TẢI LẠI TÀI LIỆU KHÁC'),
+                  : (isTempFailure ? 'THỬ LẠI XÁC MINH TỰ ĐỘNG' : 'NỘP LẠI CHỨNG CHỈ KHÁC'),
               style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
             ),
           ),

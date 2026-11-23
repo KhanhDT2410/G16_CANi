@@ -204,6 +204,7 @@
 .notif-type-group { background: #f5f3ff; color: #8b5cf6; }
 .notif-type-ticket { background: #f0f9ff; color: #0284c7; }
 .notif-type-appeal { background: #fff7ed; color: #ea580c; }
+.notif-type-emergency { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: 800; }
 
 .notif-item-content {
   flex: 1;

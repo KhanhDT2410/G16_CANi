@@ -32,6 +32,7 @@ public class H2DataSeeder implements CommandLineRunner {
         private final PlanRepository planRepository;
         private final SubscriptionRepository subscriptionRepository;
         private final PaymentRepository paymentRepository;
+        private final PayOSOrderRepository payOSOrderRepository;
         private final ReliabilityLogRepository reliabilityLogRepository;
         private final RsAppealRepository rsAppealRepository;
         private final FaqRepository faqRepository;
@@ -312,6 +313,47 @@ public class H2DataSeeder implements CommandLineRunner {
                                         samplePayments.size());
                 }
 
+                // Seed Sample PayOS Orders (UC-108)
+                if (eo != null && payOSOrderRepository.count() == 0) {
+                        Instant now = Instant.now();
+                        List<PayOSOrder> samplePayOSOrders = List.of(
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611001L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.MATCHING_PLUS)
+                                                        .amount(BigDecimal.valueOf(99000))
+                                                        .status("PAID")
+                                                        .createdAt(now.minus(4, ChronoUnit.DAYS))
+                                                        .build(),
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611002L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.ENTERPRISE)
+                                                        .amount(BigDecimal.valueOf(249000))
+                                                        .status("PAID")
+                                                        .createdAt(now.minus(2, ChronoUnit.DAYS))
+                                                        .build(),
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611003L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.MATCHING_PLUS)
+                                                        .amount(BigDecimal.valueOf(99000))
+                                                        .status("PENDING")
+                                                        .createdAt(now.minus(1, ChronoUnit.DAYS))
+                                                        .build(),
+                                        PayOSOrder.builder()
+                                                        .orderCode(202611004L)
+                                                        .eoId(eo.getEoId())
+                                                        .planType(PlanType.INVITE_ONLY)
+                                                        .amount(BigDecimal.valueOf(50000))
+                                                        .status("CANCELLED")
+                                                        .createdAt(now.minus(12, ChronoUnit.HOURS))
+                                                        .build());
+                        payOSOrderRepository.saveAll(samplePayOSOrders);
+                        log.info("==> [H2 Profile] Seeded {} sample PayOS orders for UC-108.",
+                                        samplePayOSOrders.size());
+                }
+
                 // Seed Sample ReliabilityLog & RS Appeal (UC-94)
                 if (worker != null && reliabilityLogRepository.count() == 0) {
                         Instant now = Instant.now();
@@ -441,8 +483,9 @@ public class H2DataSeeder implements CommandLineRunner {
                                                                 "[{\"skillName\":\"Nghiệp vụ Lễ tân Sự kiện\",\"taxonomyRole\":\"Lễ tân / Check-in\",\"confidenceScore\":0.95,\"evidenceSnippet\":\"Hoàn thành khóa đào tạo Nghiệp vụ Lễ tân Sự kiện\"}]")
                                                 .hasSealOrSignature(true)
                                                 .overallConfidence(new BigDecimal("0.92"))
-                                                .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                                                .routingReason("Hồ sơ chứng chỉ mẫu đã được Admin thẩm định thủ công hợp lệ.")
+                                                .verificationSource("QR_OFFICIAL_REGISTRY")
+                                                .routingDecision(RoutingDecision.AUTO_APPROVE)
+                                                .routingReason("Chứng chỉ mẫu đã được xác thực thành công qua nguồn tra cứu chính thức.")
                                                 .status(SkillVerificationStatus.APPROVED)
                                                 .spAwarded(25)
                                                 .build());
@@ -457,12 +500,13 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .recipientName("NGUYỄN VĂN AN")
                                                 .institution("Trung tâm Đào tạo Pha chế Á Âu")
                                                 .issueDate("10/09/2025")
-                                                .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                                                .routingReason("Chờ Admin / CSKH kiểm tra tệp chứng chỉ và duyệt thủ công.")
-                                                .status(SkillVerificationStatus.PENDING_REVIEW)
+                                                .verificationSource("UNSUPPORTED_SOURCE")
+                                                .routingDecision(RoutingDecision.REJECT)
+                                                .routingReason("Chưa thể xác minh tự động: Chứng chỉ không có nguồn tra cứu chính thức được CANi hỗ trợ. Vui lòng nộp lại chứng chỉ có mã QR/nguồn tra cứu hợp lệ.")
+                                                .status(SkillVerificationStatus.REJECTED)
                                                 .spAwarded(0)
                                                 .build());
-                                log.info("==> [H2 Profile] Seeded 2 demo SkillVerificationRequests (APPROVED & PENDING_REVIEW)");
+                                log.info("==> [H2 Profile] Seeded 2 demo SkillVerificationRequests (APPROVED & UNSUPPORTED_SOURCE)");
                         }
                 }
 

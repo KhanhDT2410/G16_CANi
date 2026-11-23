@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,15 +48,33 @@ public class NoShowService {
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DispatchProposalRepository dispatchProposalRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ShiftStaffingPolicy shiftStaffingPolicy;
+
+    private ShiftStaffingPolicy getStaffingPolicy() {
+        if (shiftStaffingPolicy != null) {
+            return shiftStaffingPolicy;
+        }
+        return ShiftStaffingPolicy.withFallbackDependencies(
+                shiftAssignmentRepository,
+                dispatchProposalRepository
+        );
+    }
+
     /**
      * Đánh dấu một ca làm việc vi phạm No-show và thực hiện toàn bộ quy trình chế tài & điều phối thay thế.
      */
     @Transactional
     public NoShowResponseDto markNoShow(UUID assignmentId, NoShowDetectedBy detectedBy, UUID actorUserId, String notes) {
-        ShiftAssignment assignment = shiftAssignmentRepository.findById(assignmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Phân công ca làm việc", "id", assignmentId));
+        ShiftAssignment assignment = shiftAssignmentRepository.findByIdForUpdate(assignmentId)
+                .orElseGet(() -> shiftAssignmentRepository.findById(assignmentId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Phân công ca làm việc", "id", assignmentId)));
 
-        if (noShowRecordRepository.existsByShiftAssignment_AssignmentId(assignmentId)) {
+        if (noShowRecordRepository.existsByShiftAssignment_AssignmentId(assignmentId)
+                || assignment.getStatus() == AssignmentStatus.NO_SHOW) {
             throw new BadRequestException("Ca làm việc này đã được ghi nhận No-show trước đó");
         }
 
@@ -83,8 +102,17 @@ public class NoShowService {
         // Nếu assignment thuộc 1 Group -> đánh dấu cooldown no-show của Group (20 phút)
         markGroupNoShowCooldown(assignment.getGroupId());
 
-        // Mở lại vị trí còn thiếu cho Shift và bật chế độ khẩn cấp (emergency)
+        // Mở lại vị trí còn thiếu cho Shift và đánh giá điều kiện Emergency Dispatch theo thời gian thực
+        Instant now = Instant.now();
+        ShiftStaffingPolicy policy = getStaffingPolicy();
         Shift shift = assignment.getShift();
+        if (shift != null && shift.getShiftId() != null) {
+            shift = shiftRepository.findByIdForUpdate(shift.getShiftId()).orElse(shift);
+        }
+
+        ShiftStaffingPolicy.AutoEmergencyEligibility autoEligibility =
+                new ShiftStaffingPolicy.AutoEmergencyEligibility(false, "Không tìm thấy ca làm việc.", null, 0, 0, 0, ShiftStaffingPolicy.DEFAULT_EMERGENCY_RADIUS_KM);
+
         if (shift != null) {
             if (shift.getConfirmedWorkers() != null && shift.getConfirmedWorkers() > 0) {
                 shift.setConfirmedWorkers(shift.getConfirmedWorkers() - 1);
@@ -92,10 +120,26 @@ public class NoShowService {
             if (shift.getRemainingWorkers() != null) {
                 shift.setRemainingWorkers(shift.getRemainingWorkers() + 1);
             }
-            if (shift.getStatus() == com.cani.entity.enums.ShiftStatus.FULLY_STAFFED) {
-                shift.setStatus(com.cani.entity.enums.ShiftStatus.ACTIVE);
+
+            ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, now);
+            if (shift.getStatus() == ShiftStatus.FULLY_STAFFED) {
+                shift.setStatus(effectiveStatus == ShiftStatus.IN_PROGRESS ? ShiftStatus.IN_PROGRESS : ShiftStatus.ACTIVE);
+            } else if (effectiveStatus == ShiftStatus.IN_PROGRESS && shift.getStatus() == ShiftStatus.ACTIVE) {
+                shift.setStatus(ShiftStatus.IN_PROGRESS);
+            } else if (effectiveStatus == ShiftStatus.COMPLETED && shift.getStatus() != ShiftStatus.COMPLETED) {
+                shift.setStatus(ShiftStatus.COMPLETED);
             }
-            shift.setEmergency(true);
+
+            autoEligibility = policy.evaluateAutoEmergencyEligibility(shift, now);
+            if (autoEligibility.eligible()) {
+                shift.setEmergency(true);
+                shift.setUnderstaffedAlertSent(true);
+            } else if (autoEligibility.missingWorkers() <= 0
+                    || effectiveStatus == ShiftStatus.COMPLETED
+                    || effectiveStatus == ShiftStatus.CANCELLED) {
+                shift.setEmergency(false);
+                shift.setUnderstaffedAlertSent(false);
+            }
             shiftRepository.save(shift);
         }
 
@@ -145,21 +189,20 @@ public class NoShowService {
                 .notes(notes)
                 .build();
 
-        // Kích hoạt Emergency Dispatch tìm nhân sự thay thế (chỉ áp dụng cho sự kiện chế độ MATCHING)
+        // Kích hoạt Emergency Dispatch thực sự (bán kính mở rộng + ưu tiên khẩn cấp) khi đủ điều kiện
         boolean emergencyDispatched = false;
-        boolean isInviteMode = shift.getEvent() != null
-                && shift.getEvent().getMode() == com.cani.entity.enums.EventMode.INVITE;
-        if (!isInviteMode) {
+        if (shift != null && autoEligibility.eligible()) {
             try {
-                int dispatched = matchingDispatchService.dispatchForShift(shift.getShiftId());
+                int dispatched = matchingDispatchService.triggerEmergencyDispatchForSystem(shift.getShiftId(), null);
                 emergencyDispatched = (dispatched > 0);
-                log.info("Emergency Dispatch kích hoạt cho ca {}: gửi đề xuất tới {} ứng viên thay thế",
-                        shift.getShiftId(), dispatched);
+                log.info("Emergency Dispatch kích hoạt cho ca {} (radius={}km): gửi đề xuất tới {} ứng viên thay thế",
+                        shift.getShiftId(), autoEligibility.effectiveRadiusKm(), dispatched);
             } catch (Exception e) {
                 log.error("Lỗi khi kích hoạt Emergency Dispatch cho ca {}: {}", shift.getShiftId(), e.getMessage());
             }
-        } else {
-            log.info("Bỏ qua Emergency Matching cho ca {} vì sự kiện thuộc chế độ INVITE", shift.getShiftId());
+        } else if (shift != null) {
+            log.info("Bỏ qua Auto Emergency Dispatch cho ca {} sau No-show: {}",
+                    shift.getShiftId(), autoEligibility.blockReason());
         }
         record.setEmergencyDispatched(emergencyDispatched);
         NoShowRecord savedRecord = noShowRecordRepository.save(record);
@@ -168,18 +211,42 @@ public class NoShowService {
         if (workerUser != null) {
             String wTitle = "Cảnh báo vi phạm: Đánh dấu vắng mặt (No-show)";
             String wBody = String.format("Bạn bị đánh dấu vắng mặt (No-show) cho ca '%s' và bị trừ %d điểm uy tín (RS hiện tại: %d). Bạn có 7 ngày để nộp kháng cáo nếu có lý do bất khả kháng.",
-                    shift.getJobType() != null ? shift.getJobType() : "Sự kiện", NO_SHOW_PENALTY_POINTS, scoreAfter);
+                    shift != null && shift.getJobType() != null ? shift.getJobType() : "Sự kiện", NO_SHOW_PENALTY_POINTS, scoreAfter);
             notificationService.sendNotification(workerUser, wTitle, wBody, NotificationType.ASSIGNMENT, "NO_SHOW", assignmentId);
         }
 
-        if (shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null) {
+        if (shift != null && shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null) {
             User eoUser = shift.getEvent().getEventOrganizer().getUser();
             if (eoUser != null) {
                 String eoTitle = "Nhân sự vắng mặt không báo trước (No-show)";
-                String eoBody = String.format("Nhân sự %s đã bị đánh dấu vắng mặt (No-show) cho ca '%s'. Hệ thống đã tự động kích hoạt điều phối nhân sự thay thế.",
-                        workerUser != null ? workerUser.getFullName() : "Worker",
-                        shift.getJobType() != null ? shift.getJobType() : "Sự kiện");
-                notificationService.sendNotification(eoUser, eoTitle, eoBody, NotificationType.ASSIGNMENT, "NO_SHOW", assignmentId);
+                String eoBody = autoEligibility.eligible()
+                        ? String.format("Nhân sự %s đã bị đánh dấu vắng mặt (No-show) cho ca '%s' (hiện %d/%d người). Hệ thống đã tự động kích hoạt điều phối khẩn cấp tìm người thay thế.",
+                                workerUser != null ? workerUser.getFullName() : "Worker",
+                                shift.getJobType() != null ? shift.getJobType() : "Sự kiện",
+                                autoEligibility.confirmedWorkers(),
+                                autoEligibility.requiredWorkers())
+                        : String.format("Nhân sự %s đã bị đánh dấu vắng mặt (No-show) cho ca '%s'. (%s)",
+                                workerUser != null ? workerUser.getFullName() : "Worker",
+                                shift.getJobType() != null ? shift.getJobType() : "Sự kiện",
+                                autoEligibility.blockReason());
+                if (eoUser.getUserId() != null && shift.getShiftId() != null && shift.getEvent().getEventId() != null) {
+                    notificationService.createAndSend(
+                            eoUser.getUserId(),
+                            eoTitle,
+                            eoBody,
+                            NotificationType.ASSIGNMENT,
+                            "SHIFT",
+                            shift.getShiftId(),
+                            Map.of(
+                                    "eventId", shift.getEvent().getEventId().toString(),
+                                    "shiftId", shift.getShiftId().toString(),
+                                    "assignmentId", assignmentId.toString(),
+                                    "type", autoEligibility.eligible() ? "EMERGENCY_AUTO_DISPATCH" : "NO_SHOW"
+                            )
+                    );
+                } else {
+                    notificationService.sendNotification(eoUser, eoTitle, eoBody, NotificationType.ASSIGNMENT, "NO_SHOW", assignmentId);
+                }
             }
         }
 
@@ -228,6 +295,10 @@ public class NoShowService {
         int locked = 0;
 
         for (ShiftAssignment sa : candidates) {
+            Shift candidateShift = sa.getShift();
+            if (candidateShift != null && candidateShift.getStatus() == ShiftStatus.CANCELLED) {
+                continue;
+            }
             Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(sa.getAssignmentId());
             if (attOpt.isPresent() && attOpt.get().getCheckinTime() != null) {
                 continue;

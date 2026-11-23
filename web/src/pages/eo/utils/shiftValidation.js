@@ -430,26 +430,28 @@ export function validateShiftWageAgainstFloor({
   if (numWage <= 0) {
     return {
       isValid: false,
-      error: 'Vui lòng nhập mức thù lao mỗi giờ cho ca làm việc.',
+      error: 'Vui lòng nhập mức thù lao lớn hơn 0 cho ca làm việc.',
+      warning: null,
       floorWage: minFloor,
     };
   }
 
-  // Vi phạm mức sàn tối thiểu của luật lao động
+  // Mức tối thiểu chỉ là gợi ý tham khảo; không chặn EO tự quyết định mức thù lao > 0
   if (numWage < legalFloor) {
     return {
-      isValid: false,
-      error: `Mức lương này đang thấp hơn định mức lương sàn tối thiểu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h) và dưới sàn pháp lý ${regionLabel} (${legalFloor.toLocaleString('vi-VN')}đ/h theo ${legalReference}).`,
+      isValid: true,
+      error: null,
+      warning: `Gợi ý: Mức lương này đang thấp hơn mức tham chiếu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h) và sàn tham khảo ${regionLabel} (${legalFloor.toLocaleString('vi-VN')}đ/h theo ${legalReference}).`,
       floorWage: minFloor,
       isBelowLegal: true,
     };
   }
 
-  // Vi phạm Biểu ma trận thù lao tối thiểu của Admin
   if (numWage < minFloor) {
     return {
-      isValid: false,
-      error: `Mức lương này đang thấp hơn định mức lương sàn tối thiểu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h).`,
+      isValid: true,
+      error: null,
+      warning: `Gợi ý: Mức lương này đang thấp hơn mức tham chiếu tối thiểu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h).`,
       floorWage: minFloor,
       isBelowAdmin: true,
     };
@@ -458,6 +460,7 @@ export function validateShiftWageAgainstFloor({
   return {
     isValid: true,
     error: null,
+    warning: null,
     floorWage: minFloor,
   };
 }

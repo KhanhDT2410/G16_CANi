@@ -141,6 +141,21 @@ export default function EOPage() {
         } catch (err) {
           console.warn('Lỗi setSearchParams:', err);
         }
+
+        const notifType = String(e.detail?.notificationType || e.detail?.alertType || '');
+        if (targetShiftId && (notifType === 'EMERGENCY_PROPOSAL' || notifType.startsWith('EMERGENCY'))) {
+          try {
+            sessionStorage.removeItem('cani_eo_dismissed_emergency_' + targetShiftId);
+          } catch (storageErr) {
+            console.warn('Không thể xóa trạng thái dismissed emergency:', storageErr);
+          }
+          window.dispatchEvent(
+            new CustomEvent('cani_open_emergency_prompt', {
+              detail: { shiftId: targetShiftId, eventId: resolvedEventId },
+            })
+          );
+        }
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
@@ -163,6 +178,13 @@ export default function EOPage() {
     window.addEventListener('cani_global_search', handleGlobalSearch);
     return () => window.removeEventListener('cani_global_search', handleGlobalSearch);
   }, [setSearchQuery]);
+
+  const { loadEoPayments } = payments;
+  useEffect(() => {
+    if (activeTab === 'payments') {
+      loadEoPayments();
+    }
+  }, [activeTab, loadEoPayments]);
 
   // Helper đẩy URL query params vào Browser History để nút Back quay lại đúng màn/bước trước
   const syncUrlRoute = (paramsObj, { replace = false } = {}) => {
@@ -443,8 +465,8 @@ export default function EOPage() {
                       <strong>Tài khoản chưa hoàn tất định danh eKYC</strong>
                       <p>
                         {ekycStatus === 'PENDING_REVIEW'
-                          ? 'Hồ sơ eKYC của bạn đang trong quá trình thẩm định. Bạn cần được phê duyệt để mở khóa tạo sự kiện.'
-                          : 'Bạn cần hoàn tất xác thực định danh (CCCD/ĐKKD) để được phép tạo sự kiện và tuyển dụng nhân sự trên CANi.'}
+                          ? 'Hồ sơ eKYC cũ của bạn chưa được xác thực tự động. Vui lòng thực hiện xác thực định danh VNPT eKYC để mở khóa tạo sự kiện.'
+                          : 'Bạn cần hoàn tất xác thực định danh tự động qua VNPT eKYC để được phép tạo sự kiện và tuyển dụng nhân sự trên CANi.'}
                       </p>
                     </div>
                   </div>
@@ -453,7 +475,7 @@ export default function EOPage() {
                     className="btn-verify-ekyc-now"
                     onClick={() => switchTab('profile')}
                   >
-                    {ekycStatus === 'PENDING_REVIEW' ? 'Xem Trạng Thái eKYC →' : 'Xác Thực Định Danh Ngay →'}
+                    {ekycStatus === 'PENDING_REVIEW' ? 'Xác Thực Lại eKYC →' : 'Xác Thực Định Danh Ngay →'}
                   </button>
                 </div>
               )}
@@ -657,13 +679,11 @@ export default function EOPage() {
             <Suspense fallback={<EOTabFallback />}>
               <EOPaymentsTab
                 payments={payments.payments}
+                events={events.events}
                 loading={payments.loading}
                 error={payments.error}
-                onOpenPaymentModal={(p) => {
-                  payments.setSelectedAssignment(p);
-                  payments.setPaymentForm((prev) => ({ ...prev, assignmentId: p.assignmentId, declaredAmount: p.agreedAmount }));
-                  payments.setShowPaymentModal(true);
-                }}
+                onRefresh={payments.loadEoPayments}
+                onOpenPaymentModal={payments.handleOpenPaymentDeclarationFromAttendance}
                 onOpenDisputeModal={(p) => setDisputeModal({ isOpen: true, assignment: p })}
                 onOpenVoucherModal={() => setIsVoucherModalOpen(true)}
                 onNavigateToDisputes={() => handleNavClick('disputes')}

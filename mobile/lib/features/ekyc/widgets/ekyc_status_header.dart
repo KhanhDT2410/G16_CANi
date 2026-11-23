@@ -42,9 +42,9 @@ class EkycStatusHeader extends StatelessWidget {
       iconColor = const Color(0xFFD97706);
       textColor = const Color(0xFFB45309);
       subtitleColor = const Color(0xFF92400E);
-      icon = Icons.hourglass_top_rounded;
-      title = 'HỒ SƠ ĐANG CHỜ ADMIN KIỂM TRA';
-      subtitle = 'Hồ sơ định danh đã được tiếp nhận và đang chờ Bộ phận CSKH / Admin thẩm định thủ công. Trạng thái sẽ cập nhật ngay khi có kết quả.';
+      icon = Icons.refresh_rounded;
+      title = 'CẦN XÁC MINH TỰ ĐỘNG LẠI';
+      subtitle = 'Hồ sơ trước đây chưa hoàn tất xác thực tự động qua VNPT eKYC. Vui lòng chụp lại ảnh CCCD & selfie rõ nét để xác minh ngay.';
     } else if (isProcessing) {
       bgColor = const Color(0xFFEFF6FF);
       borderColor = const Color(0xFFBFDBFE);

@@ -1,5 +1,9 @@
 package com.cani.service.worker;
 
+import com.cani.client.skill.CertificateLookupSource;
+import com.cani.client.skill.CertificateLookupSource.CertificateLookupOutcome;
+import com.cani.client.skill.CertificateLookupSource.CertificateLookupResult;
+import com.cani.client.skill.UnsupportedCertificateLookupSource;
 import com.cani.dto.skill.*;
 import com.cani.entity.AuditLog;
 import com.cani.entity.Skill;
@@ -8,7 +12,6 @@ import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerSkill;
 import com.cani.entity.WorkerSkillPoint;
-import com.cani.entity.enums.AdminReviewDecision;
 import com.cani.entity.enums.ExperienceLevel;
 import com.cani.entity.enums.RoutingDecision;
 import com.cani.entity.enums.SkillTier;
@@ -42,7 +45,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("SkillVerificationService — Manual Review Workflow, Security, Admin Review & Legacy Compatibility Tests")
+@DisplayName("SkillVerificationService — Automated Lookup Verification, Retry, Resubmit & Security Tests")
 class SkillVerificationServiceTest {
 
     @Mock
@@ -65,6 +68,9 @@ class SkillVerificationServiceTest {
 
     @Mock
     private AuditLogService auditLogService;
+
+    @Mock
+    private CertificateLookupSource certificateLookupSource;
 
     private SkillVerificationService verificationService;
     private DocumentAccessTokenService documentAccessTokenService;
@@ -89,6 +95,9 @@ class SkillVerificationServiceTest {
         FileSecurityValidator fileSecurityValidator = new FileSecurityValidator();
         documentAccessTokenService = new DocumentAccessTokenService("unit-test-signing-secret-key", 300);
 
+        lenient().when(certificateLookupSource.verifyCertificate(any()))
+                .thenAnswer(inv -> new UnsupportedCertificateLookupSource().verifyCertificate(inv.getArgument(0)));
+
         verificationService = new SkillVerificationService(
                 workerRepository,
                 skillRepository,
@@ -100,7 +109,8 @@ class SkillVerificationServiceTest {
                 certificateStorageService,
                 documentAccessTokenService,
                 auditLogService,
-                null
+                null,
+                certificateLookupSource
         );
 
         userId = UUID.randomUUID();
@@ -127,8 +137,92 @@ class SkillVerificationServiceTest {
     }
 
     @Test
-    @DisplayName("Submit hợp lệ -> lưu PENDING_REVIEW (ADMIN_REVIEW, MANUAL_REVIEW, 0 SP), không tự động gọi AI hay cộng SP")
-    void testSubmitVerification_RoutesDirectlyToPendingReview() {
+    @DisplayName("Nguồn tra cứu xác thực thành công + khớp hồ sơ -> APPROVED (+25 SP), nâng cấp WorkerSkill & SkillPoint")
+    void testSubmitVerification_VerifiedSourceMatch_ApprovedAndAwardsSp() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_qr.jpg", "image/jpeg", validJpegBytes());
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_verified.jpg");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .verificationReference("https://verify.example.invalid/cert/888")
+                        .recipientName("NGUYEN VAN AN")
+                        .institution("Saigon Bartender Academy")
+                        .certificateNumber("SB-2026-888")
+                        .expiryDate("31/12/2030")
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build()
+        );
+        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillRepository.save(any(WorkerSkill.class))).thenAnswer(i -> i.getArgument(0));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(workerId, "Pha chế (Bartender/Barista)"))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.save(any(WorkerSkillPoint.class))).thenAnswer(i -> i.getArgument(0));
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(inv -> {
+            SkillVerificationRequest req = inv.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto response = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "QR certificate"
+        );
+
+        assertEquals(SkillVerificationStatus.APPROVED, response.getStatus());
+        assertEquals(RoutingDecision.AUTO_APPROVE, response.getRoutingDecision());
+        assertEquals("QR_OFFICIAL_REGISTRY", response.getVerificationSource());
+        assertEquals(25, response.getSpAwarded());
+        verify(workerSkillRepository, times(1)).save(any(WorkerSkill.class));
+        verify(workerSkillPointRepository, times(1)).save(any(WorkerSkillPoint.class));
+        verify(auditLogService, times(1)).logAction(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("Thông tin trên nguồn tra cứu không khớp tên Worker -> REJECTED và tuyệt đối không cộng SP")
+    void testSubmitVerification_HolderMismatch_RejectedWithZeroSp() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_other.jpg", "image/jpeg", validJpegBytes());
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_mismatch.jpg");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName("TRAN THI BICH")
+                        .institution("Saigon Bartender Academy")
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build()
+        );
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(inv -> {
+            SkillVerificationRequest req = inv.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto response = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), null
+        );
+
+        assertEquals(SkillVerificationStatus.REJECTED, response.getStatus());
+        assertEquals(RoutingDecision.REJECT, response.getRoutingDecision());
+        assertEquals(0, response.getSpAwarded());
+        assertTrue(response.getRoutingReason().contains("không khớp"));
+        verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
+        verify(workerSkillPointRepository, never()).save(any(WorkerSkillPoint.class));
+    }
+
+    @Test
+    @DisplayName("Thiếu nguồn tra cứu hỗ trợ -> REJECTED ('Chưa thể xác minh tự động'), không vào Admin queue, 0 SP")
+    void testSubmitVerification_UnsupportedSource_ReturnsUnverifiedMessage() {
         MockMultipartFile file = new MockMultipartFile("file", "cert.jpg", "image/jpeg", validJpegBytes());
 
         when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
@@ -138,7 +232,7 @@ class SkillVerificationServiceTest {
         when(verificationRequestRepository.save(any(SkillVerificationRequest.class)))
                 .thenAnswer(invocation -> {
                     SkillVerificationRequest req = invocation.getArgument(0);
-                    req.setId(UUID.randomUUID());
+                    if (req.getId() == null) req.setId(UUID.randomUUID());
                     return req;
                 });
 
@@ -147,11 +241,11 @@ class SkillVerificationServiceTest {
         );
 
         assertNotNull(response);
-        assertEquals(RoutingDecision.ADMIN_REVIEW, response.getRoutingDecision());
-        assertEquals(SkillVerificationStatus.PENDING_REVIEW, response.getStatus());
-        assertEquals("MANUAL_REVIEW", response.getVerificationSource());
+        assertEquals(RoutingDecision.REJECT, response.getRoutingDecision());
+        assertEquals(SkillVerificationStatus.REJECTED, response.getStatus());
+        assertEquals("UNSUPPORTED_SOURCE", response.getVerificationSource());
+        assertTrue(response.getRoutingReason().contains("Chưa thể xác minh tự động"));
         assertEquals(0, response.getSpAwarded());
-        assertEquals("Pha chế (Bartender/Barista)", response.getJobType());
         assertTrue(response.getDocumentUrl().contains("expires=") && response.getDocumentUrl().contains("sig="));
 
         verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
@@ -160,8 +254,63 @@ class SkillVerificationServiceTest {
     }
 
     @Test
-    @DisplayName("Resubmit từ NEEDS_MORE_INFO -> cập nhật lại PENDING_REVIEW và cấp Signed URL mới")
-    void testResubmitVerification_MovesBackToPendingReview() {
+    @DisplayName("Lỗi nguồn tra cứu tạm thời -> VERIFICATION_FAILED (0 SP) và Worker retry thành công -> APPROVED")
+    void testSubmitAndRetry_TemporaryFailureRecoverableByWorkerRetry() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_retry.jpg", "image/jpeg", validJpegBytes());
+        UUID reqId = UUID.randomUUID();
+        final SkillVerificationRequest[] storedReq = new SkillVerificationRequest[1];
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_retry.jpg");
+        when(certificateStorageService.readBytes("cert_retry.jpg")).thenReturn(validJpegBytes());
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(inv -> {
+            SkillVerificationRequest req = inv.getArgument(0);
+            if (req.getId() == null) req.setId(reqId);
+            storedReq[0] = req;
+            return req;
+        });
+        lenient().when(verificationRequestRepository.findById(reqId)).thenAnswer(i -> Optional.ofNullable(storedReq[0]));
+
+        when(certificateLookupSource.verifyCertificate(any()))
+                .thenReturn(CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.TEMPORARY_FAILURE)
+                        .verificationSource("ISSUER_API")
+                        .failureCode("ISSUER_API_TIMEOUT")
+                        .reason("API đơn vị cấp tạm thời quá tải")
+                        .build())
+                .thenReturn(CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("ISSUER_API")
+                        .recipientName("Nguyen Van An")
+                        .institution("Saigon Bartender Academy")
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build());
+
+        SkillVerificationResponseDto first = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "Retry test");
+        assertEquals(SkillVerificationStatus.VERIFICATION_FAILED, first.getStatus());
+        assertEquals(0, first.getSpAwarded());
+
+        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillRepository.save(any(WorkerSkill.class))).thenAnswer(i -> i.getArgument(0));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(workerId, "Pha chế (Bartender/Barista)"))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.save(any(WorkerSkillPoint.class))).thenAnswer(i -> i.getArgument(0));
+
+        SkillVerificationResponseDto retried = verificationService.retryVerification(reqId, workerId);
+        assertEquals(SkillVerificationStatus.APPROVED, retried.getStatus());
+        assertEquals(1, retried.getRetryCount());
+        assertEquals(25, retried.getSpAwarded());
+    }
+
+    @Test
+    @DisplayName("Resubmit từ REJECTED -> tra cứu lại tự động và cấp Signed URL mới")
+    void testResubmitVerification_ReevaluatesWithLookupSource() {
         UUID reqId = UUID.randomUUID();
         MockMultipartFile file = new MockMultipartFile("file", "cert_new.pdf", "application/pdf", validPdfBytes());
 
@@ -170,8 +319,8 @@ class SkillVerificationServiceTest {
                 .worker(mockWorker)
                 .skill(mockSkill)
                 .jobType("Pha chế (Bartender/Barista)")
-                .status(SkillVerificationStatus.NEEDS_MORE_INFO)
-                .routingDecision(RoutingDecision.ADMIN_REVIEW)
+                .status(SkillVerificationStatus.REJECTED)
+                .routingDecision(RoutingDecision.REJECT)
                 .documentUrl("/api/v1/workers/skills/documents/old_cert.jpg")
                 .spAwarded(0)
                 .retryCount(0)
@@ -180,20 +329,37 @@ class SkillVerificationServiceTest {
         when(verificationRequestRepository.findById(reqId)).thenReturn(Optional.of(existing));
         when(certificateStorageService.storeDocument(any(), eq("pdf")))
                 .thenReturn("/api/v1/workers/skills/documents/cert_new_999.pdf");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("DIGITAL_SIGNATURE")
+                        .recipientName("Nguyen Van An")
+                        .institution("Saigon Bartender Academy")
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build()
+        );
+        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillRepository.save(any(WorkerSkill.class))).thenAnswer(i -> i.getArgument(0));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(workerId, "Pha chế (Bartender/Barista)"))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.save(any(WorkerSkillPoint.class))).thenAnswer(i -> i.getArgument(0));
         when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> i.getArgument(0));
 
-        SkillVerificationResponseDto response = verificationService.resubmitVerification(reqId, workerId, file, "Ảnh rõ hơn");
+        SkillVerificationResponseDto response = verificationService.resubmitVerification(reqId, workerId, file, "Bản PDF có chữ ký số");
 
-        assertEquals(SkillVerificationStatus.PENDING_REVIEW, response.getStatus());
-        assertEquals(RoutingDecision.ADMIN_REVIEW, response.getRoutingDecision());
-        assertEquals("MANUAL_REVIEW", response.getVerificationSource());
-        assertEquals(0, response.getSpAwarded());
+        assertEquals(SkillVerificationStatus.APPROVED, response.getStatus());
+        assertEquals(RoutingDecision.AUTO_APPROVE, response.getRoutingDecision());
+        assertEquals("DIGITAL_SIGNATURE", response.getVerificationSource());
+        assertEquals(25, response.getSpAwarded());
         assertTrue(response.getDocumentUrl().startsWith("/api/v1/workers/skills/documents/cert_new_999.pdf?expires="));
         verify(auditLogService, times(1)).logAction(any(AuditLog.class));
     }
 
     @Test
-    @DisplayName("Idempotency: Chặn nộp trùng cùng tệp chứng chỉ (SHA-256) đang APPROVED/PENDING_REVIEW -> 409 CONFLICT")
+    @DisplayName("Idempotency: Chặn nộp trùng cùng tệp chứng chỉ (SHA-256) đã APPROVED -> 409 CONFLICT")
     void testSubmitVerification_DuplicateDocumentHash_ThrowsConflict() {
         MockMultipartFile file = new MockMultipartFile("file", "cert.jpg", "image/jpeg", validJpegBytes());
         when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
@@ -205,93 +371,6 @@ class SkillVerificationServiceTest {
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         verify(certificateStorageService, never()).storeDocument(any(), any());
-    }
-
-    @Test
-    @DisplayName("Admin Review V2: Hỗ trợ APPROVE (+25 SP), REJECT, NEEDS_MORE_INFO và chặn cấp điểm 2 lần")
-    void testAdminReview_AllDecisionsAndDoubleApproveGuard() {
-        UUID reqId = UUID.randomUUID();
-        UUID adminId = UUID.randomUUID();
-
-        SkillVerificationRequest pendingReq = SkillVerificationRequest.builder()
-                .id(reqId)
-                .worker(mockWorker)
-                .skill(mockSkill)
-                .jobType("Pha chế (Bartender/Barista)")
-                .status(SkillVerificationStatus.PENDING_REVIEW)
-                .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                .spAwarded(0)
-                .build();
-
-        when(verificationRequestRepository.findById(reqId)).thenReturn(Optional.of(pendingReq));
-        when(verificationRequestRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        assertThrows(BadRequestException.class, () ->
-                verificationService.adminReview(reqId, adminId, AdminReviewDecision.NEEDS_MORE_INFO, "  "));
-
-        SkillVerificationResponseDto moreInfoRes = verificationService.adminReview(
-                reqId, adminId, AdminReviewDecision.NEEDS_MORE_INFO, "Ảnh bị lóa góc phải, vui lòng chụp lại rõ nét.");
-        assertEquals(SkillVerificationStatus.NEEDS_MORE_INFO, moreInfoRes.getStatus());
-        assertEquals(0, moreInfoRes.getSpAwarded());
-        assertTrue(moreInfoRes.getHumanReviewed());
-
-        pendingReq.setStatus(SkillVerificationStatus.PENDING_REVIEW);
-        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
-                .thenReturn(Optional.empty());
-        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(workerId, "Pha chế (Bartender/Barista)"))
-                .thenReturn(Optional.empty());
-
-        SkillVerificationResponseDto approvedRes = verificationService.adminReview(
-                reqId, adminId, AdminReviewDecision.APPROVE, "Đã kiểm tra mã chứng chỉ hợp lệ");
-        assertEquals(SkillVerificationStatus.APPROVED, approvedRes.getStatus());
-        assertEquals(25, approvedRes.getSpAwarded());
-        assertNotNull(approvedRes.getReviewedAt());
-
-        assertThrows(BadRequestException.class, () ->
-                verificationService.adminReview(reqId, adminId, AdminReviewDecision.APPROVE, "Duyệt lại"));
-    }
-
-    @Test
-    @DisplayName("Hồ sơ VERIFICATION_FAILED cũ chuyển sang PENDING_REVIEW duyệt thủ công (giữ nguyên dữ liệu lịch sử)")
-    void testMoveFailedToManualReview_TransitionsLegacyFailedRecord() {
-        UUID reqId = UUID.randomUUID();
-        UUID adminId = UUID.randomUUID();
-
-        SkillVerificationRequest failedReq = SkillVerificationRequest.builder()
-                .id(reqId)
-                .worker(mockWorker)
-                .skill(mockSkill)
-                .jobType("Pha chế (Bartender/Barista)")
-                .documentUrl("/api/v1/workers/skills/documents/cert_legacy.jpg")
-                .documentName("cert_legacy.jpg")
-                .documentType("image/jpeg")
-                .modelName("legacy-ai-v1")
-                .promptVersion("v1.0.0")
-                .overallConfidence(new java.math.BigDecimal("0.42"))
-                .failureReason("API_TIMEOUT")
-                .status(SkillVerificationStatus.VERIFICATION_FAILED)
-                .routingDecision(RoutingDecision.ADMIN_REVIEW)
-                .retryCount(3)
-                .spAwarded(0)
-                .build();
-
-        when(verificationRequestRepository.findById(reqId)).thenReturn(Optional.of(failedReq));
-        when(verificationRequestRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
-        SkillVerificationResponseDto moved = verificationService.moveFailedToManualReview(reqId, adminId);
-
-        assertEquals(SkillVerificationStatus.PENDING_REVIEW, moved.getStatus());
-        assertEquals(RoutingDecision.ADMIN_REVIEW, moved.getRoutingDecision());
-        assertEquals("MANUAL_REVIEW", moved.getVerificationSource());
-        assertEquals(0, moved.getSpAwarded());
-        assertNull(moved.getFailureReason());
-        assertEquals("legacy-ai-v1", moved.getModelName());
-        assertEquals("v1.0.0", moved.getPromptVersion());
-        verify(auditLogService, times(1)).logAction(any(AuditLog.class));
-
-        // Đã chuyển sang PENDING_REVIEW -> không thể chuyển lại lần 2
-        assertThrows(BadRequestException.class, () ->
-                verificationService.moveFailedToManualReview(reqId, adminId));
     }
 
     @Test
@@ -433,7 +512,7 @@ class SkillVerificationServiceTest {
     }
 
     @Test
-    @DisplayName("Document URL & JobType Integrity: PDF không chọn skillId có Signed documentUrl, jobType 'Chưa xác định' và PENDING_REVIEW")
+    @DisplayName("Document URL & JobType Integrity: PDF không chọn skillId có Signed documentUrl, jobType 'Chưa xác định' và REJECTED (UNSUPPORTED_SOURCE)")
     void testSubmitVerification_PopulatesSignedDocumentUrlAndUnspecifiedJobType() {
         MockMultipartFile file = new MockMultipartFile("file", "random_cv.pdf", "application/pdf", validPdfBytes());
 
@@ -442,7 +521,7 @@ class SkillVerificationServiceTest {
                 .thenReturn("/api/v1/workers/skills/documents/cert_cv999.pdf");
         when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
             SkillVerificationRequest req = i.getArgument(0);
-            req.setId(UUID.randomUUID());
+            if (req.getId() == null) req.setId(UUID.randomUUID());
             return req;
         });
 
@@ -451,7 +530,9 @@ class SkillVerificationServiceTest {
         assertNotNull(response.getDocumentUrl());
         assertTrue(response.getDocumentUrl().startsWith("/api/v1/workers/skills/documents/cert_cv999.pdf?expires="));
         assertEquals("Chưa xác định", response.getJobType());
-        assertEquals(SkillVerificationStatus.PENDING_REVIEW, response.getStatus());
+        assertEquals(SkillVerificationStatus.REJECTED, response.getStatus());
+        assertEquals("UNSUPPORTED_SOURCE", response.getVerificationSource());
+        assertTrue(response.getRoutingReason().contains("Chưa thể xác minh tự động"));
         assertEquals(0, response.getSpAwarded());
     }
 

@@ -56,8 +56,6 @@ public class EventOrganizerEkycController {
         String message;
         if ("APPROVED".equals(result.getStatus())) {
             message = "Định danh eKYC thành công! Bạn đã được chứng thực uy tín.";
-        } else if ("PENDING_REVIEW".equals(result.getStatus())) {
-            message = "Hồ sơ eKYC đã được gửi và đang chờ Admin / CSKH thẩm định.";
         } else if ("TECHNICAL_FAILURE".equals(result.getStatus())) {
             message = "Hệ thống xác thực VNPT eKYC đang gặp sự cố kỹ thuật tạm thời. Hồ sơ chưa bị từ chối, vui lòng thử lại.";
         } else if ("PROCESSING".equals(result.getStatus()) || "PENDING".equals(result.getStatus())) {
@@ -119,40 +117,6 @@ public class EventOrganizerEkycController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<EoReviewResponseDto> reviews = eoEkycService.getEoReviews(userId);
         return ResponseEntity.ok(ApiResponse.ok(reviews, "Lấy danh sách đánh giá từ người lao động thành công"));
-    }
-
-    /**
-     * Admin / CSKH xem danh sách hồ sơ eKYC doanh nghiệp chờ phê duyệt
-     */
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
-    @GetMapping("/admin/eo-ekyc/queue")
-    public ResponseEntity<ApiResponse<List<EoEkycVerificationResultDto>>> getPendingEkycQueue() {
-        List<EoEkycVerificationResultDto> list = eoEkycService.getPendingEkycQueue();
-        return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách hồ sơ eKYC doanh nghiệp chờ duyệt thành công"));
-    }
-
-    /**
-     * Admin / CSKH duyệt thủ công hồ sơ eKYC doanh nghiệp
-     */
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
-    @GetMapping("/admin/eo-ekyc/{verificationId}")
-    public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> getPendingReviewDetails(@PathVariable UUID verificationId) {
-        return ResponseEntity.ok()
-                .cacheControl(org.springframework.http.CacheControl.noStore())
-                .body(ApiResponse.ok(eoEkycService.getPendingReviewDetails(verificationId), "Chi tiết hồ sơ chờ duyệt"));
-    }
-
-    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
-    @PostMapping("/admin/eo-ekyc/{verificationId}/review")
-    public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> adminReviewEkyc(
-            @PathVariable UUID verificationId,
-            @Valid @RequestBody EkycAdminReviewRequestDto request,
-            Authentication authentication) {
-
-        UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
-        EoEkycVerificationResultDto result = eoEkycService.adminReviewEkyc(adminUserId, verificationId, request);
-        return ResponseEntity
-                .ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC doanh nghiệp thành công: " + result.getStatus()));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

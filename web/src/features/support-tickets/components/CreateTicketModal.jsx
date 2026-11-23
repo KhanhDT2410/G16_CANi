@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { TICKET_CATEGORIES, TICKET_CATEGORY_CONFIG } from '../types/ticket.constants';
+import TicketAttachmentUpload from './TicketAttachmentUpload';
 import { showToast } from '../../../components/common/Toast';
 
 export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillData }) => {
   const [category, setCategory] = useState(TICKET_CATEGORIES.ACCOUNT);
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
-  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [attachments, setAttachments] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -19,7 +20,7 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillD
       document.body.style.overflow = '';
       setSubject('');
       setDescription('');
-      setAttachmentUrl('');
+      setAttachments([]);
     }
     return () => { document.body.style.overflow = ''; };
   }, [isOpen, prefillData]);
@@ -41,7 +42,7 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillD
       category,
       subject: subject.trim(),
       description: description.trim(),
-      attachments: attachmentUrl.trim() ? [attachmentUrl.trim()] : [],
+      attachments: attachments.map((a) => (typeof a === 'string' ? a : a.url)).filter(Boolean),
     };
 
     const res = await onSubmit(payload);
@@ -106,13 +107,14 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillD
             </div>
 
             <div className="ticket-form-group">
-              <label className="ticket-form-label">Đường Dẫn Ảnh Đính Kèm (Tùy chọn)</label>
-              <input
-                type="url"
-                className="ticket-form-input"
-                placeholder="https://storage.cani.vn/evidence.jpg"
-                value={attachmentUrl}
-                onChange={(e) => setAttachmentUrl(e.target.value)}
+              <label className="ticket-form-label">
+                Tệp Đính Kèm & Hình Ảnh Minh Chứng (Tùy chọn)
+              </label>
+              <TicketAttachmentUpload
+                attachments={attachments}
+                onChange={setAttachments}
+                disabled={loading}
+                maxFiles={5}
               />
             </div>
           </div>

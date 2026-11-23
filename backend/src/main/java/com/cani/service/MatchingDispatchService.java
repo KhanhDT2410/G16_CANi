@@ -150,6 +150,9 @@ public class MatchingDispatchService {
         }
         int totalDispatched = 0;
         for (Shift shift : activeShifts) {
+            if (shift == null || !isDispatchAllowedForEvent(shift)) {
+                continue;
+            }
             try {
                 totalDispatched += dispatchForShift(shift.getShiftId());
             } catch (Exception ex) {
@@ -173,9 +176,11 @@ public class MatchingDispatchService {
             return 0;
         }
 
-        if (shift.getStatus() != ShiftStatus.ACTIVE) {
-            log.info("Bỏ qua dispatch: Ca làm việc {} không ở trạng thái ACTIVE (hiện tại: {})", shiftId,
-                    shift.getStatus());
+        ShiftStaffingPolicy policy = getStaffingPolicy();
+        ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, Instant.now());
+        if (effectiveStatus != ShiftStatus.ACTIVE) {
+            log.info("Bỏ qua dispatch: Ca làm việc {} không ở trạng thái ACTIVE trước giờ bắt đầu (status={}, effective={})",
+                    shiftId, shift.getStatus(), effectiveStatus);
             return 0;
         }
 
@@ -262,7 +267,7 @@ public class MatchingDispatchService {
         Instant expiresAt = Instant.now().plus(Duration.ofHours(DEFAULT_TIMEOUT_HOURS));
 
         for (CandidateMatch candidate : topCandidates) {
-            if (!isShiftReadyForProposal(shift)) {
+            if (!isShiftReadyForProposal(shift, false)) {
                 log.info("Dừng dispatch sớm cho ca {}: ca không còn ACTIVE hoặc đã đủ nhân sự.", shiftId);
                 break;
             }
@@ -609,7 +614,7 @@ public class MatchingDispatchService {
     }
 
     /**
-     * UC-59: Kích hoạt điều phối khẩn cấp (Emergency Dispatch) khi ca làm việc thiếu người
+     * UC-59: Kích hoạt điều phối khẩn cấp thủ công (EO bấm trước giờ bắt đầu ca)
      */
     @Transactional
     public int triggerEmergencyDispatch(UUID shiftId, Double customRadiusKm) {
@@ -625,9 +630,10 @@ public class MatchingDispatchService {
             return 0;
         }
 
-        if (policy.resolveEffectiveShiftStatus(shift, now) != ShiftStatus.ACTIVE) {
-            log.warn("Không thể kích hoạt Emergency Dispatch: Ca làm việc {} không ở trạng thái ACTIVE (status={}, startTime={})",
-                    shiftId, shift.getStatus(), shift.getStartTime());
+        ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, now);
+        if (effectiveStatus != ShiftStatus.ACTIVE || (shift.getStartTime() != null && !now.isBefore(shift.getStartTime()))) {
+            log.warn("Không thể kích hoạt Emergency Dispatch thủ công: Ca làm việc {} không ở trạng thái ACTIVE trước giờ bắt đầu (status={}, effective={}, startTime={})",
+                    shiftId, shift.getStatus(), effectiveStatus, shift.getStartTime());
             return 0;
         }
 
@@ -636,6 +642,39 @@ public class MatchingDispatchService {
             return 0;
         }
 
+        return executeEmergencyDispatch(shift, policy, customRadiusKm, needed);
+    }
+
+    /**
+     * UC-59 / UC-88: Kích hoạt điều phối khẩn cấp tự động từ hệ thống (No-show hoặc Worker tự hủy làm thiếu người).
+     * Cho phép sau giờ bắt đầu ca nếu vẫn còn đủ thời gian làm việc (>= 30 phút), nhưng dừng khi ca kết thúc hoặc bị hủy.
+     */
+    @Transactional
+    public int triggerEmergencyDispatchForSystem(UUID shiftId, Double customRadiusKm) {
+        Shift shift = shiftRepository.findByIdForUpdate(shiftId)
+                .orElseGet(() -> shiftRepository.findById(shiftId)
+                        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ca làm việc ID: " + shiftId)));
+
+        ShiftStaffingPolicy policy = getStaffingPolicy();
+        Instant now = Instant.now();
+
+        ShiftStaffingPolicy.AutoEmergencyEligibility autoEligibility = policy.evaluateAutoEmergencyEligibility(shift, now);
+        if (!autoEligibility.eligible()) {
+            log.info("Bỏ qua Auto Emergency Dispatch cho ca {}: {}", shiftId, autoEligibility.blockReason());
+            return 0;
+        }
+
+        if (autoEligibility.effectiveStatus() == ShiftStatus.IN_PROGRESS
+                && (shift.getStatus() == ShiftStatus.ACTIVE || shift.getStatus() == ShiftStatus.FULLY_STAFFED)) {
+            shift.setStatus(ShiftStatus.IN_PROGRESS);
+        }
+
+        return executeEmergencyDispatch(shift, policy, customRadiusKm, autoEligibility.missingWorkers());
+    }
+
+    private int executeEmergencyDispatch(Shift shift, ShiftStaffingPolicy policy, Double customRadiusKm, int needed) {
+        UUID shiftId = shift.getShiftId();
+
         Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
         Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
         if (!isValidCoordinate(targetLat, targetLng)) {
@@ -643,8 +682,12 @@ public class MatchingDispatchService {
             return 0;
         }
 
+        boolean shiftDirty = false;
         if (!Boolean.TRUE.equals(shift.getEmergency())) {
             shift.setEmergency(true);
+            shiftDirty = true;
+        }
+        if (shift.getStatus() == ShiftStatus.IN_PROGRESS || shiftDirty) {
             shiftRepository.save(shift);
         }
 
@@ -654,7 +697,7 @@ public class MatchingDispatchService {
         List<Worker> onlineWorkers = workerRepository.findByIsOnlineTrue();
         if (onlineWorkers == null || onlineWorkers.isEmpty()) {
             log.info("Bỏ qua Emergency Dispatch ca {}: không có Worker nào đang Online.", shiftId);
-            return 0;
+            return dispatchGroupsForShift(shiftId, true, emergencyRadius);
         }
 
         List<CandidateMatch> matchedCandidates = new ArrayList<>();
@@ -691,7 +734,7 @@ public class MatchingDispatchService {
         Instant expiresAt = Instant.now().plus(Duration.ofMinutes(30)); // Khẩn cấp: Hết hạn sau 30 phút
 
         for (CandidateMatch candidate : topCandidates) {
-            if (!isShiftReadyForProposal(shift)) {
+            if (!isShiftReadyForProposal(shift, true)) {
                 break;
             }
             Worker worker = candidate.getWorker();
@@ -731,10 +774,15 @@ public class MatchingDispatchService {
             }
         }
 
-        createdCount += dispatchGroupsForShift(shiftId, true);
+        createdCount += dispatchGroupsForShift(shiftId, true, emergencyRadius);
 
         log.info("Emergency Dispatch hoàn tất: Đã gửi {} đề xuất khẩn cấp cho ca {}", createdCount, shiftId);
         return createdCount;
+    }
+
+    @Transactional
+    public int dispatchGroupsForShift(UUID shiftId, boolean emergency) {
+        return dispatchGroupsForShift(shiftId, emergency, null);
     }
 
     /**
@@ -742,18 +790,32 @@ public class MatchingDispatchService {
      * Proposal gán worker = leader nhóm; FCM gửi leader để cử 1 đến [claimableSlots] thành viên.
      */
     @Transactional
-    public int dispatchGroupsForShift(UUID shiftId, boolean emergency) {
+    public int dispatchGroupsForShift(UUID shiftId, boolean emergency, Double customRadiusKm) {
         Shift shift = shiftRepository.findById(shiftId).orElse(null);
-        if (shift == null || shift.getStatus() != ShiftStatus.ACTIVE) {
+        if (shift == null) {
+            return 0;
+        }
+        ShiftStaffingPolicy policy = getStaffingPolicy();
+        ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, Instant.now());
+        boolean statusAllowed = emergency
+                ? (effectiveStatus == ShiftStatus.ACTIVE || effectiveStatus == ShiftStatus.IN_PROGRESS)
+                : (effectiveStatus == ShiftStatus.ACTIVE);
+        if (!statusAllowed) {
             return 0;
         }
         if (!isDispatchAllowedForEvent(shift)) {
             log.info("Bỏ qua group dispatch: Sự kiện của ca {} đang ở chế độ INVITE hoặc trạng thái không hợp lệ.", shiftId);
             return 0;
         }
-        int remaining = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : 0;
+        int remaining = shift.getRemainingWorkers() != null
+                ? Math.max(0, shift.getRemainingWorkers())
+                : Math.max(0, policy.resolveRequiredWorkers(shift) - policy.resolveConfirmedWorkersCount(shift));
         if (remaining <= 0) {
             log.info("Ca làm việc {} đã đủ nhân sự, bỏ qua kênh group dispatch.", shiftId);
+            return 0;
+        }
+
+        if (workerGroupRepository == null || workerGroupMembershipRepository == null) {
             return 0;
         }
 
@@ -860,10 +922,12 @@ public class MatchingDispatchService {
             }
 
             // Distance nguyên tử: Toàn bộ thành viên phải có tọa độ hợp lệ và không vượt
-            // quá bán kính cho phép
-            double effectiveMaxDist = (shift.getMaxDistanceKm() != null && shift.getMaxDistanceKm().doubleValue() > 0)
-                    ? shift.getMaxDistanceKm().doubleValue()
-                    : MAX_DISTANCE_KM;
+            // quá bán kính cho phép (khẩn cấp mở rộng theo Emergency radius)
+            double effectiveMaxDist = emergency
+                    ? policy.resolveEffectiveEmergencyRadiusKm(customRadiusKm)
+                    : ((shift.getMaxDistanceKm() != null && shift.getMaxDistanceKm().doubleValue() > 0)
+                            ? shift.getMaxDistanceKm().doubleValue()
+                            : MAX_DISTANCE_KM);
 
             if (targetLat == null || targetLng == null) {
                 continue;
@@ -1129,14 +1193,23 @@ public class MatchingDispatchService {
                 || shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(shiftId, workerId);
     }
 
-    private boolean isShiftReadyForProposal(Shift shift) {
-        if (shift == null || shift.getStatus() != ShiftStatus.ACTIVE) {
+    private boolean isShiftReadyForProposal(Shift shift, boolean emergency) {
+        if (shift == null) {
             return false;
         }
-        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
+        Instant now = Instant.now();
+        if (shift.getEndTime() != null && !now.isBefore(shift.getEndTime())) {
             return false;
         }
-        int needed = shift.getRemainingWorkers() != null ? shift.getRemainingWorkers() : shift.getRequiredWorkers();
+        ShiftStaffingPolicy policy = getStaffingPolicy();
+        ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, now);
+        boolean statusReady = emergency
+                ? (effectiveStatus == ShiftStatus.ACTIVE || effectiveStatus == ShiftStatus.IN_PROGRESS)
+                : (effectiveStatus == ShiftStatus.ACTIVE);
+        if (!statusReady) {
+            return false;
+        }
+        int needed = Math.max(0, policy.resolveRequiredWorkers(shift) - policy.resolveConfirmedWorkersCount(shift));
         return needed > 0 && isDispatchAllowedForEvent(shift);
     }
 

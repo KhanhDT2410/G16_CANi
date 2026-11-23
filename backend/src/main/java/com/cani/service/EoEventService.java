@@ -8,6 +8,7 @@ import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.NoShowDetectedBy;
+import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.SkillRequirementType;
 import com.cani.entity.enums.UserRole;
@@ -1003,6 +1004,40 @@ public class EoEventService {
         log.info("EO {} kích hoạt Emergency Dispatch cho ca {} (radius={}km): Đã gửi {} đề xuất",
                 eo.getEoId(), shiftId, effectiveRadiusKm, dispatched);
 
+        // Ticket EO-011: Đồng bộ thông báo trạng thái điều phối khẩn cấp vào Notification Bell của EO
+        if (notificationService != null && eo.getUser() != null && eo.getUser().getUserId() != null) {
+            try {
+                String evName = (shift.getEvent() != null && shift.getEvent().getName() != null)
+                        ? shift.getEvent().getName() : "Sự kiện";
+                String radiusLabel = (effectiveRadiusKm == Math.rint(effectiveRadiusKm))
+                        ? String.valueOf((long) effectiveRadiusKm) : String.valueOf(effectiveRadiusKm);
+                String notifTitle = "🚨 [ĐIỀU PHỐI KHẨN CẤP] Đã kích hoạt cho ca " + shift.getJobType();
+                String notifBody = dispatched > 0
+                        ? String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s) và gửi %d đề xuất khẩn cấp đến Worker phù hợp theo Preference.",
+                                radiusLabel, shift.getJobType(), evName, dispatched)
+                        : String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s). Hệ thống đang tiếp tục quét Worker trực tuyến phù hợp.",
+                                radiusLabel, shift.getJobType(), evName);
+
+                notificationService.createAndSend(
+                        eo.getUser().getUserId(),
+                        notifTitle,
+                        notifBody,
+                        NotificationType.REMINDER,
+                        "SHIFT",
+                        shiftId,
+                        Map.of(
+                                "eventId", shift.getEvent() != null ? shift.getEvent().getEventId().toString() : "",
+                                "shiftId", shiftId.toString(),
+                                "type", "EMERGENCY_DISPATCH_ACTIVE",
+                                "dispatchedCount", String.valueOf(dispatched),
+                                "radiusKm", radiusLabel
+                        )
+                );
+            } catch (Exception ex) {
+                log.warn("Lỗi gửi thông báo kích hoạt Emergency Dispatch cho EO: {}", ex.getMessage());
+            }
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("shiftId", shiftId);
         result.put("dispatchedCount", dispatched);
@@ -1027,6 +1062,29 @@ public class EoEventService {
         shift.setEmergency(false);
         shiftRepository.save(shift);
         log.info("EO {} đã tắt chế độ Emergency Dispatch cho ca {}", eo.getEoId(), shiftId);
+
+        // Ticket EO-011: Đồng bộ thông báo tắt Emergency Dispatch vào Notification Bell của EO
+        if (notificationService != null && eo.getUser() != null && eo.getUser().getUserId() != null) {
+            try {
+                String evName = (shift.getEvent() != null && shift.getEvent().getName() != null)
+                        ? shift.getEvent().getName() : "Sự kiện";
+                notificationService.createAndSend(
+                        eo.getUser().getUserId(),
+                        "ℹ️ [ĐIỀU PHỐI KHẨN CẤP] Đã tắt chế độ khẩn cấp",
+                        String.format("Chế độ điều phối khẩn cấp cho ca \"%s\" thuộc sự kiện \"%s\" đã được tắt.", shift.getJobType(), evName),
+                        NotificationType.SYSTEM,
+                        "SHIFT",
+                        shiftId,
+                        Map.of(
+                                "eventId", shift.getEvent() != null ? shift.getEvent().getEventId().toString() : "",
+                                "shiftId", shiftId.toString(),
+                                "type", "EMERGENCY_DISPATCH_DISABLED"
+                        )
+                );
+            } catch (Exception ex) {
+                log.warn("Lỗi gửi thông báo tắt Emergency Dispatch cho EO: {}", ex.getMessage());
+            }
+        }
     }
 
     // =========================================================================
@@ -1158,9 +1216,6 @@ public class EoEventService {
     private void validateShiftHourlyWage(Event event, BigDecimal hourlyWage) {
         if (hourlyWage == null || hourlyWage.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
-        }
-        if (hourlyWage.compareTo(new BigDecimal("20000")) < 0) {
-            throw new BadRequestException("Mức lương này đang thấp hơn định mức lương sàn tối thiểu của CANi (20,000 đ/h)!");
         }
     }
 
@@ -1594,7 +1649,7 @@ public class EoEventService {
                 .performedSkillName(resolveSkillNameById(s.getPerformedSkillId()))
                 .skillRequirements(reqDtos)
                 .customSkillNotes(s.getCustomSkillNotes())
-                .emergency(Boolean.TRUE.equals(s.getEmergency()))
+                .emergency(Boolean.TRUE.equals(s.getEmergency()) && eligibility.missingWorkers() > 0)
                 .missingWorkers(eligibility.missingWorkers())
                 .nearStartUnderstaffed(eligibility.nearStartUnderstaffed())
                 .canTriggerEmergency(eligibility.canTriggerEmergency())

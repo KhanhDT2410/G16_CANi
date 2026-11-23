@@ -200,15 +200,15 @@ public class EkycDecisionEngine {
                     .build();
         }
 
-        // 5. Thiếu dữ liệu OCR, không rõ ràng, chưa đọc được ngày hết hạn hoặc cần đối soát -> PENDING_REVIEW
+        // 5. Thiếu dữ liệu OCR, không rõ ràng, chưa đọc được ngày hết hạn hoặc không đạt điều kiện tự động -> REJECTED (không chuyển hàng đợi Admin)
         String normalizedCccd = cryptoService.normalizeCccd(providerResult.getIdNumber());
         if (!cryptoService.isValidCccdFormat(normalizedCccd)
                 || providerResult.getFullName() == null
                 || providerResult.getFullName().isBlank()) {
             return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("VNPT OCR chưa trích xuất đầy đủ số CCCD hoặc họ tên từ ảnh tải lên. Hồ sơ được chuyển Admin/CSKH kiểm tra thủ công.")
+                    .status(EkycVerificationStatus.REJECTED)
+                    .routingDecision(EkycRoutingDecision.REJECTED)
+                    .routingReason("Không đọc đủ số CCCD hoặc họ tên từ ảnh mặt trước. Vui lòng chụp lại ảnh CCCD rõ nét, không chói sáng và nộp lại.")
                     .retryable(false)
                     .fraudFlags(flags)
                     .build();
@@ -216,9 +216,9 @@ public class EkycDecisionEngine {
 
         if (vnptProperties != null && vnptProperties.isVerifyBackCard() && !providerResult.isBackCardVerified()) {
             return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("Chưa có kết quả xác minh đầy đủ cho mặt sau CCCD. Hồ sơ được chuyển Admin/CSKH kiểm tra.")
+                    .status(EkycVerificationStatus.REJECTED)
+                    .routingDecision(EkycRoutingDecision.REJECTED)
+                    .routingReason("Chưa xác minh được đầy đủ mặt sau CCCD. Vui lòng chụp lại ảnh mặt sau rõ nét, đủ góc cạnh và nộp lại.")
                     .retryable(false)
                     .fraudFlags(flags)
                     .build();
@@ -226,9 +226,9 @@ public class EkycDecisionEngine {
 
         if (providerResult.getExpiryStatus() != ExpiryDateStatus.VALID) {
             return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("Không đọc được ngày hết hạn trên thẻ CCCD để tự động xác nhận hiệu lực. Hồ sơ được chuyển Admin/CSKH kiểm tra.")
+                    .status(EkycVerificationStatus.REJECTED)
+                    .routingDecision(EkycRoutingDecision.REJECTED)
+                    .routingReason("Không đọc được ngày hết hạn trên thẻ CCCD để xác nhận hiệu lực. Vui lòng chụp lại ảnh mặt trước rõ nét và nộp lại.")
                     .retryable(false)
                     .fraudFlags(flags)
                     .build();
@@ -236,9 +236,9 @@ public class EkycDecisionEngine {
 
         if (faceStatus == FaceCompareStatus.BELOW_THRESHOLD) {
             return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("Độ khớp khuôn mặt chưa đạt ngưỡng phê duyệt tự động đã cấu hình. Hồ sơ được chuyển Admin/CSKH kiểm tra.")
+                    .status(EkycVerificationStatus.REJECTED)
+                    .routingDecision(EkycRoutingDecision.REJECTED)
+                    .routingReason("Độ khớp khuôn mặt giữa ảnh chân dung và CCCD chưa đạt ngưỡng xác thực tự động. Vui lòng chụp lại ảnh selfie đủ sáng, chính diện và nộp lại.")
                     .retryable(false)
                     .fraudFlags(flags)
                     .build();
@@ -246,9 +246,9 @@ public class EkycDecisionEngine {
 
         if (vnptProperties != null && vnptProperties.isRequireLivenessForAutoApprove() && livenessStatus != LivenessStatus.PASSED) {
             return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("Chưa có xác nhận Liveness/PAD tự động từ gói VNPT eKYC. Hồ sơ được chuyển Admin/CSKH kiểm tra.")
+                    .status(EkycVerificationStatus.REJECTED)
+                    .routingDecision(EkycRoutingDecision.REJECTED)
+                    .routingReason("Chưa xác nhận được ảnh chân dung trực tiếp (Liveness/PAD). Vui lòng chụp lại ảnh selfie rõ khuôn mặt và nộp lại.")
                     .retryable(false)
                     .fraudFlags(flags)
                     .build();
@@ -256,9 +256,9 @@ public class EkycDecisionEngine {
 
         if (providerResult.isHasBlurryWarning()) {
             return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("Ảnh CCCD có cảnh báo mờ hoặc chói sáng từ VNPT. Hồ sơ được chuyển Admin/CSKH kiểm tra.")
+                    .status(EkycVerificationStatus.REJECTED)
+                    .routingDecision(EkycRoutingDecision.REJECTED)
+                    .routingReason("Ảnh CCCD bị mờ, nhòe hoặc chói sáng nên chưa đủ dữ liệu đối chiếu. Vui lòng chụp lại ảnh rõ nét và nộp lại.")
                     .retryable(false)
                     .fraudFlags(flags)
                     .build();
@@ -266,20 +266,10 @@ public class EkycDecisionEngine {
 
         if (!mismatchFields.isEmpty()) {
             return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("Thông tin người dùng đối chiếu không trùng khớp với dữ liệu VNPT OCR ("
-                            + String.join(", ", mismatchFields) + "). Hồ sơ được chuyển Admin/CSKH kiểm tra.")
-                    .retryable(false)
-                    .fraudFlags(flags)
-                    .build();
-        }
-
-        if (strictManualReview) {
-            return DecisionOutcome.builder()
-                    .status(EkycVerificationStatus.PENDING_REVIEW)
-                    .routingDecision(EkycRoutingDecision.MANUAL_REVIEW)
-                    .routingReason("Chế độ eKYC nghiêm ngặt (EKYC_STRICT=true): Hồ sơ chờ CSKH/Admin thẩm định thủ công.")
+                    .status(EkycVerificationStatus.REJECTED)
+                    .routingDecision(EkycRoutingDecision.REJECTED)
+                    .routingReason("Thông tin đối chiếu (" + String.join(", ", mismatchFields)
+                            + ") không trùng khớp với dữ liệu VNPT đọc từ CCCD. Vui lòng kiểm tra lại thông tin và chụp lại ảnh giấy tờ.")
                     .retryable(false)
                     .fraudFlags(flags)
                     .build();

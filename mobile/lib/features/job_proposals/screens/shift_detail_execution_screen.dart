@@ -1378,12 +1378,12 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
               : 'ĐÃ HẾT HẠN ĐIỂM DANH VÀO CA');
       isActionDisabled = true;
     } else if (isCompleted) {
-      solidColor = isReviewed ? cani.success : null;
-      useBrandGradient = !isReviewed;
-      iconData = isReviewed ? Icons.verified_rounded : Icons.star_rate_rounded;
-      label = isReviewed
-          ? 'ĐÃ HOÀN THÀNH & ĐÁNH GIÁ CA LÀM'
-          : 'ĐÁNH GIÁ BAN TỔ CHỨC';
+      if (isReviewed) {
+        return const SizedBox.shrink();
+      }
+      useBrandGradient = true;
+      iconData = Icons.star_rate_rounded;
+      label = 'ĐÁNH GIÁ BAN TỔ CHỨC';
     } else if (!isCheckedIn) {
       if (_isBeforeCheckinWindow) {
         final gate = _earliestCheckinTime;

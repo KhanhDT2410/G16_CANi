@@ -105,7 +105,8 @@ public class WorkerGroupService {
                 .build();
 
         membershipRepository.save(leaderMembership);
-        log.info("Đã tạo nhóm thợ thành công: groupId={}, leaderWorkerId={}", savedGroup.getGroupId(), leader.getWorkerId());
+        log.info("Đã tạo nhóm thợ thành công: groupId={}, leaderWorkerId={}", savedGroup.getGroupId(),
+                leader.getWorkerId());
 
         return mapToGroupDto(savedGroup, leader.getFullName());
     }
@@ -135,8 +136,7 @@ public class WorkerGroupService {
     public List<WorkerGroupResponseDto> getMyGroups(UUID userId) {
         Worker worker = getWorkerByUserId(userId);
         List<WorkerGroupMembership> memberships = membershipRepository.findByWorker_WorkerIdAndStatus(
-                worker.getWorkerId(), MembershipStatus.ACTIVE
-        );
+                worker.getWorkerId(), MembershipStatus.ACTIVE);
 
         return memberships.stream()
                 .map(m -> {
@@ -159,8 +159,7 @@ public class WorkerGroupService {
     public List<WorkerGroupResponseDto> getMyPendingInvites(UUID userId) {
         Worker worker = getWorkerByUserId(userId);
         List<WorkerGroupMembership> memberships = membershipRepository.findByWorker_WorkerIdAndStatus(
-                worker.getWorkerId(), MembershipStatus.PENDING
-        );
+                worker.getWorkerId(), MembershipStatus.PENDING);
 
         if (memberships.isEmpty()) {
             return List.of();
@@ -176,8 +175,7 @@ public class WorkerGroupService {
                 .collect(Collectors.toMap(
                         Worker::getWorkerId,
                         w -> w.getUser() != null ? w.getUser().getFullName() : w.getFullName(),
-                        (existing, replacement) -> existing
-                ));
+                        (existing, replacement) -> existing));
 
         return memberships.stream()
                 .map(m -> {
@@ -245,7 +243,8 @@ public class WorkerGroupService {
     }
 
     /**
-     * Xem danh sách thành viên trong nhóm thợ (Mask PII nếu không phải thành viên nhóm)
+     * Xem danh sách thành viên trong nhóm thợ (Mask PII nếu không phải thành viên
+     * nhóm)
      */
     @Transactional(readOnly = true)
     public List<WorkerGroupMemberResponseDto> getGroupMembers(UUID currentUserId, UUID groupId) {
@@ -260,7 +259,8 @@ public class WorkerGroupService {
                 if (callerWorkerId.equals(group.getLeaderWorkerId())) {
                     canViewFullPii = true;
                 } else {
-                    canViewFullPii = membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, callerWorkerId)
+                    canViewFullPii = membershipRepository
+                            .findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, callerWorkerId)
                             .filter(m -> m.getStatus() == MembershipStatus.ACTIVE)
                             .isPresent();
                 }
@@ -273,7 +273,8 @@ public class WorkerGroupService {
     }
 
     /**
-     * UC-75 (WBS 223.0): Xem danh sách các ca làm việc của Nhóm thợ (View Group Shifts)
+     * UC-75 (WBS 223.0): Xem danh sách các ca làm việc của Nhóm thợ (View Group
+     * Shifts)
      */
     @Transactional(readOnly = true)
     public List<GroupShiftResponseDto> getGroupShifts(UUID userId, UUID groupId) {
@@ -283,7 +284,8 @@ public class WorkerGroupService {
         }
 
         // Kiểm tra quyền: phải là thành viên active hoặc trưởng nhóm
-        boolean isMember = membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, caller.getWorkerId())
+        boolean isMember = membershipRepository
+                .findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, caller.getWorkerId())
                 .filter(m -> m.getStatus() == MembershipStatus.ACTIVE)
                 .isPresent();
         if (!isMember) {
@@ -293,12 +295,14 @@ public class WorkerGroupService {
         List<com.cani.entity.ShiftAssignment> assignments = shiftAssignmentRepository.findByGroupId(groupId);
 
         // Nhóm theo Shift
-        java.util.Map<com.cani.entity.Shift, List<com.cani.entity.ShiftAssignment>> groupedByShift = assignments.stream()
+        java.util.Map<com.cani.entity.Shift, List<com.cani.entity.ShiftAssignment>> groupedByShift = assignments
+                .stream()
                 .filter(sa -> sa.getShift() != null)
                 .collect(Collectors.groupingBy(com.cani.entity.ShiftAssignment::getShift));
 
         List<GroupShiftResponseDto> results = new ArrayList<>();
-        for (java.util.Map.Entry<com.cani.entity.Shift, List<com.cani.entity.ShiftAssignment>> entry : groupedByShift.entrySet()) {
+        for (java.util.Map.Entry<com.cani.entity.Shift, List<com.cani.entity.ShiftAssignment>> entry : groupedByShift
+                .entrySet()) {
             com.cani.entity.Shift shift = entry.getKey();
             List<com.cani.entity.ShiftAssignment> shiftAssignments = entry.getValue();
 
@@ -310,14 +314,19 @@ public class WorkerGroupService {
             List<GroupShiftResponseDto.MemberAssignmentDto> memberDtos = new ArrayList<>();
             for (com.cani.entity.ShiftAssignment sa : shiftAssignments) {
                 Worker w = sa.getWorker();
-                if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.CONFIRMED) confirmed++;
-                else if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN) checkedIn++;
-                else if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.COMPLETED) completed++;
-                else if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.CANCELLED) cancelled++;
+                if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.CONFIRMED)
+                    confirmed++;
+                else if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN)
+                    checkedIn++;
+                else if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.COMPLETED)
+                    completed++;
+                else if (sa.getStatus() == com.cani.entity.enums.AssignmentStatus.CANCELLED)
+                    cancelled++;
 
                 memberDtos.add(GroupShiftResponseDto.MemberAssignmentDto.builder()
                         .workerId(w != null ? w.getWorkerId() : null)
-                        .fullName(w != null && w.getUser() != null ? w.getUser().getFullName() : (w != null ? w.getFullName() : "N/A"))
+                        .fullName(w != null && w.getUser() != null ? w.getUser().getFullName()
+                                : (w != null ? w.getFullName() : "N/A"))
                         .phone(w != null && w.getUser() != null ? w.getUser().getPhone() : null)
                         .isGroupLeader(Boolean.TRUE.equals(sa.getIsGroupLeader()))
                         .assignmentStatus(sa.getStatus())
@@ -362,8 +371,7 @@ public class WorkerGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Worker", "id", request.getWorkerId()));
 
         Optional<WorkerGroupMembership> existing = membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(
-                groupId, candidate.getWorkerId()
-        );
+                groupId, candidate.getWorkerId());
         if (existing.isPresent()) {
             if (existing.get().getStatus() == MembershipStatus.ACTIVE) {
                 throw new BadRequestException("Thợ này đã là thành viên chính thức của nhóm");
@@ -403,8 +411,8 @@ public class WorkerGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("WorkerGroup", "id", groupId));
 
         WorkerGroupMembership membership = membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(
-                groupId, worker.getWorkerId()
-        ).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lời mời gia nhập nhóm này"));
+                groupId, worker.getWorkerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lời mời gia nhập nhóm này"));
 
         if (membership.getStatus() == MembershipStatus.ACTIVE) {
             throw new BadRequestException("Bạn đã là thành viên chính thức của nhóm");
@@ -445,15 +453,17 @@ public class WorkerGroupService {
         }
 
         if (isLeader && isSelf) {
-            int activeCount = membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE);
+            int activeCount = membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId,
+                    MembershipStatus.ACTIVE);
             if (activeCount > 1) {
-                throw new BadRequestException("Trưởng nhóm không thể tự rời nhóm khi nhóm vẫn còn thành viên. Vui lòng chuyển giao quyền Trưởng nhóm trước.");
+                throw new BadRequestException(
+                        "Trưởng nhóm không thể tự rời nhóm khi nhóm vẫn còn thành viên. Vui lòng chuyển giao quyền Trưởng nhóm trước.");
             }
         }
 
         WorkerGroupMembership membership = membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(
-                groupId, targetWorkerId
-        ).orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong nhóm này"));
+                groupId, targetWorkerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Thành viên không tồn tại trong nhóm này"));
 
         membership.setStatus(MembershipStatus.REMOVED);
         membershipRepository.save(membership);
@@ -461,7 +471,8 @@ public class WorkerGroupService {
         recalculateGroupMetrics(groupId);
 
         // F4: Auto-dissolve khi ACTIVE về 0
-        int remainingActive = membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE);
+        int remainingActive = membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId,
+                MembershipStatus.ACTIVE);
         if (remainingActive == 0 && Boolean.TRUE.equals(group.getIsActive())) {
             group.setIsActive(false);
             workerGroupRepository.save(group);
@@ -477,13 +488,14 @@ public class WorkerGroupService {
                                     notificationService.sendNotification(
                                             leader.getUser(),
                                             "Đội đã giải tán",
-                                            "Đội " + group.getName() + " đã tan rã vì không còn thành viên. Tạo đội mới khi cần.",
+                                            "Đội " + group.getName()
+                                                    + " đã tan rã vì không còn thành viên. Tạo đội mới khi cần.",
                                             NotificationType.SYSTEM,
                                             "GROUP_DISSOLVED",
-                                            groupId
-                                    );
+                                            groupId);
                                 } catch (Exception ex) {
-                                    log.warn("Không thể gửi thông báo FCM giải tán cho leader đội {}: {}", groupId, ex.getMessage());
+                                    log.warn("Không thể gửi thông báo FCM giải tán cho leader đội {}: {}", groupId,
+                                            ex.getMessage());
                                 }
                             }
                         });
@@ -506,7 +518,8 @@ public class WorkerGroupService {
         }
 
         // 1. Mọi DispatchProposal PENDING của group -> EXPIRED + saveAll
-        List<DispatchProposal> pending = dispatchProposalRepository.findByGroupIdAndStatus(groupId, ProposalStatus.PENDING);
+        List<DispatchProposal> pending = dispatchProposalRepository.findByGroupIdAndStatus(groupId,
+                ProposalStatus.PENDING);
         if (!pending.isEmpty()) {
             pending.forEach(p -> p.setStatus(ProposalStatus.EXPIRED));
             dispatchProposalRepository.saveAll(pending);
@@ -527,8 +540,7 @@ public class WorkerGroupService {
                             "Đội " + group.getName() + " đã được giải tán.",
                             NotificationType.SYSTEM,
                             "GROUP_DISSOLVED",
-                            groupId
-                    );
+                            groupId);
                 } catch (Exception ex) {
                     log.warn("Không thể gửi thông báo FCM giải tán cho leader đội {}: {}", groupId, ex.getMessage());
                 }
@@ -540,31 +552,35 @@ public class WorkerGroupService {
 
     private void recalculateGroupMetrics(UUID groupId) {
         WorkerGroup group = workerGroupRepository.findById(groupId).orElse(null);
-        if (group == null) return;
+        if (group == null)
+            return;
 
         List<WorkerGroupMembership> activeMembers = membershipRepository.findByWorkerGroup_GroupIdAndStatus(
-                groupId, MembershipStatus.ACTIVE
-        );
+                groupId, MembershipStatus.ACTIVE);
 
         int count = activeMembers.size();
         group.setMemberCount(count);
 
         if (count > 0) {
             List<WorkerGroupMembership> ratedMembers = activeMembers.stream()
-                    .filter(m -> m.getWorker() != null && m.getWorker().getRatingAvg() != null && m.getWorker().getRatingAvg().compareTo(BigDecimal.ZERO) > 0)
+                    .filter(m -> m.getWorker() != null && m.getWorker().getRatingAvg() != null
+                            && m.getWorker().getRatingAvg().compareTo(BigDecimal.ZERO) > 0)
                     .toList();
 
             if (!ratedMembers.isEmpty()) {
                 double avgRatingSum = ratedMembers.stream()
                         .mapToDouble(m -> m.getWorker().getRatingAvg().doubleValue())
                         .sum();
-                group.setAvgRating(BigDecimal.valueOf(avgRatingSum / ratedMembers.size()).setScale(2, RoundingMode.HALF_UP));
+                group.setAvgRating(
+                        BigDecimal.valueOf(avgRatingSum / ratedMembers.size()).setScale(2, RoundingMode.HALF_UP));
             } else {
                 group.setAvgRating(BigDecimal.valueOf(5.0));
             }
 
             int rsSum = activeMembers.stream()
-                    .map(m -> m.getWorker() != null && m.getWorker().getReliabilityScore() != null ? m.getWorker().getReliabilityScore() : 100)
+                    .map(m -> m.getWorker() != null && m.getWorker().getReliabilityScore() != null
+                            ? m.getWorker().getReliabilityScore()
+                            : 100)
                     .reduce(0, Integer::sum);
 
             group.setReliabilityScore(rsSum / count);
@@ -576,7 +592,8 @@ public class WorkerGroupService {
         workerGroupRepository.save(group);
     }
 
-    // ============================= TASK 3: Group shift proposals (leader) =============================
+    // ============================= TASK 3: Group shift proposals (leader)
+    // =============================
 
     /**
      * Xem danh sách đề xuất ca làm việc gửi cho nhóm (chỉ Leader hoặc ADMIN)
@@ -598,7 +615,8 @@ public class WorkerGroupService {
     }
 
     /**
-     * Re-check (kết quả mới tính, không tạo data) trạng thái đủ điều kiện của từng thành viên ACTIVE
+     * Re-check (kết quả mới tính, không tạo data) trạng thái đủ điều kiện của từng
+     * thành viên ACTIVE
      * để leader chọn member trước khi accept
      */
     @Transactional(readOnly = true)
@@ -609,11 +627,12 @@ public class WorkerGroupService {
 
     /**
      * Leader chấp nhận đề xuất ca cho nhóm — toàn bộ hoặc không (1 transaction):
-     * k × (ShiftAssignment source=GROUP + payment ban đầu + counter event + FCM), giữ slot bằng atomic counter
+     * k × (ShiftAssignment source=GROUP + payment ban đầu + counter event + FCM),
+     * giữ slot bằng atomic counter
      */
     @Transactional
     public AcceptGroupProposalResponseDto acceptGroupProposal(UUID callerUserId, UUID groupId,
-                                                              UUID proposalId, List<UUID> memberWorkerIds) {
+            UUID proposalId, List<UUID> memberWorkerIds) {
         checkGroupLeaderPermission(callerUserId, groupId);
         Worker leader = getWorkerByUserId(callerUserId);
         WorkerGroup group = getGroupOrThrow(groupId);
@@ -675,7 +694,8 @@ public class WorkerGroupService {
         Set<UUID> currentActiveIds = activeByWorker.keySet();
         Set<UUID> snapshotIdSet = new HashSet<>(snapshotWorkerIds);
         if (!currentActiveIds.equals(snapshotIdSet)) {
-            throw new AppException("Đội đã thay đổi kể từ khi nhận đề xuất, vui lòng chờ hệ thống dispatch lại", HttpStatus.CONFLICT);
+            throw new AppException("Đội đã thay đổi kể từ khi nhận đề xuất, vui lòng chờ hệ thống dispatch lại",
+                    HttpStatus.CONFLICT);
         }
 
         int packSize = snapshotPackSize;
@@ -691,11 +711,13 @@ public class WorkerGroupService {
             }
         }
 
-        // Re-check eligibility TOÀN pack theo snapshot trong transaction (1 fail -> toàn bộ rollback, 0 assignment)
+        // Re-check eligibility TOÀN pack theo snapshot trong transaction (1 fail ->
+        // toàn bộ rollback, 0 assignment)
         for (UUID workerId : snapshotWorkerIds) {
             WorkerGroupMembership m = activeByWorker.get(workerId);
             if (m == null || m.getWorker() == null) {
-                throw new AppException("Đội đã thay đổi kể từ khi nhận đề xuất, vui lòng chờ hệ thống dispatch lại", HttpStatus.CONFLICT);
+                throw new AppException("Đội đã thay đổi kể từ khi nhận đề xuất, vui lòng chờ hệ thống dispatch lại",
+                        HttpStatus.CONFLICT);
             }
             String reason = matchingDispatchService.groupMemberEligibilityReason(m.getWorker(), shift);
             if (reason != null) {
@@ -708,22 +730,25 @@ public class WorkerGroupService {
             throw new AppException("Ca vừa đủ người trước khi đội xác nhận", HttpStatus.CONFLICT);
         }
 
-        // ATOMIC: giữ packSize slot cùng lúc — ca vừa đủ người thì 409 + rollback toàn bộ
+        // ATOMIC: giữ packSize slot cùng lúc — ca vừa đủ người thì 409 + rollback toàn
+        // bộ
         int updatedRows = shiftRepository.incrementConfirmedWorkersAtomicBy(shift.getShiftId(), packSize);
         if (updatedRows == 0) {
             throw new AppException("Ca vừa đủ người trước khi bạn xác nhận", HttpStatus.CONFLICT);
         }
 
         // Guard chống trùng lặp assignment active trong cùng shift
-        // shortcut: H2 không hỗ trợ partial unique index; production PostgreSQL mới có index, nâng cấp test sang embedded PG khi có CI.
+        // shortcut: H2 không hỗ trợ partial unique index; production PostgreSQL mới có
+        // index, nâng cấp test sang embedded PG khi có CI.
         List<AssignmentStatus> activeStatuses = List.of(
                 AssignmentStatus.PENDING,
                 AssignmentStatus.CONFIRMED,
-                AssignmentStatus.CHECKED_IN
-        );
+                AssignmentStatus.CHECKED_IN);
         for (UUID workerId : snapshotWorkerIds) {
-            if (shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shift.getShiftId(), workerId, activeStatuses)) {
-                throw new AppException("Thành viên " + workerId + " đã có ca làm việc đang hoạt động trong ca này", HttpStatus.CONFLICT);
+            if (shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shift.getShiftId(),
+                    workerId, activeStatuses)) {
+                throw new AppException("Thành viên " + workerId + " đã có ca làm việc đang hoạt động trong ca này",
+                        HttpStatus.CONFLICT);
             }
         }
 
@@ -753,12 +778,14 @@ public class WorkerGroupService {
 
             // Counter event += packSize
             if (event != null) {
-                event.setTotalConfirmedWorkers((event.getTotalConfirmedWorkers() != null ? event.getTotalConfirmedWorkers() : 0) + packSize);
+                event.setTotalConfirmedWorkers(
+                        (event.getTotalConfirmedWorkers() != null ? event.getTotalConfirmedWorkers() : 0) + packSize);
                 eventRepository.save(event);
             }
 
             // Sync bộ đếm trong memory (native query đã persist vào DB)
-            shift.setConfirmedWorkers((shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0) + packSize);
+            shift.setConfirmedWorkers(
+                    (shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0) + packSize);
             int newRemaining = Math.max(0, remaining - packSize);
             shift.setRemainingWorkers(newRemaining);
             if (newRemaining == 0) {
@@ -766,20 +793,22 @@ public class WorkerGroupService {
                 shift.setEmergency(false);
             }
 
-            // Accept proposal: di chuyển xuống SAU KHI các assignment và counter đã persist thành công
+            // Accept proposal: di chuyển xuống SAU KHI các assignment và counter đã persist
+            // thành công
             proposal.setStatus(ProposalStatus.ACCEPTED);
             proposal.setRespondedAt(Instant.now());
             dispatchProposalRepository.save(proposal);
         } catch (DataIntegrityViolationException ex) {
-            log.warn("Lỗi vi phạm toàn vẹn khi tạo phân công ca cho nhóm {} trong ca {}: {}", groupId, shift.getShiftId(), ex.getMessage());
+            log.warn("Lỗi vi phạm toàn vẹn khi tạo phân công ca cho nhóm {} trong ca {}: {}", groupId,
+                    shift.getShiftId(), ex.getMessage());
             throw new AppException("Trùng lịch với ca khác, vui lòng thử lại", HttpStatus.CONFLICT);
         }
 
         // Notifications: FCM gửi SAU KHI commit DB thành công
         String arriveHint = shift.getArrivalTime() != null
                 ? " — có mặt trước " + shift.getArrivalTime()
-                    .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
-                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                        .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+                        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
                 : "";
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -804,7 +833,8 @@ public class WorkerGroupService {
     }
 
     /**
-     * Leader từ chối đề xuất ca cho nhóm → proposal REJECTED + re-dispatch slot còn thiếu
+     * Leader từ chối đề xuất ca cho nhóm → proposal REJECTED + re-dispatch slot còn
+     * thiếu
      */
     @Transactional
     public void rejectGroupProposal(UUID callerUserId, UUID groupId, UUID proposalId, String reason) {
@@ -861,11 +891,13 @@ public class WorkerGroupService {
         List<GroupProposalResponseDto.EligibleMemberDto> memberDtos = new ArrayList<>();
         int eligibleCount = 0;
         for (WorkerGroupMembership m : activeMembers) {
-            if (m.getWorker() == null) continue;
+            if (m.getWorker() == null)
+                continue;
             Worker w = m.getWorker();
             String reason = matchingDispatchService.groupMemberEligibilityReason(w, shift);
             boolean eligible = reason == null;
-            if (eligible) eligibleCount++;
+            if (eligible)
+                eligibleCount++;
             memberDtos.add(GroupProposalResponseDto.EligibleMemberDto.builder()
                     .workerId(w.getWorkerId())
                     .fullName(w.getUser() != null ? w.getUser().getFullName() : w.getFullName())
@@ -900,7 +932,7 @@ public class WorkerGroupService {
     }
 
     private void safeNotify(Event event, Shift shift, Worker leader, WorkerGroup group,
-                            List<UUID> selectedWorkerIds, String eventName, String arriveHint) {
+            List<UUID> selectedWorkerIds, String eventName, String arriveHint) {
         String groupName = group.getName();
         // 1. EO
         if (event != null && event.getEventOrganizer() != null && event.getEventOrganizer().getUser() != null) {
@@ -914,7 +946,8 @@ public class WorkerGroupService {
                 .collect(Collectors.toMap(Worker::getWorkerId, Function.identity(), (a, b) -> a));
         for (UUID workerId : selectedWorkerIds) {
             Worker member = workersById.get(workerId);
-            if (member == null || member.getUser() == null) continue;
+            if (member == null || member.getUser() == null)
+                continue;
             sendSafe(member.getUser().getUserId(),
                     "Bạn được phân công ca làm việc [NHÓM]",
                     "Trưởng nhóm " + leader.getFullName() + " đã phân công bạn ca \"" + shift.getJobType()
@@ -930,7 +963,8 @@ public class WorkerGroupService {
     }
 
     private void sendSafe(UUID targetUserId, String title, String body) {
-        if (targetUserId == null) return;
+        if (targetUserId == null)
+            return;
         try {
             notificationService.createAndSend(targetUserId, title, body, NotificationType.GROUP,
                     "SHIFT", null, null);
@@ -939,7 +973,8 @@ public class WorkerGroupService {
         }
     }
 
-    // ============================= TASK 5: Transfer group leadership =============================
+    // ============================= TASK 5: Transfer group leadership
+    // =============================
 
     /**
      * Chuyển giao Trưởng nhóm (1 transaction): đổi atomic cả 3 nguồn sự thật
@@ -1035,6 +1070,7 @@ public class WorkerGroupService {
             }
             code = sb.toString();
         } while (workerGroupRepository.existsByInviteCode(code));
+                    
         return code;
     }
 
@@ -1050,6 +1086,7 @@ public class WorkerGroupService {
         WorkerGroup group = workerGroupRepository.findByInviteCodeIgnoreCase(cleanCode)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkerGroup", "inviteCode", cleanCode));
 
+                
         if (!Boolean.TRUE.equals(group.getIsActive())) {
             throw new BadRequestException("Nhóm này hiện đang tạm ngưng hoạt động");
         }
@@ -1062,6 +1099,7 @@ public class WorkerGroupService {
         if (existingOpt.isPresent()) {
             WorkerGroupMembership existing = existingOpt.get();
             if (existing.getStatus() == MembershipStatus.ACTIVE) {
+                                    
                 throw new BadRequestException("Bạn đã là thành viên chính thức của nhóm \"" + group.getName() + "\"");
             }
             // Tái kích hoạt thành viên nếu trước đó bị xóa/rời nhóm

@@ -26,4 +26,10 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
            "JOIN ChatConversation c ON c.id = p1.conversationId " +
            "WHERE c.type = 'DIRECT' AND p1.userId = :user1 AND p2.userId = :user2")
     List<UUID> findDirectConversationIds(@Param("user1") UUID user1, @Param("user2") UUID user2);
+
+    @Query("SELECT COUNT(p) FROM ChatParticipant p WHERE p.userId = :userId AND p.unreadCount > 0")
+    long countUnreadConversationsByUserId(@Param("userId") UUID userId);
+
+    @Query("SELECT COALESCE(SUM(p.unreadCount), 0) FROM ChatParticipant p WHERE p.userId = :userId AND p.unreadCount > 0")
+    long sumUnreadMessagesByUserId(@Param("userId") UUID userId);
 }

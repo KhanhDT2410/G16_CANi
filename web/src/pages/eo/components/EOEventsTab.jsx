@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import EOEventDataState from './EOEventDataState';
 import {
   getEventStatusPriority,
@@ -75,7 +75,12 @@ export default function EOEventsTab({
   loading,
   loadError,
   allEvents = [],
-  filteredEvents,
+  filteredEvents = [],
+  paginatedEvents,
+  currentPage: controlledPage,
+  setCurrentPage: setControlledPage,
+  pageSize = 10,
+  totalPages: controlledTotalPages,
   searchQuery,
   setSearchQuery,
   statusFilter,
@@ -103,6 +108,28 @@ export default function EOEventsTab({
   onOpenPaymentDeclaration,
 }) {
   const [activeMenuEventId, setActiveMenuEventId] = useState(null);
+  const [internalPage, setInternalPage] = useState(1);
+
+  const currentPage = controlledPage ?? internalPage;
+  const setCurrentPage = setControlledPage ?? setInternalPage;
+  const effectivePageSize = Math.max(1, Number(pageSize) || 10);
+
+  useEffect(() => {
+    setInternalPage(1);
+  }, [searchQuery, statusFilter, sortBy]);
+
+  const totalPages =
+    controlledTotalPages ?? Math.max(1, Math.ceil(filteredEvents.length / effectivePageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startItemIndex = (safeCurrentPage - 1) * effectivePageSize;
+  const endItemIndex = Math.min(startItemIndex + effectivePageSize, filteredEvents.length);
+
+  const displayedEvents = useMemo(() => {
+    if (Array.isArray(paginatedEvents) && controlledPage !== undefined) {
+      return paginatedEvents;
+    }
+    return filteredEvents.slice(startItemIndex, endItemIndex);
+  }, [paginatedEvents, controlledPage, filteredEvents, startItemIndex, endItemIndex]);
 
   const toggleKebabMenu = (e, eventId) => {
     e.stopPropagation();
@@ -503,7 +530,7 @@ export default function EOEventsTab({
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEvents.map((evt) => {
+                    {displayedEvents.map((evt) => {
                       const isMenuOpen = activeMenuEventId === evt.eventId;
                       const activeShifts = Array.isArray(evt.shifts)
                         ? evt.shifts.filter((s) => s.status !== 'CANCELLED')
@@ -865,6 +892,69 @@ export default function EOEventsTab({
                 </table>
               )}
             </div>
+
+            {filteredEvents.length > effectivePageSize && (
+              <div className="ev-pagination-bar" role="navigation" aria-label="Phân trang danh sách sự kiện">
+                <span className="ev-pagination-summary">
+                  Hiển thị <strong>{startItemIndex + 1}–{endItemIndex}</strong> trên tổng số{' '}
+                  <strong>{filteredEvents.length}</strong> sự kiện
+                </span>
+
+                <div className="ev-pagination-controls">
+                  <button
+                    type="button"
+                    className="ev-page-btn"
+                    disabled={safeCurrentPage <= 1}
+                    onClick={() => setCurrentPage(safeCurrentPage - 1)}
+                  >
+                    &larr; Trang trước
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                    .filter((page) => {
+                      if (totalPages <= 7) return true;
+                      return (
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(page - safeCurrentPage) <= 1
+                      );
+                    })
+                    .reduce((acc, page, idx, arr) => {
+                      if (idx > 0 && page - arr[idx - 1] > 1) {
+                        acc.push({ type: 'ellipsis', key: `ellipsis-${page}` });
+                      }
+                      acc.push({ type: 'page', page, key: `page-${page}` });
+                      return acc;
+                    }, [])
+                    .map((item) =>
+                      item.type === 'ellipsis' ? (
+                        <span key={item.key} className="ev-page-ellipsis" aria-hidden="true">
+                          &hellip;
+                        </span>
+                      ) : (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={`ev-page-num-btn ${safeCurrentPage === item.page ? 'is-active' : ''}`}
+                          aria-current={safeCurrentPage === item.page ? 'page' : undefined}
+                          onClick={() => setCurrentPage(item.page)}
+                        >
+                          {item.page}
+                        </button>
+                      )
+                    )}
+
+                  <button
+                    type="button"
+                    className="ev-page-btn"
+                    disabled={safeCurrentPage >= totalPages}
+                    onClick={() => setCurrentPage(safeCurrentPage + 1)}
+                  >
+                    Trang sau &rarr;
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
         </>
       )}

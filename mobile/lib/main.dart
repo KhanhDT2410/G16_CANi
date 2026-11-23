@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 import 'package:cani/app/app.dart';
 import 'package:cani/app/home_screen.dart';
@@ -30,8 +31,14 @@ void main() async {
 
   final container = ProviderContainer();
 
-  // Khởi tạo Firebase Cloud Messaging (FCM) & Kênh thông báo nổi (Heads-up banner)
+  // Khởi tạo phần core nhẹ của FCM & LocalNotification (không chặn first frame bởi permission/getToken)
   await FcmService.initialize(
+    canNavigate: () {
+      final authState = container.read(authStateProvider);
+      return !authState.isLoading &&
+          authState.isAuthenticated &&
+          rootNavigatorKey.currentState != null;
+    },
     onForegroundMessage: (_) {
       if (!container.read(authStateProvider).isAuthenticated) return;
       container.invalidate(proposalsListProvider);
@@ -67,10 +74,24 @@ void main() async {
     },
   );
 
+  // Khi trạng thái đăng nhập khởi tạo xong và hợp lệ, xả mọi deep-link thông báo đang chờ
+  container.listen<AuthState>(authStateProvider, (previous, next) {
+    if (!next.isLoading && next.isAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        FcmService.flushPendingNavigation();
+      });
+    }
+  });
+
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const CaniApp(),
     ),
   );
+
+  // Sau khi khung hình đầu tiên đã vẽ, mới xin quyền thông báo, lấy FCM token và kiểm tra initialMessage
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(FcmService.completePostFrameInitialization());
+  });
 }

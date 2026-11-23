@@ -142,26 +142,45 @@ export const useNotifications = () => {
     setIsOpen(false);
   }, []);
 
-  // 6. Tự động kiểm tra unread count định kỳ (mỗi 15s) và lắng nghe sự kiện
+  // 6. Tự động kiểm tra unread count định kỳ (mỗi 15s khi tab đang hiển thị) và lắng nghe sự kiện
   useEffect(() => {
-    fetchUnreadCount();
+    const isTabVisible = () =>
+      typeof document === 'undefined' || document.visibilityState === 'visible';
+
+    if (isTabVisible()) {
+      fetchUnreadCount();
+    }
 
     const intervalId = setInterval(() => {
-      fetchUnreadCount();
+      if (isTabVisible()) {
+        fetchUnreadCount();
+      }
     }, 15000);
 
     const handleRefresh = () => {
+      if (!isTabVisible()) return;
       fetchUnreadCount();
       if (isOpen) {
         fetchNotifications();
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (isTabVisible()) {
+        fetchUnreadCount();
+        if (isOpen) {
+          fetchNotifications();
+        }
+      }
+    };
+
     window.addEventListener('cani_notification_refresh', handleRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(intervalId);
       window.removeEventListener('cani_notification_refresh', handleRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [fetchUnreadCount, fetchNotifications, isOpen]);
 

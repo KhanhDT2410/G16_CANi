@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,10 +23,27 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     Optional<Shift> findByIdForUpdate(@Param("shiftId") UUID shiftId);
 
     List<Shift> findByEvent_EventId(UUID eventId);
+    List<Shift> findByEvent_EventIdIn(Collection<UUID> eventIds);
     List<Shift> findByEvent_EventIdAndStatus(UUID eventId, ShiftStatus status);
     List<Shift> findByEvent_EventIdAndStatusNot(UUID eventId, ShiftStatus status);
     List<Shift> findByStatus(ShiftStatus status);
     long countByStatus(ShiftStatus status);
+
+    @Query("SELECT s FROM Shift s " +
+           "LEFT JOIN FETCH s.event e " +
+           "LEFT JOIN FETCH e.eventOrganizer eo " +
+           "LEFT JOIN FETCH eo.user " +
+           "WHERE s.status IS NOT NULL AND s.status NOT IN :excludedStatuses")
+    List<Shift> findByStatusNotInWithEvent(@Param("excludedStatuses") Collection<ShiftStatus> excludedStatuses);
+
+    @Query("SELECT s FROM Shift s " +
+           "LEFT JOIN FETCH s.event e " +
+           "LEFT JOIN FETCH e.eventOrganizer eo " +
+           "LEFT JOIN FETCH eo.user " +
+           "WHERE (s.status = com.cani.entity.enums.ShiftStatus.ACTIVE " +
+           "       OR (s.status = com.cani.entity.enums.ShiftStatus.IN_PROGRESS AND s.emergency = true)) " +
+           "AND (s.endTime IS NULL OR s.endTime >= :now)")
+    List<Shift> findNearbyCandidateShifts(@Param("now") Instant now);
 
     @Query("SELECT s.hourlyWage FROM Shift s WHERE LOWER(TRIM(s.jobType)) = LOWER(TRIM(:jobType)) AND s.status <> :cancelledStatus AND s.hourlyWage IS NOT NULL")
     List<java.math.BigDecimal> findHourlyWagesByJobTypeExcludingStatus(

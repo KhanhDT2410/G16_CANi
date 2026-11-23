@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { showConfirm } from '../../../components/common/PromptModal';
@@ -9,6 +9,43 @@ import {
   calculateEventMetrics,
 } from '../utils/eventHelpers';
 
+const DEFAULT_UI_PAGE_SIZE = 10;
+const DEFAULT_API_PAGE_SIZE = 20;
+
+function getDeletedEventIds() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function filterVisibleEvents(list = []) {
+  const deletedIds = getDeletedEventIds();
+  return (Array.isArray(list) ? list : []).filter(
+    (e) => e && e.eventId && !deletedIds.includes(e.eventId) && !e.deletedAt
+  );
+}
+
+function mergeEventsById(primaryList = [], secondaryList = []) {
+  const seen = new Set();
+  const combined = [];
+  (Array.isArray(primaryList) ? primaryList : []).forEach((item) => {
+    if (item?.eventId && !seen.has(item.eventId)) {
+      seen.add(item.eventId);
+      combined.push(item);
+    }
+  });
+  (Array.isArray(secondaryList) ? secondaryList : []).forEach((item) => {
+    if (item?.eventId && !seen.has(item.eventId)) {
+      seen.add(item.eventId);
+      combined.push(item);
+    }
+  });
+  return filterVisibleEvents(combined);
+}
+
 export function useEvents() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +53,16 @@ export function useEvents() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_UI_PAGE_SIZE);
+  const [serverPagination, setServerPagination] = useState({
+    page: 0,
+    size: DEFAULT_API_PAGE_SIZE,
+    totalPages: 1,
+    totalElements: 0,
+    loadingMore: false,
+  });
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
@@ -28,21 +75,94 @@ export function useEvents() {
 
   const [newEvent, setNewEvent] = useState(() => createDefaultNewEvent());
 
-  const loadEvents = async () => {
+  const mergeEvent = useCallback((evt) => {
+    if (!evt?.eventId) return;
+    setEvents((prev) => mergeEventsById([evt], Array.isArray(prev) ? prev : []));
+  }, []);
+
+  const loadEvents = useCallback(async ({ page = 0, size = DEFAULT_API_PAGE_SIZE } = {}) => {
     setLoading(true);
     setLoadError(false);
     try {
-      const data = await eoService.getMyEvents();
-      let deletedIds = [];
+      let rawEvents = null;
+      let pageMeta = null;
+
       try {
-        const stored = JSON.parse(localStorage.getItem('cani_deleted_events') || '[]');
-        if (Array.isArray(stored)) deletedIds = stored;
+        const pageData = await eoService.getMyEventsPage({ page, size });
+        const content = Array.isArray(pageData?.content)
+          ? pageData.content
+          : Array.isArray(pageData?.items)
+            ? pageData.items
+            : Array.isArray(pageData)
+              ? pageData
+              : null;
+        if (content) {
+          rawEvents = content;
+          pageMeta = {
+            page: Number(pageData?.number ?? pageData?.page ?? page),
+            size: Number(pageData?.size ?? size),
+            totalPages: Math.max(1, Number(pageData?.totalPages ?? 1)),
+            totalElements: Number(pageData?.totalElements ?? content.length),
+          };
+        }
       } catch {
-        // Local preferences are optional.
+        // Fallback sang getMyEvents khi endpoint phân trang chưa phản hồi
       }
-      const visible = data.filter((e) => !deletedIds.includes(e.eventId) && !e.deletedAt);
-      setEvents(visible);
-      return visible;
+
+      if (!rawEvents) {
+        const fallbackData = await eoService.getMyEvents();
+        rawEvents = Array.isArray(fallbackData) ? fallbackData : [];
+        pageMeta = {
+          page: 0,
+          size: rawEvents.length || size,
+          totalPages: 1,
+          totalElements: rawEvents.length,
+        };
+      }
+
+      const visible = filterVisibleEvents(rawEvents);
+      setServerPagination({
+        ...pageMeta,
+        loadingMore: page === 0 && pageMeta.totalPages > 1,
+      });
+
+      let mergedResult = visible;
+      setEvents((prev) => {
+        mergedResult = page === 0 ? mergeEventsById(visible, prev) : mergeEventsById(prev, visible);
+        return mergedResult;
+      });
+
+      // Tải nối tiếp các trang còn lại ở nền để đảm bảo tìm kiếm, bộ lọc và metrics đầy đủ
+      if (page === 0 && pageMeta.totalPages > 1) {
+        const maxExtraPages = Math.min(pageMeta.totalPages - 1, 9);
+        Promise.all(
+          Array.from({ length: maxExtraPages }, (_, idx) =>
+            eoService.getMyEventsPage({ page: idx + 1, size }).catch(() => null)
+          )
+        )
+          .then((extraPages) => {
+            const extraItems = [];
+            extraPages.forEach((p) => {
+              const arr = Array.isArray(p?.content)
+                ? p.content
+                : Array.isArray(p?.items)
+                  ? p.items
+                  : Array.isArray(p)
+                    ? p
+                    : [];
+              extraItems.push(...arr);
+            });
+            if (extraItems.length > 0) {
+              const visibleExtra = filterVisibleEvents(extraItems);
+              setEvents((prev) => mergeEventsById(prev, visibleExtra));
+            }
+          })
+          .finally(() => {
+            setServerPagination((prev) => ({ ...prev, loadingMore: false }));
+          });
+      }
+
+      return mergedResult;
     } catch (e) {
       console.error(e);
       setLoadError(true);
@@ -50,11 +170,16 @@ export function useEvents() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadEvents();
-  }, []);
+  }, [loadEvents]);
+
+  // Reset về trang 1 mỗi khi từ khóa tìm kiếm, bộ lọc trạng thái hoặc tiêu chí sắp xếp thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, sortBy]);
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -221,11 +346,29 @@ export function useEvents() {
     [events, searchQuery, statusFilter, sortBy]
   );
 
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredEvents.length / pageSize)),
+    [filteredEvents.length, pageSize]
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedEvents = useMemo(() => {
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const startIndex = (safePage - 1) * pageSize;
+    return filteredEvents.slice(startIndex, startIndex + pageSize);
+  }, [filteredEvents, currentPage, pageSize, totalPages]);
+
   const metrics = useMemo(() => calculateEventMetrics(events), [events]);
 
   return {
     events,
     setEvents,
+    mergeEvent,
     loading,
     loadError,
     loadEvents,
@@ -236,6 +379,13 @@ export function useEvents() {
     sortBy,
     setSortBy,
     filteredEvents,
+    paginatedEvents,
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    totalPages,
+    serverPagination,
     metrics,
     showEventModal,
     setShowEventModal,

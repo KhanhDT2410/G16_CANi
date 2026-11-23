@@ -1,6 +1,7 @@
 package com.cani.service;
 
 import com.cani.dto.admin.noshow.NoShowResponseDto;
+import com.cani.dto.eo.EoEventPageResponseDto;
 import com.cani.dto.event.*;
 import com.cani.dto.worker.ShiftChecklistItemDto;
 import com.cani.entity.*;
@@ -120,6 +121,9 @@ public class EoEventService {
     @Autowired(required = false)
     private SystemConfigRepository systemConfigRepository;
 
+    @Autowired(required = false)
+    private EoEventQueryService eoEventQueryService;
+
     private ShiftStaffingPolicy getStaffingPolicy() {
         if (shiftStaffingPolicy != null) {
             return shiftStaffingPolicy;
@@ -127,6 +131,24 @@ public class EoEventService {
         return ShiftStaffingPolicy.withFallbackDependencies(
                 shiftAssignmentRepository,
                 dispatchProposalRepository
+        );
+    }
+
+    private EoEventQueryService getEventQueryService() {
+        if (eoEventQueryService != null) {
+            return eoEventQueryService;
+        }
+        return EoEventQueryService.withFallbackDependencies(
+                eventOrganizerRepository,
+                userRepository,
+                eventRepository,
+                shiftRepository,
+                shiftAssignmentRepository,
+                paymentRepository,
+                dispatchProposalRepository,
+                shiftSkillRequirementRepository,
+                skillRepository,
+                getStaffingPolicy()
         );
     }
 
@@ -560,15 +582,20 @@ public class EoEventService {
         Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
 
         List<ShiftAssignment> assignments = shiftAssignmentRepository.findByShift_ShiftId(shiftId);
-        BigDecimal agreedWage = calculateSingleWorkerAgreedWage(shift);
+        if (assignments == null || assignments.isEmpty()) {
+            return Collections.emptyList();
+        }
         UUID eoUserId = resolveEoUserId(eo, userId);
-
-        return assignments.stream()
-                .map(sa -> {
-                    String checklistSummary = computeChecklistSummary(shift.getChecklist(), sa.getChecklistProgress());
-                    return mapToShiftAttendanceDto(sa, eoUserId, agreedWage, checklistSummary);
-                })
-                .collect(Collectors.toList());
+        Map<UUID, Shift> shiftsById = new HashMap<>();
+        if (shift.getShiftId() != null) {
+            shiftsById.put(shift.getShiftId(), shift);
+        }
+        for (ShiftAssignment sa : assignments) {
+            if (sa != null && sa.getShift() == null) {
+                sa.setShift(shift);
+            }
+        }
+        return mapAssignmentsToAttendanceDtos(assignments, shiftsById, eoUserId);
     }
 
     /**
@@ -860,16 +887,19 @@ public class EoEventService {
     }
 
     /**
-     * Danh sách tất cả các sự kiện của EO
+     * Danh sách tất cả các sự kiện của EO (Batch-fetched O(1) queries)
      */
     @Transactional(readOnly = true)
     public List<EventResponseDto> getMyEvents(UUID userId) {
-        EventOrganizer eo = getEoOrThrow(userId);
-        List<Event> events = eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eo.getEoId());
-        return events.stream().map(e -> {
-            List<Shift> shifts = shiftRepository.findByEvent_EventId(e.getEventId());
-            return mapToEventResponseDto(e, shifts);
-        }).collect(Collectors.toList());
+        return getEventQueryService().getMyEvents(userId);
+    }
+
+    /**
+     * Danh sách sự kiện của EO có phân trang (Batch-fetched O(1) queries)
+     */
+    @Transactional(readOnly = true)
+    public EoEventPageResponseDto getMyEventsPage(UUID userId, int page, int size) {
+        return getEventQueryService().getMyEventsPage(userId, page, size);
     }
 
     /**
@@ -892,10 +922,7 @@ public class EoEventService {
      */
     @Transactional(readOnly = true)
     public EventResponseDto getEventDetail(UUID userId, UUID eventId) {
-        EventOrganizer eo = getEoOrThrow(userId);
-        Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
-        List<Shift> shifts = shiftRepository.findByEvent_EventId(eventId);
-        return mapToEventResponseDto(event, shifts);
+        return getEventQueryService().getEventDetail(userId, eventId);
     }
 
     /**
@@ -1395,32 +1422,282 @@ public class EoEventService {
         workerRepository.save(worker);
     }
 
+    public List<ShiftAttendanceDto> mapAssignmentsToAttendanceDtos(
+            List<ShiftAssignment> assignments,
+            Map<UUID, Shift> shiftsById
+    ) {
+        return mapAssignmentsToAttendanceDtos(assignments, shiftsById, null);
+    }
+
+    public List<ShiftAttendanceDto> mapAssignmentsToAttendanceDtos(
+            List<ShiftAssignment> assignments,
+            Map<UUID, Shift> shiftsById,
+            UUID eoUserId
+    ) {
+        if (assignments == null || assignments.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<UUID, Shift> safeShiftsById = shiftsById != null ? shiftsById : Collections.emptyMap();
+
+        List<UUID> assignmentIds = assignments.stream()
+                .filter(Objects::nonNull)
+                .map(ShiftAssignment::getAssignmentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        // 1. Batch AttendanceLog
+        Map<UUID, AttendanceLog> attendanceByAssignmentId = new HashMap<>();
+        boolean hasBatchAttendance = false;
+        if (!assignmentIds.isEmpty() && attendanceLogRepository != null) {
+            List<AttendanceLog> batchLogs = attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(assignmentIds);
+            if (batchLogs != null && !batchLogs.isEmpty()) {
+                hasBatchAttendance = true;
+                for (AttendanceLog att : batchLogs) {
+                    if (att != null && att.getShiftAssignment() != null && att.getShiftAssignment().getAssignmentId() != null) {
+                        attendanceByAssignmentId.putIfAbsent(att.getShiftAssignment().getAssignmentId(), att);
+                    }
+                }
+            }
+        }
+
+        // 2. Batch Payment
+        Map<UUID, Payment> paymentByAssignmentId = new HashMap<>();
+        boolean hasBatchPayments = false;
+        if (!assignmentIds.isEmpty() && paymentRepository != null) {
+            List<Payment> batchPayments = paymentRepository.findByAssignmentIdIn(assignmentIds);
+            if (batchPayments != null && !batchPayments.isEmpty()) {
+                hasBatchPayments = true;
+                for (Payment p : batchPayments) {
+                    if (p != null && p.getAssignmentId() != null) {
+                        paymentByAssignmentId.putIfAbsent(p.getAssignmentId(), p);
+                    }
+                }
+            }
+        }
+
+        // 3. Batch Review
+        Set<UUID> reviewedAssignmentIds = new LinkedHashSet<>();
+        boolean hasBatchReviews = false;
+        if (!assignmentIds.isEmpty() && reviewRepository != null) {
+            List<Review> batchReviews = reviewRepository.findByAssignmentIdIn(assignmentIds);
+            if (batchReviews != null && !batchReviews.isEmpty()) {
+                hasBatchReviews = true;
+                for (Review r : batchReviews) {
+                    if (r != null && r.getAssignmentId() != null
+                            && (eoUserId == null || Objects.equals(r.getReviewerId(), eoUserId))) {
+                        reviewedAssignmentIds.add(r.getAssignmentId());
+                    }
+                }
+            }
+        }
+
+        // 4. Batch WorkerEkycVerification
+        List<UUID> workerIds = assignments.stream()
+                .filter(Objects::nonNull)
+                .map(ShiftAssignment::getWorker)
+                .filter(Objects::nonNull)
+                .map(Worker::getWorkerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<UUID, WorkerEkycVerification> latestApprovedEkycByWorkerId = new HashMap<>();
+        Map<UUID, WorkerEkycVerification> latestAnyEkycByWorkerId = new HashMap<>();
+        boolean hasBatchEkyc = false;
+        if (!workerIds.isEmpty() && workerEkycVerificationRepository != null) {
+            List<WorkerEkycVerification> batchEkycs =
+                    workerEkycVerificationRepository.findByWorker_WorkerIdInOrderByCreatedAtDesc(workerIds);
+            if (batchEkycs != null && !batchEkycs.isEmpty()) {
+                hasBatchEkyc = true;
+                for (WorkerEkycVerification v : batchEkycs) {
+                    if (v != null && v.getWorker() != null && v.getWorker().getWorkerId() != null) {
+                        UUID wId = v.getWorker().getWorkerId();
+                        latestAnyEkycByWorkerId.putIfAbsent(wId, v);
+                        if ("APPROVED".equalsIgnoreCase(v.getStatus())) {
+                            latestApprovedEkycByWorkerId.putIfAbsent(wId, v);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Batch Skill Names & Precomputed Shift wages
+        Set<UUID> skillIds = new LinkedHashSet<>();
+        Map<UUID, BigDecimal> wageByShiftId = new HashMap<>();
+        for (Shift s : safeShiftsById.values()) {
+            if (s != null) {
+                if (s.getShiftId() != null) {
+                    wageByShiftId.put(s.getShiftId(), calculateSingleWorkerAgreedWage(s));
+                }
+                if (s.getPerformedSkillId() != null) {
+                    skillIds.add(s.getPerformedSkillId());
+                }
+            }
+        }
+        for (ShiftAssignment sa : assignments) {
+            if (sa == null) continue;
+            if (sa.getConfirmedPerformedSkillId() != null) {
+                skillIds.add(sa.getConfirmedPerformedSkillId());
+            }
+            Shift s = sa.getShift();
+            if (s != null) {
+                if (s.getPerformedSkillId() != null) {
+                    skillIds.add(s.getPerformedSkillId());
+                }
+                if (s.getShiftId() != null) {
+                    wageByShiftId.computeIfAbsent(s.getShiftId(), k -> calculateSingleWorkerAgreedWage(s));
+                }
+            }
+        }
+        Map<UUID, String> skillNamesById = new HashMap<>();
+        if (!skillIds.isEmpty() && skillRepository != null) {
+            List<Skill> loadedSkills = skillRepository.findAllById(skillIds);
+            if (loadedSkills != null) {
+                for (Skill sk : loadedSkills) {
+                    if (sk != null && sk.getSkillId() != null && sk.getName() != null) {
+                        skillNamesById.put(sk.getSkillId(), sk.getName());
+                    }
+                }
+            }
+        }
+
+        List<ShiftAttendanceDto> results = new ArrayList<>(assignments.size());
+        for (ShiftAssignment sa : assignments) {
+            if (sa == null) continue;
+            Shift shift = sa.getShift();
+            if (shift != null && shift.getShiftId() != null && safeShiftsById.containsKey(shift.getShiftId())) {
+                shift = safeShiftsById.get(shift.getShiftId());
+            } else if (shift == null && safeShiftsById.size() == 1) {
+                shift = safeShiftsById.values().iterator().next();
+            }
+
+            BigDecimal agreedWage = (shift != null && shift.getShiftId() != null && wageByShiftId.containsKey(shift.getShiftId()))
+                    ? wageByShiftId.get(shift.getShiftId())
+                    : calculateSingleWorkerAgreedWage(shift);
+            String checklistSummary = computeChecklistSummary(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
+
+            Optional<AttendanceLog> attOpt;
+            if (hasBatchAttendance) {
+                attOpt = Optional.ofNullable(sa.getAssignmentId() != null ? attendanceByAssignmentId.get(sa.getAssignmentId()) : null);
+            } else {
+                attOpt = (sa.getAssignmentId() != null && attendanceLogRepository != null)
+                        ? attendanceLogRepository.findByShiftAssignment_AssignmentId(sa.getAssignmentId())
+                        : Optional.empty();
+            }
+
+            Optional<Payment> payOpt;
+            if (hasBatchPayments) {
+                payOpt = Optional.ofNullable(sa.getAssignmentId() != null ? paymentByAssignmentId.get(sa.getAssignmentId()) : null);
+            } else {
+                payOpt = (sa.getAssignmentId() != null && paymentRepository != null)
+                        ? paymentRepository.findByAssignmentId(sa.getAssignmentId())
+                        : Optional.empty();
+            }
+
+            boolean reviewed;
+            if (hasBatchReviews) {
+                reviewed = sa.getAssignmentId() != null && reviewedAssignmentIds.contains(sa.getAssignmentId());
+            } else {
+                reviewed = sa.getAssignmentId() != null && reviewRepository != null
+                        && reviewRepository.findByAssignmentIdAndReviewerId(sa.getAssignmentId(), eoUserId).isPresent();
+            }
+
+            Optional<WorkerEkycVerification> ekycOpt = Optional.empty();
+            Worker worker = sa.getWorker();
+            if (worker != null && worker.getWorkerId() != null) {
+                if (hasBatchEkyc) {
+                    WorkerEkycVerification v = latestApprovedEkycByWorkerId.getOrDefault(
+                            worker.getWorkerId(),
+                            latestAnyEkycByWorkerId.get(worker.getWorkerId())
+                    );
+                    ekycOpt = Optional.ofNullable(v);
+                } else if (workerEkycVerificationRepository != null) {
+                    ekycOpt = workerEkycVerificationRepository
+                            .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(), List.of("APPROVED"))
+                            .or(() -> workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
+                }
+            }
+
+            ShiftAttendanceDto dto = buildShiftAttendanceDto(
+                    sa,
+                    shift,
+                    agreedWage,
+                    checklistSummary,
+                    attOpt,
+                    payOpt,
+                    reviewed,
+                    ekycOpt,
+                    skillNamesById
+            );
+            if (shift != null) {
+                dto.setShiftId(shift.getShiftId());
+                dto.setJobType(shift.getJobType());
+                dto.setShiftName(shift.getJobType());
+            }
+            results.add(dto);
+        }
+        return results;
+    }
+
     private ShiftAttendanceDto mapToShiftAttendanceDto(ShiftAssignment sa, UUID eoUserId, BigDecimal agreedWage, String checklistSummary) {
         Worker worker = sa.getWorker();
-        User u = worker != null ? worker.getUser() : null;
         Shift shift = sa.getShift();
+
+        Optional<AttendanceLog> attOpt = (sa.getAssignmentId() != null && attendanceLogRepository != null)
+                ? attendanceLogRepository.findByShiftAssignment_AssignmentId(sa.getAssignmentId())
+                : Optional.empty();
+        Optional<Payment> payOpt = (sa.getAssignmentId() != null && paymentRepository != null)
+                ? paymentRepository.findByAssignmentId(sa.getAssignmentId())
+                : Optional.empty();
+        boolean reviewed = sa.getAssignmentId() != null && reviewRepository != null
+                && reviewRepository.findByAssignmentIdAndReviewerId(sa.getAssignmentId(), eoUserId).isPresent();
+
+        Optional<WorkerEkycVerification> ekycOpt = Optional.empty();
+        if (worker != null && worker.getWorkerId() != null && workerEkycVerificationRepository != null) {
+            ekycOpt = workerEkycVerificationRepository
+                    .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(), List.of("APPROVED"))
+                    .or(() -> workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
+        }
+
+        return buildShiftAttendanceDto(
+                sa,
+                shift,
+                agreedWage,
+                checklistSummary,
+                attOpt,
+                payOpt,
+                reviewed,
+                ekycOpt,
+                Collections.emptyMap()
+        );
+    }
+
+    private ShiftAttendanceDto buildShiftAttendanceDto(
+            ShiftAssignment sa,
+            Shift shift,
+            BigDecimal agreedWage,
+            String checklistSummary,
+            Optional<AttendanceLog> attOpt,
+            Optional<Payment> payOpt,
+            boolean reviewed,
+            Optional<WorkerEkycVerification> ekycOpt,
+            Map<UUID, String> preloadedSkillNames
+    ) {
+        Worker worker = sa.getWorker();
+        User u = worker != null ? worker.getUser() : null;
         boolean checklistDone = isChecklistFullyCompleted(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
 
-        Optional<AttendanceLog> attOpt = attendanceLogRepository.findByShiftAssignment_AssignmentId(sa.getAssignmentId());
-        Optional<Payment> payOpt = paymentRepository.findByAssignmentId(sa.getAssignmentId());
-        boolean reviewed = reviewRepository.findByAssignmentIdAndReviewerId(sa.getAssignmentId(), eoUserId).isPresent();
-
-        String defaultName = "Worker #" + (worker != null ? worker.getWorkerId().toString().substring(0, 8) : "");
+        String defaultName = "Worker #" + (worker != null && worker.getWorkerId() != null ? worker.getWorkerId().toString().substring(0, 8) : "");
 
         Integer workerAge = null;
         Boolean meetsMinimumAge = null;
-        if (worker != null) {
-            Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository
-                    .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(worker.getWorkerId(), List.of("APPROVED"))
-                    .or(() -> workerEkycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()));
-            if (ekycOpt.isPresent()) {
-                WorkerEkycVerification latestEkyc = ekycOpt.get();
-                meetsMinimumAge = latestEkyc.getMeetsMinimumAge() != null
-                        ? latestEkyc.getMeetsMinimumAge()
-                        : EkycConsentAndAgeHelper.evaluateMeetsMinimumAge(latestEkyc.getDob(), systemConfigRepository);
-                // Chỉ tính tuổi từ dữ liệu dob cũ nếu bản ghi cũ còn lưu; không trả dob thô ra DTO và không bịa 22 tuổi.
-                workerAge = EkycConsentAndAgeHelper.calculateAgeFromDob(latestEkyc.getDob());
-            }
+        if (ekycOpt != null && ekycOpt.isPresent()) {
+            WorkerEkycVerification latestEkyc = ekycOpt.get();
+            meetsMinimumAge = latestEkyc.getMeetsMinimumAge() != null
+                    ? latestEkyc.getMeetsMinimumAge()
+                    : EkycConsentAndAgeHelper.evaluateMeetsMinimumAge(latestEkyc.getDob(), systemConfigRepository);
+            workerAge = EkycConsentAndAgeHelper.calculateAgeFromDob(latestEkyc.getDob());
         }
 
         String bankCode = worker != null ? worker.getBankCode() : null;
@@ -1433,8 +1710,16 @@ public class EoEventService {
 
         UUID performedSkillId = shift != null ? shift.getPerformedSkillId() : null;
         UUID confirmedSkillId = sa.getConfirmedPerformedSkillId();
-        String performedSkillName = resolveSkillNameById(performedSkillId);
-        String confirmedSkillName = resolveSkillNameById(confirmedSkillId);
+        String performedSkillName = performedSkillId != null
+                ? (preloadedSkillNames != null && preloadedSkillNames.containsKey(performedSkillId)
+                        ? preloadedSkillNames.get(performedSkillId)
+                        : resolveSkillNameById(performedSkillId))
+                : null;
+        String confirmedSkillName = confirmedSkillId != null
+                ? (preloadedSkillNames != null && preloadedSkillNames.containsKey(confirmedSkillId)
+                        ? preloadedSkillNames.get(confirmedSkillId)
+                        : resolveSkillNameById(confirmedSkillId))
+                : null;
 
         return ShiftAttendanceDto.builder()
                 .assignmentId(sa.getAssignmentId())
@@ -1491,87 +1776,53 @@ public class EoEventService {
                 .build();
     }
 
+    private List<EventResponseDto> mapEventsToResponseDtos(List<Event> events) {
+        return getEventQueryService().mapEventsToResponseDtos(events);
+    }
+
     private EventResponseDto mapToEventResponseDto(Event e, List<Shift> shifts) {
-        BigDecimal effectiveTotalPaid = e.getTotalPaid();
-        if ((effectiveTotalPaid == null || effectiveTotalPaid.compareTo(BigDecimal.ZERO) == 0)
-                && e.getEventId() != null && paymentRepository != null) {
-            try {
-                List<Payment> eventPayments = paymentRepository.findByEventId(e.getEventId());
-                if (eventPayments != null && !eventPayments.isEmpty()) {
-                    effectiveTotalPaid = eventPayments.stream()
-                            .filter(p -> p.getStatus() == com.cani.entity.enums.PaymentStatus.CONFIRMED_FULL
-                                    || p.getStatus() == com.cani.entity.enums.PaymentStatus.CONFIRMED_PARTIAL
-                                    || p.getStatus() == com.cani.entity.enums.PaymentStatus.DECLARED_PENDING_WORKER)
-                            .map(p -> p.getDeclaredAmount() != null ? p.getDeclaredAmount() : p.getAgreedAmount())
-                            .filter(java.util.Objects::nonNull)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                }
-            } catch (Exception ignored) {}
-        }
-
-        EventStatus resolvedEventStatus = e.getStatus();
-        if (resolvedEventStatus != EventStatus.CANCELLED && resolvedEventStatus != EventStatus.DRAFT) {
-            Instant now = Instant.now();
-            boolean allShiftsCompleted = shifts != null && !shifts.isEmpty() && shifts.stream()
-                    .allMatch(s -> s.getStatus() == ShiftStatus.COMPLETED || s.getStatus() == ShiftStatus.CANCELLED);
-            if ((e.getEndTime() != null && now.isAfter(e.getEndTime())) || allShiftsCompleted) {
-                resolvedEventStatus = EventStatus.COMPLETED;
-                if (e.getStatus() != EventStatus.COMPLETED) {
-                    e.setStatus(EventStatus.COMPLETED);
-                }
-            } else if (e.getStartTime() != null && !now.isBefore(e.getStartTime())) {
-                resolvedEventStatus = EventStatus.ONGOING;
-                if (e.getStatus() == EventStatus.ACTIVE) {
-                    e.setStatus(EventStatus.ONGOING);
-                }
-            }
-        }
-
-        return EventResponseDto.builder()
-                .eventId(e.getEventId())
-                .name(e.getName())
-                .description(e.getDescription())
-                .venueAddress(e.getVenueAddress())
-                .venueLat(e.getVenueLat())
-                .venueLng(e.getVenueLng())
-                .eventDate(e.getEventDate())
-                .startTime(e.getStartTime())
-                .endTime(e.getEndTime())
-                .imageUrl(e.getImageUrl())
-                .mode(e.getMode())
-                .status(resolvedEventStatus)
-                .readinessScore(e.getReadinessScore())
-                .totalShifts(e.getTotalShifts())
-                .totalRequiredWorkers(e.getTotalRequiredWorkers())
-                .totalConfirmedWorkers(e.getTotalConfirmedWorkers())
-                .totalEstimatedCost(e.getTotalEstimatedCost())
-                .totalPaid(effectiveTotalPaid != null ? effectiveTotalPaid : BigDecimal.ZERO)
-                .createdAt(e.getCreatedAt())
-                .shifts(shifts.stream().map(this::mapToShiftResponseDto).collect(Collectors.toList()))
-                .build();
+        return getEventQueryService().mapToEventResponseDto(e, shifts);
     }
 
     @Transactional(readOnly = true)
     public List<ShiftAttendanceDto> getEventWorkersList(UUID userId, UUID eventId) {
         EventOrganizer eo = getEoOrThrow(userId);
-        Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
+        getOwnedEventOrThrow(eventId, eo.getEoId());
         List<Shift> shifts = shiftRepository.findByEvent_EventIdAndStatusNot(eventId, ShiftStatus.CANCELLED);
-        List<ShiftAttendanceDto> allWorkers = new ArrayList<>();
+        if (shifts == null || shifts.isEmpty()) {
+            return Collections.emptyList();
+        }
         UUID eoUserId = resolveEoUserId(eo, userId);
 
+        Map<UUID, Shift> shiftsById = new LinkedHashMap<>();
+        List<UUID> shiftIds = new ArrayList<>(shifts.size());
         for (Shift s : shifts) {
-            List<ShiftAssignment> assignments = shiftAssignmentRepository.findByShift_ShiftId(s.getShiftId());
-            BigDecimal agreedWage = calculateSingleWorkerAgreedWage(s);
-            for (ShiftAssignment sa : assignments) {
-                String checklistSummary = computeChecklistSummary(s.getChecklist(), sa.getChecklistProgress());
-                ShiftAttendanceDto dto = mapToShiftAttendanceDto(sa, eoUserId, agreedWage, checklistSummary);
-                dto.setShiftId(s.getShiftId());
-                dto.setJobType(s.getJobType());
-                dto.setShiftName(s.getJobType());
-                allWorkers.add(dto);
+            if (s != null && s.getShiftId() != null) {
+                shiftsById.put(s.getShiftId(), s);
+                shiftIds.add(s.getShiftId());
             }
         }
-        return allWorkers;
+
+        List<ShiftAssignment> allAssignments = (!shiftIds.isEmpty() && shiftAssignmentRepository != null)
+                ? shiftAssignmentRepository.findByShift_ShiftIdIn(shiftIds)
+                : Collections.emptyList();
+        if ((allAssignments == null || allAssignments.isEmpty()) && shiftAssignmentRepository != null) {
+            allAssignments = new ArrayList<>();
+            for (Shift s : shifts) {
+                if (s != null && s.getShiftId() != null) {
+                    List<ShiftAssignment> perShift = shiftAssignmentRepository.findByShift_ShiftId(s.getShiftId());
+                    if (perShift != null) {
+                        for (ShiftAssignment sa : perShift) {
+                            if (sa != null && sa.getShift() == null) {
+                                sa.setShift(s);
+                            }
+                            allAssignments.add(sa);
+                        }
+                    }
+                }
+            }
+        }
+        return mapAssignmentsToAttendanceDtos(allAssignments, shiftsById, eoUserId);
     }
 
     public String uploadEventImage(org.springframework.web.multipart.MultipartFile file) {
@@ -1622,55 +1873,7 @@ public class EoEventService {
     }
 
     private ShiftResponseDto mapToShiftResponseDto(Shift s) {
-        ShiftStaffingPolicy.EmergencyEligibility eligibility = getStaffingPolicy().evaluateEmergencyEligibility(s, Instant.now());
-        ShiftStatus resolvedStatus = eligibility.effectiveStatus();
-        if (s.getStatus() != ShiftStatus.CANCELLED && s.getStatus() != ShiftStatus.DRAFT) {
-            if (resolvedStatus == ShiftStatus.COMPLETED && s.getStatus() != ShiftStatus.COMPLETED) {
-                s.setStatus(ShiftStatus.COMPLETED);
-            } else if (resolvedStatus == ShiftStatus.IN_PROGRESS
-                    && (s.getStatus() == ShiftStatus.ACTIVE || s.getStatus() == ShiftStatus.FULLY_STAFFED)) {
-                s.setStatus(ShiftStatus.IN_PROGRESS);
-            }
-        }
-
-        List<ShiftSkillRequirementDto> reqDtos = resolveShiftSkillRequirementDtos(s);
-        return ShiftResponseDto.builder()
-                .shiftId(s.getShiftId())
-                .eventId(s.getEvent() != null ? s.getEvent().getEventId() : null)
-                .jobType(s.getJobType())
-                .description(s.getDescription())
-                .startTime(s.getStartTime())
-                .endTime(s.getEndTime())
-                .arrivalTime(s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
-                .requiredWorkers(eligibility.requiredWorkers())
-                .confirmedWorkers(eligibility.confirmedWorkers())
-                .remainingWorkers(eligibility.missingWorkers())
-                .hourlyWage(s.getHourlyWage())
-                .allowance(s.getAllowance())
-                .totalCost(s.getTotalCost())
-                .status(resolvedStatus)
-                .riskScore(s.getRiskScore())
-                .locationAddress(s.getLocationAddress())
-                .locationLat(s.getLocationLat())
-                .locationLng(s.getLocationLng())
-                .minReliabilityScore(s.getMinReliabilityScore())
-                .minExperienceLevel(s.getMinExperienceLevel())
-                .dressCode(s.getDressCode())
-                .imageUrl(s.getImageUrl())
-                .checklist(s.getChecklist())
-                .requiredSkills(s.getRequiredSkills())
-                .performedSkillId(s.getPerformedSkillId())
-                .performedSkillName(resolveSkillNameById(s.getPerformedSkillId()))
-                .skillRequirements(reqDtos)
-                .customSkillNotes(s.getCustomSkillNotes())
-                .emergency(Boolean.TRUE.equals(s.getEmergency()) && eligibility.missingWorkers() > 0)
-                .missingWorkers(eligibility.missingWorkers())
-                .nearStartUnderstaffed(eligibility.nearStartUnderstaffed())
-                .canTriggerEmergency(eligibility.canTriggerEmergency())
-                .emergencyBlockReason(eligibility.blockReason())
-                .pendingProposalCount(eligibility.pendingProposalCount())
-                .defaultEmergencyRadiusKm(eligibility.defaultEmergencyRadiusKm())
-                .build();
+        return getEventQueryService().mapToShiftResponseDto(s);
     }
 
     private PreparedShiftSkillConfig prepareShiftSkillConfig(
@@ -1801,46 +2004,6 @@ public class EoEventService {
             return null;
         }
         return skillRepository.findById(skillId).map(Skill::getName).orElse(null);
-    }
-
-    private List<ShiftSkillRequirementDto> resolveShiftSkillRequirementDtos(Shift s) {
-        if (s == null) {
-            return Collections.emptyList();
-        }
-        if (shiftSkillRequirementRepository != null && s.getShiftId() != null) {
-            List<ShiftSkillRequirement> rows = shiftSkillRequirementRepository.findByShiftIdWithSkill(s.getShiftId());
-            if (rows != null && !rows.isEmpty()) {
-                return rows.stream()
-                        .map(r -> ShiftSkillRequirementDto.builder()
-                                .skillId(r.getSkill() != null ? r.getSkill().getSkillId() : null)
-                                .skillName(r.getSkill() != null ? r.getSkill().getName() : null)
-                                .requirementType(r.getRequirementType())
-                                .minVerificationTier(r.getMinVerificationTier())
-                                .requiresValidCertificate(Boolean.TRUE.equals(r.getRequiresValidCertificate()))
-                                .build())
-                        .toList();
-            }
-        }
-        if (s.getRequiredSkills() != null && s.getRequiredSkills().length > 0) {
-            List<UUID> ids = Arrays.stream(s.getRequiredSkills()).filter(Objects::nonNull).toList();
-            Map<UUID, String> names = new HashMap<>();
-            if (skillRepository != null && !ids.isEmpty()) {
-                for (Skill sk : skillRepository.findAllById(ids)) {
-                    names.put(sk.getSkillId(), sk.getName());
-                }
-            }
-            return ids.stream()
-                    .distinct()
-                    .map(id -> ShiftSkillRequirementDto.builder()
-                            .skillId(id)
-                            .skillName(names.get(id))
-                            .requirementType(SkillRequirementType.REQUIRED)
-                            .minVerificationTier(VerificationTier.SELF_DECLARED)
-                            .requiresValidCertificate(false)
-                            .build())
-                    .toList();
-        }
-        return Collections.emptyList();
     }
 
     private int tierRank(VerificationTier tier) {

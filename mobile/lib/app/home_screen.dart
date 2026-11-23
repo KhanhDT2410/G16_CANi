@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,15 +28,40 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  static const int _maxTrackedNotifIds = 200;
+
   Timer? _notifSyncTimer;
-  Set<String>? _seenNotifIds;
+  final LinkedHashSet<String> _notifiedIds = LinkedHashSet<String>();
+  DateTime? _lastSyncedCreatedAt;
+  bool _hasInitialNotifSync = false;
   bool _syncingNotifs = false;
+  final Set<int> _visitedTabs = {0};
+
+  void _rememberNotifiedId(String id) {
+    _notifiedIds.remove(id);
+    _notifiedIds.add(id);
+    while (_notifiedIds.length > _maxTrackedNotifIds) {
+      _notifiedIds.remove(_notifiedIds.first);
+    }
+  }
 
   final List<Widget> _pages = const [
     JobRadarScreen(),
     MyAssignmentsScreen(),
     WorkerProfileScreen(),
   ];
+
+  void _startNotifSyncTimer() {
+    if (_notifSyncTimer?.isActive ?? false) return;
+    _notifSyncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      _syncDeviceNotifications();
+    });
+  }
+
+  void _stopNotifSyncTimer() {
+    _notifSyncTimer?.cancel();
+    _notifSyncTimer = null;
+  }
 
   @override
   void initState() {
@@ -49,34 +75,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         _syncDeviceNotifications();
       }
     });
-    _notifSyncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      _syncDeviceNotifications();
-    });
+    _startNotifSyncTimer();
   }
 
   @override
   void dispose() {
-    _notifSyncTimer?.cancel();
+    _stopNotifSyncTimer();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _syncDeviceNotifications();
-      if (ref.read(authStateProvider).isAuthenticated) {
-        ref.invalidate(proposalsListProvider);
-        ref.invalidate(assignmentsListProvider);
-        if (ref.read(ekycProvider).result?.isApproved == true) {
-          ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _startNotifSyncTimer();
+        _syncDeviceNotifications();
+        if (ref.read(authStateProvider).isAuthenticated) {
+          ref.invalidate(proposalsListProvider);
+          ref.invalidate(assignmentsListProvider);
+          if (ref.read(ekycProvider).result?.isApproved == true) {
+            ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
+          }
         }
-      }
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _stopNotifSyncTimer();
+        break;
     }
   }
 
   /// Đồng bộ thông báo mới từ backend và bật banner Local Notification trên thiết bị
   /// (bổ sung fallback khi thiết bị/emulator không có Google Play Services cho FCM).
+  /// Sử dụng con trỏ thời gian [_lastSyncedCreatedAt] kết hợp tập hợp giới hạn [_notifiedIds]
+  /// (tối đa 200 ID) để ngắt sớm các thông báo cũ khi hệ thống có >50 ca active cùng lúc.
   Future<void> _syncDeviceNotifications() async {
     if (_syncingNotifs || !mounted) return;
     final auth = ref.read(authStateProvider);
@@ -89,19 +124,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       final raw = res.data is Map ? res.data['data'] : null;
       if (raw is! List) return;
 
-      final unread = raw
-          .whereType<Map>()
-          .where((item) => item['isRead'] != true && item['notificationId'] != null)
-          .toList();
-      final ids = unread.map((e) => e['notificationId'].toString()).toSet();
+      final cursor = _lastSyncedCreatedAt;
+      DateTime? newestCreatedAt = cursor;
 
-      if (_seenNotifIds == null) {
-        _seenNotifIds = ids;
+      if (!_hasInitialNotifSync) {
+        for (final entry in raw) {
+          if (entry is! Map) continue;
+          if (entry['isRead'] == true || entry['notificationId'] == null) continue;
+          final idStr = entry['notificationId'].toString();
+          _rememberNotifiedId(idStr);
+          final createdAt = DateTime.tryParse(entry['createdAt']?.toString() ?? '');
+          if (createdAt != null && (newestCreatedAt == null || createdAt.isAfter(newestCreatedAt))) {
+            newestCreatedAt = createdAt;
+          }
+        }
+        _lastSyncedCreatedAt = newestCreatedAt;
+        _hasInitialNotifSync = true;
         return;
       }
 
-      final newlyArrived = unread.where((e) => !_seenNotifIds!.contains(e['notificationId'].toString())).toList();
-      _seenNotifIds!.addAll(ids);
+      final newlyArrived = <Map>[];
+      for (final entry in raw) {
+        if (entry is! Map) continue;
+        if (entry['isRead'] == true || entry['notificationId'] == null) continue;
+
+        final idStr = entry['notificationId'].toString();
+        final createdAt = DateTime.tryParse(entry['createdAt']?.toString() ?? '');
+
+        if (_notifiedIds.contains(idStr)) {
+          if (cursor != null && createdAt != null && !createdAt.isAfter(cursor)) {
+            break;
+          }
+          continue;
+        }
+
+        if (cursor != null && createdAt != null && createdAt.isBefore(cursor)) {
+          break;
+        }
+
+        newlyArrived.add(entry);
+        _rememberNotifiedId(idStr);
+        if (createdAt != null && (newestCreatedAt == null || createdAt.isAfter(newestCreatedAt))) {
+          newestCreatedAt = createdAt;
+        }
+      }
+
+      _lastSyncedCreatedAt = newestCreatedAt;
 
       if (newlyArrived.isNotEmpty) {
         ref.invalidate(proposalsListProvider);
@@ -133,6 +201,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Widget build(BuildContext context) {
     // Lắng nghe thay đổi trạng thái đăng nhập để hiển thị điều khoản một cách an toàn
     ref.listen<AuthState>(authStateProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id) {
+        _notifiedIds.clear();
+        _lastSyncedCreatedAt = null;
+        _hasInitialNotifSync = false;
+      }
       if (next.isAuthenticated && next.user != null && previous?.user?.id != next.user!.id) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -163,18 +236,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       return const CompleteProfileScreen();
     }
 
-    final assignments = ref.watch(assignmentsListProvider).asData?.value ?? const <ShiftAssignmentItem>[];
-    final activeAssignmentsCount =
-        assignments.where((a) => a.status != 'COMPLETED' && a.checkoutTime == null).length;
+    _visitedTabs.add(currentIndex);
+
+    final activeAssignmentsCount = ref.watch(
+      assignmentsListProvider.select(
+        (asyncVal) =>
+            (asyncVal.asData?.value ?? const <ShiftAssignmentItem>[])
+                .where((a) => a.status != 'COMPLETED' && a.checkoutTime == null)
+                .length,
+      ),
+    );
 
     return Scaffold(
       body: IndexedStack(
         index: currentIndex,
-        children: _pages,
+        children: List<Widget>.generate(
+          _pages.length,
+          (index) => _visitedTabs.contains(index) ? _pages[index] : const SizedBox.shrink(),
+        ),
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: currentIndex,
         onTap: (index) {
+          _visitedTabs.add(index);
           ref.read(homeTabIndexProvider.notifier).state = index;
           if (index == 0) {
             ref.invalidate(proposalsListProvider);

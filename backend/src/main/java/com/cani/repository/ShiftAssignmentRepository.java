@@ -5,6 +5,7 @@ import com.cani.entity.enums.AssignmentStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -12,26 +13,48 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment, UUID> {
+    interface ShiftAssignmentCountProjection {
+        UUID getShiftId();
+        long getTotalCount();
+        long getConfirmedCount();
+    }
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT sa FROM ShiftAssignment sa WHERE sa.assignmentId = :assignmentId")
     Optional<ShiftAssignment> findByIdForUpdate(@Param("assignmentId") UUID assignmentId);
 
     List<ShiftAssignment> findByShift_ShiftId(UUID shiftId);
+    List<ShiftAssignment> findByShift_ShiftIdIn(Collection<UUID> shiftIds);
     List<ShiftAssignment> findByGroupId(UUID groupId);
     List<ShiftAssignment> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
+
+    @EntityGraph(attributePaths = {"shift"})
     List<ShiftAssignment> findByWorker_WorkerIdAndStatusIn(UUID workerId, List<AssignmentStatus> statuses);
+
     Optional<ShiftAssignment> findByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftId(UUID shiftId);
     boolean existsByWorker_WorkerId(UUID workerId);
     long countByShift_ShiftIdAndStatusIn(UUID shiftId, List<AssignmentStatus> statuses);
     boolean existsByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(UUID shiftId, UUID workerId, java.util.Collection<AssignmentStatus> statuses);
+
+    @Query("SELECT sa.shift.shiftId AS shiftId, " +
+           "COUNT(sa) AS totalCount, " +
+           "COUNT(CASE WHEN sa.status IN :validStatuses THEN sa.assignmentId END) AS confirmedCount " +
+           "FROM ShiftAssignment sa " +
+           "WHERE sa.shift.shiftId IN :shiftIds " +
+           "GROUP BY sa.shift.shiftId")
+    List<ShiftAssignmentCountProjection> countAssignmentsByShiftIds(
+            @Param("shiftIds") Collection<UUID> shiftIds,
+            @Param("validStatuses") Collection<AssignmentStatus> validStatuses
+    );
 
     @Query(value = "SELECT sa FROM ShiftAssignment sa " +
                    "JOIN FETCH sa.shift s " +

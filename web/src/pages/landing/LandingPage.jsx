@@ -192,6 +192,7 @@ export default function LandingPage() {
                 src="/assets/event-coordinator.jpg"
                 alt="CANi Event Coordinator"
                 className="coordinator-main-photo"
+                decoding="async"
               />
               <div className="coordinator-gradient-overlay" />
             </div>

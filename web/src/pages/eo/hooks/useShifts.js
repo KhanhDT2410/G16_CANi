@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { showConfirm } from '../../../components/common/PromptModal';
@@ -164,6 +164,9 @@ export function calculateShiftRiskAnalysis(shift = {}, venueAddress = '', venueL
   };
 }
 
+let cachedSkillTaxonomy = null;
+let skillTaxonomyPromise = null;
+
 export function useShifts({ onReloadEvents }) {
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -176,17 +179,47 @@ export function useShifts({ onReloadEvents }) {
   const [loadingQr, setLoadingQr] = useState(false);
   const [selectedShiftForAttendance, setSelectedShiftForAttendance] = useState(null);
 
-  // Danh mục kỹ năng (taxonomy) để chọn requiredSkills cho ca — tải 1 lần khi hook mount
-  const [skillTaxonomy, setSkillTaxonomy] = useState([]);
-  useEffect(() => {
-    let active = true;
-    eoService.getSkillTaxonomy().then((list) => {
-      if (active && Array.isArray(list) && list.length > 0) setSkillTaxonomy(list);
+  // Danh mục kỹ năng (taxonomy) — chỉ tải khi mở modal tạo/sửa ca hoặc chi tiết ca và cache lại
+  const [skillTaxonomy, setSkillTaxonomy] = useState(() => cachedSkillTaxonomy || []);
+
+  const ensureSkillTaxonomy = useCallback(() => {
+    if (Array.isArray(cachedSkillTaxonomy) && cachedSkillTaxonomy.length > 0) {
+      setSkillTaxonomy((prev) => (prev.length > 0 ? prev : cachedSkillTaxonomy));
+      return Promise.resolve(cachedSkillTaxonomy);
+    }
+    if (!skillTaxonomyPromise) {
+      skillTaxonomyPromise = eoService
+        .getSkillTaxonomy()
+        .then((list) => {
+          if (Array.isArray(list) && list.length > 0) {
+            cachedSkillTaxonomy = list;
+            setSkillTaxonomy(list);
+            return list;
+          }
+          return [];
+        })
+        .catch(() => [])
+        .finally(() => {
+          skillTaxonomyPromise = null;
+        });
+    }
+    return skillTaxonomyPromise.then((list) => {
+      if (Array.isArray(list) && list.length > 0) {
+        setSkillTaxonomy(list);
+      }
+      return list;
     });
-    return () => {
-      active = false;
-    };
   }, []);
+
+  const shouldLoadSkillTaxonomy = Boolean(
+    showShiftModal || editingShift || selectedShiftForAttendance || expandedEventId
+  );
+
+  useEffect(() => {
+    if (shouldLoadSkillTaxonomy) {
+      ensureSkillTaxonomy();
+    }
+  }, [shouldLoadSkillTaxonomy, ensureSkillTaxonomy]);
 
   const [newShift, setNewShift] = useState(() => {
     const tStart = new Date();
@@ -411,6 +444,7 @@ export function useShifts({ onReloadEvents }) {
     selectedShiftForAttendance,
     setSelectedShiftForAttendance,
     skillTaxonomy,
+    ensureSkillTaxonomy,
     getShiftDurationHours,
     calculateShiftTotal,
     handleRoleChange,

@@ -460,33 +460,46 @@ public class WorkerShiftEligibilityService {
         if (shift == null) {
             return List.of();
         }
+        List<ShiftSkillRequirement> rows = (shiftSkillRequirementRepository != null && shift.getShiftId() != null)
+                ? shiftSkillRequirementRepository.findByShiftIdWithSkill(shift.getShiftId())
+                : null;
+        return resolveEffectiveRequirements(shift, rows, null);
+    }
+
+    public List<EffectiveRequirement> resolveEffectiveRequirements(
+            Shift shift,
+            List<ShiftSkillRequirement> preloadedRows,
+            Map<UUID, String> preloadedSkillNames
+    ) {
+        if (shift == null) {
+            return List.of();
+        }
         Map<UUID, EffectiveRequirement> ordered = new LinkedHashMap<>();
 
-        if (shiftSkillRequirementRepository != null && shift.getShiftId() != null) {
-            List<ShiftSkillRequirement> rows = shiftSkillRequirementRepository.findByShiftIdWithSkill(shift.getShiftId());
-            if (rows != null && !rows.isEmpty()) {
-                for (ShiftSkillRequirement row : rows) {
-                    if (row.getSkill() == null || row.getSkill().getSkillId() == null) {
-                        continue;
-                    }
-                    UUID skId = row.getSkill().getSkillId();
-                    ordered.putIfAbsent(skId, new EffectiveRequirement(
-                            skId,
-                            row.getSkill().getName(),
-                            row.getRequirementType() != null ? row.getRequirementType() : SkillRequirementType.REQUIRED,
-                            row.getMinVerificationTier() != null ? row.getMinVerificationTier() : VerificationTier.SELF_DECLARED,
-                            Boolean.TRUE.equals(row.getRequiresValidCertificate())
-                    ));
+        if (preloadedRows != null && !preloadedRows.isEmpty()) {
+            for (ShiftSkillRequirement row : preloadedRows) {
+                if (row.getSkill() == null || row.getSkill().getSkillId() == null) {
+                    continue;
                 }
-                return new ArrayList<>(ordered.values());
+                UUID skId = row.getSkill().getSkillId();
+                ordered.putIfAbsent(skId, new EffectiveRequirement(
+                        skId,
+                        row.getSkill().getName(),
+                        row.getRequirementType() != null ? row.getRequirementType() : SkillRequirementType.REQUIRED,
+                        row.getMinVerificationTier() != null ? row.getMinVerificationTier() : VerificationTier.SELF_DECLARED,
+                        Boolean.TRUE.equals(row.getRequiresValidCertificate())
+                ));
             }
+            return new ArrayList<>(ordered.values());
         }
 
         // Fallback tương thích ngược cho ca làm chỉ có shifts.required_skills
         if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0) {
             Map<UUID, String> skillNameLookup = new HashMap<>();
             List<UUID> nonNullIds = Arrays.stream(shift.getRequiredSkills()).filter(Objects::nonNull).toList();
-            if (skillRepository != null && !nonNullIds.isEmpty()) {
+            if (preloadedSkillNames != null) {
+                skillNameLookup.putAll(preloadedSkillNames);
+            } else if (skillRepository != null && !nonNullIds.isEmpty()) {
                 for (Skill sk : skillRepository.findAllById(nonNullIds)) {
                     if (sk != null && sk.getSkillId() != null && sk.getName() != null) {
                         skillNameLookup.put(sk.getSkillId(), sk.getName());

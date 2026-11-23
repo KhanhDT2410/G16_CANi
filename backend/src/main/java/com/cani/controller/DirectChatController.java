@@ -15,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -27,6 +28,19 @@ import java.util.UUID;
 public class DirectChatController {
 
     private final DirectChatService directChatService;
+
+    /**
+     * Lấy nhanh số lượng cuộc trò chuyện và tin nhắn chưa đọc của tôi.
+     * GET /api/v1/chat/unread-count
+     */
+    @GetMapping("/unread-count")
+    public ResponseEntity<ApiResponse<Map<String, Long>>> getUnreadCount(
+            Authentication authentication
+    ) {
+        UUID userId = currentUserId(authentication);
+        Map<String, Long> counts = directChatService.getUnreadCount(userId);
+        return ResponseEntity.ok(ApiResponse.ok(counts, "Lấy số lượng tin nhắn chưa đọc thành công"));
+    }
 
     /**
      * Lấy danh sách các cuộc trò chuyện của tôi.

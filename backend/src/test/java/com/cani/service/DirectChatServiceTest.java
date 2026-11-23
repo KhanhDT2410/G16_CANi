@@ -158,4 +158,16 @@ class DirectChatServiceTest {
         assertThat(list.get(0).getTargetUserName()).isEqualTo("Duy Hưng Phạm");
         assertThat(list.get(0).getLastMessagePreview()).isEqualTo("Chào em");
     }
+
+    @Test
+    @DisplayName("4. getUnreadCount trả về số hội thoại và tổng số tin nhắn chưa đọc")
+    void getUnreadCount_ReturnsCounts() {
+        when(participantRepository.countUnreadConversationsByUserId(userWorkerId)).thenReturn(2L);
+        when(participantRepository.sumUnreadMessagesByUserId(userWorkerId)).thenReturn(5L);
+
+        Map<String, Long> counts = directChatService.getUnreadCount(userWorkerId);
+
+        assertThat(counts.get("unreadConversations")).isEqualTo(2L);
+        assertThat(counts.get("unreadMessages")).isEqualTo(5L);
+    }
 }

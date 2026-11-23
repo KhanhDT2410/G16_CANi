@@ -49,14 +49,15 @@ export default function EOPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Custom Domain Hooks - Khởi tạo sớm trước effect và local state
-  const events = useEvents();
-  const shifts = useShifts({ onReloadEvents: events.loadEvents });
-  const payments = usePayments();
-  const directChat = useDirectChat();
-
   const [activeNav, setActiveNav] = useState('overview');
   const [activeTab, setActiveTab] = useState('overview');
   const [activeEventSubTab, setActiveEventSubTab] = useState('list');
+
+  const events = useEvents();
+  const shifts = useShifts({ onReloadEvents: events.loadEvents });
+  const payments = usePayments();
+  const directChat = useDirectChat({ isOpen: activeTab === 'messages' });
+
   const [highlightAssignmentId, setHighlightAssignmentId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
@@ -81,6 +82,7 @@ export default function EOPage() {
   // Lắng nghe sự kiện chuyển tab từ Navbar hoặc Chuông thông báo (Deep Link)
   const eventsRef = useRef(events);
   eventsRef.current = events;
+  const inFlightDetailEventIdRef = useRef(null);
 
   useEffect(() => {
     const handleSwitch = (e) => {
@@ -130,6 +132,34 @@ export default function EOPage() {
           setActiveEventSubTab('detail');
           currentEvents?.loadEvents?.();
         } else if (targetTab === 'events' && (targetEventId || targetShiftId)) {
+          setWorkspaceShiftId(targetShiftId || null);
+          setActiveEventSubTab('detail');
+          if (targetEventId) {
+            inFlightDetailEventIdRef.current = targetEventId;
+            eoService
+              .getEventDetail(targetEventId)
+              .then((fetchedEvent) => {
+                if (fetchedEvent && fetchedEvent.eventId) {
+                  setDetailEvent(fetchedEvent);
+                  if (currentEvents?.mergeEvent) {
+                    currentEvents.mergeEvent(fetchedEvent);
+                  } else {
+                    currentEvents?.setEvents?.((prev) => {
+                      const list = Array.isArray(prev) ? prev : [];
+                      if (list.some((ev) => ev.eventId === fetchedEvent.eventId)) {
+                        return list.map((ev) => (ev.eventId === fetchedEvent.eventId ? { ...ev, ...fetchedEvent } : ev));
+                      }
+                      return [fetchedEvent, ...list];
+                    });
+                  }
+                }
+              })
+              .finally(() => {
+                if (inFlightDetailEventIdRef.current === targetEventId) {
+                  inFlightDetailEventIdRef.current = null;
+                }
+              });
+          }
           currentEvents?.loadEvents?.();
         }
 
@@ -247,7 +277,34 @@ export default function EOPage() {
         const matched = Array.isArray(events.events)
           ? events.events.find((e) => e.eventId === eventIdParam)
           : null;
-        if (matched) setDetailEvent(matched);
+        if (matched) {
+          setDetailEvent(matched);
+        } else if (inFlightDetailEventIdRef.current !== eventIdParam) {
+          inFlightDetailEventIdRef.current = eventIdParam;
+          eoService
+            .getEventDetail(eventIdParam)
+            .then((fetchedEvent) => {
+              if (fetchedEvent && fetchedEvent.eventId) {
+                setDetailEvent(fetchedEvent);
+                if (eventsRef.current?.mergeEvent) {
+                  eventsRef.current.mergeEvent(fetchedEvent);
+                } else {
+                  eventsRef.current?.setEvents?.((prev) => {
+                    const list = Array.isArray(prev) ? prev : [];
+                    if (list.some((ev) => ev.eventId === fetchedEvent.eventId)) {
+                      return list.map((ev) => (ev.eventId === fetchedEvent.eventId ? { ...ev, ...fetchedEvent } : ev));
+                    }
+                    return [fetchedEvent, ...list];
+                  });
+                }
+              }
+            })
+            .finally(() => {
+              if (inFlightDetailEventIdRef.current === eventIdParam) {
+                inFlightDetailEventIdRef.current = null;
+              }
+            });
+        }
         setWorkspaceShiftId(shiftIdParam || null);
         setActiveEventSubTab('detail');
       } else {
@@ -298,6 +355,19 @@ export default function EOPage() {
       }
     }
   }, [events.events, detailEvent?.eventId]);
+
+  const { ensureSkillTaxonomy } = shifts;
+  useEffect(() => {
+    if (
+      activeTab === 'events' &&
+      (activeEventSubTab === 'create' ||
+        activeEventSubTab === 'detail' ||
+        Boolean(detailEvent) ||
+        Boolean(workspaceShiftId))
+    ) {
+      ensureSkillTaxonomy?.();
+    }
+  }, [activeTab, activeEventSubTab, detailEvent, workspaceShiftId, ensureSkillTaxonomy]);
 
   const handleOpenEventDetailPage = (evt, initialTab = 'SHIFTS') => {
     if (!evt) return;
@@ -516,8 +586,10 @@ export default function EOPage() {
                   }}
                   onClose={() => handleEventSubTabChange('list')}
                   onSuccess={events.loadEvents}
-                  onEventCreated={async (createdEvt) => {
-                    const refreshed = await events.loadEvents();
+                  onEventCreated={async (createdEvt, prefetchedEvents) => {
+                    const refreshed = Array.isArray(prefetchedEvents)
+                      ? prefetchedEvents
+                      : await events.loadEvents();
                     const list = Array.isArray(refreshed) ? refreshed : events.events;
                     const found = list.find((e) => e.eventId === createdEvt?.eventId) || createdEvt;
                     handleOpenEventDetailPage(found);
@@ -626,6 +698,11 @@ export default function EOPage() {
                 loadError={events.loadError}
                 allEvents={events.events}
                 filteredEvents={events.filteredEvents}
+                paginatedEvents={events.paginatedEvents}
+                currentPage={events.currentPage}
+                setCurrentPage={events.setCurrentPage}
+                pageSize={events.pageSize}
+                totalPages={events.totalPages}
                 searchQuery={events.searchQuery}
                 setSearchQuery={events.setSearchQuery}
                 statusFilter={events.statusFilter}

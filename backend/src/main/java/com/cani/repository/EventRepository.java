@@ -3,10 +3,13 @@ package com.cani.repository;
 import com.cani.entity.Event;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +18,9 @@ import java.util.UUID;
 public interface EventRepository extends JpaRepository<Event, UUID> {
     List<Event> findByEventOrganizer_EoIdOrderByCreatedAtDesc(UUID eoId);
     List<Event> findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(UUID eoId);
+    Page<Event> findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(UUID eoId, Pageable pageable);
     List<Event> findByStatus(EventStatus status);
+    List<Event> findByStatusNotInAndDeletedAtIsNull(Collection<EventStatus> excludedStatuses);
     Optional<Event> findByEventIdAndEventOrganizer_EoId(UUID eventId, UUID eoId);
     long countByStatus(EventStatus status);
 

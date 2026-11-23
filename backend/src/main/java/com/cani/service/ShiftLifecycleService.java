@@ -21,8 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Service quản lý vòng đời tự động của Ca làm việc (Shift) và Sự kiện (Event)
@@ -38,6 +42,19 @@ public class ShiftLifecycleService {
 
     private static final DateTimeFormatter TIME_FMT =
             DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+
+    private static final List<ShiftStatus> EXCLUDED_LIFECYCLE_SHIFT_STATUSES = List.of(
+            ShiftStatus.CANCELLED,
+            ShiftStatus.DRAFT,
+            ShiftStatus.SUSPENDED,
+            ShiftStatus.COMPLETED
+    );
+
+    private static final List<EventStatus> EXCLUDED_LIFECYCLE_EVENT_STATUSES = List.of(
+            EventStatus.CANCELLED,
+            EventStatus.DRAFT,
+            EventStatus.COMPLETED
+    );
 
     private final ShiftRepository shiftRepository;
     private final EventRepository eventRepository;
@@ -88,11 +105,10 @@ public class ShiftLifecycleService {
         ShiftStaffingPolicy policy = getStaffingPolicy();
 
         // 1. Quét và cập nhật trạng thái các Ca làm việc (Shifts) + phát hiện thiếu người sát giờ
-        List<Shift> nonCancelledShifts = shiftRepository.findAll().stream()
+        List<Shift> rawCandidateShifts = shiftRepository.findByStatusNotInWithEvent(EXCLUDED_LIFECYCLE_SHIFT_STATUSES);
+        List<Shift> nonCancelledShifts = (rawCandidateShifts != null ? rawCandidateShifts : Collections.<Shift>emptyList()).stream()
                 .filter(s -> s.getStatus() != null
-                        && s.getStatus() != ShiftStatus.CANCELLED
-                        && s.getStatus() != ShiftStatus.DRAFT
-                        && s.getStatus() != ShiftStatus.SUSPENDED)
+                        && !EXCLUDED_LIFECYCLE_SHIFT_STATUSES.contains(s.getStatus()))
                 .toList();
 
         int shiftsCompleted = 0;
@@ -148,7 +164,7 @@ public class ShiftLifecycleService {
                 continue;
             }
 
-            if (policy.isNearStartUnderstaffed(s, effectiveNow)
+            if (policy.isNearStartUnderstaffed(s, effectiveNow, confirmed)
                     && !Boolean.TRUE.equals(s.getUnderstaffedAlertSent())
                     && !Boolean.TRUE.equals(s.getEmergency())) {
                 sendNearStartUnderstaffedNotification(s, policy.resolveEffectiveShiftStatus(s, effectiveNow), confirmed, required);
@@ -159,32 +175,48 @@ public class ShiftLifecycleService {
         }
 
         // 2. Quét và cập nhật trạng thái Sự kiện (Events)
-        List<Event> nonCancelledEvents = eventRepository.findAll().stream()
-                .filter(e -> e.getStatus() != null && e.getStatus() != EventStatus.CANCELLED && e.getStatus() != EventStatus.DRAFT)
+        List<Event> rawCandidateEvents = eventRepository.findByStatusNotInAndDeletedAtIsNull(EXCLUDED_LIFECYCLE_EVENT_STATUSES);
+        List<Event> nonCancelledEvents = (rawCandidateEvents != null ? rawCandidateEvents : Collections.<Event>emptyList()).stream()
+                .filter(e -> e.getStatus() != null && !EXCLUDED_LIFECYCLE_EVENT_STATUSES.contains(e.getStatus()))
                 .toList();
 
         int eventsCompleted = 0;
         int eventsOngoing = 0;
 
-        for (Event e : nonCancelledEvents) {
-            List<Shift> eventShifts = shiftRepository.findByEvent_EventId(e.getEventId());
-            boolean allShiftsCompleted = !eventShifts.isEmpty() && eventShifts.stream()
-                    .allMatch(s -> s.getStatus() == ShiftStatus.COMPLETED || s.getStatus() == ShiftStatus.CANCELLED);
+        if (!nonCancelledEvents.isEmpty()) {
+            List<UUID> candidateEventIds = nonCancelledEvents.stream()
+                    .map(Event::getEventId)
+                    .filter(Objects::nonNull)
+                    .toList();
+            List<Shift> batchEventShifts = !candidateEventIds.isEmpty()
+                    ? shiftRepository.findByEvent_EventIdIn(candidateEventIds)
+                    : Collections.emptyList();
+            Map<UUID, List<Shift>> shiftsByEventId = (batchEventShifts != null ? batchEventShifts : Collections.<Shift>emptyList()).stream()
+                    .filter(s -> s.getEvent() != null && s.getEvent().getEventId() != null)
+                    .collect(Collectors.groupingBy(s -> s.getEvent().getEventId()));
 
-            // Sự kiện đã qua giờ kết thúc hoặc toàn bộ ca đã xong -> COMPLETED
-            if ((e.getEndTime() != null && effectiveNow.isAfter(e.getEndTime())) || allShiftsCompleted) {
-                if (e.getStatus() != EventStatus.COMPLETED) {
-                    e.setStatus(EventStatus.COMPLETED);
-                    eventRepository.save(e);
-                    eventsCompleted++;
+            for (Event e : nonCancelledEvents) {
+                List<Shift> eventShifts = e.getEventId() != null
+                        ? shiftsByEventId.getOrDefault(e.getEventId(), Collections.emptyList())
+                        : Collections.emptyList();
+                boolean allShiftsCompleted = !eventShifts.isEmpty() && eventShifts.stream()
+                        .allMatch(s -> s.getStatus() == ShiftStatus.COMPLETED || s.getStatus() == ShiftStatus.CANCELLED);
+
+                // Sự kiện đã qua giờ kết thúc hoặc toàn bộ ca đã xong -> COMPLETED
+                if ((e.getEndTime() != null && effectiveNow.isAfter(e.getEndTime())) || allShiftsCompleted) {
+                    if (e.getStatus() != EventStatus.COMPLETED) {
+                        e.setStatus(EventStatus.COMPLETED);
+                        eventRepository.save(e);
+                        eventsCompleted++;
+                    }
                 }
-            }
-            // Sự kiện đang trong khung giờ diễn ra -> ONGOING
-            else if (e.getStartTime() != null && !effectiveNow.isBefore(e.getStartTime())) {
-                if (e.getStatus() == EventStatus.ACTIVE) {
-                    e.setStatus(EventStatus.ONGOING);
-                    eventRepository.save(e);
-                    eventsOngoing++;
+                // Sự kiện đang trong khung giờ diễn ra -> ONGOING
+                else if (e.getStartTime() != null && !effectiveNow.isBefore(e.getStartTime())) {
+                    if (e.getStatus() == EventStatus.ACTIVE) {
+                        e.setStatus(EventStatus.ONGOING);
+                        eventRepository.save(e);
+                        eventsOngoing++;
+                    }
                 }
             }
         }

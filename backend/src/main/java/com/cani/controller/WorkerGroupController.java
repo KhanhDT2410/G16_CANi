@@ -204,6 +204,21 @@ public class WorkerGroupController {
     }
 
     /**
+     * F4: Giải tán nhóm thợ (chỉ Trưởng nhóm hoặc ADMIN)
+     */
+    @Operation(summary = "Giải tán nhóm thợ", description = "Trưởng nhóm hoặc Admin giải tán nhóm thợ; chuyển mọi đề xuất ca đang chờ sang EXPIRED và ngừng hoạt động nhóm.")
+    @PreAuthorize("hasAnyRole('WORKER', 'ADMIN')")
+    @PostMapping("/{id}/dissolve")
+    public ResponseEntity<ApiResponse<Void>> dissolveGroup(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        workerGroupService.dissolveGroup(userId, id);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Giải tán nhóm thợ thành công"));
+    }
+
+    /**
      * Task 3: Xem danh sách đề xuất ca làm việc gửi cho nhóm (chỉ Leader hoặc ADMIN)
      */
     @Operation(summary = "Đề xuất ca cho nhóm", description = "Lấy danh sách đề xuất ca (PENDING + EXPIRED 24h qua) gửi đến nhóm, chỉ Trưởng nhóm hoặc Admin.")

@@ -60,6 +60,13 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
             @Param("thresholdTime") Instant thresholdTime
     );
 
+    // shortcut: dùng updatedAt của ShiftAssignment để xác định thời điểm no-show trong 20 phút qua; nâng cấp thêm trường noShowAt riêng khi có yêu cầu audit sâu hơn.
+    @Query("SELECT DISTINCT sa.worker.workerId FROM ShiftAssignment sa WHERE sa.status = :status AND sa.updatedAt >= :since")
+    List<UUID> findWorkerIdsByStatusAndUpdatedAtAfter(
+            @Param("status") AssignmentStatus status,
+            @Param("since") Instant since
+    );
+
     @Query("SELECT sa FROM ShiftAssignment sa " +
            "JOIN FETCH sa.worker w " +
            "JOIN FETCH w.user u " +

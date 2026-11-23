@@ -258,7 +258,8 @@ public class MatchingDispatchService {
                 .filter(p -> {
                     WorkerGroup group = groups.get(p.getGroupId());
                     return group != null
-                            && !p.getWorker().getWorkerId().equals(group.getLeaderWorkerId());
+                            && (!p.getWorker().getWorkerId().equals(group.getLeaderWorkerId())
+                                || !Boolean.TRUE.equals(group.getIsActive()));
                 })
                 .toList());
         if (stale.isEmpty()) {
@@ -266,7 +267,7 @@ public class MatchingDispatchService {
         }
         stale.forEach(p -> p.setStatus(ProposalStatus.EXPIRED));
         dispatchProposalRepository.saveAll(stale);
-        log.info("Đã chuyển {} proposal PENDING hết hạn/đội trưởng đã thay đổi sang EXPIRED.", stale.size());
+        log.info("Đã chuyển {} proposal PENDING hết hạn/đội trưởng đã thay đổi/nhóm ngừng hoạt động sang EXPIRED.", stale.size());
     }
 
     /**
@@ -616,11 +617,10 @@ public class MatchingDispatchService {
         Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
         Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
 
-        // shortcut: lấy 50 group active đầu (không rank trước); upgrade: query top-50 theo avgRating/reliability khi tổng số group > vài trăm.
-        List<WorkerGroup> candidateGroups = workerGroupRepository.findAll().stream()
-                .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
-                .limit(50)
-                .toList();
+        // shortcut: xét toàn bộ group active in-memory; mô hình party group có
+        // tuổi đời ngắn nên số active luôn nhỏ. Nếu someday số group active vượt
+        // ~2000 thì thêm pre-filter SQL theo vùng địa lý (bounding box quanh venue).
+        List<WorkerGroup> candidateGroups = workerGroupRepository.findAllByIsActiveTrue();
         if (candidateGroups.isEmpty()) {
             return 0;
         }
@@ -631,6 +631,11 @@ public class MatchingDispatchService {
         Map<UUID, List<WorkerGroupMembership>> membershipsByGroup = memberships.stream()
                 .filter(m -> m.getWorkerGroup() != null)
                 .collect(Collectors.groupingBy(m -> m.getWorkerGroup().getGroupId()));
+
+        Instant noShowCutoff = Instant.now().minus(Duration.ofMinutes(GROUP_NO_SHOW_COOLDOWN_MINUTES));
+        Set<UUID> recentNoShowWorkerIds = new HashSet<>(
+                shiftAssignmentRepository.findWorkerIdsByStatusAndUpdatedAtAfter(AssignmentStatus.NO_SHOW, noShowCutoff)
+        );
 
         List<GroupCandidate> groupCandidates = new ArrayList<>();
         for (WorkerGroup group : candidateGroups) {
@@ -670,7 +675,16 @@ public class MatchingDispatchService {
 
             // No-show cooldown: group có thành viên no-show trong 20 phút qua -> tạm bỏ qua
             if (group.getLastNoShowAt() != null
-                    && group.getLastNoShowAt().isAfter(Instant.now().minus(Duration.ofMinutes(GROUP_NO_SHOW_COOLDOWN_MINUTES)))) {
+                    && group.getLastNoShowAt().isAfter(noShowCutoff)) {
+                continue;
+            }
+
+            // F3: Member-level no-show check trong 20 phút qua (chống giải tán lập lại nhóm mới để né cooldown)
+            boolean hasNoShowMember = groupMemberships.stream()
+                    .filter(m -> m.getWorker() != null)
+                    .anyMatch(m -> recentNoShowWorkerIds.contains(m.getWorker().getWorkerId()));
+            if (hasNoShowMember) {
+                log.debug("Nhóm {} có thành viên vi phạm no-show trong 20 phút qua, loại cả nhóm khỏi dispatch", group.getGroupId());
                 continue;
             }
 
@@ -727,8 +741,12 @@ public class MatchingDispatchService {
             double normP90 = Math.max(0.0, 100.0 - (p90Dist / effectiveMaxDist) * 100.0);
             double distanceScore = 0.6 * normMedian + 0.4 * normP90;
 
+            double avgRatingVal = (group.getAvgRating() == null || group.getAvgRating().signum() == 0)
+                    ? 5.0
+                    : group.getAvgRating().doubleValue();
+
             double groupScore = 0.35 * distanceScore
-                    + 0.25 * Math.min(100.0, ((group.getAvgRating() != null ? group.getAvgRating().doubleValue() : 5.0) / 5.0) * 100.0)
+                    + 0.25 * Math.min(100.0, (avgRatingVal / 5.0) * 100.0)
                     + 0.2 * Math.min(100.0, eligible.stream()
                         .mapToDouble(w -> (double) (w.getTotalShiftsCompleted() != null ? w.getTotalShiftsCompleted() : 0))
                         .average().orElse(0.0) / 10.0 * 100.0)

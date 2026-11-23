@@ -17,6 +17,8 @@ public interface WorkerGroupRepository extends JpaRepository<WorkerGroup, UUID> 
 
     List<WorkerGroup> findByLeaderWorkerId(UUID leaderWorkerId);
 
+    List<WorkerGroup> findAllByIsActiveTrue();
+
     boolean existsByNameIgnoreCase(String name);
 
     Optional<WorkerGroup> findByInviteCodeIgnoreCase(String inviteCode);

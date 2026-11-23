@@ -459,7 +459,83 @@ public class WorkerGroupService {
         membershipRepository.save(membership);
 
         recalculateGroupMetrics(groupId);
+
+        // F4: Auto-dissolve khi ACTIVE về 0
+        int remainingActive = membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE);
+        if (remainingActive == 0 && Boolean.TRUE.equals(group.getIsActive())) {
+            group.setIsActive(false);
+            workerGroupRepository.save(group);
+            log.info("Đội {} đã tự động tan rã vì không còn thành viên ACTIVE", groupId);
+
+            if (group.getLeaderWorkerId() != null) {
+                membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, group.getLeaderWorkerId())
+                        .filter(m -> m.getStatus() == MembershipStatus.ACTIVE)
+                        .ifPresent(m -> {
+                            Worker leader = workerRepository.findById(group.getLeaderWorkerId()).orElse(null);
+                            if (leader != null && leader.getUser() != null) {
+                                try {
+                                    notificationService.sendNotification(
+                                            leader.getUser(),
+                                            "Đội đã giải tán",
+                                            "Đội " + group.getName() + " đã tan rã vì không còn thành viên. Tạo đội mới khi cần.",
+                                            NotificationType.SYSTEM,
+                                            "GROUP_DISSOLVED",
+                                            groupId
+                                    );
+                                } catch (Exception ex) {
+                                    log.warn("Không thể gửi thông báo FCM giải tán cho leader đội {}: {}", groupId, ex.getMessage());
+                                }
+                            }
+                        });
+            }
+        }
+
         log.info("Đã xóa/rời thành viên {} khỏi nhóm {}", targetWorkerId, groupId);
+    }
+
+    /**
+     * F4: Nút ý chí giải tán đội (Leader hoặc ADMIN)
+     */
+    @Transactional
+    public void dissolveGroup(UUID callerUserId, UUID groupId) {
+        checkGroupLeaderPermission(callerUserId, groupId);
+        WorkerGroup group = getGroupOrThrow(groupId);
+
+        if (!Boolean.TRUE.equals(group.getIsActive())) {
+            throw new BadRequestException("Nhóm đã ngừng hoạt động");
+        }
+
+        // 1. Mọi DispatchProposal PENDING của group -> EXPIRED + saveAll
+        List<DispatchProposal> pending = dispatchProposalRepository.findByGroupIdAndStatus(groupId, ProposalStatus.PENDING);
+        if (!pending.isEmpty()) {
+            pending.forEach(p -> p.setStatus(ProposalStatus.EXPIRED));
+            dispatchProposalRepository.saveAll(pending);
+        }
+
+        // 2. group.setIsActive(false)
+        group.setIsActive(false);
+        workerGroupRepository.save(group);
+
+        // 3. FCM leader: "Đội [Tên] đã được giải tán."
+        if (group.getLeaderWorkerId() != null) {
+            Worker leader = workerRepository.findById(group.getLeaderWorkerId()).orElse(null);
+            if (leader != null && leader.getUser() != null) {
+                try {
+                    notificationService.sendNotification(
+                            leader.getUser(),
+                            "Đội đã giải tán",
+                            "Đội " + group.getName() + " đã được giải tán.",
+                            NotificationType.SYSTEM,
+                            "GROUP_DISSOLVED",
+                            groupId
+                    );
+                } catch (Exception ex) {
+                    log.warn("Không thể gửi thông báo FCM giải tán cho leader đội {}: {}", groupId, ex.getMessage());
+                }
+            }
+        }
+
+        log.info("Nhóm {} đã được giải tán bởi user {}", groupId, callerUserId);
     }
 
     private void recalculateGroupMetrics(UUID groupId) {
@@ -484,7 +560,7 @@ public class WorkerGroupService {
                         .sum();
                 group.setAvgRating(BigDecimal.valueOf(avgRatingSum / ratedMembers.size()).setScale(2, RoundingMode.HALF_UP));
             } else {
-                group.setAvgRating(BigDecimal.ZERO);
+                group.setAvgRating(BigDecimal.valueOf(5.0));
             }
 
             int rsSum = activeMembers.stream()
@@ -493,7 +569,7 @@ public class WorkerGroupService {
 
             group.setReliabilityScore(rsSum / count);
         } else {
-            group.setAvgRating(BigDecimal.ZERO);
+            group.setAvgRating(BigDecimal.valueOf(5.0));
             group.setReliabilityScore(100);
         }
 

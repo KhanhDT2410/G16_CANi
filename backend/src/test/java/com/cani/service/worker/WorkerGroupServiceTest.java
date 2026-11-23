@@ -1008,4 +1008,123 @@ class WorkerGroupServiceTest {
 
         assertThrows(BadRequestException.class, () -> workerGroupService.joinByCode(memberUserId, req));
     }
+
+    @Test
+    @DisplayName("F2 - recalculateGroupMetrics: Nhóm có thành viên nhưng chưa ai có rating -> avgRating mặc định là 5.0 (trung tính)")
+    void recalculateGroupMetrics_noRatedMembers_defaultsTo5() {
+        Worker unratedWorker = Worker.builder()
+                .workerId(UUID.randomUUID())
+                .fullName("Thợ Mới")
+                .ratingAvg(null)
+                .reliabilityScore(90)
+                .build();
+        WorkerGroupMembership m = WorkerGroupMembership.builder()
+                .workerGroup(mockGroup)
+                .worker(unratedWorker)
+                .status(MembershipStatus.ACTIVE)
+                .build();
+
+        when(workerRepository.findByUser_UserId(leaderUserId)).thenReturn(Optional.of(leaderWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, memberWorkerId))
+                .thenReturn(Optional.of(WorkerGroupMembership.builder().status(MembershipStatus.ACTIVE).build()));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE))
+                .thenReturn(List.of(m));
+        when(membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE))
+                .thenReturn(1);
+
+        workerGroupService.removeMember(leaderUserId, groupId, memberWorkerId);
+
+        ArgumentCaptor<WorkerGroup> groupCaptor = ArgumentCaptor.forClass(WorkerGroup.class);
+        verify(workerGroupRepository).save(groupCaptor.capture());
+        WorkerGroup saved = groupCaptor.getValue();
+        assertEquals(0, BigDecimal.valueOf(5.0).compareTo(saved.getAvgRating()));
+    }
+
+    @Test
+    @DisplayName("F4-A - removeMember: Khi thành viên cuối cùng rời nhóm (activeCount = 0) -> auto-dissolve (isActive = false)")
+    void remove_last_active_member_auto_deactivates_group() {
+        mockGroup.setIsActive(true);
+        when(workerRepository.findByUser_UserId(leaderUserId)).thenReturn(Optional.of(leaderWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+        when(membershipRepository.findByWorkerGroup_GroupIdAndWorker_WorkerId(groupId, memberWorkerId))
+                .thenReturn(Optional.of(WorkerGroupMembership.builder().status(MembershipStatus.ACTIVE).build()));
+        // Sau khi remove, số activeCount = 0
+        when(membershipRepository.countByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE))
+                .thenReturn(0);
+        when(membershipRepository.findByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+
+        workerGroupService.removeMember(leaderUserId, groupId, memberWorkerId);
+
+        assertFalse(mockGroup.getIsActive());
+        verify(workerGroupRepository, atLeastOnce()).save(mockGroup);
+    }
+
+    @Test
+    @DisplayName("F4-B - dissolveGroup: Leader chủ động giải tán -> proposal PENDING chuyển EXPIRED, group isActive=false, FCM leader")
+    void dissolve_group_expires_pending_proposals_and_deactivates() {
+        mockGroup.setIsActive(true);
+        when(userRepository.findById(leaderUserId)).thenReturn(Optional.of(leaderUser));
+        when(workerRepository.findByUser_UserId(leaderUserId)).thenReturn(Optional.of(leaderWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+        when(workerRepository.findById(leaderWorkerId)).thenReturn(Optional.of(leaderWorker));
+
+        DispatchProposal p1 = DispatchProposal.builder()
+                .proposalId(UUID.randomUUID())
+                .groupId(groupId)
+                .status(ProposalStatus.PENDING)
+                .build();
+        DispatchProposal p2 = DispatchProposal.builder()
+                .proposalId(UUID.randomUUID())
+                .groupId(groupId)
+                .status(ProposalStatus.PENDING)
+                .build();
+        when(dispatchProposalRepository.findByGroupIdAndStatus(groupId, ProposalStatus.PENDING))
+                .thenReturn(List.of(p1, p2));
+
+        workerGroupService.dissolveGroup(leaderUserId, groupId);
+
+        assertFalse(mockGroup.getIsActive());
+        assertEquals(ProposalStatus.EXPIRED, p1.getStatus());
+        assertEquals(ProposalStatus.EXPIRED, p2.getStatus());
+        verify(dispatchProposalRepository).saveAll(List.of(p1, p2));
+        verify(workerGroupRepository).save(mockGroup);
+        verify(notificationService).sendNotification(
+                eq(leaderUser),
+                contains("giải tán"),
+                anyString(),
+                eq(NotificationType.SYSTEM),
+                eq("GROUP_DISSOLVED"),
+                eq(groupId)
+        );
+    }
+
+    @Test
+    @DisplayName("F4-B - dissolveGroup: Người gọi không phải leader/admin -> 403 Forbidden")
+    void dissolve_by_non_leader_rejects() {
+        mockGroup.setIsActive(true);
+        when(userRepository.findById(memberUserId)).thenReturn(Optional.of(memberUser));
+        when(workerRepository.findByUser_UserId(memberUserId)).thenReturn(Optional.of(memberWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+
+        AppException ex = assertThrows(AppException.class, () ->
+                workerGroupService.dissolveGroup(memberUserId, groupId));
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+        verify(workerGroupRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("F4-B - dissolveGroup: Nhóm đã ngừng hoạt động -> 400 BadRequest")
+    void dissolve_already_inactive_400() {
+        mockGroup.setIsActive(false);
+        when(userRepository.findById(leaderUserId)).thenReturn(Optional.of(leaderUser));
+        when(workerRepository.findByUser_UserId(leaderUserId)).thenReturn(Optional.of(leaderWorker));
+        when(workerGroupRepository.findById(groupId)).thenReturn(Optional.of(mockGroup));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                workerGroupService.dissolveGroup(leaderUserId, groupId));
+        assertTrue(ex.getMessage().contains("Nhóm đã ngừng hoạt động"));
+        verify(dispatchProposalRepository, never()).saveAll(anyList());
+    }
 }

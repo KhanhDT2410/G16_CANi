@@ -4,6 +4,7 @@ import { SupportTicketsCenterView } from '../../features/support-tickets';
 import { FaqView } from '../../features/faqs';
 import { RsAppealsView } from '../../features/rs-appeals';
 import { NoShowView } from '../../features/no-shows';
+import { EkycReviewCenterView } from '../../features/ekyc-review';
 import CustomerCareSidebar from './components/CustomerCareSidebar';
 import './CustomerCarePage.css';
 
@@ -27,6 +28,10 @@ const TAB_METADATA = {
   noshows: {
     title: 'Xử Lý Vi Phạm Vắng Mặt',
     subtitle: 'Theo dõi vắng mặt không phép, chế tài điểm uy tín và hỗ trợ điều động nhân sự thay thế',
+  },
+  ekyc_review: {
+    title: 'Thẩm Định Hồ Sơ eKYC',
+    subtitle: 'Kiểm tra và xét duyệt hồ sơ định danh CCCD đang chờ thẩm định cho Worker & Nhà tổ chức',
   },
 };
 
@@ -59,6 +64,8 @@ export const CustomerCarePage = () => {
         setActiveTab('noshows');
       } else if (tab === 'faqs') {
         setActiveTab('faqs');
+      } else if (tab === 'ekyc' || tab === 'ekyc_review') {
+        setActiveTab('ekyc_review');
       }
     };
     if (window.__cani_pending_chat) {
@@ -140,6 +147,7 @@ export const CustomerCarePage = () => {
           {activeTab === 'faqs' && <FaqView />}
           {activeTab === 'appeals' && <RsAppealsView />}
           {activeTab === 'noshows' && <NoShowView onNavigateAppeal={() => setActiveTab('appeals')} />}
+          {activeTab === 'ekyc_review' && <EkycReviewCenterView />}
         </section>
       </main>
     </div>

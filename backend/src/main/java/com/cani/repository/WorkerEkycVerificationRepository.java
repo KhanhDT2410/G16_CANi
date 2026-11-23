@@ -47,4 +47,13 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
     List<WorkerEkycVerification> findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(Instant cutoff);
 
     long countByStatus(String status);
+    boolean existsByWorker_WorkerIdAndStatus(UUID ownerId, String status);
+    boolean existsByWorker_WorkerIdAndStatusIn(UUID workerId, Collection<String> statuses);
+    boolean existsByWorker_WorkerIdAndLegalHoldTrue(UUID workerId);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select (count(v) > 0) from WorkerEkycVerification v
+            where v.frontImageUrl = :key or v.backImageUrl = :key or v.selfieImageUrl = :key
+            """)
+    boolean existsImageReference(String key);
 }

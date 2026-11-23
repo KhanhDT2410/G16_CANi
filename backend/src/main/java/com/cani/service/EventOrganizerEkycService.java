@@ -7,7 +7,6 @@ import com.cani.dto.ekyc.EkycUserSubmittedInput;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
 import com.cani.dto.event.EoReviewResponseDto;
-import com.cani.entity.AuditLog;
 import com.cani.entity.EoEkycVerification;
 import com.cani.entity.EventOrganizer;
 import com.cani.entity.Review;
@@ -121,6 +120,7 @@ public class EventOrganizerEkycService {
             String confirmedCccd) {
 
         // 1. Kiểm tra bảo mật tệp (magic bytes, MIME type, dung lượng tối đa)
+        cryptoService.requireIndexKey();
         EkycImageValidator.ValidatedEkycImage validatedFront =
                 imageValidator.validate(frontFile, "Ảnh mặt trước CCCD người đại diện");
         EkycImageValidator.ValidatedEkycImage validatedBack =
@@ -152,10 +152,11 @@ public class EventOrganizerEkycService {
                     storedBack != null ? storedBack.getObjectKey() : null,
                     storedSelfie != null ? storedSelfie.getObjectKey() : null
             );
-            executeInTransaction(() -> markStorageTechnicalFailure(prepared.verificationId()));
+            executeInTransaction(() -> markTechnicalFailure(prepared.verificationId(), prepared.attempt(), "STORAGE_WRITE_FAILED"));
             throw storageEx;
         }
 
+        boolean finalizationStarted = false;
         try {
             // 4. Gọi VNPT eKYC thực tế (ngoài DB transaction)
             EkycIdentityResultDto providerResult = ekycProvider.verifyIdentity(
@@ -175,8 +176,12 @@ public class EventOrganizerEkycService {
             final EkycImageStorage.StoredObject finalSelfie = storedSelfie;
 
             // 5. Transaction ngắn 2 (khóa đồng bộ theo hash CCCD): Check trùng Worker+EO, chấm quyết định & lưu kết quả
+            finalizationStarted = true;
             EoEkycVerificationResultDto result = cccdLockManager.executeWithCccdLock(primaryHash, () ->
-                    executeInTransaction(() -> finalizeSubmission(
+                    executeInTransaction(() -> {
+                        imageRetentionService.deleteAfterRollback(finalFront.getObjectKey(),
+                                finalBack.getObjectKey(), finalSelfie.getObjectKey());
+                        return finalizeSubmission(
                             userId,
                             prepared.eoId(),
                             prepared.verificationId(),
@@ -188,8 +193,8 @@ public class EventOrganizerEkycService {
                             lookupHashes,
                             finalFront.getObjectKey(),
                             finalBack.getObjectKey(),
-                            finalSelfie.getObjectKey()
-                    ))
+                            finalSelfie.getObjectKey());
+                    })
             );
             if (prepared.isRetry()) {
                 imageRetentionService.deleteStoredImagesQuietly(
@@ -200,8 +205,15 @@ public class EventOrganizerEkycService {
             }
             return result;
         } catch (RuntimeException failure) {
-            imageRetentionService.deleteStoredImagesQuietly(storedFront.getObjectKey(),
-                    storedBack.getObjectKey(), storedSelfie.getObjectKey());
+            if (!finalizationStarted) {
+                imageRetentionService.deleteStoredImagesQuietly(storedFront.getObjectKey(),
+                        storedBack.getObjectKey(), storedSelfie.getObjectKey());
+            }
+            try {
+                executeInTransaction(() -> markTechnicalFailure(prepared.verificationId(), prepared.attempt(), "FINALIZATION_FAILED"));
+            } catch (RuntimeException statusUpdateFailure) {
+                failure.addSuppressed(statusUpdateFailure);
+            }
             throw failure;
         }
     }
@@ -247,15 +259,20 @@ public class EventOrganizerEkycService {
         return new PreparedEoSubmission(eo.getEoId(), record.getId(), record.getRetryCount(), isRetry, prevFront, prevBack, prevSelfie);
     }
 
-    private void markStorageTechnicalFailure(UUID verificationId) {
+    private void markTechnicalFailure(UUID verificationId, Integer attempt, String code) {
         if (verificationId == null) {
             return;
         }
-        eoEkycVerificationRepository.findById(verificationId).ifPresent(record -> {
+        eoEkycVerificationRepository.findById(verificationId)
+                .filter(record -> !record.isLegalHold()
+                        && Objects.equals(record.getRetryCount(), attempt)
+                        && EkycVerificationStatus.PROCESSING.name().equals(record.getStatus()))
+                .ifPresent(record -> {
             record.setStatus(EkycVerificationStatus.TECHNICAL_FAILURE.name());
             record.setRoutingDecision(EkycRoutingDecision.TECHNICAL_FAILURE.name());
-            record.setFailureCode("STORAGE_WRITE_FAILED");
-            record.setRoutingReason("Không thể lưu ảnh xác minh vào kho bảo mật. Vui lòng thử lại sau.");
+            record.setFailureCode(code);
+            record.setImageRetentionUntil(imageRetentionService.calculateRetentionDeadline(EkycVerificationStatus.TECHNICAL_FAILURE));
+            record.setRoutingReason("Không thể hoàn tất lưu hồ sơ. Vui lòng thử lại sau.");
             eoEkycVerificationRepository.save(record);
         });
     }
@@ -362,10 +379,6 @@ public class EventOrganizerEkycService {
         switch (verificationStatus) {
             case APPROVED -> {
                 if (providerResult != null) {
-                    if (providerResult.getResidenceAddress() != null && !providerResult.getResidenceAddress().isBlank()
-                            && (eo.getAddress() == null || eo.getAddress().isBlank())) {
-                        eo.setAddress(providerResult.getResidenceAddress().trim());
-                    }
                     if (providerResult.getFullName() != null && !providerResult.getFullName().isBlank()
                             && eo.getUser() != null) {
                         eo.getUser().setFullName(providerResult.getFullName().trim());
@@ -660,6 +673,18 @@ public class EventOrganizerEkycService {
                 });
     }
 
+    @Transactional
+    public EoEkycVerificationResultDto updateLegalHold(UUID adminUserId, UUID verificationId, boolean legalHold, String reason) {
+        EoEkycVerification record = eoEkycVerificationRepository.findById(verificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ eKYC có ID: " + verificationId));
+        record.setLegalHold(legalHold);
+        record = eoEkycVerificationRepository.save(record);
+        recordAudit(adminUserId, "EO_EKYC_LEGAL_HOLD_UPDATED", verificationId,
+                Map.of("legalHold", legalHold, "reason", reason != null ? reason.trim() : ""));
+        log.info("Admin {} updated EO eKYC legalHold={} [verificationId={}]", adminUserId, legalHold, verificationId);
+        return mapToDto(record, false);
+    }
+
     /**
      * Lấy danh sách hàng đợi hồ sơ eKYC đang chờ duyệt (PENDING_REVIEW)
      */
@@ -667,14 +692,13 @@ public class EventOrganizerEkycService {
     public List<EoEkycVerificationResultDto> getPendingEkycQueue() {
         return eoEkycVerificationRepository.findByStatusOrderByCreatedAtAsc(EkycVerificationStatus.PENDING_REVIEW.name())
                 .stream()
-                .map(row -> EoEkycVerificationResultDto.builder()
-                        .verificationId(row.getId())
-                        .eoId(row.getEventOrganizer().getEoId())
-                        .representativeName(row.getRepresentativeName())
-                        .createdAt(row.getCreatedAt())
-                        .status(row.getStatus())
-                        .routingDecision(row.getRoutingDecision())
-                        .build())
+                .map(row -> {
+                    EoEkycVerificationResultDto dto = mapToDto(row, false);
+                    dto.setFrontImageUrl(null);
+                    dto.setBackImageUrl(null);
+                    dto.setSelfieImageUrl(null);
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -701,18 +725,19 @@ public class EventOrganizerEkycService {
         EventOrganizer eo = record.getEventOrganizer();
 
         if (EkycVerificationStatus.APPROVED.name().equals(decision)) {
-            if (record.getCccdNumberHash() != null && eo != null && eo.getEoId() != null) {
-                cccdLockManager.acquireDbTransactionLockIfPostgres(record.getCccdNumberHash());
-                boolean isDup = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
-                        record.getCccdNumberHash(), List.of(EkycVerificationStatus.APPROVED.name()), eo.getEoId());
-                if (!isDup && workerEkycVerificationRepository != null && eo.getUser() != null) {
-                    isDup = workerEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_User_UserIdNot(
-                            record.getCccdNumberHash(), List.of(EkycVerificationStatus.APPROVED.name()), eo.getUser().getUserId());
-                }
-                if (isDup) {
-                    throw new BadRequestException(
-                            "Số CCCD này đã được phê duyệt cho một tài khoản khác trong hệ thống! Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
-                }
+            if (record.getCccdNumberHash() == null || eo == null) {
+                throw new BadRequestException("Hồ sơ thiếu số giấy tờ đã đối chiếu. Vui lòng yêu cầu nộp lại hồ sơ.");
+            }
+            cccdLockManager.acquireDbTransactionLockIfPostgres(record.getCccdNumberHash());
+            boolean isDup = eoEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
+                    record.getCccdNumberHash(), List.of(EkycVerificationStatus.APPROVED.name()), eo.getEoId());
+            if (!isDup && workerEkycVerificationRepository != null && eo.getUser() != null) {
+                isDup = workerEkycVerificationRepository.existsByCccdNumberHashAndStatusInAndWorker_User_UserIdNot(
+                        record.getCccdNumberHash(), List.of(EkycVerificationStatus.APPROVED.name()), eo.getUser().getUserId());
+            }
+            if (isDup) {
+                throw new BadRequestException(
+                        "Số CCCD này đã được phê duyệt cho một tài khoản khác trong hệ thống! Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản.");
             }
             record.setStatus(EkycVerificationStatus.APPROVED.name());
             record.setRoutingDecision(EkycRoutingDecision.MANUAL_APPROVED.name());
@@ -747,10 +772,28 @@ public class EventOrganizerEkycService {
         log.info("Admin {} reviewed EO eKYC [verificationId={}, status={}]", adminUserId, verificationId, record.getStatus());
         recordAudit(adminUserId, "EO_EKYC_ADMIN_REVIEWED", verificationId,
                 Map.of("status", record.getStatus()));
-        return mapToDto(record);
+        return EoEkycVerificationResultDto.builder()
+                .verificationId(verificationId)
+                .status(record.getStatus())
+                .routingDecision(record.getRoutingDecision())
+                .reviewedBy(adminUserId)
+                .reviewedAt(record.getReviewedAt())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public EoEkycVerificationResultDto getPendingReviewDetails(UUID verificationId) {
+        EoEkycVerification record = eoEkycVerificationRepository.findById(verificationId)
+                .filter(row -> EkycVerificationStatus.PENDING_REVIEW.name().equals(row.getStatus()))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ eKYC đang chờ duyệt."));
+        return mapToDto(record, false);
     }
 
     private EoEkycVerificationResultDto mapToDto(EoEkycVerification record) {
+        return mapToDto(record, true);
+    }
+
+    private EoEkycVerificationResultDto mapToDto(EoEkycVerification record, boolean signedLinks) {
         boolean hasManagedImages = record.getImagesPurgedAt() == null
                 && (imageStorage.isManagedObjectKey(record.getFrontImageUrl())
                 || imageStorage.isManagedObjectKey(record.getBackImageUrl())
@@ -769,9 +812,9 @@ public class EventOrganizerEkycService {
                 .residenceAddress(record.getResidenceAddress())
                 .expiryDate(record.getExpiryDate())
                 .issueDate(record.getIssueDate())
-                .frontImageUrl(resolveSignedImageUrl(record, record.getFrontImageUrl(), "front"))
-                .backImageUrl(resolveSignedImageUrl(record, record.getBackImageUrl(), "back"))
-                .selfieImageUrl(resolveSignedImageUrl(record, record.getSelfieImageUrl(), "selfie"))
+                .frontImageUrl(resolveSignedImageUrl(record, record.getFrontImageUrl(), "front", signedLinks))
+                .backImageUrl(resolveSignedImageUrl(record, record.getBackImageUrl(), "back", signedLinks))
+                .selfieImageUrl(resolveSignedImageUrl(record, record.getSelfieImageUrl(), "selfie", signedLinks))
                 .faceMatchScore(record.getFaceMatchScore())
                 .ocrConfidence(record.getOcrConfidence())
                 .fraudFlags(record.getFraudFlags())
@@ -780,6 +823,7 @@ public class EventOrganizerEkycService {
                 .retryable(EkycVerificationStatus.TECHNICAL_FAILURE.name().equals(record.getStatus()))
                 .retryCount(record.getRetryCount())
                 .imagesAvailable(hasManagedImages)
+                .legalHold(record.isLegalHold())
                 .routingDecision(record.getRoutingDecision())
                 .routingReason(record.getRoutingReason())
                 .status(record.getStatus())
@@ -791,9 +835,12 @@ public class EventOrganizerEkycService {
                 .build();
     }
 
-    private String resolveSignedImageUrl(EoEkycVerification v, String storedKey, String slot) {
+    private String resolveSignedImageUrl(EoEkycVerification v, String storedKey, String slot, boolean signedLink) {
         if (v.getId() == null || v.getImagesPurgedAt() != null || !imageStorage.isManagedObjectKey(storedKey)) {
             return null;
+        }
+        if (!signedLink) {
+            return "/api/v1/ekyc/images/eo/" + v.getId() + "/" + slot;
         }
         return imageAccessTokenService.generateSignedImageUrl("eo", v.getId(), slot, storedKey, v.getStatus());
     }
@@ -817,13 +864,7 @@ public class EventOrganizerEkycService {
         if (auditLogService == null) {
             return;
         }
-        auditLogService.logAction(AuditLog.builder()
-                .userId(actorUserId)
-                .action(action)
-                .entityType("EO_EKYC")
-                .entityId(entityId)
-                .newValues(metadata != null ? metadata.toString() : null)
-                .build());
+        auditLogService.logEkycAction(actorUserId, action, "EO_EKYC", entityId, metadata);
     }
 
     private static BigDecimal scaleOrNull(Double val) {

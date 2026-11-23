@@ -10,7 +10,9 @@ import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
 import com.cani.repository.EventOrganizerRepository;
 import com.cani.repository.PaymentRepository;
+import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.repository.UserRepository;
+import com.cani.repository.WorkerEkycVerificationRepository;
 import com.cani.repository.WorkerRepository;
 import com.cani.service.AuthService;
 import com.cani.service.EmailOtpService;
@@ -24,6 +26,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,6 +53,12 @@ class AuthWorkerTransitionTest {
 
     @Mock
     private PaymentRepository paymentRepository;
+
+    @Mock
+    private WorkerEkycVerificationRepository workerEkycVerificationRepository;
+
+    @Mock
+    private ShiftAssignmentRepository shiftAssignmentRepository;
 
     @Mock
     private SupabaseAuthClient supabaseAuthClient;
@@ -251,6 +260,95 @@ class AuthWorkerTransitionTest {
         authService.googleLogin(req);
 
         verify(userRepository, atLeastOnce()).save(argThat(u -> u.getRole() == UserRole.EVENT_ORGANIZER));
+        verify(workerRepository, never()).delete(any(Worker.class));
+    }
+
+    @Test
+    @DisplayName("UTC-SEC-011: googleLogin - Worker có hồ sơ eKYC đang chờ/đã duyệt dù workers.cccdNumber null -> Giữ nguyên WORKER, không xóa worker")
+    void googleLogin_WorkerHasEkycVerificationWithoutLegacyCccd_TargetEO_KeepsWorkerRole() {
+        UUID userId = UUID.randomUUID();
+        UUID workerId = UUID.randomUUID();
+        String email = "ekyc_worker@cani.vn";
+
+        User user = User.builder()
+                .userId(userId)
+                .email(email)
+                .fullName("eKYC Worker")
+                .role(UserRole.WORKER)
+                .status(UserStatus.ACTIVE)
+                .build();
+
+        Worker worker = Worker.builder()
+                .workerId(workerId)
+                .user(user)
+                .cccdNumber(null)
+                .totalShiftsCompleted(0)
+                .build();
+
+        GoogleLoginRequest req = GoogleLoginRequest.builder()
+                .supabaseAccessToken("valid.token")
+                .targetRole("EVENT_ORGANIZER")
+                .build();
+
+        Jwt mockJwt = mock(Jwt.class);
+        when(mockJwt.getSubject()).thenReturn(userId.toString());
+        when(mockJwt.getClaimAsString("email")).thenReturn(email);
+        lenient().when(mockJwt.getClaimAsString("name")).thenReturn("eKYC Worker");
+        when(jwtDecoder.decode("valid.token")).thenReturn(mockJwt);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerEkycVerificationRepository.existsByWorker_WorkerIdAndStatusIn(
+                workerId, List.of("PROCESSING", "PENDING_REVIEW", "APPROVED"))).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        LoginResponse response = authService.googleLogin(req);
+
+        assertThat(response.getUser().getRole()).isEqualTo(UserRole.WORKER);
+        verify(workerRepository, never()).delete(any(Worker.class));
+    }
+
+    @Test
+    @DisplayName("UTC-SEC-012: googleLogin - Worker có lịch sử ShiftAssignment -> Giữ nguyên WORKER, không xóa worker")
+    void googleLogin_WorkerHasShiftAssignment_TargetEO_KeepsWorkerRole() {
+        UUID userId = UUID.randomUUID();
+        UUID workerId = UUID.randomUUID();
+        String email = "shift_worker@cani.vn";
+
+        User user = User.builder()
+                .userId(userId)
+                .email(email)
+                .fullName("Shift Worker")
+                .role(UserRole.WORKER)
+                .status(UserStatus.ACTIVE)
+                .build();
+
+        Worker worker = Worker.builder()
+                .workerId(workerId)
+                .user(user)
+                .cccdNumber(null)
+                .totalShiftsCompleted(0)
+                .build();
+
+        GoogleLoginRequest req = GoogleLoginRequest.builder()
+                .supabaseAccessToken("valid.token")
+                .targetRole("EVENT_ORGANIZER")
+                .build();
+
+        Jwt mockJwt = mock(Jwt.class);
+        when(mockJwt.getSubject()).thenReturn(userId.toString());
+        when(mockJwt.getClaimAsString("email")).thenReturn(email);
+        lenient().when(mockJwt.getClaimAsString("name")).thenReturn("Shift Worker");
+        when(jwtDecoder.decode("valid.token")).thenReturn(mockJwt);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.existsByWorker_WorkerId(workerId)).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        LoginResponse response = authService.googleLogin(req);
+
+        assertThat(response.getUser().getRole()).isEqualTo(UserRole.WORKER);
         verify(workerRepository, never()).delete(any(Worker.class));
     }
 }

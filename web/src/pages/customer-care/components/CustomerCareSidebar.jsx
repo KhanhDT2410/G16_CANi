@@ -5,6 +5,7 @@ import {
   DisputeIcon,
   AppealIcon,
   NoShowIcon,
+  EkycIcon,
   CollapseToggleIcon,
   ChevronDownIcon,
 } from '../../admin/components/AdminSidebarIcons';
@@ -17,6 +18,7 @@ export const CC_NAV_GROUPS = [
     groupLabel: 'Tiếp nhận & Hỗ trợ',
     items: [
       { id: 'tickets', label: 'Phiếu Hỗ Trợ Khách Hàng', icon: <TicketIcon />, hasChildren: true },
+      { id: 'ekyc_review', label: 'Thẩm Định eKYC', icon: <EkycIcon /> },
       { id: 'faqs', label: 'Câu Hỏi Thường Gặp', icon: <FaqIcon /> },
     ],
   },

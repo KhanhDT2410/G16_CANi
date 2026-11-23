@@ -39,33 +39,32 @@ public class EkycImageRetentionService {
             EkycImageStorage imageStorage,
             WorkerEkycVerificationRepository workerEkycRepository,
             EoEkycVerificationRepository eoEkycRepository,
-            @Value("${cani.ekyc.retention.approved-image-days:30}") int approvedRetentionDays,
-            @Value("${cani.ekyc.retention.rejected-image-days:7}") int rejectedRetentionDays,
-            @Value("${cani.ekyc.retention.technical-failure-image-days:3}") int technicalFailureRetentionDays,
-            @Value("${cani.ekyc.retention.pending-review-image-days:30}") int pendingReviewRetentionDays,
-            @Value("${cani.ekyc.retention.cleanup-enabled:true}") boolean cleanupEnabled
+            @Value("${cani.ekyc.retention.approved-image-days:0}") int approvedRetentionDays,
+            @Value("${cani.ekyc.retention.rejected-image-days:0}") int rejectedRetentionDays,
+            @Value("${cani.ekyc.retention.technical-failure-image-days:0}") int technicalFailureRetentionDays,
+            @Value("${cani.ekyc.retention.pending-review-image-days:0}") int pendingReviewRetentionDays,
+            @Value("${cani.ekyc.retention.cleanup-enabled:false}") boolean cleanupEnabled
     ) {
         this.imageStorage = imageStorage;
         this.workerEkycRepository = workerEkycRepository;
         this.eoEkycRepository = eoEkycRepository;
-        this.approvedRetentionDays = Math.max(1, approvedRetentionDays);
-        this.rejectedRetentionDays = Math.max(1, rejectedRetentionDays);
-        this.technicalFailureRetentionDays = Math.max(1, technicalFailureRetentionDays);
-        this.pendingReviewRetentionDays = Math.max(1, pendingReviewRetentionDays);
+        this.approvedRetentionDays = Math.max(0, approvedRetentionDays);
+        this.rejectedRetentionDays = Math.max(0, rejectedRetentionDays);
+        this.technicalFailureRetentionDays = Math.max(0, technicalFailureRetentionDays);
+        this.pendingReviewRetentionDays = Math.max(0, pendingReviewRetentionDays);
         this.cleanupEnabled = cleanupEnabled;
     }
 
     public Instant calculateRetentionDeadline(EkycVerificationStatus status) {
-        Instant now = Instant.now();
-        if (status == null) {
-            return now.plus(pendingReviewRetentionDays, ChronoUnit.DAYS);
-        }
-        return switch (status) {
-            case APPROVED -> now.plus(approvedRetentionDays, ChronoUnit.DAYS);
-            case REJECTED -> now.plus(rejectedRetentionDays, ChronoUnit.DAYS);
-            case TECHNICAL_FAILURE -> now.plus(technicalFailureRetentionDays, ChronoUnit.DAYS);
-            case PENDING, PROCESSING, PENDING_REVIEW -> now.plus(pendingReviewRetentionDays, ChronoUnit.DAYS);
+        int days = switch (status) {
+            case APPROVED -> approvedRetentionDays;
+            case REJECTED -> rejectedRetentionDays;
+            case TECHNICAL_FAILURE -> technicalFailureRetentionDays;
+            case PENDING_REVIEW -> pendingReviewRetentionDays;
+            case null -> 0;
+            case PENDING, PROCESSING -> 0;
         };
+        return days > 0 ? Instant.now().plus(days, ChronoUnit.DAYS) : null;
     }
 
     public void deleteAfterCommit(String front, String back, String selfie) {
@@ -77,6 +76,18 @@ public class EkycImageRetentionService {
                 new org.springframework.transaction.support.TransactionSynchronization() {
                     @Override public void afterCommit() { deleteStoredImagesQuietly(front, back, selfie); }
                 });
+    }
+
+    public void deleteAfterRollback(String front, String back, String selfie) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            if (status == STATUS_ROLLED_BACK) deleteStoredImagesQuietly(front, back, selfie);
+                        }
+                    });
+        }
     }
 
     public void deleteStoredImagesQuietly(String frontKey, String backKey, String selfieKey) {
@@ -103,7 +114,8 @@ public class EkycImageRetentionService {
         List<WorkerEkycVerification> expiredWorkers =
                 workerEkycRepository.findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(now);
         for (WorkerEkycVerification record : expiredWorkers) {
-            if (record.isLegalHold() || !imageStorage.deleteIfPresent(record.getFrontImageUrl())
+            if (record.isLegalHold() || EkycVerificationStatus.PROCESSING.name().equals(record.getStatus())
+                    || !imageStorage.deleteIfPresent(record.getFrontImageUrl())
                     || !imageStorage.deleteIfPresent(record.getBackImageUrl())
                     || !imageStorage.deleteIfPresent(record.getSelfieImageUrl())) continue;
             record.setFrontImageUrl(null);
@@ -117,7 +129,8 @@ public class EkycImageRetentionService {
         List<EoEkycVerification> expiredEos =
                 eoEkycRepository.findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(now);
         for (EoEkycVerification record : expiredEos) {
-            if (record.isLegalHold() || !imageStorage.deleteIfPresent(record.getFrontImageUrl())
+            if (record.isLegalHold() || EkycVerificationStatus.PROCESSING.name().equals(record.getStatus())
+                    || !imageStorage.deleteIfPresent(record.getFrontImageUrl())
                     || !imageStorage.deleteIfPresent(record.getBackImageUrl())
                     || !imageStorage.deleteIfPresent(record.getSelfieImageUrl())) continue;
             record.setFrontImageUrl(null);

@@ -1,6 +1,7 @@
 package com.cani.dto.profile;
 
 import com.cani.entity.enums.SkillTier;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,12 +20,16 @@ public class WorkerPublicProfileResponseDto {
     private UUID userId;
     private String fullName;
     private String avatarUrl;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String phone;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String email;
     private String bio;
     private Integer yearsExperience;
     private Boolean isOnline;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Integer age;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String baseAddress;
 
     // Năng lực & Uy tín

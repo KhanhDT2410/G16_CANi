@@ -10,9 +10,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -153,5 +158,73 @@ class EmailOtpServiceTest {
         assertTrue(ex.getMessage().contains("không chính xác"));
         assertEquals(2, otp.getAttempts());
         verify(otpRepository, times(1)).saveAndFlush(otp);
+    }
+
+    @Test
+    @DisplayName("Gửi OTP lưu mã băm 64 ký tự (không lưu plaintext) và xác thực thành công bằng mã gốc")
+    void sendOtp_StoresHashedDigest_AndVerifiesPlaintext() {
+        ReflectionTestUtils.setField(emailOtpService, "otpHashPepper", "otp-test-pepper");
+        when(userRepository.existsByEmail(testEmail)).thenReturn(false);
+        when(otpRepository.findTopByEmailIgnoreCaseAndOtpTypeAndIsUsedFalseOrderByCreatedAtDesc(eq(testEmail), eq("REGISTER")))
+                .thenReturn(Optional.empty());
+
+        emailOtpService.sendOtp(testEmail, "REGISTER");
+
+        ArgumentCaptor<EmailOtpVerification> savedCaptor = ArgumentCaptor.forClass(EmailOtpVerification.class);
+        ArgumentCaptor<String> plainCaptor = ArgumentCaptor.forClass(String.class);
+        verify(otpRepository).save(savedCaptor.capture());
+        verify(emailService).sendOtpEmail(eq(testEmail), plainCaptor.capture());
+
+        EmailOtpVerification stored = savedCaptor.getValue();
+        String plaintext = plainCaptor.getValue();
+        assertEquals(6, plaintext.length());
+        assertEquals(64, stored.getOtpCode().length());
+        assertNotEquals(plaintext, stored.getOtpCode());
+
+        stored.setId(UUID.randomUUID());
+        when(otpRepository.findTopByEmailIgnoreCaseAndOtpTypeAndIsUsedFalseOrderByCreatedAtDesc(eq(testEmail), eq("REGISTER")))
+                .thenReturn(Optional.of(stored));
+
+        assertDoesNotThrow(() -> emailOtpService.verifyOtp(testEmail, plaintext, "REGISTER"));
+        assertTrue(stored.getIsUsed());
+    }
+
+    @Test
+    @DisplayName("Nhập sai OTP khi có TransactionManager -> cập nhật attempts trong REQUIRES_NEW transaction")
+    void verifyOtp_WrongCodeWithTransactionManager_CommitsAttemptsInRequiresNew() {
+        PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
+        when(txManager.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
+        ReflectionTestUtils.setField(emailOtpService, "transactionManager", txManager);
+
+        UUID otpId = UUID.randomUUID();
+        EmailOtpVerification otp = EmailOtpVerification.builder()
+                .id(otpId)
+                .email(testEmail)
+                .otpCode("0000000000000000000000000000000000000000000000000000000000000000")
+                .otpType("REGISTER")
+                .expiresAt(Instant.now().plus(4, ChronoUnit.MINUTES))
+                .attempts(0)
+                .isUsed(false)
+                .build();
+
+        when(otpRepository.findTopByEmailIgnoreCaseAndOtpTypeAndIsUsedFalseOrderByCreatedAtDesc(eq(testEmail), eq("REGISTER")))
+                .thenReturn(Optional.of(otp));
+        when(otpRepository.findById(otpId)).thenReturn(Optional.of(otp));
+
+        assertThrows(BadRequestException.class,
+                () -> emailOtpService.verifyOtp(testEmail, "999999", "REGISTER"));
+
+        ArgumentCaptor<TransactionDefinition> defCaptor = ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(txManager).getTransaction(defCaptor.capture());
+        assertEquals(TransactionDefinition.PROPAGATION_REQUIRES_NEW, defCaptor.getValue().getPropagationBehavior());
+        assertEquals(1, otp.getAttempts());
+        verify(otpRepository).saveAndFlush(otp);
+    }
+
+    @Test
+    @DisplayName("Dọn dẹp OTP đã hết hạn quá 24 giờ gọi deleteByExpiresAtBefore")
+    void purgeExpiredOtps_DeletesOldRecords() {
+        emailOtpService.purgeExpiredOtps();
+        verify(otpRepository).deleteByExpiresAtBefore(any(Instant.class));
     }
 }

@@ -7,12 +7,16 @@ class RadarSlidingJobCard extends StatefulWidget {
   final NearbyShiftItem shift;
   final VoidCallback onViewDetails;
   final VoidCallback onApply;
+  final int activeInviteCount;
+  final VoidCallback? onViewInvites;
 
   const RadarSlidingJobCard({
     super.key,
     required this.shift,
     required this.onViewDetails,
     required this.onApply,
+    this.activeInviteCount = 0,
+    this.onViewInvites,
   });
 
   @override
@@ -25,10 +29,23 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
   @override
   void didUpdateWidget(covariant RadarSlidingJobCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Khi người dùng chạm vào marker ca khác trên bản đồ, tự động mở bung thẻ
     if (oldWidget.shift.shiftId != widget.shift.shiftId) {
       _isCollapsed = false;
     }
+  }
+
+  String _formatWage(double wage) {
+    return wage.toInt().toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
+  }
+
+  String? _formatTime(NearbyShiftItem s) {
+    if (s.startTime == null || s.endTime == null) return null;
+    final st = '${s.startTime!.hour.toString().padLeft(2, '0')}:${s.startTime!.minute.toString().padLeft(2, '0')}';
+    final et = '${s.endTime!.hour.toString().padLeft(2, '0')}:${s.endTime!.minute.toString().padLeft(2, '0')}';
+    return '$st - $et · ${s.startTime!.day}/${s.startTime!.month}';
   }
 
   @override
@@ -41,25 +58,22 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
       onVerticalDragEnd: (details) {
         if (details.primaryVelocity != null) {
           if (details.primaryVelocity! > 120) {
-            // Vuốt xuống -> Thu nhỏ gập xuống đáy
             setState(() => _isCollapsed = true);
           } else if (details.primaryVelocity! < -120) {
-            // Vuốt lên -> Mở rộng
             setState(() => _isCollapsed = false);
           }
         }
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic,
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
         padding: _isCollapsed
             ? const EdgeInsets.symmetric(horizontal: 14, vertical: 8)
-            : const EdgeInsets.all(14),
+            : const EdgeInsets.fromLTRB(14, 10, 14, 12),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(_isCollapsed ? 16 : 22),
-          border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
+          borderRadius: BorderRadius.circular(_isCollapsed ? 16 : 20),
+          border: Border.all(color: isDark ? cani.border : cani.border.withValues(alpha: 0.7)),
           boxShadow: [
             BoxShadow(
               color: isDark
@@ -84,26 +98,25 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
           Container(
             width: 36,
             height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF475569) : cani.border,
-                borderRadius: BorderRadius.circular(99),
-              ),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF475569) : cani.border,
+              borderRadius: BorderRadius.circular(99),
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    color: cani.brand.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.location_on, size: 15, color: cani.brand),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: cani.brand.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
                 ),
+                child: Icon(Icons.location_on, size: 15, color: cani.brand),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -121,13 +134,11 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                     ),
                     Text(
                       s.isConflicting
-                          ? '⚠️ ${s.conflictReason ?? "Trùng thời gian ca khác"}'
-                          : 'Cách bạn ${s.distanceKm.toStringAsFixed(1)} km · ${s.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ/h',
+                          ? (s.conflictReason ?? 'Trùng thời gian ca khác')
+                          : 'Cách bạn ${s.distanceKm.toStringAsFixed(1)} km · ${_formatWage(s.hourlyWage)} đ/h',
                       style: TextStyle(
                         fontSize: 10.5,
-                        color: s.isConflicting
-                            ? cani.danger
-                            : cani.textMuted,
+                        color: s.isConflicting ? cani.danger : cani.textMuted,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -163,128 +174,171 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
   }
 
   Widget _buildExpandedView(CaniTokens cani, bool isDark, NearbyShiftItem s) {
+    final timeStr = _formatTime(s);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Drag handle & Nút gạt xuống
-        InkWell(
-          onTap: () => setState(() => _isCollapsed = true),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(width: 24),
-                Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF475569) : cani.border,
-                    borderRadius: BorderRadius.circular(99),
+        // Hàng đầu: "Ca gần bạn" + trạng thái khẩn cấp/matching + nút thu gọn + về lời mời (nếu có)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF064E3B).withValues(alpha: 0.45)
+                          : const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Ca gần bạn',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF047857),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: s.emergency
+                          ? cani.dangerBg
+                          : (isDark ? cani.canvas : const Color(0xFFF1F5F9)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      s.emergency ? 'Khẩn cấp' : 'Matching',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: s.emergency ? cani.danger : cani.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (widget.activeInviteCount > 0 && widget.onViewInvites != null) ...[
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: widget.onViewInvites,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: Text(
+                    'Lời mời (${widget.activeInviteCount})',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: cani.brand,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 18,
-                  color: cani.textMuted,
-                ),
-              ],
+              ),
+            ],
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: () => setState(() => _isCollapsed = true),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: cani.textMuted),
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
 
-        // Top Info Row
+        // Thông tin chính: Sự kiện, Vị trí & Lương
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Job Icon Box
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF064E3B).withValues(alpha: 0.4)
-                    : const Color(0xFF10B981).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                Icons.work_outline_rounded,
-                size: 22,
-                color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
-              ),
-            ),
-            const SizedBox(width: 11),
-
-            // Title and Subtitle
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${s.jobType} · ${s.eventName}',
+                    s.eventName,
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 13.5,
+                      fontSize: 14,
                       color: isDark ? const Color(0xFFF8FAFC) : cani.textMain,
-                      letterSpacing: -0.1,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Cách bạn ${s.distanceKm.toStringAsFixed(1)} km · Cần ${s.remainingWorkers} người',
+                    '${s.jobType} · Cách ${s.distanceKm.toStringAsFixed(1)} km · Cần ${s.remainingWorkers} người',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w600,
                       color: cani.textMuted,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (timeStr != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: cani.textBody,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-
-            // Wage
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${s.hourlyWage.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                  '${_formatWage(s.hourlyWage)} đ',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
+                    fontSize: 14,
                     color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                   ),
                 ),
-                const Text(
+                Text(
                   '/giờ',
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF94A3B8),
+                    color: cani.textMuted,
                   ),
                 ),
               ],
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
 
-        // Cảnh báo trùng ca làm việc (nếu có)
         if (s.isConflicting) ...[
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2),
+              color: cani.dangerBg,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFFCA5A5)),
+              border: Border.all(color: cani.danger.withValues(alpha: 0.4)),
             ),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, size: 16, color: cani.danger),
+                Icon(Icons.warning_amber_rounded, size: 15, color: cani.danger),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -303,102 +357,91 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
           ),
         ],
 
-        // 2 Action Buttons
+        // 2 Action Buttons: Xem chi tiết & Ứng tuyển / Trạng thái
         Row(
           children: [
             Expanded(
-              flex: 1,
               child: SizedBox(
-                height: 42,
-                child: OutlinedButton.icon(
+                height: 40,
+                child: OutlinedButton(
                   onPressed: widget.onViewDetails,
-                  icon: Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    side: BorderSide(
+                      color: isDark ? cani.borderStrong : cani.border,
+                      width: 1.3,
+                    ),
+                    backgroundColor: isDark ? cani.canvas : const Color(0xFFF8FAFC),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  label: Text(
-                    'Chi tiết',
+                  child: Text(
+                    'Xem chi tiết',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
                     ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: isDark ? const Color(0xFF334155) : cani.border,
-                      width: 1.5,
-                    ),
-                    backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              flex: 1,
               child: SizedBox(
-                height: 42,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: (s.isConflicting || !s.emergency)
-                        ? null
-                        : LinearGradient(
-                            colors: [cani.danger, cani.danger],
-                          ),
-                    color: (s.isConflicting || !s.emergency)
-                        ? (isDark ? const Color(0xFF1E293B) : cani.border)
-                        : null,
-                    border: (s.isConflicting || !s.emergency)
-                        ? Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1))
-                        : null,
-                    borderRadius: BorderRadius.circular(12),
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: s.isConflicting
+                      ? () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(s.conflictReason ?? 'Bạn đã có ca khác trùng khung giờ này!'),
+                              backgroundColor: cani.danger,
+                            ),
+                          );
+                        }
+                      : (s.emergency
+                          ? widget.onApply
+                          : () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                      'Ca này đang ghép đôi tự động (Matching). Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp!'),
+                                  backgroundColor: cani.warning,
+                                ),
+                              );
+                            }),
+                  icon: Icon(
+                    s.isConflicting
+                        ? Icons.block
+                        : (s.emergency ? Icons.flash_on_rounded : Icons.schedule_send_rounded),
+                    size: 15,
+                    color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
                   ),
-                  child: ElevatedButton.icon(
-                    onPressed: s.isConflicting
-                        ? () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(s.conflictReason ?? 'Bạn đã có ca khác trùng khung giờ này!'),
-                                backgroundColor: cani.danger,
-                              ),
-                            );
-                          }
-                        : (s.emergency
-                            ? widget.onApply
-                            : () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Ca này đang ghép đôi tự động (Matching). Ứng tuyển trực tiếp chỉ mở khi Ban tổ chức kích hoạt điều phối khẩn cấp!'),
-                                    backgroundColor: cani.warning,
-                                  ),
-                                );
-                              }),
-                    icon: Icon(
-                      s.isConflicting
-                          ? Icons.block
-                          : (s.emergency ? Icons.flash_on_rounded : Icons.schedule_send_rounded),
-                      size: 16,
+                  label: Text(
+                    s.isConflicting
+                        ? 'Trùng lịch'
+                        : (s.emergency ? 'Ứng tuyển' : 'Chờ lời mời'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                       color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
                     ),
-                    label: Text(
-                      s.isConflicting
-                          ? 'Trùng lịch ca'
-                          : (s.emergency ? 'Ứng tuyển ngay' : 'Chờ lời mời (Matching)'),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: (s.isConflicting || !s.emergency)
+                        ? (isDark ? cani.canvas : cani.skeleton)
+                        : cani.danger,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: (s.isConflicting || !s.emergency)
+                          ? BorderSide(color: cani.borderStrong)
+                          : BorderSide.none,
                     ),
                   ),
                 ),

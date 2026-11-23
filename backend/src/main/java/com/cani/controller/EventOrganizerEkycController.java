@@ -1,6 +1,7 @@
 package com.cani.controller;
 
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
+import com.cani.dto.ekyc.EkycLegalHoldRequestDto;
 import com.cani.dto.ekyc.EoEkycVerificationResultDto;
 import com.cani.dto.ekyc.EoProfileDto;
 import com.cani.dto.event.EoReviewResponseDto;
@@ -124,6 +125,14 @@ public class EventOrganizerEkycController {
      * Admin / CSKH duyệt thủ công hồ sơ eKYC doanh nghiệp
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
+    @GetMapping("/admin/eo-ekyc/{verificationId}")
+    public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> getPendingReviewDetails(@PathVariable UUID verificationId) {
+        return ResponseEntity.ok()
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(ApiResponse.ok(eoEkycService.getPendingReviewDetails(verificationId), "Chi tiết hồ sơ chờ duyệt"));
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
     @PostMapping("/admin/eo-ekyc/{verificationId}/review")
     public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> adminReviewEkyc(
             @PathVariable UUID verificationId,
@@ -134,5 +143,17 @@ public class EventOrganizerEkycController {
         EoEkycVerificationResultDto result = eoEkycService.adminReviewEkyc(adminUserId, verificationId, request);
         return ResponseEntity
                 .ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC doanh nghiệp thành công: " + result.getStatus()));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/admin/eo-ekyc/{verificationId}/legal-hold")
+    public ResponseEntity<ApiResponse<EoEkycVerificationResultDto>> updateLegalHold(
+            @PathVariable UUID verificationId,
+            @Valid @RequestBody EkycLegalHoldRequestDto request,
+            Authentication authentication) {
+        UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
+        EoEkycVerificationResultDto result = eoEkycService.updateLegalHold(
+                adminUserId, verificationId, Boolean.TRUE.equals(request.getLegalHold()), request.getReason());
+        return ResponseEntity.ok(ApiResponse.ok(result, "Cập nhật trạng thái bảo lưu pháp lý hồ sơ eKYC doanh nghiệp thành công"));
     }
 }

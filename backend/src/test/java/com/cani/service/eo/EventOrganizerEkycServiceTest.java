@@ -290,6 +290,7 @@ class EventOrganizerEkycServiceTest {
         EoEkycVerification pending = EoEkycVerification.builder()
                 .id(verificationId)
                 .eventOrganizer(eo)
+                .cccdNumberHash("synthetic-index")
                 .status("PENDING_REVIEW")
                 .build();
 

@@ -82,7 +82,7 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
                     <span className="detail-section-subtitle">(Worker Profile)</span>
                   </div>
                   <div className="detail-grid">
-                    <DetailItem label="Số CCCD" value={user.workerProfile.cccdNumber} />
+                    <DetailItem label="Số CCCD (đã che)" value={user.workerProfile.cccdNumber} />
                     <DetailItem
                       label="Trạng thái eKYC"
                       value={KYC_STATUS_LABELS[user.workerProfile.kycStatus]?.label || user.workerProfile.kycStatus}

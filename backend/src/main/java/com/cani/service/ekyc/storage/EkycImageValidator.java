@@ -91,8 +91,8 @@ public class EkycImageValidator {
         if (declaredMime != null && !declaredMime.isBlank()) {
             String normalizedDeclared = declaredMime.toLowerCase(Locale.ROOT).split(";")[0].trim();
             if (!"application/octet-stream".equals(normalizedDeclared)
-                    && !MIME_TO_EXTENSIONS.containsKey(normalizedDeclared)) {
-                throw new BadRequestException(fieldLabel + " có MIME type không được hỗ trợ: " + normalizedDeclared);
+                    && !detectedMime.equals(normalizedDeclared)) {
+                throw new BadRequestException(fieldLabel + " có MIME type không khớp định dạng ảnh thực tế.");
             }
         }
 

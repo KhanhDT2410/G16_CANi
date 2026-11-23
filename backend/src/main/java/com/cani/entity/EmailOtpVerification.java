@@ -27,7 +27,7 @@ public class EmailOtpVerification {
     @Column(name = "email", nullable = false)
     private String email;
 
-    @Column(name = "otp_code", length = 10, nullable = false)
+    @Column(name = "otp_code", length = 64, nullable = false)
     private String otpCode;
 
     @Column(name = "otp_type", length = 50, nullable = false)

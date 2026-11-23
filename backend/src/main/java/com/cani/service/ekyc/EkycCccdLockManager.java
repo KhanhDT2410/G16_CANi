@@ -78,8 +78,8 @@ public class EkycCccdLockManager {
         try (Connection conn = dataSource.getConnection()) {
             String product = conn.getMetaData().getDatabaseProductName();
             return product != null && product.toLowerCase().contains("postgresql");
-        } catch (Exception e) {
-            return false;
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("Cannot determine eKYC locking mode", e);
         }
     }
 }

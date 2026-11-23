@@ -240,4 +240,15 @@ class CustomerCareQueueSecurityTest {
                         .with(authentication(createAuthToken(workerUser))))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("CUSTOMER_CARE bị chặn 403 Forbidden khi thay đổi Legal Hold hồ sơ eKYC")
+    void customerCare_forbiddenFromUpdatingLegalHold() throws Exception {
+        UUID verificationId = UUID.randomUUID();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/v1/admin/ekyc/" + verificationId + "/legal-hold")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"legalHold\":true,\"reason\":\"Test\"}")
+                        .with(authentication(createAuthToken(ccUser))))
+                .andExpect(status().isForbidden());
+    }
 }

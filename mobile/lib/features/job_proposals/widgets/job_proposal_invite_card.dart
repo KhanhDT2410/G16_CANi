@@ -9,12 +9,18 @@ class JobProposalInviteCard extends StatefulWidget {
   final JobProposalItem proposal;
   final VoidCallback onAccept;
   final VoidCallback onReject;
+  final bool compact;
+  final int totalPendingCount;
+  final VoidCallback? onViewAll;
 
   const JobProposalInviteCard({
     super.key,
     required this.proposal,
     required this.onAccept,
     required this.onReject,
+    this.compact = false,
+    this.totalPendingCount = 1,
+    this.onViewAll,
   });
 
   @override
@@ -34,6 +40,15 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
         setState(_syncSecondsLeft);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant JobProposalInviteCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.proposal.proposalId != widget.proposal.proposalId ||
+        oldWidget.proposal.expiresAt != widget.proposal.expiresAt) {
+      _syncSecondsLeft();
+    }
   }
 
   void _syncSecondsLeft() {
@@ -64,8 +79,270 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
+  String _formatMoney(double amount) {
+    return amount.toInt().toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
+  }
+
+  String _formatTimeRange(JobProposalItem p) {
+    final s = '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')}';
+    final e = '${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')}';
+    return '$s - $e · ${p.startTime.day}/${p.startTime.month}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.compact) {
+      return _buildCompactBottomCard(context);
+    }
+    return _buildFullCard(context);
+  }
+
+  Widget _buildCompactBottomCard(BuildContext context) {
+    final p = widget.proposal;
+    final cani = Theme.of(context).cani;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isExpired = _secondsLeft == 0;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: cani.brand.withValues(alpha: isDark ? 0.45 : 0.28),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.40)
+                : cani.textMain.withValues(alpha: 0.14),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Hàng tiêu đề: "Lời mời làm việc" + đếm ngược + "Xem tất cả (N)"
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: cani.brandSoft,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.notifications_active_rounded, size: 12.5, color: cani.brand),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Lời mời làm việc',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: cani.brand,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: cani.warning.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _secondsLeft < 0 ? 'Đang mở' : _formatCountdown(),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.totalPendingCount > 1 && widget.onViewAll != null) ...[
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: widget.onViewAll,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    child: Text(
+                      'Xem tất cả (${widget.totalPendingCount})',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: cani.brand,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Tên sự kiện, vị trí công việc & thù lao
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.eventName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: cani.textMain,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      p.jobType,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cani.brand,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${_formatMoney(p.totalEstimatedPay)} đ',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: cani.success,
+                    ),
+                  ),
+                  Text(
+                    'ước tính',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cani.textMuted),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Giờ làm & Địa điểm
+          Row(
+            children: [
+              Icon(Icons.access_time_rounded, size: 13.5, color: cani.textMuted),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '${_formatTimeRange(p)}${p.venueAddress.trim().isNotEmpty ? ' · ${p.venueAddress}' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: cani.textBody),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Nút Từ chối & Nhận ca ngay
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: OutlinedButton(
+                    onPressed: widget.onReject,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      side: BorderSide(color: isDark ? cani.borderStrong : cani.border, width: 1.3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(
+                      'Từ chối',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: cani.textBody,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 40,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: isExpired ? null : LinearGradient(colors: cani.brandGradient),
+                      color: isExpired ? cani.skeleton : null,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ElevatedButton(
+                      onPressed: isExpired ? null : widget.onAccept,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        isExpired ? 'Đã hết hạn' : 'Nhận ca ngay',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFullCard(BuildContext context) {
     final p = widget.proposal;
     final cani = Theme.of(context).cani;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -90,7 +367,6 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Vị trí việc + Badge Khớp kỹ năng
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -128,7 +404,6 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           ),
           const SizedBox(height: 5),
 
-          // Tên sự kiện & Hồ sơ Ban tổ chức
           Row(
             children: [
               Expanded(
@@ -182,7 +457,6 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           ),
           const SizedBox(height: 10),
 
-          // Ảnh đồng phục / ca làm nếu có
           if (p.imageUrl != null && p.imageUrl!.trim().isNotEmpty) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -216,7 +490,6 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
             const SizedBox(height: 10),
           ],
 
-          // Địa chỉ & Thời gian
           Row(
             children: [
               Icon(Icons.location_on, size: 15, color: cani.brand),
@@ -236,9 +509,13 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
             children: [
               Icon(Icons.access_time_rounded, size: 15, color: cani.brand),
               const SizedBox(width: 6),
-              Text(
-                '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')} - ${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')} (${p.startTime.day}/${p.startTime.month}/${p.startTime.year})${p.arrivalTime != null ? ' · Mở điểm danh ${p.arrivalTime!.hour.toString().padLeft(2, '0')}:${p.arrivalTime!.minute.toString().padLeft(2, '0')}' : ''}',
-                style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontWeight: FontWeight.w600),
+              Expanded(
+                child: Text(
+                  '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')} - ${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')} (${p.startTime.day}/${p.startTime.month}/${p.startTime.year})${p.arrivalTime != null ? ' · Mở điểm danh ${p.arrivalTime!.hour.toString().padLeft(2, '0')}:${p.arrivalTime!.minute.toString().padLeft(2, '0')}' : ''}',
+                  style: TextStyle(fontSize: 11.5, color: cani.textMuted, fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -256,7 +533,6 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
               ),
             ),
 
-          // Kỹ năng yêu cầu (bắt buộc) & ưu tiên thêm
           if (p.requiredSkillNames.isNotEmpty || p.preferredSkillNames.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -287,62 +563,71 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
             ),
           const SizedBox(height: 12),
 
-          // Divider mỏng
           Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF0F7FF)),
           const SizedBox(height: 12),
 
-          // Footer: Thù lao & Đồng hồ đếm ngược
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${p.totalEstimatedPay.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16.5,
-                      color: Color(0xFF059669),
-                      letterSpacing: -0.2,
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${_formatMoney(p.totalEstimatedPay)} đ',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16.5,
+                        color: Color(0xFF059669),
+                        letterSpacing: -0.2,
+                      ),
                     ),
-                  ),
                     Text(
                       '/ca làm việc',
                       style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: cani.textMuted),
                     ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: cani.warning.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.timer_outlined, size: 13, color: Color(0xFFB45309)),
-                    const SizedBox(width: 4),
-                    Text(
-                      _secondsLeft < 0
-                          ? 'Đang mở nhận'
-                          : (_secondsLeft == 0
-                              ? 'Đã hết hạn'
-                              : 'Hết hạn sau ${_formatCountdown()}'),
-                      style: const TextStyle(
-                        color: Color(0xFFB45309),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
                   ],
                 ),
-              ),
-            ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: cani.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 13, color: Color(0xFFB45309)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          _secondsLeft < 0
+                              ? 'Đang mở nhận'
+                              : (_secondsLeft == 0
+                                  ? 'Đã hết hạn'
+                                  : 'Hết hạn sau ${_formatCountdown()}'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFB45309),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 13),
 
-          // 2 Nút: Từ chối & Nhận ca ngay
           Row(
             children: [
               Expanded(
@@ -374,19 +659,19 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                 flex: 1,
                 child: SizedBox(
                   height: 44,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: cani.brandGradient,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: cani.brandGradient,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: cani.brand.withValues(alpha: 0x50 / 255),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
                         ),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: cani.brand.withValues(alpha: 0x50 / 255),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                      ],
                     ),
                     child: ElevatedButton(
                       onPressed: widget.onAccept,

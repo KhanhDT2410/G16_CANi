@@ -14,6 +14,7 @@ import {
   GeneralConfigIcon,
   PricingPlanIcon,
   WageMatrixIcon,
+  EkycIcon,
 } from './AdminSidebarIcons';
 
 // Danh mục phân nhóm menu chức năng Admin thuần tiếng Việt
@@ -31,6 +32,7 @@ export const ADMIN_NAV_GROUPS = [
     groupLabel: 'Quản trị & Vận hành',
     items: [
       { id: 'users', label: 'Quản Trị Người Dùng', icon: <UsersIcon /> },
+      { id: 'ekyc_review', label: 'Thẩm Định eKYC', icon: <EkycIcon /> },
       { id: 'account_appeals', label: 'Giải Trình Khóa Tài Khoản', icon: <AppealIcon /> },
       { id: 'shifts', label: 'Danh Sách Ca Làm Việc', icon: <ShiftIcon /> },
       { id: 'noshows', label: 'Xử Lý Vi Phạm Vắng Mặt', icon: <NoShowIcon /> },
@@ -81,6 +83,10 @@ export const ADMIN_TAB_METADATA = {
   users: {
     title: 'Quản Trị Người Dùng',
     subtitle: 'Tra cứu danh sách, kiểm tra hồ sơ chi tiết và phân quyền khóa hoặc mở tài khoản',
+  },
+  ekyc_review: {
+    title: 'Thẩm Định Hồ Sơ eKYC',
+    subtitle: 'Đối chiếu CCCD, ảnh chân dung bảo mật và phê duyệt định danh cho Worker & Nhà tổ chức',
   },
   shifts: {
     title: 'Danh Sách Ca Làm Việc',

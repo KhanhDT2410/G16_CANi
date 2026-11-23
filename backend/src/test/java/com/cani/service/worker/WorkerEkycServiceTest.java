@@ -334,7 +334,7 @@ class WorkerEkycServiceTest {
         assertThat(approved.getRoutingDecision()).isEqualTo("MANUAL_APPROVED");
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
         assertThat(worker.getCccdNumber()).isEqualTo("********2345");
-        assertThat(approved.getFrontImageUrl()).startsWith("/api/v1/ekyc/images/worker/");
+        assertThat(approved.getFrontImageUrl()).isNull();
 
         // Reject một hồ sơ PENDING_REVIEW khác của worker chưa approved
         Worker unverifiedWorker = Worker.builder().workerId(UUID.randomUUID()).user(workerUser).kycStatus(KycStatus.PENDING).build();

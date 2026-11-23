@@ -275,6 +275,7 @@ class AuthServiceTest {
             when(supabaseAuthClient.createUser(any(), any(), any(), any(), any(), any()))
                     .thenThrow(new RuntimeException("Supabase network timeout"));
 
+            when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
             UUID expectedUuid = UUID.nameUUIDFromBytes("fallback@cani.vn".toLowerCase().getBytes());
             when(userRepository.findById(expectedUuid)).thenReturn(Optional.empty());
             when(userRepository.findByEmail("fallback@cani.vn")).thenReturn(Optional.empty());

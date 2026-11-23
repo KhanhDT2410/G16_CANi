@@ -696,6 +696,7 @@ const ShiftCreateModal = ({
           <ShiftChecklistEditor
             items={newShift.checklistItems || []}
             onChange={(updatedItems) => setNewShift((prev) => ({ ...prev, checklistItems: updatedItems }))}
+            jobType={newShift.jobType}
           />
 
           {/* Chi phí ước tính hiển thị realtime */}

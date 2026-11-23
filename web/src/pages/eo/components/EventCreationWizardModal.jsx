@@ -1899,6 +1899,7 @@ const EventCreationWizardModal = ({
                     checklistItems: updatedItems,
                   }))
                 }
+                jobType={currentShift.jobType}
               />
 
               <div

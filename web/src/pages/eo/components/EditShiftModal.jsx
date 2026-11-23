@@ -724,6 +724,7 @@ const EditShiftModal = ({
           <ShiftChecklistEditor
             items={formData.checklistItems}
             onChange={(updatedItems) => setFormData((prev) => ({ ...prev, checklistItems: updatedItems }))}
+            jobType={formData.jobType}
           />
 
           <div className="eo-modal-footer">

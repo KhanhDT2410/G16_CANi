@@ -73,6 +73,26 @@ public class Review {
     @Builder.Default
     private Boolean isAutoClosed = false;
 
+    @Column(name = "is_hidden", nullable = false)
+    @Builder.Default
+    private Boolean isHidden = false;
+
+    @Column(name = "hidden_reason")
+    private String hiddenReason;
+
+    @Column(name = "hidden_by_admin_id")
+    private UUID hiddenByAdminId;
+
+    @Column(name = "hidden_at")
+    private Instant hiddenAt;
+
+    @Column(name = "is_flagged", nullable = false)
+    @Builder.Default
+    private Boolean isFlagged = false;
+
+    @Column(name = "flag_reason")
+    private String flagReason;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

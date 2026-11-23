@@ -4,6 +4,7 @@ import com.cani.entity.AuditLog;
 import com.cani.entity.Shift;
 import com.cani.entity.ShiftAssignment;
 import com.cani.entity.Skill;
+import com.cani.entity.SystemConfig;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerSkill;
 import com.cani.entity.WorkerSkillPoint;
@@ -14,6 +15,7 @@ import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.BadRequestException;
 import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.repository.SkillRepository;
+import com.cani.repository.SystemConfigRepository;
 import com.cani.repository.WorkerRepository;
 import com.cani.repository.WorkerSkillPointRepository;
 import com.cani.repository.WorkerSkillRepository;
@@ -61,6 +63,28 @@ public class SkillProgressionService {
 
     @Autowired(required = false)
     private AuditLogService auditLogService;
+
+    @Autowired(required = false)
+    private SystemConfigRepository systemConfigRepository;
+
+    private int getPlatformProvenSp() {
+        if (systemConfigRepository == null) {
+            return VerificationTier.PLATFORM_PROVEN.getSpVerify();
+        }
+        try {
+            return systemConfigRepository.findByKey("skill_verify_sp_platform_proven")
+                    .map(SystemConfig::getValue)
+                    .map(String::trim)
+                    .filter(val -> !val.isEmpty())
+                    .map(Integer::parseInt)
+                    .filter(val -> val >= 0)
+                    .orElse(VerificationTier.PLATFORM_PROVEN.getSpVerify());
+        } catch (Exception e) {
+            log.warn("Lỗi khi đọc cấu hình skill_verify_sp_platform_proven, fallback về {}: {}",
+                    VerificationTier.PLATFORM_PROVEN.getSpVerify(), e.getMessage());
+            return VerificationTier.PLATFORM_PROVEN.getSpVerify();
+        }
+    }
 
     /**
      * Cộng điểm kinh nghiệm (SP_experience) có kiểm soát idempotency ở mức Assignment + Pessimistic Lock.
@@ -355,7 +379,7 @@ public class SkillProgressionService {
                         .build());
 
         if (ws.getVerificationTier() != VerificationTier.PLATFORM_PROVEN) {
-            int provenSp = VerificationTier.PLATFORM_PROVEN.getSpVerify();
+            int provenSp = getPlatformProvenSp();
             int existingSp = ws.getSpVerifyAwarded() != null ? ws.getSpVerifyAwarded() : 0;
 
             ws.setVerificationTier(VerificationTier.PLATFORM_PROVEN);

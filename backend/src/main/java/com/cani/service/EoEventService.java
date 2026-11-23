@@ -5,6 +5,7 @@ import com.cani.dto.event.*;
 import com.cani.dto.worker.ShiftChecklistItemDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.DisputeStatus;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.NoShowDetectedBy;
@@ -81,6 +82,9 @@ public class EoEventService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DisputeService disputeService;
+
+    @Autowired(required = false)
+    private DisputeRepository disputeRepository;
 
     private static final String EVENT_UPLOAD_DIR = "uploads/events";
     private static final Set<String> ALLOWED_IMAGE_EXTS = Set.of("jpg", "jpeg", "png", "webp", "gif");
@@ -816,6 +820,16 @@ public class EoEventService {
                 || sa.getStatus() == AssignmentStatus.COMPLETED;
         if (!hasCheckedOut) {
             throw new BadRequestException("Chỉ có thể đánh giá nhân sự sau khi nhân sự đã hoàn thành Check-out ca làm việc.");
+        }
+
+        Shift shift = sa.getShift();
+        if (shift != null && shift.getEndTime() != null && Instant.now().isBefore(shift.getEndTime())) {
+            throw new BadRequestException("Chỉ có thể đánh giá nhân sự sau khi ca làm việc đã kết thúc theo lịch trình.");
+        }
+
+        if (disputeRepository != null && disputeRepository.existsByAssignmentIdAndStatusIn(
+                assignmentId, List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING, DisputeStatus.ESCALATED))) {
+            throw new BadRequestException("Ca làm việc đang có tranh chấp chưa được giải quyết. Vui lòng hoàn tất xử lý tranh chấp trước khi gửi đánh giá.");
         }
 
         Worker worker = sa.getWorker();

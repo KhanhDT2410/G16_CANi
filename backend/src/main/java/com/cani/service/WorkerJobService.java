@@ -5,6 +5,7 @@ import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentSource;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.AttendanceStatus;
+import com.cani.entity.enums.DisputeStatus;
 import com.cani.entity.enums.PaymentStatus;
 import com.cani.entity.enums.ProposalStatus;
 import com.cani.entity.enums.ShiftStatus;
@@ -98,6 +99,9 @@ public class WorkerJobService {
 
     @Autowired(required = false)
     private ShiftSkillRequirementRepository shiftSkillRequirementRepository;
+
+    @Autowired(required = false)
+    private DisputeRepository disputeRepository;
 
     @Autowired(required = false)
     private WorkerShiftEligibilityService workerShiftEligibilityService;
@@ -1464,8 +1468,12 @@ public class WorkerJobService {
             throw new BadRequestException("Chỉ có thể đánh giá Ban tổ chức sau khi đã hoàn thành và kết ca.");
         }
         if (assignment.getStatus() != AssignmentStatus.COMPLETED) {
-            assignment.setStatus(AssignmentStatus.COMPLETED);
-            shiftAssignmentRepository.save(assignment);
+            throw new BadRequestException("Chỉ có thể đánh giá Ban tổ chức khi ca làm việc đã hoàn thành (COMPLETED).");
+        }
+
+        if (disputeRepository != null && disputeRepository.existsByAssignmentIdAndStatusIn(
+                assignmentId, List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING, DisputeStatus.ESCALATED))) {
+            throw new BadRequestException("Ca làm việc đang có tranh chấp chưa được giải quyết. Vui lòng hoàn tất tranh chấp trước khi gửi đánh giá.");
         }
 
         // getWorkerOrThrow tra cứu theo userId nên userId chính là reviewer — tránh NPE worker.getUser()
@@ -1475,6 +1483,9 @@ public class WorkerJobService {
         }
 
         Shift shift = assignment.getShift();
+        if (shift != null && shift.getEndTime() != null && Instant.now().isBefore(shift.getEndTime())) {
+            throw new BadRequestException("Chỉ có thể đánh giá Ban tổ chức sau khi ca làm việc đã kết thúc theo lịch trình.");
+        }
         Event event = shift != null ? shift.getEvent() : null;
         EventOrganizer eo = event != null ? event.getEventOrganizer() : null;
         if (eo == null || eo.getUser() == null) {

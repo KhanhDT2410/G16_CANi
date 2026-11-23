@@ -133,6 +133,26 @@ export const SYSTEM_CONFIG_METAS = {
     type: 'number',
     hint: 'Số ngày tối đa EO và Worker có thể chấm điểm sao và nhận xét lẫn nhau sau ca làm',
   },
+  skill_verify_sp_ai_document: {
+    label: 'Điểm SP thưởng xác minh chứng chỉ AI',
+    category: 'OPERATION',
+    unit: 'SP',
+    defaultValue: '25',
+    type: 'number',
+    step: '5',
+    min: 0,
+    hint: 'Số điểm kỹ năng cộng cho Worker khi vượt qua xác thực chứng chỉ hoặc bằng cấp',
+  },
+  skill_verify_sp_platform_proven: {
+    label: 'Điểm SP thưởng bảo chứng thực chiến',
+    category: 'OPERATION',
+    unit: 'SP',
+    defaultValue: '50',
+    type: 'number',
+    step: '5',
+    min: 0,
+    hint: 'Số điểm kỹ năng cộng cho Worker khi hoàn thành xuất sắc các ca làm thực tế trên sàn',
+  },
 
   // === 3. TÀI CHÍNH & HOA HỒNG (FINANCIAL) ===
   commission_rate: {
@@ -194,7 +214,7 @@ export const getConfigMeta = (key) => {
     category = 'MATCHING';
   } else if (key.includes('commission') || key.includes('payment') || key.includes('fee') || key.includes('wage')) {
     category = 'FINANCIAL';
-  } else if (key.includes('shift') || key.includes('event') || key.includes('penalty') || key.includes('rating') || key.includes('noshow')) {
+  } else if (key.includes('shift') || key.includes('event') || key.includes('penalty') || key.includes('rating') || key.includes('noshow') || key.includes('skill') || key.includes('tier')) {
     category = 'OPERATION';
   }
 

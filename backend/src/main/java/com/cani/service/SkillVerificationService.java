@@ -9,6 +9,7 @@ import com.cani.dto.skill.*;
 import com.cani.entity.AuditLog;
 import com.cani.entity.Skill;
 import com.cani.entity.SkillVerificationRequest;
+import com.cani.entity.SystemConfig;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerSkill;
@@ -26,6 +27,7 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.SkillRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
+import com.cani.repository.SystemConfigRepository;
 import com.cani.repository.WorkerRepository;
 import com.cani.repository.WorkerSkillPointRepository;
 import com.cani.repository.WorkerSkillRepository;
@@ -36,6 +38,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -95,6 +98,51 @@ public class SkillVerificationService {
     private final AuditLogService auditLogService;
     private final TransactionTemplate transactionTemplate;
     private final CertificateLookupSource certificateLookupSource;
+
+    @Autowired(required = false)
+    private SystemConfigRepository systemConfigRepository;
+
+    public void setSystemConfigRepository(SystemConfigRepository systemConfigRepository) {
+        this.systemConfigRepository = systemConfigRepository;
+    }
+
+    private int getAiDocumentSp() {
+        if (systemConfigRepository == null) {
+            return VerificationTier.AI_DOCUMENT.getSpVerify();
+        }
+        try {
+            return systemConfigRepository.findByKey("skill_verify_sp_ai_document")
+                    .map(SystemConfig::getValue)
+                    .map(String::trim)
+                    .filter(val -> !val.isEmpty())
+                    .map(Integer::parseInt)
+                    .filter(val -> val >= 0)
+                    .orElse(VerificationTier.AI_DOCUMENT.getSpVerify());
+        } catch (Exception e) {
+            log.warn("Lỗi khi đọc cấu hình skill_verify_sp_ai_document, fallback về {}: {}",
+                    VerificationTier.AI_DOCUMENT.getSpVerify(), e.getMessage());
+            return VerificationTier.AI_DOCUMENT.getSpVerify();
+        }
+    }
+
+    private int getPlatformProvenSp() {
+        if (systemConfigRepository == null) {
+            return VerificationTier.PLATFORM_PROVEN.getSpVerify();
+        }
+        try {
+            return systemConfigRepository.findByKey("skill_verify_sp_platform_proven")
+                    .map(SystemConfig::getValue)
+                    .map(String::trim)
+                    .filter(val -> !val.isEmpty())
+                    .map(Integer::parseInt)
+                    .filter(val -> val >= 0)
+                    .orElse(VerificationTier.PLATFORM_PROVEN.getSpVerify());
+        } catch (Exception e) {
+            log.warn("Lỗi khi đọc cấu hình skill_verify_sp_platform_proven, fallback về {}: {}",
+                    VerificationTier.PLATFORM_PROVEN.getSpVerify(), e.getMessage());
+            return VerificationTier.PLATFORM_PROVEN.getSpVerify();
+        }
+    }
 
     private <T> T executeInTransaction(Supplier<T> action) {
         if (transactionTemplate != null) {
@@ -635,9 +683,10 @@ public class SkillVerificationService {
         req.setIdentityVerificationStatus(IdentityVerificationStatus.EXACT_MATCH);
         req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
 
+        int baseSp = getAiDocumentSp();
         int spAwarded = Math.max(
-                VerificationTier.AI_DOCUMENT.getSpVerify(),
-                skillsToApprove.size() * VerificationTier.AI_DOCUMENT.getSpVerify()
+                baseSp,
+                skillsToApprove.size() * baseSp
         );
         req.setSpAwarded(spAwarded);
         applyApprovedSkills(worker, skillsToApprove, req.getJobType(), req.getId(), parsedExpiry);
@@ -827,7 +876,7 @@ public class SkillVerificationService {
         }
 
         Worker worker = req.getWorker();
-        int spToDeduct = req.getSpAwarded() != null ? req.getSpAwarded() : VerificationTier.AI_DOCUMENT.getSpVerify();
+        int spToDeduct = req.getSpAwarded() != null ? req.getSpAwarded() : getAiDocumentSp();
         Map<UUID, Skill> affectedSkills = new LinkedHashMap<>();
         Map<UUID, WorkerSkill> updatedBySkillId = new LinkedHashMap<>();
         Set<String> fallbackJobTypes = new LinkedHashSet<>();
@@ -886,14 +935,14 @@ public class SkillVerificationService {
             if (currentWs != null) {
                 int remaining = currentWs.getSpVerifyAwarded() != null ? currentWs.getSpVerifyAwarded() : 0;
                 if (currentWs.getVerificationTier() == VerificationTier.PLATFORM_PROVEN) {
-                    remaining = Math.max(remaining, VerificationTier.PLATFORM_PROVEN.getSpVerify());
+                    remaining = Math.max(remaining, getPlatformProvenSp());
                 } else if (currentWs.getVerificationTier() == VerificationTier.SELF_DECLARED) {
                     remaining = 0;
                 }
                 newVerify = Math.max(0, remaining);
             } else {
                 int currentVerify = sp.getSpVerify() != null ? sp.getSpVerify() : 0;
-                int deductForSkill = Math.min(spToDeduct, VerificationTier.AI_DOCUMENT.getSpVerify());
+                int deductForSkill = Math.min(spToDeduct, getAiDocumentSp());
                 newVerify = Math.max(0, currentVerify - deductForSkill);
             }
 
@@ -1048,12 +1097,13 @@ public class SkillVerificationService {
                             .build()
                     );
 
+            int baseSp = getAiDocumentSp();
             // Không hạ cấp từ PLATFORM_PROVEN xuống AI_DOCUMENT
             if (ws.getVerificationTier() != VerificationTier.PLATFORM_PROVEN) {
                 ws.setVerificationTier(VerificationTier.AI_DOCUMENT);
                 ws.setSpVerifyAwarded(Math.max(
                         ws.getSpVerifyAwarded() != null ? ws.getSpVerifyAwarded() : 0,
-                        VerificationTier.AI_DOCUMENT.getSpVerify()
+                        baseSp
                 ));
             }
             ws.setVerifiedAt(now);
@@ -1074,7 +1124,7 @@ public class SkillVerificationService {
                 WorkerSkill wsForSkill = updatedWorkerSkills.get(managedSkill.getSkillId());
                 int skillVerifySp = (wsForSkill != null && wsForSkill.getSpVerifyAwarded() != null)
                         ? wsForSkill.getSpVerifyAwarded()
-                        : VerificationTier.AI_DOCUMENT.getSpVerify();
+                        : getAiDocumentSp();
 
                 // Đồng bộ sp_verify theo đúng Skill ID (idempotent, không cộng dồn khi retry)
                 wsp.setSpVerify(skillVerifySp);
@@ -1110,7 +1160,7 @@ public class SkillVerificationService {
                         );
                 int totalSpVerifyForJob = Math.max(
                         wsp.getSpVerify() != null ? wsp.getSpVerify() : 0,
-                        VerificationTier.AI_DOCUMENT.getSpVerify()
+                        getAiDocumentSp()
                 );
                 wsp.setSpVerify(totalSpVerifyForJob);
                 int exp = wsp.getSpExperience() != null ? wsp.getSpExperience() : 0;

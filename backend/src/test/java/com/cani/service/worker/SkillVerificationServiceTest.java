@@ -72,6 +72,9 @@ class SkillVerificationServiceTest {
     @Mock
     private CertificateLookupSource certificateLookupSource;
 
+    @Mock
+    private SystemConfigRepository systemConfigRepository;
+
     private SkillVerificationService verificationService;
     private DocumentAccessTokenService documentAccessTokenService;
 
@@ -112,6 +115,7 @@ class SkillVerificationServiceTest {
                 null,
                 certificateLookupSource
         );
+        verificationService.setSystemConfigRepository(systemConfigRepository);
 
         userId = UUID.randomUUID();
         workerId = UUID.randomUUID();
@@ -562,5 +566,40 @@ class SkillVerificationServiceTest {
         assertFalse(Boolean.TRUE.equals(created.getIsActive()));
 
         assertThrows(BadRequestException.class, () -> verificationService.getOrCreateCustomSkill("   ", null));
+    }
+
+    @Test
+    @DisplayName("Dynamic SystemConfig: Admin cấu hình skill_verify_sp_ai_document = 35 thì áp dụng 35 SP")
+    void testDynamicSpVerificationFromSystemConfig() {
+        when(systemConfigRepository.findByKey("skill_verify_sp_ai_document"))
+                .thenReturn(Optional.of(com.cani.entity.SystemConfig.builder()
+                        .key("skill_verify_sp_ai_document")
+                        .value("35")
+                        .build()));
+
+        SkillVerificationRequest req = SkillVerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .worker(mockWorker)
+                .skill(mockSkill)
+                .status(SkillVerificationStatus.APPROVED)
+                .spAwarded(null)
+                .build();
+
+        when(verificationRequestRepository.findById(req.getId())).thenReturn(Optional.of(req));
+        when(workerSkillRepository.findByEvidenceRequestId(req.getId())).thenReturn(List.of());
+        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(any(), any())).thenReturn(Optional.empty());
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndSkill_SkillId(any(), any()))
+                .thenReturn(Optional.of(WorkerSkillPoint.builder()
+                        .worker(mockWorker)
+                        .skill(mockSkill)
+                        .spVerify(35)
+                        .totalSp(35)
+                        .tier(SkillTier.STARTER)
+                        .build()));
+        when(verificationRequestRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        SkillVerificationResponseDto res = verificationService.revokeVerification(req.getId(), UUID.randomUUID(), "Thu hồi");
+        assertEquals(SkillVerificationStatus.REVOKED, res.getStatus());
+        verify(systemConfigRepository, atLeastOnce()).findByKey("skill_verify_sp_ai_document");
     }
 }

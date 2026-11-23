@@ -13,6 +13,7 @@ import { NoShowView } from '../../features/no-shows';
 import { AdminPlansView } from '../../features/admin-plans';
 import { WageMatrixView } from '../../features/admin-wage-matrix';
 import { AdminSkillView } from '../../features/admin-skills';
+import { AdminReviewView } from '../../features/admin-reviews';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
 
@@ -32,6 +33,10 @@ const TAB_METADATA = {
   shifts: {
     title: 'Danh Sách Ca Làm Việc',
     subtitle: 'Tra cứu thông tin sự kiện, ca làm việc thực tế và đối soát nhân sự tham gia',
+  },
+  reviews: {
+    title: 'Kiểm Duyệt Đánh Giá & Matching',
+    subtitle: 'Quản trị đánh giá hai chiều, phát hiện gian lận bơm/kéo điểm và gỡ bỏ review sai lệch',
   },
   noshows: {
     title: 'Xử Lý Vi Phạm Vắng Mặt',
@@ -203,6 +208,7 @@ const AdminPage = () => {
           {activeTab === 'users' && <UserManagementView />}
           {activeTab === 'account_appeals' && <AdminAccountAppealsTable />}
           {activeTab === 'shifts' && <AdminShiftView />}
+          {activeTab === 'reviews' && <AdminReviewView />}
           {activeTab === 'disputes' && <DisputeCenterView />}
           {activeTab === 'tickets' && (
             <SupportTicketsCenterView

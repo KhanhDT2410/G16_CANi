@@ -251,6 +251,22 @@ public class SkillProgressionService {
         workerSkillPointRepository.save(wsp);
     }
 
+    /**
+     * Tái kiểm tra và thăng hạng Tier 3 (PLATFORM_PROVEN) cho Worker khi có biến động điểm đánh giá/uy tín
+     * (ví dụ: sau khi Admin gỡ đánh giá oan).
+     */
+    @Transactional
+    public void recheckTierProgression(Worker worker) {
+        if (worker == null || workerSkillPointRepository == null) return;
+        List<WorkerSkillPoint> points = workerSkillPointRepository.findByWorker_WorkerId(worker.getWorkerId());
+        if (points == null || points.isEmpty()) return;
+        for (WorkerSkillPoint wsp : points) {
+            tryPromoteToPlatformProven(worker, wsp.getSkill(), wsp.getJobType(), wsp);
+            workerSkillPointRepository.save(wsp);
+            syncWorkerOverallTier(worker, wsp.getTier());
+        }
+    }
+
     private void applyCompletedShiftPoint(Worker worker, Skill matchedSkill, String canonicalJobType) {
         WorkerSkillPoint wsp = findOrCreateSkillPoint(worker, matchedSkill, canonicalJobType);
         int completed = (wsp.getTotalShiftsCompleted() != null ? wsp.getTotalShiftsCompleted() : 0) + 1;

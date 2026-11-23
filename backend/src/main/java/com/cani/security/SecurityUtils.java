@@ -3,6 +3,7 @@ package com.cani.security;
 import com.cani.entity.User;
 import com.cani.exception.BadRequestException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.UUID;
 
@@ -24,11 +25,12 @@ public final class SecurityUtils {
      * @throws BadRequestException nếu không tìm thấy phiên hợp lệ hoặc danh tính không xác định
      */
     public static UUID getCurrentUserId(Authentication authentication) {
-        if (authentication != null && authentication.getPrincipal() instanceof User u) {
+        Authentication auth = authentication != null ? authentication : SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User u) {
             return u.getUserId();
-        } else if (authentication != null && authentication.getName() != null) {
+        } else if (auth != null && auth.getName() != null) {
             try {
-                return UUID.fromString(authentication.getName());
+                return UUID.fromString(auth.getName());
             } catch (Exception ignored) {
                 // Name không phải UUID
             }

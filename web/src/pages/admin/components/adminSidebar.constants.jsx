@@ -34,6 +34,7 @@ export const ADMIN_NAV_GROUPS = [
       { id: 'users', label: 'Quản Trị Người Dùng', icon: <UsersIcon /> },
       { id: 'account_appeals', label: 'Giải Trình Khóa Tài Khoản', icon: <AppealIcon /> },
       { id: 'shifts', label: 'Danh Sách Ca Làm Việc', icon: <ShiftIcon /> },
+      { id: 'reviews', label: 'Kiểm Duyệt Đánh Giá', icon: <SkillReviewIcon /> },
       { id: 'noshows', label: 'Xử Lý Vi Phạm Vắng Mặt', icon: <NoShowIcon /> },
       { id: 'appeals', label: 'Kháng Cáo Điểm Uy Tín', icon: <AppealIcon /> },
     ],
@@ -87,6 +88,10 @@ export const ADMIN_TAB_METADATA = {
   shifts: {
     title: 'Danh Sách Ca Làm Việc',
     subtitle: 'Tra cứu thông tin sự kiện, ca làm việc thực tế và đối soát nhân sự tham gia',
+  },
+  reviews: {
+    title: 'Kiểm Duyệt Đánh Giá & Matching',
+    subtitle: 'Quản trị đánh giá hai chiều, phát hiện gian lận bơm/kéo điểm và gỡ bỏ review sai lệch',
   },
   noshows: {
     title: 'Xử Lý Vi Phạm Vắng Mặt',

@@ -68,7 +68,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
         <form onSubmit={handleSubmit}>
           <div className="dispute-modal-body">
             <div className="dispute-field-group">
-              <label>Kết quả phán quyết (Outcome) *</label>
+              <label>Kết quả phán quyết *</label>
               <select
                 className="dispute-select"
                 value={outcome}
@@ -84,12 +84,12 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
 
             {outcome === DISPUTE_OUTCOMES.WORKER_FAULT && (
               <div className="dispute-rule-notice">
-                <strong>Lưu ý:</strong> Kết quả <code>WORKER_FAULT</code> sẽ tự động khấu trừ <strong>-10 điểm uy tín</strong> của nhân sự (trừ khi có lý do miễn trừ hợp lệ bên dưới).
+                <strong>Lưu ý:</strong> Kết quả này sẽ tự động khấu trừ <strong>-10 điểm uy tín</strong> của nhân sự (trừ khi có lý do miễn trừ hợp lệ bên dưới).
               </div>
             )}
 
             <div className="dispute-field-group">
-              <label>Lý do quyết định (Rationale - Tối thiểu 100 ký tự) *</label>
+              <label>Lý do quyết định (Tối thiểu 100 ký tự) *</label>
               <textarea
                 className="dispute-textarea"
                 rows={5}
@@ -99,12 +99,12 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
                 required
               />
               <div className={`char-counter ${isRationaleValid ? 'valid' : 'invalid'}`}>
-                {rationaleLen} / 100 ký tự tối thiểu {isRationaleValid ? '(Đủ điều kiện)' : '(Chưa đủ)'}
+                {rationaleLen} / 100 ký tự tối thiểu {isRationaleValid ? '— Đạt yêu cầu' : '— Chưa đủ'}
               </div>
             </div>
 
             <div className="dispute-field-group">
-              <label>Lý do miễn trừ phạt điểm RS (Nếu có xem xét miễn trừ)</label>
+              <label>Lý do miễn trừ phạt điểm uy tín (Nếu có)</label>
               <input
                 type="text"
                 className="dispute-input"

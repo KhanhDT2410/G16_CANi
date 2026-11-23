@@ -12,12 +12,12 @@ export const DISPUTE_STATUS = {
 };
 
 export const DISPUTE_STATUS_CONFIG = {
-  OPEN: { label: 'Mới mở (Chờ CC)', badgeClass: 'badge-status-open' },
+  OPEN: { label: 'Mới mở', badgeClass: 'badge-status-open' },
   INVESTIGATING: { label: 'Đang điều tra', badgeClass: 'badge-status-investigating' },
-  RESOLVED: { label: 'Đã giải quyết (CC)', badgeClass: 'badge-status-resolved' },
+  RESOLVED: { label: 'Đã giải quyết', badgeClass: 'badge-status-resolved' },
   UNVERIFIED: { label: 'Không xác minh được', badgeClass: 'badge-status-unverified' },
-  ESCALATED: { label: 'Đã kháng nghị lên Admin', badgeClass: 'badge-status-escalated' },
-  FINAL_RESOLVED: { label: 'Phán quyết cuối (Admin)', badgeClass: 'badge-status-final' },
+  ESCALATED: { label: 'Đã kháng nghị lên Quản trị viên', badgeClass: 'badge-status-escalated' },
+  FINAL_RESOLVED: { label: 'Phán quyết cuối cùng', badgeClass: 'badge-status-final' },
 };
 
 export const DISPUTE_TYPES = {
@@ -45,11 +45,11 @@ export const DISPUTE_OUTCOMES = {
 };
 
 export const DISPUTE_OUTCOME_LABELS = {
-  EO_FAULT: 'Lỗi thuộc về Nhà tổ chức (EO_FAULT)',
-  WORKER_FAULT: 'Lỗi thuộc về Worker (-10 điểm RS) (WORKER_FAULT)',
-  PARTIAL: 'Lỗi từ cả hai phía (PARTIAL)',
-  UNVERIFIED: 'Không đủ chứng cứ xác minh (UNVERIFIED)',
-  UPHOLD: 'Giữ nguyên phán quyết sơ bộ (UPHOLD)',
+  EO_FAULT: 'Lỗi thuộc về Nhà tổ chức',
+  WORKER_FAULT: 'Lỗi thuộc về Nhân sự (Trừ 10 điểm uy tín)',
+  PARTIAL: 'Lỗi từ cả hai phía',
+  UNVERIFIED: 'Không đủ chứng cứ xác minh',
+  UPHOLD: 'Giữ nguyên phán quyết sơ bộ',
 };
 
 export const DISPUTE_EVIDENCE_TYPES = {
@@ -60,9 +60,9 @@ export const DISPUTE_EVIDENCE_TYPES = {
 };
 
 export const DISPUTE_EVIDENCE_LABELS = {
-  IMAGE: 'Hình ảnh (Ảnh chụp / Biên lai)',
+  IMAGE: 'Hình ảnh, biên lai',
   VIDEO: 'Video clip',
-  DOCUMENT: 'Tài liệu / Biên bản',
+  DOCUMENT: 'Tài liệu, biên bản',
   TRANSACTION_RECORD: 'Bản ghi giao dịch ngân hàng',
 };
 

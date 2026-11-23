@@ -238,3 +238,80 @@ class CreateDisputePayload {
     };
   }
 }
+
+class DisputeChatMessageItem {
+  final String id;
+  final String conversationId;
+  final String senderId;
+  final String senderName;
+  final String senderRole;
+  final String messageText;
+  final String? attachmentUrl;
+  final bool isRead;
+  final bool isMe;
+  final DateTime? createdAt;
+
+  const DisputeChatMessageItem({
+    required this.id,
+    required this.conversationId,
+    required this.senderId,
+    required this.senderName,
+    required this.senderRole,
+    required this.messageText,
+    this.attachmentUrl,
+    this.isRead = false,
+    this.isMe = false,
+    this.createdAt,
+  });
+
+  factory DisputeChatMessageItem.fromJson(Map<String, dynamic> json) {
+    return DisputeChatMessageItem(
+      id: (json['id'] ?? '').toString(),
+      conversationId: (json['conversationId'] ?? '').toString(),
+      senderId: (json['senderId'] ?? '').toString(),
+      senderName: (json['senderName'] ?? 'Người dùng').toString(),
+      senderRole: (json['senderRole'] ?? '').toString(),
+      messageText: (json['messageText'] ?? '').toString(),
+      attachmentUrl: json['attachmentUrl'] as String?,
+      isRead: json['isRead'] == true,
+      isMe: json['isMe'] == true,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())?.toLocal()
+          : null,
+    );
+  }
+}
+
+class DisputeChatData {
+  final String disputeId;
+  final String disputeTitle;
+  final String disputeStatus;
+  final String? conversationId;
+  final List<DisputeChatMessageItem> messages;
+
+  const DisputeChatData({
+    required this.disputeId,
+    required this.disputeTitle,
+    required this.disputeStatus,
+    this.conversationId,
+    this.messages = const [],
+  });
+
+  factory DisputeChatData.fromJson(Map<String, dynamic> json) {
+    final workerConv = json['workerConversation'] as Map<String, dynamic>?;
+    final rawMessages = (workerConv?['messages'] is List)
+        ? (workerConv!['messages'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(DisputeChatMessageItem.fromJson)
+            .toList()
+        : <DisputeChatMessageItem>[];
+
+    return DisputeChatData(
+      disputeId: (json['disputeId'] ?? '').toString(),
+      disputeTitle: (json['disputeTitle'] ?? '').toString(),
+      disputeStatus: (json['disputeStatus'] ?? 'OPEN').toString(),
+      conversationId: workerConv?['conversationId']?.toString(),
+      messages: rawMessages,
+    );
+  }
+}

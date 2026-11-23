@@ -344,8 +344,8 @@ export const RegisterForm = () => {
               {isSendingOtp
                 ? 'Đang gửi lại...'
                 : countdown > 0
-                ? `Gửi lại sau ${countdown}s`
-                : 'Gửi lại mã OTP'}
+                  ? `Gửi lại sau ${countdown}s`
+                  : 'Gửi lại mã OTP'}
             </button>
           </div>
 
@@ -380,7 +380,7 @@ export const RegisterForm = () => {
 
       <div className="auth-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #f3f4f6' }}>
         <div>
-          Bạn là <strong>Nhân sự sự kiện (Worker)</strong>? Hãy tải ứng dụng <strong>CANi Mobile (Android APK)</strong> trên điện thoại để nhận ca làm linh hoạt.
+          Bạn là <strong>Nhân sự sự kiện</strong>? Hãy tải ứng dụng <strong>CANi Mobile (Android APK)</strong> trên điện thoại để nhận ca làm linh hoạt.
         </div>
         <div style={{ marginTop: '0.5rem' }}>
           Đã có tài khoản? <Link to="/login">Đăng nhập tại đây</Link>

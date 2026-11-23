@@ -124,7 +124,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           _countdownText = _assignment.status == 'CANCELLED'
               ? 'Ca làm việc đã bị hủy'
               : (_assignment.status == 'NO_SHOW'
-                  ? 'Đã ghi nhận vắng mặt (No-show)'
+                  ? 'Đã ghi nhận vắng mặt'
                   : 'Ca làm việc đã quá hạn điểm danh');
         });
       }
@@ -862,7 +862,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
                                         ? (_assignment.status == 'CANCELLED'
                                             ? 'Ca đã bị hủy'
                                             : (_assignment.status == 'NO_SHOW'
-                                                ? 'Vắng mặt (No-show)'
+                                                ? 'Vắng mặt'
                                                 : 'Quá hạn điểm danh'))
                                         : (isCompleted
                                             ? 'Đã hoàn thành ca'
@@ -1374,7 +1374,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       label = _assignment.status == 'CANCELLED'
           ? 'CA LÀM VIỆC ĐÃ BỊ HỦY'
           : (_assignment.status == 'NO_SHOW'
-              ? 'ĐÃ GHI NHẬN VẮNG MẶT (NO-SHOW)'
+              ? 'ĐÃ GHI NHẬN VẮNG MẶT'
               : 'ĐÃ HẾT HẠN ĐIỂM DANH VÀO CA');
       isActionDisabled = true;
     } else if (isCompleted) {

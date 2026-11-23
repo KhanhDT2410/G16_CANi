@@ -54,7 +54,7 @@ class _ProfilePublicProfileBlockState extends ConsumerState<ProfilePublicProfile
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Cho phép Ban Tổ Chức (EO) tìm thấy hồ sơ của bạn trên Radar tuyển dụng',
+                      'Cho phép Ban Tổ Chức tìm thấy hồ sơ của bạn trên Radar tuyển dụng',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: t.muted, fontSize: 11.5),
                     ),
                   ],

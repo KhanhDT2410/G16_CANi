@@ -114,7 +114,7 @@ export const ADMIN_TAB_METADATA = {
   },
   config_operation: {
     title: 'Vận Hành & Điểm Uy Tín',
-    subtitle: 'Thiết lập ngưỡng thời gian vắng mặt (No-show), mức trừ điểm uy tín và thời hạn đánh giá',
+    subtitle: 'Thiết lập ngưỡng thời gian vắng mặt, mức trừ điểm uy tín và thời hạn đánh giá',
   },
   config_financial: {
     title: 'Tài Chính & Hoa Hồng',

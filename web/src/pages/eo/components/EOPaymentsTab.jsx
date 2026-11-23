@@ -38,8 +38,8 @@ export default function EOPaymentsTab({
       return (
         <div>
           <span className="payment-status-badge badge-resolved">Đã phân xử</span>
-          {p.disputeOutcome === 'EO_FAULT' && <div className="dispute-outcome-pill pill-eo-fault">Lỗi EO (Cần trả)</div>}
-          {p.disputeOutcome === 'WORKER_FAULT' && <div className="dispute-outcome-pill pill-worker-fault">Lỗi Worker (-10 RS)</div>}
+          {p.disputeOutcome === 'EO_FAULT' && <div className="dispute-outcome-pill pill-eo-fault">Lỗi Nhà tổ chức</div>}
+          {p.disputeOutcome === 'WORKER_FAULT' && <div className="dispute-outcome-pill pill-worker-fault">Lỗi Nhân sự</div>}
           {p.disputeOutcome === 'PARTIAL' && <div className="dispute-outcome-pill pill-partial">Chia sẻ 2 bên</div>}
           {p.disputeOutcome === 'UNVERIFIED' && <div className="dispute-outcome-pill pill-unverified">Không xác minh</div>}
         </div>
@@ -163,7 +163,7 @@ export default function EOPaymentsTab({
           <thead>
             <tr>
               <th>Mã Phân Công</th>
-              <th>Nhân Sự (Worker)</th>
+              <th>Nhân Sự</th>
               <th>Vị Trí / Ca</th>
               <th>Thù Lao Thỏa Thuận</th>
               <th>Đã Khai Báo</th>

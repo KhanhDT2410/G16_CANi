@@ -48,7 +48,7 @@ const AuthCallbackPage = () => {
         // Nếu tài khoản được gán là WORKER, từ chối trên Web Portal
         if (loginData.user && loginData.user.role === 'WORKER') {
           await authApi.logout();
-          setErrorMessage('Tài khoản của bạn là Nhân sự (Worker). Vui lòng đăng nhập trên ứng dụng CANi Mobile!');
+          setErrorMessage('Tài khoản của bạn là Nhân sự. Vui lòng đăng nhập trên ứng dụng CANi Mobile!');
           setIsProcessing(false);
           return;
         }

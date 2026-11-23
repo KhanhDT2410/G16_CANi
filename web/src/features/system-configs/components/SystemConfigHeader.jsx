@@ -28,7 +28,7 @@ export const SystemConfigHeader = ({
     },
     OPERATION: {
       title: 'Vận Hành & Điểm Uy Tín',
-      subtitle: 'Thiết lập ngưỡng phát hiện vắng mặt (No-show), mức trừ điểm uy tín và thời hạn đánh giá sau ca làm.',
+      subtitle: 'Thiết lập ngưỡng phát hiện vắng mặt, mức trừ điểm uy tín và thời hạn đánh giá sau ca làm.',
     },
     FINANCIAL: {
       title: 'Tài Chính & Hoa Hồng',

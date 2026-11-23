@@ -13,7 +13,7 @@ export const NO_SHOW_DETECTED_BY_LABELS = {
   SYSTEM_CRON: 'Hệ thống tự động',
   ADMIN: 'Quản trị viên',
   CUSTOMER_CARE: 'Chăm sóc khách hàng',
-  EVENT_ORGANIZER: 'Nhà tổ chức (EO)',
+  EVENT_ORGANIZER: 'Nhà tổ chức',
 };
 
 export const NO_SHOW_DETECTED_BY_BADGE = {

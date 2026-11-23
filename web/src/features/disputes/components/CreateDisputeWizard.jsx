@@ -9,7 +9,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const TYPE_DESCRIPTIONS = {
   [DISPUTE_TYPES.PAYMENT]: 'Thiếu tiền công, chậm thanh toán hoặc sai lệch số tiền thỏa thuận.',
   [DISPUTE_TYPES.WORK_QUALITY]: 'Chất lượng thực hiện nhiệm vụ không đúng thỏa thuận hoặc bàn giao thiếu.',
-  [DISPUTE_TYPES.ATTENDANCE]: 'Tranh chấp giờ điểm danh vào/ra ca, đi trễ hoặc vắng mặt (no-show).',
+  [DISPUTE_TYPES.ATTENDANCE]: 'Tranh chấp giờ điểm danh vào/ra ca, đi trễ hoặc vắng mặt.',
   [DISPUTE_TYPES.CONDUCT]: 'Thái độ làm việc, ứng xử thiếu chuyên nghiệp hoặc vi phạm nội quy.',
   [DISPUTE_TYPES.OTHER]: 'Các vấn đề phát sinh khác cần CSKH hỗ trợ làm rõ.',
 };
@@ -170,7 +170,7 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
           </button>
           <h3 className="dispute-wizard-title">Tạo Đơn Tranh Chấp & Khiếu Nại</h3>
           <p className="dispute-wizard-subtitle">
-            Thực hiện lần lượt 3 bước để hồ sơ có đủ căn cứ đối soát và được CSKH tiếp nhận nhanh nhất (Quy định BR-52: trong 14 ngày sau kết ca).
+            Thực hiện lần lượt 3 bước để hồ sơ có đủ căn cứ đối soát và được CSKH tiếp nhận nhanh nhất trong vòng 14 ngày sau khi kết thúc ca.
           </p>
         </div>
       </div>
@@ -224,7 +224,7 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
                       textDecoration: 'underline',
                     }}
                   >
-                    {manualIdMode ? 'Chọn từ danh sách ca làm việc' : 'Nhập mã Assignment UUID thủ công'}
+                    {manualIdMode ? 'Chọn từ danh sách ca làm việc' : 'Nhập mã phân công thủ công'}
                   </button>
                 )}
               </div>
@@ -252,12 +252,12 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
                       const isSelected = String(a.assignmentId) === String(assignmentId);
                       const timeStr = a.startTime
                         ? new Date(a.startTime).toLocaleString('vi-VN', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
                         : '';
                       const isComp = a.status === 'COMPLETED';
                       const isCheck = a.status === 'CHECKED_IN';
@@ -278,7 +278,10 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
                           </div>
                           <div className="dispute-assignment-meta">
                             <span>Vị trí: <strong>{a.jobType || 'Nhân sự'}</strong></span>
-                            <span>Đối tác: <strong>{a.counterpartyName || 'Chưa cập nhật'}</strong></span>
+                          </div>
+                          <div style={{ marginTop: '0.45rem', padding: '0.35rem 0.6rem', background: isSelected ? '#eff6ff' : '#f8fafc', borderRadius: '6px', border: '1px solid ' + (isSelected ? '#bfdbfe' : '#e2e8f0'), display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569' }}>Nhân sự bị khiếu nại:</span>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{a.counterpartyName || 'Chưa cập nhật'} {a.counterpartyPhone ? `(${a.counterpartyPhone})` : ''}</span>
                           </div>
                           {timeStr && <div className="dispute-assignment-time">Thời gian ca: {timeStr}</div>}
                         </button>
@@ -290,18 +293,23 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
                       </div>
                     )}
                   </div>
+                  {selectedAssignment && (
+                    <div style={{ marginTop: '0.85rem', padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '0.85rem', color: '#166534' }}>
+                      <strong>Xác nhận đối tượng khiếu nại:</strong> Bạn đang chọn mở hồ sơ tranh chấp liên quan đến nhân sự <strong>{selectedAssignment.counterpartyName}</strong> ({selectedAssignment.jobType || 'Nhân sự'}) tại sự kiện <em>{selectedAssignment.eventName}</em>.
+                    </div>
+                  )}
                 </>
               ) : (
                 <div>
                   <input
                     type="text"
                     className="dispute-wizard-input"
-                    placeholder="Dán mã Assignment ID (UUID) ví dụ: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                    placeholder="Dán mã phân công ca làm việc, ví dụ: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
                     value={assignmentId}
                     onChange={(e) => setAssignmentId(e.target.value)}
                   />
                   <div className="dispute-inline-info" style={{ marginTop: '0.65rem' }}>
-                    <strong>Lưu ý:</strong> Bạn có thể sao chép mã Assignment ID từ trang Quản lý Ca làm việc hoặc Danh sách thanh toán để dán vào đây.
+                    <strong>Lưu ý:</strong> Bạn có thể sao chép mã phân công từ trang Quản lý Ca làm việc hoặc Danh sách thanh toán để dán vào đây.
                   </div>
                 </div>
               )}
@@ -362,7 +370,7 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
                 onChange={(e) => setDescription(e.target.value)}
               />
               <div className={`dispute-char-counter ${isDescValid ? 'valid' : 'invalid'}`}>
-                {descLength} / 50 ký tự tối thiểu {isDescValid ? '(Đủ điều kiện)' : '(Cần thêm ký tự)'}
+                {descLength} / 50 ký tự tối thiểu {isDescValid ? '— Đạt yêu cầu' : '— Cần thêm ký tự'}
               </div>
             </div>
 
@@ -436,10 +444,18 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
                   <span className="dispute-review-label">Ca làm việc áp dụng</span>
                   <span className="dispute-review-val">
                     {selectedAssignment
-                      ? `${selectedAssignment.eventName} · ${selectedAssignment.jobType} (Đối tác: ${selectedAssignment.counterpartyName})`
+                      ? `${selectedAssignment.eventName} · ${selectedAssignment.jobType}`
                       : assignmentId}
                   </span>
                 </div>
+                {selectedAssignment?.counterpartyName && (
+                  <div className="dispute-review-item">
+                    <span className="dispute-review-label">Đối tác bị khiếu nại</span>
+                    <span className="dispute-review-val" style={{ fontWeight: 800, color: '#b91c1c' }}>
+                      {selectedAssignment.counterpartyName} {selectedAssignment.counterpartyPhone ? `(${selectedAssignment.counterpartyPhone})` : ''}
+                    </span>
+                  </div>
+                )}
                 <div className="dispute-review-item">
                   <span className="dispute-review-label">Phân loại tranh chấp</span>
                   <span className="dispute-review-val">

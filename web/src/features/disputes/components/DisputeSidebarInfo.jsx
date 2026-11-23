@@ -103,7 +103,7 @@ export const DisputeSidebarInfo = ({ dispute, copiedCode, onCopyId }) => {
 
         {dispute.slaDeadline && (
           <div className="sidebar-info-item">
-            <span className="info-label">Hạn xử lý (SLA):</span>
+            <span className="info-label">Hạn xử lý:</span>
             <span className="info-text font-semibold" style={{ color: '#d97706' }}>
               {new Date(dispute.slaDeadline).toLocaleDateString('vi-VN')}
             </span>
@@ -117,8 +117,8 @@ export const DisputeSidebarInfo = ({ dispute, copiedCode, onCopyId }) => {
         <ul className="sidebar-rules-list">
           <li>Mỗi bên có quyền nộp tài liệu giải trình, hóa đơn và hình ảnh đối soát.</li>
           <li>CSKH giữ vai trò trung gian xác minh chứng cứ và đưa ra phán quyết độc lập.</li>
-          <li>Trường hợp bên có lỗi là Worker, hệ thống tự động khấu trừ điểm Uy Tín.</li>
-          <li>Nếu không đồng ý phán quyết, các bên có quyền Kháng nghị trong vòng 7 ngày.</li>
+          <li>Trường hợp bên có lỗi là Nhân sự, hệ thống tự động khấu trừ điểm uy tín.</li>
+          <li>Nếu không đồng ý phán quyết, các bên có quyền kháng nghị trong vòng 7 ngày.</li>
         </ul>
       </div>
     </div>

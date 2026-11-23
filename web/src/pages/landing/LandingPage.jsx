@@ -269,7 +269,7 @@ export default function LandingPage() {
         <div className="section-pill-badge">HỆ SINH THÁI ĐIỀU PHỐI CANI</div>
         <h2 className="section-title">Hai Phân Hệ Chuyên Biệt — Một Nền Tảng Đồng Bộ</h2>
         <p className="section-subtitle">
-          Tối ưu hóa trải nghiệm người dùng: Ứng dụng di động chuyên biệt cho lực lượng Worker và Cổng điều phối đa nhiệm trên trình duyệt máy tính dành cho Ban Tổ Chức (EO).
+          Tối ưu hóa trải nghiệm người dùng: Ứng dụng di động chuyên biệt cho lực lượng nhân sự sự kiện và Cổng điều phối đa nhiệm trên trình duyệt máy tính dành cho Ban Tổ Chức.
         </p>
 
         <div className="products-showcase-grid">
@@ -527,10 +527,10 @@ export default function LandingPage() {
 
           <div style={{ display: 'flex', gap: '2.5rem', fontSize: '0.85rem', flexWrap: 'wrap' }}>
             <div>
-              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Nhân Sự (Worker)</h5>
+              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Nhân Sự</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <a href="/downloads/cani-partner.apk" download="cani-partner.apk" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600 }}>
-                  ↓ Tải App Worker (Android APK)
+                  ↓ Tải App CANi (Android APK)
                 </a>
                 <span onClick={() => scrollToSection('products')} style={{ color: '#94a3b8', cursor: 'pointer' }}>Tính năng Radar AI 15km</span>
                 <span onClick={() => scrollToSection('products')} style={{ color: '#94a3b8', cursor: 'pointer' }}>Điểm danh Geofence 200m</span>
@@ -538,7 +538,7 @@ export default function LandingPage() {
             </div>
 
             <div>
-              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Ban Tổ Chức (EO)</h5>
+              <h5 style={{ color: '#f8fafc', margin: '0 0 0.75rem', fontWeight: 700 }}>Dành cho Ban Tổ Chức</h5>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <Link to="/login" style={{ color: '#94a3b8', textDecoration: 'none' }}>Đăng nhập Cổng Quản lý</Link>
                 <Link to="/register" style={{ color: '#94a3b8', textDecoration: 'none' }}>Đăng ký Ban Tổ Chức</Link>

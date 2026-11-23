@@ -6,7 +6,7 @@ import SupportChatFaqModal from './SupportChatFaqModal';
 import './SupportChatWidget.css';
 
 const QUICK_FAQS = [
-  { q: 'Không quét được mã QR điểm danh ca', a: 'Nếu QR ca sự kiện bị mờ hoặc lỗi GPS, bạn hãy báo Quản lý ca (EO) quét điểm danh thủ công hoặc gửi ảnh chứng minh vào đây để CSKH hỗ trợ nhé!' },
+  { q: 'Không quét được mã QR điểm danh ca', a: 'Nếu QR ca sự kiện bị mờ hoặc lỗi GPS, bạn hãy báo Quản lý ca quét điểm danh thủ công hoặc gửi ảnh chứng minh vào đây để CSKH hỗ trợ nhé!' },
   { q: 'Bao lâu thì nhận được thù lao ca làm?', a: 'Thù lao sẽ được chuyển khoản trực tiếp sau khi Nhà tổ chức hoàn tất đối soát ca (chậm nhất 24 giờ sau khi kết thúc sự kiện).' },
   { q: 'Làm thế nào để kháng cáo điểm uy tín?', a: 'Bạn vào mục "Kháng cáo điểm uy tín" trong vòng 7 ngày kể từ khi bị trừ điểm, kèm ảnh chụp minh chứng bất khả kháng để được duyệt hoàn điểm.' },
   { q: 'Tôi muốn gặp chuyên viên CSKH trực tiếp', a: 'Chuyên viên CSKH của CANi đã nhận được yêu cầu của bạn. Vui lòng để lại tin nhắn chi tiết, chúng tôi sẽ phản hồi trong giây lát!' },
@@ -149,7 +149,7 @@ export const SupportChatWidget = () => {
           const supportOnlyMessages = (res.messages || []).filter((m) => {
             const isFromStaff = m.senderRole === 'CUSTOMER_CARE' || m.senderRole === 'ADMIN';
             const isFromMe = (user?.userId && m.senderId && String(m.senderId) === String(user.userId)) ||
-                             (m.senderRole && user?.role && m.senderRole === user.role && m.senderRole !== 'WORKER');
+              (m.senderRole && user?.role && m.senderRole === user.role && m.senderRole !== 'WORKER');
             return isFromStaff || isFromMe;
           });
 

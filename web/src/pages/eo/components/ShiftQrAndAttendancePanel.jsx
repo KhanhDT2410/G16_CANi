@@ -186,7 +186,7 @@ export default function ShiftQrAndAttendancePanel({
     const handlePaymentUpdated = () => {
       loadAttendance();
       if (onReloadEvents) {
-        Promise.resolve(onReloadEvents()).catch(() => {});
+        Promise.resolve(onReloadEvents()).catch(() => { });
       }
     };
     window.addEventListener('cani_payment_updated', handlePaymentUpdated);
@@ -599,7 +599,7 @@ export default function ShiftQrAndAttendancePanel({
                         <td style={{ padding: '12px 14px' }}>
                           {isNoShow && (
                             <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem' }}>
-                              ✕ Vắng mặt (No-Show)
+                              ✕ Vắng mặt
                             </span>
                           )}
                           {!isNoShow && isCheckedIn && (
@@ -886,8 +886,8 @@ export default function ShiftQrAndAttendancePanel({
                                   !isCheckedIn
                                     ? 'Nhân sự chưa check-in vào ca'
                                     : !canVerify
-                                    ? 'Chưa hoàn tất các đầu việc bắt buộc hoặc thiếu ảnh minh chứng'
-                                    : 'Xác nhận hoàn thành công việc và duyệt công'
+                                      ? 'Chưa hoàn tất các đầu việc bắt buộc hoặc thiếu ảnh minh chứng'
+                                      : 'Xác nhận hoàn thành công việc và duyệt công'
                                 }
                                 style={{
                                   background: !canVerify ? '#94a3b8' : '#059669',

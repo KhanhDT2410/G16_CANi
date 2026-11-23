@@ -720,4 +720,67 @@ class ProposalRepository {
       throw RepositoryException(_extractErrorMessage(e, 'Gửi khiếu nại thất bại.'), e);
     }
   }
+
+  // Lấy dữ liệu hội thoại tranh chấp
+  Future<DisputeChatData> fetchDisputeChat(String disputeId) async {
+    try {
+      final response = await _dio.get('/v1/disputes/$disputeId/chat');
+      final data = response.data;
+      if (data != null && data['data'] is Map<String, dynamic>) {
+        return DisputeChatData.fromJson(data['data'] as Map<String, dynamic>);
+      }
+      return DisputeChatData(
+        disputeId: disputeId,
+        disputeTitle: 'Tranh chấp',
+        disputeStatus: 'OPEN',
+      );
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Không thể tải hội thoại tranh chấp.'), e);
+    }
+  }
+
+  // Gửi tin nhắn trong phiên tranh chấp
+  Future<DisputeChatMessageItem> sendDisputeChatMessage(
+    String disputeId,
+    String messageText, {
+    String? attachmentUrl,
+  }) async {
+    try {
+      final payload = {
+        'messageText': messageText,
+        'targetParty': 'WORKER',
+        if (attachmentUrl != null && attachmentUrl.isNotEmpty) 'attachmentUrl': attachmentUrl,
+      };
+      final response = await _dio.post('/v1/disputes/$disputeId/chat/messages', data: payload);
+      final data = response.data;
+      if (data != null && data['data'] is Map<String, dynamic>) {
+        return DisputeChatMessageItem.fromJson(data['data'] as Map<String, dynamic>);
+      }
+      return DisputeChatMessageItem(
+        id: 'local-${DateTime.now().millisecondsSinceEpoch}',
+        conversationId: 'temp',
+        senderId: 'me',
+        senderName: 'Tôi',
+        senderRole: 'WORKER',
+        messageText: messageText,
+        attachmentUrl: attachmentUrl,
+        isMe: true,
+        createdAt: DateTime.now(),
+      );
+    } catch (e) {
+      throw RepositoryException(_extractErrorMessage(e, 'Gửi tin nhắn thất bại.'), e);
+    }
+  }
+
+  // Đánh dấu đã đọc tin nhắn tranh chấp
+  Future<void> markDisputeChatRead(String disputeId) async {
+    try {
+      await _dio.post(
+        '/v1/disputes/$disputeId/chat/read',
+        queryParameters: {'party': 'WORKER'},
+      );
+    } catch (_) {
+      // Bỏ qua lỗi ngầm khi đánh dấu đọc
+    }
+  }
 }

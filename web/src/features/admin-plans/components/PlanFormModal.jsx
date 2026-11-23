@@ -78,7 +78,7 @@ export default function PlanFormModal({ isOpen, isCreating, plan, onClose, onSav
         <div className="plan-modal-header">
           <div>
             <h3 className="modal-title">{isCreating ? 'Tạo Gói Dịch Vụ Mới' : 'Cập Nhật Gói Cước & Đơn Giá'}</h3>
-            <p className="modal-subtitle">Thiết lập đơn giá và hạn mức tài nguyên cho Ban tổ chức sự kiện (EO)</p>
+            <p className="modal-subtitle">Thiết lập đơn giá và hạn mức tài nguyên cho Ban tổ chức sự kiện</p>
           </div>
           <button type="button" className="btn-modal-close" onClick={onClose} disabled={saving}>
             Đóng

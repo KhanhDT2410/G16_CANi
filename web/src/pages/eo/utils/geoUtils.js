@@ -36,7 +36,7 @@ function formatPhotonFeatureAddress(props = {}) {
   return parts.join(', ');
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 6500) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -65,7 +65,7 @@ export async function getAddressFromCoordinates(lat, lng) {
     const res = await fetchWithTimeout(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${numLat}&lon=${numLng}&zoom=18&addressdetails=1`,
       { headers: { 'Accept-Language': 'vi' } },
-      6500
+      4000
     );
     if (res.ok) {
       const data = await res.json();
@@ -81,7 +81,7 @@ export async function getAddressFromCoordinates(lat, lng) {
     const res = await fetchWithTimeout(
       `https://photon.komoot.io/reverse?lat=${numLat}&lon=${numLng}`,
       {},
-      5500
+      3500
     );
     if (res.ok) {
       const data = await res.json();

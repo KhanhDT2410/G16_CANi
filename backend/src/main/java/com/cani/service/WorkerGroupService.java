@@ -29,8 +29,11 @@ import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerGroupMembershipRepository;
 import com.cani.repository.WorkerGroupRepository;
 import com.cani.repository.WorkerRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -63,6 +66,7 @@ public class WorkerGroupService {
     private final DirectPaymentService directPaymentService;
     private final MatchingDispatchService matchingDispatchService;
     private final NotificationService notificationService;
+    private final ObjectMapper objectMapper;
 
     /**
      * UC-70: Worker (Group Leader) tạo nhóm thợ sự kiện mới
@@ -552,6 +556,36 @@ public class WorkerGroupService {
             throw new BadRequestException("Ca làm việc này không còn ở trạng thái đang mở");
         }
 
+        // Parse breakdown snapshot
+        String breakdown = proposal.getScoreBreakdown();
+        if (breakdown == null || breakdown.isBlank()) {
+            throw new BadRequestException("Đề xuất này không có snapshot đội, vui lòng chờ dispatch lại");
+        }
+        List<UUID> snapshotWorkerIds = new ArrayList<>();
+        int snapshotPackSize;
+        try {
+            JsonNode node = objectMapper.readTree(breakdown);
+            if (!node.hasNonNull("packWorkerIds") || !node.hasNonNull("packSize")) {
+                throw new BadRequestException("Đề xuất này không có snapshot đội, vui lòng chờ dispatch lại");
+            }
+            snapshotPackSize = node.get("packSize").asInt();
+            JsonNode idsNode = node.get("packWorkerIds");
+            if (!idsNode.isArray()) {
+                throw new BadRequestException("Đề xuất này không có snapshot đội, vui lòng chờ dispatch lại");
+            }
+            for (JsonNode idNode : idsNode) {
+                snapshotWorkerIds.add(UUID.fromString(idNode.asText()));
+            }
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BadRequestException("Đề xuất này không có snapshot đội, vui lòng chờ dispatch lại");
+        }
+
+        if (snapshotWorkerIds.size() != snapshotPackSize) {
+            throw new BadRequestException("Đề xuất này không có snapshot đội, vui lòng chờ dispatch lại");
+        }
+
         List<WorkerGroupMembership> activeMembers = membershipRepository
                 .findByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE);
         Map<UUID, WorkerGroupMembership> activeByWorker = activeMembers.stream()
@@ -561,34 +595,35 @@ public class WorkerGroupService {
         if (activeMembers.isEmpty() || activeByWorker.isEmpty()) {
             throw new BadRequestException("Nhóm không có thành viên nào đang hoạt động");
         }
-        int packSize = activeByWorker.size();
 
-        // CẤM partial:
-        // Request null/rỗng memberWorkerIds -> dùng toàn bộ ACTIVE members (k = packSize).
-        // Request truyền danh sách KHÔNG khớp đúng tập ACTIVE members (subset hoặc thừa ngoài nhóm) -> 400 BadRequest.
-        List<UUID> allActiveWorkerIds = activeMembers.stream()
-                .filter(m -> m.getWorker() != null)
-                .map(m -> m.getWorker().getWorkerId())
-                .toList();
-
-        List<UUID> selectedIds;
-        if (memberWorkerIds == null || memberWorkerIds.isEmpty()) {
-            selectedIds = allActiveWorkerIds;
-        } else {
-            Set<UUID> requestedSet = new HashSet<>(memberWorkerIds);
-            Set<UUID> activeSet = new HashSet<>(allActiveWorkerIds);
-            if (!requestedSet.equals(activeSet)) {
-                throw new BadRequestException("Group proposal chỉ hỗ trợ nhận ca trọn đội");
-            }
-            selectedIds = allActiveWorkerIds;
+        Set<UUID> currentActiveIds = activeByWorker.keySet();
+        Set<UUID> snapshotIdSet = new HashSet<>(snapshotWorkerIds);
+        if (!currentActiveIds.equals(snapshotIdSet)) {
+            throw new AppException("Đội đã thay đổi kể từ khi nhận đề xuất, vui lòng chờ hệ thống dispatch lại", HttpStatus.CONFLICT);
         }
 
-        // Re-check eligibility TOÀN pack trong transaction (1 fail -> toàn bộ rollback, 0 assignment)
-        for (WorkerGroupMembership m : activeMembers) {
-            if (m.getWorker() == null) continue;
+        int packSize = snapshotPackSize;
+
+        // CẤM partial:
+        // Request null/rỗng memberWorkerIds -> dùng toàn bộ snapshot (k = packSize).
+        // Request truyền danh sách KHÔNG khớp đúng tập snapshot -> 400 BadRequest.
+        List<UUID> selectedIds = snapshotWorkerIds;
+        if (memberWorkerIds != null && !memberWorkerIds.isEmpty()) {
+            Set<UUID> requestedSet = new HashSet<>(memberWorkerIds);
+            if (!requestedSet.equals(snapshotIdSet)) {
+                throw new BadRequestException("Group proposal chỉ hỗ trợ nhận ca trọn đội");
+            }
+        }
+
+        // Re-check eligibility TOÀN pack theo snapshot trong transaction (1 fail -> toàn bộ rollback, 0 assignment)
+        for (UUID workerId : snapshotWorkerIds) {
+            WorkerGroupMembership m = activeByWorker.get(workerId);
+            if (m == null || m.getWorker() == null) {
+                throw new AppException("Đội đã thay đổi kể từ khi nhận đề xuất, vui lòng chờ hệ thống dispatch lại", HttpStatus.CONFLICT);
+            }
             String reason = matchingDispatchService.groupMemberEligibilityReason(m.getWorker(), shift);
             if (reason != null) {
-                throw new BadRequestException("Member " + m.getWorker().getWorkerId() + " không đủ điều kiện cho ca này (" + reason + ")");
+                throw new BadRequestException("Member " + workerId + " không đủ điều kiện cho ca này (" + reason + ")");
             }
         }
 
@@ -602,19 +637,6 @@ public class WorkerGroupService {
         if (updatedRows == 0) {
             throw new AppException("Ca vừa đủ người trước khi bạn xác nhận", HttpStatus.CONFLICT);
         }
-        // Sync bộ đếm trong memory (native query đã persist vào DB)
-        shift.setConfirmedWorkers((shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0) + packSize);
-        int newRemaining = Math.max(0, remaining - packSize);
-        shift.setRemainingWorkers(newRemaining);
-        if (newRemaining == 0) {
-            shift.setStatus(ShiftStatus.FULLY_STAFFED);
-            shift.setEmergency(false);
-        }
-
-        // Accept proposal
-        proposal.setStatus(ProposalStatus.ACCEPTED);
-        proposal.setRespondedAt(Instant.now());
-        dispatchProposalRepository.save(proposal);
 
         // Guard chống trùng lặp assignment active trong cùng shift
         // shortcut: H2 không hỗ trợ partial unique index; production PostgreSQL mới có index, nâng cấp test sang embedded PG khi có CI.
@@ -623,38 +645,58 @@ public class WorkerGroupService {
                 AssignmentStatus.CONFIRMED,
                 AssignmentStatus.CHECKED_IN
         );
-        for (UUID workerId : selectedIds) {
+        for (UUID workerId : snapshotWorkerIds) {
             if (shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(shift.getShiftId(), workerId, activeStatuses)) {
                 throw new AppException("Thành viên " + workerId + " đã có ca làm việc đang hoạt động trong ca này", HttpStatus.CONFLICT);
             }
         }
 
-        // packSize × (ShiftAssignment CONFIRMED source=GROUP + payment ban đầu)
         Event event = shift.getEvent();
         String eventName = event != null ? event.getName() : "Sự kiện";
         List<UUID> assignmentIds = new ArrayList<>();
-        for (UUID workerId : selectedIds) {
-            WorkerGroupMembership m = activeByWorker.get(workerId);
-            Worker member = m.getWorker();
-            ShiftAssignment assignment = ShiftAssignment.builder()
-                    .shift(shift)
-                    .worker(member)
-                    .proposalId(proposal.getProposalId())
-                    .source(AssignmentSource.GROUP)
-                    .status(AssignmentStatus.CONFIRMED)
-                    .groupId(groupId)
-                    .isGroupLeader(m.getRoleInGroup() == GroupRole.LEADER)
-                    .eoConfirmed(false)
-                    .build();
-            assignment = shiftAssignmentRepository.save(assignment);
-            assignmentIds.add(assignment.getAssignmentId());
-            directPaymentService.createInitialPayment(assignment);
-        }
 
-        // Counter event += packSize
-        if (event != null) {
-            event.setTotalConfirmedWorkers((event.getTotalConfirmedWorkers() != null ? event.getTotalConfirmedWorkers() : 0) + packSize);
-            eventRepository.save(event);
+        try {
+            // packSize × (ShiftAssignment CONFIRMED source=GROUP + payment ban đầu)
+            for (UUID workerId : snapshotWorkerIds) {
+                WorkerGroupMembership m = activeByWorker.get(workerId);
+                Worker member = m.getWorker();
+                ShiftAssignment assignment = ShiftAssignment.builder()
+                        .shift(shift)
+                        .worker(member)
+                        .proposalId(proposal.getProposalId())
+                        .source(AssignmentSource.GROUP)
+                        .status(AssignmentStatus.CONFIRMED)
+                        .groupId(groupId)
+                        .isGroupLeader(m.getRoleInGroup() == GroupRole.LEADER)
+                        .eoConfirmed(false)
+                        .build();
+                assignment = shiftAssignmentRepository.save(assignment);
+                assignmentIds.add(assignment.getAssignmentId());
+                directPaymentService.createInitialPayment(assignment);
+            }
+
+            // Counter event += packSize
+            if (event != null) {
+                event.setTotalConfirmedWorkers((event.getTotalConfirmedWorkers() != null ? event.getTotalConfirmedWorkers() : 0) + packSize);
+                eventRepository.save(event);
+            }
+
+            // Sync bộ đếm trong memory (native query đã persist vào DB)
+            shift.setConfirmedWorkers((shift.getConfirmedWorkers() != null ? shift.getConfirmedWorkers() : 0) + packSize);
+            int newRemaining = Math.max(0, remaining - packSize);
+            shift.setRemainingWorkers(newRemaining);
+            if (newRemaining == 0) {
+                shift.setStatus(ShiftStatus.FULLY_STAFFED);
+                shift.setEmergency(false);
+            }
+
+            // Accept proposal: di chuyển xuống SAU KHI các assignment và counter đã persist thành công
+            proposal.setStatus(ProposalStatus.ACCEPTED);
+            proposal.setRespondedAt(Instant.now());
+            dispatchProposalRepository.save(proposal);
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Lỗi vi phạm toàn vẹn khi tạo phân công ca cho nhóm {} trong ca {}: {}", groupId, shift.getShiftId(), ex.getMessage());
+            throw new AppException("Trùng lịch với ca khác, vui lòng thử lại", HttpStatus.CONFLICT);
         }
 
         // Notifications: FCM gửi SAU KHI commit DB thành công

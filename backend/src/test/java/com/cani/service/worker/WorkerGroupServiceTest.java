@@ -42,15 +42,19 @@ import com.cani.service.DirectPaymentService;
 import com.cani.service.MatchingDispatchService;
 import com.cani.service.NotificationService;
 import com.cani.service.WorkerGroupService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import java.util.Collections;
+import java.util.Locale;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -103,6 +107,9 @@ class WorkerGroupServiceTest {
 
     @Mock
     private NotificationService notificationService;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private WorkerGroupService workerGroupService;
@@ -530,6 +537,8 @@ class WorkerGroupServiceTest {
                 .status(ProposalStatus.PENDING)
                 .matchScore(BigDecimal.valueOf(0.92))
                 .expiresAt(Instant.now().plus(Duration.ofHours(24)))
+                .scoreBreakdown(String.format(Locale.US, "{\"packSize\":3,\"packWorkerIds\":[\"%s\",\"%s\",\"%s\"]}",
+                        leaderWorkerId, memberWorkerId, secondWorkerId))
                 .build();
 
         // Leader check: user WORKER + worker = leaderWorkerId của group
@@ -678,6 +687,88 @@ class WorkerGroupServiceTest {
                 leaderUserId, groupId, proposalId, null));
         assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
         verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
+    }
+
+    @Test
+    @DisplayName("T3-FINDING1-1 - acceptGroupProposal() - Snapshot drift: member gia nhập sau dispatch → 409 Conflict")
+    void accept_rejects_when_member_joined_since_dispatch() {
+        setupTask3Context();
+        // Giả sử có thêm 1 member thứ 4 gia nhập đội sau dispatch
+        Worker extraWorker = Worker.builder().workerId(UUID.randomUUID()).fullName("Nguyễn Văn Mới").kycStatus(KycStatus.APPROVED).build();
+        when(membershipRepository.findByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE))
+                .thenReturn(List.of(
+                        leaderMembership(),
+                        memberMembership(memberWorker),
+                        memberMembership(secondWorker),
+                        memberMembership(extraWorker)
+                ));
+
+        AppException ex = assertThrows(AppException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+        assertTrue(ex.getMessage().contains("Đội đã thay đổi kể từ khi nhận đề xuất"));
+        verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
+    }
+
+    @Test
+    @DisplayName("T3-FINDING1-2 - acceptGroupProposal() - Snapshot drift: member rời đội sau dispatch → 409 Conflict")
+    void accept_rejects_when_member_left_since_dispatch() {
+        setupTask3Context();
+        // 1 member đã rời đội -> hiện tại chỉ còn 2 active members
+        when(membershipRepository.findByWorkerGroup_GroupIdAndStatus(groupId, MembershipStatus.ACTIVE))
+                .thenReturn(List.of(
+                        leaderMembership(),
+                        memberMembership(memberWorker)
+                ));
+
+        AppException ex = assertThrows(AppException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+        assertTrue(ex.getMessage().contains("Đội đã thay đổi kể từ khi nhận đề xuất"));
+        verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
+    }
+
+    @Test
+    @DisplayName("T3-FINDING1-3 - acceptGroupProposal() - Snapshot hợp lệ: chấp nhận trọn đội thành công")
+    void accept_with_matching_snapshot_creates_full_pack() {
+        setupTask3Context();
+        when(shiftRepository.incrementConfirmedWorkersAtomicBy(shiftId, 3)).thenReturn(1);
+
+        AcceptGroupProposalResponseDto response = workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null);
+
+        assertNotNull(response);
+        assertEquals(3, response.getMemberCount());
+        verify(shiftAssignmentRepository, times(3)).save(any(ShiftAssignment.class));
+        assertEquals(ProposalStatus.ACCEPTED, task3Proposal.getStatus());
+    }
+
+    @Test
+    @DisplayName("T3-FINDING1-4 - acceptGroupProposal() - Breakdown thiếu trường snapshot → 400 BadRequest")
+    void accept_rejects_when_breakdown_missing_pack_fields() {
+        setupTask3Context();
+        task3Proposal.setScoreBreakdown("{\"someOtherField\": 123}");
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null));
+        assertTrue(ex.getMessage().contains("Đề xuất này không có snapshot đội"));
+        verify(shiftAssignmentRepository, never()).save(any(ShiftAssignment.class));
+    }
+
+    @Test
+    @DisplayName("T3-FINDING2 - acceptGroupProposal() - Race condition vi phạm unique index → map sang 409 Conflict")
+    void accept_maps_unique_index_violation_to_409() {
+        setupTask3Context();
+        when(shiftRepository.incrementConfirmedWorkersAtomicBy(shiftId, 3)).thenReturn(1);
+        when(shiftAssignmentRepository.save(any(ShiftAssignment.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
+
+        AppException ex = assertThrows(AppException.class, () -> workerGroupService.acceptGroupProposal(
+                leaderUserId, groupId, proposalId, null));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+        assertTrue(ex.getMessage().contains("Trùng lịch với ca khác"));
+        // Đảm bảo proposal KHÔNG bị chuyển sang ACCEPTED
+        assertNotEquals(ProposalStatus.ACCEPTED, task3Proposal.getStatus());
     }
 
     @Test

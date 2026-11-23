@@ -1,4 +1,4 @@
--- V46: Add invite_code to worker_groups for self-service squad joining
+-- V55: Add invite_code to worker_groups for self-service squad joining
 ALTER TABLE worker_groups ADD COLUMN IF NOT EXISTS invite_code VARCHAR(12) NULL;
 
 -- Unique index on non-null invite_code

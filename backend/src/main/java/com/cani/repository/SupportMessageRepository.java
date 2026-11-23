@@ -17,6 +17,9 @@ public interface SupportMessageRepository extends JpaRepository<SupportMessage, 
     List<SupportMessage> findByShiftIdOrderByCreatedAtAsc(UUID shiftId);
     List<SupportMessage> findByShiftIdInOrderByCreatedAtAsc(Collection<UUID> shiftIds);
 
+    @org.springframework.data.jpa.repository.Query("SELECT m FROM SupportMessage m WHERE m.shiftId IS NOT NULL AND m.conversationId IN :convIds ORDER BY m.createdAt DESC")
+    List<SupportMessage> findShiftMessagesForConversations(@org.springframework.data.repository.query.Param("convIds") Collection<UUID> convIds);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("DELETE FROM SupportMessage m WHERE m.conversationId IN :conversationIds")
     int deleteByConversationIdIn(@org.springframework.data.repository.query.Param("conversationIds") Collection<UUID> conversationIds);

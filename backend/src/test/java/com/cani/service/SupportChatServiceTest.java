@@ -89,7 +89,7 @@ class SupportChatServiceTest {
         @DisplayName("1. getMyConversation khi đã có hội thoại trả về chi tiết hội thoại và tin nhắn")
         void getMyConversation_Existing_ReturnsDetail() {
                 when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
-                when(conversationRepository.findByUserId(userId)).thenReturn(Optional.of(mockConv));
+                when(conversationRepository.findByUserIdAndDisputeIdIsNull(userId)).thenReturn(Optional.of(mockConv));
                 when(messageRepository.findByConversationIdAndIsReadFalseAndSenderRole(any(), any()))
                                 .thenReturn(new ArrayList<>());
                 when(messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId))
@@ -115,7 +115,7 @@ class SupportChatServiceTest {
         @DisplayName("2. sendUserMessage lưu tin nhắn và tăng unreadStaffCount")
         void sendUserMessage_Success_IncrementsStaffUnread() {
                 when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
-                when(conversationRepository.findByUserId(userId)).thenReturn(Optional.of(mockConv));
+                when(conversationRepository.findByUserIdAndDisputeIdIsNull(userId)).thenReturn(Optional.of(mockConv));
                 when(messageRepository.save(any(SupportMessage.class))).thenAnswer(invocation -> {
                         SupportMessage m = invocation.getArgument(0);
                         m.setId(UUID.randomUUID());
@@ -139,7 +139,7 @@ class SupportChatServiceTest {
         @DisplayName("3. getStaffConversations trả về danh sách toàn bộ người dùng EO và Worker")
         void getStaffConversations_ReturnsList() {
                 when(userRepository.findByRoleIn(any())).thenReturn(List.of(mockUser));
-                when(conversationRepository.findAll()).thenReturn(List.of(mockConv));
+                when(conversationRepository.findByDisputeIdIsNull()).thenReturn(List.of(mockConv));
 
                 List<SupportConversationSummaryDto> list = supportChatService.getStaffConversations(null);
 
@@ -177,7 +177,7 @@ class SupportChatServiceTest {
         @DisplayName("5. getOrCreateStaffConversationForUser tạo mới nếu chưa có và trả về chi tiết")
         void getOrCreateStaffConversationForUser_Success() {
                 when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
-                when(conversationRepository.findByUserId(userId)).thenReturn(Optional.empty());
+                when(conversationRepository.findByUserIdAndDisputeIdIsNull(userId)).thenReturn(Optional.empty());
                 when(conversationRepository.save(any(SupportConversation.class))).thenReturn(mockConv);
                 when(messageRepository.findByConversationIdAndIsReadFalseAndSenderRole(any(), any()))
                                 .thenReturn(new ArrayList<>());
@@ -195,8 +195,10 @@ class SupportChatServiceTest {
         @Test
         @DisplayName("6. getStaffUnreadSummary tính toán đúng tổng số tin nhắn chưa đọc")
         void getStaffUnreadSummary_ReturnsCorrectCounts() {
-                when(userRepository.findByRoleIn(any())).thenReturn(List.of(mockUser));
-                when(conversationRepository.findAll()).thenReturn(List.of(mockConv));
+                when(conversationRepository.sumUnreadStaffCount()).thenReturn(1);
+                when(conversationRepository.countUnreadStaffConversations()).thenReturn(1);
+                when(conversationRepository.findRecentSupportConversations(any())).thenReturn(List.of(mockConv));
+                when(userRepository.findAllById(any())).thenReturn(List.of(mockUser));
 
                 StaffChatUnreadSummaryDto summary = supportChatService.getStaffUnreadSummary();
 

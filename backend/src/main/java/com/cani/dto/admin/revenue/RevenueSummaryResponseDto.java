@@ -17,6 +17,7 @@ public class RevenueSummaryResponseDto {
     private RevenueGrowthDto growth;
     private List<PackageTypeRevenueDto> packageTypeBreakdown;
     private List<EventModeRevenueDto> eventModeBreakdown;
+    private PayOSSummaryDto payosSummary;
     private VnPaySummaryDto vnpaySummary;
     private List<RevenueTransactionDto> flaggedTransactions;
 }

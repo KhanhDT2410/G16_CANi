@@ -7,6 +7,7 @@ import com.cani.dto.admin.revenue.RevenueSummaryResponseDto;
 import com.cani.dto.admin.revenue.RevenueTransactionDto;
 import com.cani.entity.Event;
 import com.cani.entity.EventOrganizer;
+import com.cani.entity.PayOSOrder;
 import com.cani.entity.Payment;
 import com.cani.entity.Subscription;
 import com.cani.entity.User;
@@ -17,6 +18,7 @@ import com.cani.entity.enums.PlanType;
 import com.cani.entity.enums.SubscriptionStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.repository.EventRepository;
+import com.cani.repository.PayOSOrderRepository;
 import com.cani.repository.PaymentRepository;
 import com.cani.repository.SubscriptionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +57,9 @@ class RevenueServiceTest {
 
     @Mock
     private EventRepository eventRepository;
+
+    @Mock
+    private PayOSOrderRepository payOSOrderRepository;
 
     @InjectMocks
     private RevenueService revenueService;
@@ -141,6 +146,8 @@ class RevenueServiceTest {
 
             when(eventRepository.findByCreatedAtBetween(any(), any()))
                     .thenReturn(List.of());
+            when(payOSOrderRepository.findByCreatedAtBetween(any(), any()))
+                    .thenReturn(List.of());
 
             RevenueSummaryResponseDto response = revenueService.getRevenueSummary(thirtyDaysAgo, now);
 
@@ -197,7 +204,28 @@ class RevenueServiceTest {
                     .thenReturn(List.of(pVnPayOk, pDisputed, pUnverified));
             when(eventRepository.findByCreatedAtBetween(any(), any())).thenReturn(List.of());
 
+            PayOSOrder payosPaid = PayOSOrder.builder()
+                    .orderCode(101L)
+                    .amount(BigDecimal.valueOf(99000))
+                    .status("PAID")
+                    .createdAt(now.minus(1, ChronoUnit.DAYS))
+                    .build();
+            PayOSOrder payosPending = PayOSOrder.builder()
+                    .orderCode(102L)
+                    .amount(BigDecimal.valueOf(50000))
+                    .status("PENDING")
+                    .createdAt(now.minus(2, ChronoUnit.DAYS))
+                    .build();
+            when(payOSOrderRepository.findByCreatedAtBetween(any(), any())).thenReturn(List.of(payosPaid, payosPending));
+
             RevenueSummaryResponseDto response = revenueService.getRevenueSummary(thirtyDaysAgo, now);
+
+            // PayOS summary
+            assertThat(response.getPayosSummary()).isNotNull();
+            assertThat(response.getPayosSummary().getTotalTransactions()).isEqualTo(2);
+            assertThat(response.getPayosSummary().getConfirmedCount()).isEqualTo(1);
+            assertThat(response.getPayosSummary().getPendingCount()).isEqualTo(1);
+            assertThat(response.getPayosSummary().getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(99000));
 
             // VNPay summary
             assertThat(response.getVnpaySummary().getTotalTransactions()).isEqualTo(2);

@@ -93,7 +93,7 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
     assert.equal(summary.canTriggerEmergency, false);
   });
 
-  it('Ca IN_PROGRESS còn thiếu người trước giờ kết thúc: vẫn cho phép bật kích hoạt khẩn cấp để bù người', () => {
+  it('Ca IN_PROGRESS còn thiếu người: chặn kích hoạt khẩn cấp thủ công (chỉ cho auto khi No-show)', () => {
     const sRunning = {
       shiftId: 's-run',
       jobType: 'Bảo vệ',
@@ -109,7 +109,29 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
 
     assert.equal(summary.isInProgress, true);
     assert.equal(summary.nearStartUnderstaffed, true);
-    assert.equal(summary.canTriggerEmergency, true);
+    assert.equal(summary.canTriggerEmergency, false);
+  });
+
+  it('Worker tự hủy làm thiếu người (hệ thống tự bật emergency) -> hiện cảnh báo và chặn kích hoạt trùng', () => {
+    const sCancelledSlot = {
+      shiftId: 's-cancel',
+      jobType: 'Lễ tân',
+      status: 'ACTIVE',
+      requiredWorkers: 4,
+      confirmedWorkers: 3,
+      startTime: new Date(now.getTime() + 10 * 3600 * 1000).toISOString(),
+      endTime: new Date(now.getTime() + 14 * 3600 * 1000).toISOString(),
+      emergency: true,
+      pendingProposalCount: 2,
+    };
+    const event = { eventId: 'e1', mode: 'MATCHING', status: 'ACTIVE', shifts: [sCancelledSlot] };
+    const summary = getShiftStaffingSummary(sCancelledSlot, event, now, 4);
+
+    assert.equal(summary.isEmergency, true);
+    assert.equal(summary.nearStartUnderstaffed, true);
+    assert.equal(summary.canTriggerEmergency, false);
+    assert.equal(summary.hasCandidates, true);
+    assert.equal(getEventUnderstaffedSummary(event, now, 4).count, 1);
   });
 
   it('Ca đã bật Emergency với 0 ứng viên vs có ứng viên', () => {
@@ -135,7 +157,7 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
     assert.equal(withCandidates.canTriggerEmergency, false);
   });
 
-  it('Ca đã đủ người -> gỡ cảnh báo đang hoạt động và nút kích hoạt', () => {
+  it('Ca đã đủ người -> gỡ cảnh báo đang hoạt động, cờ emergency và nút kích hoạt', () => {
     const fullShift = {
       shiftId: 's-full',
       jobType: 'Lễ tân',
@@ -144,11 +166,13 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
       confirmedWorkers: 6,
       startTime: new Date(now.getTime() + 1 * 3600 * 1000).toISOString(),
       endTime: new Date(now.getTime() + 5 * 3600 * 1000).toISOString(),
-      emergency: false,
+      emergency: true, // dù payload cũ còn sót cờ, helper vẫn dọn sạch khi missing === 0
     };
     const event = { eventId: 'e1', mode: 'MATCHING', status: 'ACTIVE', shifts: [fullShift] };
     const summary = getShiftStaffingSummary(fullShift, event, now, 4);
 
+    assert.equal(summary.isFullyStaffed, true);
+    assert.equal(summary.isEmergency, false);
     assert.equal(summary.nearStartUnderstaffed, false);
     assert.equal(summary.canTriggerEmergency, false);
     assert.equal(getShiftStaffingAlerts([fullShift], event, now, 4).length, 0);

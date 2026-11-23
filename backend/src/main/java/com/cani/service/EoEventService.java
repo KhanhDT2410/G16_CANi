@@ -1159,9 +1159,6 @@ public class EoEventService {
         if (hourlyWage == null || hourlyWage.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
         }
-        if (hourlyWage.compareTo(new BigDecimal("20000")) < 0) {
-            throw new BadRequestException("Mức lương này đang thấp hơn định mức lương sàn tối thiểu của CANi (20,000 đ/h)!");
-        }
     }
 
     private BigDecimal calculateShiftTotalCost(Instant startTime, Instant endTime, BigDecimal hourlyWage, int requiredWorkers, BigDecimal allowance) {
@@ -1594,7 +1591,7 @@ public class EoEventService {
                 .performedSkillName(resolveSkillNameById(s.getPerformedSkillId()))
                 .skillRequirements(reqDtos)
                 .customSkillNotes(s.getCustomSkillNotes())
-                .emergency(Boolean.TRUE.equals(s.getEmergency()))
+                .emergency(Boolean.TRUE.equals(s.getEmergency()) && eligibility.missingWorkers() > 0)
                 .missingWorkers(eligibility.missingWorkers())
                 .nearStartUnderstaffed(eligibility.nearStartUnderstaffed())
                 .canTriggerEmergency(eligibility.canTriggerEmergency())

@@ -3,9 +3,11 @@ import { getShiftStaffingSummary } from '../utils/eventHelpers';
 
 /**
  * Hiển thị cảnh báo thiếu nhân sự cho từng ca làm việc tại chỗ kèm thao tác hợp lệ:
- * - Ca ACTIVE hoặc IN_PROGRESS (trước giờ kết thúc) còn thiếu -> nút "Kích hoạt khẩn cấp"
+ * - Ca ACTIVE (trước giờ bắt đầu) còn thiếu -> nút "Kích hoạt khẩn cấp"
  * - Ca INVITE còn thiếu -> nút "Mời thêm Worker"
- * - Ca đã bật Emergency -> nhãn "Đang điều phối khẩn cấp" hoặc "Đã bật điều phối · Chưa tìm được Worker phù hợp"
+ * - Ca đã bật Emergency (do EO hoặc hệ thống tự động khi Worker hủy/No-show) -> nhãn "Đang điều phối khẩn cấp" (ẩn nút tránh kích hoạt trùng)
+ * - Ca IN_PROGRESS (đã đến giờ làm) -> ẩn nút kích hoạt thủ công, giải thích cơ chế tự động khi ghi nhận No-show còn đủ thời gian làm việc
+ * - Khi vừa bù đủ nhân sự trong phiên -> hiện phản hồi xanh "Đã bù đủ nhân sự" và gỡ cảnh báo thiếu/nút khẩn cấp
  */
 export default function ShiftEmergencyBanner({
   shift,
@@ -16,8 +18,35 @@ export default function ShiftEmergencyBanner({
 }) {
   const summary = getShiftStaffingSummary(shift, event);
 
-  // Khi đã đủ nhân sự -> gỡ cảnh báo đang hoạt động và nút kích hoạt
+  // Khi đã đủ nhân sự -> gỡ cảnh báo thiếu và nút kích hoạt; nếu vừa theo dõi emergency trong phiên thì hiện kết quả đã bù đủ
   if (summary.missing <= 0 || summary.isDraft || summary.isCancelled || summary.isCompleted) {
+    if (
+      localDispatchResult &&
+      summary.missing <= 0 &&
+      !summary.isDraft &&
+      !summary.isCancelled &&
+      !summary.isCompleted
+    ) {
+      return (
+        <div
+          style={{
+            padding: '0.65rem 0.95rem',
+            borderRadius: 10,
+            backgroundColor: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#047857' }}>
+            Đã bù đủ nhân sự ({summary.confirmed}/{summary.required}) — Điều phối khẩn cấp đã tự động kết thúc.
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 
@@ -57,7 +86,7 @@ export default function ShiftEmergencyBanner({
           <div style={{ fontSize: '0.76rem', color: '#9a3412' }}>
             {summary.isInviteMode
               ? 'Ca đã đến giờ làm việc. Bạn có thể mời thêm Worker hoặc kiểm tra điểm danh ca.'
-              : 'Ca đã đến giờ làm việc và vẫn còn thiếu nhân sự. Bạn có thể bật điều phối khẩn cấp để tìm người bù ca hoặc kiểm tra điểm danh.'}
+              : 'Ca đã đến giờ làm việc (không thể bật điều phối khẩn cấp thủ công). Hệ thống sẽ tự động điều phối khẩn cấp nếu ghi nhận nhân sự vắng mặt (No-show) khi ca còn đủ thời gian làm việc; vui lòng kiểm tra điểm danh hoặc báo cáo vắng mặt nếu cần.'}
           </div>
         )}
       </div>

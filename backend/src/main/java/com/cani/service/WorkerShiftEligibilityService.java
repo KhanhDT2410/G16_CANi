@@ -197,7 +197,7 @@ public class WorkerShiftEligibilityService {
                         "Ca làm việc này hiện không còn mở tuyển nhân sự (Trạng thái: " + shift.getStatus() + ").");
             }
         }
-        if (shift.getEndTime() != null && Instant.now().isAfter(shift.getEndTime())) {
+        if (shift.getEndTime() != null && !Instant.now().isBefore(shift.getEndTime())) {
             return EligibilityResult.fail("SHIFT_ENDED",
                     "Ca làm việc này đã kết thúc, không thể tham gia.");
         }

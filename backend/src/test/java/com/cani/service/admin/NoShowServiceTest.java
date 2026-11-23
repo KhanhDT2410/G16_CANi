@@ -9,7 +9,9 @@ import com.cani.dto.admin.noshow.NoShowStatsDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
 import com.cani.entity.enums.AttendanceStatus;
+import com.cani.entity.enums.EventStatus;
 import com.cani.entity.enums.NoShowDetectedBy;
+import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.UserStatus;
 import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
@@ -105,6 +107,7 @@ class NoShowServiceTest {
         testEvent = Event.builder()
                 .eventId(UUID.randomUUID())
                 .name("Lễ Hội Âm Nhạc CANi")
+                .status(EventStatus.ACTIVE)
                 .build();
 
         testShift = Shift.builder()
@@ -115,6 +118,7 @@ class NoShowServiceTest {
                 .endTime(Instant.now().plusSeconds(7200))
                 .requiredWorkers(5)
                 .remainingWorkers(2)
+                .status(ShiftStatus.ACTIVE)
                 .build();
 
         testAssignment = ShiftAssignment.builder()
@@ -144,7 +148,7 @@ class NoShowServiceTest {
             return record;
         });
 
-        when(matchingDispatchService.dispatchForShift(testShift.getShiftId())).thenReturn(3);
+        when(matchingDispatchService.triggerEmergencyDispatchForSystem(testShift.getShiftId(), null)).thenReturn(3);
 
         NoShowResponseDto result = noShowService.markNoShow(
                 assignmentId, NoShowDetectedBy.ADMIN, UUID.randomUUID(), "Worker không đến làm"
@@ -156,6 +160,7 @@ class NoShowServiceTest {
         assertEquals(60, testWorker.getReliabilityScore()); // 85 - 25 = 60
         assertFalse(result.getIsAccountLocked());
         assertTrue(result.getEmergencyDispatched());
+        assertTrue(Boolean.TRUE.equals(testShift.getEmergency()));
 
         verify(workerRepository).save(testWorker);
         verify(shiftRepository).save(testShift);
@@ -163,8 +168,30 @@ class NoShowServiceTest {
         verify(attendanceLogRepository).save(any(AttendanceLog.class));
         verify(reliabilityLogRepository).save(any(ReliabilityLog.class));
         verify(notificationService, atLeastOnce()).sendNotification(any(User.class), anyString(), anyString(), any(), anyString(), any());
-        verify(matchingDispatchService).dispatchForShift(testShift.getShiftId());
+        verify(matchingDispatchService).triggerEmergencyDispatchForSystem(testShift.getShiftId(), null);
         verify(auditLogService).logAction(any());
+    }
+
+    @Test
+    @DisplayName("No-show khi ca đã kết thúc hoặc còn dưới 30 phút -> không kích hoạt Auto Emergency Dispatch")
+    void markNoShow_stopsEmergencyDispatch_whenShiftEndedOrTooShortRemaining() {
+        testShift.setStartTime(Instant.now().minusSeconds(7200));
+        testShift.setEndTime(Instant.now().plusSeconds(600)); // chỉ còn 10 phút (< 30 phút)
+        testShift.setEmergency(false);
+
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(testAssignment));
+        when(noShowRecordRepository.existsByShiftAssignment_AssignmentId(assignmentId)).thenReturn(false);
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)).thenReturn(Optional.empty());
+        when(reliabilityLogRepository.save(any(ReliabilityLog.class))).thenAnswer(i -> i.getArgument(0));
+        when(noShowRecordRepository.save(any(NoShowRecord.class))).thenAnswer(i -> i.getArgument(0));
+
+        NoShowResponseDto result = noShowService.markNoShow(
+                assignmentId, NoShowDetectedBy.SYSTEM_CRON, null, "Quá hạn"
+        );
+
+        assertFalse(Boolean.TRUE.equals(result.getEmergencyDispatched()));
+        assertFalse(Boolean.TRUE.equals(testShift.getEmergency()));
+        verify(matchingDispatchService, never()).triggerEmergencyDispatchForSystem(any(), any());
     }
 
     @Test
@@ -263,7 +290,7 @@ class NoShowServiceTest {
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(testAssignment));
         when(reliabilityLogRepository.save(any(ReliabilityLog.class))).thenAnswer(i -> i.getArgument(0));
         when(noShowRecordRepository.save(any(NoShowRecord.class))).thenAnswer(i -> i.getArgument(0));
-        when(matchingDispatchService.dispatchForShift(testShift.getShiftId())).thenReturn(2);
+        when(matchingDispatchService.triggerEmergencyDispatchForSystem(testShift.getShiftId(), null)).thenReturn(2);
 
         NoShowScanResultDto scanResult = noShowService.scanAndProcessNoShows();
 

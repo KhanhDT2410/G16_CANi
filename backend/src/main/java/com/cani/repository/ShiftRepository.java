@@ -56,16 +56,25 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     }
 
     @Modifying
-    @Query("UPDATE Shift s SET s.confirmedWorkers = CASE WHEN (s.confirmedWorkers > 0) THEN s.confirmedWorkers - 1 ELSE 0 END, s.remainingWorkers = s.remainingWorkers + 1, s.status = :activeStatus WHERE s.shiftId = :shiftId")
-    int decrementConfirmedWorkersAtomic(@Param("shiftId") UUID shiftId, @Param("activeStatus") ShiftStatus activeStatus);
+    @Query("UPDATE Shift s SET s.confirmedWorkers = CASE WHEN (s.confirmedWorkers > 0) THEN s.confirmedWorkers - 1 ELSE 0 END, "
+            + "s.remainingWorkers = s.remainingWorkers + 1, "
+            + "s.status = CASE WHEN (s.status = :fullStatus) THEN :activeStatus ELSE s.status END "
+            + "WHERE s.shiftId = :shiftId")
+    int decrementConfirmedWorkersAtomic(
+            @Param("shiftId") UUID shiftId,
+            @Param("activeStatus") ShiftStatus activeStatus,
+            @Param("fullStatus") ShiftStatus fullStatus
+    );
 
     default int decrementConfirmedWorkersAtomic(UUID shiftId) {
-        return decrementConfirmedWorkersAtomic(shiftId, ShiftStatus.ACTIVE);
+        return decrementConfirmedWorkersAtomic(shiftId, ShiftStatus.ACTIVE, ShiftStatus.FULLY_STAFFED);
     }
 
     @Modifying
     @Query(value = "UPDATE shifts SET confirmed_workers = confirmed_workers + :n, "
-            + "remaining_workers = GREATEST(0, remaining_workers - :n) "
+            + "remaining_workers = GREATEST(0, remaining_workers - :n), "
+            + "emergency = CASE WHEN (confirmed_workers + :n >= required_workers) THEN false ELSE emergency END, "
+            + "understaffed_alert_sent = CASE WHEN (confirmed_workers + :n >= required_workers) THEN false ELSE understaffed_alert_sent END "
             + "WHERE id = :shiftId AND confirmed_workers + :n <= required_workers",
             nativeQuery = true)
     int incrementConfirmedWorkersAtomicBy(@Param("shiftId") UUID shiftId, @Param("n") int n);

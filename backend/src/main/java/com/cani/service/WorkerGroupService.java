@@ -789,8 +789,11 @@ public class WorkerGroupService {
             int newRemaining = Math.max(0, remaining - packSize);
             shift.setRemainingWorkers(newRemaining);
             if (newRemaining == 0) {
-                shift.setStatus(ShiftStatus.FULLY_STAFFED);
+                if (shift.getStatus() == ShiftStatus.ACTIVE) {
+                    shift.setStatus(ShiftStatus.FULLY_STAFFED);
+                }
                 shift.setEmergency(false);
+                shift.setUnderstaffedAlertSent(false);
             }
 
             // Accept proposal: di chuyển xuống SAU KHI các assignment và counter đã persist

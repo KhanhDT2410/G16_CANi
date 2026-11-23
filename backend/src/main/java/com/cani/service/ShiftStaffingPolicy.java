@@ -31,6 +31,7 @@ public class ShiftStaffingPolicy {
 
     public static final int DEFAULT_UNDERSTAFFED_ALERT_HOURS = 4;
     public static final double DEFAULT_EMERGENCY_RADIUS_KM = 25.0;
+    public static final long MIN_REMAINING_MINUTES_FOR_AUTO_EMERGENCY = 30L;
     public static final List<AssignmentStatus> VALID_CONFIRMED_STATUSES = List.of(
             AssignmentStatus.CONFIRMED,
             AssignmentStatus.CHECKED_IN,
@@ -77,6 +78,17 @@ public class ShiftStaffingPolicy {
             boolean inviteMode,
             int pendingProposalCount,
             double defaultEmergencyRadiusKm
+    ) {
+    }
+
+    public record AutoEmergencyEligibility(
+            boolean eligible,
+            String blockReason,
+            ShiftStatus effectiveStatus,
+            int requiredWorkers,
+            int confirmedWorkers,
+            int missingWorkers,
+            double effectiveRadiusKm
     ) {
     }
 
@@ -185,13 +197,73 @@ public class ShiftStaffingPolicy {
         if (confirmed >= required) {
             return false;
         }
+        // Nếu hệ thống đã bật chế độ khẩn cấp (vd do Worker hủy ca hoặc No-show) -> hiển thị cảnh báo ngay
+        if (Boolean.TRUE.equals(shift.getEmergency())) {
+            return true;
+        }
         int alertWindowHours = Math.max(1, understaffedAlertHours);
         Instant windowStart = shift.getStartTime().minus(Duration.ofHours(alertWindowHours));
         return !effectiveNow.isBefore(windowStart);
     }
 
     /**
-     * Đánh giá toàn diện quyền kích hoạt Emergency Dispatch thủ công & dữ liệu hiển thị thống nhất cho Web + API.
+     * Đánh giá điều kiện cho đường TỰ ĐỘNG (No-show / Worker tự hủy làm thiếu người):
+     * - Cho phép cả trước giờ bắt đầu (ACTIVE) và sau giờ bắt đầu (IN_PROGRESS) nếu còn đủ thời gian làm việc (>= 30 phút).
+     * - Cả hai đường đều dừng khi ca đã kết thúc (now >= endTime / COMPLETED), bị hủy, tạm đình chỉ, nháp, INVITE hoặc đã đủ người.
+     */
+    public AutoEmergencyEligibility evaluateAutoEmergencyEligibility(Shift shift, Instant now) {
+        Instant effectiveNow = now != null ? now : Instant.now();
+        double defaultRadius = resolveEffectiveEmergencyRadiusKm(null);
+        if (shift == null) {
+            return new AutoEmergencyEligibility(false, "Không tìm thấy ca làm việc.", null, 0, 0, 0, defaultRadius);
+        }
+
+        Event event = shift.getEvent();
+        boolean inviteMode = event != null && event.getMode() == EventMode.INVITE;
+        ShiftStatus effectiveStatus = resolveEffectiveShiftStatus(shift, effectiveNow);
+        int required = resolveRequiredWorkers(shift);
+        int confirmed = resolveConfirmedWorkersCount(shift);
+        int missing = Math.max(0, required - confirmed);
+
+        String blockReason = null;
+        if (inviteMode) {
+            blockReason = "Sự kiện đang ở chế độ Mời trực tiếp (INVITE), không kích hoạt điều phối tự động.";
+        } else if (event != null && !isEventEligibleForStaffingOperations(event)) {
+            blockReason = "Sự kiện không còn ở trạng thái mở tuyển dụng.";
+        } else if (effectiveStatus == ShiftStatus.CANCELLED) {
+            blockReason = "Ca làm việc đã bị hủy.";
+        } else if (effectiveStatus == ShiftStatus.DRAFT) {
+            blockReason = "Ca làm việc đang ở trạng thái bản nháp.";
+        } else if (effectiveStatus == ShiftStatus.SUSPENDED) {
+            blockReason = "Ca làm việc đang bị tạm đình chỉ.";
+        } else if (effectiveStatus == ShiftStatus.COMPLETED
+                || (shift.getEndTime() != null && !effectiveNow.isBefore(shift.getEndTime()))) {
+            blockReason = "Ca làm việc đã kết thúc.";
+        } else if (missing <= 0 || effectiveStatus == ShiftStatus.FULLY_STAFFED) {
+            blockReason = "Ca làm việc vẫn đủ nhân sự.";
+        } else if (effectiveStatus == ShiftStatus.IN_PROGRESS
+                || (shift.getStartTime() != null && !effectiveNow.isBefore(shift.getStartTime()))) {
+            if (shift.getEndTime() == null
+                    || Duration.between(effectiveNow, shift.getEndTime()).toMinutes() < MIN_REMAINING_MINUTES_FOR_AUTO_EMERGENCY) {
+                blockReason = "Ca làm việc đã vào giờ và không còn đủ thời gian tối thiểu (30 phút) để điều phối thay thế.";
+            }
+        } else if (effectiveStatus != ShiftStatus.ACTIVE) {
+            blockReason = "Trạng thái ca làm việc không hợp lệ để điều phối.";
+        }
+
+        return new AutoEmergencyEligibility(
+                blockReason == null,
+                blockReason,
+                effectiveStatus,
+                required,
+                confirmed,
+                missing,
+                defaultRadius
+        );
+    }
+
+    /**
+     * Đánh giá toàn diện quyền kích hoạt Emergency Dispatch THỦ CÔNG (chỉ trước giờ bắt đầu ca) & dữ liệu hiển thị cho Web + API.
      */
     public EmergencyEligibility evaluateEmergencyEligibility(Shift shift, Instant now) {
         Instant effectiveNow = now != null ? now : Instant.now();
@@ -220,12 +292,16 @@ public class ShiftStaffingPolicy {
             blockReason = "Ca làm việc đang ở trạng thái bản nháp, vui lòng xuất bản trước khi điều phối.";
         } else if (effectiveStatus == ShiftStatus.SUSPENDED) {
             blockReason = "Ca làm việc đang bị tạm đình chỉ.";
-        } else if (effectiveStatus == ShiftStatus.COMPLETED) {
+        } else if (effectiveStatus == ShiftStatus.COMPLETED
+                || (shift.getEndTime() != null && !effectiveNow.isBefore(shift.getEndTime()))) {
             blockReason = "Ca làm việc đã kết thúc, không thể kích hoạt điều phối khẩn cấp.";
         } else if (missing <= 0 || effectiveStatus == ShiftStatus.FULLY_STAFFED) {
             blockReason = "Ca làm việc đã tuyển đủ nhân sự, không cần kích hoạt điều phối khẩn cấp.";
-        } else if (effectiveStatus != ShiftStatus.ACTIVE && effectiveStatus != ShiftStatus.IN_PROGRESS) {
-            blockReason = "Chỉ có thể kích hoạt điều phối khẩn cấp cho ca làm việc đang mở tuyển hoặc đang diễn ra.";
+        } else if (effectiveStatus == ShiftStatus.IN_PROGRESS
+                || (shift.getStartTime() != null && !effectiveNow.isBefore(shift.getStartTime()))) {
+            blockReason = "Ca làm việc đã đến giờ bắt đầu (IN_PROGRESS), không thể bật điều phối khẩn cấp thủ công.";
+        } else if (effectiveStatus != ShiftStatus.ACTIVE) {
+            blockReason = "Chỉ có thể kích hoạt điều phối khẩn cấp thủ công cho ca làm việc đang mở tuyển trước giờ bắt đầu.";
         } else if (Boolean.TRUE.equals(shift.getEmergency())) {
             blockReason = "Ca làm việc đã được bật điều phối khẩn cấp trước đó.";
         }

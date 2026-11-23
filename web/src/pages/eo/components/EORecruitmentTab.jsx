@@ -379,7 +379,7 @@ export default function EORecruitmentTab({
                       >
                         {isFull ? 'Đã Tuyển Đủ' : `Cần tuyển ${required - confirmed} người nữa`}
                       </span>
-                      {activeEmergencies[shift.shiftId] && (
+                      {!isFull && (shift.emergency || activeEmergencies[shift.shiftId]) && (
                         <span
                           style={{
                             padding: '2px 8px',
@@ -403,7 +403,9 @@ export default function EORecruitmentTab({
                               display: 'inline-block',
                             }}
                           />
-                          Cứu Trợ Khẩn Cấp (+{formatCurrency(activeEmergencies[shift.shiftId].allowanceBonus)}đ/h • {activeEmergencies[shift.shiftId].expandedRadiusKm}km)
+                          {activeEmergencies[shift.shiftId]
+                            ? `Cứu Trợ Khẩn Cấp (+${formatCurrency(activeEmergencies[shift.shiftId].allowanceBonus)}đ/h • ${activeEmergencies[shift.shiftId].expandedRadiusKm}km)`
+                            : 'Đang điều phối khẩn cấp'}
                         </span>
                       )}
                     </div>

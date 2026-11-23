@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Guard test để đảm bảo migration V47 (PostgreSQL partial unique index)
+ * Guard test để đảm bảo migration V56 (PostgreSQL partial unique index)
  * được định nghĩa đúng cấu trúc chống trùng assignment active.
  *
  * Lưu ý kỹ thuật:
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class MigrationSqlGuardTest {
 
-    private static final String MIGRATION_FILE = "/db/migration/V47__unique_active_shift_assignment.sql";
+    private static final String MIGRATION_FILE = "/db/migration/V56__unique_active_shift_assignment.sql";
 
     @Test
     @DisplayName("V47 - Kiểm tra cú pháp Partial Unique Index cho Shift Assignment Active")

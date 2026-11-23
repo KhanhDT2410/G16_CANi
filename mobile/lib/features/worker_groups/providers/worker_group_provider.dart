@@ -261,6 +261,31 @@ class WorkerGroupsNotifier extends StateNotifier<WorkerGroupsState> {
     }
   }
 
+  /// F4 & F6: Nút ý chí giải tán đội (Leader hoặc Admin).
+  Future<({bool success, String? message})> dissolveGroup(String groupId) async {
+    try {
+      final dio = _ref.read(dioProvider);
+      final response = await dio.post('/v1/worker-groups/$groupId/dissolve');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await loadMyGroups();
+        return (success: true, message: null);
+      }
+      return (success: false, message: 'Giải tán đội thất bại');
+    } on DioException catch (e) {
+      debugPrint('Lỗi giải tán đội: $e');
+      String msg = 'Giải tán đội thất bại';
+      if (e.response?.data is Map<String, dynamic>) {
+        final data = e.response!.data as Map<String, dynamic>;
+        msg = data['message'] as String? ?? msg;
+      }
+      return (success: false, message: msg);
+    } catch (e) {
+      debugPrint('Lỗi giải tán đội: $e');
+      return (success: false, message: e.toString());
+    }
+  }
+
   /// Task 3: Danh sách đề xuất ca gửi đến đội (chỉ Leader/Admin, API trả 403 với member thường).
   Future<void> loadGroupProposals(String groupId) async {
     state = state.copyWith(isProposalLoading: true);

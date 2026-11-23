@@ -30,6 +30,78 @@ class _WorkerGroupDetailScreenState
     });
   }
 
+  void _showDissolveDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.group_off_rounded, color: Color(0xFFEF4444)),
+            SizedBox(width: 8),
+            Text(
+              'Giải tán đội',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Giải tán đội ${widget.group.name}? Mọi lời mời ca đang chờ sẽ bị hủy. Đội có thể tạo lại bằng mã mới.',
+              style: const TextStyle(fontSize: 13.5, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Dữ liệu lịch sử ca làm việc đã hoàn thành trước đó của các thành viên không bị mất.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Hủy', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final result = await ref
+                  .read(workerGroupsProvider.notifier)
+                  .dissolveGroup(widget.group.groupId);
+              if (mounted) {
+                if (result.success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã giải tán đội thành công'),
+                      backgroundColor: Color(0xFF0D9488),
+                    ),
+                  );
+                  Navigator.of(context).pop();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result.message ??
+                          'Giải tán đội thất bại. Vui lòng thử lại!'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Giải tán'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showInviteDialog() {
     final workerIdController = TextEditingController();
     final roleTitleController = TextEditingController();
@@ -794,6 +866,13 @@ class _WorkerGroupDetailScreenState
             tooltip: 'Mời thành viên',
             onPressed: _showInviteDialog,
           ),
+          if (_isCurrentUserLeader(state))
+            IconButton(
+              icon: const Icon(Icons.group_off_rounded,
+                  color: Color(0xFFEF4444)),
+              tooltip: 'Giải tán đội',
+              onPressed: _showDissolveDialog,
+            ),
         ],
       ),
       body: RefreshIndicator(

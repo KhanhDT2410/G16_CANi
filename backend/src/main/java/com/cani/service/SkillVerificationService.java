@@ -12,6 +12,7 @@ import com.cani.entity.SkillVerificationRequest;
 import com.cani.entity.SystemConfig;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
+import com.cani.entity.WorkerEkycVerification;
 import com.cani.entity.WorkerSkill;
 import com.cani.entity.WorkerSkillPoint;
 import com.cani.entity.enums.DocumentAuthenticityStatus;
@@ -28,6 +29,7 @@ import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.SkillRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
 import com.cani.repository.SystemConfigRepository;
+import com.cani.repository.WorkerEkycVerificationRepository;
 import com.cani.repository.WorkerRepository;
 import com.cani.repository.WorkerSkillPointRepository;
 import com.cani.repository.WorkerSkillRepository;
@@ -102,8 +104,15 @@ public class SkillVerificationService {
     @Autowired(required = false)
     private SystemConfigRepository systemConfigRepository;
 
+    @Autowired(required = false)
+    private WorkerEkycVerificationRepository workerEkycVerificationRepository;
+
     public void setSystemConfigRepository(SystemConfigRepository systemConfigRepository) {
         this.systemConfigRepository = systemConfigRepository;
+    }
+
+    public void setWorkerEkycVerificationRepository(WorkerEkycVerificationRepository workerEkycVerificationRepository) {
+        this.workerEkycVerificationRepository = workerEkycVerificationRepository;
     }
 
     private int getAiDocumentSp() {
@@ -636,7 +645,8 @@ public class SkillVerificationService {
             req.setStatus(SkillVerificationStatus.REJECTED);
             req.setRoutingDecision(RoutingDecision.REJECT);
             req.setFailureReason(null);
-            req.setRoutingReason("Tên người nhận trên nguồn tra cứu chứng chỉ không khớp với hồ sơ tài khoản Worker.");
+            req.setRoutingReason("Tên người nhận trên nguồn tra cứu chứng chỉ (" + result.getRecipientName()
+                    + ") không khớp với danh tính eKYC/hồ sơ Worker (" + workerName + ").");
             req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
             req.setIdentityVerificationStatus(IdentityVerificationStatus.MISMATCH);
             req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
@@ -644,7 +654,29 @@ public class SkillVerificationService {
             return;
         }
 
-        LocalDate parsedExpiry = parseFlexibleDate(result.getExpiryDate());
+        // Phân biệt chứng chỉ được nguồn xác nhận không có hạn (vô thời hạn) vs ngày hết hạn sai định dạng / không đọc được
+        boolean isPermanent = result.isPermanent() || isPermanentExpiry(result.getExpiryDate());
+        LocalDate parsedExpiry = null;
+        if (result.getExpiryDate() != null && !result.getExpiryDate().isBlank()) {
+            if (isPermanent) {
+                parsedExpiry = null;
+            } else {
+                parsedExpiry = parseFlexibleDate(result.getExpiryDate());
+                if (parsedExpiry == null) {
+                    req.setStatus(SkillVerificationStatus.REJECTED);
+                    req.setRoutingDecision(RoutingDecision.REJECT);
+                    req.setFailureReason(null);
+                    req.setRoutingReason("Ngày hết hạn từ nguồn tra cứu chứng chỉ không đọc được hoặc sai định dạng ("
+                            + result.getExpiryDate() + ").");
+                    req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
+                    req.setIdentityVerificationStatus(IdentityVerificationStatus.EXACT_MATCH);
+                    req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
+                    req.setSpAwarded(0);
+                    return;
+                }
+            }
+        }
+
         if (parsedExpiry != null && parsedExpiry.isBefore(LocalDate.now(ZoneOffset.UTC))) {
             req.setStatus(SkillVerificationStatus.REJECTED);
             req.setRoutingDecision(RoutingDecision.REJECT);
@@ -662,7 +694,14 @@ public class SkillVerificationService {
             req.setStatus(SkillVerificationStatus.REJECTED);
             req.setRoutingDecision(RoutingDecision.REJECT);
             req.setFailureReason(null);
-            req.setRoutingReason("Không xác định được kỹ năng hợp lệ trong danh mục CANi từ kết quả tra cứu chứng chỉ.");
+            if (result.getMatchedSkillNames() == null || result.getMatchedSkillNames().isEmpty()) {
+                req.setRoutingReason("Nguồn tra cứu chứng chỉ không xác nhận kỹ năng nào trong chứng chỉ.");
+            } else if (requestedSkill != null) {
+                req.setRoutingReason("Kỹ năng được nguồn tra cứu xác nhận không khớp với kỹ năng yêu cầu thẩm định ("
+                        + requestedSkill.getName() + ").");
+            } else {
+                req.setRoutingReason("Không xác định được kỹ năng hợp lệ trong danh mục CANi từ kết quả tra cứu chứng chỉ.");
+            }
             req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
             req.setIdentityVerificationStatus(IdentityVerificationStatus.EXACT_MATCH);
             req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
@@ -693,21 +732,60 @@ public class SkillVerificationService {
     }
 
     private List<Skill> resolveSkillsFromLookupOrRequest(Skill requestedSkill, CertificateLookupResult result) {
-        Map<UUID, Skill> resolved = new LinkedHashMap<>();
-        if (requestedSkill != null) {
-            resolved.put(requestedSkill.getSkillId(), requestedSkill);
+        if (result == null || result.getMatchedSkillNames() == null || result.getMatchedSkillNames().isEmpty()) {
+            // Nguồn chính thức KHÔNG xác nhận kỹ năng nào -> tuyệt đối không tự ý cấp điểm theo requestedSkill
+            return Collections.emptyList();
         }
-        if (result.getMatchedSkillNames() != null) {
-            for (String skillName : result.getMatchedSkillNames()) {
-                if (skillName == null || skillName.isBlank()) {
-                    continue;
+
+        List<Skill> matched = new ArrayList<>();
+        if (requestedSkill != null && requestedSkill.getName() != null) {
+            String normRequested = normalizeName(requestedSkill.getName());
+            boolean confirmed = false;
+            for (String sourceSkillName : result.getMatchedSkillNames()) {
+                if (sourceSkillName == null || sourceSkillName.isBlank()) continue;
+                String normSource = normalizeName(sourceSkillName);
+                if (normSource.equals(normRequested)) {
+                    confirmed = true;
+                    break;
                 }
-                skillRepository.findByNameIgnoreCase(skillName.trim())
-                        .or(() -> matchActiveSkillByAlias(skillName))
-                        .ifPresent(s -> resolved.put(s.getSkillId(), s));
+                Optional<Skill> resolvedOpt = skillRepository.findByNameIgnoreCase(sourceSkillName.trim())
+                        .or(() -> matchActiveSkillByAlias(sourceSkillName));
+                if (resolvedOpt.isPresent() && (resolvedOpt.get().getSkillId().equals(requestedSkill.getSkillId())
+                        || normalizeName(resolvedOpt.get().getName()).equals(normRequested))) {
+                    confirmed = true;
+                    break;
+                }
             }
+            if (confirmed) {
+                matched.add(requestedSkill);
+                return matched;
+            }
+            // Yêu cầu kỹ năng cụ thể nhưng nguồn tra cứu không xác nhận kỹ năng đó -> sai kỹ năng (0 SP)
+            return Collections.emptyList();
         }
-        return new ArrayList<>(resolved.values());
+
+        // Không chọn kỹ năng trước -> lấy các kỹ năng do nguồn tra cứu xác nhận khớp với danh mục CANi
+        for (String sourceSkillName : result.getMatchedSkillNames()) {
+            if (sourceSkillName == null || sourceSkillName.isBlank()) continue;
+            skillRepository.findByNameIgnoreCase(sourceSkillName.trim())
+                    .or(() -> matchActiveSkillByAlias(sourceSkillName))
+                    .ifPresent(matched::add);
+        }
+        return matched;
+    }
+
+    public static boolean isPermanentExpiry(String rawExpiry) {
+        if (rawExpiry == null || rawExpiry.isBlank()) {
+            return false;
+        }
+        String norm = normalizeName(rawExpiry).toUpperCase(Locale.ROOT);
+        return norm.contains("VO THOI HAN")
+                || norm.contains("KHONG THOI HAN")
+                || norm.contains("KHONG CO THOI HAN")
+                || norm.contains("LIFETIME")
+                || norm.contains("PERMANENT")
+                || norm.contains("NO EXPIRY")
+                || norm.contains("UNLIMITED");
     }
 
     private static LocalDate parseFlexibleDate(String rawDate) {
@@ -1285,11 +1363,26 @@ public class SkillVerificationService {
     }
 
     private String resolveWorkerFullName(Worker worker) {
+        if (worker == null) {
+            return "";
+        }
+        if (workerEkycVerificationRepository != null) {
+            try {
+                Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository
+                        .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
+                                worker.getWorkerId(), List.of("VERIFIED", "APPROVED"));
+                if (ekycOpt.isPresent() && ekycOpt.get().getFullName() != null && !ekycOpt.get().getFullName().isBlank()) {
+                    return ekycOpt.get().getFullName().trim();
+                }
+            } catch (Exception ex) {
+                log.warn("Không thể lấy danh tính eKYC của Worker {}: {}", worker.getWorkerId(), ex.getMessage());
+            }
+        }
         if (worker.getFullName() != null && !worker.getFullName().isBlank()) {
-            return worker.getFullName();
+            return worker.getFullName().trim();
         }
         return (worker.getUser() != null && worker.getUser().getFullName() != null)
-                ? worker.getUser().getFullName()
+                ? worker.getUser().getFullName().trim()
                 : "";
     }
 

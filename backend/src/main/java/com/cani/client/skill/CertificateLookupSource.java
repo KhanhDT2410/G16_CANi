@@ -47,8 +47,13 @@ public interface CertificateLookupSource {
         String certificateNumber;
         String issueDate;
         String expiryDate;
+        Boolean permanentExpiry;
         List<String> matchedSkillNames;
         String failureCode;
         String reason;
+
+        public boolean isPermanent() {
+            return Boolean.TRUE.equals(permanentExpiry);
+        }
     }
 }

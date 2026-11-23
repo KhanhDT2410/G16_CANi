@@ -192,9 +192,11 @@ export function useEvents() {
       const lat = parseFloat(pos.coords.latitude.toFixed(6));
       const lng = parseFloat(pos.coords.longitude.toFixed(6));
 
-      // 1. CẬP NHẬT TỌA ĐỘ NGAY LẬP TỨC để bản đồ và con ghim nhảy ngay tới vị trí thiết bị
+      // 1. CẬP NHẬT TỌA ĐỘ VÀ ĐỊA CHỈ TẠM NGAY LẬP TỨC để ô tìm kiếm không bị rỗng
+      const initialGpsLabel = `Vị trí GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
       setNewEvent((prev) => ({
         ...prev,
+        venueAddress: prev.venueAddress && prev.venueAddress !== DEFAULT_NEW_EVENT.venueAddress ? prev.venueAddress : initialGpsLabel,
         venueLat: lat,
         venueLng: lng,
         locationPicked: true,
@@ -202,22 +204,19 @@ export function useEvents() {
       setLocating(false);
       showToast('Đã định vị tọa độ GPS trên bản đồ!', 'info');
 
-      // 2. Dò địa chỉ chạy ngầm (non-blocking)
+      // 2. Dò địa chỉ chi tiết chạy ngầm (non-blocking) qua BigDataCloud & OSM
       (async () => {
         try {
           const addr = await getAddressFromCoordinates(lat, lng);
-          if (addr) {
-            setNewEvent((prev) => ({
-              ...prev,
-              venueAddress: addr,
-              venueLat: lat,
-              venueLng: lng,
-              locationPicked: true,
-            }));
-            showToast('Đã xác định địa chỉ tổ chức từ GPS!', 'success');
-          } else {
-            showToast('Vui lòng nhập thêm tên địa điểm hoặc số nhà cụ thể.', 'info');
-          }
+          const finalAddress = addr || initialGpsLabel;
+          setNewEvent((prev) => ({
+            ...prev,
+            venueAddress: finalAddress,
+            venueLat: lat,
+            venueLng: lng,
+            locationPicked: true,
+          }));
+          showToast(`Đã lấy địa chỉ: ${finalAddress}`, 'success');
         } catch (geoErr) {
           console.warn('Lỗi reverse geocoding:', geoErr);
         }

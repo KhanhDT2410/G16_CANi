@@ -60,12 +60,36 @@ export async function getAddressFromCoordinates(lat, lng) {
     return `${matchedPopular.name}, ${matchedPopular.displayName}`;
   }
 
-  // 1. OpenStreetMap Nominatim reverse geocoding
+  // 1. BigDataCloud reverse geocoding (Hỗ trợ CORS: * đầy đủ cho trình duyệt, độ chính xác cao tại Việt Nam)
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${numLat}&longitude=${numLng}&localityLanguage=vi`,
+      {},
+      4000
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const parts = [];
+      if (data.locality) parts.push(data.locality);
+      if (data.city && !parts.includes(data.city)) parts.push(data.city);
+      if (data.principalSubdivision && !parts.includes(data.principalSubdivision)) {
+        parts.push(data.principalSubdivision);
+      }
+      if (data.countryName && !parts.includes(data.countryName)) parts.push(data.countryName);
+      if (parts.length > 0) {
+        return parts.join(', ');
+      }
+    }
+  } catch (err) {
+    console.warn('BigDataCloud reverse geocode error:', err);
+  }
+
+  // 2. OpenStreetMap Nominatim reverse geocoding (Fallback)
   try {
     const res = await fetchWithTimeout(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${numLat}&lon=${numLng}&zoom=18&addressdetails=1`,
       { headers: { 'Accept-Language': 'vi' } },
-      4000
+      3000
     );
     if (res.ok) {
       const data = await res.json();
@@ -76,12 +100,12 @@ export async function getAddressFromCoordinates(lat, lng) {
     // Chuyển sang fallback Photon
   }
 
-  // 2. Fallback: Photon (Komoot OSM) reverse geocoding
+  // 3. Fallback: Photon (Komoot OSM) reverse geocoding
   try {
     const res = await fetchWithTimeout(
       `https://photon.komoot.io/reverse?lat=${numLat}&lon=${numLng}`,
       {},
-      3500
+      3000
     );
     if (res.ok) {
       const data = await res.json();
@@ -93,7 +117,8 @@ export async function getAddressFromCoordinates(lat, lng) {
     // Bỏ qua lỗi mạng
   }
 
-  return '';
+  // 4. Fallback tối thượng: Ghi rõ tọa độ GPS để không bao giờ bị rỗng ô nhập liệu
+  return `Vị trí GPS (${numLat.toFixed(5)}, ${numLng.toFixed(5)})`;
 }
 
 /**
@@ -103,6 +128,10 @@ export const POPULAR_VENUES = [
   { name: 'Trung tâm Hội chợ & Triển lãm Sài Gòn (SECC)', displayName: '799 Nguyễn Văn Linh, Tân Phú, Quận 7, TP.HCM', lat: 10.7328, lng: 106.7214 },
   { name: 'Sân vận động Quốc gia Mỹ Đình', displayName: 'Đường Lê Đức Thọ, Mỹ Đình 1, Nam Từ Liêm, Hà Nội', lat: 21.0205, lng: 105.7641 },
   { name: 'Trung tâm Hội nghị Quốc gia Việt Nam', displayName: 'Đại lộ Thăng Long, Mễ Trì, Nam Từ Liêm, Hà Nội', lat: 21.0068, lng: 105.7865 },
+  { name: 'Trung tâm Hội nghị tỉnh Ninh Bình', displayName: 'Đường Tràng An, Tân Thành, TP. Ninh Bình, Ninh Bình', lat: 20.2543, lng: 105.9754 },
+  { name: 'Khu du lịch Sinh thái Tràng An', displayName: 'Tràng An, Trường Yên, Hoa Lư, Ninh Bình', lat: 20.2528, lng: 105.9142 },
+  { name: 'Quần thể Chùa Bái Đính', displayName: 'Gia Sinh, Gia Viễn, Ninh Bình', lat: 20.2721, lng: 105.8569 },
+  { name: 'Cố đô Hoa Lư', displayName: 'Trường Yên, Hoa Lư, Ninh Bình', lat: 20.2847, lng: 105.9083 },
   { name: 'Trung tâm Sự kiện GEM Center', displayName: '8 Nguyễn Bỉnh Khiêm, Đa Kao, Quận 1, TP.HCM', lat: 10.7877, lng: 106.7027 },
   { name: 'Trung tâm Hội nghị White Palace', displayName: '194 Hoàng Văn Thụ, Phường 9, Phú Nhuận, TP.HCM', lat: 10.7995, lng: 106.6713 },
   { name: 'Nhà thi đấu Thể dục Thể thao Phú Thọ', displayName: '1 Lữ Gia, Phường 15, Quận 11, TP.HCM', lat: 10.7686, lng: 106.6575 },

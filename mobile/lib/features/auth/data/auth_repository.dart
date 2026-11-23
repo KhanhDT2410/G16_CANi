@@ -186,7 +186,7 @@ class AuthRepository {
       // 5. Kiểm tra vai trò: App di động dành riêng cho Worker
       if (response.user.role.toUpperCase() != 'WORKER') {
         await clearSession();
-        throw Exception('Tài khoản của bạn là ${response.user.role}. Ứng dụng này chỉ dành cho Nhân sự (Worker). Vui lòng đăng nhập trên Web Portal.');
+        throw Exception('Tài khoản của bạn là ${response.user.role}. Ứng dụng này chỉ dành cho Nhân sự. Vui lòng đăng nhập trên Web Portal.');
       }
 
       // 6. Lưu trữ token

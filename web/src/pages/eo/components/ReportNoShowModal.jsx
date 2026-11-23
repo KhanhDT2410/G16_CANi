@@ -41,7 +41,7 @@ export default function ReportNoShowModal({ isOpen, onClose, assignment, shift, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: '1.4rem' }}>⚠️</span>
             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>
-              Báo Cáo Nhân Sự Vắng Mặt (No-Show)
+              Báo Cáo Nhân Sự Vắng Mặt
             </h3>
           </div>
           <button

@@ -8,6 +8,7 @@ import '../data/proposal_repository.dart';
 import '../models/dispute_models.dart';
 import '../models/proposal_models.dart';
 import '../widgets/shift_checklist_section.dart';
+import 'dispute_chat_screen.dart';
 
 class MyDisputesScreen extends ConsumerStatefulWidget {
   final ShiftAssignmentItem? assignment;
@@ -290,7 +291,7 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
                         Text(
                           isDescValid
                               ? 'Đạt yêu cầu độ dài mô tả'
-                              : 'Cần thêm ${50 - descLength} ký tự (BR-52)',
+                              : 'Cần thêm ${50 - descLength} ký tự',
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
@@ -634,7 +635,7 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Ca làm này đang có hồ sơ khiếu nại chờ xử lý (mỗi ca tối đa 1 đơn đang mở theo BR-52).',
+                                    'Ca làm này đang có hồ sơ khiếu nại chờ xử lý giữa bạn và đối tác.',
                                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF0369A1)),
                                   ),
                                 ),
@@ -909,6 +910,33 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0284C7)),
                 ),
             ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: Icon(Icons.forum_outlined, size: 16, color: cani.brand),
+              label: Text(
+                'Trao đổi với Trọng tài CSKH',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: cani.brand),
+              ),
+              style: OutlinedButton.styleFrom(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                side: BorderSide(color: cani.brand.withValues(alpha: 0.3)),
+                padding: const EdgeInsets.symmetric(vertical: 9),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DisputeChatScreen(
+                      disputeId: item.id,
+                      disputeTitle: item.title,
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),

@@ -17,7 +17,7 @@ export const ShiftInfoGrid = ({ shift }) => {
       </div>
 
       <div>
-        <div className="grid-label">Nhà Tổ Chức (EO)</div>
+        <div className="grid-label">Nhà Tổ Chức</div>
         <div className="grid-main-val">{shift.eoName}</div>
         <div className="grid-sub-val">SĐT: {shift.eoPhone} • {shift.eoEmail}</div>
         {shift.companyName && <div className="grid-company-val">{shift.companyName}</div>}

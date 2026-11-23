@@ -146,7 +146,7 @@ class _SkillPointPolicyDialogState extends State<SkillPointPolicyDialog> {
                         ),
                         _buildSection(
                           '4. Chế Tài Kỷ Luật (Chính Sách Bỏ Ca - No-Show)',
-                          '• Đã xác nhận ca nhưng vắng mặt không báo trước (No-Show) sẽ bị trừ 30 - 50 SP và có nguy cơ bị hạ bậc hạng.\n'
+                          '• Đã xác nhận ca nhưng vắng mặt không báo trước sẽ bị trừ 30 - 50 SP và có nguy cơ bị hạ bậc hạng.\n'
                           '• Đi muộn không lý do chính đáng hoặc vi phạm quy định trang phục sẽ làm giảm điểm đánh giá uy tín.',
                         ),
                         _buildSection(

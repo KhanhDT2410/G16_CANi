@@ -88,7 +88,7 @@ public class DisputeService {
 
         if (disputeRepository.existsByAssignmentIdAndStatusIn(assignment.getAssignmentId(), OPEN_STATUSES)) {
             throw new BadRequestException(
-                    "Đã có tranh chấp chưa được xử lý cho ca làm việc này (BR-52: không cho phép trùng lặp)");
+                    "Đã có hồ sơ tranh chấp đang được xử lý cho phân công ca làm việc này (BR-52: không cho phép trùng lặp hồ sơ đang mở)");
         }
 
         Dispute dispute = Dispute.builder()

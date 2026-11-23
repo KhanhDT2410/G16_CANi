@@ -121,11 +121,11 @@ class _TermsOfServiceDialogState extends State<TermsOfServiceDialog> {
                       children: [
                         _buildSection(
                           '1. Phạm vi áp dụng & Tư cách thành viên',
-                          'CANi là nền tảng công nghệ kết nối Nhân sự Sự kiện (Worker) và Nhà tổ chức sự kiện (Event Organizer). Bằng việc đăng ký tài khoản, bạn cam kết cung cấp thông tin trung thực và chịu trách nhiệm pháp lý về các hoạt động của mình.',
+                          'CANi là nền tảng công nghệ kết nối Nhân sự Sự kiện và Nhà tổ chức sự kiện. Bằng việc đăng ký tài khoản, bạn cam kết cung cấp thông tin trung thực và chịu trách nhiệm pháp lý về các hoạt động của mình.',
                         ),
                         _buildSection(
-                          '2. Cam kết thực hiện ca làm việc & Chống bỏ ca (No-Show)',
-                          '• Khi đã bấm "Xác nhận nhận việc", bạn có nghĩa vụ có mặt đúng giờ, mặc trang phục theo quy định và hoàn thành đầy đủ thời gian ca làm việc.\n• Trường hợp bất khả kháng cần hủy ca, phải thông báo qua ứng dụng tối thiểu trước 12 tiếng.\n• Hành vi bỏ ca không lý do (No-Show) sẽ bị trừ 30-50 điểm SP uy tín và tạm khóa quyền nhận việc theo quy chế.',
+                          '2. Cam kết thực hiện ca làm việc & Chống bỏ ca',
+                          '• Khi đã bấm "Xác nhận nhận việc", bạn có nghĩa vụ có mặt đúng giờ, mặc trang phục theo quy định và hoàn thành đầy đủ thời gian ca làm việc.\n• Trường hợp bất khả kháng cần hủy ca, phải thông báo qua ứng dụng tối thiểu trước 12 tiếng.\n• Hành vi bỏ ca không lý do sẽ bị trừ 30-50 điểm SP uy tín và tạm khóa quyền nhận việc theo quy chế.',
                         ),
                         _buildSection(
                           '3. Tiêu chuẩn Định danh eKYC & Giấy tờ Căn cước',

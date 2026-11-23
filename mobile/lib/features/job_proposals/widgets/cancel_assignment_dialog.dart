@@ -162,7 +162,9 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
             const SizedBox(height: 6),
             ..._quickReasons.map(
               (r) => RadioListTile<String>(
+                // ignore: deprecated_member_use
                 value: r,
+                // ignore: deprecated_member_use
                 groupValue: _selectedQuickReason,
                 dense: true,
                 contentPadding: EdgeInsets.zero,
@@ -174,6 +176,7 @@ class _CancelAssignmentDialogState extends ConsumerState<CancelAssignmentDialog>
                     color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
                   ),
                 ),
+                // ignore: deprecated_member_use
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedQuickReason = val);
                 },

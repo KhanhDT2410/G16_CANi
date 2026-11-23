@@ -98,7 +98,7 @@ export default function ShiftWorkspacePage({
     const handlePaymentUpdated = () => {
       loadAttendance();
       if (onReloadEvents) {
-        Promise.resolve(onReloadEvents()).catch(() => {});
+        Promise.resolve(onReloadEvents()).catch(() => { });
       }
     };
     window.addEventListener('cani_payment_updated', handlePaymentUpdated);
@@ -346,7 +346,7 @@ export default function ShiftWorkspacePage({
 
   return (
     <div className="shift-workspace-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      
+
       {/* 1. THANH ĐIỀU HƯỚNG & CÔNG CỤ CA */}
       <div
         style={{
@@ -840,7 +840,7 @@ export default function ShiftWorkspacePage({
                       <td style={{ padding: '14px' }}>
                         {isNoShow && (
                           <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            ✕ Vắng mặt (No-Show)
+                            ✕ Vắng mặt
                           </span>
                         )}
                         {!isNoShow && isCheckedIn && (
@@ -1219,8 +1219,8 @@ export default function ShiftWorkspacePage({
                                 !isCheckedIn
                                   ? 'Nhân sự chưa check-in vào ca'
                                   : !canVerify
-                                  ? 'Chưa hoàn tất các đầu việc bắt buộc hoặc còn thiếu minh chứng ảnh'
-                                  : 'Xác nhận hoàn thành công việc và duyệt công'
+                                    ? 'Chưa hoàn tất các đầu việc bắt buộc hoặc còn thiếu minh chứng ảnh'
+                                    : 'Xác nhận hoàn thành công việc và duyệt công'
                               }
                               style={{
                                 background: !canVerify ? '#94a3b8' : (verifyingId === item.assignmentId ? '#94a3b8' : '#2563eb'),

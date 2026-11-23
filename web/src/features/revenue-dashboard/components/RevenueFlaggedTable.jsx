@@ -29,8 +29,8 @@ export const RevenueFlaggedTable = ({ flaggedTransactions }) => {
           <thead>
             <tr>
               <th>Thời Gian</th>
-              <th>Bên Tổ Chức (EO)</th>
-              <th>Nhân Sự (Worker)</th>
+              <th>Bên Tổ Chức</th>
+              <th>Nhân Sự</th>
               <th>Số Tiền</th>
               <th>Phương Thức</th>
               <th>Trạng Thái</th>

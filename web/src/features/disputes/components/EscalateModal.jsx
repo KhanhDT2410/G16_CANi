@@ -60,7 +60,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
             </div>
 
             <div className="dispute-escalate-notice">
-              Đơn sẽ được chuyển trực tiếp vào hàng đợi thẩm định của Quản trị viên (Admin). Quyết định của Quản trị viên sau bước này sẽ là <strong>phán quyết cuối cùng</strong>.
+              Đơn sẽ được chuyển trực tiếp vào hàng đợi thẩm định của Quản trị viên. Quyết định của Quản trị viên sau bước này sẽ là <strong>phán quyết cuối cùng</strong>.
             </div>
           </div>
 

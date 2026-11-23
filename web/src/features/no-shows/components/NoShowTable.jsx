@@ -23,7 +23,7 @@ export const NoShowTable = ({ items, loading, onSelectDetail }) => {
       <table className="noshow-table">
         <thead>
           <tr>
-            <th>Nhân Sự (Worker)</th>
+            <th>Nhân Sự</th>
             <th>Sự Kiện & Ca Trực</th>
             <th>Thời Gian Ca</th>
             <th>Mức Phạt RS</th>

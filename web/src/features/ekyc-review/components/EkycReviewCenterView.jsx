@@ -78,7 +78,7 @@ export default function EkycReviewCenterView({ canManageLegalHold = false }) {
             className={`ekyc-target-tab ${targetType === 'worker' ? 'active' : ''}`}
             onClick={() => setTargetType('worker')}
           >
-            <span>Nhân sự (Worker)</span>
+            <span>Nhân sự</span>
             <span className="ekyc-count-badge">{workerQueue.length}</span>
           </button>
           <button
@@ -86,7 +86,7 @@ export default function EkycReviewCenterView({ canManageLegalHold = false }) {
             className={`ekyc-target-tab ${targetType === 'eo' ? 'active' : ''}`}
             onClick={() => setTargetType('eo')}
           >
-            <span>Nhà tổ chức (EO)</span>
+            <span>Nhà tổ chức</span>
             <span className="ekyc-count-badge">{eoQueue.length}</span>
           </button>
         </div>

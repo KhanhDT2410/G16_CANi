@@ -24,7 +24,7 @@ export const ShiftTable = ({
             <tr>
               <th style={{ width: '95px', minWidth: '95px' }}>Mã Ca</th>
               <th style={{ minWidth: '180px' }}>Sự Kiện & Ca Làm</th>
-              <th style={{ minWidth: '160px' }}>Nhà Tổ Chức (EO)</th>
+              <th style={{ minWidth: '160px' }}>Nhà Tổ Chức</th>
               <th style={{ width: '140px', minWidth: '140px' }}>Khung Giờ & Ngày</th>
               <th style={{ minWidth: '150px' }}>Địa Điểm</th>
               <th style={{ width: '95px', minWidth: '95px' }}>Nhân Sự</th>
@@ -165,8 +165,8 @@ export const ShiftTable = ({
                             isFinished
                               ? 'Ca làm việc đã kết thúc hoàn thành, không thể đình chỉ'
                               : shift.status === 'CANCELLED'
-                              ? 'Ca làm việc đã bị hủy trước đó, không thể đình chỉ'
-                              : 'Tạm đình chỉ ca làm việc này'
+                                ? 'Ca làm việc đã bị hủy trước đó, không thể đình chỉ'
+                                : 'Tạm đình chỉ ca làm việc này'
                           }
                         >
                           Đình Chỉ

@@ -6,7 +6,7 @@ import { showToast } from '../../../components/common/Toast';
 const DISPUTE_TYPES = [
   { value: 'PAYMENT', label: 'Tranh chấp tiền lương / đối soát thanh toán' },
   { value: 'WORK_QUALITY', label: 'Chất lượng công việc không đạt yêu cầu' },
-  { value: 'NO_SHOW', label: 'Nhân sự vắng mặt không lý do (No-show)' },
+  { value: 'NO_SHOW', label: 'Nhân sự vắng mặt không lý do' },
   { value: 'HARASSMENT', label: 'Thái độ / Vi phạm quy tắc ứng xử' },
   { value: 'OTHER', label: 'Lý do khác' },
 ];
@@ -67,7 +67,7 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
         evidence: form.evidence,
       });
 
-      showToast('Đã gửi khiếu nại thành công! Ban Chăm Sóc Khách Hàng (CC) sẽ xử lý trong 24h.', 'success');
+      showToast('Đã gửi khiếu nại thành công! Ban Chăm Sóc Khách Hàng sẽ xử lý trong 24h.', 'success');
       loadMyDisputes();
       setActiveTab('HISTORY');
       if (onSuccess) onSuccess();
@@ -116,7 +116,7 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, color: '#0f172a' }}>
-            Khiếu Nại & Tranh Chấp 3 Bên (FE-11)
+            Khiếu Nại & Tranh Chấp 3 Bên
           </h3>
           <button
             type="button"
@@ -277,10 +277,10 @@ export default function DisputeModal({ isOpen, onClose, assignment, onSuccess })
                         {d.status === 'SUBMITTED'
                           ? 'Đã gửi (Chờ xử lý)'
                           : d.status === 'IN_REVIEW'
-                          ? 'Đang điều tra'
-                          : d.status === 'RESOLVED'
-                          ? 'Đã giải quyết'
-                          : d.status}
+                            ? 'Đang điều tra'
+                            : d.status === 'RESOLVED'
+                              ? 'Đã giải quyết'
+                              : d.status}
                       </span>
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0' }}>

@@ -53,7 +53,7 @@ export const useLogin = () => {
 
       if (data.user && data.user.role === 'WORKER') {
         await authApi.logout();
-        setErrorMessage('Tài khoản Nhân sự (Worker) vui lòng đăng nhập trên ứng dụng CANi Mobile!');
+        setErrorMessage('Tài khoản Nhân sự vui lòng đăng nhập trên ứng dụng CANi Mobile!');
         return;
       }
 

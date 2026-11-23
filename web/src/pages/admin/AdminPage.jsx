@@ -52,7 +52,7 @@ const TAB_METADATA = {
   },
   account_appeals: {
     title: 'Giải Trình Khóa Tài Khoản',
-    subtitle: 'Thẩm định hồ sơ giải trình và chứng từ khắc phục từ Nhà tổ chức (EO) hoặc Người lao động (Worker) bị khóa',
+    subtitle: 'Thẩm định hồ sơ giải trình và chứng từ khắc phục từ Nhà tổ chức hoặc Người lao động bị khóa',
   },
   tickets: {
     title: 'Phiếu Hỗ Trợ Khách Hàng',
@@ -72,7 +72,7 @@ const TAB_METADATA = {
   },
   config_operation: {
     title: 'Vận Hành & Điểm Uy Tín',
-    subtitle: 'Thiết lập ngưỡng thời gian vắng mặt (No-show), mức trừ điểm uy tín và thời hạn đánh giá',
+    subtitle: 'Thiết lập ngưỡng thời gian vắng mặt, mức trừ điểm uy tín và thời hạn đánh giá',
   },
   config_financial: {
     title: 'Tài Chính & Hoa Hồng',

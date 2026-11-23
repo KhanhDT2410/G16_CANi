@@ -3,39 +3,39 @@ import { createPortal } from 'react-dom';
 
 const OUTCOME_CONFIG = {
   EO_FAULT: {
-    label: 'Lỗi thuộc về Nhà tổ chức (EO_FAULT)',
+    label: 'Lỗi thuộc về Nhà tổ chức',
     color: '#b91c1c',
     bg: '#fef2f2',
     border: '#fca5a5',
-    instruction: 'CSKH xác định Nhà tổ chức chưa thanh toán đủ thù lao cho Worker. EO cần hoàn tất thanh toán thù lao bổ sung theo phán quyết.',
+    instruction: 'CSKH xác định Nhà tổ chức chưa thanh toán đủ thù lao cho Nhân sự. Bạn cần hoàn tất thanh toán thù lao bổ sung theo phán quyết.',
   },
   WORKER_FAULT: {
-    label: 'Lỗi thuộc về Nhân sự (WORKER_FAULT)',
+    label: 'Lỗi thuộc về Nhân sự',
     color: '#047857',
     bg: '#ecfdf5',
     border: '#a7f3d0',
-    instruction: 'CSKH xác định Worker vi phạm quy chế ca làm việc (-10 điểm uy tín RS). Nhà tổ chức được bảo lưu / miễn trả thù lao tranh chấp.',
+    instruction: 'CSKH xác định Nhân sự vi phạm quy chế ca làm việc và bị trừ điểm uy tín. Nhà tổ chức được bảo lưu / miễn trả thù lao tranh chấp.',
   },
   PARTIAL: {
-    label: 'Chia sẻ trách nhiệm hai bên (PARTIAL)',
+    label: 'Chia sẻ trách nhiệm hai bên',
     color: '#b45309',
     bg: '#fffbeb',
     border: '#fde68a',
     instruction: 'Hai bên cùng chịu một phần trách nhiệm. Khoản thanh toán được quyết toán theo tỷ lệ phân bổ của CSKH.',
   },
   UNVERIFIED: {
-    label: 'Không đủ chứng cứ xác minh (UNVERIFIED)',
+    label: 'Không đủ chứng cứ xác minh',
     color: '#475569',
     bg: '#f8fafc',
     border: '#cbd5e1',
     instruction: 'Không đủ chứng cứ để kết luận bên vi phạm. Giữ nguyên tình trạng đối soát hiện hành.',
   },
   UPHOLD: {
-    label: 'Giữ nguyên phán quyết sơ bộ (UPHOLD)',
+    label: 'Giữ nguyên phán quyết sơ bộ',
     color: '#4338ca',
     bg: '#eef2ff',
     border: '#c7d2fe',
-    instruction: 'Admin đã thẩm tra lại và giữ nguyên phán quyết trước đó của bộ phận CSKH.',
+    instruction: 'Quản trị viên đã thẩm tra lại và giữ nguyên phán quyết trước đó của bộ phận CSKH.',
   },
 };
 
@@ -91,7 +91,7 @@ export default function DisputeResolutionDetailModal({
               {isResolved ? 'Kết Quả Phân Xử Tranh Chấp' : 'Tiến Độ Giải Quyết Tranh Chấp'}
             </h3>
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-              Đối soát 3 bên giữa EO, Worker và Chăm sóc khách hàng CANi (SRS FE-11: UC-100/102)
+              Đối soát 3 bên giữa Nhà tổ chức, Nhân sự và Chăm sóc khách hàng CANi
             </p>
           </div>
           <button

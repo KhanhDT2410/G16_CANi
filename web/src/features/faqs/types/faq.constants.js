@@ -41,8 +41,8 @@ export const FAQ_TARGET_ROLE_CONFIG = {
     badgeClass: 'faq-role-badge-all',
   },
   WORKER: {
-    label: 'Người tìm việc (Worker)',
-    shortLabel: 'Worker',
+    label: 'Người tìm việc',
+    shortLabel: 'Nhân sự',
     badgeClass: 'faq-role-badge-worker',
   },
   EVENT_ORGANIZER: {

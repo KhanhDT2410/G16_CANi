@@ -107,7 +107,7 @@ export const SYSTEM_CONFIG_METAS = {
     unit: 'giờ',
     defaultValue: '4',
     type: 'number',
-    hint: 'Hủy ca sát giờ trước ngưỡng này sẽ bị hệ thống ghi nhận lỗi vắng mặt không phép (No-show)',
+    hint: 'Hủy ca sát giờ trước ngưỡng này sẽ bị hệ thống ghi nhận lỗi vắng mặt không phép',
   },
   noshow_rs_deduction: {
     label: 'Mức trừ điểm uy tín khi vi phạm vắng mặt',

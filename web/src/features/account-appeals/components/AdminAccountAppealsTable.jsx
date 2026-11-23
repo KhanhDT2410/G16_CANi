@@ -174,7 +174,7 @@ export default function AdminAccountAppealsTable() {
                           </span>
                           <span className="appeal-user-email">{item.email}</span>
                           <span className={`appeal-role-badge ${isEO ? 'eo' : 'worker'}`}>
-                            {isEO ? 'Nhà tổ chức (EO)' : 'Người lao động (Worker)'}
+                            {isEO ? 'Nhà tổ chức' : 'Người lao động'}
                           </span>
                         </div>
                       </td>

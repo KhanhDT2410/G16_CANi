@@ -15,6 +15,10 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -40,6 +44,9 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
     private static final Set<String> SAFE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
     private static final Set<String> ALLOWED_SCOPES = Set.of("worker", "eo");
     private static final Set<String> ALLOWED_SLOTS = Set.of("front", "back", "selfie");
+
+    private static final Pattern GENERATED_KEY = Pattern.compile(
+            "(worker|eo)/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/[0-9a-f]{32}_(front|back|selfie)[.](jpg|jpeg|png|webp)");
 
     private final Path baseDirectory;
 
@@ -80,7 +87,14 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
             if (parentDir != null && !Files.exists(parentDir)) {
                 Files.createDirectories(parentDir);
             }
-            Files.write(targetPath, bytes);
+            try (var output = Files.newOutputStream(targetPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+                output.write(bytes);
+            } catch (IOException writeFailure) {
+                if (!(writeFailure instanceof java.nio.file.FileAlreadyExistsException)) {
+                    deleteIfPresent(objectKey);
+                }
+                throw writeFailure;
+            }
 
             return StoredObject.builder()
                     .objectKey(objectKey)
@@ -126,6 +140,22 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
     }
 
     @Override
+    public boolean isReadable(String objectKey) {
+        if (!isManagedObjectKey(objectKey)) {
+            return false;
+        }
+        try {
+            Path filePath = resolveSafePath(objectKey);
+            return Files.exists(filePath)
+                    && Files.isRegularFile(filePath)
+                    && Files.isReadable(filePath)
+                    && Files.size(filePath) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    @Override
     public boolean deleteIfPresent(String objectKey) {
         if (!isManagedObjectKey(objectKey)) {
             return true;
@@ -156,6 +186,16 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
         return parts.length == 3 && ALLOWED_SCOPES.contains(parts[0]);
     }
 
+    void visitAgedObjects(Instant before, Consumer<String> visitor) throws IOException {
+        if (!Files.isDirectory(baseDirectory)) return;
+        try (var candidates = Files.find(baseDirectory, 3, (path, attrs) ->
+                attrs.isRegularFile() && attrs.lastModifiedTime().toInstant().isBefore(before))) {
+            candidates.map(path -> baseDirectory.relativize(path).toString().replace((char) 92, (char) 47))
+                    .filter(key -> GENERATED_KEY.matcher(key).matches())
+                    .forEach(visitor);
+        }
+    }
+
     @Override
     public String getProviderName() {
         return PROVIDER_NAME;
@@ -168,6 +208,11 @@ public class LocalPrivateEkycImageStorage implements EkycImageStorage {
         Path resolved = baseDirectory.resolve(objectKey).normalize();
         if (!resolved.startsWith(baseDirectory)) {
             throw new BadRequestException("Đường dẫn ảnh eKYC không hợp lệ (Path Traversal bị chặn).");
+        }
+        for (Path path = resolved; path != null; path = path.getParent()) {
+            if (Files.isSymbolicLink(path)) {
+                throw new BadRequestException("Đường dẫn ảnh eKYC không hợp lệ.");
+            }
         }
         return resolved;
     }

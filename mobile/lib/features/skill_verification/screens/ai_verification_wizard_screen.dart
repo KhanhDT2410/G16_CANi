@@ -107,7 +107,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Thẩm Định Chứng Chỉ Bằng AI',
+          'Nộp Chứng Chỉ Xác Minh Kỹ Năng',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: SkillHubColors.textPrimary),
         ),
         actions: [
@@ -221,7 +221,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('AI tự động nhận diện từ tài liệu', overflow: TextOverflow.ellipsis)),
+                    const DropdownMenuItem(value: null, child: Text('Để trống để CSKH phân loại từ chứng chỉ', overflow: TextOverflow.ellipsis)),
                     ...state.taxonomy.map((s) => DropdownMenuItem(value: s.skillId, child: Text(s.name, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (val) => setState(() => _selectedSkillId = val),
@@ -256,7 +256,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
               backgroundColor: SkillHubColors.ctaPrimary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('BẮT ĐẦU QUÉT & THẨM ĐỊNH', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+            child: const Text('GỬI HỒ SƠ CHỜ THẨM ĐỊNH', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
           ),
         ),
       ],
@@ -321,14 +321,14 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
             ),
             SizedBox(width: 10),
             Text(
-              'AI đang quét và đối soát tính hợp lệ...',
+              'Đang tải chứng chỉ và tạo hồ sơ chờ duyệt...',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SkillHubColors.textPrimary),
             ),
           ],
         ),
         const SizedBox(height: 6),
         const Text(
-          'AI đang đọc và trích xuất thông tin tài liệu...',
+          'Hệ thống đang lưu trữ tệp bảo mật cho Admin / CSKH kiểm tra...',
           style: TextStyle(fontSize: 11, color: SkillHubColors.textSecondary),
         ),
       ],
@@ -465,14 +465,14 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                       ),
                     ),
                   ],
-                  _buildResultRow('Kỹ năng nhận diện:', result?.skillName ?? 'Chưa xác định'),
-                  _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Chưa xác định'),
-                  _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Chưa xác định'),
+                  _buildResultRow('Kỹ năng đăng ký:', result?.skillName ?? result?.jobType ?? 'Chờ phân loại'),
+                  _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Chờ thẩm định từ tài liệu'),
+                  _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Chờ thẩm định thủ công'),
                   _buildResultRow(
-                    'Độ tin cậy AI:',
-                    result?.overallConfidence != null
-                        ? '${(result!.overallConfidence * 100).toStringAsFixed(0)}%'
-                        : '—',
+                    'Quy trình thẩm định:',
+                    isAutoApprove
+                        ? 'Đã phê duyệt'
+                        : (isPendingReview ? 'Chờ Admin / CSKH duyệt thủ công' : 'Cần nộp lại tài liệu'),
                   ),
                 ],
               ),
@@ -486,13 +486,19 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
           child: ElevatedButton(
             onPressed: isAutoApprove
                 ? () => setState(() => _step = 4)
-                : () => setState(() => _step = 1),
+                : isPendingReview
+                    ? () => Navigator.of(context).pop()
+                    : () => setState(() => _step = 1),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isAutoApprove ? SkillHubColors.ctaPrimary : const Color(0xFFEF4444),
+              backgroundColor: isAutoApprove
+                  ? SkillHubColors.ctaPrimary
+                  : (isPendingReview ? const Color(0xFFD97706) : const Color(0xFFEF4444)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
-              isAutoApprove ? 'TIẾP TỤC CẬP NHẬT HỒ SƠ' : 'CHỤP LẠI TÀI LIỆU KHÁC',
+              isAutoApprove
+                  ? 'TIẾP TỤC CẬP NHẬT HỒ SƠ'
+                  : (isPendingReview ? 'HOÀN TẤT & QUAY LẠI' : 'TẢI LẠI TÀI LIỆU KHÁC'),
               style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
             ),
           ),

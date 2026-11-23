@@ -103,9 +103,12 @@ public class EkycDecisionEngine {
         FaceCompareStatus faceStatus = providerResult.getFaceCompareStatus() != null
                 ? providerResult.getFaceCompareStatus()
                 : FaceCompareStatus.MISSING;
-        if ((faceStatus == FaceCompareStatus.MATCH && (providerResult.getFaceMatchScore() == null
-                || !Double.isFinite(providerResult.getFaceMatchScore()) || providerResult.getFaceMatchScore() < 0))
-                || faceStatus == FaceCompareStatus.MISSING
+        if (faceStatus == FaceCompareStatus.MATCH && (providerResult.getFaceMatchScore() == null
+                || !Double.isFinite(providerResult.getFaceMatchScore()) || providerResult.getFaceMatchScore() < 0)) {
+            faceStatus = FaceCompareStatus.INVALID_FORMAT;
+            flags.put("faceCompareStatus", faceStatus.name());
+        }
+        if (faceStatus == FaceCompareStatus.MISSING
                 || faceStatus == FaceCompareStatus.TIMEOUT
                 || faceStatus == FaceCompareStatus.INVALID_FORMAT
                 || faceStatus == FaceCompareStatus.ERROR) {

@@ -28,6 +28,12 @@ class JobProposalItem {
   final String status;
   final String? imageUrl;
 
+  bool isActiveAt(DateTime now) {
+    if (status.toUpperCase() != 'PENDING') return false;
+    if (expiresAt != null && !expiresAt!.isAfter(now)) return false;
+    return true;
+  }
+
   JobProposalItem({
     required this.proposalId,
     required this.shiftId,

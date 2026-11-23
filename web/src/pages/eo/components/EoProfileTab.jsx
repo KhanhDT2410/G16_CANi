@@ -88,8 +88,15 @@ export default function EoProfileTab() {
     totalConfirmedWorkers: 0,
   });
 
-  // Trạng thái eKYC
+  // Trạng thái eKYC & Nghị định 13/2023 consent
   const [ekycData, setEkycData] = useState(null);
+  const [consentPolicy, setConsentPolicy] = useState({
+    required: true,
+    noticeVersion: '2026.11-nd13-v1',
+    title: 'Thông báo xử lý dữ liệu cá nhân & sinh trắc học (Nghị định 13/2023/NĐ-CP)',
+    summary: 'CANi chỉ dùng ảnh CCCD và chân dung selfie để xác thực danh tính qua VNPT eKYC, kiểm tra độ tuổi tối thiểu và phòng chống trùng lặp tài khoản.',
+  });
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
   const [files, setFiles] = useState({
     frontImage: null,
@@ -107,11 +114,15 @@ export default function EoProfileTab() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [profileRes, ekycRes, eventsRes] = await Promise.allSettled([
+      const [profileRes, ekycRes, eventsRes, consentRes] = await Promise.allSettled([
         eoService.getEoProfile(),
         eoService.getEkycStatus(),
         eoService.getMyEvents(),
+        eoService.getEkycConsentPolicy(),
       ]);
+      if (consentRes.status === 'fulfilled' && consentRes.value) {
+        setConsentPolicy(consentRes.value);
+      }
 
       const rawEvents =
         eventsRes.status === 'fulfilled' && Array.isArray(eventsRes.value)
@@ -251,6 +262,10 @@ export default function EoProfileTab() {
       showToast('Vui lòng tải lên đầy đủ ảnh mặt trước, mặt sau CCCD và ảnh selfie đại diện', 'error');
       return;
     }
+    if (consentPolicy?.required !== false && !consentAccepted) {
+      showToast('Vui lòng đọc và xác nhận đồng ý xử lý dữ liệu cá nhân & sinh trắc học (Nghị định 13/2023/NĐ-CP).', 'error');
+      return;
+    }
 
     setSubmittingEkyc(true);
     try {
@@ -258,6 +273,10 @@ export default function EoProfileTab() {
       formData.append('frontImage', files.frontImage);
       formData.append('backImage', files.backImage);
       formData.append('selfieImage', files.selfieImage);
+      formData.append('consentAccepted', String(Boolean(consentAccepted)));
+      if (consentPolicy?.noticeVersion) {
+        formData.append('consentNoticeVersion', consentPolicy.noticeVersion);
+      }
       if (profile.fullName?.trim()) {
         formData.append('representativeName', profile.fullName.trim());
       }
@@ -807,19 +826,29 @@ export default function EoProfileTab() {
                   <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
                 </div>
                 <div className="info-item">
-                  <span className="info-label">Ngày sinh & Giới tính</span>
+                  <span className="info-label">Độ tuổi quy định</span>
                   <span className="info-val">
-                    {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
+                    {ekycData.meetsMinimumAge === true
+                      ? 'Đạt độ tuổi quy định'
+                      : ekycData.meetsMinimumAge === false
+                        ? 'Chưa đạt độ tuổi tối thiểu'
+                        : 'Đã ghi nhận xác minh'}
                   </span>
                 </div>
-                <div className="info-item">
-                  <span className="info-label">Quê quán</span>
-                  <span className="info-val">{ekycData.originAddress || '—'}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Nơi thường trú (Trên CCCD)</span>
-                  <span className="info-val">{ekycData.residenceAddress || '—'}</span>
-                </div>
+                {(ekycData.dob || ekycData.gender) && (
+                  <div className="info-item">
+                    <span className="info-label">Thông tin bổ sung (dữ liệu cũ)</span>
+                    <span className="info-val">
+                      {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ')}
+                    </span>
+                  </div>
+                )}
+                {ekycData.residenceAddress && (
+                  <div className="info-item">
+                    <span className="info-label">Nơi thường trú (dữ liệu cũ)</span>
+                    <span className="info-val">{ekycData.residenceAddress}</span>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -827,10 +856,14 @@ export default function EoProfileTab() {
               {ekycStatus === 'PENDING_REVIEW' && (
                 <div style={{ backgroundColor: '#fefce8', border: '1px solid #fef08a', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
                   <div style={{ fontWeight: 700, color: '#854d0e', marginBottom: '0.25rem' }}>
-                    Hồ sơ eKYC đang chờ Admin / CSKH thẩm định
+                    {ekycData?.imagesExpired || ekycData?.imagesAvailable === false
+                      ? 'Hồ sơ chờ duyệt đã hết hạn lưu trữ ảnh — Vui lòng nộp lại'
+                      : 'Hồ sơ eKYC đang chờ Admin / CSKH thẩm định'}
                   </div>
                   <div style={{ fontSize: '0.875rem', color: '#a16207', marginBottom: '0.75rem' }}>
-                    {ekycData?.routingReason || 'Hệ thống đã bóc tách thông tin CCCD của bạn và đang chờ Admin phê duyệt.'}
+                    {(ekycData?.imagesExpired || ekycData?.imagesAvailable === false)
+                      ? (ekycData?.imagesUnavailableReason || 'Ảnh xác minh trước đó đã hết hạn lưu trữ tạm thời. Bạn có thể chụp và gửi lại hồ sơ mới ngay bên dưới.')
+                      : (ekycData?.routingReason || 'Hệ thống đã tiếp nhận hồ sơ từ VNPT eKYC và đang chờ Admin phê duyệt.')}
                   </div>
                   {ekycData && (
                     <div className="info-grid" style={{ marginTop: '0.75rem' }}>
@@ -841,16 +874,6 @@ export default function EoProfileTab() {
                       <div className="info-item">
                         <span className="info-label">Số CCCD (Bảo mật NĐ 13)</span>
                         <span className="info-val">{ekycData.cccdNumberMasked || '—'}</span>
-                      </div>
-                      <div className="info-item">
-                        <span className="info-label">Ngày sinh & Giới tính</span>
-                        <span className="info-val">
-                          {[ekycData.dob, ekycData.gender].filter(Boolean).join(' • ') || '—'}
-                        </span>
-                      </div>
-                      <div className="info-item">
-                        <span className="info-label">Nơi thường trú (Trên CCCD)</span>
-                        <span className="info-val">{ekycData.residenceAddress || '—'}</span>
                       </div>
                     </div>
                   )}
@@ -946,10 +969,39 @@ export default function EoProfileTab() {
                   </label>
                 </div>
 
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.9rem 1rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', marginBottom: '0.35rem' }}>
+                    {consentPolicy?.title}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45, marginBottom: '0.6rem' }}>
+                    {consentPolicy?.summary}
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', cursor: 'pointer', fontSize: '0.84rem', color: '#1e293b', fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={consentAccepted}
+                      onChange={(e) => setConsentAccepted(e.target.checked)}
+                      disabled={submittingEkyc}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                    <span>
+                      Tôi đồng ý cho CANi thu thập và xử lý ảnh CCCD, ảnh chân dung sinh trắc học qua VNPT eKYC theo thông báo phiên bản {consentPolicy?.noticeVersion}.
+                    </span>
+                  </label>
+                </div>
+
                 <div className="profile-actions-bar">
                   <button
                     type="submit"
-                    disabled={submittingEkyc}
+                    disabled={submittingEkyc || (consentPolicy?.required !== false && !consentAccepted)}
                     className="profile-btn-primary"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

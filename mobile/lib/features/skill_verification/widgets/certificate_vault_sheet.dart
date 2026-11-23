@@ -70,7 +70,7 @@ class CertificateVaultSheet extends ConsumerWidget {
             child: historyList.isEmpty
                 ? const Center(
                     child: Text(
-                      'Chưa có chứng chỉ nào trong kho của bạn.\nNhấn "Thẩm định kỹ năng AI" để gửi thẩm định tài liệu đầu tiên!',
+                      'Chưa có chứng chỉ nào trong kho của bạn.\nNhấn "Tải chứng chỉ" để gửi hồ sơ xác minh đầu tiên!',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: SkillHubColors.textSecondary, fontSize: 13, height: 1.5),
                     ),
@@ -94,21 +94,29 @@ class CertificateVaultSheet extends ConsumerWidget {
     final isApproved = statusUpper == 'APPROVED';
     final isRevoked = statusUpper == 'REVOKED';
     final isExpired = statusUpper == 'EXPIRED';
+    final isNeedsInfo = statusUpper == 'NEEDS_MORE_INFO';
+    final isFailed = statusUpper == 'VERIFICATION_FAILED';
     final isPending = statusUpper == 'PENDING_REVIEW' ||
         (!isApproved &&
             !isRevoked &&
             !isExpired &&
+            !isNeedsInfo &&
+            !isFailed &&
             (item.routingDecision == 'MANUAL_REVIEW' || item.routingDecision == 'ADMIN_REVIEW'));
     final statusColor = isApproved
         ? SkillHubColors.successText
-        : (isPending ? SkillHubColors.warningText : SkillHubColors.dangerText);
+        : ((isPending || isNeedsInfo) ? SkillHubColors.warningText : SkillHubColors.dangerText);
     final statusText = isApproved
         ? 'Đã duyệt (+${item.spAwarded} SP)'
         : (isRevoked
             ? 'Đã thu hồi'
             : (isExpired
                 ? 'Hết hạn'
-                : (isPending ? 'Đang chờ duyệt' : 'Từ chối')));
+                : (isNeedsInfo
+                    ? 'Cần bổ sung'
+                    : (isFailed
+                        ? 'Chờ nộp lại / chuyển duyệt'
+                        : (isPending ? 'Chờ duyệt thủ công' : 'Từ chối')))));
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -157,7 +165,7 @@ class CertificateVaultSheet extends ConsumerWidget {
             ),
           const SizedBox(height: 4),
           Text(
-            item.routingReason.isNotEmpty ? item.routingReason : 'Thẩm định chứng chỉ tự động',
+            item.routingReason.isNotEmpty ? item.routingReason : 'Hồ sơ chờ Admin / CSKH kiểm tra thủ công',
             style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
           ),
           if (item.createdAt != null) ...[

@@ -1,8 +1,5 @@
 package com.cani.service;
 
-import com.cani.client.skill.AiProviderException;
-import com.cani.client.skill.SkillVerificationPromptBuilder;
-import com.cani.client.skill.SkillVisionAiClient;
 import com.cani.dto.skill.*;
 import com.cani.entity.AuditLog;
 import com.cani.entity.Skill;
@@ -12,9 +9,6 @@ import com.cani.entity.Worker;
 import com.cani.entity.WorkerSkill;
 import com.cani.entity.WorkerSkillPoint;
 import com.cani.entity.enums.AdminReviewDecision;
-import com.cani.entity.enums.DocumentAuthenticityStatus;
-import com.cani.entity.enums.IdentityVerificationStatus;
-import com.cani.entity.enums.IssuerVerificationStatus;
 import com.cani.entity.enums.RoutingDecision;
 import com.cani.entity.enums.SkillTier;
 import com.cani.entity.enums.SkillVerificationStatus;
@@ -31,8 +25,6 @@ import com.cani.repository.WorkerSkillRepository;
 import com.cani.service.skill.CertificateStorageService;
 import com.cani.service.skill.DocumentAccessTokenService;
 import com.cani.service.skill.FileSecurityValidator;
-import com.cani.service.skill.SkillTrustScoringEngine;
-import com.cani.service.skill.TrustEvaluationResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -41,25 +33,26 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Orchestrator cho module CANi Skill Trust & Verification Engine (V2).
- * Phân tách rõ:
+ * Orchestrator cho module Xác minh Chứng chỉ Kỹ năng Worker (Duyệt thủ công bởi Admin / CSKH).
  * - FileSecurityValidator + CertificateStorageService + DocumentAccessTokenService (Bảo mật tệp)
- * - SkillVisionAiClient (Document Intelligence - Fail-Closed)
- * - SkillTrustScoringEngine (TrustScore + Hard Gates - Backend quyết định cuối cùng)
+ * - Trạng thái sau nộp: PENDING_REVIEW -> Admin / CSKH xem tài liệu, APPROVE / NEEDS_MORE_INFO / REJECT
  * - AuditLogService (Kiểm toán độc lập REQUIRES_NEW)
  */
 @Service
@@ -68,8 +61,9 @@ import java.util.stream.Collectors;
 public class SkillVerificationService {
 
     private static final String DEFAULT_UNSPECIFIED_JOB_TYPE = "Chưa xác định";
-    private static final int MAX_AI_RETRY_COUNT = 3;
+    private static final String MANUAL_VERIFICATION_SOURCE = "MANUAL_REVIEW";
     private static final String AUDIT_ENTITY_TYPE = "SKILL_VERIFICATION_REQUEST";
+    private static final Pattern DIACRITICS = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
     private static final List<SkillVerificationStatus> ACTIVE_DUPLICATE_STATUSES = List.of(
             SkillVerificationStatus.APPROVED,
             SkillVerificationStatus.PENDING_REVIEW
@@ -80,12 +74,10 @@ public class SkillVerificationService {
     private final WorkerSkillRepository workerSkillRepository;
     private final WorkerSkillPointRepository workerSkillPointRepository;
     private final SkillVerificationRequestRepository verificationRequestRepository;
-    private final SkillVisionAiClient skillVisionAiClient;
     private final ObjectMapper objectMapper;
     private final FileSecurityValidator fileSecurityValidator;
     private final CertificateStorageService certificateStorageService;
     private final DocumentAccessTokenService documentAccessTokenService;
-    private final SkillTrustScoringEngine trustScoringEngine;
     private final AuditLogService auditLogService;
     private final TransactionTemplate transactionTemplate;
 
@@ -96,9 +88,45 @@ public class SkillVerificationService {
         return action.get();
     }
 
+    private void deleteStoredDocumentAfterRollback(String storedDocumentUrl) {
+        String filename = documentAccessTokenService != null
+                ? documentAccessTokenService.extractFilename(storedDocumentUrl)
+                : null;
+        if (filename == null || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    certificateStorageService.deleteQuietly(filename);
+                }
+            }
+        });
+    }
+
+    private void deleteStoredDocumentAfterCommit(String storedDocumentUrl) {
+        String filename = documentAccessTokenService != null
+                ? documentAccessTokenService.extractFilename(storedDocumentUrl)
+                : null;
+        if (filename == null) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            certificateStorageService.deleteQuietly(filename);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                certificateStorageService.deleteQuietly(filename);
+            }
+        });
+    }
+
     /**
-     * Submit certificate/credential for V2 Trust & Verification Pipeline (UC-43 & UC-46).
-     * NOTE: Outer method is intentionally NOT @Transactional to avoid holding DB connections during Gemini HTTP I/O.
+     * Nộp chứng chỉ nghề nghiệp để Admin / CSKH kiểm tra và phê duyệt thủ công (UC-43).
+     * Không gọi AI, không tự động cấp điểm khi hồ sơ đang chờ duyệt.
      */
     public SkillVerificationResponseDto submitVerification(
             UUID workerId,
@@ -125,59 +153,34 @@ public class SkillVerificationService {
                 ? skillRepository.findById(requestedSkillId).orElse(null)
                 : null;
 
-        List<Skill> activeSkills = skillRepository.findByIsActiveTrue();
-        List<String> taxonomyNames = activeSkills.stream().map(Skill::getName).toList();
-
         // 3. Lưu tệp riêng tư bằng UUID filename (fail-fast nếu lỗi ghi đĩa)
         String storedDocumentUrl = certificateStorageService.storeDocument(
                 validatedDoc.getBytes(),
                 validatedDoc.getSafeExtension()
         );
 
-        String workerFullName = resolveWorkerFullName(worker);
-
-        // 4. Gọi tầng Document Intelligence (truyền đầy đủ expectedWorkerName & sanitized filename)
         try {
-            SkillVerificationAiResultDto aiResult = skillVisionAiClient.verifyDocument(
-                    validatedDoc.getBytes(),
-                    validatedDoc.getDetectedMimeType(),
-                    taxonomyNames,
-                    validatedDoc.getSanitizedOriginalFilename(),
-                    workerFullName
-            );
-
-            // 5. Backend Trust Scoring Engine tính TrustScore + Hard Gates -> quyết định cuối cùng
-            TrustEvaluationResult evaluation = trustScoringEngine.evaluate(
-                    workerFullName, requestedSkill, activeSkills, aiResult
-            );
-
-            return executeInTransaction(() -> persistTrustVerificationResult(
-                    workerId,
-                    requestedSkill,
-                    validatedDoc,
-                    storedDocumentUrl,
-                    aiResult,
-                    evaluation,
-                    notes,
-                    activeSkills
-            ));
-        } catch (AiProviderException ex) {
-            // Fail-Closed: tuyệt đối KHÔNG tự duyệt hay bịa dữ liệu khi AI lỗi
-            log.warn("Skill verification fail-closed for workerId={} [code={}, retryable={}]",
-                    workerId, ex.getErrorCode(), ex.isRetryable());
-            return executeInTransaction(() -> persistFailedVerification(
-                    workerId,
-                    requestedSkill,
-                    validatedDoc,
-                    storedDocumentUrl,
-                    ex,
-                    notes
-            ));
+            return executeInTransaction(() -> {
+                deleteStoredDocumentAfterRollback(storedDocumentUrl);
+                return persistPendingManualReview(
+                        workerId,
+                        requestedSkill,
+                        validatedDoc,
+                        storedDocumentUrl,
+                        notes
+                );
+            });
+        } catch (RuntimeException ex) {
+            String filename = documentAccessTokenService != null
+                    ? documentAccessTokenService.extractFilename(storedDocumentUrl)
+                    : null;
+            certificateStorageService.deleteQuietly(filename);
+            throw ex;
         }
     }
 
     /**
-     * Worker bổ sung / thay thế tài liệu khi yêu cầu ở trạng thái NEEDS_MORE_INFO hoặc VERIFICATION_FAILED.
+     * Worker bổ sung / thay thế tài liệu khi yêu cầu ở trạng thái NEEDS_MORE_INFO, VERIFICATION_FAILED hoặc REJECTED.
      */
     public SkillVerificationResponseDto resubmitVerification(
             UUID verificationId,
@@ -185,9 +188,7 @@ public class SkillVerificationService {
             MultipartFile file,
             String notes
     ) {
-        record ResubmitContext(Skill skill, String workerFullName) {}
-
-        ResubmitContext ctx = executeInTransaction(() -> {
+        executeInTransaction(() -> {
             SkillVerificationRequest existing = verificationRequestRepository.findById(verificationId)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu thẩm định với ID: " + verificationId));
 
@@ -200,123 +201,87 @@ public class SkillVerificationService {
                     && existing.getStatus() != SkillVerificationStatus.REJECTED) {
                 throw new BadRequestException("Chỉ có thể bổ sung tài liệu khi hồ sơ ở trạng thái NEEDS_MORE_INFO, VERIFICATION_FAILED hoặc REJECTED.");
             }
-            return new ResubmitContext(existing.getSkill(), resolveWorkerFullName(existing.getWorker()));
+            return existing.getId();
         });
 
         FileSecurityValidator.ValidatedDocument validatedDoc = fileSecurityValidator.validate(file);
 
-        // Không cho phép nộp lại y hệt tệp cũ đang bị từ chối/lỗi nếu đã có bản APPROVED/PENDING_REVIEW
         if (verificationRequestRepository.existsByWorker_WorkerIdAndDocumentHashAndStatusIn(
                 workerId, validatedDoc.getSha256Hash(), ACTIVE_DUPLICATE_STATUSES)) {
             throw new AppException("Tài liệu này đã tồn tại trong một hồ sơ đang chờ duyệt hoặc đã phê duyệt.", HttpStatus.CONFLICT);
         }
 
-        List<Skill> activeSkills = skillRepository.findByIsActiveTrue();
-        List<String> taxonomyNames = activeSkills.stream().map(Skill::getName).toList();
         String storedDocumentUrl = certificateStorageService.storeDocument(
                 validatedDoc.getBytes(),
                 validatedDoc.getSafeExtension()
         );
 
         try {
-            SkillVerificationAiResultDto aiResult = skillVisionAiClient.verifyDocument(
-                    validatedDoc.getBytes(),
-                    validatedDoc.getDetectedMimeType(),
-                    taxonomyNames,
-                    validatedDoc.getSanitizedOriginalFilename(),
-                    ctx.workerFullName()
-            );
-            TrustEvaluationResult evaluation = trustScoringEngine.evaluate(
-                    ctx.workerFullName(), ctx.skill(), activeSkills, aiResult
-            );
-            return executeInTransaction(() -> updateResubmittedRequest(
-                    verificationId, validatedDoc, storedDocumentUrl, aiResult, evaluation, notes, activeSkills
-            ));
-        } catch (AiProviderException ex) {
-            log.warn("Skill verification resubmit fail-closed [requestId={}, code={}]", verificationId, ex.getErrorCode());
-            return executeInTransaction(() -> updateFailedRequest(verificationId, validatedDoc, storedDocumentUrl, ex, notes, false));
+            return executeInTransaction(() -> {
+                deleteStoredDocumentAfterRollback(storedDocumentUrl);
+                return updateResubmittedManualRequest(
+                        verificationId, workerId, validatedDoc, storedDocumentUrl, notes
+                );
+            });
+        } catch (RuntimeException ex) {
+            String filename = documentAccessTokenService != null
+                    ? documentAccessTokenService.extractFilename(storedDocumentUrl)
+                    : null;
+            certificateStorageService.deleteQuietly(filename);
+            throw ex;
         }
     }
 
     /**
-     * Admin/Hệ thống thực hiện retry có kiểm soát cho yêu cầu bị VERIFICATION_FAILED (tối đa 3 lần).
+     * Chuyển hồ sơ cũ từng ở trạng thái VERIFICATION_FAILED (lỗi AI trước đây) sang hàng đợi duyệt thủ công (PENDING_REVIEW).
      */
+    @Transactional
+    public SkillVerificationResponseDto moveFailedToManualReview(UUID verificationId, UUID adminUserId) {
+        SkillVerificationRequest req = verificationRequestRepository.findById(verificationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu thẩm định với ID: " + verificationId));
+
+        if (req.getStatus() != SkillVerificationStatus.VERIFICATION_FAILED) {
+            throw new BadRequestException("Chỉ có thể chuyển sang duyệt thủ công khi hồ sơ đang ở trạng thái VERIFICATION_FAILED.");
+        }
+
+        req.setStatus(SkillVerificationStatus.PENDING_REVIEW);
+        req.setRoutingDecision(RoutingDecision.ADMIN_REVIEW);
+        req.setVerificationSource(MANUAL_VERIFICATION_SOURCE);
+        req.setRoutingReason("Hồ sơ lỗi trước đây đã được chuyển sang hàng đợi Admin / CSKH kiểm tra thủ công.");
+        req.setFailureReason(null);
+        req.setHumanReviewed(false);
+        req.setSpAwarded(0);
+
+        SkillVerificationRequest saved = verificationRequestRepository.save(req);
+
+        recordAudit(
+                adminUserId,
+                "SKILL_VERIFICATION_MOVED_TO_MANUAL_REVIEW",
+                saved.getId(),
+                Map.of("status", SkillVerificationStatus.VERIFICATION_FAILED.name()),
+                Map.of("status", SkillVerificationStatus.PENDING_REVIEW.name())
+        );
+
+        log.info("Admin {} moved legacy failed skill verification {} to PENDING_REVIEW", adminUserId, verificationId);
+        return mapToResponseDto(saved, null, null, saved.getWorker());
+    }
+
+    /**
+     * Alias giữ tương thích cho các caller cũ gọi retryFailedVerification -> chuyển thẳng sang duyệt thủ công, không gọi AI.
+     */
+    @Transactional
     public SkillVerificationResponseDto retryFailedVerification(UUID verificationId, UUID adminUserId) {
-        record RetryContext(
-                String documentUrl,
-                String documentName,
-                String documentType,
-                String workerNotes,
-                int currentRetries,
-                Skill skill,
-                String workerFullName
-        ) {}
-
-        RetryContext ctx = executeInTransaction(() -> {
-            SkillVerificationRequest existing = verificationRequestRepository.findById(verificationId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu thẩm định với ID: " + verificationId));
-
-            if (existing.getStatus() != SkillVerificationStatus.VERIFICATION_FAILED) {
-                throw new BadRequestException("Chỉ có thể thử lại (retry) hồ sơ ở trạng thái VERIFICATION_FAILED.");
-            }
-
-            int currentRetries = existing.getRetryCount() != null ? existing.getRetryCount() : 0;
-            if (currentRetries >= MAX_AI_RETRY_COUNT) {
-                throw new BadRequestException("Hồ sơ đã vượt quá giới hạn " + MAX_AI_RETRY_COUNT
-                        + " lần thử lại AI. Vui lòng kiểm tra thủ công hoặc yêu cầu Worker nộp lại tài liệu.");
-            }
-            return new RetryContext(
-                    existing.getDocumentUrl(),
-                    existing.getDocumentName(),
-                    existing.getDocumentType(),
-                    existing.getWorkerNotes(),
-                    currentRetries,
-                    existing.getSkill(),
-                    resolveWorkerFullName(existing.getWorker())
-            );
-        });
-
-        String storedFilename = documentAccessTokenService.extractFilename(ctx.documentUrl());
-        if (storedFilename == null) {
-            throw new BadRequestException("Không tìm thấy tệp chứng chỉ lưu trữ nội bộ để thực hiện thử lại.");
-        }
-
-        byte[] fileBytes = certificateStorageService.readBytes(storedFilename);
-        String mimeType = ctx.documentType() != null ? ctx.documentType() : "image/jpeg";
-        List<Skill> activeSkills = skillRepository.findByIsActiveTrue();
-        List<String> taxonomyNames = activeSkills.stream().map(Skill::getName).toList();
-
-        try {
-            SkillVerificationAiResultDto aiResult = skillVisionAiClient.verifyDocument(
-                    fileBytes,
-                    mimeType,
-                    taxonomyNames,
-                    ctx.documentName(),
-                    ctx.workerFullName()
-            );
-            TrustEvaluationResult evaluation = trustScoringEngine.evaluate(
-                    ctx.workerFullName(), ctx.skill(), activeSkills, aiResult
-            );
-            return executeInTransaction(() -> applyRetrySuccess(verificationId, adminUserId, aiResult, evaluation, activeSkills));
-        } catch (AiProviderException ex) {
-            log.warn("Controlled retry failed [requestId={}, attempt={}, code={}]",
-                    verificationId, ctx.currentRetries() + 1, ex.getErrorCode());
-            return executeInTransaction(() -> updateFailedRequest(verificationId, null, ctx.documentUrl(), ex, ctx.workerNotes(), true));
-        }
+        return moveFailedToManualReview(verificationId, adminUserId);
     }
 
     @Transactional
-    protected SkillVerificationResponseDto persistTrustVerificationResult(
+    protected SkillVerificationResponseDto persistPendingManualReview(
             UUID workerId,
             Skill requestedSkill,
             FileSecurityValidator.ValidatedDocument validatedDoc,
             String storedDocumentUrl,
-            SkillVerificationAiResultDto aiResult,
-            TrustEvaluationResult evaluation,
-            String notes,
-            List<Skill> activeSkills
+            String notes
     ) {
-        // Kiểm tra lại chống race condition trong transaction
         if (verificationRequestRepository.existsByWorker_WorkerIdAndDocumentHashAndStatusIn(
                 workerId, validatedDoc.getSha256Hash(), ACTIVE_DUPLICATE_STATUSES)) {
             throw new AppException(
@@ -328,66 +293,30 @@ public class SkillVerificationService {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Worker not found: " + workerId));
 
-        List<Skill> approvedSkills = evaluation.getFinalStatus() == SkillVerificationStatus.APPROVED
-                ? resolveSkillsForApproval(evaluation.getMatchedApprovedSkills(), requestedSkill)
-                : Collections.emptyList();
-
-        int spAwarded = evaluation.getFinalStatus() == SkillVerificationStatus.APPROVED
-                ? Math.max(VerificationTier.AI_DOCUMENT.getSpVerify(),
-                approvedSkills.size() * VerificationTier.AI_DOCUMENT.getSpVerify())
-                : 0;
-
-        String resolvedJobType = resolveJobType(aiResult, requestedSkill, approvedSkills);
-        Skill rawResolvedSkill = resolveLinkedSkill(requestedSkill, approvedSkills, aiResult, activeSkills);
-        Skill resolvedSkill = (rawResolvedSkill != null && rawResolvedSkill.getSkillId() != null)
-                ? skillRepository.findById(rawResolvedSkill.getSkillId()).orElse(rawResolvedSkill)
-                : rawResolvedSkill;
+        String resolvedJobType = (requestedSkill != null && requestedSkill.getName() != null && !requestedSkill.getName().isBlank())
+                ? requestedSkill.getName()
+                : DEFAULT_UNSPECIFIED_JOB_TYPE;
 
         SkillVerificationRequest entity = SkillVerificationRequest.builder()
                 .worker(worker)
-                .skill(resolvedSkill)
+                .skill(requestedSkill)
                 .jobType(resolvedJobType)
                 .documentUrl(storedDocumentUrl)
                 .documentName(validatedDoc.getSanitizedOriginalFilename())
                 .documentType(validatedDoc.getDetectedMimeType())
                 .documentHash(validatedDoc.getSha256Hash())
-                .recipientName(aiResult.getRecipientName())
-                .identityNumber(aiResult.getIdentityNumber())
-                .institution(aiResult.getInstitution())
-                .certificateNumber(aiResult.getCertificateNumber())
-                .issueDate(aiResult.getIssueDate())
-                .expiryDate(aiResult.getExpiryDate())
-                .modelName(aiResult.getModelName())
-                .promptVersion(aiResult.getPromptVersion() != null
-                        ? aiResult.getPromptVersion()
-                        : SkillVerificationPromptBuilder.PROMPT_VERSION)
-                .aiRawResponse(sanitizeJsonOrNull(aiResult.getRawAiJson()))
-                .extractedSkills(serializeQuietly(aiResult.getExtractedSkills()))
-                .hasSealOrSignature(Boolean.TRUE.equals(aiResult.getHasSealOrSignature())
-                        || Boolean.TRUE.equals(aiResult.getHasSeal())
-                        || Boolean.TRUE.equals(aiResult.getHasSignature()))
-                .overallConfidence(scaleDecimal(evaluation.getSanitizedConfidence(), 2))
-                .trustScore(scaleDecimal(evaluation.getTrustScore(), 2))
-                .trustScoreBreakdown(serializeQuietly(evaluation.getBreakdown()))
-                .identityVerificationStatus(evaluation.getIdentityStatus())
-                .issuerVerificationStatus(evaluation.getIssuerStatus())
-                .documentAuthenticityStatus(evaluation.getAuthenticityStatus())
-                .verificationSource(evaluation.getVerificationSource())
-                .verificationReference(evaluation.getVerificationReference())
-                .routingDecision(evaluation.getFinalRoutingDecision())
-                .routingReason(evaluation.getFinalReason())
-                .status(evaluation.getFinalStatus())
+                .hasSealOrSignature(false)
+                .verificationSource(MANUAL_VERIFICATION_SOURCE)
+                .routingDecision(RoutingDecision.ADMIN_REVIEW)
+                .routingReason("Hồ sơ chứng chỉ đã được tiếp nhận, đang chờ Admin / CSKH kiểm tra thủ công.")
+                .status(SkillVerificationStatus.PENDING_REVIEW)
                 .humanReviewed(false)
-                .spAwarded(spAwarded)
+                .spAwarded(0)
                 .workerNotes(notes)
                 .retryCount(0)
                 .build();
 
         SkillVerificationRequest saved = verificationRequestRepository.save(entity);
-
-        if (saved.getStatus() == SkillVerificationStatus.APPROVED) {
-            applyApprovedSkills(worker, approvedSkills, resolvedJobType, saved.getId(), evaluation.getParsedExpiryDate());
-        }
 
         recordAudit(
                 worker.getUser() != null ? worker.getUser().getUserId() : null,
@@ -397,96 +326,43 @@ public class SkillVerificationService {
                 Map.of(
                         "status", saved.getStatus().name(),
                         "routingDecision", saved.getRoutingDecision().name(),
-                        "trustScore", evaluation.getTrustScore(),
-                        "spAwarded", spAwarded
+                        "verificationSource", MANUAL_VERIFICATION_SOURCE,
+                        "spAwarded", 0
                 )
         );
 
-        log.info("Skill verification evaluated [requestId={}, workerId={}, status={}, decision={}, trustScore={}]",
-                saved.getId(), workerId, saved.getStatus(), saved.getRoutingDecision(), evaluation.getTrustScore());
+        log.info("Skill verification queued for manual review [requestId={}, workerId={}, skill={}]",
+                saved.getId(), workerId, resolvedJobType);
 
-        return mapToResponseDto(saved, aiResult.getExtractedSkills(), evaluation.getBreakdown(), worker);
+        return mapToResponseDto(saved, null, null, worker);
     }
 
     @Transactional
-    protected SkillVerificationResponseDto persistFailedVerification(
-            UUID workerId,
-            Skill requestedSkill,
-            FileSecurityValidator.ValidatedDocument validatedDoc,
-            String storedDocumentUrl,
-            AiProviderException ex,
-            String notes
-    ) {
-        Worker worker = workerRepository.findById(workerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Worker not found: " + workerId));
-
-        String jobType = (requestedSkill != null && requestedSkill.getName() != null)
-                ? requestedSkill.getName()
-                : DEFAULT_UNSPECIFIED_JOB_TYPE;
-
-        SkillVerificationRequest entity = SkillVerificationRequest.builder()
-                .worker(worker)
-                .skill(requestedSkill)
-                .jobType(jobType)
-                .documentUrl(storedDocumentUrl)
-                .documentName(validatedDoc.getSanitizedOriginalFilename())
-                .documentType(validatedDoc.getDetectedMimeType())
-                .documentHash(validatedDoc.getSha256Hash())
-                .promptVersion(SkillVerificationPromptBuilder.PROMPT_VERSION)
-                .hasSealOrSignature(false)
-                .overallConfidence(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
-                .trustScore(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
-                .identityVerificationStatus(IdentityVerificationStatus.UNVERIFIED)
-                .issuerVerificationStatus(IssuerVerificationStatus.UNKNOWN_ISSUER)
-                .documentAuthenticityStatus(DocumentAuthenticityStatus.UNVERIFIED)
-                .verificationSource("AI_PROVIDER_FAILED")
-                .routingDecision(RoutingDecision.REJECT)
-                .routingReason(ex.getUserSafeReason())
-                .status(SkillVerificationStatus.VERIFICATION_FAILED)
-                .humanReviewed(false)
-                .failureReason(ex.getErrorCode() + ": " + ex.getUserSafeReason())
-                .retryCount(0)
-                .spAwarded(0)
-                .workerNotes(notes)
-                .build();
-
-        SkillVerificationRequest saved = verificationRequestRepository.save(entity);
-
-        recordAudit(
-                worker.getUser() != null ? worker.getUser().getUserId() : null,
-                "SKILL_VERIFICATION_AI_FAILED",
-                saved.getId(),
-                null,
-                Map.of("errorCode", ex.getErrorCode(), "retryable", ex.isRetryable())
-        );
-
-        return mapToResponseDto(saved, Collections.emptyList(), null, worker);
-    }
-
-    @Transactional
-    protected SkillVerificationResponseDto updateResubmittedRequest(
+    protected SkillVerificationResponseDto updateResubmittedManualRequest(
             UUID verificationId,
+            UUID workerId,
             FileSecurityValidator.ValidatedDocument validatedDoc,
             String storedDocumentUrl,
-            SkillVerificationAiResultDto aiResult,
-            TrustEvaluationResult evaluation,
-            String notes,
-            List<Skill> activeSkills
+            String notes
     ) {
         SkillVerificationRequest req = verificationRequestRepository.findById(verificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu: " + verificationId));
+        if (!req.getWorker().getWorkerId().equals(workerId)) {
+            throw new AppException("Bạn không có quyền bổ sung tài liệu cho hồ sơ của Worker khác.", HttpStatus.FORBIDDEN);
+        }
+        if (req.getStatus() != SkillVerificationStatus.NEEDS_MORE_INFO
+                && req.getStatus() != SkillVerificationStatus.VERIFICATION_FAILED
+                && req.getStatus() != SkillVerificationStatus.REJECTED) {
+            throw new BadRequestException("Trạng thái hồ sơ đã thay đổi, không thể nộp lại.");
+        }
+        if (verificationRequestRepository.existsByWorker_WorkerIdAndDocumentHashAndStatusIn(
+                workerId, validatedDoc.getSha256Hash(), ACTIVE_DUPLICATE_STATUSES)) {
+            throw new AppException("Tài liệu này đã tồn tại trong một hồ sơ đang chờ duyệt hoặc đã phê duyệt.", HttpStatus.CONFLICT);
+        }
+
         String oldStatus = req.getStatus().name();
-
+        String previousDocumentUrl = req.getDocumentUrl();
         Worker worker = req.getWorker();
-        List<Skill> approvedSkills = evaluation.getFinalStatus() == SkillVerificationStatus.APPROVED
-                ? resolveSkillsForApproval(evaluation.getMatchedApprovedSkills(), req.getSkill())
-                : Collections.emptyList();
-
-        int spAwarded = (evaluation.getFinalStatus() == SkillVerificationStatus.APPROVED
-                && (req.getSpAwarded() == null || req.getSpAwarded() == 0))
-                ? Math.max(VerificationTier.AI_DOCUMENT.getSpVerify(),
-                approvedSkills.size() * VerificationTier.AI_DOCUMENT.getSpVerify())
-                : 0;
 
         req.setDocumentUrl(storedDocumentUrl);
         req.setDocumentName(validatedDoc.getSanitizedOriginalFilename());
@@ -495,14 +371,21 @@ public class SkillVerificationService {
         if (notes != null) {
             req.setWorkerNotes(notes);
         }
-        applyAiEvaluationToEntity(req, aiResult, evaluation, activeSkills, approvedSkills, spAwarded);
         req.setFailureReason(null);
         req.setHumanReviewed(false);
+        req.setReviewedBy(null);
+        req.setReviewedAt(null);
+        req.setReviewNotes(null);
+        req.setSpAwarded(0);
+        req.setVerificationSource(MANUAL_VERIFICATION_SOURCE);
+        req.setRoutingDecision(RoutingDecision.ADMIN_REVIEW);
+        req.setRoutingReason("Worker đã bổ sung tài liệu, đang chờ Admin / CSKH kiểm tra thủ công.");
+        req.setStatus(SkillVerificationStatus.PENDING_REVIEW);
 
         SkillVerificationRequest saved = verificationRequestRepository.save(req);
 
-        if (saved.getStatus() == SkillVerificationStatus.APPROVED && spAwarded > 0) {
-            applyApprovedSkills(worker, approvedSkills, saved.getJobType(), saved.getId(), evaluation.getParsedExpiryDate());
+        if (previousDocumentUrl != null && !previousDocumentUrl.equals(storedDocumentUrl)) {
+            deleteStoredDocumentAfterCommit(previousDocumentUrl);
         }
 
         recordAudit(
@@ -510,133 +393,10 @@ public class SkillVerificationService {
                 "SKILL_VERIFICATION_RESUBMITTED",
                 saved.getId(),
                 Map.of("status", oldStatus),
-                Map.of("status", saved.getStatus().name(), "trustScore", evaluation.getTrustScore())
+                Map.of("status", saved.getStatus().name(), "verificationSource", MANUAL_VERIFICATION_SOURCE)
         );
 
-        return mapToResponseDto(saved, aiResult.getExtractedSkills(), evaluation.getBreakdown(), worker);
-    }
-
-    @Transactional
-    protected SkillVerificationResponseDto applyRetrySuccess(
-            UUID verificationId,
-            UUID adminUserId,
-            SkillVerificationAiResultDto aiResult,
-            TrustEvaluationResult evaluation,
-            List<Skill> activeSkills
-    ) {
-        SkillVerificationRequest req = verificationRequestRepository.findById(verificationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu: " + verificationId));
-
-        if (req.getStatus() != SkillVerificationStatus.VERIFICATION_FAILED) {
-            throw new BadRequestException("Hồ sơ đã thay đổi trạng thái trước khi hoàn tất thử lại.");
-        }
-
-        Worker worker = req.getWorker();
-        List<Skill> approvedSkills = evaluation.getFinalStatus() == SkillVerificationStatus.APPROVED
-                ? resolveSkillsForApproval(evaluation.getMatchedApprovedSkills(), req.getSkill())
-                : Collections.emptyList();
-
-        int spAwarded = (evaluation.getFinalStatus() == SkillVerificationStatus.APPROVED
-                && (req.getSpAwarded() == null || req.getSpAwarded() == 0))
-                ? Math.max(VerificationTier.AI_DOCUMENT.getSpVerify(),
-                approvedSkills.size() * VerificationTier.AI_DOCUMENT.getSpVerify())
-                : 0;
-
-        req.setRetryCount((req.getRetryCount() != null ? req.getRetryCount() : 0) + 1);
-        req.setFailureReason(null);
-        applyAiEvaluationToEntity(req, aiResult, evaluation, activeSkills, approvedSkills, spAwarded);
-
-        SkillVerificationRequest saved = verificationRequestRepository.save(req);
-
-        if (saved.getStatus() == SkillVerificationStatus.APPROVED && spAwarded > 0) {
-            applyApprovedSkills(worker, approvedSkills, saved.getJobType(), saved.getId(), evaluation.getParsedExpiryDate());
-        }
-
-        recordAudit(
-                adminUserId,
-                "SKILL_VERIFICATION_RETRIED",
-                saved.getId(),
-                Map.of("status", SkillVerificationStatus.VERIFICATION_FAILED.name()),
-                Map.of("status", saved.getStatus().name(), "retryCount", saved.getRetryCount())
-        );
-
-        return mapToResponseDto(saved, aiResult.getExtractedSkills(), evaluation.getBreakdown(), worker);
-    }
-
-    @Transactional
-    protected SkillVerificationResponseDto updateFailedRequest(
-            UUID verificationId,
-            FileSecurityValidator.ValidatedDocument validatedDoc,
-            String storedDocumentUrl,
-            AiProviderException ex,
-            String notes,
-            boolean incrementRetry
-    ) {
-        SkillVerificationRequest req = verificationRequestRepository.findById(verificationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu: " + verificationId));
-
-        if (validatedDoc != null) {
-            req.setDocumentUrl(storedDocumentUrl);
-            req.setDocumentName(validatedDoc.getSanitizedOriginalFilename());
-            req.setDocumentType(validatedDoc.getDetectedMimeType());
-            req.setDocumentHash(validatedDoc.getSha256Hash());
-        }
-        if (notes != null) {
-            req.setWorkerNotes(notes);
-        }
-        if (incrementRetry) {
-            req.setRetryCount((req.getRetryCount() != null ? req.getRetryCount() : 0) + 1);
-        }
-        req.setStatus(SkillVerificationStatus.VERIFICATION_FAILED);
-        req.setRoutingDecision(RoutingDecision.REJECT);
-        req.setRoutingReason(ex.getUserSafeReason());
-        req.setFailureReason(ex.getErrorCode() + ": " + ex.getUserSafeReason());
-        req.setSpAwarded(0);
-
-        SkillVerificationRequest saved = verificationRequestRepository.save(req);
-        return mapToResponseDto(saved, Collections.emptyList(), null, saved.getWorker());
-    }
-
-    private void applyAiEvaluationToEntity(
-            SkillVerificationRequest req,
-            SkillVerificationAiResultDto aiResult,
-            TrustEvaluationResult evaluation,
-            List<Skill> activeSkills,
-            List<Skill> approvedSkills,
-            int spAwarded
-    ) {
-        String resolvedJobType = resolveJobType(aiResult, req.getSkill(), approvedSkills);
-        Skill resolvedSkill = resolveLinkedSkill(req.getSkill(), approvedSkills, aiResult, activeSkills);
-
-        req.setSkill(resolvedSkill);
-        req.setJobType(resolvedJobType);
-        req.setRecipientName(aiResult.getRecipientName());
-        req.setIdentityNumber(aiResult.getIdentityNumber());
-        req.setInstitution(aiResult.getInstitution());
-        req.setCertificateNumber(aiResult.getCertificateNumber());
-        req.setIssueDate(aiResult.getIssueDate());
-        req.setExpiryDate(aiResult.getExpiryDate());
-        req.setModelName(aiResult.getModelName());
-        req.setPromptVersion(aiResult.getPromptVersion() != null
-                ? aiResult.getPromptVersion()
-                : SkillVerificationPromptBuilder.PROMPT_VERSION);
-        req.setAiRawResponse(sanitizeJsonOrNull(aiResult.getRawAiJson()));
-        req.setExtractedSkills(serializeQuietly(aiResult.getExtractedSkills()));
-        req.setHasSealOrSignature(Boolean.TRUE.equals(aiResult.getHasSealOrSignature())
-                || Boolean.TRUE.equals(aiResult.getHasSeal())
-                || Boolean.TRUE.equals(aiResult.getHasSignature()));
-        req.setOverallConfidence(scaleDecimal(evaluation.getSanitizedConfidence(), 2));
-        req.setTrustScore(scaleDecimal(evaluation.getTrustScore(), 2));
-        req.setTrustScoreBreakdown(serializeQuietly(evaluation.getBreakdown()));
-        req.setIdentityVerificationStatus(evaluation.getIdentityStatus());
-        req.setIssuerVerificationStatus(evaluation.getIssuerStatus());
-        req.setDocumentAuthenticityStatus(evaluation.getAuthenticityStatus());
-        req.setVerificationSource(evaluation.getVerificationSource());
-        req.setVerificationReference(evaluation.getVerificationReference());
-        req.setRoutingDecision(evaluation.getFinalRoutingDecision());
-        req.setRoutingReason(evaluation.getFinalReason());
-        req.setStatus(evaluation.getFinalStatus());
-        req.setSpAwarded(spAwarded);
+        return mapToResponseDto(saved, null, null, worker);
     }
 
     /**
@@ -1034,12 +794,11 @@ public class SkillVerificationService {
     }
 
     public static boolean isNameMatching(String workerName, String recipientName) {
-        SkillTrustScoringEngine.normalizeName(workerName); // reuse strict logic
         if (workerName == null || recipientName == null) {
             return false;
         }
-        String normWorker = SkillTrustScoringEngine.normalizeName(workerName);
-        String normRecipient = SkillTrustScoringEngine.normalizeName(recipientName);
+        String normWorker = normalizeName(workerName);
+        String normRecipient = normalizeName(recipientName);
         if (normWorker.equals(normRecipient)) {
             return true;
         }
@@ -1049,7 +808,6 @@ public class SkillVerificationService {
             boolean firstMatches = wTokens[0].equals(rTokens[0]);
             boolean lastMatches = wTokens[wTokens.length - 1].equals(rTokens[rTokens.length - 1]);
             if (firstMatches && lastMatches) {
-                // Nếu cả hai bên đều có tên đệm mà khác nhau -> không khớp
                 if (wTokens.length > 2 && rTokens.length > 2) {
                     List<String> wMid = Arrays.asList(wTokens).subList(1, wTokens.length - 1);
                     List<String> rMid = Arrays.asList(rTokens).subList(1, rTokens.length - 1);
@@ -1062,7 +820,16 @@ public class SkillVerificationService {
     }
 
     public static String removeDiacritics(String str) {
-        return SkillTrustScoringEngine.normalizeName(str);
+        return normalizeName(str);
+    }
+
+    public static String normalizeName(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String nfd = Normalizer.normalize(raw.trim().toLowerCase(Locale.ROOT), Normalizer.Form.NFD);
+        String noDiacritics = DIACRITICS.matcher(nfd).replaceAll("").replace('đ', 'd');
+        return noDiacritics.replaceAll("[^a-z0-9\\s.]", " ").replaceAll("\\s+", " ").trim();
     }
 
     private void applyApprovedSkills(
@@ -1196,17 +963,6 @@ public class SkillVerificationService {
         workerRepository.save(worker);
     }
 
-    private List<Skill> resolveSkillsForApproval(List<Skill> matchedSkills, Skill requestedSkill) {
-        List<Skill> result = new ArrayList<>();
-        if (matchedSkills != null) {
-            result.addAll(matchedSkills);
-        }
-        if (result.isEmpty() && requestedSkill != null) {
-            result.add(requestedSkill);
-        }
-        return result;
-    }
-
     private List<Skill> resolveSkillsFromStoredRequest(SkillVerificationRequest req) {
         List<Skill> skills = new ArrayList<>();
         if (req.getSkill() != null) {
@@ -1292,50 +1048,6 @@ public class SkillVerificationService {
                 .avgRating(BigDecimal.ZERO)
                 .ratingCount(0)
                 .build());
-    }
-
-    private Skill resolveLinkedSkill(
-            Skill requestedSkill,
-            List<Skill> approvedSkills,
-            SkillVerificationAiResultDto aiResult,
-            List<Skill> activeSkills
-    ) {
-        if (requestedSkill != null) {
-            return requestedSkill;
-        }
-        if (approvedSkills != null && !approvedSkills.isEmpty()) {
-            return approvedSkills.get(0);
-        }
-        if (aiResult != null && aiResult.getExtractedSkills() != null && activeSkills != null) {
-            Map<String, Skill> byName = activeSkills.stream()
-                    .filter(s -> s.getName() != null)
-                    .collect(Collectors.toMap(s -> s.getName().toLowerCase(), s -> s, (a, b) -> a));
-            for (ExtractedSkillDto ext : aiResult.getExtractedSkills()) {
-                if (ext.getTaxonomyRole() != null) {
-                    Skill matched = byName.get(ext.getTaxonomyRole().trim().toLowerCase());
-                    if (matched != null) {
-                        return matched;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private String resolveJobType(SkillVerificationAiResultDto aiResult, Skill requestedSkill, List<Skill> approvedSkills) {
-        if (requestedSkill != null && requestedSkill.getName() != null) {
-            return requestedSkill.getName();
-        }
-        if (approvedSkills != null && !approvedSkills.isEmpty()) {
-            return approvedSkills.get(0).getName();
-        }
-        if (aiResult != null && aiResult.getExtractedSkills() != null && !aiResult.getExtractedSkills().isEmpty()) {
-            String role = aiResult.getExtractedSkills().get(0).getTaxonomyRole();
-            if (role != null && !role.isBlank() && !role.equalsIgnoreCase("N/A")) {
-                return role;
-            }
-        }
-        return DEFAULT_UNSPECIFIED_JOB_TYPE;
     }
 
     private String resolveWorkerFullName(Worker worker) {
@@ -1457,10 +1169,6 @@ public class SkillVerificationService {
         return "*".repeat(trimmed.length() - 4) + trimmed.substring(trimmed.length() - 4);
     }
 
-    private BigDecimal scaleDecimal(double value, int scale) {
-        return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_UP);
-    }
-
     private String serializeQuietly(Object obj) {
         if (obj == null) {
             return null;
@@ -1469,18 +1177,6 @@ public class SkillVerificationService {
             return objectMapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
             log.warn("Không thể serialize dữ liệu sang JSON: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    private String sanitizeJsonOrNull(String rawJson) {
-        if (rawJson == null || rawJson.isBlank()) {
-            return null;
-        }
-        try {
-            objectMapper.readTree(rawJson);
-            return rawJson;
-        } catch (Exception e) {
             return null;
         }
     }
@@ -1540,7 +1236,7 @@ public class SkillVerificationService {
     }
 
     private Optional<Skill> matchActiveSkillByAlias(String rawName) {
-        String normalizedInput = SkillTrustScoringEngine.normalizeName(rawName);
+        String normalizedInput = normalizeName(rawName);
         if (normalizedInput.isBlank()) {
             return Optional.empty();
         }
@@ -1553,7 +1249,7 @@ public class SkillVerificationService {
             if (skill.getName() == null) {
                 continue;
             }
-            String normSkill = SkillTrustScoringEngine.normalizeName(skill.getName());
+            String normSkill = normalizeName(skill.getName());
             if (normSkill.equals(normalizedInput)) {
                 return Optional.of(skill);
             }
@@ -1599,7 +1295,7 @@ public class SkillVerificationService {
         if (targetHint != null) {
             final String hint = targetHint;
             return activeSkills.stream()
-                    .filter(s -> s.getName() != null && SkillTrustScoringEngine.normalizeName(s.getName()).contains(hint))
+                    .filter(s -> s.getName() != null && normalizeName(s.getName()).contains(hint))
                     .findFirst();
         }
         return Optional.empty();

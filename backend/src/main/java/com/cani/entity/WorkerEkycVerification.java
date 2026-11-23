@@ -126,6 +126,21 @@ public class WorkerEkycVerification {
     @Column(name = "legal_hold", nullable = false)
     private boolean legalHold;
 
+    @Column(name = "meets_minimum_age")
+    private Boolean meetsMinimumAge;
+
+    @Column(name = "processing_started_at")
+    private Instant processingStartedAt;
+
+    @Column(name = "attempt_token", length = 64)
+    private String attemptToken;
+
+    @Column(name = "consent_notice_version", length = 64)
+    private String consentNoticeVersion;
+
+    @Column(name = "consented_at")
+    private Instant consentedAt;
+
     @Column(name = "reviewed_at")
     private Instant reviewedAt;
 

@@ -7,12 +7,16 @@ import com.cani.dto.ekyc.EkycIdentityResultDto;
 import com.cani.dto.ekyc.EkycIdentityResultDto.ExpiryDateStatus;
 import com.cani.dto.ekyc.EkycIdentityResultDto.FaceCompareStatus;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
+import com.cani.entity.EkycConsentRecord;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
 import com.cani.entity.WorkerEkycVerification;
 import com.cani.entity.enums.KycStatus;
+import com.cani.exception.AppException;
 import com.cani.exception.BadRequestException;
+import com.cani.repository.EkycConsentRecordRepository;
 import com.cani.repository.EoEkycVerificationRepository;
+import com.cani.repository.SystemConfigRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerEkycVerificationRepository;
 import com.cani.repository.WorkerRepository;
@@ -33,10 +37,14 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,6 +56,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class WorkerEkycServiceTest {
 
+    private static final String CONSENT_VERSION = "2026.11-nd13-v1";
     private static final byte[] VALID_JPEG = new byte[]{
             (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46
     };
@@ -66,6 +75,12 @@ class WorkerEkycServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private EkycConsentRecordRepository consentRecordRepository;
+
+    @Mock
+    private SystemConfigRepository systemConfigRepository;
 
     @Mock
     private EkycProvider ekycProvider;
@@ -90,7 +105,7 @@ class WorkerEkycServiceTest {
         imageStorage = new LocalPrivateEkycImageStorage(tempDir.toString());
         EkycImageAccessTokenService accessTokenService = new EkycImageAccessTokenService("test-signing-secret", 180);
         EkycImageRetentionService retentionService = new EkycImageRetentionService(
-                imageStorage, ekycVerificationRepository, eoEkycVerificationRepository, 30, 7, 3, 30, true);
+                imageStorage, ekycVerificationRepository, eoEkycVerificationRepository, 0, 0, 3, 14, true);
         EkycCccdLockManager lockManager = new EkycCccdLockManager();
 
         workerEkycService = new WorkerEkycService(
@@ -107,6 +122,8 @@ class WorkerEkycServiceTest {
                 lockManager
         );
         ReflectionTestUtils.setField(workerEkycService, "eoEkycVerificationRepository", eoEkycVerificationRepository);
+        ReflectionTestUtils.setField(workerEkycService, "consentRecordRepository", consentRecordRepository);
+        ReflectionTestUtils.setField(workerEkycService, "systemConfigRepository", systemConfigRepository);
         ReflectionTestUtils.setField(workerEkycService, "ekycStrict", false);
 
         lenient().when(ekycProvider.getProviderName()).thenReturn("VNPT_EKYC");
@@ -129,36 +146,60 @@ class WorkerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Xác minh thành công qua VNPT -> APPROVED, lưu object key riêng tư (không URL giả), trả Signed URL")
-    void shouldApproveWhenVnptVerificationValid() {
+    @DisplayName("Bắt buộc đồng ý Nghị định 13/2023/NĐ-CP trước khi lưu ảnh hoặc gọi VNPT")
+    void shouldRequireConsentBeforeStoringImagesOrCallingVnpt() {
+        assertThatThrownBy(() -> workerEkycService.submitEkyc(
+                workerUser.getUserId(), frontFile, backFile, selfieFile))
+                .isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> workerEkycService.submitEkyc(
+                workerUser.getUserId(), frontFile, backFile, selfieFile,
+                null, null, null, null, null, null, null, null,
+                true, "outdated-version"))
+                .isInstanceOf(BadRequestException.class);
+        verifyNoInteractions(ekycProvider);
+        verifyNoInteractions(consentRecordRepository);
+    }
+
+    @Test
+    @DisplayName("VNPT APPROVED -> giảm thiểu OCR thô, kiểm tra đủ tuổi, lưu consent và xóa ảnh ngay sau commit khi retention=0")
+    void shouldApproveWithOcrMinimizationAndImmediatePurge() {
         EkycIdentityResultDto vnptResult = validVnptMatchResult("079201012345", "TRẦN THỊ HOA");
 
         stubHappyRepositoryFlow();
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(vnptResult);
 
-        EkycVerificationResultDto result = workerEkycService.submitEkyc(
-                workerUser.getUserId(), frontFile, backFile, selfieFile);
+        EkycVerificationResultDto result = submitWithConsent(workerUser.getUserId(), null, null);
 
         assertThat(result.getStatus()).isEqualTo("APPROVED");
         assertThat(result.getRoutingDecision()).isEqualTo("AUTO_APPROVED");
         assertThat(result.getCccdNumberMasked()).isEqualTo("********2345");
-        assertThat(result.getFrontImageUrl()).startsWith("/api/v1/ekyc/images/worker/");
-        assertThat(result.getFrontImageUrl()).contains("sig=");
-        assertThat(result.getFrontImageUrl()).doesNotContain("storage.cani.vn");
-        assertThat(result.getImagesAvailable()).isTrue();
+        assertThat(result.getMeetsMinimumAge()).isTrue();
+        assertThat(result.getConsentNoticeVersion()).isEqualTo(CONSENT_VERSION);
+        assertThat(result.getConsentedAt()).isNotNull();
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
 
+        verify(consentRecordRepository, times(1)).save(any(EkycConsentRecord.class));
         ArgumentCaptor<WorkerEkycVerification> captor = ArgumentCaptor.forClass(WorkerEkycVerification.class);
         verify(ekycVerificationRepository, atLeast(2)).save(captor.capture());
         WorkerEkycVerification savedFinal = captor.getValue();
-        assertThat(savedFinal.getFrontImageUrl()).startsWith("worker/" + worker.getWorkerId() + "/");
-        assertThat(imageStorage.exists(savedFinal.getFrontImageUrl())).isTrue();
-        assertThat(imageStorage.exists(savedFinal.getBackImageUrl())).isTrue();
-        assertThat(imageStorage.exists(savedFinal.getSelfieImageUrl())).isTrue();
+
+        // Đã ngừng ghi các trường OCR thô không cần thiết
+        assertThat(savedFinal.getDob()).isNull();
+        assertThat(savedFinal.getGender()).isNull();
+        assertThat(savedFinal.getNationality()).isNull();
+        assertThat(savedFinal.getOriginAddress()).isNull();
+        assertThat(savedFinal.getResidenceAddress()).isNull();
+        assertThat(savedFinal.getIssueDate()).isNull();
+        assertThat(savedFinal.getExpiryDate()).isNull();
+        assertThat(savedFinal.getMeetsMinimumAge()).isTrue();
+        assertThat(savedFinal.getImageRetentionUntil()).isNotNull();
+        // Chính sách approvedRetentionDays=0 -> xóa ngay, ghi images_purged_at
+        assertThat(savedFinal.getImagesPurgedAt()).isNotNull();
+        assertThat(savedFinal.getFrontImageUrl()).isNull();
     }
 
     @Test
-    @DisplayName("Cần Admin review khi ngày hết hạn CCCD không đọc được -> PENDING_REVIEW (không ép thành REJECTED)")
+    @DisplayName("Cần Admin review -> PENDING_REVIEW giữ tạm ảnh 14 ngày kèm signed URL")
     void shouldRouteToPendingReviewWhenExpiryUnreadable() {
         EkycIdentityResultDto vnptResult = validVnptMatchResult("079201012345", "TRẦN THỊ HOA");
         vnptResult.setExpiryDate(null);
@@ -167,16 +208,20 @@ class WorkerEkycServiceTest {
         stubHappyRepositoryFlow();
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(vnptResult);
 
-        EkycVerificationResultDto result = workerEkycService.submitEkyc(
-                workerUser.getUserId(), frontFile, backFile, selfieFile);
+        EkycVerificationResultDto result = submitWithConsent(workerUser.getUserId(), null, null);
 
         assertThat(result.getStatus()).isEqualTo("PENDING_REVIEW");
         assertThat(result.getRoutingDecision()).isEqualTo("MANUAL_REVIEW");
+        assertThat(result.getImagesAvailable()).isTrue();
+        assertThat(result.getImagesExpired()).isFalse();
+        assertThat(result.getFrontImageUrl()).startsWith("/api/v1/ekyc/images/worker/");
+        assertThat(result.getFrontImageUrl()).contains("sig=");
+        assertThat(result.getImageRetentionUntil()).isAfter(Instant.now().plus(13, ChronoUnit.DAYS));
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.PENDING);
     }
 
     @Test
-    @DisplayName("Lỗi kỹ thuật từ VNPT -> TECHNICAL_FAILURE (cho phép retry), không lưu REJECTED")
+    @DisplayName("Lỗi kỹ thuật từ VNPT -> TECHNICAL_FAILURE (giữ ảnh 3 ngày để đối soát), không lưu REJECTED")
     void shouldReturnTechnicalFailureWhenProviderFailsTechnically() {
         EkycIdentityResultDto techFailure = EkycIdentityResultDto.builder()
                 .providerName("VNPT_EKYC")
@@ -188,13 +233,13 @@ class WorkerEkycServiceTest {
         stubHappyRepositoryFlow();
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(techFailure);
 
-        EkycVerificationResultDto result = workerEkycService.submitEkyc(
-                workerUser.getUserId(), frontFile, backFile, selfieFile);
+        EkycVerificationResultDto result = submitWithConsent(workerUser.getUserId(), null, null);
 
         assertThat(result.getStatus()).isEqualTo("TECHNICAL_FAILURE");
         assertThat(result.getFailureCode()).isEqualTo("VNPT_TIMEOUT");
         assertThat(result.getRetryable()).isTrue();
         assertThat(result.getFaceMatchScore()).isNull();
+        assertThat(result.getImageRetentionUntil()).isAfter(Instant.now().plus(2, ChronoUnit.DAYS));
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.PENDING);
     }
 
@@ -208,8 +253,7 @@ class WorkerEkycServiceTest {
                 .thenReturn(true);
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(vnptResult);
 
-        EkycVerificationResultDto result = workerEkycService.submitEkyc(
-                workerUser.getUserId(), frontFile, backFile, selfieFile);
+        EkycVerificationResultDto result = submitWithConsent(workerUser.getUserId(), null, null);
 
         assertThat(result.getStatus()).isEqualTo("REJECTED");
         assertThat(result.getRoutingReason()).contains("Mỗi CCCD chỉ được định danh cho duy nhất 1 tài khoản");
@@ -224,13 +268,8 @@ class WorkerEkycServiceTest {
         stubHappyRepositoryFlow();
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(vnptResult);
 
-        // Client cố tình truyền số CCCD và họ tên giả khác với kết quả VNPT OCR
-        EkycVerificationResultDto result = workerEkycService.submitEkyc(
-                workerUser.getUserId(),
-                frontFile, backFile, selfieFile,
-                "099999999999", "NGUYỄN VĂN GIẢ",
-                null, null, null, null, null, null
-        );
+        EkycVerificationResultDto result = submitWithConsent(
+                workerUser.getUserId(), "099999999999", "NGUYỄN VĂN GIẢ");
 
         assertThat(result.getCccdNumberMasked()).isEqualTo("********2345");
         assertThat(result.getFullName()).isEqualTo("TRẦN THỊ HOA");
@@ -255,8 +294,7 @@ class WorkerEkycServiceTest {
         stubHappyRepositoryFlow();
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any())).thenReturn(techFailure);
 
-        EkycVerificationResultDto result = workerEkycService.submitEkyc(
-                workerUser.getUserId(), frontFile, backFile, selfieFile);
+        EkycVerificationResultDto result = submitWithConsent(workerUser.getUserId(), null, null);
 
         assertThat(result.getStatus()).isEqualTo("TECHNICAL_FAILURE");
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
@@ -264,7 +302,7 @@ class WorkerEkycServiceTest {
     }
 
     @Test
-    @DisplayName("Retry sau TECHNICAL_FAILURE tái sử dụng bản ghi cũ, tăng retryCount và không tạo bản ghi trùng")
+    @DisplayName("Retry sau TECHNICAL_FAILURE tái sử dụng bản ghi cũ, tăng retryCount và xóa ảnh cũ")
     void shouldReuseTechnicalFailureRecordOnRetryWithoutCreatingDuplicates() {
         UUID existingVerificationId = UUID.randomUUID();
         EkycImageStorage.StoredObject oldFront = imageStorage.store("worker", worker.getWorkerId(), "front", VALID_JPEG, "jpg", "image/jpeg");
@@ -286,7 +324,8 @@ class WorkerEkycServiceTest {
         when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
         when(ekycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(
                 eq(worker.getWorkerId()))).thenReturn(Optional.of(existingFailed));
-        when(ekycVerificationRepository.findById(existingVerificationId)).thenReturn(Optional.of(existingFailed));
+        when(ekycVerificationRepository.findByIdForUpdate(existingVerificationId)).thenReturn(Optional.of(existingFailed));
+        lenient().when(ekycVerificationRepository.findById(existingVerificationId)).thenReturn(Optional.of(existingFailed));
         when(ekycVerificationRepository.existsByCccdNumberHashInAndStatusInAndWorker_WorkerIdNot(any(), any(), any()))
                 .thenReturn(false);
         when(eoEkycVerificationRepository.existsByCccdNumberHashInAndStatusInAndEventOrganizer_User_UserIdNot(any(), any(), any()))
@@ -296,23 +335,24 @@ class WorkerEkycServiceTest {
         when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any()))
                 .thenReturn(validVnptMatchResult("079201012345", "TRẦN THỊ HOA"));
 
-        EkycVerificationResultDto result = workerEkycService.submitEkyc(
-                workerUser.getUserId(), frontFile, backFile, selfieFile);
+        EkycVerificationResultDto result = submitWithConsent(workerUser.getUserId(), null, null);
 
         assertThat(result.getVerificationId()).isEqualTo(existingVerificationId);
         assertThat(result.getRetryCount()).isEqualTo(1);
         assertThat(result.getStatus()).isEqualTo("APPROVED");
-        // Ảnh cũ của lần lỗi trước phải được xóa sạch
         assertThat(imageStorage.exists(oldFront.getObjectKey())).isFalse();
     }
 
     @Test
-    @DisplayName("Admin approve và reject hồ sơ PENDING_REVIEW vẫn hoạt động chuẩn xác")
-    void shouldAdminApproveAndRejectSuccessfully() {
+    @DisplayName("Admin approve yêu cầu đủ 3 ảnh còn hạn đọc được; chặn APPROVED nếu ảnh hết hạn/thiếu/đã xóa")
+    void shouldAdminApproveWhenAllImagesValidAndBlockWhenImagesUnavailableOrExpired() {
         UUID verificationId = UUID.randomUUID();
         UUID adminId = UUID.randomUUID();
 
         EkycImageStorage.StoredObject storedFront = imageStorage.store("worker", worker.getWorkerId(), "front", VALID_JPEG, "jpg", "image/jpeg");
+        EkycImageStorage.StoredObject storedBack = imageStorage.store("worker", worker.getWorkerId(), "back", VALID_JPEG, "jpg", "image/jpeg");
+        EkycImageStorage.StoredObject storedSelfie = imageStorage.store("worker", worker.getWorkerId(), "selfie", VALID_JPEG, "jpg", "image/jpeg");
+
         WorkerEkycVerification pending = WorkerEkycVerification.builder()
                 .id(verificationId)
                 .worker(worker)
@@ -320,33 +360,120 @@ class WorkerEkycServiceTest {
                 .cccdNumberMasked("********2345")
                 .cccdNumberHash(cryptoService.hashCccd("079201012345"))
                 .frontImageUrl(storedFront.getObjectKey())
+                .backImageUrl(storedBack.getObjectKey())
+                .selfieImageUrl(storedSelfie.getObjectKey())
+                .imageRetentionUntil(Instant.now().plus(7, ChronoUnit.DAYS))
                 .build();
 
-        when(ekycVerificationRepository.findById(verificationId)).thenReturn(Optional.of(pending));
+        when(ekycVerificationRepository.findByIdForUpdate(verificationId)).thenReturn(Optional.of(pending));
+        lenient().when(ekycVerificationRepository.findById(verificationId)).thenReturn(Optional.of(pending));
         when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> i.getArgument(0));
 
+        // 1. Ảnh hết hạn -> chặn APPROVED
+        pending.setImageRetentionUntil(Instant.now().minusSeconds(60));
+        assertThatThrownBy(() -> workerEkycService.adminReviewEkyc(
+                adminId, verificationId,
+                EkycAdminReviewRequestDto.builder().decision("APPROVED").build()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("hết hạn");
+
+        // 2. Đủ 3 ảnh còn hạn & đọc được -> APPROVED thành công + xóa ảnh ngay
+        pending.setImageRetentionUntil(Instant.now().plus(7, ChronoUnit.DAYS));
         EkycVerificationResultDto approved = workerEkycService.adminReviewEkyc(
-                adminId,
-                verificationId,
+                adminId, verificationId,
                 EkycAdminReviewRequestDto.builder().decision("APPROVED").reviewNotes("Hợp lệ").build());
 
         assertThat(approved.getStatus()).isEqualTo("APPROVED");
         assertThat(approved.getRoutingDecision()).isEqualTo("MANUAL_APPROVED");
         assertThat(worker.getKycStatus()).isEqualTo(KycStatus.APPROVED);
-        assertThat(worker.getCccdNumber()).isEqualTo("********2345");
-        assertThat(approved.getFrontImageUrl()).startsWith("/api/v1/ekyc/images/worker/");
+        assertThat(imageStorage.exists(storedFront.getObjectKey())).isFalse();
 
-        // Reject một hồ sơ PENDING_REVIEW khác của worker chưa approved
+        // 3. Hồ sơ hết hạn vẫn được REJECT để yêu cầu người dùng nộp lại
         Worker unverifiedWorker = Worker.builder().workerId(UUID.randomUUID()).user(workerUser).kycStatus(KycStatus.PENDING).build();
         UUID rejectId = UUID.randomUUID();
-        WorkerEkycVerification pending2 = WorkerEkycVerification.builder()
-                .id(rejectId).worker(unverifiedWorker).status("PENDING_REVIEW").build();
-        when(ekycVerificationRepository.findById(rejectId)).thenReturn(Optional.of(pending2));
+        WorkerEkycVerification expiredPending = WorkerEkycVerification.builder()
+                .id(rejectId).worker(unverifiedWorker).status("PENDING_REVIEW")
+                .imagesPurgedAt(Instant.now().minusSeconds(10)).build();
+        when(ekycVerificationRepository.findByIdForUpdate(rejectId)).thenReturn(Optional.of(expiredPending));
 
         EkycVerificationResultDto rejected = workerEkycService.adminReviewEkyc(
-                adminId, rejectId, EkycAdminReviewRequestDto.builder().decision("REJECTED").reviewNotes("Ảnh mờ").build());
+                adminId, rejectId, EkycAdminReviewRequestDto.builder().decision("REJECTED").reviewNotes("Ảnh hết hạn, vui lòng nộp lại").build());
         assertThat(rejected.getStatus()).isEqualTo("REJECTED");
         assertThat(unverifiedWorker.getKycStatus()).isEqualTo(KycStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("Chặn 409 CONFLICT khi PROCESSING đang chạy; thu hồi PROCESSING quá hạn và cho phép nộp lại sau PENDING_REVIEW hết hạn")
+    void shouldBlockActiveProcessingAndRecoverExpiredProcessingAndAllowExpiredPendingResubmit() {
+        WorkerEkycVerification activeProcessing = WorkerEkycVerification.builder()
+                .id(UUID.randomUUID())
+                .worker(worker)
+                .status("PROCESSING")
+                .processingStartedAt(Instant.now().minusSeconds(10))
+                .build();
+        when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
+        when(ekycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()))
+                .thenReturn(Optional.of(activeProcessing));
+
+        assertThatThrownBy(() -> submitWithConsent(workerUser.getUserId(), null, null))
+                .isInstanceOf(AppException.class)
+                .satisfies(ex -> assertThat(((AppException) ex).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        verifyNoInteractions(ekycProvider);
+
+        // Hết hạn PROCESSING -> getMyEkycStatus tự động phục hồi sang TECHNICAL_FAILURE
+        WorkerEkycVerification staleProcessing = WorkerEkycVerification.builder()
+                .id(UUID.randomUUID())
+                .worker(worker)
+                .status("PROCESSING")
+                .processingStartedAt(Instant.now().minusSeconds(300))
+                .build();
+        when(ekycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()))
+                .thenReturn(Optional.of(staleProcessing));
+        when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> i.getArgument(0));
+
+        EkycVerificationResultDto recoveredDto = workerEkycService.getMyEkycStatus(workerUser.getUserId());
+        assertThat(recoveredDto.getStatus()).isEqualTo("TECHNICAL_FAILURE");
+        assertThat(recoveredDto.getFailureCode()).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(recoveredDto.getRetryable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Worker có thể nộp lại ngay khi hồ sơ PENDING_REVIEW trước đó đã hết hạn lưu trữ")
+    void shouldAllowWorkerResubmitWhenPreviousPendingReviewExpired() {
+        UUID expiredId = UUID.randomUUID();
+        WorkerEkycVerification expiredPending = WorkerEkycVerification.builder()
+                .id(expiredId)
+                .worker(worker)
+                .status("PENDING_REVIEW")
+                .imageRetentionUntil(Instant.now().minusSeconds(60))
+                .imagesPurgedAt(Instant.now().minusSeconds(30))
+                .build();
+
+        when(workerRepository.findByUser_UserId(workerUser.getUserId())).thenReturn(Optional.of(worker));
+        when(ekycVerificationRepository.findTopByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId()))
+                .thenReturn(Optional.of(expiredPending));
+        when(ekycVerificationRepository.save(any(WorkerEkycVerification.class))).thenAnswer(i -> {
+            WorkerEkycVerification v = i.getArgument(0);
+            if (v.getId() == null) {
+                UUID nextId = UUID.randomUUID();
+                v.setId(nextId);
+                lenient().when(ekycVerificationRepository.findByIdForUpdate(nextId)).thenReturn(Optional.of(v));
+                lenient().when(ekycVerificationRepository.findById(nextId)).thenReturn(Optional.of(v));
+            }
+            return v;
+        });
+        when(ekycVerificationRepository.existsByCccdNumberHashInAndStatusInAndWorker_WorkerIdNot(any(), any(), any()))
+                .thenReturn(false);
+        when(eoEkycVerificationRepository.existsByCccdNumberHashInAndStatusInAndEventOrganizer_User_UserIdNot(any(), any(), any()))
+                .thenReturn(false);
+        when(workerRepository.existsByCccdNumberInAndWorkerIdNot(any(), any())).thenReturn(false);
+        when(ekycProvider.verifyIdentity(any(), any(), any(), any(), any(), any()))
+                .thenReturn(validVnptMatchResult("079201012345", "TRẦN THỊ HOA"));
+
+        EkycVerificationResultDto resubmitted = submitWithConsent(workerUser.getUserId(), null, null);
+        assertThat(expiredPending.getStatus()).isEqualTo("REJECTED");
+        assertThat(resubmitted.getVerificationId()).isNotEqualTo(expiredId);
+        assertThat(resubmitted.getStatus()).isEqualTo("APPROVED");
     }
 
     @Test
@@ -354,9 +481,19 @@ class WorkerEkycServiceTest {
     void shouldRejectSpoofedImageFileBeforeCallingVnpt() {
         MockMultipartFile fakeJpg = new MockMultipartFile("frontImage", "fake.jpg", "image/jpeg", "<html>not-an-image</html>".getBytes());
 
-        assertThatThrownBy(() -> workerEkycService.submitEkyc(workerUser.getUserId(), fakeJpg, backFile, selfieFile))
+        assertThatThrownBy(() -> workerEkycService.submitEkyc(
+                workerUser.getUserId(), fakeJpg, backFile, selfieFile,
+                null, null, null, null, null, null, null, null,
+                true, CONSENT_VERSION))
                 .isInstanceOf(BadRequestException.class);
         verifyNoInteractions(ekycProvider);
+    }
+
+    private EkycVerificationResultDto submitWithConsent(UUID userId, String confirmedCccd, String confirmedName) {
+        return workerEkycService.submitEkyc(
+                userId, frontFile, backFile, selfieFile,
+                confirmedCccd, confirmedName, null, null, null, null, null, null,
+                true, CONSENT_VERSION);
     }
 
     private void stubHappyRepositoryFlow() {
@@ -373,6 +510,7 @@ class WorkerEkycServiceTest {
             holder[0] = v;
             return v;
         });
+        lenient().when(ekycVerificationRepository.findByIdForUpdate(generatedId)).thenAnswer(i -> Optional.ofNullable(holder[0]));
         lenient().when(ekycVerificationRepository.findById(generatedId)).thenAnswer(i -> Optional.ofNullable(holder[0]));
         lenient().when(ekycVerificationRepository.existsByCccdNumberHashInAndStatusInAndWorker_WorkerIdNot(any(), any(), any()))
                 .thenReturn(false);

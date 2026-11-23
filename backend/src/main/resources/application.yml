@@ -80,13 +80,6 @@ cani:
       url: ${SUPABASE_URL:https://hgnilsojrauajmyslhug.supabase.co}
       anon-key: ${SUPABASE_ANON_KEY:}
       service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
-  ai:
-    gemini:
-      api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-2.5-flash}
-      url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
-      timeout-ms: 20000
-      sandbox-fallback-enabled: ${GEMINI_SANDBOX_FALLBACK:false}
   security:
     document-signing-secret: ${DOCUMENT_SIGNING_SECRET:}
     document-url-ttl-seconds: ${DOCUMENT_URL_TTL_SECONDS:300}
@@ -100,12 +93,18 @@ cani:
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
     strict: ${EKYC_STRICT:false}
+    processing-timeout-seconds: ${EKYC_PROCESSING_TIMEOUT_SECONDS:120}
+    processing-recovery-cron: ${EKYC_PROCESSING_RECOVERY_CRON:0 */1 * * * *}
+    consent:
+      required: ${EKYC_CONSENT_REQUIRED:true}
+      notice-version: ${EKYC_CONSENT_NOTICE_VERSION:2026.11-nd13-v1}
     retention:
-      approved-image-days: ${EKYC_RETENTION_APPROVED_DAYS:30}
-      rejected-image-days: ${EKYC_RETENTION_REJECTED_DAYS:7}
+      approved-image-days: ${EKYC_RETENTION_APPROVED_DAYS:0}
+      rejected-image-days: ${EKYC_RETENTION_REJECTED_DAYS:0}
       technical-failure-image-days: ${EKYC_RETENTION_TECH_FAILURE_DAYS:3}
-      pending-review-image-days: ${EKYC_RETENTION_PENDING_REVIEW_DAYS:30}
+      pending-review-image-days: ${EKYC_RETENTION_PENDING_REVIEW_DAYS:14}
       cleanup-enabled: ${EKYC_RETENTION_CLEANUP_ENABLED:true}
+      orphan-grace-hours: ${EKYC_RETENTION_ORPHAN_GRACE_HOURS:24}
       cleanup-cron: ${EKYC_RETENTION_CLEANUP_CRON:0 30 2 * * *}
     vnpt:
       enabled: ${VNPT_EKYC_ENABLED:false}
@@ -118,6 +117,8 @@ cani:
       verify-back-card: ${VNPT_EKYC_VERIFY_BACK_CARD:true}
       ocr-front-path: ${VNPT_EKYC_OCR_FRONT_PATH:/ai/v1/ocr/id/front}
       ocr-back-path: ${VNPT_EKYC_OCR_BACK_PATH:/ai/v1/ocr/id/back}
+      face-match-min-threshold: ${VNPT_EKYC_FACE_MATCH_MIN_THRESHOLD:}
+      face-match-score-max: ${VNPT_EKYC_FACE_MATCH_SCORE_MAX:}
       face-compare-path: ${VNPT_EKYC_FACE_COMPARE_PATH:/ai/v1/face/compare}
       card-liveness-enabled: ${VNPT_EKYC_CARD_LIVENESS_ENABLED:false}
       card-liveness-path: ${VNPT_EKYC_CARD_LIVENESS_PATH:}

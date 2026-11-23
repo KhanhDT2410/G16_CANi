@@ -9,12 +9,14 @@ import 'package:cani/features/job_radar/models/job_radar_models.dart';
 class JobRadarState {
   final bool isOnline;
   final bool isLoading;
+  final bool hasLoadedShifts;
   final double userLat;
   final double userLng;
   final double searchRadiusKm;
   final List<NearbyShiftItem> nearbyShifts;
   final NearbyShiftItem? selectedShift;
   final String? errorMessage;
+  final String? radarLoadError;
   final bool isRadarView;
   final bool isLocationPermissionGranted;
   final bool isRealLocation;
@@ -29,12 +31,14 @@ class JobRadarState {
   const JobRadarState({
     this.isOnline = false,
     this.isLoading = false,
+    this.hasLoadedShifts = false,
     this.userLat = 21.0285,
     this.userLng = 105.8542,
     this.searchRadiusKm = 15.0,
     this.nearbyShifts = const [],
     this.selectedShift,
     this.errorMessage,
+    this.radarLoadError,
     this.isRadarView = true,
     this.isLocationPermissionGranted = false,
     this.isRealLocation = false,
@@ -52,6 +56,7 @@ class JobRadarState {
   JobRadarState copyWith({
     bool? isOnline,
     bool? isLoading,
+    bool? hasLoadedShifts,
     double? userLat,
     double? userLng,
     double? searchRadiusKm,
@@ -59,6 +64,8 @@ class JobRadarState {
     NearbyShiftItem? selectedShift,
     bool clearSelectedShift = false,
     String? errorMessage,
+    String? radarLoadError,
+    bool clearRadarLoadError = false,
     bool? isRadarView,
     bool? isLocationPermissionGranted,
     bool? isRealLocation,
@@ -73,12 +80,14 @@ class JobRadarState {
     return JobRadarState(
       isOnline: isOnline ?? this.isOnline,
       isLoading: isLoading ?? this.isLoading,
+      hasLoadedShifts: hasLoadedShifts ?? this.hasLoadedShifts,
       userLat: userLat ?? this.userLat,
       userLng: userLng ?? this.userLng,
       searchRadiusKm: searchRadiusKm ?? this.searchRadiusKm,
       nearbyShifts: nearbyShifts ?? this.nearbyShifts,
       selectedShift: clearSelectedShift ? null : (selectedShift ?? this.selectedShift),
       errorMessage: errorMessage,
+      radarLoadError: clearRadarLoadError ? null : (radarLoadError ?? this.radarLoadError),
       isRadarView: isRadarView ?? this.isRadarView,
       isLocationPermissionGranted: isLocationPermissionGranted ?? this.isLocationPermissionGranted,
       isRealLocation: isRealLocation ?? this.isRealLocation,
@@ -112,14 +121,13 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
 
   /// Khởi tạo: đồng bộ Preferences (tọa độ ưu tiên + bán kính + trạng thái isOnline thật) & vị trí GPS thực tế
   Future<void> initLocationAndScan({bool preferGpsCenter = false}) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true, errorMessage: null, clearRadarLoadError: true);
 
     WorkerPreferencesModel? prefs;
     try {
       prefs = await _proposalRepo.fetchPreferences();
       state = state.copyWith(
         searchRadiusKm: prefs.maxDistanceKm > 0 ? prefs.maxDistanceKm : state.searchRadiusKm,
-        // Không ghi đè nếu người dùng vừa chủ động bấm bật/tắt trước khi API khởi tạo trả về
         isOnline: _hasUserToggledOnline ? state.isOnline : (prefs.isOnline ?? state.isOnline),
         preferredLat: prefs.baseLat,
         preferredLng: prefs.baseLng,
@@ -140,7 +148,10 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     }
 
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => false,
+      );
       if (!serviceEnabled) {
         if (preferGpsCenter || !hasPrefCenter) {
           state = state.copyWith(
@@ -151,7 +162,10 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => LocationPermission.denied,
+      );
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
@@ -175,7 +189,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         return;
       }
 
-      // Lấy tọa độ GPS thực tế của điện thoại (lưu riêng vào gpsLat/gpsLng)
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -190,7 +203,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         isRealLocation: true,
       );
 
-      // Chỉ đặt tâm bản đồ về GPS khi người dùng chưa cài Khu vực ưu tiên hoặc chủ động chuyển về GPS
       if (preferGpsCenter || !hasPrefCenter) {
         state = state.copyWith(
           userLat: position.latitude,
@@ -278,7 +290,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         _ref.invalidate(proposalsListProvider);
       }
     } catch (e) {
-      // Rollback trạng thái khi API lỗi hoặc mất kết nối và gửi thông báo lỗi rõ ràng ra UI
       final cleanError = e.toString().replaceFirst('Exception: ', '').trim();
       if (mounted) {
         state = state.copyWith(
@@ -293,7 +304,7 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
 
   Future<void> setRadius(double radiusKm) async {
     state = state.copyWith(searchRadiusKm: radiusKm);
-    scanNearbyShifts();
+    await scanNearbyShifts();
   }
 
   void toggleViewMode(bool isRadar) {
@@ -305,25 +316,56 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
   }
 
   void selectShift(NearbyShiftItem? shift) {
-    state = state.copyWith(selectedShift: shift);
+    if (shift == null) {
+      state = state.copyWith(clearSelectedShift: true);
+    } else {
+      state = state.copyWith(selectedShift: shift);
+    }
   }
 
-  Future<void> scanNearbyShifts() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+  void clearSelectedShift() {
+    state = state.copyWith(clearSelectedShift: true);
+  }
+
+  Future<void> scanNearbyShifts({bool silent = false}) async {
+    if (!silent) {
+      state = state.copyWith(isLoading: true, clearRadarLoadError: true);
+    }
     try {
       final shifts = await _repo.getNearbyShifts(
         lat: state.userLat,
         lng: state.userLng,
         radiusKm: state.searchRadiusKm,
       );
+      if (!mounted) return;
+
+      NearbyShiftItem? resolvedSelection;
+      var clearSelection = false;
+      final currentSelection = state.selectedShift;
+      if (currentSelection != null) {
+        final matchIdx = shifts.indexWhere((s) => s.shiftId == currentSelection.shiftId);
+        if (matchIdx >= 0) {
+          resolvedSelection = shifts[matchIdx];
+        } else {
+          clearSelection = true;
+        }
+      }
+
       state = state.copyWith(
         isLoading: false,
+        hasLoadedShifts: true,
         nearbyShifts: shifts,
+        selectedShift: resolvedSelection,
+        clearSelectedShift: clearSelection,
+        clearRadarLoadError: true,
       );
     } catch (e) {
+      if (!mounted) return;
+      final clean = e.toString().replaceFirst('Exception: ', '').trim();
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Không thể kết nối đến máy chủ radar: $e',
+        hasLoadedShifts: true,
+        radarLoadError: clean.isNotEmpty ? clean : 'Không thể kết nối đến máy chủ radar.',
       );
     }
   }

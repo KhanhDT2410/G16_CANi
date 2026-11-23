@@ -7,9 +7,11 @@ import 'package:cani/core/notifications/local_notification_service.dart';
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/screens/complete_profile_screen.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
+import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
+import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 import 'package:cani/features/job_radar/screens/job_radar_screen.dart';
 import 'package:cani/features/profile/profile.dart';
 import 'package:cani/shared/widgets/bottom_nav_bar.dart';
@@ -63,6 +65,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _syncDeviceNotifications();
+      if (ref.read(authStateProvider).isAuthenticated) {
+        ref.invalidate(proposalsListProvider);
+        ref.invalidate(assignmentsListProvider);
+        if (ref.read(ekycProvider).result?.isApproved == true) {
+          ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
+        }
+      }
     }
   }
 
@@ -95,8 +104,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       _seenNotifIds!.addAll(ids);
 
       if (newlyArrived.isNotEmpty) {
+        ref.invalidate(proposalsListProvider);
         ref.invalidate(assignmentsListProvider);
         ref.invalidate(incomeSummaryProvider);
+        if (ref.read(ekycProvider).result?.isApproved == true) {
+          ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
+        }
         for (final n in newlyArrived.take(3)) {
           final idStr = n['notificationId'].toString();
           final title = n['title']?.toString() ?? 'Thông báo mới từ CANi';
@@ -163,7 +176,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         currentIndex: currentIndex,
         onTap: (index) {
           ref.read(homeTabIndexProvider.notifier).state = index;
-          if (index == 1) {
+          if (index == 0) {
+            ref.invalidate(proposalsListProvider);
+          } else if (index == 1) {
             // Tự động làm mới danh sách ca làm để đồng bộ ngay ca vừa nhận
             ref.invalidate(assignmentsListProvider);
             ref.invalidate(incomeSummaryProvider);

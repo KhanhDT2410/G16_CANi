@@ -7,6 +7,7 @@ import com.cani.dto.auth.*;
 import com.cani.entity.EventOrganizer;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
+import com.cani.entity.enums.KycStatus;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
 import com.cani.exception.AccountLockedException;
@@ -15,7 +16,9 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.EventOrganizerRepository;
 import com.cani.repository.PaymentRepository;
+import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.repository.UserRepository;
+import com.cani.repository.WorkerEkycVerificationRepository;
 import com.cani.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +46,8 @@ public class AuthService {
     private final EventOrganizerRepository eventOrganizerRepository;
     private final WorkerRepository workerRepository;
     private final PaymentRepository paymentRepository;
+    private final WorkerEkycVerificationRepository workerEkycVerificationRepository;
+    private final ShiftAssignmentRepository shiftAssignmentRepository;
     private final SupabaseAuthClient supabaseAuthClient;
     private final JwtDecoder jwtDecoder;
     private final EmailOtpService emailOtpService;
@@ -83,9 +89,14 @@ public class AuthService {
                     assignedRole.name(),
                     request.getCompanyName());
         } catch (Exception e) {
-            log.warn("Không thể tạo user qua Supabase GoTrue (fallback local registration): {}", e.getClass().getSimpleName());
+            log.warn("GoTrue registration failed [{}]", e.getClass().getSimpleName());
         }
 
+        if ((supabaseUser == null || supabaseUser.getId() == null) && !environment.acceptsProfiles(Profiles.of("h2"))) {
+            throw new AppException(
+                    "Hệ thống xác thực chưa thể tạo tài khoản. Vui lòng thử lại sau.",
+                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
+        }
         UUID userId = (supabaseUser != null && supabaseUser.getId() != null)
                 ? supabaseUser.getId()
                 : UUID.nameUUIDFromBytes(request.getEmail().toLowerCase().getBytes());
@@ -309,8 +320,7 @@ public class AuthService {
 
                 Optional<Worker> workerOpt = workerRepository.findByUser_UserId(user.getUserId());
                 boolean isEstablishedWorker = workerOpt
-                        .map(w -> (w.getCccdNumber() != null && !w.getCccdNumber().isBlank()) ||
-                                (w.getTotalShiftsCompleted() != null && w.getTotalShiftsCompleted() > 0))
+                        .map(this::isEstablishedWorkerProfile)
                         .orElse(false);
 
                 if (!isEstablishedWorker) {
@@ -461,6 +471,29 @@ public class AuthService {
                     appealToken
             );
         }
+    }
+
+    private boolean isEstablishedWorkerProfile(Worker w) {
+        if (w == null) {
+            return false;
+        }
+        if (w.getKycStatus() == KycStatus.APPROVED) {
+            return true;
+        }
+        if (w.getCccdNumber() != null && !w.getCccdNumber().isBlank()) {
+            return true;
+        }
+        if (w.getTotalShiftsCompleted() != null && w.getTotalShiftsCompleted() > 0) {
+            return true;
+        }
+        if (workerEkycVerificationRepository != null
+                && (workerEkycVerificationRepository.existsByWorker_WorkerIdAndStatusIn(
+                        w.getWorkerId(), List.of("PROCESSING", "PENDING_REVIEW", "APPROVED"))
+                    || workerEkycVerificationRepository.existsByWorker_WorkerIdAndLegalHoldTrue(w.getWorkerId()))) {
+            return true;
+        }
+        return shiftAssignmentRepository != null
+                && shiftAssignmentRepository.existsByWorker_WorkerId(w.getWorkerId());
     }
 
     private UserDto toUserDto(User user) {

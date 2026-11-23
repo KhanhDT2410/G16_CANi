@@ -245,7 +245,7 @@ public class AdminUserService {
                 .avatarUrl(user.getAvatarUrl())
                 .emailVerified(user.getEmailVerified())
                 .language(user.getLanguage())
-                .fcmToken(user.getFcmToken())
+                .fcmToken(null)
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
@@ -258,7 +258,7 @@ public class AdminUserService {
         return WorkerProfileSummaryDto.builder()
                 .workerId(worker.getWorkerId())
                 .fullName(worker.getFullName())
-                .cccdNumber(worker.getCccdNumber())
+                .cccdNumber(maskCccdDisplay(worker.getCccdNumber()))
                 .kycStatus(worker.getKycStatus())
                 .skillStatus(skillStatus)
                 .reliabilityScore(worker.getReliabilityScore())
@@ -298,5 +298,20 @@ public class AdminUserService {
                 .ratingCount(eo.getRatingCount())
                 .totalEventsCompleted(eo.getTotalEventsCompleted())
                 .build();
+    }
+
+    private String maskCccdDisplay(String rawCccd) {
+        if (rawCccd == null || rawCccd.isBlank()) {
+            return null;
+        }
+        String trimmed = rawCccd.trim();
+        if (trimmed.startsWith("****")) {
+            return trimmed;
+        }
+        String digits = trimmed.replaceAll("\\D", "");
+        if (digits.length() < 6) {
+            return "******";
+        }
+        return "********" + digits.substring(digits.length() - 4);
     }
 }

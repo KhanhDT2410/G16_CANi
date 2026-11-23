@@ -104,7 +104,7 @@ Các phiên trước (chi tiết cũ) dừng ở HEAD `5e5a13f` trên nhánh `qu
 | UC-108 Revenue | ✅ | ✅ | ✅ (7+5) | data payment đã chặt hơn sau `78c8002` |
 | UC-94 RS Appeal | ✅ | ✅ | ✅ (8+5) | |
 | UC-88 No-Show | ✅ (V18) | ✅ | ✅ (8+6) | cron 10' |
-| UC-47 Skill verify | ✅ (AI direct decision) | 🟡 **UI đã xóa (WIP)** | 🟡 1 assertion fail | xem #1, #4 §3 |
-| eKYC worker/EO | ✅ (VNPT 100%, Gemini OCR) | 🟡 admin queue UI đã xóa | ✅ (5+6) | xem #4 §3 |
+| UC-47 Skill verify | ✅ (duyệt thủ công bởi Admin/CSKH) | ✅ (`skill-review`) | ✅ | đã gỡ hoàn toàn Gemini |
+| eKYC worker/EO | ✅ (VNPT 100%, thu gọn OCR & consent NĐ13) | ✅ (`ekyc-review`) | ✅ | giữ tương thích dữ liệu cũ |
 | SLA monitoring | ✅ (cron 15', V17) | — (alert qua notification) | ✅ (6) | |
 | Wage Matrix / Invite / BlockList / GeoMap / MyTeam / Notification / Subscription + PayOS | ✅ (hung) | 🟡 (EO side) | ✅ | ngoài phạm vi Admin/CC, không sâu |

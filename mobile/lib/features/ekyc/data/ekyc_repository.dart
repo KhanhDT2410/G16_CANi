@@ -30,6 +30,21 @@ class EkycRepository {
     return DioMediaType('image', 'jpeg');
   }
 
+  Future<EkycConsentPolicy> getConsentPolicy({String? token}) async {
+    try {
+      final options = token != null ? Options(headers: {'Authorization': 'Bearer $token'}) : null;
+      final response = await _dio.get('/v1/ekyc/consent-policy', options: options);
+      if (response.data != null && response.data['data'] != null) {
+        return EkycConsentPolicy.fromJson(
+          Map<String, dynamic>.from(response.data['data'] as Map),
+        );
+      }
+      return EkycConsentPolicy.fallback;
+    } catch (_) {
+      return EkycConsentPolicy.fallback;
+    }
+  }
+
   Future<EkycVerificationItem> submitEkyc({
     required Uint8List frontBytes,
     required String frontFileName,
@@ -37,6 +52,8 @@ class EkycRepository {
     required String backFileName,
     required Uint8List selfieBytes,
     required String selfieFileName,
+    bool consentAccepted = false,
+    String? consentNoticeVersion,
     String? token,
     String? cccdNumber,
     String? fullName,
@@ -64,6 +81,9 @@ class EkycRepository {
           filename: selfieFileName,
           contentType: _imageMediaType(selfieFileName),
         ),
+        'consentAccepted': consentAccepted.toString(),
+        if (consentNoticeVersion != null && consentNoticeVersion.isNotEmpty)
+          'consentNoticeVersion': consentNoticeVersion,
       };
       // Các trường dưới đây chỉ phục vụ đối chiếu chéo phía backend, không ghi đè dữ liệu VNPT eKYC
       if (cccdNumber != null && cccdNumber.isNotEmpty) formDataMap['cccdNumber'] = cccdNumber;

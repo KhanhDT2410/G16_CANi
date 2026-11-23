@@ -30,11 +30,7 @@ final assignmentsListProvider = FutureProvider<List<ShiftAssignmentItem>>((ref) 
 
 final proposalsListProvider = FutureProvider<List<JobProposalItem>>((ref) async {
   final repo = ref.watch(proposalRepositoryProvider);
-  try {
-    return await repo.fetchProposals();
-  } catch (_) {
-    return const [];
-  }
+  return repo.fetchProposals();
 });
 
 final myDisputesListProvider = FutureProvider<List<WorkerDisputeItem>>((ref) async {

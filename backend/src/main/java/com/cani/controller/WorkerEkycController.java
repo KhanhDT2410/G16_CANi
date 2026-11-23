@@ -1,6 +1,9 @@
 package com.cani.controller;
 
 import com.cani.dto.ekyc.EkycAdminReviewRequestDto;
+import com.cani.dto.ekyc.EkycConsentPolicyDto;
+import com.cani.dto.ekyc.EkycLegacyRetentionInventoryDto;
+import com.cani.dto.ekyc.EkycLegalHoldRequestDto;
 import com.cani.dto.ekyc.EkycVerificationResultDto;
 import com.cani.dto.response.ApiResponse;
 import com.cani.security.SecurityUtils;
@@ -24,6 +27,13 @@ public class WorkerEkycController {
 
     private final WorkerEkycService ekycService;
 
+    @GetMapping("/ekyc/consent-policy")
+    public ResponseEntity<ApiResponse<EkycConsentPolicyDto>> getConsentPolicy() {
+        return ResponseEntity.ok(ApiResponse.ok(
+                ekycService.getConsentPolicy(),
+                "Lấy thông báo xử lý dữ liệu cá nhân & sinh trắc học eKYC thành công"));
+    }
+
     /**
      * Worker nộp hồ sơ eKYC (Mặt trước CCCD, Mặt sau CCCD, Ảnh chân dung Selfie)
      */
@@ -41,13 +51,16 @@ public class WorkerEkycController {
             @RequestParam(value = "residenceAddress", required = false) String residenceAddress,
             @RequestParam(value = "issueDate", required = false) String issueDate,
             @RequestParam(value = "expiryDate", required = false) String expiryDate,
+            @RequestParam(value = "consentAccepted", required = false) Boolean consentAccepted,
+            @RequestParam(value = "consentNoticeVersion", required = false) String consentNoticeVersion,
             Authentication authentication) {
 
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.submitEkyc(
                 userId, frontImage, backImage, selfieImage,
                 cccdNumber, fullName, dob, gender,
-                originAddress, residenceAddress, issueDate, expiryDate);
+                originAddress, residenceAddress, issueDate, expiryDate,
+                consentAccepted, consentNoticeVersion);
 
         String message;
         if ("APPROVED".equals(result.getStatus())) {
@@ -104,6 +117,14 @@ public class WorkerEkycController {
      * Admin / Customer Care duyệt thủ công hồ sơ eKYC
      */
     @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
+    @GetMapping("/admin/ekyc/{verificationId}")
+    public ResponseEntity<ApiResponse<EkycVerificationResultDto>> getPendingReviewDetails(@PathVariable UUID verificationId) {
+        return ResponseEntity.ok()
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(ApiResponse.ok(ekycService.getPendingReviewDetails(verificationId), "Chi tiết hồ sơ chờ duyệt"));
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'CUSTOMER_CARE')")
     @PostMapping("/admin/ekyc/{verificationId}/review")
     public ResponseEntity<ApiResponse<EkycVerificationResultDto>> adminReviewEkyc(
             @PathVariable UUID verificationId,
@@ -113,5 +134,29 @@ public class WorkerEkycController {
         UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
         EkycVerificationResultDto result = ekycService.adminReviewEkyc(adminUserId, verificationId, request);
         return ResponseEntity.ok(ApiResponse.ok(result, "Phê duyệt hồ sơ eKYC thành công: " + result.getStatus()));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/admin/ekyc/{verificationId}/legal-hold")
+    public ResponseEntity<ApiResponse<EkycVerificationResultDto>> updateLegalHold(
+            @PathVariable UUID verificationId,
+            @Valid @RequestBody EkycLegalHoldRequestDto request,
+            Authentication authentication) {
+        UUID adminUserId = SecurityUtils.getCurrentUserId(authentication);
+        EkycVerificationResultDto result = ekycService.updateLegalHold(
+                adminUserId, verificationId, Boolean.TRUE.equals(request.getLegalHold()), request.getReason());
+        return ResponseEntity.ok(ApiResponse.ok(result, "Cập nhật trạng thái bảo lưu pháp lý hồ sơ eKYC thành công"));
+    }
+
+    /**
+     * Truy vấn kiểm kê chỉ trả số đếm các hồ sơ eKYC cũ có image_retention_until IS NULL.
+     * Tuyệt đối không gán hạn hay xóa tệp thật.
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/ekyc/retention/legacy-inventory")
+    public ResponseEntity<ApiResponse<EkycLegacyRetentionInventoryDto>> getLegacyNullRetentionInventory() {
+        return ResponseEntity.ok(ApiResponse.ok(
+                ekycService.getLegacyNullRetentionInventory(),
+                "Kiểm kê số lượng hồ sơ eKYC cũ chưa có hạn lưu giữ ảnh"));
     }
 }

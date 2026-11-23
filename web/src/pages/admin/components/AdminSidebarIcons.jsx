@@ -152,6 +152,23 @@ export const WageMatrixIcon = () => (
   </svg>
 );
 
+export const EkycIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="2" />
+    <path d="M6.5 16a3.5 3.5 0 0 1 5 0" />
+    <line x1="14" y1="9" x2="18" y2="9" />
+    <line x1="14" y1="13" x2="18" y2="13" />
+  </svg>
+);
+
+export const SkillReviewIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="6" />
+    <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+  </svg>
+);
+
 export const ChevronDownIcon = ({ expanded }) => (
   <svg
     width="14"

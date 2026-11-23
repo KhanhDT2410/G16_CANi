@@ -76,11 +76,9 @@ public class WorkerProfileController {
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/workers/{workerId}/public-profile")
     public ResponseEntity<ApiResponse<WorkerPublicProfileResponseDto>> getWorkerPublicProfile(
-            @PathVariable UUID workerId,
-            Authentication authentication
+            @PathVariable UUID workerId
     ) {
-        UUID callerUserId = SecurityUtils.getCurrentUserId(authentication);
-        WorkerPublicProfileResponseDto profile = workerProfileService.getWorkerProfileForEo(callerUserId, workerId);
+        WorkerPublicProfileResponseDto profile = workerProfileService.getWorkerProfileForEo(null, workerId);
         return ResponseEntity.ok(ApiResponse.ok(profile, "Lấy hồ sơ nhân sự thành công"));
     }
 

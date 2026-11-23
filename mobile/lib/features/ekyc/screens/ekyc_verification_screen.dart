@@ -612,7 +612,56 @@ class _EkycVerificationScreenState
             ),
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                state.consentPolicy.title,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                state.consentPolicy.summary,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF475569),
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 6),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                value: state.consentAccepted,
+                onChanged: state.isLoading
+                    ? null
+                    : (checked) => notifier.setConsentAccepted(checked ?? false),
+                title: Text(
+                  'Tôi đồng ý cho CANi xử lý ảnh CCCD & sinh trắc học qua VNPT eKYC (${state.consentPolicy.noticeVersion}).',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         _buildSubmitButton(state, notifier),
         const SizedBox(height: 20),
       ],

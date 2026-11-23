@@ -1,6 +1,7 @@
 package com.cani.dto.profile;
 
 import com.cani.entity.enums.SkillTier;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,12 +20,17 @@ public class WorkerPublicProfileResponseDto {
     private UUID userId;
     private String fullName;
     private String avatarUrl;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String phone;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String email;
     private String bio;
     private Integer yearsExperience;
     private Boolean isOnline;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Integer age;
+    private Boolean meetsMinimumAge;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String baseAddress;
 
     // Năng lực & Uy tín
@@ -37,7 +43,7 @@ public class WorkerPublicProfileResponseDto {
     private Integer totalCancellations;
     private Integer totalNoshows;
 
-    // Danh sách kỹ năng (Phân loại Tier 1, Tier 2 tích xanh AI, Tier 3)
+    // Danh sách kỹ năng (Phân loại Tier 1, Tier 2 chứng chỉ xác minh, Tier 3)
     private List<WorkerSkillProfileDto> skills;
 
     // Lịch sử đánh giá thực tế từ các nhà tổ chức sự kiện

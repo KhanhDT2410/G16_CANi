@@ -13,6 +13,7 @@ import com.cani.entity.enums.VerificationStatus;
 import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.*;
+import com.cani.service.ekyc.EkycConsentAndAgeHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,8 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.Period;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +44,9 @@ public class WorkerProfileService {
     private EventRepository eventRepository;
 
     @Autowired(required = false)
+    private SystemConfigRepository systemConfigRepository;
+
+    @Autowired(required = false)
     private ShiftAssignmentRepository shiftAssignmentRepository;
 
     /**
@@ -52,7 +54,9 @@ public class WorkerProfileService {
      */
     @Transactional(readOnly = true)
     public WorkerPublicProfileResponseDto getMyProfile(UUID userId) {
-        return getWorkerProfileForEo(null, userId);
+        Worker worker = workerRepository.findByUser_UserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hồ sơ nhân sự (Worker)", "userId", userId));
+        return buildWorkerProfile(worker, null, true);
     }
 
     /**
@@ -91,7 +95,7 @@ public class WorkerProfileService {
         }
         workerRepository.save(worker);
 
-        return getWorkerProfileForEo(null, userId);
+        return buildWorkerProfile(worker, null, true);
     }
 
     /**
@@ -104,12 +108,27 @@ public class WorkerProfileService {
                 .or(() -> workerRepository.findByUser_UserId(workerId))
                 .orElseThrow(() -> new ResourceNotFoundException("Nhân sự (Worker)", "id", workerId));
 
+        return buildWorkerProfile(worker, eoUserId, false);
+    }
+
+    private WorkerPublicProfileResponseDto buildWorkerProfile(Worker worker, UUID eoUserId, boolean owner) {
         User user = worker.getUser();
         UUID actualWorkerId = worker.getWorkerId();
         UUID workerUserId = user != null ? user.getUserId() : null;
 
-        // 1. Tính tuổi Worker từ eKYC hoặc kinh nghiệm
-        Integer workerAge = calculateWorkerAge(actualWorkerId, worker.getYearsExperience());
+        Optional<WorkerEkycVerification> approvedEkycOpt = actualWorkerId == null
+                ? Optional.empty()
+                : workerEkycVerificationRepository
+                        .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(actualWorkerId, List.of("APPROVED"));
+
+        Boolean meetsMinimumAge = approvedEkycOpt
+                .map(ekyc -> ekyc.getMeetsMinimumAge() != null
+                        ? ekyc.getMeetsMinimumAge()
+                        : EkycConsentAndAgeHelper.evaluateMeetsMinimumAge(ekyc.getDob(), systemConfigRepository))
+                .orElse(null);
+
+        // Giữ tương thích dữ liệu cũ cho chính chủ nếu bản ghi eKYC cũ còn lưu dob, không suy đoán/bịa tuổi mới.
+        Integer workerAge = owner ? calculateWorkerAge(approvedEkycOpt) : null;
 
         // 2. Nạp tổng điểm kỹ năng (SP) và index theo skill_id / tên kỹ năng
         List<WorkerSkillPoint> skillPoints = workerSkillPointRepository.findByWorker_WorkerId(actualWorkerId);
@@ -201,13 +220,14 @@ public class WorkerProfileService {
                 .userId(workerUserId)
                 .fullName(worker.getFullName() != null ? worker.getFullName() : (user != null ? user.getFullName() : "Nhân sự CANi"))
                 .avatarUrl(user != null ? user.getAvatarUrl() : null)
-                .phone(user != null ? user.getPhone() : null)
-                .email(user != null ? user.getEmail() : null)
+                .phone(user != null && (owner || isMyTeamMember) ? user.getPhone() : null)
+                .email(user != null && owner ? user.getEmail() : null)
                 .bio(worker.getBio())
                 .yearsExperience(worker.getYearsExperience() != null ? worker.getYearsExperience() : 0)
                 .isOnline(Boolean.TRUE.equals(worker.getIsOnline()))
                 .age(workerAge)
-                .baseAddress(worker.getBaseAddress())
+                .meetsMinimumAge(meetsMinimumAge)
+                .baseAddress(owner ? worker.getBaseAddress() : null)
                 .skillTier(worker.getSkillTier() != null ? worker.getSkillTier() : SkillTier.STARTER)
                 .totalSp(totalSp)
                 .reliabilityScore(worker.getReliabilityScore() != null ? worker.getReliabilityScore() : 100)
@@ -600,35 +620,10 @@ public class WorkerProfileService {
                 .collect(Collectors.toList());
     }
 
-    private Integer calculateWorkerAge(UUID workerId, Integer yearsExperience) {
-        if (workerId == null) return 22;
-
-        Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository
-                .findTopByWorker_WorkerIdOrderByCreatedAtDesc(workerId);
-
-        if (ekycOpt.isPresent() && ekycOpt.get().getDob() != null && !ekycOpt.get().getDob().isBlank()) {
-            String workerDob = ekycOpt.get().getDob().trim();
-            try {
-                LocalDate birthDate = null;
-                if (workerDob.contains("/")) {
-                    String[] parts = workerDob.split("/");
-                    if (parts.length == 3) {
-                        birthDate = LocalDate.of(Integer.parseInt(parts[2]), Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
-                    }
-                } else if (workerDob.contains("-")) {
-                    birthDate = LocalDate.parse(workerDob);
-                }
-                if (birthDate != null) {
-                    return Period.between(birthDate, LocalDate.now()).getYears();
-                }
-            } catch (Exception ignored) {
-                // Parse fallback
-            }
+    private Integer calculateWorkerAge(Optional<WorkerEkycVerification> approvedEkycOpt) {
+        if (approvedEkycOpt.isEmpty()) {
+            return null;
         }
-
-        if (yearsExperience != null && yearsExperience > 0) {
-            return 18 + yearsExperience;
-        }
-        return 22;
+        return EkycConsentAndAgeHelper.calculateAgeFromDob(approvedEkycOpt.get().getDob());
     }
 }

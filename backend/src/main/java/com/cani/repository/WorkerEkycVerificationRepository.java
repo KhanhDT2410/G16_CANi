@@ -19,6 +19,11 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"worker", "worker.user"})
     Optional<WorkerEkycVerification> findById(UUID id);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"worker", "worker.user"})
+    @org.springframework.data.jpa.repository.Query("select v from WorkerEkycVerification v where v.id = :id")
+    Optional<WorkerEkycVerification> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") UUID id);
+
     Optional<WorkerEkycVerification> findTopByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
     Optional<WorkerEkycVerification> findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
@@ -43,8 +48,32 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
     boolean existsByCccdNumberHashInAndStatusInAndWorker_User_UserIdNot(
             Collection<String> cccdNumberHashes, Collection<String> statuses, UUID userId);
 
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     List<WorkerEkycVerification> findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(Instant cutoff);
 
+    long countByImagesPurgedAtIsNullAndImageRetentionUntilIsNull();
+
+    @org.springframework.data.jpa.repository.Query("""
+            select v.status, count(v) from WorkerEkycVerification v
+            where v.imagesPurgedAt is null and v.imageRetentionUntil is null
+            group by v.status
+            """)
+    List<Object[]> countLegacyNullRetentionByStatus();
+
+    @org.springframework.data.jpa.repository.Query("""
+            select v.id from WorkerEkycVerification v
+            where v.status = 'PROCESSING'
+              and coalesce(v.processingStartedAt, v.updatedAt, v.createdAt) < :cutoff
+            """)
+    List<UUID> findExpiredProcessingIds(@org.springframework.data.repository.query.Param("cutoff") Instant cutoff);
+
     long countByStatus(String status);
+    boolean existsByWorker_WorkerIdAndStatus(UUID ownerId, String status);
+    boolean existsByWorker_WorkerIdAndStatusIn(UUID workerId, Collection<String> statuses);
+    boolean existsByWorker_WorkerIdAndLegalHoldTrue(UUID workerId);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select (count(v) > 0) from WorkerEkycVerification v
+            where v.frontImageUrl = :key or v.backImageUrl = :key or v.selfieImageUrl = :key
+            """)
+    boolean existsImageReference(String key);
 }

@@ -1,7 +1,7 @@
 # TÀI LIỆU KỸ THUẬT: LUỒNG THẨM ĐỊNH KỸ NĂNG & THĂNG HẠNG NGHỀ NGHIỆP WORKER (SKILL VERIFICATION)
 **Dự án:** CANi - Nền tảng Điều phối Nhân sự Sự kiện  
-**Phạm vi:** Ứng dụng Di động Worker (Flutter) & Máy chủ Backend (Spring Boot, Gemini Vision AI, PostgreSQL)  
-**Thời gian cập nhật:** Tháng 10/2026  
+**Phạm vi:** Ứng dụng Di động Worker (Flutter), Web Admin / CSKH (React) & Máy chủ Backend (Spring Boot, PostgreSQL — Duyệt thủ công, không dùng Gemini AI)  
+**Thời gian cập nhật:** Tháng 11/2026  
 
 ---
 
@@ -29,10 +29,11 @@ Nền tảng CANi xây dựng cơ chế **Đánh giá Năng lực Đa tầng (Mu
 │    • Người dùng tự chọn kỹ năng có sẵn từ Taxonomy của sàn CANi.            │
 │    • Trạng thái: Kích hoạt ngay (ACTIVE). SP_verify: 0 điểm.                │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ 🥈 Tier 2: THẨM ĐỊNH AI VISION (AI Document Verified)                       │
+│ 🥈 Tier 2: CHỨNG CHỈ XÁC MINH THỦ CÔNG (Document Verified)                  │
 │    • Tải ảnh bằng cấp, chứng chỉ nghề, chứng nhận an toàn, tiếng Anh.       │
-│    • Gemini Vision AI quét dấu mộc, chữ ký, độ uy tín và đối soát Taxonomy. │
-│    • Quyết định tự động: Phê duyệt -> Cấp tích xanh Tier 2, CỘNG +25 SP.    │
+│    • Hồ sơ được kiểm tra tệp và chuyển trực tiếp sang trạng thái           │
+│      PENDING_REVIEW để Admin / CSKH kiểm tra tệp gốc và duyệt thủ công.     │
+│    • Quyết định duyệt (APPROVE) -> Cấp tích xanh Tier 2, CỘNG +25 SP.       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ 🥇 Tier 3: KIỂM CHỨNG THỰC TẾ TRÊN SÀN (Platform Proven)                   │
 │    • Tích lũy qua các ca làm thực tế (Shift Assignments) trên sàn CANi.     │
@@ -62,14 +63,14 @@ sequenceDiagram
     participant Wizard as AiVerificationWizard (Mobile)
     participant Provider as SkillVerificationNotifier
     participant Backend as Spring Boot Controller & Service
-    participant VisionAI as Gemini Multimodal Vision AI
     participant DB as PostgreSQL Database
+    participant Admin as Admin / CSKH Web
 
     %% GIAI ĐOẠN 1 & 2
     Worker->>Hub: Mở tab "Trung Tâm Kỹ Năng"
     Hub->>Backend: GET /api/v1/workers/skills/points & /my-skills
     Backend-->>Hub: Trả về Bảng điểm SP, Tier hiện tại, Danh sách kỹ năng
-    Worker->>Hub: Bấm nút "Thẩm định AI"
+    Worker->>Hub: Bấm nút "Tải chứng chỉ"
     Hub->>Wizard: Mở AiVerificationWizardScreen
 
     %% GIAI ĐOẠN 3: NỘP HỒ SƠ
@@ -178,50 +179,27 @@ sequenceDiagram
 
 ---
 
-## 6. Giai đoạn 4: Bóc tách Multimodal Vision AI & Định tuyến tại Backend
+## 6. Giai đoạn 4: Lưu trữ Tệp & Đưa vào Hàng đợi Duyệt Thủ Công tại Backend
 
 ### 6.1. Tiếp nhận tại Controller
 * **Tệp mã nguồn:** `backend/src/main/java/com/cani/controller/SkillVerificationController.java`
-* **Endpoint:** `@PostMapping(value = "/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)` (dòng 64)
+* **Endpoint:** `@PostMapping(value = "/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)`
 * **Tham số nhận vào:**
   * `file`: Tệp MultipartFile chứng chỉ.
   * `skillId`: ID kỹ năng mục tiêu (tùy chọn).
   * `notes`: Ghi chú bổ sung từ Worker.
 
-### 6.2. Phân tích tài liệu bằng Gemini Vision AI
-* **Tệp mã nguồn:** `backend/src/main/java/com/cani/client/skill/SkillVisionAiClient.java`
-* **Cơ chế hoạt động:**
-  1. Gửi ảnh chứng chỉ cùng bảng Taxonomy chuẩn của CANi sang mô hình AI Vision:
-  ```json
-  {
-    "recipientName": "Tên người được cấp bằng",
-    "identityNumber": "Số CCCD hoặc mã học viên (nếu có)",
-    "institution": "Tổ chức/Trường học/Trung tâm cấp chứng chỉ",
-    "issueDate": "Ngày tháng cấp bằng",
-    "hasSealOrSignature": true,
-    "overallConfidence": 0.92,
-    "extractedSkills": [
-      {
-        "skillName": "Pha chế đồ uống nâng cao",
-        "taxonomyRole": "Pha chế (Bartender)"
-      }
-    ]
-  }
-  ```
+### 6.2. Xử lý sau khi tệp hợp lệ (`SkillVerificationService`)
+1. Kiểm tra magic bytes, MIME type, dung lượng tối đa và tính SHA-256 chống nộp trùng (`409 CONFLICT`).
+2. Lưu tệp vào private storage (`CertificateStorageService`).
+3. Lưu bản ghi trực tiếp vào `PENDING_REVIEW` (`RoutingDecision.ADMIN_REVIEW`, `verificationSource = MANUAL_REVIEW`, `spAwarded = 0`). Không gọi bất kỳ dịch vụ AI ngoài nào.
 
-### 6.3. Định tuyến nghiệp vụ & Cập nhật Cơ sở dữ liệu
-Tại `SkillVerificationService.java` (hàm `persistVerificationResult` dòng 111):
-1. **Trường hợp 1: `overallConfidence >= 0.85` (Tự động Phê duyệt - AUTO_APPROVE):**
-   * Cập nhật trạng thái chứng chỉ: `status = APPROVED`.
-   * **Cộng điểm kỹ năng (`spAwarded`):** Cộng ngay **+25 SP_verify** cho mỗi kỹ năng được duyệt (Quy chế `BR-65`).
-   * Cập nhật bảng `public.worker_skills`: Gán `verification_tier = AI_DOCUMENT` kèm tích xanh bảo chứng.
-   * Tính toán lại tổng điểm `Total SP` trong bảng `public.worker_skill_points`.
-   * Nếu tổng điểm vượt ngưỡng, tự động thăng hạng tài khoản của Worker (`worker.setSkillTier(calculatedTier)`).
-2. **Trường hợp 2: `0.60 <= overallConfidence < 0.85` (ADMIN_REVIEW):**
-   * Đưa hồ sơ vào trạng thái `PENDING_REVIEW`.
-   * Đẩy vào hàng đợi thẩm định của CSKH/Admin tại giao diện quản trị (`screen_018_verification_details.png`).
-3. **Trường hợp 3: `overallConfidence < 0.60` (Từ chối - REJECT):**
-   * Đánh dấu `REJECTED`, lưu lý do (tài liệu mờ, không tìm thấy con dấu, hoặc kỹ năng không thuộc ngành sự kiện).
+### 6.3. Admin / CSKH duyệt thủ công & Cập nhật Cơ sở dữ liệu
+Tại `SkillVerificationService.adminReview(...)` và giao diện Web (`SkillReviewCenterView`):
+1. **APPROVE:** Cập nhật `APPROVED`, cộng **+25 SP_verify**, ghi `WorkerSkill` (`verification_tier = AI_DOCUMENT`) và tính lại `SkillTier`.
+2. **NEEDS_MORE_INFO:** Yêu cầu Worker nộp lại tài liệu rõ nét hơn (0 SP).
+3. **REJECT:** Từ chối hồ sơ với lý do cụ thể (0 SP).
+4. **Chuyển duyệt thủ công với hồ sơ lỗi cũ (`POST /admin/{id}/manual-review`):** Cho phép chuyển các hồ sơ từng ở trạng thái `VERIFICATION_FAILED` sang `PENDING_REVIEW` mà không gọi lại AI.
 
 ---
 
@@ -253,8 +231,8 @@ Tại `SkillVerificationService.java` (hàm `persistVerificationResult` dòng 11
 | **3** | Lưu kỹ năng Tier 1 | Nút *"Lưu danh sách kỹ năng"* | `mobile/.../declare_skills_sheet.dart` | `notifier.declareSkills()` | `POST /v1/workers/skills/declare`<br>`SkillVerificationController:37` |
 | **4** | Mở Wizard Thẩm định AI | Nút **"Thẩm định AI (AI Verification)"** | `mobile/.../skill_hub_screen.dart` (L96) | `Navigator.push(AiVerificationWizard)` | *(Mở màn hình Wizard nội bộ)* |
 | **5** | Chọn tệp chứng chỉ | Khung tải lên *"Chọn ảnh hoặc PDF"* | `mobile/.../ai_verification_wizard.dart` (L45) | `_pickFile()` (FilePicker) | *(Thư viện phần cứng FilePicker)* |
-| **6** | Gửi phân tích AI | Nút **"Bắt đầu phân tích AI"** | `mobile/.../ai_verification_wizard.dart` (L68) | `_startScanningAndSubmit()` | `POST /v1/workers/skills/verify`<br>`SkillVerificationController:64` |
-| **7** | Thẩm định Vision AI | *(Tự động bên trong Backend)* | `backend/.../SkillVisionAiClient.java` (L40) | `verifyDocument()` | Gọi Gemini Multimodal AI API |
+| **6** | Gửi hồ sơ chờ duyệt | Nút **"GỬI HỒ SƠ CHỜ THẨM ĐỊNH"** | `mobile/.../ai_verification_wizard_screen.dart` | `_startScanningAndSubmit()` | `POST /v1/workers/skills/verify` |
+| **7** | Đưa vào hàng đợi Admin | *(Tự động bên trong Backend)* | `backend/.../SkillVerificationService.java` | `submitVerification()` | Lưu `PENDING_REVIEW` (`MANUAL_REVIEW`) |
 | **8** | Xem kho chứng chỉ | Nút *"Kho chứng chỉ"* | `mobile/.../quick_action_bar.dart` (L55) | `CertificateVaultSheet.show()` | `GET /v1/workers/skills/history`<br>`SkillVerificationController:90` |
 | **9** | Admin duyệt thủ công | Nút *"Phê duyệt"* / *"Từ chối"* | `backend/.../SkillVerificationController.java` (L135) | `adminReview()` | `POST /v1/workers/skills/admin/{id}/review` |
 

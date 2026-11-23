@@ -120,15 +120,37 @@ class EkycResultCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Thông tin OCR trích xuất từ VNPT (nếu có)
+              // Thông tin tối thiểu đã xác minh từ VNPT (giữ tương thích dữ liệu cũ nếu có)
               if (item.fullName.isNotEmpty) _buildInfoRow('Họ và tên:', item.fullName),
               if (item.cccdNumberMasked.isNotEmpty) _buildInfoRow('Số CCCD:', item.cccdNumberMasked),
-              if (item.dob != null && item.dob!.isNotEmpty) _buildInfoRow('Ngày sinh:', item.dob!),
+              if (item.meetsMinimumAge != null)
+                _buildInfoRow(
+                  'Độ tuổi quy định:',
+                  item.meetsMinimumAge! ? 'Đạt độ tuổi tối thiểu' : 'Chưa đạt độ tuổi tối thiểu',
+                ),
+              if (item.dob != null && item.dob!.isNotEmpty) _buildInfoRow('Ngày sinh (cũ):', item.dob!),
               if (item.residenceAddress != null && item.residenceAddress!.isNotEmpty)
-                _buildInfoRow('Nơi thường trú:', item.residenceAddress!),
+                _buildInfoRow('Nơi thường trú (cũ):', item.residenceAddress!),
               if (item.expiryDate != null && item.expiryDate!.isNotEmpty)
-                _buildInfoRow('Hạn sử dụng:', item.expiryDate!),
+                _buildInfoRow('Hạn sử dụng (cũ):', item.expiryDate!),
               const SizedBox(height: 12),
+
+              if (item.isExpiredPending) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFED7AA)),
+                  ),
+                  child: Text(
+                    item.imagesUnavailableReason ??
+                        'Ảnh xác minh đã hết hạn lưu trữ tạm thời. Bạn có thể chụp và gửi lại hồ sơ mới.',
+                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF9A3412), height: 1.4),
+                  ),
+                ),
+              ],
 
               // Lý do / ghi chú từ backend
               Container(

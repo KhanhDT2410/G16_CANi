@@ -72,6 +72,8 @@ export const WorkerProfileHeader = ({ profile }) => {
           </div>
 
           <div className="worker-meta-details">
+            {profile.meetsMinimumAge === true && <span>Độ tuổi: <strong>Đạt quy định</strong></span>}
+            {profile.meetsMinimumAge === false && <span>Độ tuổi: <strong>Chưa đạt tối thiểu</strong></span>}
             {age && <span>Tuổi: <strong>{age}</strong></span>}
             {yearsExperience > 0 && <span>Kinh nghiệm: <strong>{yearsExperience} năm</strong></span>}
             {phone && <span>SĐT: <strong>{phone}</strong></span>}

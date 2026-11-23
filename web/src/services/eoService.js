@@ -71,6 +71,21 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // EO Lấy thông báo đồng ý xử lý dữ liệu sinh trắc học (Nghị định 13/2023/NĐ-CP)
+  getEkycConsentPolicy: async () => {
+    try {
+      const response = await apiClient.get('/v1/eo/ekyc/consent-policy');
+      return response.data?.data;
+    } catch {
+      return {
+        required: true,
+        noticeVersion: '2026.11-nd13-v1',
+        title: 'Thông báo xử lý dữ liệu cá nhân & sinh trắc học (Nghị định 13/2023/NĐ-CP)',
+        summary: 'Ảnh CCCD và chân dung chỉ dùng để xác thực danh tính qua VNPT eKYC, kiểm tra độ tuổi tối thiểu và chống trùng lặp tài khoản.',
+      };
+    }
+  },
+
   // EO Lấy trạng thái hồ sơ định danh doanh nghiệp eKYC
   getEkycStatus: async () => {
     try {

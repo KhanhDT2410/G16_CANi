@@ -6,13 +6,25 @@ import com.cani.repository.EmailOtpVerificationRepository;
 import com.cani.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -23,13 +35,20 @@ public class EmailOtpService {
     private final UserRepository userRepository;
     private final EmailService emailService;
 
+    @Autowired(required = false)
+    private PlatformTransactionManager transactionManager;
+
+    @Value("${cani.security.ekyc-hash-pepper:}")
+    private String otpHashPepper;
+
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int OTP_EXPIRY_MINUTES = 5;
     private static final int COOLDOWN_SECONDS = 60;
     private static final int MAX_ATTEMPTS = 3;
+    private static final int RETENTION_HOURS_AFTER_EXPIRY = 24;
 
     /**
-     * Tạo và gửi mã OTP 6 số đến email người dùng.
+     * Tạo và gửi mã OTP 6 số đến email người dùng (chỉ lưu mã băm trong DB).
      */
     @Transactional
     public void sendOtp(String rawEmail, String rawType) {
@@ -56,13 +75,13 @@ public class EmailOtpService {
                     }
                 });
 
-        // 3. Sinh ngẫu nhiên mã OTP 6 chữ số
+        // 3. Sinh ngẫu nhiên mã OTP 6 chữ số và lưu bản băm vào CSDL
         String otpCode = String.format("%06d", RANDOM.nextInt(1_000_000));
         Instant expiresAt = Instant.now().plus(OTP_EXPIRY_MINUTES, ChronoUnit.MINUTES);
 
         EmailOtpVerification verification = EmailOtpVerification.builder()
                 .email(email)
-                .otpCode(otpCode)
+                .otpCode(hashOtp(email, otpType, otpCode))
                 .otpType(otpType)
                 .expiresAt(expiresAt)
                 .isUsed(false)
@@ -78,8 +97,8 @@ public class EmailOtpService {
 
     /**
      * Xác thực mã OTP 6 số từ người dùng.
-     * Lưu ý: Không dùng @Transactional ở tầng method để tránh việc ném BadRequestException
-     * làm rollback giao dịch ghi nhận số lần thử sai (attempts counter).
+     * Lưu ý: Không bọc @Transactional ở method này và tách bước ghi nhận attempts sai sang REQUIRES_NEW
+     * để việc ném BadRequestException ở transaction cha (AuthService) không làm rollback số lần thử sai.
      */
     public void verifyOtp(String rawEmail, String otpCode, String rawType) {
         if (rawEmail == null || rawEmail.isBlank()) {
@@ -105,10 +124,11 @@ public class EmailOtpService {
             throw new BadRequestException("Bạn đã nhập sai mã OTP quá " + MAX_ATTEMPTS + " lần. Vui lòng yêu cầu gửi lại mã mới.");
         }
 
-        if (!verification.getOtpCode().equals(otpCode.trim())) {
-            verification.setAttempts(currentAttempts + 1);
-            otpRepository.saveAndFlush(verification);
-            int remaining = Math.max(0, MAX_ATTEMPTS - (currentAttempts + 1));
+        if (!matchesOtp(verification.getOtpCode(), email, otpType, otpCode.trim())) {
+            int nextAttempts = currentAttempts + 1;
+            verification.setAttempts(nextAttempts);
+            persistFailedAttemptInNewTransaction(verification, nextAttempts);
+            int remaining = Math.max(0, MAX_ATTEMPTS - nextAttempts);
             throw new BadRequestException("Mã xác thực OTP không chính xác. Bạn còn " + remaining + " lần thử.");
         }
 
@@ -116,5 +136,64 @@ public class EmailOtpService {
         verification.setIsUsed(true);
         otpRepository.saveAndFlush(verification);
         log.info("Xác thực OTP thành công cho email: {}, loại: {}", email, otpType);
+    }
+
+    /**
+     * Dọn dẹp định kỳ các bản ghi OTP đã hết hạn quá 24 giờ để giảm phình bảng và dữ liệu tồn dư.
+     */
+    @Scheduled(cron = "${cani.auth.otp-cleanup-cron:0 15 * * * *}")
+    @Transactional
+    public void purgeExpiredOtps() {
+        Instant cutoff = Instant.now().minus(RETENTION_HOURS_AFTER_EXPIRY, ChronoUnit.HOURS);
+        otpRepository.deleteByExpiresAtBefore(cutoff);
+    }
+
+    private void persistFailedAttemptInNewTransaction(EmailOtpVerification verification, int nextAttempts) {
+        if (transactionManager != null && verification.getId() != null) {
+            TransactionTemplate template = new TransactionTemplate(transactionManager);
+            template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            UUID recordId = verification.getId();
+            template.executeWithoutResult(status -> otpRepository.findById(recordId).ifPresent(fresh -> {
+                fresh.setAttempts(nextAttempts);
+                otpRepository.saveAndFlush(fresh);
+            }));
+            return;
+        }
+        otpRepository.saveAndFlush(verification);
+    }
+
+    private boolean matchesOtp(String storedValue, String email, String otpType, String submittedOtp) {
+        if (storedValue == null || submittedOtp == null) {
+            return false;
+        }
+        String candidateHash = hashOtp(email, otpType, submittedOtp);
+        if (constantTimeEquals(storedValue, candidateHash)) {
+            return true;
+        }
+        // Tương thích các bản ghi 6 chữ số cũ trước thời điểm bật băm OTP
+        return storedValue.length() == 6
+                && storedValue.chars().allMatch(Character::isDigit)
+                && constantTimeEquals(storedValue, submittedOtp);
+    }
+
+    private String hashOtp(String email, String otpType, String otpCode) {
+        String payload = otpType + ":" + email + ":" + otpCode;
+        try {
+            if (otpHashPepper != null && !otpHashPepper.isBlank()) {
+                Mac mac = Mac.getInstance("HmacSHA256");
+                mac.init(new SecretKeySpec(otpHashPepper.trim().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+                return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+            }
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(("CANI_OTP:" + payload).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("Không thể tạo mã băm OTP an toàn.", e);
+        }
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        return MessageDigest.isEqual(
+                a.getBytes(StandardCharsets.UTF_8),
+                b.getBytes(StandardCharsets.UTF_8));
     }
 }

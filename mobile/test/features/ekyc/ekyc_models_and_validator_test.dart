@@ -48,7 +48,7 @@ void main() {
       expect(rejected.isApproved, isFalse);
     });
 
-    test('keeps faceMatchScore and ocrConfidence nullable when backend omits them', () {
+    test('keeps faceMatchScore and ocrConfidence nullable and parses expiry/age/consent fields', () {
       final item = EkycVerificationItem.fromJson({
         'verificationId': 'v-2',
         'status': 'TECHNICAL_FAILURE',
@@ -59,6 +59,30 @@ void main() {
       expect(item.ocrConfidence, isNull);
       expect(item.failureCode, 'VNPT_TIMEOUT');
       expect(item.retryable, isTrue);
+
+      final expiredPending = EkycVerificationItem.fromJson({
+        'verificationId': 'v-3',
+        'status': 'PENDING_REVIEW',
+        'imagesAvailable': false,
+        'imagesExpired': true,
+        'imagesUnavailableReason': 'Ảnh hết hạn lưu trữ',
+        'meetsMinimumAge': true,
+        'consentNoticeVersion': '2026.11-nd13-v1',
+        'routingReason': 'Pending review',
+      });
+      expect(expiredPending.isExpiredPending, isTrue);
+      expect(expiredPending.canRetry, isTrue);
+      expect(expiredPending.meetsMinimumAge, isTrue);
+      expect(expiredPending.consentNoticeVersion, '2026.11-nd13-v1');
+
+      final policy = EkycConsentPolicy.fromJson({
+        'required': true,
+        'noticeVersion': '2026.11-nd13-v1',
+        'title': 'Tiêu đề',
+        'summary': 'Nội dung',
+      });
+      expect(policy.required, isTrue);
+      expect(policy.noticeVersion, '2026.11-nd13-v1');
     });
   });
 

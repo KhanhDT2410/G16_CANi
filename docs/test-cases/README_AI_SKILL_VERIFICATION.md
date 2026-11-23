@@ -1,6 +1,8 @@
-# HƯỚNG DẪN BỘ KIỂM THỬ THẨM ĐỊNH KỸ NĂNG BẰNG AI (UC-46)
+# HƯỚNG DẪN BỘ KIỂM THỬ THẨM ĐỊNH CHỨNG CHỈ KỸ NĂNG (UC-46/UC-47 — ĐÃ CHUYỂN DUYỆT THỦ CÔNG)
+> **Cập nhật kiến trúc:** CANi đã gỡ bỏ hoàn toàn Gemini Vision AI khỏi hệ thống. Chứng chỉ do Worker nộp được lưu trữ bảo mật và chuyển trực tiếp vào trạng thái `PENDING_REVIEW` để Admin / CSKH thẩm định thủ công. Nội dung kịch bản AI dưới đây chỉ giữ lại làm tài liệu tham khảo lịch sử cho các case kiểm thử tài liệu đầu vào.
+
 **Dự án:** CANi - Event Staffing Platform (SEP490_G16)  
-**Phạm vi:** Thẩm định chứng chỉ nghề nghiệp tự động bằng Vision AI (Gemini 3.8 Flash)
+**Phạm vi hiện tại:** Duyệt thủ công chứng chỉ nghề nghiệp bởi Admin / CSKH (gỡ bỏ Gemini AI)
 
 ---
 

@@ -43,6 +43,13 @@ public class EoEkycVerificationResultDto {
     private Boolean retryable;
     private Integer retryCount;
     private Boolean imagesAvailable;
+    private Boolean imagesExpired;
+    private String imagesUnavailableReason;
+    private Instant imageRetentionUntil;
+    private Boolean legalHold;
+    private Boolean meetsMinimumAge;
+    private String consentNoticeVersion;
+    private Instant consentedAt;
 
     private String routingDecision;
     private String routingReason;

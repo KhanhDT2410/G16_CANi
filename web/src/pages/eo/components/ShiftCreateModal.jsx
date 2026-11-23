@@ -136,7 +136,7 @@ const ShiftCreateModal = ({
 
   return (
     <div className="eo-modal-overlay">
-      <div className="eo-modal-box" style={{ maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="eo-modal-box eo-modal-box--wide" style={{ maxWidth: '1060px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
             Thêm Ca Làm Việc & Tiêu Chí Tuyển Dụng
@@ -144,9 +144,9 @@ const ShiftCreateModal = ({
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b', fontWeight: 600 }}
+            style={{ background: 'none', border: 'none', fontSize: '0.95rem', cursor: 'pointer', color: '#64748b', fontWeight: 600 }}
           >
-            Đóng ✕
+            Đóng
           </button>
         </div>
 
@@ -304,7 +304,7 @@ const ShiftCreateModal = ({
                     }
                   }
                   if (wageMode === 'PER_SHIFT') {
-                    const computed = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
+                    const computed = Math.max(1, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
                     setNewShift({ ...newShift, startTime: val, arrivalTime: nextArrival, hourlyWage: computed });
                   } else {
                     setNewShift({ ...newShift, startTime: val, arrivalTime: nextArrival });
@@ -327,7 +327,7 @@ const ShiftCreateModal = ({
                   const en = new Date(val);
                   const dur = !isNaN(s.getTime()) && !isNaN(en.getTime()) && en > s ? parseFloat(((en - s) / 3600000).toFixed(1)) : safeHours;
                   if (wageMode === 'PER_SHIFT') {
-                    const computed = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
+                    const computed = Math.max(1, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, dur)));
                     setNewShift({ ...newShift, endTime: val, hourlyWage: computed });
                   } else {
                     setNewShift({ ...newShift, endTime: val });
@@ -457,8 +457,8 @@ const ShiftCreateModal = ({
                   <label>Thù Lao Theo Giờ (VNĐ/giờ) *</label>
                   <input
                     type="number"
-                    min="20000"
-                    step="5000"
+                    min="1"
+                    step="any"
                     required
                     className="eo-form-input"
                     style={{
@@ -499,8 +499,8 @@ const ShiftCreateModal = ({
                   <label>Mức Lương Trọn Gói Theo Ca (VNĐ/ca) *</label>
                   <input
                     type="number"
-                    min="20000"
-                    step="10000"
+                    min="1"
+                    step="any"
                     required
                     className="eo-form-input"
                     style={{

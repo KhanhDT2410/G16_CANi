@@ -396,7 +396,7 @@ const ShiftSkillSelector = ({
               whiteSpace: 'nowrap',
             }}
           >
-            {proposalSubmitting ? 'Đang ghi...' : '+ Thêm ghi chú ngoài danh mục'}
+            {proposalSubmitting ? 'Đang ghi...' : 'Thêm ghi chú ngoài danh mục'}
           </button>
         )}
       </div>
@@ -408,7 +408,7 @@ const ShiftSkillSelector = ({
       {filteredTaxonomy.length > 0 && (
         <div style={{ marginTop: '0.35rem' }}>
           <div style={{ fontSize: '0.74rem', color: '#64748b', marginBottom: '0.3rem', fontWeight: 500 }}>
-            Chọn từ danh mục chuẩn (+ Bắt buộc | ☆ Ưu tiên):
+            Chọn từ danh mục chuẩn (Bắt buộc | Ưu tiên):
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
             {filteredTaxonomy.map((sk) => (
@@ -437,7 +437,7 @@ const ShiftSkillSelector = ({
                   }}
                   title="Thêm làm kỹ năng BẮT BUỘC"
                 >
-                  + {sk.name}
+                  {sk.name}
                 </button>
                 <button
                   type="button"
@@ -454,7 +454,7 @@ const ShiftSkillSelector = ({
                   }}
                   title="Thêm làm kỹ năng ƯU TIÊN THÊM"
                 >
-                  ☆ Ưu tiên
+                  Ưu tiên
                 </button>
               </div>
             ))}

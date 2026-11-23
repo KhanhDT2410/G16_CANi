@@ -41,7 +41,7 @@ public class CreateShiftRequestDto {
     private Integer requiredWorkers = 1;
 
     @NotNull(message = "Mức lương/giờ không được để trống")
-    @DecimalMin(value = "20000.0", message = "Mức lương tối thiểu là 20,000 VND/giờ")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Mức lương theo giờ phải lớn hơn 0")
     private BigDecimal hourlyWage;
 
     @Builder.Default

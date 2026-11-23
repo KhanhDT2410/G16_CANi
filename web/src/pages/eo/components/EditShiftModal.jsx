@@ -144,7 +144,7 @@ const EditShiftModal = ({
 
     let nextHourly = formData.hourlyWage;
     if (wageMode === 'PER_SHIFT') {
-      nextHourly = Math.max(20000, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, nextDur)));
+      nextHourly = Math.max(1, Math.round(Number(shiftPackageWage || 0) / Math.max(0.5, nextDur)));
       setFormData((prev) => ({
         ...prev,
         [field]: value,
@@ -243,7 +243,7 @@ const EditShiftModal = ({
       customSkillNotes: formData.customSkillNotes?.trim() || null,
       dressCode: formData.dressCode || '',
       requiredWorkers: Math.max(1, Number(formData.requiredWorkers) || 1),
-      hourlyWage: Math.max(20000, Number(formData.hourlyWage) || 20000),
+      hourlyWage: Number(formData.hourlyWage || 0),
       allowance: Math.max(0, Number(formData.allowance) || 0),
       minReliabilityScore: Number(formData.minReliabilityScore || 60),
       checklist: serializeChecklistItems(formData.checklistItems),
@@ -265,7 +265,7 @@ const EditShiftModal = ({
 
   return (
     <div className="eo-modal-overlay">
-      <div className="eo-modal-box" style={{ maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="eo-modal-box eo-modal-box--wide" style={{ maxWidth: '1060px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>
             Chỉnh Sửa Ca Làm Việc
@@ -276,7 +276,7 @@ const EditShiftModal = ({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '1rem',
+              fontSize: '0.95rem',
               cursor: 'pointer',
               color: '#64748b',
               fontWeight: 600,
@@ -285,13 +285,12 @@ const EditShiftModal = ({
             }}
             aria-label="Đóng popup"
           >
-            Đóng ✕
+            Đóng
           </button>
         </div>
 
         {formError && (
           <div className="eo-form-alert-error" role="alert">
-            <span style={{ fontSize: '1.15rem' }} aria-hidden="true">⚠️</span>
             <div>
               <strong>Dữ liệu chưa hợp lệ:</strong> {formError}
             </div>
@@ -327,7 +326,6 @@ const EditShiftModal = ({
             </datalist>
             {jobTypeError && (
               <div className="eo-field-error ecw-field-error">
-                <span aria-hidden="true">⚠️</span>
                 <span>{jobTypeError}</span>
               </div>
             )}
@@ -376,7 +374,6 @@ const EditShiftModal = ({
           </div>
           {timeError && (
             <div className="eo-field-error ecw-field-error" style={{ marginTop: '-0.1rem', marginBottom: '1rem' }}>
-              <span aria-hidden="true">⚠️</span>
               <span>{timeError}</span>
             </div>
           )}
@@ -490,7 +487,6 @@ const EditShiftModal = ({
                 />
                 {workersError && (
                   <div className="eo-field-error ecw-field-error">
-                    <span aria-hidden="true">⚠️</span>
                     <span>{workersError}</span>
                   </div>
                 )}
@@ -501,8 +497,8 @@ const EditShiftModal = ({
                   <label>Thù Lao Theo Giờ (VNĐ/h) *</label>
                   <input
                     type="number"
-                    step="5000"
-                    min="20000"
+                    step="any"
+                    min="1"
                     required
                     className={`eo-form-input ${wageError ? 'has-error' : ''}`}
                     style={{
@@ -544,7 +540,6 @@ const EditShiftModal = ({
                   />
                   {wageError ? (
                     <div className="eo-field-error ecw-field-error">
-                      <span aria-hidden="true">⚠️</span>
                       <span>{wageError}</span>
                     </div>
                   ) : (
@@ -558,8 +553,8 @@ const EditShiftModal = ({
                   <label>Lương Trọn Gói Ca (VNĐ/ca) *</label>
                   <input
                     type="number"
-                    step="10000"
-                    min="20000"
+                    step="any"
+                    min="1"
                     required
                     className={`eo-form-input ${wageError ? 'has-error' : ''}`}
                     style={{
@@ -591,7 +586,6 @@ const EditShiftModal = ({
                   />
                   {wageError ? (
                     <div className="eo-field-error ecw-field-error">
-                      <span aria-hidden="true">⚠️</span>
                       <span>{wageError}</span>
                     </div>
                   ) : (
@@ -641,7 +635,6 @@ const EditShiftModal = ({
                 />
                 {allowanceError && (
                   <div className="eo-field-error ecw-field-error">
-                    <span aria-hidden="true">⚠️</span>
                     <span>{allowanceError}</span>
                   </div>
                 )}

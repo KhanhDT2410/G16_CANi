@@ -209,7 +209,7 @@ const ShiftChecklistEditor = ({
           {titlePrefix} ({normalizedList.length})
         </span>
         <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>
-          Nhấp đúp hoặc bấm ✏️ để sửa task • Kéo thả ⋮⋮ để đảo thứ tự
+          Nhấp đúp hoặc bấm Sửa để chỉnh sửa task • Kéo thả để đảo thứ tự
         </span>
       </label>
 
@@ -248,8 +248,7 @@ const ShiftChecklistEditor = ({
           }}
           title="Bật nếu đầu việc này bắt buộc nhân sự chụp ảnh minh chứng trên app"
         >
-          <span>{newRequireEvidence ? '☑' : '☐'}</span>
-          <span>Yêu cầu minh chứng</span>
+          <span>{newRequireEvidence ? 'Yêu cầu minh chứng: Bật' : 'Yêu cầu minh chứng'}</span>
         </button>
         <button
           type="button"
@@ -264,7 +263,7 @@ const ShiftChecklistEditor = ({
           }}
           onClick={handleAddItem}
         >
-          + Thêm đầu việc
+          Thêm đầu việc
         </button>
       </div>
 
@@ -290,7 +289,7 @@ const ShiftChecklistEditor = ({
           }}
         >
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
-            💡 Gợi ý mẫu theo vị trí sự kiện:
+            Gợi ý mẫu theo vị trí sự kiện:
           </span>
           {unaddedCount > 0 && (
             <button
@@ -308,7 +307,7 @@ const ShiftChecklistEditor = ({
               }}
               title="Thêm toàn bộ các đầu việc trong nhóm này vào ca làm"
             >
-              + Thêm tất cả nhóm ({unaddedCount})
+              Thêm tất cả nhóm ({unaddedCount})
             </button>
           )}
         </div>
@@ -337,7 +336,6 @@ const ShiftChecklistEditor = ({
                   transition: 'all 0.15s ease',
                 }}
               >
-                <span>{cat.icon}</span>
                 <span>{cat.label}</span>
               </button>
             );
@@ -375,7 +373,6 @@ const ShiftChecklistEditor = ({
                     : 'Nhấp để thêm nhanh'
                 }
               >
-                <span>{isAdded ? '✓' : '+'}</span>
                 <span>{suggestion.title}</span>
                 {suggestion.isRequiredEvidence && (
                   <span
@@ -444,19 +441,6 @@ const ShiftChecklistEditor = ({
               >
                 {/* Phần hiển thị / chỉnh sửa inline tiêu đề task (EO-003) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                  <span
-                    style={{
-                      color: isEditing ? '#cbd5e1' : '#94a3b8',
-                      fontWeight: 900,
-                      cursor: isEditing ? 'default' : 'grab',
-                      userSelect: 'none',
-                      fontSize: '0.95rem',
-                      lineHeight: 1,
-                    }}
-                    title={isEditing ? '' : 'Giữ chuột kéo thả để đảo vị trí'}
-                  >
-                    ⋮⋮
-                  </span>
                   <strong style={{ color: '#2563eb', flexShrink: 0 }}>#{idx + 1}</strong>
 
                   {isEditing ? (
@@ -504,7 +488,7 @@ const ShiftChecklistEditor = ({
                         }}
                         title="Lưu thay đổi (Enter)"
                       >
-                        ✓ Lưu
+                        Lưu
                       </button>
                       <button
                         type="button"
@@ -523,7 +507,7 @@ const ShiftChecklistEditor = ({
                         }}
                         title="Hủy bỏ (Esc)"
                       >
-                        ✕ Hủy
+                        Hủy
                       </button>
                     </div>
                   ) : (
@@ -543,16 +527,6 @@ const ShiftChecklistEditor = ({
                       title="Nhấp vào để chỉnh sửa nội dung đầu việc"
                     >
                       <span>{item.title}</span>
-                      <span
-                        style={{
-                          fontSize: '0.75rem',
-                          color: '#94a3b8',
-                          opacity: 0.8,
-                        }}
-                        title="Nhấp để sửa"
-                      >
-                        ✏️
-                      </span>
                     </span>
                   )}
                 </div>
@@ -576,7 +550,7 @@ const ShiftChecklistEditor = ({
                     }}
                     title="Nhấn để bật/tắt yêu cầu nhân sự gửi ảnh minh chứng hoàn thành đầu việc này"
                   >
-                    {item.isRequiredEvidence ? '✓ Cần minh chứng' : '+ Yêu cầu minh chứng'}
+                    {item.isRequiredEvidence ? 'Cần minh chứng' : 'Yêu cầu minh chứng'}
                   </button>
 
                   {/* Nút bấm mở sửa (nếu không đang sửa) */}
@@ -588,14 +562,15 @@ const ShiftChecklistEditor = ({
                         background: '#ffffff',
                         border: '1px solid #cbd5e1',
                         borderRadius: '4px',
-                        padding: '0.15rem 0.4rem',
-                        fontSize: '0.75rem',
+                        padding: '0.15rem 0.45rem',
+                        fontSize: '0.73rem',
+                        fontWeight: 600,
                         cursor: 'pointer',
                         color: '#475569',
                       }}
                       title="Chỉnh sửa nội dung đầu việc này"
                     >
-                      ✏️
+                      Sửa
                     </button>
                   )}
 
@@ -609,14 +584,14 @@ const ShiftChecklistEditor = ({
                         background: '#ffffff',
                         border: '1px solid #cbd5e1',
                         borderRadius: '4px',
-                        padding: '0.1rem 0.35rem',
+                        padding: '0.15rem 0.4rem',
                         fontSize: '0.72rem',
                         cursor: idx === 0 ? 'not-allowed' : 'pointer',
                         color: idx === 0 ? '#cbd5e1' : '#475569',
                       }}
                       title="Đưa đầu việc lên trên"
                     >
-                      ↑
+                      Lên
                     </button>
                     <button
                       type="button"
@@ -626,14 +601,14 @@ const ShiftChecklistEditor = ({
                         background: '#ffffff',
                         border: '1px solid #cbd5e1',
                         borderRadius: '4px',
-                        padding: '0.1rem 0.35rem',
+                        padding: '0.15rem 0.4rem',
                         fontSize: '0.72rem',
                         cursor: idx === normalizedList.length - 1 ? 'not-allowed' : 'pointer',
                         color: idx === normalizedList.length - 1 ? '#cbd5e1' : '#475569',
                       }}
                       title="Đưa đầu việc xuống dưới"
                     >
-                      ↓
+                      Xuống
                     </button>
                   </div>
 
@@ -647,12 +622,12 @@ const ShiftChecklistEditor = ({
                       color: '#ef4444',
                       cursor: 'pointer',
                       fontWeight: 700,
-                      padding: '0.15rem 0.35rem',
-                      fontSize: '0.85rem',
+                      padding: '0.15rem 0.4rem',
+                      fontSize: '0.73rem',
                     }}
                     title="Xóa đầu việc này"
                   >
-                    ✕
+                    Xóa
                   </button>
                 </div>
               </div>
@@ -672,7 +647,7 @@ const ShiftChecklistEditor = ({
             border: '1px dashed #cbd5e1',
           }}
         >
-          Chưa có đầu việc nào cho ca này. Hãy chọn từ danh mục gợi ý ở trên hoặc nhập tên và bấm &ldquo;+ Thêm đầu việc&rdquo;.
+          Chưa có đầu việc nào cho ca này. Hãy chọn từ danh mục gợi ý ở trên hoặc nhập tên và bấm &ldquo;Thêm đầu việc&rdquo;.
         </div>
       )}
     </div>

@@ -142,7 +142,7 @@ export default function WageBenchmarkBox({
               transition: 'all 0.15s ease',
             }}
           >
-            Sàn: {benchmark.minWage.toLocaleString('vi-VN')}đ
+            Tối thiểu gợi ý: {benchmark.minWage.toLocaleString('vi-VN')}đ
           </button>
           <button
             type="button"
@@ -192,7 +192,7 @@ export default function WageBenchmarkBox({
             marginTop: '0.25rem',
           }}
         >
-          Mức thù lao thấp hơn sàn tối thiểu ({benchmark.minWage.toLocaleString('vi-VN')}đ/h).{' '}
+          Gợi ý: Mức thù lao thấp hơn mức tham chiếu tối thiểu ({benchmark.minWage.toLocaleString('vi-VN')}đ/h) — giá ca vẫn do Ban tổ chức quyết định.{' '}
           <button
             type="button"
             onClick={() => onSelectWage?.(benchmark.minWage)}
@@ -207,7 +207,7 @@ export default function WageBenchmarkBox({
               fontSize: '0.76rem',
             }}
           >
-            Áp dụng mức sàn
+            Áp dụng mức gợi ý
           </button>
         </div>
       )}

@@ -168,6 +168,21 @@ public class DirectChatService {
     }
 
     /**
+     * Lấy nhanh số lượng hội thoại có tin nhắn chưa đọc và tổng số tin nhắn chưa đọc của người dùng.
+     */
+    public Map<String, Long> getUnreadCount(UUID currentUserId) {
+        if (currentUserId == null) {
+            return Map.of("unreadConversations", 0L, "unreadMessages", 0L);
+        }
+        long unreadConversations = participantRepository.countUnreadConversationsByUserId(currentUserId);
+        long unreadMessages = participantRepository.sumUnreadMessagesByUserId(currentUserId);
+        Map<String, Long> counts = new LinkedHashMap<>();
+        counts.put("unreadConversations", Math.max(0L, unreadConversations));
+        counts.put("unreadMessages", Math.max(0L, unreadMessages));
+        return counts;
+    }
+
+    /**
      * Lấy chi tiết tin nhắn và đánh dấu đã đọc (reset unread_count = 0).
      */
     @Transactional

@@ -16,6 +16,7 @@ import java.util.UUID;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     List<Payment> findByEventId(UUID eventId);
+    List<Payment> findByEventIdIn(Collection<UUID> eventIds);
     List<Payment> findByShiftId(UUID shiftId);
     Optional<Payment> findByAssignmentId(UUID assignmentId);
     List<Payment> findByAssignmentIdIn(Collection<UUID> assignmentIds);

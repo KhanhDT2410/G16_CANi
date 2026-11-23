@@ -17,21 +17,33 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class FcmService {
   FcmService._();
 
-  static bool _isInitialized = false;
+  static bool _isCoreInitialized = false;
+  static bool _isPostFrameInitialized = false;
   static String? _cachedToken;
+  static Map<String, dynamic>? _pendingNavigationData;
+  static void Function(Map<String, dynamic> data)? _onNotificationNavigate;
+  static void Function(String newToken)? _onTokenRefresh;
+  static bool Function()? _canNavigate;
 
-  /// Khởi tạo Firebase và cấu hình lắng nghe 3 trạng thái ứng dụng
+  /// Khởi tạo nhẹ phần core của Firebase & LocalNotification trước `runApp()`.
+  /// Tuyệt đối không chặn khung hình đầu tiên (first frame) bởi hộp thoại xin quyền OS
+  /// hay lời gọi mạng `getToken()` / `getInitialMessage()`.
   static Future<void> initialize({
     void Function(Map<String, dynamic> data)? onNotificationNavigate,
     void Function(Map<String, dynamic> data)? onForegroundMessage,
     void Function(String newToken)? onTokenRefresh,
+    bool Function()? canNavigate,
   }) async {
+    _onNotificationNavigate = onNotificationNavigate;
+    _onTokenRefresh = onTokenRefresh;
+    _canNavigate = canNavigate;
+
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
       debugPrint('[FcmService] FCM is skipped on this non-mobile platform.');
       return;
     }
 
-    if (_isInitialized) return;
+    if (_isCoreInitialized) return;
 
     try {
       // 1. Khởi tạo Firebase Native
@@ -43,35 +55,22 @@ class FcmService {
       // 3. Khởi tạo Local Notification cho trạng thái Foreground (khi đang mở app)
       await LocalNotificationService.initialize(
         onNotificationTapped: (response) {
-          if (response.payload != null && onNotificationNavigate != null) {
+          if (response.payload != null) {
             try {
               final decoded = jsonDecode(response.payload!);
               if (decoded is Map<String, dynamic>) {
-                onNotificationNavigate(decoded);
+                handleOrBufferNavigation(decoded);
                 return;
               }
             } catch (_) {}
-            onNotificationNavigate({'payload': response.payload});
+            handleOrBufferNavigation({'payload': response.payload});
           }
         },
       );
 
-      // 4. Xin quyền thông báo (Yêu cầu trên Android 13+ và iOS)
       final messaging = FirebaseMessaging.instance;
-      final settings = await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
 
-      debugPrint('[FcmService] Notification authorization status: ${settings.authorizationStatus}');
-
-      // 5. Lấy FCM Device Token lần đầu
-      _cachedToken = await messaging.getToken();
-      debugPrint('[FcmService] Device FCM Token: $_cachedToken');
-
-      // 6. Lắng nghe thông báo khi ứng dụng đang mở ở tiền cảnh (Foreground)
+      // 4. Lắng nghe thông báo khi ứng dụng đang mở ở tiền cảnh (Foreground)
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('[FcmService] Foreground message received: ${message.notification?.title}');
         final noti = message.notification;
@@ -89,38 +88,100 @@ class FcmService {
       // Đồng bộ lại token nếu FCM tự xoay vòng token mới
       messaging.onTokenRefresh.listen((newToken) {
         _cachedToken = newToken;
-        onTokenRefresh?.call(newToken);
+        _onTokenRefresh?.call(newToken);
       });
 
-      // 7. Lắng nghe khi người dùng bấm vào thông báo từ khay hệ thống (Background)
+      // 5. Lắng nghe khi người dùng bấm vào thông báo từ khay hệ thống (Background)
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         debugPrint('[FcmService] Notification opened from background: ${message.data}');
-        if (onNotificationNavigate != null) {
-          onNotificationNavigate(message.data);
-        }
+        handleOrBufferNavigation(message.data);
       });
 
-      // 8. Xử lý trường hợp mở app từ trạng thái tắt hoàn toàn (Terminated)
-      final initialMessage = await messaging.getInitialMessage();
-      if (initialMessage != null && onNotificationNavigate != null) {
-        debugPrint('[FcmService] App opened from terminated state via notification: ${initialMessage.data}');
-        onNotificationNavigate(initialMessage.data);
+      _isCoreInitialized = true;
+    } catch (e) {
+      debugPrint('[FcmService] Warning: Could not initialize Firebase FCM core: $e');
+    }
+  }
+
+  /// Thực thi sau khi khung hình đầu tiên (first frame) đã hiển thị:
+  /// xin quyền thông báo, lấy FCM token, đồng bộ backend và xử lý deep-link lúc mở app.
+  static Future<void> completePostFrameInitialization() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+    if (_isPostFrameInitialized) {
+      flushPendingNavigation();
+      return;
+    }
+    _isPostFrameInitialized = true;
+
+    try {
+      if (!_isCoreInitialized) {
+        await initialize(
+          onNotificationNavigate: _onNotificationNavigate,
+          onTokenRefresh: _onTokenRefresh,
+          canNavigate: _canNavigate,
+        );
+      }
+      if (!_isCoreInitialized) return;
+
+      final messaging = FirebaseMessaging.instance;
+
+      // 1. Xin quyền thông báo sau first frame để không chặn splash/home render
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+      debugPrint('[FcmService] Notification authorization status: ${settings.authorizationStatus}');
+
+      // 2. Lấy FCM Device Token lần đầu và kích hoạt đồng bộ nếu phiên đăng nhập đã sẵn sàng
+      _cachedToken = await messaging.getToken();
+      debugPrint('[FcmService] Device FCM Token: $_cachedToken');
+      if (_cachedToken != null) {
+        _onTokenRefresh?.call(_cachedToken!);
       }
 
-      _isInitialized = true;
+      // 3. Xử lý trường hợp mở app từ trạng thái tắt hoàn toàn (Terminated)
+      final initialMessage = await messaging.getInitialMessage();
+      if (initialMessage != null) {
+        debugPrint('[FcmService] App opened from terminated state via notification: ${initialMessage.data}');
+        handleOrBufferNavigation(initialMessage.data);
+      } else {
+        flushPendingNavigation();
+      }
     } catch (e) {
-      debugPrint('[FcmService] Warning: Could not initialize Firebase FCM: $e');
+      debugPrint('[FcmService] Warning: Post-frame FCM setup failed: $e');
     }
+  }
+
+  /// Lưu payload điều hướng vào bộ đệm nếu Navigator hoặc AuthState chưa sẵn sàng,
+  /// và chỉ thực thi khi cả hai đã khởi tạo xong.
+  static void handleOrBufferNavigation(Map<String, dynamic> data) {
+    _pendingNavigationData = Map<String, dynamic>.from(data);
+    flushPendingNavigation();
+  }
+
+  /// Xả payload điều hướng đang chờ nếu `canNavigate` đã thỏa mãn.
+  static void flushPendingNavigation() {
+    final pending = _pendingNavigationData;
+    final navigate = _onNotificationNavigate;
+    if (pending == null || navigate == null) return;
+    if (_canNavigate != null && !_canNavigate!()) {
+      return;
+    }
+    _pendingNavigationData = null;
+    navigate(pending);
   }
 
   /// Đồng bộ FCM Device Token lên Backend Spring Boot
   static Future<void> syncTokenWithBackend(Dio dio, {String? explicitUserId}) async {
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+    if (!_isCoreInitialized && Firebase.apps.isEmpty) return;
 
     try {
-      final token = _cachedToken ?? await FirebaseMessaging.instance.getToken();
+      final token = _cachedToken ?? (_isPostFrameInitialized ? await FirebaseMessaging.instance.getToken() : null);
       if (token == null) {
-        debugPrint('[FcmService] No FCM token available to sync.');
+        debugPrint('[FcmService] FCM token not yet fetched; will sync after post-frame init.');
         return;
       }
 

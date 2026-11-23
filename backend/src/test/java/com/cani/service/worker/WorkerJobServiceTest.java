@@ -794,7 +794,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC024 - getNearbyShifts() - Normal: Lấy các ca đang tuyển gần vị trí tìm kiếm")
     void getNearbyShifts_Success_ReturnsSortedShiftsWithinRadius() {
-        when(shiftRepository.findByStatus(ShiftStatus.ACTIVE)).thenReturn(List.of(activeShift));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class))).thenReturn(List.of(activeShift));
 
         List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(10.7769, 106.7009, 10.0);
 
@@ -806,7 +806,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC025 - getNearbyShifts() - Boundary: Bán kính null mặc định 15km")
     void getNearbyShifts_Boundary_NullRadiusFallsBackToDefault() {
-        when(shiftRepository.findByStatus(ShiftStatus.ACTIVE)).thenReturn(List.of(activeShift));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class))).thenReturn(List.of(activeShift));
 
         List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(10.7769, 106.7009, null);
 
@@ -816,7 +816,7 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC026 - getNearbyShifts() - Boundary: Tọa độ null dùng trung tâm mặc định TP.HCM")
     void getNearbyShifts_Boundary_NullLatLongFallsBackToDefaultCenter() {
-        when(shiftRepository.findByStatus(ShiftStatus.ACTIVE)).thenReturn(List.of(activeShift));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class))).thenReturn(List.of(activeShift));
 
         List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(null, null, 20.0);
 
@@ -835,7 +835,7 @@ class WorkerJobServiceTest {
                 .confirmedWorkers(4)
                 .remainingWorkers(0)
                 .build();
-        when(shiftRepository.findByStatus(ShiftStatus.ACTIVE)).thenReturn(List.of(fullShift));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class))).thenReturn(List.of(fullShift));
 
         List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(10.7769, 106.7009, 10.0);
 
@@ -851,6 +851,57 @@ class WorkerJobServiceTest {
         List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 10.0);
 
         assertThat(list).isEmpty();
+    }
+
+    @Test
+    @DisplayName("UTC026d - isWithinBoundingBox() & getNearbyShifts() - Pre-filter loại nhanh ca ở xa và fallback tọa độ Event khi Shift null")
+    void getNearbyShifts_BoundingBoxPreFilter_RejectsFarCoordinatesAndPreservesEventVenueFallback() {
+        // 1. Direct unit test of bounding-box helper
+        assertThat(WorkerNearbyShiftQueryService.isWithinBoundingBox(10.7769, 106.7009, 15.0, 10.7800, 106.7050)).isTrue();
+        assertThat(WorkerNearbyShiftQueryService.isWithinBoundingBox(10.7769, 106.7009, 15.0, 21.0285, 105.8542)).isFalse(); // Hà Nội vs TP.HCM
+        assertThat(WorkerNearbyShiftQueryService.isWithinBoundingBox(10.7769, 106.7009, 15.0, Double.NaN, 106.7009)).isFalse();
+
+        // 2. Shift có locationLat/locationLng = null -> fallback sang event.venueLat/venueLng (nằm trong bán kính 15km)
+        Shift fallbackVenueShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Lễ tân fallback tọa độ Event")
+                .locationLat(null)
+                .locationLng(null)
+                .startTime(Instant.now().plus(24, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(28, ChronoUnit.HOURS))
+                .requiredWorkers(3)
+                .confirmedWorkers(1)
+                .remainingWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .status(ShiftStatus.ACTIVE)
+                .build();
+
+        // 3. Shift ở Hà Nội (ngoài bounding box 15km của TP.HCM) -> bị loại ngay bởi bounding box
+        Shift farHanoiShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Ca ở Hà Nội")
+                .locationLat(21.0285)
+                .locationLng(105.8542)
+                .startTime(Instant.now().plus(24, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(28, ChronoUnit.HOURS))
+                .requiredWorkers(3)
+                .confirmedWorkers(0)
+                .remainingWorkers(3)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .status(ShiftStatus.ACTIVE)
+                .build();
+
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class)))
+                .thenReturn(List.of(fallbackVenueShift, farHanoiShift));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(10.7769, 106.7009, 15.0);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getShiftId()).isEqualTo(fallbackVenueShift.getShiftId());
+        assertThat(list.get(0).getLocationLat()).isEqualTo(mockEvent.getVenueLat());
+        assertThat(list.get(0).getLocationLng()).isEqualTo(mockEvent.getVenueLng());
     }
 
     // =========================================================================

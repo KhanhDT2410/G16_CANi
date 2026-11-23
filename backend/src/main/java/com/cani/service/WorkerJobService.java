@@ -109,6 +109,9 @@ public class WorkerJobService {
     @Autowired(required = false)
     private ShiftStaffingPolicy shiftStaffingPolicy;
 
+    @Autowired(required = false)
+    private WorkerNearbyShiftQueryService workerNearbyShiftQueryService;
+
     private ShiftStaffingPolicy getStaffingPolicy() {
         if (shiftStaffingPolicy != null) {
             return shiftStaffingPolicy;
@@ -130,6 +133,20 @@ public class WorkerJobService {
                 workerAvailabilityRepository,
                 blockListService,
                 skillRepository
+        );
+    }
+
+    private WorkerNearbyShiftQueryService getNearbyShiftQueryService() {
+        if (workerNearbyShiftQueryService != null) {
+            return workerNearbyShiftQueryService;
+        }
+        return WorkerNearbyShiftQueryService.withFallbackDependencies(
+                workerRepository,
+                shiftRepository,
+                shiftAssignmentRepository,
+                shiftSkillRequirementRepository,
+                skillRepository,
+                getEligibilityService()
         );
     }
 
@@ -619,149 +636,7 @@ public class WorkerJobService {
 
     @Transactional(readOnly = true)
     public List<NearbyShiftResponseDto> getNearbyShifts(UUID userId, Double userLat, Double userLng, Double radiusKm) {
-        double searchRadius = (radiusKm != null && radiusKm > 0) ? radiusKm : DEFAULT_SEARCH_RADIUS_KM;
-        double centerLat = (userLat != null) ? userLat : DEFAULT_CENTER_LAT;
-        double centerLng = (userLng != null) ? userLng : DEFAULT_CENTER_LNG;
-
-        // Lấy danh sách ca đang active của Worker để check trùng ca (1 thời điểm chỉ làm 1 ca)
-        List<ShiftAssignment> workerActiveAssignments = Collections.emptyList();
-        if (userId != null) {
-            Worker worker = workerRepository.findByUser_UserId(userId).orElse(null);
-            if (worker != null) {
-                // Ưu tiên tiêu chí tìm việc (Worker Preferences) nếu client không truyền bán kính cụ thể
-                if ((radiusKm == null || radiusKm <= 0) && worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0) {
-                    searchRadius = worker.getMaxDistanceKm();
-                }
-                // Fallback tọa độ cơ sở của Worker nếu GPS client không gửi lên
-                if (userLat == null && worker.getBaseLat() != null) {
-                    centerLat = worker.getBaseLat();
-                }
-                if (userLng == null && worker.getBaseLng() != null) {
-                    centerLng = worker.getBaseLng();
-                }
-
-                // Yêu cầu eKYC: Tài khoản chưa hoàn tất định danh -> không hiển thị danh sách việc làm gần đó
-                if (worker.getKycStatus() != com.cani.entity.enums.KycStatus.APPROVED) {
-                    log.info("Worker {} chưa hoàn tất eKYC (KycStatus={}), ẩn danh sách công việc gần đó", userId, worker.getKycStatus());
-                    return Collections.emptyList();
-                }
-                workerActiveAssignments = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
-                        worker.getWorkerId(),
-                        List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING)
-                );
-            }
-        }
-
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
-        Instant now = Instant.now();
-        List<Shift> candidateShifts = new ArrayList<>();
-        List<Shift> activeShifts = shiftRepository.findByStatus(ShiftStatus.ACTIVE);
-        if (activeShifts != null) {
-            candidateShifts.addAll(activeShifts);
-        }
-        List<Shift> inProgressShifts = shiftRepository.findByStatus(ShiftStatus.IN_PROGRESS);
-        if (inProgressShifts != null) {
-            for (Shift s : inProgressShifts) {
-                if (Boolean.TRUE.equals(s.getEmergency())
-                        && (s.getEndTime() == null || !now.isAfter(s.getEndTime()))) {
-                    candidateShifts.add(s);
-                }
-            }
-        }
-        List<NearbyShiftResponseDto> nearbyList = new ArrayList<>();
-
-        for (Shift s : candidateShifts) {
-            // Chỉ hiển thị các ca còn cần tuyển người (remainingWorkers > 0) và chưa hết giờ làm
-            if (s.getRemainingWorkers() == null || s.getRemainingWorkers() <= 0) {
-                continue;
-            }
-            if (s.getEndTime() != null && now.isAfter(s.getEndTime())) {
-                continue;
-            }
-
-            Double sLat = s.getLocationLat() != null ? s.getLocationLat() : (s.getEvent() != null ? s.getEvent().getVenueLat() : null);
-            Double sLng = s.getLocationLng() != null ? s.getLocationLng() : (s.getEvent() != null ? s.getEvent().getVenueLng() : null);
-
-            double distance = MatchingDispatchService.calculateDistance(centerLat, centerLng, sLat, sLng);
-            if (distance <= searchRadius) {
-                Event e = s.getEvent();
-
-                // Kiểm tra xung đột trùng ca
-                boolean isConflicting = false;
-                String conflictReason = null;
-                if (!workerActiveAssignments.isEmpty() && s.getStartTime() != null && s.getEndTime() != null) {
-                    for (ShiftAssignment activeAssign : workerActiveAssignments) {
-                        Shift existingShift = activeAssign.getShift();
-                        if (existingShift != null && existingShift.getStartTime() != null && existingShift.getEndTime() != null) {
-                            if (s.getStartTime().isBefore(existingShift.getEndTime()) && s.getEndTime().isAfter(existingShift.getStartTime())) {
-                                isConflicting = true;
-                                String cJob = existingShift.getJobType() != null ? existingShift.getJobType() : "Ca làm việc";
-                                String cRange = fmt.format(existingShift.getStartTime()) + " - " + fmt.format(existingShift.getEndTime());
-                                conflictReason = "Trùng giờ với " + cJob + " (" + cRange + ")";
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
-                String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()
-                        ? eo.getCompanyName()
-                        : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
-                List<WorkerShiftEligibilityService.EffectiveRequirement> effectiveReqs = getEligibilityService().resolveEffectiveRequirements(s);
-                List<String> reqSkillNames = effectiveReqs.stream()
-                        .filter(r -> r.requirementType() == com.cani.entity.enums.SkillRequirementType.REQUIRED)
-                        .map(WorkerShiftEligibilityService.EffectiveRequirement::skillName)
-                        .filter(Objects::nonNull)
-                        .toList();
-                if (reqSkillNames.isEmpty() && s.getRequiredSkills() != null && s.getRequiredSkills().length > 0) {
-                    reqSkillNames = resolveSkillNames(s.getRequiredSkills());
-                }
-                List<String> prefSkillNames = effectiveReqs.stream()
-                        .filter(r -> r.requirementType() == com.cani.entity.enums.SkillRequirementType.PREFERRED)
-                        .map(WorkerShiftEligibilityService.EffectiveRequirement::skillName)
-                        .filter(Objects::nonNull)
-                        .toList();
-
-                nearbyList.add(NearbyShiftResponseDto.builder()
-                        .shiftId(s.getShiftId())
-                        .eventId(e != null ? e.getEventId() : null)
-                        .eventName(e != null ? e.getName() : "Sự kiện")
-                        .eoId(eo != null ? eo.getEoId() : null)
-                        .eoName(eoName)
-                        .eoVerified(eo != null && eo.getVerificationStatus() == com.cani.entity.enums.VerificationStatus.APPROVED)
-                        .eoRatingAvg(eo != null ? eo.getRatingAvg() : null)
-                        .jobType(s.getJobType())
-                        .description(s.getDescription())
-                        .locationAddress(s.getLocationAddress() != null ? s.getLocationAddress() : (e != null ? e.getVenueAddress() : ""))
-                        .locationLat(sLat)
-                        .locationLng(sLng)
-                        .hourlyWage(s.getHourlyWage())
-                        .allowance(s.getAllowance())
-                        .startTime(s.getStartTime())
-                        .endTime(s.getEndTime())
-                        .arrivalTime(s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime())
-                        .requiredSkills(s.getRequiredSkills())
-                        .requiredSkillNames(reqSkillNames)
-                        .preferredSkillNames(prefSkillNames)
-                        .performedSkillId(s.getPerformedSkillId())
-                        .performedSkillName(resolveSingleSkillName(s.getPerformedSkillId()))
-                        .skillRequirements(effectiveReqs.stream().map(WorkerShiftEligibilityService.EffectiveRequirement::toDto).toList())
-                        .customSkillNotes(s.getCustomSkillNotes())
-                        .distanceKm(Math.round(distance * 10.0) / 10.0)
-                        .requiredWorkers(s.getRequiredWorkers())
-                        .confirmedWorkers(s.getConfirmedWorkers())
-                        .remainingWorkers(s.getRemainingWorkers())
-                        .imageUrl(s.getImageUrl())
-                        .isConflicting(isConflicting)
-                        .conflictReason(conflictReason)
-                        .emergency(Boolean.TRUE.equals(s.getEmergency()))
-                        .build());
-            }
-        }
-
-        nearbyList.sort(Comparator.comparingDouble(NearbyShiftResponseDto::getDistanceKm));
-        return nearbyList;
+        return getNearbyShiftQueryService().getNearbyShifts(userId, userLat, userLng, radiusKm);
     }
 
     /** Map skillId -> tên kỹ năng (taxonomy) để mobile hiển thị badge kỹ năng bắt buộc */

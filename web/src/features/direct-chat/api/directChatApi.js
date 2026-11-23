@@ -11,6 +11,12 @@ export const directChatApi = {
     return res.data?.data || [];
   },
 
+  /** Lấy số lượng cuộc trò chuyện chưa đọc (lightweight polling khi đóng chat) */
+  getUnreadCount: async () => {
+    const res = await apiClient.get('/v1/chat/unread-count');
+    return res.data?.data ?? res.data ?? 0;
+  },
+
   /** Mở hoặc khởi tạo chat 1-1 với một người dùng (Worker / EO) */
   openDirectConversation: async (targetUserId) => {
     const res = await apiClient.post(`/v1/chat/direct/${targetUserId}`);

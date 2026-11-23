@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -70,10 +72,8 @@ public class NotificationService {
         Notification saved = notificationRepository.save(notification);
         log.info("[NotificationService] In-App Notification saved for user {}: {}", targetUserId, title);
 
-        // 2. Bắn Push Notification qua Firebase (Kênh tức thời - Lockscreen)
-        if (fcmService != null) {
-            fcmService.sendPushToUser(targetUserId, title, body, dataPayload);
-        }
+        // 2. Bắn Push Notification qua Firebase (Kênh tức thời - Lockscreen) sau khi transaction commit
+        dispatchPushAfterCommit(targetUserId, title, body, dataPayload);
 
         return saved;
     }
@@ -101,18 +101,36 @@ public class NotificationService {
             Notification saved = notificationRepository.save(notification);
             log.info("[NotificationService] In-App Notification saved for user {}: {}", user.getUserId(), title);
 
-            if (fcmService != null && user.getUserId() != null) {
-                try {
-                    fcmService.sendPushToUser(user.getUserId(), title, body, null);
-                } catch (Exception ex) {
-                    log.warn("Lỗi khi gửi FCM push cho user {}: {}", user.getUserId(), ex.getMessage());
-                }
-            }
+            dispatchPushAfterCommit(user.getUserId(), title, body, null);
 
             return saved;
         } catch (Exception e) {
             log.error("Lỗi khi lưu thông báo cho user {}: {}", user.getUserId(), e.getMessage(), e);
             return null;
+        }
+    }
+
+    private void dispatchPushAfterCommit(UUID userId, String title, String body, Map<String, String> data) {
+        if (fcmService == null || userId == null) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        fcmService.sendPushToUser(userId, title, body, data);
+                    } catch (Exception ex) {
+                        log.warn("Lỗi khi gửi FCM push sau commit cho user {}: {}", userId, ex.getMessage());
+                    }
+                }
+            });
+        } else {
+            try {
+                fcmService.sendPushToUser(userId, title, body, data);
+            } catch (Exception ex) {
+                log.warn("Lỗi khi gửi FCM push cho user {}: {}", userId, ex.getMessage());
+            }
         }
     }
 

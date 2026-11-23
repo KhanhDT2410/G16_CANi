@@ -1732,12 +1732,11 @@ class EoEventServiceTest {
         UUID e2 = UUID.randomUUID();
         Event event1 = Event.builder().eventId(e1).name("Event 1").build();
         Event event2 = Event.builder().eventId(e2).name("Event 2").build();
-        Shift shift1 = Shift.builder().shiftId(UUID.randomUUID()).build();
+        Shift shift1 = Shift.builder().shiftId(UUID.randomUUID()).event(event1).build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eoId)).thenReturn(List.of(event1, event2));
-        when(shiftRepository.findByEvent_EventId(e1)).thenReturn(List.of(shift1));
-        when(shiftRepository.findByEvent_EventId(e2)).thenReturn(Collections.emptyList());
+        when(shiftRepository.findByEvent_EventIdIn(anyCollection())).thenReturn(List.of(shift1));
 
         List<EventResponseDto> list = eoEventService.getMyEvents(userId);
 
@@ -1767,7 +1766,7 @@ class EoEventServiceTest {
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
         when(eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(eoId)).thenReturn(List.of(eNew, eOld));
-        when(shiftRepository.findByEvent_EventId(any())).thenReturn(Collections.emptyList());
+        when(shiftRepository.findByEvent_EventIdIn(anyCollection())).thenReturn(Collections.emptyList());
 
         List<EventResponseDto> list = eoEventService.getMyEvents(userId);
 
@@ -2258,6 +2257,85 @@ class EoEventServiceTest {
         assertEquals(confirmedSkillId, sa.getConfirmedPerformedSkillId());
         assertTrue(sa.getEoConfirmed());
         verify(progService).recordCompletedShiftForAssignment(sa, confirmedSkillId);
+    }
+
+    @Test
+    @DisplayName("UTC078 - getMyEventsPage() - Normal: Trả về trang sự kiện EO kèm metadata phân trang & batch shifts")
+    void getMyEventsPage_Success_ReturnsPaginatedEventsWithShifts() {
+        UUID e1 = UUID.randomUUID();
+        Event event1 = Event.builder().eventId(e1).name("Paginated Event 1").status(EventStatus.ACTIVE).build();
+        Shift shift1 = Shift.builder().shiftId(UUID.randomUUID()).event(event1).jobType("Lễ tân").requiredWorkers(2).confirmedWorkers(1).build();
+
+        org.springframework.data.domain.Page<Event> eventPage = new org.springframework.data.domain.PageImpl<>(
+                List.of(event1),
+                org.springframework.data.domain.PageRequest.of(0, 1),
+                3L
+        );
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventOrganizer_EoIdAndDeletedAtIsNullOrderByCreatedAtDesc(
+                eq(eoId), any(org.springframework.data.domain.Pageable.class)
+        )).thenReturn(eventPage);
+        when(shiftRepository.findByEvent_EventIdIn(List.of(e1))).thenReturn(List.of(shift1));
+
+        com.cani.dto.eo.EoEventPageResponseDto result = eoEventService.getMyEventsPage(userId, 0, 1);
+
+        assertNotNull(result);
+        assertEquals(1, result.getItems().size());
+        assertEquals("Paginated Event 1", result.getItems().get(0).getName());
+        assertEquals(1, result.getItems().get(0).getShifts().size());
+        assertEquals(0, result.getPage());
+        assertEquals(1, result.getSize());
+        assertEquals(3L, result.getTotalElements());
+        assertEquals(3, result.getTotalPages());
+        assertTrue(result.isHasNext());
+        assertFalse(result.isHasPrevious());
+    }
+
+    @Test
+    @DisplayName("UTC079 - getEventWorkersList() - Normal: Batch-fetches assignments, attendance logs, payments và reviews theo O(1)")
+    void getEventWorkersList_Success_UsesBatchQueriesWithoutNPlusOne() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).name("Batch Workers Event").build();
+        UUID s1Id = UUID.randomUUID();
+        UUID s2Id = UUID.randomUUID();
+        Shift s1 = Shift.builder().shiftId(s1Id).event(mockEvent).jobType("Lễ tân").hourlyWage(BigDecimal.valueOf(50000)).build();
+        Shift s2 = Shift.builder().shiftId(s2Id).event(mockEvent).jobType("Bảo vệ").hourlyWage(BigDecimal.valueOf(60000)).build();
+
+        UUID a1Id = UUID.randomUUID();
+        UUID a2Id = UUID.randomUUID();
+        Worker w1 = Worker.builder().workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).fullName("Worker A").build()).build();
+        Worker w2 = Worker.builder().workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).fullName("Worker B").build()).build();
+        ShiftAssignment sa1 = ShiftAssignment.builder().assignmentId(a1Id).shift(s1).worker(w1).status(AssignmentStatus.COMPLETED).eoConfirmed(true).build();
+        ShiftAssignment sa2 = ShiftAssignment.builder().assignmentId(a2Id).shift(s2).worker(w2).status(AssignmentStatus.CHECKED_IN).eoConfirmed(false).build();
+
+        AttendanceLog log1 = AttendanceLog.builder().shiftAssignment(sa1).worker(w1).hoursWorked(BigDecimal.valueOf(4.0)).isOnTime(true).build();
+        Payment pay1 = Payment.builder().assignmentId(a1Id).status(PaymentStatus.CONFIRMED_FULL).declaredAmount(BigDecimal.valueOf(200000)).build();
+        Review rev1 = Review.builder().assignmentId(a1Id).reviewerId(userId).rating(5).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+        when(shiftRepository.findByEvent_EventIdAndStatusNot(eventId, ShiftStatus.CANCELLED)).thenReturn(List.of(s1, s2));
+        when(shiftAssignmentRepository.findByShift_ShiftIdIn(List.of(s1Id, s2Id))).thenReturn(List.of(sa1, sa2));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(List.of(a1Id, a2Id))).thenReturn(List.of(log1));
+        when(paymentRepository.findByAssignmentIdIn(List.of(a1Id, a2Id))).thenReturn(List.of(pay1));
+        when(reviewRepository.findByAssignmentIdIn(List.of(a1Id, a2Id))).thenReturn(List.of(rev1));
+
+        List<ShiftAttendanceDto> workers = eoEventService.getEventWorkersList(userId, eventId);
+
+        assertNotNull(workers);
+        assertEquals(2, workers.size());
+        assertEquals("Worker A", workers.get(0).getWorkerName());
+        assertEquals("CONFIRMED_FULL", workers.get(0).getPaymentStatus());
+        assertTrue(workers.get(0).getHasReviewedWorker());
+        assertEquals("Worker B", workers.get(1).getWorkerName());
+        assertEquals("NOT_DECLARED", workers.get(1).getPaymentStatus());
+        assertFalse(workers.get(1).getHasReviewedWorker());
+
+        verify(shiftAssignmentRepository, times(1)).findByShift_ShiftIdIn(List.of(s1Id, s2Id));
+        verify(shiftAssignmentRepository, never()).findByShift_ShiftId(any());
+        verify(attendanceLogRepository, never()).findByShiftAssignment_AssignmentId(any());
+        verify(paymentRepository, never()).findByAssignmentId(any());
     }
 
 }

@@ -174,6 +174,33 @@ public class ShiftStaffingPolicy {
      * Điều kiện ca nằm trong khung cảnh báo thiếu nhân sự sát giờ (mặc định <= 4h trước startTime đến trước endTime).
      */
     public boolean isNearStartUnderstaffed(Shift shift, Instant now) {
+        if (!isShiftEligibleForNearStartUnderstaffedCheck(shift, now)) {
+            return false;
+        }
+        int confirmed = resolveConfirmedWorkersCount(shift);
+        return isNearStartUnderstaffed(shift, now, confirmed);
+    }
+
+    public boolean isNearStartUnderstaffed(Shift shift, Instant now, int confirmedWorkers) {
+        if (!isShiftEligibleForNearStartUnderstaffedCheck(shift, now)) {
+            return false;
+        }
+        Instant effectiveNow = now != null ? now : Instant.now();
+        int required = resolveRequiredWorkers(shift);
+        int confirmed = Math.max(0, confirmedWorkers);
+        if (confirmed >= required) {
+            return false;
+        }
+        // Nếu hệ thống đã bật chế độ khẩn cấp (vd do Worker hủy ca hoặc No-show) -> hiển thị cảnh báo ngay
+        if (Boolean.TRUE.equals(shift.getEmergency())) {
+            return true;
+        }
+        int alertWindowHours = Math.max(1, understaffedAlertHours);
+        Instant windowStart = shift.getStartTime().minus(Duration.ofHours(alertWindowHours));
+        return !effectiveNow.isBefore(windowStart);
+    }
+
+    private boolean isShiftEligibleForNearStartUnderstaffedCheck(Shift shift, Instant now) {
         if (shift == null || shift.getStartTime() == null) {
             return false;
         }
@@ -189,21 +216,7 @@ public class ShiftStaffingPolicy {
                 || effectiveStatus == ShiftStatus.SUSPENDED) {
             return false;
         }
-        if (shift.getEndTime() != null && effectiveNow.isAfter(shift.getEndTime())) {
-            return false;
-        }
-        int required = resolveRequiredWorkers(shift);
-        int confirmed = resolveConfirmedWorkersCount(shift);
-        if (confirmed >= required) {
-            return false;
-        }
-        // Nếu hệ thống đã bật chế độ khẩn cấp (vd do Worker hủy ca hoặc No-show) -> hiển thị cảnh báo ngay
-        if (Boolean.TRUE.equals(shift.getEmergency())) {
-            return true;
-        }
-        int alertWindowHours = Math.max(1, understaffedAlertHours);
-        Instant windowStart = shift.getStartTime().minus(Duration.ofHours(alertWindowHours));
-        return !effectiveNow.isBefore(windowStart);
+        return shift.getEndTime() == null || !effectiveNow.isAfter(shift.getEndTime());
     }
 
     /**
@@ -270,15 +283,30 @@ public class ShiftStaffingPolicy {
         if (shift == null) {
             return new EmergencyEligibility(false, "Không tìm thấy thông tin ca làm việc.", null, 0, 0, 0, false, false, 0, resolveEffectiveEmergencyRadiusKm(null));
         }
+        int confirmed = resolveConfirmedWorkersCount(shift);
+        int pendingProposals = resolvePendingProposalCount(shift);
+        return evaluateEmergencyEligibility(shift, effectiveNow, confirmed, pendingProposals);
+    }
+
+    public EmergencyEligibility evaluateEmergencyEligibility(
+            Shift shift,
+            Instant now,
+            int confirmedWorkers,
+            int pendingProposals
+    ) {
+        Instant effectiveNow = now != null ? now : Instant.now();
+        if (shift == null) {
+            return new EmergencyEligibility(false, "Không tìm thấy thông tin ca làm việc.", null, 0, 0, 0, false, false, 0, resolveEffectiveEmergencyRadiusKm(null));
+        }
 
         Event event = shift.getEvent();
         boolean inviteMode = event != null && event.getMode() == EventMode.INVITE;
         ShiftStatus effectiveStatus = resolveEffectiveShiftStatus(shift, effectiveNow);
         int required = resolveRequiredWorkers(shift);
-        int confirmed = resolveConfirmedWorkersCount(shift);
+        int confirmed = Math.max(0, confirmedWorkers);
         int missing = Math.max(0, required - confirmed);
-        boolean nearStart = isNearStartUnderstaffed(shift, effectiveNow);
-        int pendingProposals = resolvePendingProposalCount(shift);
+        boolean nearStart = isNearStartUnderstaffed(shift, effectiveNow, confirmed);
+        int resolvedPendingProposals = Math.max(0, pendingProposals);
         double defaultRadius = resolveEffectiveEmergencyRadiusKm(null);
 
         String blockReason = null;
@@ -315,7 +343,7 @@ public class ShiftStaffingPolicy {
                 missing,
                 nearStart,
                 inviteMode,
-                pendingProposals,
+                resolvedPendingProposals,
                 defaultRadius
         );
     }

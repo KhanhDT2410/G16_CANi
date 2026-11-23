@@ -15,6 +15,8 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
 
     List<WorkerEkycVerification> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
+    List<WorkerEkycVerification> findByWorker_WorkerIdInOrderByCreatedAtDesc(Collection<UUID> workerIds);
+
     @Override
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"worker", "worker.user"})
     Optional<WorkerEkycVerification> findById(UUID id);

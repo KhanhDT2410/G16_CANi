@@ -778,9 +778,9 @@ const EventCreationWizardModal = ({
       await eoService.publishEvent(createdEvent.eventId);
       const finalEvent = buildFinalEventObject('ACTIVE');
       showToast('Đã đăng tuyển và tự động tìm kiếm nhân sự thành công! Chuyển sang trang chi tiết sự kiện.', 'success');
-      await onSuccess?.();
+      const refreshed = await onSuccess?.();
       handleClose();
-      onEventCreated?.(finalEvent);
+      onEventCreated?.(finalEvent, refreshed);
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi khi kích hoạt tìm kiếm', 'error');
     } finally {
@@ -791,9 +791,9 @@ const EventCreationWizardModal = ({
   const handleSaveAsDraft = async () => {
     const finalEvent = buildFinalEventObject('DRAFT');
     showToast('Đã lưu sự kiện ở chế độ Bản nháp! Chuyển sang trang chi tiết sự kiện.', 'success');
-    await onSuccess?.();
+    const refreshed = await onSuccess?.();
     handleClose();
-    onEventCreated?.(finalEvent);
+    onEventCreated?.(finalEvent, refreshed);
   };
 
   const handleClose = () => {

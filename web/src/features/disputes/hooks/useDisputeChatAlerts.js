@@ -20,15 +20,38 @@ export const useDisputeChatAlerts = (intervalMs = 20000) => {
   }, []);
 
   useEffect(() => {
-    fetchAlerts();
-    const timer = setInterval(fetchAlerts, intervalMs);
+    const isTabVisible = () =>
+      typeof document === 'undefined' || document.visibilityState === 'visible';
 
-    const handleDisputeUpdated = () => fetchAlerts();
+    if (isTabVisible()) {
+      fetchAlerts();
+    }
+
+    const timer = setInterval(() => {
+      if (isTabVisible()) {
+        fetchAlerts();
+      }
+    }, intervalMs);
+
+    const handleDisputeUpdated = () => {
+      if (isTabVisible()) {
+        fetchAlerts();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (isTabVisible()) {
+        fetchAlerts();
+      }
+    };
+
     window.addEventListener('cani:dispute_chat_updated', handleDisputeUpdated);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(timer);
       window.removeEventListener('cani:dispute_chat_updated', handleDisputeUpdated);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [fetchAlerts, intervalMs]);
 

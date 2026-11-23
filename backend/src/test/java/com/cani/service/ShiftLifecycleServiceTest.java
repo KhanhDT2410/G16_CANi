@@ -79,7 +79,7 @@ class ShiftLifecycleServiceTest {
                 .endTime(Instant.now().plus(Duration.ofHours(10)))
                 .build();
 
-        lenient().when(eventRepository.findAll()).thenReturn(List.of());
+        lenient().when(eventRepository.findByStatusNotInAndDeletedAtIsNull(anyCollection())).thenReturn(List.of());
     }
 
     @Test
@@ -98,7 +98,7 @@ class ShiftLifecycleServiceTest {
                 .understaffedAlertSent(false)
                 .build();
 
-        when(shiftRepository.findAll()).thenReturn(List.of(shift));
+        when(shiftRepository.findByStatusNotInWithEvent(anyCollection())).thenReturn(List.of(shift));
         when(shiftAssignmentRepository.existsByShift_ShiftId(shift.getShiftId())).thenReturn(false);
 
         shiftLifecycleService.evaluateShiftsAndEventsLifecycleAt(now);
@@ -124,7 +124,7 @@ class ShiftLifecycleServiceTest {
                 .understaffedAlertSent(false)
                 .build();
 
-        when(shiftRepository.findAll()).thenReturn(List.of(shift));
+        when(shiftRepository.findByStatusNotInWithEvent(anyCollection())).thenReturn(List.of(shift));
         when(shiftAssignmentRepository.existsByShift_ShiftId(shift.getShiftId())).thenReturn(false);
 
         shiftLifecycleService.evaluateShiftsAndEventsLifecycleAt(now);
@@ -152,7 +152,7 @@ class ShiftLifecycleServiceTest {
                 .understaffedAlertSent(false)
                 .build();
 
-        when(shiftRepository.findAll()).thenReturn(List.of(shift));
+        when(shiftRepository.findByStatusNotInWithEvent(anyCollection())).thenReturn(List.of(shift));
         // Có 4 assignment CONFIRMED (các proposal PENDING không tính là đã chốt)
         when(shiftAssignmentRepository.existsByShift_ShiftId(shiftId)).thenReturn(true);
         when(shiftAssignmentRepository.countByShift_ShiftIdAndStatusIn(eq(shiftId), anyList())).thenReturn(4L);
@@ -212,7 +212,7 @@ class ShiftLifecycleServiceTest {
                 .status(ShiftStatus.COMPLETED).requiredWorkers(5).confirmedWorkers(0)
                 .startTime(now.minus(Duration.ofHours(5))).endTime(now.minus(Duration.ofHours(1))).build();
 
-        when(shiftRepository.findAll()).thenReturn(List.of(draft, cancelled, completed));
+        when(shiftRepository.findByStatusNotInWithEvent(anyCollection())).thenReturn(List.of(draft, cancelled, completed));
 
         shiftLifecycleService.evaluateShiftsAndEventsLifecycleAt(now);
 
@@ -235,7 +235,7 @@ class ShiftLifecycleServiceTest {
                 .understaffedAlertSent(false)
                 .build();
 
-        when(shiftRepository.findAll()).thenReturn(List.of(shift));
+        when(shiftRepository.findByStatusNotInWithEvent(anyCollection())).thenReturn(List.of(shift));
         when(shiftAssignmentRepository.existsByShift_ShiftId(shift.getShiftId())).thenReturn(false);
 
         shiftLifecycleService.evaluateShiftsAndEventsLifecycleAt(now);
@@ -273,7 +273,7 @@ class ShiftLifecycleServiceTest {
                 .understaffedAlertSent(false)
                 .build();
 
-        when(shiftRepository.findAll()).thenReturn(List.of(shift));
+        when(shiftRepository.findByStatusNotInWithEvent(anyCollection())).thenReturn(List.of(shift));
         when(shiftAssignmentRepository.existsByShift_ShiftId(shift.getShiftId())).thenReturn(false);
 
         shiftLifecycleService.evaluateShiftsAndEventsLifecycleAt(now);
@@ -298,7 +298,7 @@ class ShiftLifecycleServiceTest {
                 .understaffedAlertSent(false)
                 .build();
 
-        when(shiftRepository.findAll()).thenReturn(List.of(shift));
+        when(shiftRepository.findByStatusNotInWithEvent(anyCollection())).thenReturn(List.of(shift));
         when(shiftAssignmentRepository.existsByShift_ShiftId(shift.getShiftId())).thenReturn(false);
 
         shiftLifecycleService.evaluateShiftsAndEventsLifecycleAt(now);

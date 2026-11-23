@@ -7,6 +7,12 @@ export const eoService = {
     return response.data?.data || [];
   },
 
+  // Lấy danh sách sự kiện của EO theo trang (Server-side Pagination)
+  getMyEventsPage: async ({ page = 0, size = 20 } = {}) => {
+    const response = await apiClient.get('/v1/eo/events/page', { params: { page, size } });
+    return response.data?.data;
+  },
+
   // Chi tiết sự kiện
   getEventDetail: async (eventId) => {
     try {

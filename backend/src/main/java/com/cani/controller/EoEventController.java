@@ -1,6 +1,7 @@
 package com.cani.controller;
 
 import com.cani.dto.admin.noshow.NoShowResponseDto;
+import com.cani.dto.eo.EoEventPageResponseDto;
 import com.cani.dto.event.*;
 import com.cani.dto.response.ApiResponse;
 import com.cani.entity.Review;
@@ -231,6 +232,21 @@ public class EoEventController {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
         List<EventResponseDto> list = eoEventService.getMyEvents(userId);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách sự kiện thành công"));
+    }
+
+    /**
+     * Danh sách sự kiện của EO có phân trang (Batch-fetched O(1) queries)
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/page")
+    public ResponseEntity<ApiResponse<EoEventPageResponseDto>> getMyEventsPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        EoEventPageResponseDto pageResult = eoEventService.getMyEventsPage(userId, page, size);
+        return ResponseEntity.ok(ApiResponse.ok(pageResult, "Lấy danh sách sự kiện phân trang thành công"));
     }
 
     /**

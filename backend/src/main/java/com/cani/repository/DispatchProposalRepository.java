@@ -3,15 +3,23 @@ package com.cani.repository;
 import com.cani.entity.DispatchProposal;
 import com.cani.entity.enums.ProposalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface DispatchProposalRepository extends JpaRepository<DispatchProposal, UUID> {
+    interface ShiftProposalCountProjection {
+        UUID getShiftId();
+        long getProposalCount();
+    }
+
     List<DispatchProposal> findByShift_ShiftId(UUID shiftId);
     List<DispatchProposal> findByWorker_WorkerIdAndStatusOrderByCreatedAtDesc(UUID workerId, ProposalStatus status);
     List<DispatchProposal> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
@@ -19,6 +27,15 @@ public interface DispatchProposalRepository extends JpaRepository<DispatchPropos
     boolean existsByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(UUID shiftId, UUID workerId, List<ProposalStatus> statuses);
     long countByShift_ShiftIdAndStatusIn(UUID shiftId, List<ProposalStatus> statuses);
+
+    @Query("SELECT dp.shift.shiftId AS shiftId, COUNT(dp) AS proposalCount " +
+           "FROM DispatchProposal dp " +
+           "WHERE dp.shift.shiftId IN :shiftIds AND dp.status IN :statuses " +
+           "GROUP BY dp.shift.shiftId")
+    List<ShiftProposalCountProjection> countProposalsByShiftIdsAndStatusIn(
+            @Param("shiftIds") Collection<UUID> shiftIds,
+            @Param("statuses") Collection<ProposalStatus> statuses
+    );
     List<DispatchProposal> findByStatusAndExpiresAtBefore(ProposalStatus status, Instant expiresAt);
     List<DispatchProposal> findByStatus(ProposalStatus status);
     List<DispatchProposal> findByStatusAndGroupIdIsNotNullAndCreatedAtAfter(ProposalStatus status, Instant after);

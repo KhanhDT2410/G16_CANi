@@ -39,10 +39,15 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
   late final MapController _mapController;
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
+  final Stopwatch _mountStopwatch = Stopwatch();
+  bool _loggedFirstTileReady = false;
+  bool _loggedFirstTileError = false;
+  int _tileErrorCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _mountStopwatch.start();
     _mapController = MapController();
     _pulseController = AnimationController(
       vsync: this,
@@ -125,7 +130,29 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
               subdomains: const ['0', '1', '2', '3'],
               fallbackUrl: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
               maxZoom: 20,
-              errorTileCallback: (tile, error, stackTrace) {},
+              tileBuilder: (context, tileWidget, tile) {
+                if (!_loggedFirstTileReady && tile.loadFinishedAt != null && !tile.loadError) {
+                  _loggedFirstTileReady = true;
+                  _mountStopwatch.stop();
+                  debugPrint(
+                    '[JobRadarMap] First tile rendered in ${_mountStopwatch.elapsedMilliseconds}ms '
+                    '(coords=${tile.coordinates.z}/${tile.coordinates.x}/${tile.coordinates.y}, '
+                    'tileErrorsBeforeFirst=$_tileErrorCount)',
+                  );
+                }
+                return tileWidget;
+              },
+              errorTileCallback: (tile, error, stackTrace) {
+                _tileErrorCount++;
+                if (!_loggedFirstTileError) {
+                  _loggedFirstTileError = true;
+                  debugPrint(
+                    '[JobRadarMap] Primary tile error at ${_mountStopwatch.elapsedMilliseconds}ms '
+                    '(coords=${tile.coordinates.z}/${tile.coordinates.x}/${tile.coordinates.y}, '
+                    'fallback=cartocdn): $error',
+                  );
+                }
+              },
             ),
             CircleLayer(
               circles: [

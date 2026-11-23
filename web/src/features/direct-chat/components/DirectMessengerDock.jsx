@@ -61,10 +61,23 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
     };
 
     fetchDetail();
-    const interval = setInterval(fetchDetail, 3000);
+    const interval = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        fetchDetail();
+      }
+    }, 3000);
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        fetchDetail();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [convId]);
 

@@ -1377,6 +1377,8 @@ class WorkerJobServiceTest {
     @Test
     @DisplayName("UTC054 - createReview() - Normal: Worker gửi đánh giá EO thành công sau khi COMPLETED")
     void createReview_Success_CreatesReviewForOrganizer() {
+        activeShift.setStartTime(Instant.now().minus(5, ChronoUnit.HOURS));
+        activeShift.setEndTime(Instant.now().minus(1, ChronoUnit.HOURS));
         UUID assignmentId = UUID.randomUUID();
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.COMPLETED).build();
         CreateReviewRequestDto req = CreateReviewRequestDto.builder()
@@ -1411,6 +1413,22 @@ class WorkerJobServiceTest {
         assertThatThrownBy(() -> workerJobService.createReview(userId, assignmentId, CreateReviewRequestDto.builder().build()))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Chỉ có thể đánh giá Ban tổ chức sau khi đã hoàn thành và kết ca");
+    }
+
+    @Test
+    @DisplayName("UTC054c - createReview() - Abnormal: Chưa đến giờ kết thúc ca theo lịch trình bị chặn đánh giá")
+    void createReview_Abnormal_BeforeEndTimeThrowsBadRequestException() {
+        UUID assignmentId = UUID.randomUUID();
+        activeShift.setEndTime(Instant.now().plus(2, ChronoUnit.HOURS));
+        ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.COMPLETED).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> workerJobService.createReview(userId, assignmentId, CreateReviewRequestDto.builder().build()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ có thể đánh giá Ban tổ chức sau khi ca làm việc đã kết thúc theo lịch trình");
     }
 
     @Test

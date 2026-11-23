@@ -277,12 +277,29 @@ public class WorkerJobService {
         log.info("Worker {} đã từ chối đề xuất {}. Lý do: {}", userId, proposalId, reason);
 
         Shift rejectedShift = proposal.getShift();
-        if (rejectedShift != null && (rejectedShift.getEvent() == null
-                || rejectedShift.getEvent().getMode() != com.cani.entity.enums.EventMode.INVITE)) {
-            try {
-                matchingDispatchService.dispatchForShift(rejectedShift.getShiftId());
-            } catch (Exception e) {
-                log.warn("Lỗi khi dispatch lại sau khi reject: {}", e.getMessage());
+        if (rejectedShift != null) {
+            // Ticket EO-011: Thông báo cho EO khi Worker từ chối đề xuất ca khẩn cấp
+            if (Boolean.TRUE.equals(rejectedShift.getEmergency())) {
+                Event ev = rejectedShift.getEvent();
+                String evName = ev != null ? ev.getName() : "Sự kiện";
+                sendEoShiftNotification(
+                        rejectedShift,
+                        "⚠️ [CỨU TRỢ KHẨN CẤP] Worker từ chối lời mời nhận ca",
+                        String.format("Worker %s đã từ chối đề xuất khẩn cấp ca \"%s\" (%s). Hệ thống tiếp tục điều phối ứng viên tiếp theo.",
+                                worker.getFullName(), rejectedShift.getJobType(), evName),
+                        com.cani.entity.enums.NotificationType.REMINDER,
+                        null,
+                        worker.getWorkerId(),
+                        "EMERGENCY_PROPOSAL_REJECTED"
+                );
+            }
+
+            if (rejectedShift.getEvent() == null || rejectedShift.getEvent().getMode() != com.cani.entity.enums.EventMode.INVITE) {
+                try {
+                    matchingDispatchService.dispatchForShift(rejectedShift.getShiftId());
+                } catch (Exception e) {
+                    log.warn("Lỗi khi dispatch lại sau khi reject: {}", e.getMessage());
+                }
             }
         }
     }
@@ -1672,20 +1689,34 @@ public class WorkerJobService {
         if (shift == null || worker == null || assignment == null) return;
         Event ev = shift.getEvent();
         String evName = ev != null ? ev.getName() : "Sự kiện";
+        boolean isEmergency = Boolean.TRUE.equals(shift.getEmergency());
+        String title = isEmergency
+                ? "🚨 [CỨU TRỢ KHẨN CẤP] Nhân sự nhận ca thành công: " + shift.getJobType()
+                : "Nhân sự nhận ca làm việc: " + shift.getJobType();
+        String body = isEmergency
+                ? String.format("Worker %s đã tiếp nhận ca cứu trợ khẩn cấp \"%s\" (%s).",
+                        worker.getFullName(), shift.getJobType(), evName)
+                : worker.getFullName() + " đã tham gia ca \"" + shift.getJobType() + "\" trong sự kiện \"" + evName + "\".";
         sendEoShiftNotification(
                 shift,
-                "Nhân sự nhận ca làm việc",
-                worker.getFullName() + " đã tham gia ca \"" + shift.getJobType() + "\" trong sự kiện \"" + evName + "\".",
+                title,
+                body,
                 com.cani.entity.enums.NotificationType.ASSIGNMENT,
-                assignment.getAssignmentId()
+                assignment.getAssignmentId(),
+                worker.getWorkerId(),
+                isEmergency ? "EMERGENCY_ASSIGNMENT_ACCEPTED" : "ASSIGNMENT_ACCEPTED"
         );
     }
 
     private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId) {
-        sendEoShiftNotification(shift, title, body, type, assignmentId, null);
+        sendEoShiftNotification(shift, title, body, type, assignmentId, null, null);
     }
 
     private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId, UUID workerId) {
+        sendEoShiftNotification(shift, title, body, type, assignmentId, workerId, null);
+    }
+
+    private void sendEoShiftNotification(Shift shift, String title, String body, com.cani.entity.enums.NotificationType type, UUID assignmentId, UUID workerId, String alertType) {
         if (notificationService == null || shift == null) return;
         Event ev = shift.getEvent();
         if (ev != null && ev.getEventOrganizer() != null && ev.getEventOrganizer().getUser() != null
@@ -1700,6 +1731,9 @@ public class WorkerJobService {
                 }
                 if (workerId != null) {
                     metadata.put("workerId", workerId.toString());
+                }
+                if (alertType != null) {
+                    metadata.put("type", alertType);
                 }
                 notificationService.createAndSend(
                         eoUserId,

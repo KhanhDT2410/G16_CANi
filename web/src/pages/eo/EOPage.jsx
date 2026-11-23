@@ -141,6 +141,19 @@ export default function EOPage() {
         } catch (err) {
           console.warn('Lỗi setSearchParams:', err);
         }
+
+        const notifType = String(e.detail?.notificationType || e.detail?.alertType || '');
+        if (targetShiftId && (notifType === 'EMERGENCY_PROPOSAL' || notifType.startsWith('EMERGENCY'))) {
+          try {
+            sessionStorage.removeItem('cani_eo_dismissed_emergency_' + targetShiftId);
+          } catch {}
+          window.dispatchEvent(
+            new CustomEvent('cani_open_emergency_prompt', {
+              detail: { shiftId: targetShiftId, eventId: resolvedEventId },
+            })
+          );
+        }
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };

@@ -52,6 +52,36 @@ export const NOTIFICATION_TYPE_CONFIG = {
     icon: 'UT',
     badgeClass: 'notif-type-appeal',
   },
+  EMERGENCY: {
+    label: 'Cứu trợ khẩn cấp',
+    icon: '🚨',
+    badgeClass: 'notif-type-emergency',
+  },
+};
+
+/**
+ * Kiểm tra xem thông báo có thuộc sự kiện Emergency Dispatch hay không (Ticket EO-011)
+ */
+export const isEmergencyNotification = (notification) => {
+  if (!notification) return false;
+  const title = String(notification.title || '').toUpperCase();
+  if (
+    title.includes('KHẨN CẤP') ||
+    title.includes('CỨU TRỢ') ||
+    title.includes('EMERGENCY')
+  ) {
+    return true;
+  }
+  let parsedData = {};
+  if (notification.data) {
+    try {
+      parsedData = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
+    } catch {
+      // ignore
+    }
+  }
+  const type = String(parsedData?.type || '').toUpperCase();
+  return type.startsWith('EMERGENCY') || type === 'UNDERSTAFFED_NEAR_START';
 };
 
 /**

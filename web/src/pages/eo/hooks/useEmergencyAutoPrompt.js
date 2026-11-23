@@ -13,10 +13,59 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
   const [promptTarget, setPromptTarget] = useState(null); // { shift, event }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const activePromptIdRef = useRef(null);
+  const pendingPromptShiftIdRef = useRef(null);
+
+  // Lắng nghe sự kiện người dùng bấm vào thông báo chuông khẩn cấp (Ticket EO-011)
+  useEffect(() => {
+    const handleOpenPrompt = (e) => {
+      const shiftId = Number(e.detail?.shiftId);
+      if (!shiftId) return;
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(DISMISSED_STORAGE_KEY_PREFIX + shiftId);
+      }
+      let foundPair = null;
+      if (Array.isArray(events)) {
+        for (const evt of events) {
+          if (!evt || !Array.isArray(evt.shifts)) continue;
+          const s = evt.shifts.find((item) => item.shiftId === shiftId);
+          if (s) {
+            foundPair = { shift: s, event: evt };
+            break;
+          }
+        }
+      }
+
+      if (foundPair) {
+        activePromptIdRef.current = shiftId;
+        setPromptTarget(foundPair);
+        pendingPromptShiftIdRef.current = null;
+      } else {
+        pendingPromptShiftIdRef.current = shiftId;
+      }
+    };
+
+    window.addEventListener('cani_open_emergency_prompt', handleOpenPrompt);
+    return () => window.removeEventListener('cani_open_emergency_prompt', handleOpenPrompt);
+  }, [events]);
 
   useEffect(() => {
     if (!Array.isArray(events) || events.length === 0) return;
     if (promptTarget) return; // Đang hiển thị popup cho một ca, không ghi đè
+
+    // Nếu có ca đang chờ kích hoạt từ Notification Bell
+    if (pendingPromptShiftIdRef.current) {
+      const pendingId = pendingPromptShiftIdRef.current;
+      for (const evt of events) {
+        if (!evt || !Array.isArray(evt.shifts)) continue;
+        const shift = evt.shifts.find((s) => s.shiftId === pendingId);
+        if (shift) {
+          pendingPromptShiftIdRef.current = null;
+          activePromptIdRef.current = shift.shiftId;
+          setPromptTarget({ shift, event: evt });
+          return;
+        }
+      }
+    }
 
     const now = new Date();
     const candidatePairs = [];

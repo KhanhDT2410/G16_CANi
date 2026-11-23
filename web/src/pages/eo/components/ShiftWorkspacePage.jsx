@@ -8,7 +8,6 @@ import { getDynamicShiftStatus, getShiftStaffingSummary } from '../utils/eventHe
 import RateWorkerModal from './RateWorkerModal';
 import ConfirmVerifySkillModal from './ConfirmVerifySkillModal';
 import ReportNoShowModal from './ReportNoShowModal';
-import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
 import ShiftEmergencyBanner from './ShiftEmergencyBanner';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
@@ -35,7 +34,6 @@ export default function ShiftWorkspacePage({
   const [attendanceList, setAttendanceList] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
-  const [emergencyConfirmOpen, setEmergencyConfirmOpen] = useState(false);
   const [emergencyDispatchResult, setEmergencyDispatchResult] = useState(null);
   const [selectedForVerify, setSelectedForVerify] = useState(null);
   const [selectedForReview, setSelectedForReview] = useState(null);
@@ -418,18 +416,21 @@ export default function ShiftWorkspacePage({
               setShowQrModal(true);
             }}
             style={{
+              minHeight: '38px',
               background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '8px',
-              padding: '0.5rem 0.95rem',
+              padding: '0.45rem 1rem',
               fontSize: '0.84rem',
-              fontWeight: 800,
+              fontWeight: 700,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 6,
               boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+              transition: 'all 0.15s ease',
             }}
             title="Mở mã QR điểm danh Vào ca cho nhân sự"
           >
@@ -443,18 +444,21 @@ export default function ShiftWorkspacePage({
               setShowQrModal(true);
             }}
             style={{
+              minHeight: '38px',
               background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '8px',
-              padding: '0.5rem 0.95rem',
+              padding: '0.45rem 1rem',
               fontSize: '0.84rem',
-              fontWeight: 800,
+              fontWeight: 700,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 6,
               boxShadow: '0 2px 6px rgba(13, 148, 136, 0.25)',
+              transition: 'all 0.15s ease',
             }}
             title="Mở mã QR điểm danh Kết ca cho nhân sự"
           >
@@ -464,13 +468,15 @@ export default function ShiftWorkspacePage({
           {shift.emergency && staffingSummary.missing > 0 && (
             <span
               style={{
+                minHeight: '38px',
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 background: '#fff1f2',
                 color: '#e11d48',
                 border: '1.5px solid #fecdd3',
                 borderRadius: '8px',
-                padding: '0.45rem 0.85rem',
+                padding: '0.45rem 0.95rem',
                 fontSize: '0.82rem',
                 fontWeight: 700,
               }}
@@ -489,14 +495,19 @@ export default function ShiftWorkspacePage({
               type="button"
               onClick={() => onOpenInvite(shift, event)}
               style={{
+                minHeight: '38px',
                 background: '#f5f3ff',
                 color: '#6d28d9',
                 border: '1px solid #ddd6fe',
                 borderRadius: '8px',
-                padding: '0.5rem 0.85rem',
+                padding: '0.45rem 0.95rem',
                 fontSize: '0.82rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
               }}
             >
               Mã Mời
@@ -508,14 +519,19 @@ export default function ShiftWorkspacePage({
               type="button"
               onClick={() => onEditShift(shift)}
               style={{
+                minHeight: '38px',
                 background: '#ffffff',
                 color: '#334155',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
-                padding: '0.5rem 0.85rem',
+                padding: '0.45rem 0.95rem',
                 fontSize: '0.82rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
               }}
             >
               Sửa Ca
@@ -524,22 +540,12 @@ export default function ShiftWorkspacePage({
         </div>
       </div>
 
-      {/* Cảnh báo thiếu nhân sự sát giờ / nút kích hoạt khẩn cấp hoặc mời thêm */}
+      {/* Cảnh báo thiếu nhân sự sát giờ hoặc đã bật khẩn cấp */}
       <ShiftEmergencyBanner
         shift={shift}
         event={event}
         localDispatchResult={emergencyDispatchResult}
-        onTriggerEmergency={() => setEmergencyConfirmOpen(true)}
         onOpenInvite={onOpenInvite}
-      />
-
-      <EmergencyDispatchConfirmModal
-        isOpen={emergencyConfirmOpen}
-        shift={shift}
-        event={event}
-        onClose={() => setEmergencyConfirmOpen(false)}
-        onSuccess={(_, res) => setEmergencyDispatchResult(res)}
-        onReloadEvents={onReloadEvents}
       />
 
       {/* 2. THÔNG TIN CHUNG CỦA CA */}

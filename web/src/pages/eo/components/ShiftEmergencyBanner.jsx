@@ -2,21 +2,22 @@ import React from 'react';
 import { getShiftStaffingSummary } from '../utils/eventHelpers';
 
 /**
- * Hiển thị cảnh báo thiếu nhân sự cho từng ca làm việc tại chỗ kèm thao tác hợp lệ:
- * - Ca ACTIVE hoặc IN_PROGRESS (trước giờ kết thúc) còn thiếu -> nút "Kích hoạt khẩn cấp"
- * - Ca INVITE còn thiếu -> nút "Mời thêm Worker"
- * - Ca đã bật Emergency -> nhãn "Đang điều phối khẩn cấp" hoặc "Đã bật điều phối · Chưa tìm được Worker phù hợp"
+ * ShiftEmergencyBanner (Ticket EO-009)
+ * Hiển thị cảnh báo thiếu nhân sự cho từng ca làm việc tại chỗ:
+ * - Loại bỏ nút bật Emergency Dispatch thủ công theo yêu cầu EO-009.
+ * - Ca đã bật Emergency -> hiển thị nhãn "Đang điều phối khẩn cấp".
+ * - Ca cận giờ thiếu người (ACTIVE hoặc IN_PROGRESS) -> hiển thị thông báo và hệ thống tự động đề xuất.
+ * - Ca INVITE còn thiếu -> nút "Mời thêm Worker".
  */
 export default function ShiftEmergencyBanner({
   shift,
   event,
-  onTriggerEmergency,
   onOpenInvite,
   localDispatchResult = null,
 }) {
   const summary = getShiftStaffingSummary(shift, event);
 
-  // Khi đã đủ nhân sự -> gỡ cảnh báo đang hoạt động và nút kích hoạt
+  // Khi đã đủ nhân sự -> gỡ cảnh báo đang hoạt động
   if (summary.missing <= 0 || summary.isDraft || summary.isCancelled || summary.isCompleted) {
     return null;
   }
@@ -38,7 +39,7 @@ export default function ShiftEmergencyBanner({
   return (
     <div
       style={{
-        padding: '0.75rem 0.95rem',
+        padding: '0.75rem 1rem',
         borderRadius: 10,
         backgroundColor: summary.isEmergency ? '#fef2f2' : summary.isInProgress ? '#fff7ed' : '#fff1f2',
         border: `1px solid ${summary.isEmergency ? '#fca5a5' : summary.isInProgress ? '#fdba74' : '#fecdd3'}`,
@@ -57,39 +58,46 @@ export default function ShiftEmergencyBanner({
           <div style={{ fontSize: '0.76rem', color: '#9a3412' }}>
             {summary.isInviteMode
               ? 'Ca đã đến giờ làm việc. Bạn có thể mời thêm Worker hoặc kiểm tra điểm danh ca.'
-              : 'Ca đã đến giờ làm việc và vẫn còn thiếu nhân sự. Bạn có thể bật điều phối khẩn cấp để tìm người bù ca hoặc kiểm tra điểm danh.'}
+              : 'Ca đã đến giờ làm việc và vẫn còn thiếu nhân sự. Hệ thống tự động đề xuất mở rộng tìm người bù ca hoặc bạn có thể kiểm tra điểm danh.'}
           </div>
         )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        {/* Chế độ mời trực tiếp (INVITE) */}
         {summary.isInviteMode && onOpenInvite && (
           <button
             type="button"
             onClick={() => onOpenInvite(shift, event)}
             style={{
+              minHeight: '34px',
               background: '#7c3aed',
               color: '#ffffff',
               border: 'none',
               borderRadius: 8,
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.8rem',
+              padding: '0.45rem 0.9rem',
+              fontSize: '0.82rem',
               fontWeight: 700,
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               whiteSpace: 'nowrap',
+              transition: 'background 0.15s ease',
             }}
           >
             Mời thêm Worker
           </button>
         )}
 
+        {/* Ca đã kích hoạt Emergency Dispatch */}
         {!summary.isInviteMode && summary.isEmergency && (
           <span
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.4rem 0.8rem',
+              gap: '0.4rem',
+              padding: '0.4rem 0.85rem',
               borderRadius: 8,
               fontSize: '0.78rem',
               fontWeight: 700,
@@ -112,25 +120,35 @@ export default function ShiftEmergencyBanner({
           </span>
         )}
 
-        {!summary.isInviteMode && !summary.isEmergency && summary.canTriggerEmergency && onTriggerEmergency && (
-          <button
-            type="button"
-            onClick={() => onTriggerEmergency(shift, event)}
+        {/* Ca cận giờ thiếu người nhưng chưa bật Emergency Dispatch (Được quản lý tự động bởi hệ thống qua Popup) */}
+        {!summary.isInviteMode && !summary.isEmergency && summary.nearStartUnderstaffed && (
+          <span
             style={{
-              background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-              color: '#ffffff',
-              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.4rem 0.85rem',
               borderRadius: 8,
-              padding: '0.45rem 0.9rem',
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(225, 29, 72, 0.25)',
+              backgroundColor: '#fff1f2',
+              color: '#be123c',
+              border: '1px solid #fecdd3',
               whiteSpace: 'nowrap',
             }}
+            title="Hệ thống tự động đề xuất mở rộng phạm vi tìm kiếm khi cận giờ bắt đầu"
           >
-            Kích hoạt khẩn cấp
-          </button>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: '#e11d48',
+                display: 'inline-block',
+              }}
+            />
+            Cận giờ · Tự động đề xuất
+          </span>
         )}
       </div>
     </div>

@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { showToast } from '../../../components/common/Toast';
 import { eoService } from '../../../services/eoService';
-import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import { getEventStatusPriority, getShiftStaffingSummary } from '../utils/eventHelpers';
 
@@ -21,7 +20,6 @@ export default function EORecruitmentTab({
 }) {
   const [selectedEventFilter, setSelectedEventFilter] = useState('ALL');
   const [roleFilter, setRoleFilter] = useState('ALL');
-  const [emergencyModal, setEmergencyModal] = useState({ isOpen: false, shift: null });
   const [activeEmergencies, setActiveEmergencies] = useState({});
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
@@ -438,29 +436,45 @@ export default function EORecruitmentTab({
 
                   {/* Các thao tác tuyển dụng & vận hành ca */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {!isFull && canTriggerEmergency && (
-                      <button
-                        type="button"
+                    {shift.emergency && (
+                      <span
                         style={{
-                          background: '#dc2626',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '0.45rem 0.85rem',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
+                          gap: '0.35rem',
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: 6,
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          backgroundColor: '#fee2e2',
+                          color: '#b91c1c',
+                          border: '1px solid #fecdd3',
                         }}
-                        onClick={() => setEmergencyModal({ isOpen: true, shift })}
-                        title="Ca sắp diễn ra mà chưa đủ người! Kích hoạt Emergency Broadcast Pool diện rộng."
                       >
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ffffff', display: 'inline-block' }} />
-                        Cứu Trợ Khẩn Cấp
-                      </button>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#dc2626' }} />
+                        Đang điều phối khẩn cấp
+                      </span>
+                    )}
+
+                    {!shift.emergency && summary.nearStartUnderstaffed && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.35rem 0.75rem',
+                          borderRadius: 6,
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          backgroundColor: '#fff1f2',
+                          color: '#be123c',
+                          border: '1px solid #fecdd3',
+                        }}
+                        title="Hệ thống tự động đề xuất mở rộng tìm kiếm khi cận giờ"
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#e11d48' }} />
+                        Cận giờ · Tự động đề xuất
+                      </span>
                     )}
 
                     {isDraftShift && (
@@ -631,15 +645,7 @@ export default function EORecruitmentTab({
         </div>
       )}
 
-      {/* Modal Cứu Trợ Ca Khẩn Cấp (Emergency Dispatch Pool - Section 11) */}
-      <EmergencyDispatchConfirmModal
-        isOpen={emergencyModal.isOpen}
-        shift={emergencyModal.shift}
-        event={events.find((e) => e.eventId === emergencyModal.shift?.eventId)}
-        onClose={() => setEmergencyModal({ isOpen: false, shift: null })}
-        onSuccess={handleEmergencySuccess}
-        onReloadEvents={onReloadEvents}
-      />
+      {/* Hết danh sách ca */}
     </div>
   );
 }

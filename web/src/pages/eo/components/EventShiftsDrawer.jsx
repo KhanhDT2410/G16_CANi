@@ -3,7 +3,6 @@ import { showToast } from '../../../components/common/Toast';
 import { showConfirm } from '../../../components/common/PromptModal';
 import { eoService } from '../../../services/eoService';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
 import { getDynamicShiftStatus, getShiftStaffingSummary } from '../utils/eventHelpers';
 
 /**
@@ -29,7 +28,6 @@ const EventShiftsDrawer = ({
 }) => {
   const [selectedShiftForPanel, setSelectedShiftForPanel] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
-  const [emergencyConfirmShift, setEmergencyConfirmShift] = useState(null);
 
   // Phân loại & sắp xếp: Ca đang hoạt động lên đầu, Ca nháp xuống dưới; Ca đã hủy tách riêng
   const { activeAndDraftShifts, cancelledShifts } = useMemo(() => {
@@ -239,67 +237,50 @@ const EventShiftsDrawer = ({
               if (summary.isDraft || summary.isCancelled || summary.isCompleted) return null;
               if (summary.isEmergency) {
                 return (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const confirmed = await showConfirm({
-                        title: `Tắt điều phối khẩn cấp (${shift.jobType})`,
-                        description: `Tắt chế độ điều phối khẩn cấp cho ca "${shift.jobType}"?`,
-                        type: 'info',
-                        confirmText: 'Tắt chế độ',
-                      });
-                      if (!confirmed) return;
-                      try {
-                        await eoService.disableEmergencyDispatch(shift.shiftId);
-                        showToast(`Đã tắt chế độ khẩn cấp cho ca "${shift.jobType}".`, 'info');
-                        onReloadEvents?.();
-                      } catch (err) {
-                        showToast(err.response?.data?.message || err.message || 'Lỗi thao tác khẩn cấp', 'error');
-                      }
-                    }}
+                  <span
                     style={{
-                      background: '#fef2f2',
-                      color: '#b91c1c',
-                      border: '1px solid #f87171',
-                      borderRadius: 6,
-                      padding: '6px 10px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 4,
+                      gap: '0.35rem',
+                      padding: '0.4rem 0.75rem',
+                      borderRadius: 6,
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      backgroundColor: '#fee2e2',
+                      color: '#b91c1c',
+                      border: '1px solid #fecdd3',
+                      whiteSpace: 'nowrap',
                     }}
-                    title="Tắt điều phối khẩn cấp"
                   >
-                    Tắt Khẩn Cấp
-                  </button>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#dc2626' }} />
+                    Đang điều phối khẩn cấp
+                  </span>
                 );
               }
-              if (!summary.canTriggerEmergency) return null;
-              return (
-                <button
-                  type="button"
-                  onClick={() => setEmergencyConfirmShift(shift)}
-                  style={{
-                    background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '6px 10px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    boxShadow: '0 2px 6px rgba(225, 29, 72, 0.25)',
-                  }}
-                  title="Kích hoạt điều phối khẩn cấp cho ca này"
-                >
-                  Kích hoạt khẩn cấp
-                </button>
-              );
+              if (summary.nearStartUnderstaffed) {
+                return (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.4rem 0.75rem',
+                      borderRadius: 6,
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      backgroundColor: '#fff1f2',
+                      color: '#be123c',
+                      border: '1px solid #fecdd3',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title="Hệ thống tự động đề xuất mở rộng tìm kiếm khi cận giờ"
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#e11d48' }} />
+                    Cận giờ · Tự động đề xuất
+                  </span>
+                );
+              }
+              return null;
             })()}
 
             {shift.status !== 'CANCELLED' && (
@@ -541,13 +522,6 @@ const EventShiftsDrawer = ({
           )}
         </div>
       )}
-      <EmergencyDispatchConfirmModal
-        isOpen={Boolean(emergencyConfirmShift)}
-        shift={emergencyConfirmShift}
-        event={event}
-        onClose={() => setEmergencyConfirmShift(null)}
-        onReloadEvents={onReloadEvents}
-      />
     </div>
   );
 };

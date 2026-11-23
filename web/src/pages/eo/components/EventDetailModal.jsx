@@ -5,7 +5,6 @@ import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import { showPrompt } from '../../../components/common/PromptModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
-import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
 import ShiftEmergencyBanner from './ShiftEmergencyBanner';
 import {
   getDynamicEventStatus,
@@ -45,7 +44,6 @@ export default function EventDetailModal({
   const workerProfile = useWorkerProfile();
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
-  const [emergencyConfirmShift, setEmergencyConfirmShift] = useState(null);
   const [dispatchResultsByShiftId, setDispatchResultsByShiftId] = useState({});
 
   useEffect(() => {
@@ -611,7 +609,6 @@ export default function EventDetailModal({
                       shift={alertSummary.shift}
                       event={event}
                       localDispatchResult={dispatchResultsByShiftId[alertSummary.shift.shiftId]}
-                      onTriggerEmergency={(sh) => setEmergencyConfirmShift(sh)}
                       onOpenInvite={onOpenInvite}
                     />
                   ))}
@@ -1225,21 +1222,6 @@ export default function EventDetailModal({
           error={workerProfile.error}
           profile={workerProfile.profile}
           onClose={workerProfile.closeProfile}
-        />
-
-        {/* Modal Xác Nhận Kích Hoạt Điều Phối Khẩn Cấp (chỉ mở khi EO bấm nút) */}
-        <EmergencyDispatchConfirmModal
-          isOpen={Boolean(emergencyConfirmShift)}
-          shift={emergencyConfirmShift}
-          event={event}
-          onClose={() => setEmergencyConfirmShift(null)}
-          onSuccess={(shiftId, res) =>
-            setDispatchResultsByShiftId((prev) => ({
-              ...prev,
-              [shiftId]: res,
-            }))
-          }
-          onReloadEvents={onReloadEvents}
         />
     </div>
   );

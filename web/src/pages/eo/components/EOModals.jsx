@@ -9,6 +9,8 @@ import DisputeModal from './DisputeModal';
 import LiveAttendanceModal from './LiveAttendanceModal';
 import EditEventModal from './EditEventModal';
 import EditShiftModal from './EditShiftModal';
+import EmergencyDispatchConfirmModal from './EmergencyDispatchConfirmModal';
+import { useEmergencyAutoPrompt } from '../hooks/useEmergencyAutoPrompt';
 import { ROLES } from '../hooks/useShifts';
 
 export default function EOModals({
@@ -24,6 +26,16 @@ export default function EOModals({
 }) {
   const activeEvent =
     events?.eventsList?.find((e) => e.eventId === shifts?.selectedEventId) || null;
+
+  const {
+    promptTarget,
+    isSubmitting: isAutoPromptSubmitting,
+    handleAccept: handleAutoPromptAccept,
+    handleDecline: handleAutoPromptDecline,
+  } = useEmergencyAutoPrompt({
+    events: events?.events || events?.eventsList || [],
+    onReloadEvents: events?.loadEvents,
+  });
 
   return (
     <>
@@ -126,6 +138,18 @@ export default function EOModals({
         address={mapModal.venueAddress}
         radiusKm={mapModal.radiusKm}
       />
+
+      {promptTarget && (
+        <EmergencyDispatchConfirmModal
+          isOpen={Boolean(promptTarget)}
+          shift={promptTarget.shift}
+          event={promptTarget.event}
+          onClose={() => handleAutoPromptDecline(promptTarget.shift.shiftId)}
+          onConfirm={({ radiusKm }) => handleAutoPromptAccept(promptTarget.shift.shiftId, radiusKm)}
+          isSubmitting={isAutoPromptSubmitting}
+          isAutoPrompt={true}
+        />
+      )}
     </>
   );
 }

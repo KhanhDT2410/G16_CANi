@@ -12,9 +12,8 @@ class ApiConstants {
     if (kIsWeb) {
       return 'http://localhost:8080';
     }
-    // Trên thiết bị cắm cáp USB (qua adb reverse tcp:8080 tcp:8080) hoặc máy chủ local:
-    // Mặc định kết nối qua 127.0.0.1:8080 (cực nhanh, không phụ thuộc mạng Wi-Fi)
-    return 'http://127.0.0.1:8080';
+    // Trên thiết bị thật Android / Wi-Fi LAN: Ưu tiên IP LAN máy chủ máy tính để tránh adb reverse bị chặn trên ColorOS/Oppo
+    return 'http://192.168.1.10:8080';
   }
 
   static final String baseUrl = const String.fromEnvironment(
@@ -26,8 +25,8 @@ class ApiConstants {
 
   static const String apiPath = '/api';
 
-  static const Duration connectTimeout = Duration(seconds: 15);
-  static const Duration receiveTimeout = Duration(seconds: 15);
+  static const Duration connectTimeout = Duration(seconds: 6);
+  static const Duration receiveTimeout = Duration(seconds: 10);
 
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',

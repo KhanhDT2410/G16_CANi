@@ -432,7 +432,12 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
       );
     } catch (e) {
       if (!mounted || mySeq != _scanRequestSeq) return;
-      final clean = e.toString().replaceFirst('Exception: ', '').trim();
+      var clean = e.toString().trim();
+      if (clean.startsWith('Exception: ')) {
+        clean = clean.substring(11).trim();
+      } else if (clean.startsWith('DioException')) {
+        clean = 'Không thể kết nối đến máy chủ radar.';
+      }
       state = state.copyWith(
         isLoading: false,
         hasLoadedShifts: true,

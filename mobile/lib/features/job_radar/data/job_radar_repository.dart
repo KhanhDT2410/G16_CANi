@@ -85,6 +85,29 @@ class JobRadarRepository {
             .toList();
       }
       return [];
+    } on DioException catch (e) {
+      if (demoMode) {
+        return _generateDemoShifts(lat, lng);
+      }
+      final statusCode = e.response?.statusCode;
+      final serverMessage = e.response?.data is Map
+          ? (e.response?.data['message'] as String?)
+          : null;
+      if (serverMessage != null && serverMessage.trim().isNotEmpty) {
+        throw Exception(serverMessage.trim());
+      }
+      if (statusCode == 401) {
+        throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+      if (statusCode == 403) {
+        throw Exception('Tài khoản chưa có quyền truy cập dữ liệu việc làm.');
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        throw Exception('Không kết nối được tới máy chủ CANi.');
+      }
+      throw Exception('Không thể tải dữ liệu radar ($statusCode).');
     } catch (e) {
       if (demoMode) {
         return _generateDemoShifts(lat, lng);

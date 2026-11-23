@@ -456,7 +456,7 @@ class JobRadarMapTopOverlay extends ConsumerWidget {
         .any((p) => p.isActiveAt(now));
 
     final isLoadingAny = overlaySlice.isLoading || proposalsAsync.isLoading;
-    final hasAnyError = proposalsAsync.hasError || overlaySlice.radarLoadError != null;
+    final hasAnyError = overlaySlice.radarLoadError != null;
     final hasAnyVisibleData = hasActiveProposals || overlaySlice.hasNearbyShifts;
 
     if (hasAnyError && !isLoadingAny) {
@@ -482,7 +482,11 @@ class JobRadarMapTopOverlay extends ConsumerWidget {
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  hasAnyVisibleData ? 'Tải cập nhật thất bại' : 'Không thể tải dữ liệu Radar',
+                  hasAnyVisibleData
+                      ? 'Tải cập nhật thất bại'
+                      : (overlaySlice.radarLoadError != null && overlaySlice.radarLoadError!.isNotEmpty
+                          ? overlaySlice.radarLoadError!
+                          : 'Không thể tải dữ liệu Radar'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

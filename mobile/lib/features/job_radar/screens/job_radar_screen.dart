@@ -107,7 +107,7 @@ class _JobRadarMapSection extends ConsumerWidget {
         .any((p) => p.isActiveAt(now));
 
     final isLoadingAny = mapSlice.isLoading || proposalsAsync.isLoading;
-    final hasAnyError = proposalsAsync.hasError || mapSlice.radarLoadError != null;
+    final hasAnyError = mapSlice.radarLoadError != null;
     final hasAnyVisibleData = hasActiveProposals || mapSlice.nearbyShifts.isNotEmpty;
 
     final showTopOverlay =

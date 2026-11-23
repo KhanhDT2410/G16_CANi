@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+
+import 'package:cani/core/utils/geo_utils.dart';
 
 class _DistrictHub {
   final String fullName;
@@ -12,19 +13,6 @@ class _DistrictHub {
   final double lat;
   final double lng;
   const _DistrictHub(this.fullName, this.shortName, this.lat, this.lng);
-}
-
-class _AddressSuggestion {
-  final String title;
-  final String fullAddress;
-  final double lat;
-  final double lng;
-  const _AddressSuggestion({
-    required this.title,
-    required this.fullAddress,
-    required this.lat,
-    required this.lng,
-  });
 }
 
 class JobPreferencesCard extends StatefulWidget {
@@ -63,7 +51,7 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
   late final MapController _mapController;
   bool _isGettingGps = false;
   bool _isSearchingAddress = false;
-  List<_AddressSuggestion> _suggestions = [];
+  List<AddressSuggestion> _suggestions = [];
   Timer? _debounceTimer;
 
   final List<double> _distancePresets = const [5, 10, 15, 20, 30];
@@ -115,11 +103,14 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
     _addressController = TextEditingController(text: widget.baseAddress);
     _syncControllerText();
 
-    // Tự động phân giải địa chỉ cụ thể nếu trước đó chỉ lưu chuỗi tọa độ kinh/vĩ độ
+    // Tự động phân giải địa chỉ cụ thể nếu trước đó chỉ lưu chuỗi tọa độ hoặc chuỗi generic
     if (widget.baseLat != null && widget.baseLng != null) {
       final addr = widget.baseAddress.trim();
-      final isRawCoords = addr.isEmpty || RegExp(r'^-?\d+(\.\d+)?[,\s]+-?\d+(\.\d+)?$').hasMatch(addr);
-      if (isRawCoords) {
+      final isGenericOrCoords = addr.isEmpty ||
+          addr == 'Khu vực gần vị trí hiện tại' ||
+          addr == 'Vị trí đã chọn trên bản đồ' ||
+          RegExp(r'^-?\d+(\.\d+)?[,\s]+-?\d+(\.\d+)?$').hasMatch(addr);
+      if (isGenericOrCoords) {
         _resolveFriendlyAddress(widget.baseLat!, widget.baseLng!);
       }
     }
@@ -181,136 +172,37 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
   }
 
   Future<void> _resolveFriendlyAddress(double lat, double lng) async {
-    final resolved = await _reverseGeocode(lat, lng);
+    final resolved = await GeoUtils.reverseGeocode(lat, lng);
     if (resolved != null && resolved.isNotEmpty && mounted) {
       _addressController.text = resolved;
       widget.onLocationChanged(resolved, lat, lng);
     }
   }
 
-  // Tra cứu địa chỉ thực tế từ tọa độ GPS (Reverse Geocoding)
-  Future<String?> _reverseGeocode(double lat, double lng) async {
-    try {
-      final dio = Dio();
-      final res = await dio.get(
-        'https://nominatim.openstreetmap.org/reverse',
-        queryParameters: {
-          'format': 'json',
-          'lat': lat,
-          'lon': lng,
-          'zoom': 18,
-          'addressdetails': 1,
-        },
-        options: Options(
-          headers: {
-            'Accept-Language': 'vi,en;q=0.8',
-            'User-Agent': 'CANiEventStaffingApp/1.0',
-          },
-          receiveTimeout: const Duration(seconds: 4),
-          sendTimeout: const Duration(seconds: 4),
-        ),
-      );
-
-      if (res.data != null && res.data is Map) {
-        final map = res.data as Map<String, dynamic>;
-        final address = map['address'] as Map<String, dynamic>?;
-
-        if (address != null) {
-          final building = address['building'] ??
-              address['amenity'] ??
-              address['residential'] ??
-              address['office'] ??
-              address['commercial'];
-          final road = address['road'] ?? address['pedestrian'] ?? address['street'];
-          final houseNumber = address['house_number'];
-          final suburb = address['suburb'] ?? address['quarter'] ?? address['neighbourhood'] ?? address['village'];
-          final district = address['city_district'] ?? address['district'] ?? address['county'];
-          final city = address['city'] ?? address['state'] ?? address['province'];
-
-          final parts = <String>[];
-          if (building != null && building.toString().isNotEmpty) {
-            parts.add(building.toString());
-          }
-          if (houseNumber != null && road != null) {
-            parts.add('$houseNumber $road');
-          } else if (road != null) {
-            parts.add('$road');
-          }
-          if (suburb != null) parts.add('$suburb');
-          if (district != null) parts.add('$district');
-          if (city != null) parts.add('$city');
-
-          if (parts.isNotEmpty) {
-            return parts.join(', ');
-          }
-        }
-
-        if (map['display_name'] != null) {
-          return map['display_name'].toString();
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
   // Tìm kiếm gợi ý địa chỉ tự động khi người dùng gõ
   void _onAddressInputChanged(String query) {
     widget.onLocationChanged(query, widget.baseLat, widget.baseLng);
     _debounceTimer?.cancel();
-    if (query.trim().length < 3) {
+    if (query.trim().length < 2) {
       if (_suggestions.isNotEmpty) {
         setState(() => _suggestions = []);
       }
       return;
     }
 
-    _debounceTimer = Timer(const Duration(milliseconds: 600), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
       setState(() => _isSearchingAddress = true);
-      try {
-        final dio = Dio();
-        final res = await dio.get(
-          'https://nominatim.openstreetmap.org/search',
-          queryParameters: {
-            'format': 'json',
-            'q': query.trim(),
-            'countrycodes': 'vn',
-            'limit': 5,
-            'addressdetails': 1,
-          },
-          options: Options(
-            headers: {
-              'Accept-Language': 'vi,en;q=0.8',
-              'User-Agent': 'CANiEventStaffingApp/1.0',
-            },
-            receiveTimeout: const Duration(seconds: 4),
-          ),
-        );
-
-        if (mounted && res.data != null && res.data is List) {
-          final list = (res.data as List).map((item) {
-            final m = item as Map<String, dynamic>;
-            final displayName = m['display_name']?.toString() ?? query;
-            final shortTitle = m['name']?.toString() ?? displayName.split(',').first;
-            return _AddressSuggestion(
-              title: shortTitle,
-              fullAddress: displayName,
-              lat: double.tryParse(m['lat'].toString()) ?? 0.0,
-              lng: double.tryParse(m['lon'].toString()) ?? 0.0,
-            );
-          }).toList();
-
-          setState(() {
-            _suggestions = list;
-            _isSearchingAddress = false;
-          });
-          return;
-        }
-      } catch (_) {}
-      if (mounted) setState(() => _isSearchingAddress = false);
+      final results = await GeoUtils.searchAddressSuggestions(query);
+      if (mounted) {
+        setState(() {
+          _suggestions = results;
+          _isSearchingAddress = false;
+        });
+      }
     });
   }
 
-  // Lấy vị trí GPS thực tế từ máy điện thoại và chuyển thành địa chỉ rõ ràng
+  // Lấy vị trí GPS thực tế từ máy điện thoại và chuyển thành địa chỉ rõ ràng (Tương tự Web EO)
   Future<void> _captureGpsLocation() async {
     setState(() => _isGettingGps = true);
     try {
@@ -337,33 +229,61 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
         }
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
+      // 1. Phản hồi tức thì bằng vị trí vừa lưu (Stale-While-Revalidate)
+      Position? position = await Geolocator.getLastKnownPosition();
+      if (position != null) {
+        try {
+          _mapController.move(LatLng(position.latitude, position.longitude), 14.0);
+        } catch (_) {}
+      }
 
-      // Tra cứu địa chỉ chi tiết (Tên đường, phường, quận)
-      final resolvedAddress = await _reverseGeocode(position.latitude, position.longitude);
-      final finalAddress = (resolvedAddress != null && resolvedAddress.isNotEmpty)
-          ? resolvedAddress
-          : 'Khu vực gần vị trí hiện tại';
+      // 2. Lấy tọa độ GPS mới nhất với timeout 5s (tránh bị treo 10s vệ tinh)
+      try {
+        final freshPos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+        position = freshPos;
+      } catch (_) {
+        // Nếu timeout lấy vị trí mới, vẫn tiếp tục dùng position từ lastKnownPosition
+      }
 
-      _addressController.text = finalAddress;
-      widget.onLocationChanged(finalAddress, position.latitude, position.longitude);
+      if (position == null) {
+        throw Exception('Không thể xác định tọa độ GPS thiết bị');
+      }
+
+      // 3. Phân giải địa chỉ chi tiết bằng cơ chế đa tầng (Nominatim + Photon)
+      final resolvedAddress = await GeoUtils.reverseGeocode(position.latitude, position.longitude);
+
+      if (resolvedAddress != null && resolvedAddress.isNotEmpty) {
+        _addressController.text = resolvedAddress;
+        widget.onLocationChanged(resolvedAddress, position.latitude, position.longitude);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đã nhận diện: $resolvedAddress'),
+              backgroundColor: const Color(0xFF0D9488),
+            ),
+          );
+        }
+      } else {
+        // Tọa độ GPS đã nhận nhưng chưa dịch được địa chỉ chữ: KHÔNG gán chuỗi rác vào text!
+        widget.onLocationChanged(_addressController.text, position.latitude, position.longitude);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã định vị tọa độ GPS. Vui lòng nhập thêm số nhà/tên đường nếu cần.'),
+              backgroundColor: Color(0xFF2563EB),
+            ),
+          );
+        }
+      }
+
       try {
         _mapController.move(LatLng(position.latitude, position.longitude), 14.0);
       } catch (_) {}
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã nhận diện: $finalAddress'),
-            backgroundColor: const Color(0xFF0D9488),
-          ),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -736,10 +656,13 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
-                      hintText: 'Ví dụ: Chung cư Vinhomes, Khu tập thể Thành Công...',
+                      hintText: 'Ví dụ: Goldmark City, Chung cư Vinhomes, Cầu Giấy...',
                       hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
                     ),
-                    onChanged: _onAddressInputChanged,
+                    onChanged: (val) {
+                      setState(() {});
+                      _onAddressInputChanged(val);
+                    },
                   ),
                 ),
                 if (_isSearchingAddress)
@@ -747,6 +670,18 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
                     width: 14,
                     height: 14,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0066FF)),
+                  )
+                else if (_addressController.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _addressController.clear();
+                      setState(() => _suggestions = []);
+                      widget.onLocationChanged('', widget.baseLat, widget.baseLng);
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(4.0),
+                      child: Icon(Icons.close_rounded, size: 16, color: Color(0xFF64748B)),
+                    ),
                   ),
               ],
             ),
@@ -909,10 +844,12 @@ class _JobPreferencesCardState extends State<JobPreferencesCard> {
                         try {
                           _mapController.move(point, 13.5);
                         } catch (_) {}
-                        final resolved = await _reverseGeocode(point.latitude, point.longitude);
+                        final resolved = await GeoUtils.reverseGeocode(point.latitude, point.longitude);
                         final displayAddr = (resolved != null && resolved.isNotEmpty)
                             ? resolved
-                            : 'Vị trí đã chọn trên bản đồ';
+                            : (_addressController.text.trim().isNotEmpty
+                                ? _addressController.text.trim()
+                                : 'Vị trí đã chọn trên bản đồ');
                         _addressController.text = displayAddr;
                         widget.onLocationChanged(displayAddr, point.latitude, point.longitude);
                       },

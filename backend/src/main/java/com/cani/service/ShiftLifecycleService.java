@@ -209,10 +209,10 @@ public class ShiftLifecycleService {
                     : "Ca đã bắt đầu, bạn có thể kiểm tra điểm danh hoặc điều phối nhân sự.";
         } else {
             title = inviteMode
-                    ? "⚠️ Cảnh báo thiếu nhân sự sát giờ: " + s.getJobType()
+                    ? "Thiếu nhân sự sát giờ: " + s.getJobType()
                     : "🚨 [ĐỀ XUẤT KHẨN CẤP] Thiếu nhân sự sát giờ: " + s.getJobType();
             actionHint = inviteMode
-                    ? "Vui lòng mở sự kiện để gửi thêm lời mời trực tiếp hoặc mời thêm Worker."
+                    ? "Vui lòng mở sự kiện để mời thêm Worker."
                     : "Hệ thống tự động đề xuất mở rộng tìm kiếm khẩn cấp (Emergency Dispatch). Nhấp để xem và xác nhận.";
         }
 

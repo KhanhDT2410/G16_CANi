@@ -1,17 +1,27 @@
 package com.cani.service.skill;
 
+import com.cani.client.skill.CertificateLookupSource;
+import com.cani.client.skill.CertificateLookupSource.CertificateLookupOutcome;
+import com.cani.client.skill.CertificateLookupSource.CertificateLookupResult;
+import com.cani.client.skill.UnsupportedCertificateLookupSource;
 import com.cani.dto.skill.SkillVerificationResponseDto;
 import com.cani.entity.Skill;
 import com.cani.entity.SkillVerificationRequest;
 import com.cani.entity.Worker;
+import com.cani.entity.WorkerSkill;
+import com.cani.entity.WorkerSkillPoint;
 import com.cani.entity.enums.RoutingDecision;
 import com.cani.entity.enums.SkillVerificationStatus;
+import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.AppException;
 import com.cani.repository.AuditLogRepository;
 import com.cani.repository.SkillRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
 import com.cani.repository.WorkerRepository;
+import com.cani.repository.WorkerSkillPointRepository;
+import com.cani.repository.WorkerSkillRepository;
 import com.cani.service.SkillVerificationService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +33,13 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 /**
  * Integration Test (H2 profile): Xác thực toàn bộ Spring Context V2, JPA mapping các cột V2,
@@ -56,10 +70,25 @@ class SkillVerificationPersistenceIntegrationTest {
     private SkillVerificationRequestRepository requestRepository;
 
     @Autowired
+    private WorkerSkillRepository workerSkillRepository;
+
+    @Autowired
+    private WorkerSkillPointRepository workerSkillPointRepository;
+
+    @Autowired
     private AuditLogRepository auditLogRepository;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    @MockitoBean
+    private CertificateLookupSource certificateLookupSource;
+
+    @BeforeEach
+    void setUpLookupSource() {
+        lenient().when(certificateLookupSource.verifyCertificate(any()))
+                .thenAnswer(inv -> new UnsupportedCertificateLookupSource().verifyCertificate(inv.getArgument(0)));
+    }
 
     private static byte[] validJpegBytes(byte marker) {
         return new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 0x4A, 0x46, marker};
@@ -157,5 +186,73 @@ class SkillVerificationPersistenceIntegrationTest {
         copy2.setReviewNotes("Admin 2 stale update");
         assertThrows(ObjectOptimisticLockingFailureException.class, () ->
                 requestRepository.saveAndFlush(copy2));
+    }
+
+    @Test
+    @DisplayName("Post-Test DB Audit: Thẩm định thành công ghi nhận đầy đủ vào skill_verification_requests, worker_skills, worker_skill_points")
+    void testApprovedVerification_AuditsDatabasePersistenceAndSpAwarding() {
+        Worker worker = workerRepository.findAll().stream().findFirst().orElseThrow();
+        Skill barista = skillRepository.findByName("Pha chế (Bartender/Barista)").orElseThrow();
+
+        // Cấu hình mock nguồn tra cứu xác thực thành công đúng người, đúng kỹ năng
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .verificationReference("https://registry.example.invalid/cert/persist-100")
+                        .recipientName(worker.getFullName())
+                        .institution("Học viện Đào tạo Pha chế Sài Gòn")
+                        .certificateNumber("SB-2026-PERSIST-100")
+                        .expiryDate("31/12/2030")
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build()
+        );
+
+        byte[] certImage = validJpegBytes((byte) 0xAA);
+        MockMultipartFile file = new MockMultipartFile("file", "cert_audit_success.jpg", "image/jpeg", certImage);
+
+        SkillVerificationResponseDto res = verificationService.submitVerification(
+                worker.getWorkerId(), file, barista.getSkillId(), "Audit persistence test"
+        );
+
+        assertNotNull(res);
+        assertEquals(SkillVerificationStatus.APPROVED, res.getStatus());
+        assertEquals(25, res.getSpAwarded());
+
+        // =========================================================================
+        // ĐỐI SOÁT CƠ SỞ DỮ LIỆU THỰC TẾ (POST-TEST DB AUDIT - AGENTS.MD MỤC 5)
+        // =========================================================================
+
+        // 1. Đối soát bảng skill_verification_requests
+        SkillVerificationRequest persistedReq = requestRepository.findById(res.getId()).orElseThrow();
+        assertEquals(SkillVerificationStatus.APPROVED, persistedReq.getStatus());
+        assertEquals(RoutingDecision.AUTO_APPROVE, persistedReq.getRoutingDecision());
+        assertEquals("QR_OFFICIAL_REGISTRY", persistedReq.getVerificationSource());
+        assertEquals("SB-2026-PERSIST-100", persistedReq.getCertificateNumber());
+        assertEquals(25, persistedReq.getSpAwarded());
+        assertNotNull(persistedReq.getDocumentHash());
+        assertNotNull(persistedReq.getVersion());
+
+        // 2. Đối soát bảng worker_skills
+        WorkerSkill persistedWs = workerSkillRepository
+                .findByWorker_WorkerIdAndSkill_SkillId(worker.getWorkerId(), barista.getSkillId())
+                .orElseThrow();
+        assertEquals(VerificationTier.AI_DOCUMENT, persistedWs.getVerificationTier());
+        assertEquals(25, persistedWs.getSpVerifyAwarded());
+        assertEquals(persistedReq.getId(), persistedWs.getEvidenceRequestId());
+        assertNotNull(persistedWs.getVerifiedAt());
+        assertNotNull(persistedWs.getExpiresAt());
+
+        // 3. Đối soát bảng worker_skill_points
+        WorkerSkillPoint persistedWsp = workerSkillPointRepository
+                .findByWorker_WorkerIdAndSkill_SkillId(worker.getWorkerId(), barista.getSkillId())
+                .orElseThrow();
+        assertEquals(25, persistedWsp.getSpVerify());
+        assertTrue(persistedWsp.getTotalSp() >= 25);
+        assertNotNull(persistedWsp.getTier());
+
+        // 4. Đối soát bảng workers (SkillTier tổng thể)
+        Worker updatedWorker = workerRepository.findById(worker.getWorkerId()).orElseThrow();
+        assertNotNull(updatedWorker.getSkillTier());
     }
 }

@@ -1,0 +1,309 @@
+[
+  {
+    "id": "EVAL-01-CV-PORTFOLIO",
+    "datasetSplit": "EVAL",
+    "description": "Portfolio cá nhân tự lập, không có chứng thực từ cơ quan cấp thẩm quyền",
+    "sampleDocumentPath": "samples/eval_cv_portfolio.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CV_SELF_DECLARED",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": null,
+      "certificateNumber": null,
+      "expiryDate": null,
+      "skills": ["Pha chế (Bartender/Barista)"],
+      "evidenceSnippets": {
+        "skills": "Kỹ năng tự khai: Pha chế (Bartender/Barista)",
+        "recipientName": "Ứng viên: NGUYỄN VĂN AN"
+      },
+      "unreadableFields": [],
+      "missingFields": ["certificateNumber", "institution", "expiryDate"]
+    },
+    "lookupOutcome": "UNSUPPORTED_SOURCE",
+    "lookupSource": "UNSUPPORTED_SOURCE",
+    "lookupFailureReason": "Chưa thể xác minh tự động: Portfolio tự khai không có nguồn tra cứu chứng chỉ",
+    "expectedVerificationStatus": "REJECTED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "NONE"
+  },
+  {
+    "id": "EVAL-02-CORRUPTED-IMAGE",
+    "datasetSplit": "EVAL",
+    "description": "Tệp hình ảnh JPEG bị hỏng bitstream hoặc sai định dạng",
+    "sampleDocumentPath": "samples/eval_corrupted_image.jpg",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CORRUPTED",
+      "recipientName": null,
+      "institution": null,
+      "certificateNumber": null,
+      "expiryDate": null,
+      "skills": [],
+      "evidenceSnippets": {},
+      "unreadableFields": ["documentType", "recipientName", "institution", "certificateNumber", "expiryDate", "skills"],
+      "missingFields": []
+    },
+    "lookupOutcome": "UNSUPPORTED_SOURCE",
+    "lookupSource": "CORRUPTED_FILE_REJECTED",
+    "lookupFailureReason": "Tệp bị hỏng hoặc không thể đọc",
+    "expectedVerificationStatus": "REJECTED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "AI_EXTRACTION"
+  },
+  {
+    "id": "EVAL-03-VALID-CERT-BARISTA",
+    "datasetSplit": "EVAL",
+    "description": "Chứng chỉ Barista chuyên nghiệp hợp lệ, đúng người, đúng kỹ năng, nguồn API chính thức xác thực",
+    "sampleDocumentPath": "samples/eval_cert_valid_barista.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": "Trung tâm Đào tạo Ẩm thực Á Âu",
+      "certificateNumber": "AAU-2026-777",
+      "expiryDate": "31/12/2030",
+      "skills": ["Pha chế (Bartender/Barista)"],
+      "evidenceSnippets": {
+        "recipientName": "Cấp cho: NGUYỄN VĂN AN",
+        "skills": "Kỹ năng: Pha chế (Bartender/Barista)",
+        "certificateNumber": "Số hiệu: AAU-2026-777",
+        "institution": "Đơn vị cấp: Trung tâm Đào tạo Ẩm thực Á Âu"
+      },
+      "unreadableFields": [],
+      "missingFields": []
+    },
+    "lookupOutcome": "VERIFIED",
+    "lookupSource": "NATIONAL_REGISTRY_API",
+    "lookupRecipientName": "NGUYỄN VĂN AN",
+    "lookupInstitution": "Trung tâm Đào tạo Ẩm thực Á Âu",
+    "lookupCertificateNumber": "AAU-2026-777",
+    "lookupExpiryDate": "31/12/2030",
+    "lookupPermanent": false,
+    "lookupMatchedSkills": ["Pha chế (Bartender/Barista)"],
+    "expectedVerificationStatus": "APPROVED",
+    "expectedSp": 25,
+    "expectedFailureCategory": "NONE"
+  },
+  {
+    "id": "EVAL-04-RECIPIENT-MISMATCH",
+    "datasetSplit": "EVAL",
+    "description": "Chứng chỉ cấp cho người khác (Lê Văn Đức != Nguyễn Văn An) -> REJECTED (0 SP)",
+    "sampleDocumentPath": "samples/eval_cert_recipient_mismatch.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "LÊ VĂN ĐỨC",
+      "institution": "Viện Đào tạo Nghề Pha chế Hà Nội",
+      "certificateNumber": "HN-2026-112",
+      "expiryDate": "31/12/2030",
+      "skills": ["Pha chế (Bartender/Barista)"],
+      "evidenceSnippets": {
+        "recipientName": "Cấp cho: LÊ VĂN ĐỨC",
+        "skills": "Kỹ năng: Pha chế (Bartender/Barista)"
+      },
+      "unreadableFields": [],
+      "missingFields": []
+    },
+    "lookupOutcome": "VERIFIED",
+    "lookupSource": "OFFICIAL_API",
+    "lookupRecipientName": "LÊ VĂN ĐỨC",
+    "lookupInstitution": "Viện Đào tạo Nghề Pha chế Hà Nội",
+    "lookupCertificateNumber": "HN-2026-112",
+    "lookupExpiryDate": "31/12/2030",
+    "lookupPermanent": false,
+    "lookupMatchedSkills": ["Pha chế (Bartender/Barista)"],
+    "expectedVerificationStatus": "REJECTED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "BACKEND_RULE"
+  },
+  {
+    "id": "EVAL-05-SKILL-MISMATCH",
+    "datasetSplit": "EVAL",
+    "description": "Chứng chỉ cấp cho Phục vụ bàn tiệc, nhưng Worker yêu cầu Pha chế -> REJECTED (0 SP)",
+    "sampleDocumentPath": "samples/eval_cert_skill_mismatch.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": "Trung tâm Bồi dưỡng Nghiệp vụ Khách sạn",
+      "certificateNumber": "KS-2026-333",
+      "expiryDate": "31/12/2030",
+      "skills": ["Phục vụ bàn (Waiter/Waitress)"],
+      "evidenceSnippets": {
+        "skills": "Kỹ năng: Phục vụ bàn (Waiter/Waitress)",
+        "recipientName": "Trao cho: NGUYỄN VĂN AN"
+      },
+      "unreadableFields": [],
+      "missingFields": []
+    },
+    "lookupOutcome": "VERIFIED",
+    "lookupSource": "OFFICIAL_API",
+    "lookupRecipientName": "NGUYỄN VĂN AN",
+    "lookupInstitution": "Trung tâm Bồi dưỡng Nghiệp vụ Khách sạn",
+    "lookupCertificateNumber": "KS-2026-333",
+    "lookupExpiryDate": "31/12/2030",
+    "lookupPermanent": false,
+    "lookupMatchedSkills": ["Phục vụ bàn (Waiter/Waitress)"],
+    "expectedVerificationStatus": "REJECTED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "BACKEND_RULE"
+  },
+  {
+    "id": "EVAL-06-MALFORMED-DATE",
+    "datasetSplit": "EVAL",
+    "description": "Ngày hết hạn trên chứng chỉ ghi 'chưa rõ' không đọc được -> REJECTED (0 SP)",
+    "sampleDocumentPath": "samples/eval_cert_malformed_date.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": "Học viện Đào tạo Bartender Quốc tế",
+      "certificateNumber": "BI-2026-UNKNOWN-EXP",
+      "expiryDate": "KHONG_DOC_DUOC",
+      "skills": ["Pha chế (Bartender/Barista)"],
+      "evidenceSnippets": {
+        "recipientName": "Trao cho: NGUYỄN VĂN AN",
+        "expiryDate": "Ngày hết hạn: chưa rõ"
+      },
+      "unreadableFields": ["expiryDate"],
+      "missingFields": []
+    },
+    "lookupOutcome": "VERIFIED",
+    "lookupSource": "QR_OFFICIAL_REGISTRY",
+    "lookupRecipientName": "NGUYỄN VĂN AN",
+    "lookupInstitution": "Học viện Đào tạo Bartender Quốc tế",
+    "lookupCertificateNumber": "BI-2026-UNKNOWN-EXP",
+    "lookupExpiryDate": "chưa rõ",
+    "lookupPermanent": false,
+    "lookupMatchedSkills": ["Pha chế (Bartender/Barista)"],
+    "expectedVerificationStatus": "REJECTED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "BACKEND_RULE"
+  },
+  {
+    "id": "EVAL-07-SOURCE-EMPTY-SKILL",
+    "datasetSplit": "EVAL",
+    "description": "Nguồn cấp trả VERIFIED nhưng danh sách kỹ năng rỗng -> REJECTED (0 SP)",
+    "sampleDocumentPath": "samples/eval_cert_empty_skills_source.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": "Viện Phát triển Nguồn Nhân lực Sự kiện",
+      "certificateNumber": "HR-2026-ZERO",
+      "expiryDate": "31/12/2030",
+      "skills": [],
+      "evidenceSnippets": {
+        "recipientName": "Trao cho: NGUYỄN VĂN AN"
+      },
+      "unreadableFields": [],
+      "missingFields": ["skills"]
+    },
+    "lookupOutcome": "VERIFIED",
+    "lookupSource": "OFFICIAL_API",
+    "lookupRecipientName": "NGUYỄN VĂN AN",
+    "lookupInstitution": "Viện Phát triển Nguồn Nhân lực Sự kiện",
+    "lookupCertificateNumber": "HR-2026-ZERO",
+    "lookupExpiryDate": "31/12/2030",
+    "lookupPermanent": false,
+    "lookupMatchedSkills": [],
+    "expectedVerificationStatus": "REJECTED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "BACKEND_RULE"
+  },
+  {
+    "id": "EVAL-08-LIFETIME-CERT",
+    "datasetSplit": "EVAL",
+    "description": "Giấy chứng nhận vô thời hạn được nguồn xác nhận -> APPROVED (+25 SP)",
+    "sampleDocumentPath": "samples/eval_cert_lifetime_safety.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": "Trung tâm Y tế và An toàn Lao động",
+      "certificateNumber": "ATTP-2026-PERM",
+      "expiryDate": "VO_THOI_HAN",
+      "skills": ["Pha chế (Bartender/Barista)"],
+      "evidenceSnippets": {
+        "recipientName": "Trao cho: NGUYỄN VĂN AN",
+        "expiryDate": "Ngày hết hạn: VÔ THỜI HẠN",
+        "skills": "Kỹ năng: Pha chế (Bartender/Barista)"
+      },
+      "unreadableFields": [],
+      "missingFields": []
+    },
+    "lookupOutcome": "VERIFIED",
+    "lookupSource": "NATIONAL_REGISTRY_API",
+    "lookupRecipientName": "NGUYỄN VĂN AN",
+    "lookupInstitution": "Trung tâm Y tế và An toàn Lao động",
+    "lookupCertificateNumber": "ATTP-2026-PERM",
+    "lookupExpiryDate": "VÔ THỜI HẠN",
+    "lookupPermanent": true,
+    "lookupMatchedSkills": ["Pha chế (Bartender/Barista)"],
+    "expectedVerificationStatus": "APPROVED",
+    "expectedSp": 25,
+    "expectedFailureCategory": "NONE"
+  },
+  {
+    "id": "EVAL-09-UNSUPPORTED",
+    "datasetSplit": "EVAL",
+    "description": "Chứng chỉ từ workshop nhỏ không có nguồn tra cứu trực tuyến hỗ trợ",
+    "sampleDocumentPath": "samples/eval_cert_unsupported.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": "Workshop Cà Phê Thủ Công",
+      "certificateNumber": "WS-2026-01",
+      "expiryDate": "31/12/2027",
+      "skills": ["Pha chế (Bartender/Barista)"],
+      "evidenceSnippets": {
+        "skills": "Kỹ năng: Pha chế (Bartender/Barista)"
+      },
+      "unreadableFields": [],
+      "missingFields": []
+    },
+    "lookupOutcome": "UNSUPPORTED_SOURCE",
+    "lookupSource": "UNSUPPORTED_SOURCE",
+    "lookupFailureReason": "Chưa thể xác minh tự động: Chứng chỉ không có nguồn tra cứu chính thức được CANi hỗ trợ",
+    "expectedVerificationStatus": "REJECTED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "LOOKUP_SOURCE"
+  },
+  {
+    "id": "EVAL-10-SOURCE-TIMEOUT",
+    "datasetSplit": "EVAL",
+    "description": "Nguồn tra cứu API gặp lỗi tạm thời (HTTP 504 Timeout) -> VERIFICATION_FAILED (0 SP)",
+    "sampleDocumentPath": "samples/eval_cert_timeout_error.txt",
+    "workerFullName": "Nguyễn Văn An",
+    "workerRequestedSkill": "Pha chế (Bartender/Barista)",
+    "groundTruth": {
+      "documentType": "CERTIFICATE",
+      "recipientName": "NGUYỄN VĂN AN",
+      "institution": "Hiệp hội Pha chế Việt Nam",
+      "certificateNumber": "VBC-2026-TIMEOUT",
+      "expiryDate": "31/12/2030",
+      "skills": ["Pha chế (Bartender/Barista)"],
+      "evidenceSnippets": {
+        "skills": "Kỹ năng: Pha chế (Bartender/Barista)"
+      },
+      "unreadableFields": [],
+      "missingFields": []
+    },
+    "lookupOutcome": "TEMPORARY_FAILURE",
+    "lookupSource": "ISSUER_API",
+    "lookupFailureReason": "Nguồn tra cứu chứng chỉ đang gặp sự cố kết nối tạm thời. Vui lòng thử lại sau ít phút.",
+    "expectedVerificationStatus": "VERIFICATION_FAILED",
+    "expectedSp": 0,
+    "expectedFailureCategory": "LOOKUP_SOURCE"
+  }
+]

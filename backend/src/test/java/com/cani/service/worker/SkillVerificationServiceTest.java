@@ -602,4 +602,218 @@ class SkillVerificationServiceTest {
         assertEquals(SkillVerificationStatus.REVOKED, res.getStatus());
         verify(systemConfigRepository, atLeastOnce()).findByKey("skill_verify_sp_ai_document");
     }
+
+    @Test
+    @DisplayName("Hồi quy Hung Bug 1: Nguồn trả VERIFIED nhưng danh sách kỹ năng rỗng -> REJECTED (0 SP)")
+    void testSubmitVerification_SourceVerifiedButEmptySkills_RejectedWithZeroSp() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_no_skills.jpg", "image/jpeg", validJpegBytes());
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_no_skills.jpg");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName("Nguyen Van An")
+                        .institution("General Training Center")
+                        .certificateNumber("GTC-2026-001")
+                        .expiryDate("31/12/2030")
+                        .matchedSkillNames(Collections.emptyList()) // Rỗng
+                        .build()
+        );
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto res = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "Cert without skills confirmed"
+        );
+
+        assertEquals(SkillVerificationStatus.REJECTED, res.getStatus());
+        assertEquals(RoutingDecision.REJECT, res.getRoutingDecision());
+        assertEquals(0, res.getSpAwarded());
+        assertTrue(res.getRoutingReason().contains("không xác nhận kỹ năng"));
+        verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
+        verify(workerSkillPointRepository, never()).save(any(WorkerSkillPoint.class));
+    }
+
+    @Test
+    @DisplayName("Hồi quy Hung Bug 2: Nguồn trả VERIFIED nhưng ngày hết hạn sai định dạng -> REJECTED (0 SP)")
+    void testSubmitVerification_MalformedExpiryDate_RejectedWithZeroSp() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_bad_date.jpg", "image/jpeg", validJpegBytes());
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_bad_date.jpg");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName("Nguyen Van An")
+                        .institution("Saigon Bartender Academy")
+                        .certificateNumber("SB-2026-999")
+                        .expiryDate("2025/13/40") // Sai định dạng
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build()
+        );
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto res = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "Cert with malformed date"
+        );
+
+        assertEquals(SkillVerificationStatus.REJECTED, res.getStatus());
+        assertEquals(RoutingDecision.REJECT, res.getRoutingDecision());
+        assertEquals(0, res.getSpAwarded());
+        assertTrue(res.getRoutingReason().contains("không đọc được hoặc sai định dạng"));
+        verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
+        verify(workerSkillPointRepository, never()).save(any(WorkerSkillPoint.class));
+    }
+
+    @Test
+    @DisplayName("Chứng chỉ được nguồn cấp xác nhận là không có hạn (vô thời hạn) -> APPROVED (+25 SP)")
+    void testSubmitVerification_PermanentCertificate_ApprovedWithSp() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_permanent.jpg", "image/jpeg", validJpegBytes());
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_permanent.jpg");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName("Nguyen Van An")
+                        .institution("Saigon Bartender Academy")
+                        .certificateNumber("SB-2026-PERM")
+                        .expiryDate("VÔ THỜI HẠN")
+                        .permanentExpiry(true)
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build()
+        );
+        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillRepository.save(any(WorkerSkill.class))).thenAnswer(i -> i.getArgument(0));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(workerId, "Pha chế (Bartender/Barista)"))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.save(any(WorkerSkillPoint.class))).thenAnswer(i -> i.getArgument(0));
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto res = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "Cert permanent"
+        );
+
+        assertEquals(SkillVerificationStatus.APPROVED, res.getStatus());
+        assertEquals(RoutingDecision.AUTO_APPROVE, res.getRoutingDecision());
+        assertEquals(25, res.getSpAwarded());
+        verify(workerSkillRepository, times(1)).save(any(WorkerSkill.class));
+        verify(workerSkillPointRepository, times(1)).save(any(WorkerSkillPoint.class));
+    }
+
+    @Test
+    @DisplayName("Sai kỹ năng: Worker yêu cầu Pha chế nhưng nguồn xác nhận Bảo vệ -> REJECTED (0 SP)")
+    void testSubmitVerification_SkillMismatch_RejectedWithZeroSp() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_other_skill.jpg", "image/jpeg", validJpegBytes());
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_other_skill.jpg");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName("Nguyen Van An")
+                        .institution("Security Academy")
+                        .certificateNumber("SEC-2026-101")
+                        .expiryDate("31/12/2030")
+                        .matchedSkillNames(List.of("Bảo vệ (Security)"))
+                        .build()
+        );
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto res = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "Cert skill mismatch"
+        );
+
+        assertEquals(SkillVerificationStatus.REJECTED, res.getStatus());
+        assertEquals(RoutingDecision.REJECT, res.getRoutingDecision());
+        assertEquals(0, res.getSpAwarded());
+        assertTrue(res.getRoutingReason().contains("không khớp với kỹ năng yêu cầu thẩm định"));
+        verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
+        verify(workerSkillPointRepository, never()).save(any(WorkerSkillPoint.class));
+    }
+
+    @Test
+    @DisplayName("Đối soát danh tính qua eKYC: Ưu tiên tên eKYC đã xác thực khi đối chiếu với nguồn cấp")
+    void testSubmitVerification_VerifiedEkycIdentity_MatchesAndAwardsSp() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_ekyc.jpg", "image/jpeg", validJpegBytes());
+        WorkerEkycVerificationRepository mockEkycRepo = mock(WorkerEkycVerificationRepository.class);
+        verificationService.setWorkerEkycVerificationRepository(mockEkycRepo);
+
+        com.cani.entity.WorkerEkycVerification verifiedEkyc = com.cani.entity.WorkerEkycVerification.builder()
+                .id(UUID.randomUUID())
+                .fullName("NGUYỄN VĂN AN")
+                .status("VERIFIED")
+                .build();
+
+        when(mockEkycRepo.findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(eq(workerId), any()))
+                .thenReturn(Optional.of(verifiedEkyc));
+
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("jpg")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_ekyc.jpg");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName("Nguyen Van An")
+                        .institution("Saigon Bartender Academy")
+                        .certificateNumber("SB-2026-EKYC")
+                        .expiryDate("31/12/2030")
+                        .matchedSkillNames(List.of("Pha chế (Bartender/Barista)"))
+                        .build()
+        );
+        when(workerSkillRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillRepository.save(any(WorkerSkill.class))).thenAnswer(i -> i.getArgument(0));
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndSkill_SkillId(workerId, mockSkill.getSkillId()))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.findByWorker_WorkerIdAndJobType(workerId, "Pha chế (Bartender/Barista)"))
+                .thenReturn(Optional.empty());
+        when(workerSkillPointRepository.save(any(WorkerSkillPoint.class))).thenAnswer(i -> i.getArgument(0));
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto res = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), "eKYC verified match"
+        );
+
+        assertEquals(SkillVerificationStatus.APPROVED, res.getStatus());
+        assertEquals(25, res.getSpAwarded());
+        verify(mockEkycRepo, atLeastOnce()).findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(eq(workerId), any());
+    }
 }

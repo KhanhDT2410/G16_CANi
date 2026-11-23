@@ -59,6 +59,7 @@ public class DisputeService {
     private final NotificationRepository notificationRepository;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
+    private final SupportConversationRepository supportConversationRepository;
 
     private static final List<DisputeStatus> OPEN_STATUSES =
             List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING);
@@ -217,7 +218,16 @@ public class DisputeService {
                 .filter(d -> seen.add(d.getDisputeId()))
                 .sorted(Comparator.comparing(Dispute::getCreatedAt,
                         Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-                .map(this::toDetailDto)
+                .map(d -> {
+                    DisputeDetailResponseDto dto = toDetailDto(d);
+                    supportConversationRepository.findByDisputeIdAndDisputeParty(d.getDisputeId(), "EO")
+                            .filter(c -> c.getUserId().equals(userId))
+                            .ifPresent(c -> dto.setUnreadCount(c.getUnreadUserCount() != null ? c.getUnreadUserCount() : 0));
+                    supportConversationRepository.findByDisputeIdAndDisputeParty(d.getDisputeId(), "WORKER")
+                            .filter(c -> c.getUserId().equals(userId))
+                            .ifPresent(c -> dto.setUnreadCount(c.getUnreadUserCount() != null ? c.getUnreadUserCount() : 0));
+                    return dto;
+                })
                 .toList();
     }
 
@@ -775,6 +785,30 @@ public class DisputeService {
             }
         }
 
+        List<SupportConversation> convs = supportConversationRepository.findByDisputeId(dispute.getDisputeId());
+        int unreadStaff = 0;
+        int workerUnread = 0;
+        int eoUnread = 0;
+        String lastSender = null;
+        Instant lastMsgAt = null;
+
+        for (SupportConversation c : convs) {
+            if (c.getUnreadStaffCount() != null) {
+                unreadStaff += c.getUnreadStaffCount();
+                if ("WORKER".equalsIgnoreCase(c.getDisputeParty())) {
+                    workerUnread += c.getUnreadStaffCount();
+                } else if ("EO".equalsIgnoreCase(c.getDisputeParty())) {
+                    eoUnread += c.getUnreadStaffCount();
+                }
+            }
+            if (c.getLastMessageAt() != null) {
+                if (lastMsgAt == null || c.getLastMessageAt().isAfter(lastMsgAt)) {
+                    lastMsgAt = c.getLastMessageAt();
+                    lastSender = c.getDisputeParty();
+                }
+            }
+        }
+
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())
                 .assignmentId(dispute.getAssignmentId())
@@ -808,11 +842,40 @@ public class DisputeService {
                 .rsPenaltyApplied(dispute.getRsPenaltyApplied())
                 .createdAt(dispute.getCreatedAt())
                 .updatedAt(dispute.getUpdatedAt())
+                .unreadCount(unreadStaff)
+                .workerUnreadCount(workerUnread)
+                .eoUnreadCount(eoUnread)
+                .lastMessageSenderParty(lastSender)
+                .lastMessageAt(lastMsgAt)
                 .evidences(evidences)
                 .build();
     }
 
     private DisputeQueueItemDto toQueueItemDto(Dispute dispute, Instant slaRiskCutoff) {
+        List<SupportConversation> convs = supportConversationRepository.findByDisputeId(dispute.getDisputeId());
+        int unreadStaff = 0;
+        int workerUnread = 0;
+        int eoUnread = 0;
+        String lastSender = null;
+        Instant lastMsgAt = null;
+
+        for (SupportConversation c : convs) {
+            if (c.getUnreadStaffCount() != null) {
+                unreadStaff += c.getUnreadStaffCount();
+                if ("WORKER".equalsIgnoreCase(c.getDisputeParty())) {
+                    workerUnread += c.getUnreadStaffCount();
+                } else if ("EO".equalsIgnoreCase(c.getDisputeParty())) {
+                    eoUnread += c.getUnreadStaffCount();
+                }
+            }
+            if (c.getLastMessageAt() != null) {
+                if (lastMsgAt == null || c.getLastMessageAt().isAfter(lastMsgAt)) {
+                    lastMsgAt = c.getLastMessageAt();
+                    lastSender = c.getDisputeParty();
+                }
+            }
+        }
+
         return DisputeQueueItemDto.builder()
                 .id(dispute.getDisputeId())
                 .type(dispute.getType())
@@ -825,6 +888,11 @@ public class DisputeService {
                 .assignedTo(dispute.getAssignedTo())
                 .escalated(dispute.getStatus() == DisputeStatus.ESCALATED)
                 .slaAtRisk(slaAtRisk(dispute, slaRiskCutoff))
+                .unreadCount(unreadStaff)
+                .workerUnreadCount(workerUnread)
+                .eoUnreadCount(eoUnread)
+                .lastMessageSenderParty(lastSender)
+                .lastMessageAt(lastMsgAt)
                 .build();
     }
 

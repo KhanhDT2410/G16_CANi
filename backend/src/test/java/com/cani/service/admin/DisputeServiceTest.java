@@ -43,6 +43,7 @@ class DisputeServiceTest {
     @Mock private ReliabilityLogRepository reliabilityLogRepository;
     @Mock private NotificationRepository notificationRepository;
     @Mock private AuditLogService auditLogService;
+    @Mock private SupportConversationRepository supportConversationRepository;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks

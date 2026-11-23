@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDisputeChatAlerts } from '../../../features/disputes';
 
 export default function EOSidebar({
   activeNav,
@@ -10,6 +11,7 @@ export default function EOSidebar({
   unreadMessagesCount = 0,
 }) {
   const [isEventsSubMenuOpen, setIsEventsSubMenuOpen] = useState(true);
+  const { unreadDisputes } = useDisputeChatAlerts();
 
   const navItems = [
     {
@@ -55,6 +57,7 @@ export default function EOSidebar({
     {
       key: 'disputes',
       label: 'Tranh chấp & khiếu nại',
+      badge: unreadDisputes > 0 ? unreadDisputes : null,
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>

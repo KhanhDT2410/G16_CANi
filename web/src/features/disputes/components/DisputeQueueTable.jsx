@@ -33,6 +33,7 @@ const DisputeQueueTable = ({
             <th>Mã đơn</th>
             <th>Loại tranh chấp</th>
             <th>Tiêu đề</th>
+            <th>Tin nhắn mới</th>
             <th>SLA Deadline</th>
             <th>Trạng thái</th>
             <th>Người phụ trách</th>
@@ -58,6 +59,29 @@ const DisputeQueueTable = ({
                 </td>
                 <td>
                   <span title={item.title}>{item.title}</span>
+                </td>
+                <td>
+                  {item.workerUnreadCount > 0 || item.eoUnreadCount > 0 || item.unreadCount > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      {item.workerUnreadCount > 0 && (
+                        <span className="unread-sender-pill worker">
+                          Nhân sự ({item.workerUnreadCount})
+                        </span>
+                      )}
+                      {item.eoUnreadCount > 0 && (
+                        <span className="unread-sender-pill eo">
+                          Nhà tổ chức ({item.eoUnreadCount})
+                        </span>
+                      )}
+                      {!item.workerUnreadCount && !item.eoUnreadCount && item.unreadCount > 0 && (
+                        <span className="unread-sender-pill default">
+                          {item.unreadCount} tin mới
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Đã đọc</span>
+                  )}
                 </td>
                 <td>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>

@@ -21,6 +21,7 @@ const MyDisputesTable = ({ disputes, loading, onSelect, onAddEvidence, onEscalat
             <th>Mã đơn</th>
             <th>Danh mục</th>
             <th>Tiêu đề</th>
+            <th>Tin nhắn mới</th>
             <th>Ngày nộp</th>
             <th>Trạng thái</th>
             <th style={{ textAlign: 'right' }}>Thao tác</th>
@@ -46,6 +47,15 @@ const MyDisputesTable = ({ disputes, loading, onSelect, onAddEvidence, onEscalat
                   <span style={{ fontWeight: 500 }}>{typeLabel}</span>
                 </td>
                 <td>{item.title}</td>
+                <td>
+                  {item.unreadCount > 0 ? (
+                    <span className="unread-sender-pill arbitrator">
+                      CSKH ({item.unreadCount} tin mới)
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Đã xem</span>
+                  )}
+                </td>
                 <td>{created}</td>
                 <td>
                   <span className={`dispute-badge ${statusConfig.badgeClass}`}>

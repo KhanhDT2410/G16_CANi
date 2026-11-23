@@ -10,6 +10,7 @@ import {
 } from '../../admin/components/AdminSidebarIcons';
 import { TICKET_SUB_ITEMS } from '../../admin/components/adminSidebar.constants';
 import { useStaffChatAlerts } from '../../../features/support-tickets';
+import { useDisputeChatAlerts } from '../../../features/disputes';
 
 export const CC_NAV_GROUPS = [
   {
@@ -46,6 +47,7 @@ export const CustomerCareSidebar = ({
 }) => {
   const [ticketsExpanded, setTicketsExpanded] = useState(true);
   const { totalUnread } = useStaffChatAlerts();
+  const { unreadDisputes } = useDisputeChatAlerts();
 
   return (
     <aside className={`cc-sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Menu chức năng chăm sóc khách hàng">
@@ -147,16 +149,39 @@ export const CustomerCareSidebar = ({
                   );
                 }
 
+                const isDisputes = item.id === 'disputes';
+                const showDisputeBadge = isDisputes && unreadDisputes > 0;
+
                 return (
                   <button
                     key={item.id}
                     type="button"
                     className={`cc-nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => onSelectTab(item.id)}
-                    title={item.label}
+                    title={showDisputeBadge ? `${item.label} (${unreadDisputes} vụ việc có tin mới)` : item.label}
                   >
-                    <span className="cc-item-icon">{item.icon}</span>
-                    {!collapsed && <span className="cc-item-label">{item.label}</span>}
+                    <span className="cc-item-icon" style={{ position: 'relative' }}>
+                      {item.icon}
+                      {showDisputeBadge && (
+                        <span
+                          className="sidebar-item-dot-badge"
+                          title={`${unreadDisputes} vụ việc có tin mới`}
+                        />
+                      )}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="cc-item-label">{item.label}</span>
+                        {showDisputeBadge && (
+                          <span
+                            className="sidebar-sub-badge"
+                            title={`${unreadDisputes} vụ việc có tin mới`}
+                          >
+                            {unreadDisputes > 99 ? '99+' : unreadDisputes}
+                          </span>
+                        )}
+                      </>
+                    )}
                     {isActive && <span className="cc-active-indicator" />}
                   </button>
                 );

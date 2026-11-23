@@ -11,4 +11,8 @@ import java.util.UUID;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
 
     List<ChatMessage> findByConversationIdOrderByCreatedAtAsc(UUID conversationId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM ChatMessage m WHERE m.createdAt < :cutoff")
+    int deleteByCreatedAtBefore(@org.springframework.data.repository.query.Param("cutoff") java.time.Instant cutoff);
 }

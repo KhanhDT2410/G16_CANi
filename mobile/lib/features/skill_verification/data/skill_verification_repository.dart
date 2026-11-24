@@ -59,6 +59,38 @@ class SkillVerificationRepository {
     String? skillId,
     String? notes,
   }) async {
+    return _uploadVerification(
+      path: '/v1/workers/skills/verify',
+      fileBytes: fileBytes,
+      fileName: fileName,
+      skillId: skillId,
+      notes: notes,
+    );
+  }
+
+  Future<SkillVerificationResult> resubmitVerification({
+    required String verificationId,
+    required Uint8List fileBytes,
+    required String fileName,
+    String? skillId,
+    String? notes,
+  }) async {
+    return _uploadVerification(
+      path: '/v1/workers/skills/verifications/$verificationId/resubmit',
+      fileBytes: fileBytes,
+      fileName: fileName,
+      skillId: skillId,
+      notes: notes,
+    );
+  }
+
+  Future<SkillVerificationResult> _uploadVerification({
+    required String path,
+    required Uint8List fileBytes,
+    required String fileName,
+    String? skillId,
+    String? notes,
+  }) async {
     try {
       final formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(
@@ -71,7 +103,7 @@ class SkillVerificationRepository {
       });
 
       final response = await _dio.post(
-        '/v1/workers/skills/verify',
+        path,
         data: formData,
         options: Options(
           contentType: 'multipart/form-data',

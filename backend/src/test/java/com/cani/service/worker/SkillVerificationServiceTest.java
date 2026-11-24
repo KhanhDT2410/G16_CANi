@@ -980,11 +980,89 @@ class SkillVerificationServiceTest {
 
         assertEquals(SkillVerificationStatus.REJECTED, res.getStatus());
         assertEquals(0, res.getSpAwarded());
+        assertEquals("CV_SELF_DECLARED", res.getFailureCode());
+        assertEquals("NGUYEN VAN AN", res.getRecipientName());
         assertNotNull(res.getExtractedSkills());
         assertEquals(1, res.getExtractedSkills().size());
         assertEquals("Pha chế (Bartender/Barista)", res.getExtractedSkills().get(0).getSkillName());
         assertTrue(res.getRoutingReason().contains("CV tự khai"));
         verify(workerSkillRepository, never()).save(any(WorkerSkill.class));
         verify(workerSkillPointRepository, never()).save(any(WorkerSkillPoint.class));
+    }
+
+    @Test
+    @DisplayName("failureCode phân biệt rõ UNSUPPORTED_SOURCE, EKYC_REQUIRED và Resubmit cập nhật skillId trên hồ sơ cũ")
+    void testFailureCodesAndResubmitWithNewSkillId() {
+        MockMultipartFile file = new MockMultipartFile("file", "cert_ekyc_missing.pdf", "application/pdf", validPdfBytes());
+        when(workerEkycVerificationRepository.findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(eq(workerId), any()))
+                .thenReturn(Optional.empty());
+        when(workerRepository.findById(workerId)).thenReturn(Optional.of(mockWorker));
+        when(skillRepository.findById(mockSkill.getSkillId())).thenReturn(Optional.of(mockSkill));
+        when(certificateStorageService.storeDocument(any(), eq("pdf")))
+                .thenReturn("/api/v1/workers/skills/documents/cert_ekyc_missing.pdf");
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName("Nguyen Van An")
+                        .institution("Academy")
+                        .expiryDate("31/12/2030")
+                        .matchedSkillNames(List.of(mockSkill.getName()))
+                        .build()
+        );
+        when(verificationRequestRepository.save(any(SkillVerificationRequest.class))).thenAnswer(i -> {
+            SkillVerificationRequest req = i.getArgument(0);
+            if (req.getId() == null) req.setId(UUID.randomUUID());
+            return req;
+        });
+
+        SkillVerificationResponseDto missingEkycRes = verificationService.submitVerification(
+                workerId, file, mockSkill.getSkillId(), null
+        );
+        assertEquals("EKYC_REQUIRED", missingEkycRes.getFailureCode());
+
+        // Test RoutingCertificateLookupSource fallback & adapter dispatch
+        com.cani.client.skill.IssuerCertificateLookupAdapter mockAdapter = mock(com.cani.client.skill.IssuerCertificateLookupAdapter.class);
+        when(mockAdapter.supports(any())).thenReturn(false);
+        com.cani.client.skill.RoutingCertificateLookupSource router =
+                new com.cani.client.skill.RoutingCertificateLookupSource(
+                        List.of(mockAdapter),
+                        new UnsupportedCertificateLookupSource()
+                );
+        CertificateLookupResult fallbackRes = router.verifyCertificate(
+                CertificateLookupSource.CertificateLookupRequest.builder().workerId(workerId).build()
+        );
+        assertEquals(CertificateLookupOutcome.UNSUPPORTED_SOURCE, fallbackRes.getOutcome());
+
+        // Test resubmit updating skillId on old record
+        UUID newSkillId = UUID.randomUUID();
+        Skill newSkill = Skill.builder().skillId(newSkillId).name("Phục vụ bàn").isActive(true).build();
+        SkillVerificationRequest existing = SkillVerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .worker(mockWorker)
+                .skill(mockSkill)
+                .jobType(mockSkill.getName())
+                .status(SkillVerificationStatus.REJECTED)
+                .routingDecision(RoutingDecision.REJECT)
+                .documentUrl("/api/v1/workers/skills/documents/old.pdf")
+                .spAwarded(0)
+                .retryCount(2)
+                .build();
+        when(verificationRequestRepository.findById(existing.getId())).thenReturn(Optional.of(existing));
+        when(skillRepository.findById(newSkillId)).thenReturn(Optional.of(newSkill));
+        when(workerEkycVerificationRepository.findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(eq(workerId), any()))
+                .thenReturn(Optional.of(com.cani.entity.WorkerEkycVerification.builder()
+                        .id(UUID.randomUUID()).fullName("Nguyen Van An").status("VERIFIED").build()));
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                new UnsupportedCertificateLookupSource().verifyCertificate(null)
+        );
+
+        SkillVerificationResponseDto resubmitted = verificationService.resubmitVerification(
+                existing.getId(), workerId, file, newSkillId, "Đổi kỹ năng"
+        );
+        assertEquals(newSkillId, resubmitted.getSkillId());
+        assertEquals("Phục vụ bàn", resubmitted.getSkillName());
+        assertEquals("UNSUPPORTED_SOURCE", resubmitted.getFailureCode());
+        assertEquals(0, resubmitted.getRetryCount());
     }
 }

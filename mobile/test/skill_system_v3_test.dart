@@ -168,5 +168,53 @@ void main() {
       expect(proposal.matchedSkillNames, ['Phục vụ bàn']);
       expect(proposal.recommendationReasonVi, contains('Kỹ năng đã xác thực'));
     });
+
+    test('SkillVerificationResult classifies failureCode flags cleanly for Step 3 button routing', () {
+      final unsupported = SkillVerificationResult.fromJson({
+        'id': 'ver-1',
+        'workerId': 'w-1',
+        'jobType': 'Pha chế',
+        'status': 'REJECTED',
+        'verificationSource': 'UNSUPPORTED_SOURCE',
+        'failureCode': 'UNSUPPORTED_SOURCE',
+        'routingReason': 'CANi chưa hỗ trợ tra cứu chứng chỉ của đơn vị này',
+      });
+      expect(unsupported.isUnsupportedIssuer, isTrue);
+      expect(unsupported.isTempFailure, isFalse);
+      expect(unsupported.isSelfDeclaredCv, isFalse);
+      expect(unsupported.isEkycRequired, isFalse);
+
+      final cvResult = SkillVerificationResult.fromJson({
+        'id': 'ver-2',
+        'workerId': 'w-1',
+        'jobType': 'Pha chế',
+        'status': 'REJECTED',
+        'verificationSource': 'UNSUPPORTED_SOURCE',
+        'failureCode': 'CV_SELF_DECLARED',
+        'routingReason': 'Tài liệu là CV tự khai',
+      });
+      expect(cvResult.isSelfDeclaredCv, isTrue);
+      expect(cvResult.isUnsupportedIssuer, isFalse);
+
+      final tempFail = SkillVerificationResult.fromJson({
+        'id': 'ver-3',
+        'workerId': 'w-1',
+        'jobType': 'Pha chế',
+        'status': 'VERIFICATION_FAILED',
+        'failureCode': 'TEMPORARY_FAILURE',
+      });
+      expect(tempFail.isTempFailure, isTrue);
+      expect(tempFail.isUnsupportedIssuer, isFalse);
+
+      final ekycReq = SkillVerificationResult.fromJson({
+        'id': 'ver-4',
+        'workerId': 'w-1',
+        'jobType': 'Pha chế',
+        'status': 'REJECTED',
+        'failureCode': 'EKYC_REQUIRED',
+      });
+      expect(ekycReq.isEkycRequired, isTrue);
+      expect(ekycReq.isUnsupportedIssuer, isFalse);
+    });
   });
 }

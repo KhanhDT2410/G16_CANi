@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/features/skill_verification/models/skill_models.dart';
 import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
+import 'package:cani/features/skill_verification/screens/ai_verification_wizard_screen.dart';
 import 'skill_hub_theme.dart';
 
 class CertificateVaultSheet extends ConsumerWidget {
@@ -80,7 +81,7 @@ class CertificateVaultSheet extends ConsumerWidget {
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = historyList[index];
-                      return _buildVaultCard(item);
+                      return _buildVaultCard(context, item);
                     },
                   ),
           ),
@@ -89,21 +90,16 @@ class CertificateVaultSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildVaultCard(SkillVerificationResult item) {
+  Widget _buildVaultCard(BuildContext context, SkillVerificationResult item) {
     final statusUpper = item.status.toUpperCase();
-    final isApproved = statusUpper == 'APPROVED';
+    final isApproved = item.isApproved;
     final isRevoked = statusUpper == 'REVOKED';
     final isExpired = statusUpper == 'EXPIRED';
     final isNeedsInfo = statusUpper == 'NEEDS_MORE_INFO';
-    final isFailed = statusUpper == 'VERIFICATION_FAILED';
+    final isFailed = item.isTempFailure;
     final isLegacyPending = statusUpper == 'PENDING_REVIEW';
-    final isUnsupported = !isApproved &&
-        !isRevoked &&
-        !isExpired &&
-        !isNeedsInfo &&
-        !isFailed &&
-        (item.verificationSource == 'UNSUPPORTED_SOURCE' ||
-            item.routingReason.contains('Chưa thể xác minh tự động'));
+    final isUnsupported = item.isUnsupportedIssuer;
+    final canResubmit = !isApproved && !isRevoked && !isUnsupported && !isFailed;
     final statusColor = isApproved
         ? SkillHubColors.successText
         : ((isFailed || isNeedsInfo || isLegacyPending) ? SkillHubColors.warningText : SkillHubColors.dangerText);
@@ -119,7 +115,9 @@ class CertificateVaultSheet extends ConsumerWidget {
                         ? 'Lỗi tạm thời — thử lại'
                         : (isLegacyPending
                             ? 'Chưa xác minh tự động'
-                            : (isUnsupported ? 'Chưa thể xác minh tự động' : 'Không hợp lệ'))))));
+                            : (isUnsupported
+                                ? 'Chưa hỗ trợ đơn vị cấp'
+                                : (item.isSelfDeclaredCv ? 'CV tự khai (0 SP)' : 'Không hợp lệ')))))));
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -170,17 +168,45 @@ class CertificateVaultSheet extends ConsumerWidget {
           Text(
             item.routingReason.isNotEmpty
                 ? item.routingReason
-                : 'Chưa thể xác minh tự động. Vui lòng nộp chứng chỉ có nguồn tra cứu hợp lệ.',
+                : 'CANi chưa hỗ trợ tra cứu chứng chỉ của đơn vị này.',
             style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
           ),
-          if (item.createdAt != null) ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Đã nộp: ${item.createdAt!.split("T").first}',
-                style: const TextStyle(fontSize: 10.5, color: Colors.grey),
-              ),
+          if (item.createdAt != null || canResubmit) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (canResubmit)
+                  OutlinedButton(
+                    onPressed: () {
+                      final navigator = Navigator.of(context);
+                      navigator.pop();
+                      navigator.push(
+                        MaterialPageRoute(
+                          builder: (_) => AiVerificationWizardScreen(
+                            initialVerificationId: item.id,
+                            initialSkillId: item.skillId,
+                          ),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      minimumSize: const Size(0, 30),
+                      side: const BorderSide(color: SkillHubColors.ctaPrimary),
+                      foregroundColor: SkillHubColors.ctaHover,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('Nộp lại', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  )
+                else
+                  const SizedBox.shrink(),
+                if (item.createdAt != null)
+                  Text(
+                    'Đã nộp: ${item.createdAt!.split("T").first}',
+                    style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                  ),
+              ],
             ),
           ],
         ],

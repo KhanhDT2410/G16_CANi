@@ -527,4 +527,42 @@ class SkillVerificationFlowTest {
                                 .andExpect(jsonPath("$.data.spAwarded").value(25))
                                 .andExpect(jsonPath("$.data.retryCount").value(1));
         }
+
+        @Test
+        @DisplayName("Step 14: Worker resubmits PDF to overwrite old verification record with new skillId")
+        void step14_workerResubmitsOverOldVerification_Success() throws Exception {
+                UUID verificationId = UUID.randomUUID();
+                MockMultipartFile pdfFile = new MockMultipartFile(
+                                "file",
+                                "updated_cert.pdf",
+                                MediaType.APPLICATION_PDF_VALUE,
+                                "%PDF-1.4\n%%EOF\n".getBytes());
+
+                SkillVerificationResponseDto resubmittedDto = SkillVerificationResponseDto.builder()
+                                .id(verificationId)
+                                .workerId(workerId)
+                                .skillId(skillId)
+                                .skillName("Pha chế (Bartender/Barista)")
+                                .status(SkillVerificationStatus.REJECTED)
+                                .verificationSource("UNSUPPORTED_SOURCE")
+                                .failureCode("UNSUPPORTED_SOURCE")
+                                .routingDecision(RoutingDecision.REJECT)
+                                .routingReason("Chưa thể xác minh tự động: CANi chưa hỗ trợ tra cứu chứng chỉ của đơn vị này.")
+                                .spAwarded(0)
+                                .build();
+
+                when(verificationService.resubmitVerification(eq(verificationId), eq(workerId), any(), eq(skillId), eq("Nộp lại")))
+                                .thenReturn(resubmittedDto);
+
+                mockMvc.perform(multipart("/api/v1/workers/skills/verifications/" + verificationId + "/resubmit")
+                                .file(pdfFile)
+                                .param("skillId", skillId.toString())
+                                .param("notes", "Nộp lại")
+                                .with(csrf())
+                                .with(authentication(createAuthToken(workerUser))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.data.id").value(verificationId.toString()))
+                                .andExpect(jsonPath("$.data.failureCode").value("UNSUPPORTED_SOURCE"))
+                                .andExpect(jsonPath("$.data.spAwarded").value(0));
+        }
 }

@@ -91,18 +91,19 @@ public class SkillVerificationController {
     }
 
     /**
-     * Worker bổ sung hoặc thay thế tài liệu khi chưa xác minh thành công
+     * Worker bổ sung hoặc thay thế tài liệu khi chưa xác minh thành công (đè vào hồ sơ cũ)
      */
     @PostMapping(value = "/verifications/{id}/resubmit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<SkillVerificationResponseDto>> resubmitVerification(
             @PathVariable("id") UUID verificationId,
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "skillId", required = false) UUID skillId,
             @RequestParam(value = "workerId", required = false) UUID explicitWorkerId,
             @RequestParam(value = "notes", required = false) String notes,
             Authentication authentication
     ) {
         UUID workerId = resolveWorkerId(authentication, explicitWorkerId);
-        SkillVerificationResponseDto response = verificationService.resubmitVerification(verificationId, workerId, file, notes);
+        SkillVerificationResponseDto response = verificationService.resubmitVerification(verificationId, workerId, file, skillId, notes);
         return ResponseEntity.ok(ApiResponse.ok(response, buildVerificationMessage(response)));
     }
 

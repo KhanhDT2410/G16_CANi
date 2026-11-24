@@ -49,6 +49,7 @@ public class SkillVerificationResponseDto {
     private UUID reviewedBy;
     private Instant reviewedAt;
     private String reviewNotes;
+    private String failureCode;
     private String failureReason;
     private Integer retryCount;
     private RoutingDecision routingDecision;

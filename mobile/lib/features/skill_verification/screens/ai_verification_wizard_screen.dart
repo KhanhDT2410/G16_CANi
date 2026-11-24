@@ -3,11 +3,20 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/features/ekyc/screens/ekyc_verification_screen.dart';
+import 'package:cani/features/skill_verification/models/skill_models.dart';
 import 'package:cani/features/skill_verification/providers/skill_verification_provider.dart';
 import 'package:cani/features/skill_verification/widgets/skill_hub_theme.dart';
 
 class AiVerificationWizardScreen extends ConsumerStatefulWidget {
-  const AiVerificationWizardScreen({super.key});
+  final String? initialVerificationId;
+  final String? initialSkillId;
+
+  const AiVerificationWizardScreen({
+    super.key,
+    this.initialVerificationId,
+    this.initialSkillId,
+  });
 
   @override
   ConsumerState<AiVerificationWizardScreen> createState() => _AiVerificationWizardScreenState();
@@ -18,6 +27,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
   Uint8List? _fileBytes;
   String? _fileName;
   String? _selectedSkillId;
+  String? _resubmitVerificationId;
   final TextEditingController _notesController = TextEditingController();
 
   late AnimationController _scannerAnimController;
@@ -26,6 +36,8 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
   @override
   void initState() {
     super.initState();
+    _resubmitVerificationId = widget.initialVerificationId;
+    _selectedSkillId = widget.initialSkillId;
     _scannerAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -75,16 +87,31 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
 
     setState(() => _step = 2);
 
-    final success = await ref.read(skillVerificationProvider.notifier).submitVerification(
-      fileBytes: _fileBytes!,
-      fileName: _fileName!,
-      skillId: _selectedSkillId,
-      notes: _notesController.text,
-    );
+    final notifier = ref.read(skillVerificationProvider.notifier);
+    final bool success;
+    if (_resubmitVerificationId != null && _resubmitVerificationId!.isNotEmpty) {
+      success = await notifier.resubmitVerification(
+        verificationId: _resubmitVerificationId!,
+        fileBytes: _fileBytes!,
+        fileName: _fileName!,
+        skillId: _selectedSkillId,
+        notes: _notesController.text,
+      );
+    } else {
+      success = await notifier.submitVerification(
+        fileBytes: _fileBytes!,
+        fileName: _fileName!,
+        skillId: _selectedSkillId,
+        notes: _notesController.text,
+      );
+    }
 
     if (mounted) {
       if (success) {
-        setState(() => _step = 3);
+        setState(() {
+          _resubmitVerificationId = null;
+          _step = 3;
+        });
       } else {
         setState(() => _step = 1);
         final err = ref.read(skillVerificationProvider).errorMessage ?? 'Lỗi thẩm định';
@@ -93,6 +120,29 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
         );
       }
     }
+  }
+
+  Future<void> _retryFailedVerification(String verificationId) async {
+    setState(() => _step = 2);
+    final success = await ref.read(skillVerificationProvider.notifier).retryVerification(verificationId);
+    if (!mounted) return;
+    setState(() => _step = 3);
+    if (!success) {
+      final err = ref.read(skillVerificationProvider).errorMessage ?? 'Lỗi khi thử lại xác minh';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err), backgroundColor: Colors.redAccent),
+      );
+    }
+  }
+
+  void _prepareResubmit(SkillVerificationResult result) {
+    setState(() {
+      _resubmitVerificationId = result.id;
+      _selectedSkillId = result.skillId ?? _selectedSkillId;
+      _fileBytes = null;
+      _fileName = null;
+      _step = 1;
+    });
   }
 
   @override
@@ -186,6 +236,29 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                   style: TextStyle(fontSize: 11.5, color: SkillHubColors.textSecondary, height: 1.4),
                   textAlign: TextAlign.center,
                 ),
+                if (_resubmitVerificationId != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFCD34D)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.refresh_rounded, size: 16, color: Color(0xFFB45309)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Đang nộp lại tệp mới để cập nhật đè vào hồ sơ trước đó.',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 if (_fileName != null)
                   Container(
@@ -359,15 +432,72 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
   Widget _buildStep3Result() {
     final skillState = ref.watch(skillVerificationProvider);
     final result = skillState.lastResult;
-    final isApproved = result?.status == 'APPROVED';
-    final isTempFailure = result?.status == 'VERIFICATION_FAILED';
-    final isUnsupported = !isApproved &&
-        !isTempFailure &&
-        (result?.verificationSource == 'UNSUPPORTED_SOURCE' ||
-            (result?.routingReason.contains('Chưa thể xác minh tự động') ?? false));
+    final isApproved = result?.isApproved ?? false;
+    final isTempFailure = result?.isTempFailure ?? false;
+    final isUnsupported = result?.isUnsupportedIssuer ?? false;
+    final isEkycRequired = result?.isEkycRequired ?? false;
+    final isSelfDeclaredCv = result?.isSelfDeclaredCv ?? false;
+
     final accentColor = isApproved
         ? Colors.green
-        : (isTempFailure ? const Color(0xFFD97706) : Colors.red);
+        : ((isTempFailure || isEkycRequired) ? const Color(0xFFD97706) : Colors.red);
+
+    final String headingText;
+    final String badgeText;
+    final String statusSummary;
+    final String primaryButtonLabel;
+    final VoidCallback? primaryAction;
+
+    if (isApproved) {
+      headingText = 'Đã xác minh tự động thành công';
+      badgeText = '+${result?.spAwarded ?? 0} SP đã cộng';
+      statusSummary = 'Xác minh tự động hợp lệ';
+      primaryButtonLabel = 'TIẾP TỤC CẬP NHẬT HỒ SƠ';
+      primaryAction = () => setState(() => _step = 4);
+    } else if (isTempFailure && result != null) {
+      headingText = 'Nguồn tra cứu gặp lỗi tạm thời';
+      badgeText = 'Cho phép thử lại · 0 SP';
+      statusSummary = 'Lỗi nguồn tra cứu tạm thời — thử lại';
+      primaryButtonLabel = 'THỬ LẠI';
+      primaryAction = () => _retryFailedVerification(result.id);
+    } else if (isUnsupported) {
+      headingText = 'CANi chưa hỗ trợ tra cứu chứng chỉ của đơn vị này';
+      badgeText = 'Chưa cộng điểm SP';
+      statusSummary = 'Đơn vị cấp chưa được tích hợp tra cứu';
+      primaryButtonLabel = 'QUAY VỀ KỸ NĂNG';
+      primaryAction = () => Navigator.of(context).pop();
+    } else if (isEkycRequired) {
+      headingText = 'Cần hoàn tất xác thực eKYC';
+      badgeText = 'Chưa cộng điểm SP';
+      statusSummary = 'Chưa có danh tính eKYC để đối chiếu';
+      primaryButtonLabel = 'XÁC THỰC EKYC NGAY';
+      primaryAction = () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const EkycVerificationScreen()),
+        );
+      };
+    } else {
+      headingText = isSelfDeclaredCv
+          ? 'Tài liệu là CV, chưa phải chứng chỉ'
+          : 'Chưa đạt xác minh tự động';
+      badgeText = 'Chưa cộng điểm SP';
+      statusSummary = isSelfDeclaredCv
+          ? 'AI nhận diện tài liệu là CV tự khai'
+          : 'Tệp hoặc thông tin chưa hợp lệ — nộp lại';
+      primaryButtonLabel = 'NỘP LẠI';
+      primaryAction = result != null
+          ? () => _prepareResubmit(result)
+          : () => setState(() => _step = 1);
+    }
+
+    final String detailMessage;
+    if (isUnsupported) {
+      detailMessage = (result?.routingReason != null && result!.routingReason.isNotEmpty)
+          ? result.routingReason
+          : 'CANi chưa hỗ trợ tra cứu chứng chỉ của đơn vị này.';
+    } else {
+      detailMessage = result?.routingReason ?? '';
+    }
 
     return Column(
       children: [
@@ -389,33 +519,33 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     decoration: BoxDecoration(
                       color: isApproved
                           ? const Color(0xFFECFDF5)
-                          : (isTempFailure ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2)),
+                          : ((isTempFailure || isEkycRequired)
+                              ? const Color(0xFFFFFBEB)
+                              : const Color(0xFFFEF2F2)),
                       shape: BoxShape.circle,
                       border: Border.all(color: accentColor, width: 2),
                     ),
                     child: Icon(
                       isApproved
                           ? Icons.check_circle_outline
-                          : (isTempFailure ? Icons.sync_problem_rounded : Icons.info_outline_rounded),
+                          : (isTempFailure
+                              ? Icons.sync_problem_rounded
+                              : (isEkycRequired ? Icons.badge_outlined : Icons.info_outline_rounded)),
                       color: accentColor,
                       size: 32,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    isApproved
-                        ? 'Đã xác minh tự động thành công'
-                        : (isTempFailure
-                            ? 'Nguồn tra cứu gặp lỗi tạm thời'
-                            : (isUnsupported
-                                ? 'Chưa thể xác minh tự động'
-                                : 'Chưa đạt xác minh tự động')),
+                    headingText,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: isApproved
                           ? const Color(0xFF047857)
-                          : (isTempFailure ? const Color(0xFFB45309) : const Color(0xFFB91C1C)),
+                          : ((isTempFailure || isEkycRequired)
+                              ? const Color(0xFFB45309)
+                              : const Color(0xFFB91C1C)),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -425,45 +555,55 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     decoration: BoxDecoration(
                       color: isApproved
                           ? const Color(0xFFE8F9FD)
-                          : (isTempFailure ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                          : ((isTempFailure || isEkycRequired)
+                              ? const Color(0xFFFEF3C7)
+                              : const Color(0xFFFEE2E2)),
                       borderRadius: BorderRadius.circular(99),
                       border: Border.all(
                         color: isApproved
                             ? SkillHubColors.ctaPrimary
-                            : (isTempFailure ? const Color(0xFFF59E0B) : Colors.redAccent),
+                            : ((isTempFailure || isEkycRequired)
+                                ? const Color(0xFFF59E0B)
+                                : Colors.redAccent),
                       ),
                     ),
                     child: Text(
-                      isApproved
-                          ? '+${result?.spAwarded ?? 0} SP đã cộng'
-                          : (isTempFailure ? 'Cho phép thử lại · 0 SP' : 'Chưa cộng điểm SP'),
+                      badgeText,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: isApproved
                             ? SkillHubColors.ctaHover
-                            : (isTempFailure ? const Color(0xFF92400E) : const Color(0xFFDC2626)),
+                            : ((isTempFailure || isEkycRequired)
+                                ? const Color(0xFF92400E)
+                                : const Color(0xFFDC2626)),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (!isApproved && result?.routingReason != null && result!.routingReason.isNotEmpty) ...[
+                  if (!isApproved && detailMessage.isNotEmpty) ...[
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
-                        color: isTempFailure ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2),
+                        color: (isTempFailure || isEkycRequired)
+                            ? const Color(0xFFFFFBEB)
+                            : const Color(0xFFFEF2F2),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isTempFailure ? const Color(0xFFFDE68A) : const Color(0xFFFECACA),
+                          color: (isTempFailure || isEkycRequired)
+                              ? const Color(0xFFFDE68A)
+                              : const Color(0xFFFECACA),
                         ),
                       ),
                       child: Text(
-                        result.routingReason,
+                        detailMessage,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isTempFailure ? const Color(0xFF92400E) : const Color(0xFF991B1B),
+                          color: (isTempFailure || isEkycRequired)
+                              ? const Color(0xFF92400E)
+                              : const Color(0xFF991B1B),
                           height: 1.4,
                         ),
                       ),
@@ -472,16 +612,45 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                   _buildResultRow('Kỹ năng đăng ký:', result?.skillName ?? result?.jobType ?? 'Chưa xác định'),
                   _buildResultRow('Đơn vị cấp bằng:', result?.institution ?? 'Chưa có dữ liệu tra cứu'),
                   _buildResultRow('Họ tên người nhận:', result?.recipientName ?? 'Chưa đối chiếu được'),
-                  _buildResultRow(
-                    'Kết quả xử lý:',
-                    isApproved
-                        ? 'Xác minh tự động hợp lệ'
-                        : (isTempFailure
-                            ? 'Lỗi nguồn tra cứu tạm thời — thử lại'
-                            : (isUnsupported
-                                ? 'Nộp lại chứng chỉ có thể tra cứu'
-                                : 'Thông tin chưa khớp / chưa hợp lệ')),
-                  ),
+                  if (result?.certificateNumber != null && result!.certificateNumber!.isNotEmpty)
+                    _buildResultRow('Mã chứng chỉ:', result.certificateNumber!),
+                  _buildResultRow('Kết quả xử lý:', statusSummary),
+                  if (result != null && result.extractedSkills.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Kỹ năng AI đọc được từ tệp:',
+                        style: const TextStyle(fontSize: 11.5, color: SkillHubColors.textSecondary),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: result.extractedSkills
+                            .map((s) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F9FD),
+                                    borderRadius: BorderRadius.circular(99),
+                                    border: Border.all(color: SkillHubColors.borderSoft),
+                                  ),
+                                  child: Text(
+                                    s.skillName,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: SkillHubColors.textPrimary,
+                                    ),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -492,27 +661,33 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
           width: double.infinity,
           height: 48,
           child: ElevatedButton(
-            onPressed: skillState.isSubmitting
-                ? null
-                : (isApproved
-                    ? () => setState(() => _step = 4)
-                    : (isTempFailure && result != null
-                        ? () => ref.read(skillVerificationProvider.notifier).retryVerification(result.id)
-                        : () => setState(() => _step = 1))),
+            onPressed: skillState.isSubmitting ? null : primaryAction,
             style: ElevatedButton.styleFrom(
               backgroundColor: isApproved
                   ? SkillHubColors.ctaPrimary
-                  : (isTempFailure ? const Color(0xFFD97706) : const Color(0xFFEF4444)),
+                  : (isUnsupported
+                      ? SkillHubColors.textPrimary
+                      : ((isTempFailure || isEkycRequired)
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFFEF4444))),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Text(
-              isApproved
-                  ? 'TIẾP TỤC CẬP NHẬT HỒ SƠ'
-                  : (isTempFailure ? 'THỬ LẠI XÁC MINH TỰ ĐỘNG' : 'NỘP LẠI CHỨNG CHỈ KHÁC'),
+              primaryButtonLabel,
               style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
             ),
           ),
         ),
+        if (isEkycRequired) ...[
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Quay về kỹ năng',
+              style: TextStyle(fontWeight: FontWeight.w700, color: SkillHubColors.textSecondary),
+            ),
+          ),
+        ],
       ],
     );
   }

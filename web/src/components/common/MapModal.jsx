@@ -10,6 +10,7 @@ export const MapModal = ({
   title = 'Tọa Độ Sự Kiện & Bán Kính Điều Phối',
   eventName = '',
   venueAddress = '',
+  address = '',
   lat = 10.7328,
   lng = 106.7214,
   radiusKm = 15,
@@ -17,13 +18,15 @@ export const MapModal = ({
 }) => {
   if (!isOpen) return null;
 
+  const displayAddress = venueAddress || address || 'Chưa thiết lập địa chỉ cụ thể';
+  const displayEventName = eventName || title || 'Địa Điểm Sự Kiện';
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
   return (
     <div className="map-modal-backdrop" onClick={onClose}>
       <div className="map-modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="map-modal-header">
-          <h3 className="map-modal-title">📍 {title}</h3>
+          <h3 className="map-modal-title">📍 {title || displayEventName}</h3>
           <button type="button" className="map-modal-close" onClick={onClose}>
             &times;
           </button>
@@ -39,7 +42,7 @@ export const MapModal = ({
 
           <div className="radar-marker">
             <div className="radar-pin" />
-            <div className="radar-label">{eventName || 'Địa Điểm Sự Kiện'}</div>
+            <div className="radar-label">{displayEventName}</div>
           </div>
         </div>
 
@@ -47,7 +50,7 @@ export const MapModal = ({
           <div className="map-info-grid">
             <div className="map-info-item">
               <div className="map-info-label">Địa Chỉ Tổ Chức</div>
-              <div className="map-info-value">{venueAddress}</div>
+              <div className="map-info-value">{displayAddress}</div>
             </div>
 
             <div className="map-info-item">

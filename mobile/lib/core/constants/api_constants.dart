@@ -12,8 +12,8 @@ class ApiConstants {
     if (kIsWeb) {
       return 'http://localhost:8080';
     }
-    // Trên thiết bị thật Android / Wi-Fi LAN: Ưu tiên IP LAN máy chủ máy tính để tránh adb reverse bị chặn trên ColorOS/Oppo
-    return 'http://192.168.1.10:8080';
+    // Ưu tiên loopback 127.0.0.1 (qua adb reverse khi cắm USB); Dio fallback sẽ thử IP LAN/10.0.2.2 nếu không cắm cáp
+    return 'http://127.0.0.1:8080';
   }
 
   static final String baseUrl = const String.fromEnvironment(

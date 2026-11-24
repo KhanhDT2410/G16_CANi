@@ -6,10 +6,10 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      # Pool kết nối vừa phải cho máy dev tránh nghẽn luồng polling live chat và tránh cạn kiệt trên Supabase
-      maximum-pool-size: 15
-      minimum-idle: 5
-      idle-timeout: 120000
+      # Giữ pool nhỏ (tối đa 5) để không chiếm hết giới hạn 15 connections của Supabase Session Pooler khi nhiều dev cùng chạy
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      idle-timeout: 60000
       max-lifetime: 300000
       connection-timeout: 10000
 

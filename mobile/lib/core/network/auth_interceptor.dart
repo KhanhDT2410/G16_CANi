@@ -16,11 +16,29 @@ class AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _storage;
   static String? inMemoryToken;
 
+  static const _publicAuthPaths = <String>{
+    '/auth/login',
+    '/auth/google',
+    '/auth/register',
+    '/auth/send-otp',
+    '/auth/confirm-reset-password',
+    '/auth/verify-otp',
+    '/auth/refresh-token',
+  };
+
   @override
   void onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    final normalizedPath = options.path.startsWith('/api/')
+        ? options.path.substring(4)
+        : options.path;
+    if (_publicAuthPaths.contains(normalizedPath)) {
+      handler.next(options);
+      return;
+    }
+
     // 1. Kiểm tra session Supabase, nếu đã hết hạn thì tự động làm mới
     try {
       final session = Supabase.instance.client.auth.currentSession;

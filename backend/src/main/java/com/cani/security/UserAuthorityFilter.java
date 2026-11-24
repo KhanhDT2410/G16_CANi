@@ -27,7 +27,23 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserAuthorityFilter extends OncePerRequestFilter {
 
+    private static final List<String> PUBLIC_AUTH_PATHS = List.of(
+            "/api/auth/login",
+            "/api/auth/google",
+            "/api/auth/register",
+            "/api/auth/send-otp",
+            "/api/auth/confirm-reset-password",
+            "/api/auth/verify-otp",
+            "/api/auth/refresh-token"
+    );
+
     private final UserRepository userRepository;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return uri != null && PUBLIC_AUTH_PATHS.contains(uri);
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

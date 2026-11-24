@@ -26,6 +26,11 @@ public class WorkerBankAccountDto {
     @Pattern(regexp = "^[0-9A-Za-z]+$", message = "Số tài khoản ngân hàng chỉ chứa chữ và số")
     private String bankAccountNumber;
 
+    /**
+     * Số tài khoản ngân hàng đã được che mờ (Masked) để hiển thị UI an toàn (ví dụ: ••••••4756)
+     */
+    private String bankAccountNumberMasked;
+
     @NotBlank(message = "Tên chủ tài khoản không được để trống")
     @Size(min = 2, max = 100, message = "Tên chủ tài khoản từ 2 đến 100 ký tự")
     private String bankAccountName;

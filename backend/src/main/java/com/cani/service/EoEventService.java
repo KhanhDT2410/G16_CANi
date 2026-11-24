@@ -1965,6 +1965,7 @@ public class EoEventService {
                 .yearsExperience(worker != null ? worker.getYearsExperience() : 0)
                 .bankCode(bankCode)
                 .bankAccountNumber(bankAccountNumber)
+                .bankAccountNumberMasked(worker != null ? worker.getBankAccountNumberMasked() : com.cani.security.crypto.AesGcmCryptoUtil.mask(bankAccountNumber))
                 .bankAccountName(bankAccountName)
                 .vietQrUrl(vietQrUrl)
                 .source(sa.getSource())

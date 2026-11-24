@@ -98,11 +98,16 @@ public class Worker {
     @Column(name = "bank_code", length = 30)
     private String bankCode;
 
-    @Column(name = "bank_account_number", length = 50)
+    @Convert(converter = com.cani.security.crypto.BankAccountEncryptionConverter.class)
+    @Column(name = "bank_account_number", length = 255)
     private String bankAccountNumber;
 
     @Column(name = "bank_account_name", length = 100)
     private String bankAccountName;
+
+    public String getBankAccountNumberMasked() {
+        return com.cani.security.crypto.AesGcmCryptoUtil.mask(this.bankAccountNumber);
+    }
 
     // -------------------------------------------------------------------------
     // CÁC THUỘC TÍNH THUỘC BẢNG worker_preferences (@SecondaryTable)

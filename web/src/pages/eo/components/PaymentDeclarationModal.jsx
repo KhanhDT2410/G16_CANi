@@ -166,9 +166,14 @@ const PaymentDeclarationModal = ({
 
                     {/* Chi tiết thông tin tài khoản */}
                     <div style={{ flex: 1, minWidth: '180px', fontSize: '0.8rem', lineHeight: 1.6 }}>
-                      <div>
-                        <span style={{ color: '#64748b' }}>Ngân hàng: </span>
-                        <strong style={{ color: '#0f172a' }}>{bankCode}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Ngân hàng: </span>
+                          <strong style={{ color: '#0f172a' }}>{bankCode}</strong>
+                        </div>
+                        <span style={{ fontSize: '0.68rem', color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                          🔒 Mã hóa FLE
+                        </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '2px 0' }}>
                         <span style={{ color: '#64748b' }}>Số tài khoản: </span>

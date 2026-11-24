@@ -594,6 +594,7 @@ public class DirectPaymentService {
                 .createdAt(p.getCreatedAt())
                 .bankCode(bankCode)
                 .bankAccountNumber(bankAccountNumber)
+                .bankAccountNumberMasked(w != null ? w.getBankAccountNumberMasked() : com.cani.security.crypto.AesGcmCryptoUtil.mask(bankAccountNumber))
                 .bankAccountName(bankAccountName)
                 .workerVietQrUrl(workerVietQrUrl)
                 .disputeId(disputeId)

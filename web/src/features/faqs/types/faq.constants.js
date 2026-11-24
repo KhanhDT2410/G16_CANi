@@ -46,7 +46,7 @@ export const FAQ_TARGET_ROLE_CONFIG = {
     badgeClass: 'faq-role-badge-worker',
   },
   EVENT_ORGANIZER: {
-    label: 'Nhà tổ chức sự kiện (Organizer)',
+    label: 'Nhà tổ chức sự kiện',
     shortLabel: 'Nhà tổ chức',
     badgeClass: 'faq-role-badge-eo',
   },

@@ -3,8 +3,9 @@ import { RS_APPEAL_STATUS_CONFIG } from '../types/rsAppeal.constants';
 export const RsAppealStatusBadge = ({ status }) => {
   const config = RS_APPEAL_STATUS_CONFIG[status] || {
     label: status || '—',
-    color: '#4b5563',
-    bg: '#f3f4f6',
+    color: '#475569',
+    bg: '#f8fafc',
+    border: '#e2e8f0',
   };
 
   return (
@@ -13,6 +14,7 @@ export const RsAppealStatusBadge = ({ status }) => {
       style={{
         color: config.color,
         backgroundColor: config.bg,
+        borderColor: config.border || '#cbd5e1',
       }}
     >
       {config.label}

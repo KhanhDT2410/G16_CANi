@@ -114,7 +114,7 @@ const AdminReviewTable = ({
                   title="Xem chi tiết"
                   onClick={() => onViewDetail(r)}
                 >
-                  👁
+                  Chi tiết
                 </button>
 
                 {r.isHidden ? (
@@ -123,7 +123,7 @@ const AdminReviewTable = ({
                     title="Khôi phục hiển thị"
                     onClick={() => onUnhide(r.reviewId)}
                   >
-                    ↺
+                    Khôi phục
                   </button>
                 ) : (
                   <button
@@ -131,7 +131,7 @@ const AdminReviewTable = ({
                     title="Gỡ / Ẩn đánh giá"
                     onClick={() => onOpenModerate('HIDE', r)}
                   >
-                    🗑
+                    Ẩn
                   </button>
                 )}
 
@@ -141,7 +141,7 @@ const AdminReviewTable = ({
                     title="Gỡ cờ cảnh báo"
                     onClick={() => onUnflag(r.reviewId)}
                   >
-                    ⚐
+                    Gỡ cờ
                   </button>
                 ) : (
                   <button
@@ -149,7 +149,7 @@ const AdminReviewTable = ({
                     title="Gắn cờ nghi vấn"
                     onClick={() => onOpenModerate('FLAG', r)}
                   >
-                    ⚑
+                    Gắn cờ
                   </button>
                 )}
               </td>

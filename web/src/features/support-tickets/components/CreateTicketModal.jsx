@@ -55,7 +55,7 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillD
         <div className="ticket-modal-header">
           <h3>Gửi Yêu Cầu Hỗ Trợ Mới</h3>
           <button type="button" className="ticket-modal-close-btn" onClick={onClose}>
-            &times;
+            ✕
           </button>
         </div>
 

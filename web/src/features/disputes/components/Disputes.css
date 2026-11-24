@@ -73,17 +73,23 @@
 }
 
 .tab-badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.75rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-full);
-  background: var(--color-bg-subtle);
-  color: var(--color-text-body);
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  line-height: 1.25;
 }
 
 .tab-badge-count.risk {
-  background: var(--color-danger-bg);
-  color: var(--color-danger-text);
-  font-weight: 700;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
 }
 
 /* Dispute Table */
@@ -131,58 +137,69 @@
 .dispute-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
-  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  border-radius: 4px;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
+  line-height: 1.25;
+  box-sizing: border-box;
 }
 
 .badge-status-open {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
 }
 
 .badge-status-investigating {
-  background: #fef3c7;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
   color: #b45309;
 }
 
 .badge-status-resolved {
-  background: #dcfce7;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
   color: #15803d;
 }
 
 .badge-status-unverified {
-  background: #f1f5f9;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   color: #475569;
 }
 
 .badge-status-escalated {
-  background: #fae8ff;
-  color: #86198f;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  color: #7e22ce;
   animation: pulse-escalated 2s infinite;
 }
 
 .badge-status-final {
-  background: #ede9fe;
-  color: #5b21b6;
-  font-weight: 700;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  color: #7e22ce;
+  font-weight: 600;
 }
 
 .sla-risk-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: var(--radius-xs);
-  background: var(--color-danger-bg);
-  border: 1px solid var(--color-danger-border);
-  color: var(--color-danger-text);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 @keyframes pulse-escalated {
@@ -415,35 +432,46 @@
 }
 
 .dispute-btn-primary {
-  padding: 0.6rem 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
   color: #fff;
-  background: var(--color-primary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  background: var(--color-primary, #2563eb);
+  border: 1px solid var(--color-primary, #2563eb);
+  border-radius: 4px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .dispute-btn-primary:hover {
-  background: var(--color-primary-hover, #0284c7);
+  background: var(--color-primary-hover, #1d4ed8);
+  border-color: #1d4ed8;
 }
 
 .dispute-btn-secondary {
-  padding: 0.6rem 1rem;
-  background: var(--color-bg-subtle);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-main);
+  font-weight: 500;
+  color: #374151;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .dispute-btn-secondary:hover {
-  background: var(--color-border);
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .tab-danger-text {
@@ -496,13 +524,16 @@
 }
 
 .dispute-rule-banner-tag {
-  display: inline-block;
-  background: #dcfce7;
-  color: #166534;
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 2px 8px;
   border-radius: 4px;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 1.25;
 }
 
 .dispute-rule-banner-text {
@@ -580,18 +611,21 @@
 
 .dispute-level-badge-suggested {
   margin-left: 4px;
-  font-size: 0.7rem;
-  background: #fef08a;
-  color: #854d0e;
-  padding: 1px 4px;
-  border-radius: 3px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 1.2;
 }
 
 .btn-apply-sanction {
   background: #16a34a;
   color: #ffffff;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 7px 14px;
   font-size: 0.82rem;
   font-weight: 600;
@@ -626,45 +660,68 @@
 }
 
 .btn-cancel {
-  padding: 0.5rem 1rem;
-  background: var(--color-bg-subtle);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  font-weight: 500;
+  color: #374151;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-cancel:hover {
-  background: var(--color-border);
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-submit {
-  padding: 0.5rem 1.25rem;
-  background: var(--color-primary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  background: var(--color-primary, #2563eb);
+  border: 1px solid var(--color-primary, #2563eb);
+  border-radius: 4px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   color: #fff;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .btn-submit:disabled {
   background: #94a3b8;
+  border-color: #94a3b8;
   cursor: not-allowed;
 }
 
 .btn-escalate-submit {
-  padding: 0.5rem 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
   background: #86198f;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border: 1px solid #86198f;
+  border-radius: 4px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   color: #fff;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-escalate-submit:disabled {
@@ -736,18 +793,23 @@
 
 .workspace-type-tag,
 .workspace-sla-tag {
-  background: var(--color-bg-subtle);
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #475569;
+  font-size: 0.78rem;
   font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .workspace-sla-tag {
   color: #b45309;
   background: #fffbeb;
   border: 1px solid #fde68a;
-  font-weight: 600;
 }
 
 .workspace-actions {
@@ -899,25 +961,32 @@
 }
 
 .party-badge {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.15rem 0.5rem;
-  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .party-badge.party-complainant {
   background: #eff6ff;
+  border: 1px solid #bfdbfe;
   color: #1d4ed8;
 }
 
 .party-badge.party-respondent {
   background: #fffbeb;
+  border: 1px solid #fde68a;
   color: #b45309;
 }
 
 .party-badge.party-arbitrator {
-  background: #ecfdf5;
-  color: #047857;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
 }
 
 .msg-party-id {
@@ -930,12 +999,16 @@
 }
 
 .msg-type-tag {
-  background: #f1f5f9;
+  display: inline-flex;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   color: #475569;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
   font-weight: 500;
+  line-height: 1.25;
 }
 
 .msg-title-highlight {
@@ -988,7 +1061,7 @@
   background: #eff6ff;
   color: #1d4ed8;
   border: 1px solid #bfdbfe;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
@@ -1083,7 +1156,7 @@
   border: 1px solid #cbd5e1;
   color: #334155;
   padding: 0.35rem 0.7rem;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
@@ -1100,7 +1173,7 @@
   color: #ffffff;
   border: none;
   padding: 0.45rem 1.1rem;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -1192,18 +1265,19 @@
 }
 
 .toggle-btn {
-  padding: 0.45rem 0.9rem;
-  font-size: 0.82rem;
-  font-weight: 600;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
   border: none;
   background: transparent;
   color: #64748b;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  line-height: 1.25;
 }
 
 .toggle-btn:hover {
@@ -1302,15 +1376,19 @@
 }
 
 .pill-btn {
-  padding: 0.25rem 0.55rem;
-  font-size: 0.74rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-size: 0.78rem;
   font-weight: 500;
   border: 1px solid #e2e8f0;
-  border-radius: 9999px;
+  border-radius: 4px;
   background: #ffffff;
   color: #475569;
   cursor: pointer;
   transition: all 0.15s;
+  line-height: 1.25;
 }
 
 .pill-btn:hover {
@@ -1319,9 +1397,10 @@
 }
 
 .pill-btn.active {
-  background: #0f172a;
-  color: #ffffff;
-  border-color: #0f172a;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  font-weight: 600;
 }
 
 .pill-btn.pill-danger {
@@ -1331,9 +1410,10 @@
 }
 
 .pill-btn.pill-danger.active {
-  background: #dc2626;
-  color: #ffffff;
-  border-color: #dc2626;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+  font-weight: 600;
 }
 
 .sidebar-items-list {
@@ -1743,23 +1823,30 @@
 }
 
 .dispute-assignment-status {
-  font-size: 0.72rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 500;
   padding: 2px 8px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #334155;
+  border-radius: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
   white-space: nowrap;
+  line-height: 1.25;
 }
 
 .dispute-assignment-status.completed {
-  background: #dcfce7;
-  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
 }
 
 .dispute-assignment-status.checked-in {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
 }
 
 .dispute-assignment-meta {
@@ -1966,7 +2053,7 @@
   font-size: 0.9rem;
   font-weight: 700;
   font-family: inherit;
-  border-radius: 10px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   outline: none;
@@ -1989,7 +2076,7 @@
   font-size: 0.92rem;
   font-weight: 700;
   font-family: inherit;
-  border-radius: 10px;
+  border-radius: 4px;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
   transition: all 0.18s ease;
@@ -2050,16 +2137,17 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 0.2rem 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 2px 8px;
   font-family: monospace;
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #334155;
   cursor: pointer;
   transition: all 0.2s ease;
+  line-height: 1.25;
 }
 
 .case-ref-chip:hover {
@@ -2069,7 +2157,7 @@
 
 .case-ref-chip .copy-hint {
   font-family: inherit;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 500;
   color: #0284c7;
 }
@@ -2109,23 +2197,30 @@
 }
 
 .party-role-tag {
-  font-size: 0.68rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: #475569;
-  background: #e2e8f0;
-  padding: 1px 5px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 2px 8px;
   border-radius: 4px;
   width: fit-content;
+  line-height: 1.25;
 }
 
 .badge-unassigned {
-  display: inline-block;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
   background: #fffbeb;
   color: #b45309;
   border: 1px solid #fde68a;
-  padding: 2px 6px;
+  padding: 2px 8px;
   border-radius: 4px;
   font-weight: 500;
+  line-height: 1.25;
 }
 
 /* ==========================================================================
@@ -2164,7 +2259,7 @@
   height: 52px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   width: 100%;
@@ -2293,17 +2388,19 @@
 }
 
 .pane-header-role-right .pane-role-badge {
-  font-size: 0.72rem;
-  padding: 3px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
   border-radius: 4px;
-  background: #e0e7ff;
-  color: #3730a3;
-  font-weight: 600;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
   text-align: center;
   line-height: 1.25;
-  white-space: normal;
-  max-width: 90px;
-  display: inline-block;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dispute-single-pane-body {
@@ -2461,7 +2558,7 @@
   background: #f1f5f9;
   color: #475569;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -2483,7 +2580,7 @@
   font-weight: 600;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 4px;
   color: #475569;
   cursor: pointer;
   display: flex;
@@ -2532,7 +2629,7 @@
   background: #1e40af;
   color: #ffffff;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2620,24 +2717,33 @@
 .shift-pill,
 .event-pill,
 .dispute-pill {
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .shift-pill {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
 }
 
 .event-pill {
-  background: #f1f5f9;
-  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
 }
 
 .dispute-pill {
-  background: #fef3c7;
-  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
 }
 
 .btn-dual-modal-close {
@@ -2647,7 +2753,7 @@
   color: #334155;
   background: #ffffff;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2695,11 +2801,12 @@
 .unread-sender-pill {
   display: inline-flex;
   align-items: center;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 1px 7px;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 2px 8px;
   border-radius: 4px;
-  line-height: 1.4;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
@@ -2736,19 +2843,123 @@
 }
 
 .tab-unread-pill {
-  font-size: 0.68rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 500;
   padding: 1px 6px;
-  border-radius: 10px;
-  line-height: 1.3;
+  border-radius: 4px;
+  line-height: 1.2;
 }
 
 .tab-unread-pill.worker {
-  background: #2563eb;
-  color: #ffffff;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .tab-unread-pill.eo {
-  background: #d97706;
-  color: #ffffff;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
 }
+
+/* ==========================================================================
+   Unread Dispute Indicators & Filtering
+   ========================================================================== */
+
+.pill-btn.unread {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  font-weight: 600;
+}
+
+.pill-btn.unread:hover {
+  background: #fee2e2;
+}
+
+.pill-btn.unread.active {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+}
+
+.queue-item-card.has-unread {
+  border-left: 3px solid #ef4444;
+}
+
+.queue-item-card.has-unread.selected {
+  border-left: 3px solid #2563eb;
+}
+
+.item-card-top-left {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.item-card-top-right {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.item-card-dot-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.item-card-msg-time {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* File chip & image preview in chat */
+.pane-selected-file-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.pane-selected-file-chip button {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.pane-selected-file-chip button:hover {
+  color: #ef4444;
+}
+
+.bubble-attachment-thumb {
+  max-width: 240px;
+  max-height: 180px;
+  border-radius: 6px;
+  object-fit: cover;
+  cursor: pointer;
+  display: block;
+  margin-top: 0.35rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: transform 0.15s ease;
+}
+
+.bubble-attachment-thumb:hover {
+  transform: scale(1.02);
+}
+

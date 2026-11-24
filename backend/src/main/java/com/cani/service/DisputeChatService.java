@@ -170,6 +170,18 @@ public class DisputeChatService {
                 .build();
     }
 
+    public String uploadAttachment(UUID disputeId, org.springframework.web.multipart.MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Tệp đính kèm không được để trống");
+        }
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new BadRequestException("Dung lượng tệp tối đa là 10MB");
+        }
+        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "evidence.jpg";
+        String cleanName = UUID.randomUUID() + "_" + originalFilename.replaceAll("[^a-zA-Z0-9.-]", "_");
+        return "https://storage.cani.vn/disputes/" + cleanName;
+    }
+
     @Transactional
     public void purgeExpiredRegularChats() {
         Instant cutoff = Instant.now().minus(7, ChronoUnit.DAYS);

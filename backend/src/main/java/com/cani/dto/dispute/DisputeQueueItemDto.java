@@ -43,6 +43,9 @@ public class DisputeQueueItemDto {
     private Integer unreadCount;
     private Integer workerUnreadCount;
     private Integer eoUnreadCount;
+    private String workerName;
+    private String eoName;
     private String lastMessageSenderParty;
+    private String lastMessageSenderName;
     private Instant lastMessageAt;
 }

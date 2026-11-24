@@ -50,7 +50,7 @@ export const FaqPublicList = ({
   return (
     <div className="faq-public-container">
       <div className="faq-public-hero">
-        <h2>{title || 'Trung Tâm Trợ Giúp & Câu Hỏi Thường Gặp (Help Center)'}</h2>
+        <h2>{title || 'Trung Tâm Trợ Giúp & Câu Hỏi Thường Gặp'}</h2>
         <p>{subtitle || 'Tìm kiếm câu trả lời nhanh chóng cho các thắc mắc về tài khoản, ca làm việc, thù lao và khiếu nại'}</p>
         <div className="faq-search-box">
           <input

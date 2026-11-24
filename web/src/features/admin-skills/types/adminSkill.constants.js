@@ -20,11 +20,11 @@ export const SKILL_STATUS_FILTER = {
 };
 
 export const CATEGORY_COLOR_MAP = {
-  'F&B': { bg: '#fef3c7', text: '#92400e', border: '#fde68a' },
-  'Guest Services': { bg: '#e0f2fe', text: '#0369a1', border: '#bae6fd' },
-  'Logistics': { bg: '#f1f5f9', text: '#334155', border: '#cbd5e1' },
-  'Marketing': { bg: '#fce7f3', text: '#9d174d', border: '#fbcfe8' },
-  'Operations': { bg: '#ede9fe', text: '#5b21b6', border: '#ddd6fe' },
-  'Security': { bg: '#fee2e2', text: '#991b1b', border: '#fecaca' },
-  'Technical': { bg: '#e0e7ff', text: '#3730a3', border: '#c7d2fe' },
+  'F&B': { bg: '#fffbeb', text: '#b45309', border: '#fde68a' },
+  'Guest Services': { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+  'Logistics': { bg: '#f8fafc', text: '#475569', border: '#e2e8f0' },
+  'Marketing': { bg: '#fdf2f8', text: '#be185d', border: '#fbcfe8' },
+  'Operations': { bg: '#faf5ff', text: '#7e22ce', border: '#e9d5ff' },
+  'Security': { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' },
+  'Technical': { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
 };

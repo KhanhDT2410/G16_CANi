@@ -121,7 +121,7 @@ const UserTable = ({
             disabled={page === 0}
             onClick={() => onPageChange(page - 1)}
           >
-            &laquo; Trước
+            Trước
           </button>
           <button
             type="button"
@@ -129,7 +129,7 @@ const UserTable = ({
             disabled={page >= totalPages - 1}
             onClick={() => onPageChange(page + 1)}
           >
-            Sau &raquo;
+            Sau
           </button>
         </div>
       </div>

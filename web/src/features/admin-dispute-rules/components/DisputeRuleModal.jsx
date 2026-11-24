@@ -71,7 +71,7 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
               {isEdit ? `Mã: ${rule.code} (v${rule.version ?? 0})` : 'Tạo mới quy tắc và mức chế tài tương ứng'}
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -205,7 +205,7 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
                 name="specificPenalty"
                 className="dispute-textarea"
                 rows={2}
-                placeholder="VD: Trừ -25 RS qua điều chỉnh của Admin + tạm khóa tài khoản 7 ngày"
+                placeholder="VD: Trừ 25 điểm uy tín qua điều chỉnh của Quản trị viên + tạm khóa tài khoản 7 ngày"
                 value={formData.specificPenalty}
                 onChange={handleChange}
                 required
@@ -213,12 +213,12 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
             </div>
 
             <div className="dispute-field-group">
-              <label>Nội dung chế tài hiển thị cho CC (Tối thiểu 10 ký tự) *</label>
+              <label>Nội dung chế tài hiển thị cho CSKH (Tối thiểu 10 ký tự) *</label>
               <textarea
                 name="sanctionText"
                 className="dispute-textarea"
                 rows={2}
-                placeholder="VD: Lần 2 trong 60 ngày: Trừ -25 RS + tạm khóa tài khoản 7 ngày."
+                placeholder="VD: Lần 2 trong 60 ngày: Trừ 25 điểm uy tín + tạm khóa tài khoản 7 ngày."
                 value={formData.sanctionText}
                 onChange={handleChange}
                 required
@@ -226,12 +226,12 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
             </div>
 
             <div className="dispute-field-group">
-              <label>Lệnh cần Quản trị viên (Admin) can thiệp thủ công</label>
+              <label>Lệnh cần Quản trị viên can thiệp thủ công</label>
               <input
                 type="text"
                 name="adminActionText"
                 className="dispute-input"
-                placeholder="VD: Admin điều chỉnh -25 RS và tạm khóa 7 ngày"
+                placeholder="VD: Quản trị viên điều chỉnh giảm 25 điểm uy tín và tạm khóa 7 ngày"
                 value={formData.adminActionText}
                 onChange={handleChange}
               />
@@ -245,7 +245,7 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
                   checked={formData.enabled}
                   onChange={handleChange}
                 />
-                <span>Kích hoạt áp dụng quy tắc này trong màn hình phán quyết của CC</span>
+                <span>Kích hoạt áp dụng quy tắc này trong màn hình phán quyết của Chăm sóc khách hàng</span>
               </label>
             </div>
           </div>

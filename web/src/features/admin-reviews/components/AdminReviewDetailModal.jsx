@@ -20,7 +20,7 @@ const AdminReviewDetailModal = ({ review, onClose, onOpenModerate, onUnhide, onU
       <div className="admin-review-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="admin-review-modal-header">
           <h3>Chi Tiết Đánh Giá</h3>
-          <button className="admin-review-btn-close" onClick={onClose}>×</button>
+          <button className="admin-review-btn-close" onClick={onClose}>✕</button>
         </div>
 
         <div className="admin-review-modal-body">

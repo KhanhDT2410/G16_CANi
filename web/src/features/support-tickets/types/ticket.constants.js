@@ -37,8 +37,8 @@ export const TICKET_PRIORITIES = {
 };
 
 export const TICKET_PRIORITY_CONFIG = {
-  HIGH: { label: 'Cao (SLA 4h)', badgeClass: 'ticket-badge-high' },
-  MEDIUM: { label: 'Trung bình (SLA 1 ngày)', badgeClass: 'ticket-badge-medium' },
-  LOW: { label: 'Thấp (SLA 3 ngày)', badgeClass: 'ticket-badge-low' },
+  HIGH: { label: 'Mức cao · 4 giờ', badgeClass: 'ticket-badge-high' },
+  MEDIUM: { label: 'Trung bình · 1 ngày', badgeClass: 'ticket-badge-medium' },
+  LOW: { label: 'Tiêu chuẩn · 3 ngày', badgeClass: 'ticket-badge-low' },
 };
 

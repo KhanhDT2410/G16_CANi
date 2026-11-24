@@ -73,7 +73,7 @@ const AddEvidenceModal = ({ dispute, onClose, onSubmit }) => {
               Đơn: <code>{dispute.id}</code>
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>

@@ -48,19 +48,25 @@
 }
 
 .btn-appeals-refresh {
-  padding: 8px 14px;
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 4px;
   border: 1px solid #d1d5db;
   background: #fff;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: #374151;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-appeals-refresh:hover {
-  background: #f3f4f6;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 /* Table */
@@ -113,13 +119,20 @@
 }
 
 .penalty-amount-tag {
-  display: inline-block;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
   background: #fef2f2;
-  color: #dc2626;
-  font-size: 0.85rem;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .reason-cell {
@@ -142,11 +155,18 @@
 }
 
 .appeal-status-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .appeal-action-btns {
@@ -155,25 +175,49 @@
 }
 
 .btn-appeal-detail {
-  padding: 6px 12px;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
   border: 1px solid #d1d5db;
   background: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: #374151;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.btn-appeal-detail:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-appeal-review {
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: none;
-  background: #4f46e5;
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.btn-appeal-review:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
 }
 
 .appeal-pagination {
@@ -194,12 +238,25 @@
 }
 
 .btn-appeal-page {
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
   background: #fff;
+  color: #475569;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
+}
+
+.btn-appeal-page:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .btn-appeal-page:disabled {
@@ -349,14 +406,24 @@
 }
 
 .btn-evidence-link {
-  display: inline-block;
-  padding: 8px 14px;
-  background: #eef2ff;
-  color: #4f46e5;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  border-radius: 4px;
   text-decoration: none;
-  font-weight: 600;
-  font-size: 0.85rem;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-weight: 500;
+  font-size: 0.78rem;
+  transition: all 0.15s ease;
+}
+
+.btn-evidence-link:hover {
+  background: #dbeafe;
+  text-decoration: underline;
 }
 
 .detail-decision-box {
@@ -395,26 +462,26 @@
 }
 
 .btn-choice {
-  padding: 12px;
-  border-radius: 8px;
-  border: 2px solid #e5e7eb;
+  padding: 10px 14px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
   background: #fff;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .btn-choice.approve.active {
-  border-color: #059669;
-  background: #ecfdf5;
-  color: #065f46;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .btn-choice.reject.active {
-  border-color: #dc2626;
+  border-color: #fecaca;
   background: #fef2f2;
-  color: #991b1b;
+  color: #b91c1c;
 }
 
 .review-hint-box {
@@ -467,31 +534,54 @@
 }
 
 .btn-approve-submit {
-  background: #059669 !important;
+  background: #16a34a !important;
+  border: 1px solid #16a34a !important;
 }
 
 .btn-reject-submit {
   background: #dc2626 !important;
+  border: 1px solid #dc2626 !important;
 }
 
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  background: #4f46e5;
+  border-radius: 4px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
   color: #fff;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.85rem;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid #d1d5db;
   background: #fff;
   color: #374151;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.85rem;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .appeals-loading-box {

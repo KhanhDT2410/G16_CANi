@@ -15,7 +15,7 @@ export const NoShowDetailModal = ({ item, onClose, onNavigateAppeal }) => {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Hồ Sơ Vi Phạm No-Show</h3>
-          <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+          <button type="button" className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
         <div className="modal-body">

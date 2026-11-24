@@ -48,7 +48,7 @@ export const AdminSkillView = () => {
           className="admin-skills-btn-primary"
           onClick={openCreateModal}
         >
-          + Thêm Kỹ Năng Mới
+          Thêm kỹ năng mới
         </button>
       </div>
 

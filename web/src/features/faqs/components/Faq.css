@@ -36,37 +36,48 @@
 }
 
 .faq-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #2563eb;
   color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  font-size: 0.88rem;
-  font-weight: 600;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .faq-btn-primary:hover:not(:disabled) {
   background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .faq-btn-refresh,
 .faq-btn-secondary {
-  background: #f1f5f9;
-  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #374151;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 0.5rem 0.85rem;
-  font-size: 0.88rem;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .faq-btn-refresh:hover,
 .faq-btn-secondary:hover {
-  background: #e2e8f0;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 /* Analytics Summary */
@@ -208,49 +219,89 @@
 .faq-category-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.3rem;
   font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.2rem 0.6rem;
-  border-radius: 9999px;
-  background: #e0f2fe;
-  color: #0369a1;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
+.faq-badge-account {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.faq-badge-shift {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+
+.faq-badge-payment {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.faq-badge-dispute {
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  color: #7e22ce;
+}
+
+.faq-badge,
 .faq-status-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
   border-radius: 4px;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .faq-status-draft {
-  background: #fef3c7;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
   color: #b45309;
 }
 
 .faq-status-published {
-  background: #dcfce7;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
   color: #15803d;
 }
 
 .faq-status-archived {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
 }
 
 .faq-role-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
-  font-size: 0.74rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
   border-radius: 4px;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .faq-role-badge-all {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #475569;
   border: 1px solid #e2e8f0;
 }
@@ -262,17 +313,22 @@
 }
 
 .faq-role-badge-eo {
-  background: #fdf2f8;
-  color: #be185d;
-  border: 1px solid #fbcfe8;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
 }
 
 .faq-views-badge {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.78rem;
-  color: #64748b;
+  font-weight: 500;
+  color: #475569;
   background: #f8fafc;
-  padding: 0.2rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  padding: 2px 8px;
   border-radius: 4px;
+  line-height: 1.25;
 }
 
 .faq-card-actions {
@@ -652,26 +708,31 @@
 }
 
 .faq-cat-pill {
-  padding: 0.45rem 1rem;
-  border-radius: 9999px;
-  border: 1px solid #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
   color: #475569;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
+  line-height: 1.25;
 }
 
 .faq-cat-pill:hover {
   background: #f1f5f9;
-  border-color: #94a3b8;
+  border-color: #cbd5e1;
 }
 
 .faq-cat-pill.active {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  font-weight: 600;
 }
 
 .faq-public-list {
@@ -808,16 +869,18 @@
 }
 
 .faq-has-attachment-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .faq-answer-content {
@@ -887,7 +950,7 @@
   align-items: center;
   gap: 0.45rem;
   padding: 0.4rem 0.85rem;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #eff6ff;
   color: #1d4ed8;
   font-size: 0.85rem;
@@ -1170,51 +1233,64 @@
 
 /* Nút Lưu bản nháp (theo ảnh mẫu) */
 .faq-btn-draft {
-  background: #f1f5f9;
-  color: #1e293b;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 0.55rem 1.25rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .faq-btn-draft:hover:not(:disabled) {
-  background: #e2e8f0;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 /* Nút Gửi duyệt / Xuất bản (nút xanh nổi bật theo ảnh mẫu) */
 .faq-btn-submit {
-  background: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2563eb;
   color: #ffffff;
-  border: 1px solid #1d4ed8;
-  border-radius: 8px;
-  padding: 0.55rem 1.45rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.25);
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .faq-btn-submit:hover:not(:disabled) {
-  background: #1e40af;
-  border-color: #1e40af;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 /* Nút Quay lại bài viết của tôi (theo ảnh mẫu) */
 .faq-btn-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #f8fafc;
   color: #334155;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 0.55rem 1.25rem;
-  font-size: 0.9rem;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .faq-btn-back:hover:not(:disabled) {
@@ -1351,7 +1427,7 @@
   background: #fee2e2;
   color: #dc2626;
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 0.35rem 0.75rem;
   font-size: 0.8rem;
   font-weight: 600;

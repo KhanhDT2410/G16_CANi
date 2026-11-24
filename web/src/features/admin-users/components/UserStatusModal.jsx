@@ -49,7 +49,7 @@ const UserStatusModal = ({ user, submitting, onClose, onConfirm }) => {
             {actionTitle}
           </h3>
           <button type="button" className="btn-modal-close" onClick={onClose} aria-label="Đóng cửa sổ">
-            &times;
+            ✕
           </button>
         </div>
 

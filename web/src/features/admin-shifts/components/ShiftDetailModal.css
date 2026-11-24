@@ -105,7 +105,7 @@
   color: #64748b;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: 4px;
   transition: all 0.15s;
 }
 
@@ -671,9 +671,19 @@
 }
 
 .ticket-btn-warning {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 4px;
   background: #d97706;
   color: #ffffff;
   border: 1px solid #b45309;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .ticket-btn-warning:hover:not(:disabled) {
@@ -681,9 +691,19 @@
 }
 
 .ticket-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 4px;
   background: #dc2626;
   color: #ffffff;
   border: 1px solid #b91c1c;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .ticket-btn-danger:hover:not(:disabled) {

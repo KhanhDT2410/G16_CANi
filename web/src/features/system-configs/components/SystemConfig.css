@@ -47,36 +47,45 @@
 }
 
 .btn-config-discard {
-  padding: 0.55rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #dc2626;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #b91c1c;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 0.5rem;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-config-discard:hover:not(:disabled) {
   background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 .btn-config-save-all {
-  padding: 0.55rem 1.25rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: #ffffff;
   background: #2563eb;
-  border: none;
-  border-radius: 0.5rem;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
   transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-config-save-all:hover:not(:disabled) {
   background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .btn-config-save-all:disabled,
@@ -86,22 +95,24 @@
 }
 
 .btn-config-refresh {
-  padding: 0.55rem 0.95rem;
+  padding: 6px 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: #334155;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  border-radius: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-config-refresh:hover:not(:disabled) {
-  background: #e2e8f0;
+  background: #f8fafc;
+  border-color: #94a3b8;
   color: #0f172a;
 }
 
@@ -164,10 +175,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.45rem 0.95rem;
+  padding: 0.35rem 0.75rem;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 9999px;
+  border-radius: 4px;
   font-size: 0.84rem;
 }
 
@@ -178,17 +189,17 @@
 
 .pill-category-name {
   color: #0f172a;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .pill-count-badge {
   background: #f1f5f9;
   color: #334155;
   border: 1px solid #e2e8f0;
-  font-weight: 600;
-  font-size: 0.76rem;
-  padding: 0.12rem 0.55rem;
-  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .sys-config-category-tabs {
@@ -225,17 +236,20 @@
 }
 
 .cat-count-badge {
-  background: #e2e8f0;
+  background: #f1f5f9;
   color: #334155;
+  border: 1px solid #e2e8f0;
   font-size: 0.75rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 9999px;
-  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  line-height: 1.25;
 }
 
 .sys-config-cat-btn.active .cat-count-badge {
-  background: #dbeafe;
+  background: #eff6ff;
   color: #1d4ed8;
+  border-color: #bfdbfe;
 }
 
 /* Grid & Cards */
@@ -281,30 +295,35 @@
 }
 
 .cat-pill {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.55rem;
-  border-radius: 0.35rem;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: normal;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .badge-cat-matching {
-  background: #fdf4ff;
-  color: #a21caf;
-  border: 1px solid #f0abfc;
+  background: #faf5ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
 }
 
 .badge-cat-financial {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .badge-cat-operation {
-  background: #eef2ff;
-  color: #4338ca;
-  border: 1px solid #c7d2fe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .badge-cat-general {
@@ -314,29 +333,41 @@
 }
 
 .dirty-pill {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.2rem 0.55rem;
-  border-radius: 0.35rem;
-  background: #fef3c7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fffbeb;
   color: #b45309;
   border: 1px solid #fde68a;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .btn-card-edit-detail {
-  background: none;
-  border: 1px solid #e5e7eb;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
-  color: #4b5563;
-  border-radius: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #374151;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-card-edit-detail:hover {
-  background: #f3f4f6;
-  color: #111827;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .sys-config-card-title {
@@ -500,19 +531,24 @@
 }
 
 .btn-card-save-single {
-  padding: 0.5rem 0.85rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: #ffffff;
   background: #16a34a;
-  border: none;
-  border-radius: 0.5rem;
+  border: 1px solid #16a34a;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-card-save-single:hover:not(:disabled) {
   background: #15803d;
+  border-color: #15803d;
 }
 
 .btn-card-save-single:disabled {
@@ -625,12 +661,17 @@
 }
 
 .modal-key-badge {
+  display: inline-flex;
+  align-items: center;
   font-family: monospace;
-  font-size: 0.75rem;
-  color: #475569;
-  background: #f1f5f9;
-  padding: 0.15rem 0.45rem;
-  border-radius: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  line-height: 1.25;
 }
 
 .btn-modal-close {
@@ -730,33 +771,46 @@
 }
 
 .btn-modal-cancel {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #4b5563;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
   background: #ffffff;
   border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
+  border-radius: 4px;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-modal-cancel:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-modal-submit {
-  padding: 0.5rem 1.25rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: #ffffff;
   background: #2563eb;
-  border: none;
-  border-radius: 0.5rem;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .btn-modal-submit:hover:not(:disabled) {
   background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .btn-modal-submit:disabled,
@@ -789,15 +843,18 @@
 }
 
 .formula-badge {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #6366f1;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  padding: 0.25rem 0.6rem;
-  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #7e22ce;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  padding: 2px 8px;
+  border-radius: 4px;
   width: fit-content;
+  line-height: 1.25;
 }
 
 .formula-title-group {
@@ -818,22 +875,26 @@
 }
 
 .formula-status-pill {
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 0.35rem 0.8rem;
-  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
   white-space: nowrap;
+  line-height: 1.25;
 }
 
 .formula-status-pill.valid {
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .formula-status-pill.invalid {
   background: #fffbeb;
-  color: #92400e;
+  color: #b45309;
   border: 1px solid #fde68a;
 }
 

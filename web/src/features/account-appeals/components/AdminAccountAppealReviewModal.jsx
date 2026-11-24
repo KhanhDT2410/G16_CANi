@@ -61,7 +61,7 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
         <div className="appeal-modal-header">
           <h3>Thẩm Định Đơn Giải Trình Khóa Tài Khoản</h3>
           <button type="button" className="appeal-modal-close" onClick={onClose}>
-            &times;
+            ✕
           </button>
         </div>
 

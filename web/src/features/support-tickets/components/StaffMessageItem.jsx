@@ -43,15 +43,17 @@ export const StaffMessageItem = ({ conv, onSelect, formatTimeAgo }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
           <span
             style={{
-              fontSize: '0.68rem',
-              fontWeight: 600,
-              padding: '0.05rem 0.35rem',
+              fontFamily: "var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif)",
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              padding: '1px 6px',
               borderRadius: '4px',
-              background: isEO ? '#eff6ff' : '#f0fdf4',
-              color: isEO ? '#2563eb' : '#16a34a',
+              background: isEO ? '#fffbeb' : '#eff6ff',
+              border: `1px solid ${isEO ? '#fde68a' : '#bfdbfe'}`,
+              color: isEO ? '#b45309' : '#1d4ed8',
             }}
           >
-            {isEO ? 'Nhà tổ chức' : 'Nhân viên'}
+            {isEO ? 'Nhà tổ chức' : 'Người lao động'}
           </span>
           <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
             {conv.userPhone || ''}

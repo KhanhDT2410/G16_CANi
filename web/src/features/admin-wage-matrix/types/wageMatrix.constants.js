@@ -25,34 +25,34 @@ export const TIME_SLOT_OPTIONS = [
 
 export const TIME_SLOT_CONFIG = {
   DAYTIME_WEEKDAY: {
-    label: 'Ngày thường (Ban ngày)',
+    label: 'Ngày thường · Ban ngày',
     color: '#15803d',
     bg: '#f0fdf4',
     border: '#bbf7d0',
   },
   EVENING_WEEKDAY: {
-    label: 'Ngày thường (Buổi tối)',
+    label: 'Ngày thường · Buổi tối',
     color: '#b45309',
     bg: '#fffbeb',
     border: '#fde68a',
   },
   NIGHT_WEEKDAY: {
-    label: 'Ngày thường (Ca đêm)',
-    color: '#4338ca',
-    bg: '#eef2ff',
-    border: '#c7d2fe',
+    label: 'Ngày thường · Ca đêm',
+    color: '#7e22ce',
+    bg: '#faf5ff',
+    border: '#e9d5ff',
   },
   DAYTIME_WEEKEND: {
-    label: 'Cuối tuần (Ban ngày)',
-    color: '#0369a1',
-    bg: '#f0f9ff',
-    border: '#bae6fd',
+    label: 'Cuối tuần · Ban ngày',
+    color: '#1d4ed8',
+    bg: '#eff6ff',
+    border: '#bfdbfe',
   },
   EVENING_WEEKEND: {
-    label: 'Cuối tuần (Buổi tối)',
-    color: '#9333ea',
+    label: 'Cuối tuần · Buổi tối',
+    color: '#7e22ce',
     bg: '#faf5ff',
-    border: '#f3e8ff',
+    border: '#e9d5ff',
   },
 };
 
@@ -64,20 +64,20 @@ export const LEAD_TIME_OPTIONS = [
 
 export const LEAD_TIME_CONFIG = {
   STANDARD: {
-    label: 'Tiêu chuẩn (≥ 72h)',
+    label: 'Tiêu chuẩn · ≥ 72h',
     color: '#1d4ed8',
     bg: '#eff6ff',
     border: '#bfdbfe',
   },
   SOON: {
-    label: 'Cận ngày (24h - 72h)',
-    color: '#d97706',
+    label: 'Cận ngày · 24h - 72h',
+    color: '#b45309',
     bg: '#fffbeb',
-    border: '#fef3c7',
+    border: '#fde68a',
   },
   URGENT: {
-    label: 'Khẩn cấp (< 24h)',
-    color: '#dc2626',
+    label: 'Khẩn cấp · < 24h',
+    color: '#b91c1c',
     bg: '#fef2f2',
     border: '#fecaca',
   },
@@ -86,7 +86,7 @@ export const LEAD_TIME_CONFIG = {
 export const COMMON_JOB_TYPES = [
   'Phục vụ bàn',
   'Phụ bếp',
-  'Pha chế (Bartender/Barista)',
+  'Pha chế',
   'Thu ngân',
   'Lễ tân / Check-in',
   'Điều phối sự kiện',

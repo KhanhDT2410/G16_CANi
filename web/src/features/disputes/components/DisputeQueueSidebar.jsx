@@ -15,6 +15,7 @@ export const DisputeQueueSidebar = ({
   totalCount,
   myCount,
   riskCount,
+  unreadCount = 0,
   searchTerm,
   setSearchTerm,
   showScopeSwitcher = true,
@@ -63,6 +64,15 @@ export const DisputeQueueSidebar = ({
         >
           Tất cả
         </button>
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            className={`pill-btn unread ${queueFilter === 'UNREAD' ? 'active' : ''}`}
+            onClick={() => setQueueFilter('UNREAD')}
+          >
+            Chưa đọc ({unreadCount})
+          </button>
+        )}
         <button
           type="button"
           className={`pill-btn ${queueFilter === 'OPEN' ? 'active' : ''}`}
@@ -102,6 +112,7 @@ export const DisputeQueueSidebar = ({
         ) : (
           queue.map((item) => {
             const isSelected = item.id === selectedId;
+            const hasUnread = (item.unreadCount || 0) > 0 || (item.workerUnreadCount || 0) > 0 || (item.eoUnreadCount || 0) > 0;
             const statusCfg = DISPUTE_STATUS_CONFIG[item.status] || {
               label: item.status,
               badgeClass: 'badge-status-open',
@@ -110,36 +121,45 @@ export const DisputeQueueSidebar = ({
             const slaText = item.slaDeadline
               ? new Date(item.slaDeadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
               : 'N/A';
+            const msgTime = item.lastMessageAt
+              ? new Date(item.lastMessageAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+              : null;
 
             return (
               <div
                 key={item.id}
-                className={`queue-item-card ${isSelected ? 'selected' : ''}`}
+                className={`queue-item-card ${isSelected ? 'selected' : ''} ${hasUnread ? 'has-unread' : ''}`}
                 onClick={() => onSelect(item.id)}
                 role="button"
                 tabIndex={0}
               >
                 <div className="item-card-top">
-                  <span className="item-card-id">{item.displayId || `#${item.id?.substring(0, 8)}`}</span>
-                  <span className={`dispute-badge ${statusCfg.badgeClass}`}>{statusCfg.label}</span>
+                  <div className="item-card-top-left">
+                    <span className="item-card-id">{item.displayId || `#${item.id?.substring(0, 8)}`}</span>
+                    {hasUnread && <span className="item-card-dot-badge" title="Có tin nhắn mới chưa đọc" />}
+                  </div>
+                  <div className="item-card-top-right">
+                    {msgTime && <span className="item-card-msg-time">{msgTime}</span>}
+                    <span className={`dispute-badge ${statusCfg.badgeClass}`}>{statusCfg.label}</span>
+                  </div>
                 </div>
 
-                {/* Chỉ báo bên đang nhắn và số tin mới */}
-                {(item.workerUnreadCount > 0 || item.eoUnreadCount > 0 || item.unreadCount > 0) && (
+                {/* Thông báo bên gửi tin nhắn và số tin mới */}
+                {hasUnread && (
                   <div className="item-card-unread-row">
                     {item.workerUnreadCount > 0 && (
-                      <span className="unread-sender-pill worker">
-                        Nhân sự: {item.workerUnreadCount}
+                      <span className="unread-sender-pill worker" title={`Nhân sự ${item.workerName || ''} đã gửi tin nhắn`}>
+                        Nhân sự: {item.workerName ? item.workerName : 'Worker'} ({item.workerUnreadCount} tin mới)
                       </span>
                     )}
                     {item.eoUnreadCount > 0 && (
-                      <span className="unread-sender-pill eo">
-                        Nhà tổ chức: {item.eoUnreadCount}
+                      <span className="unread-sender-pill eo" title={`Nhà tổ chức ${item.eoName || ''} đã gửi tin nhắn`}>
+                        Nhà tổ chức: {item.eoName ? item.eoName : 'EO'} ({item.eoUnreadCount} tin mới)
                       </span>
                     )}
                     {!item.workerUnreadCount && !item.eoUnreadCount && item.unreadCount > 0 && (
                       <span className="unread-sender-pill default">
-                        {item.unreadCount} tin mới
+                        {item.lastMessageSenderName ? `${item.lastMessageSenderName}: ` : ''}{item.unreadCount} tin mới
                       </span>
                     )}
                   </div>

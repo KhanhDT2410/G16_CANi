@@ -120,7 +120,7 @@ export const TicketQueueTable = ({
                         {t.assignedName || t.assignedTo}
                       </div>
                       <div className="ticket-staff-role">
-                        {t.assignedRole ? `( ${t.assignedRole} )` : '( CSKH )'}
+                        {t.assignedRole === 'ADMIN' ? 'Quản trị viên' : 'Chuyên viên CSKH'}
                       </div>
                     </div>
                   ) : (

@@ -33,16 +33,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: 8px;
+  padding: 4px 10px;
+  border-radius: 4px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   color: #475569;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease-in-out;
   user-select: none;
+  line-height: 1.25;
 }
 
 .status-tab-btn:hover {
@@ -133,16 +134,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
-  border-radius: 8px;
+  padding: 6px 14px;
+  border-radius: 4px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
   color: #334155;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
+  line-height: 1.25;
 }
 
 .btn-appeals-refresh:hover:not(:disabled) {
@@ -334,16 +336,21 @@
 
 /* Nút Thao tác thẩm định */
 .btn-review-appeal {
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
   cursor: pointer;
   border: 1px solid #cbd5e1;
   background: #ffffff;
   color: #2563eb;
   transition: all 0.15s ease;
   white-space: nowrap;
+  line-height: 1.25;
+  box-sizing: border-box;
 }
 
 .btn-review-appeal:hover {
@@ -353,14 +360,15 @@
 }
 
 .btn-review-appeal.action-primary {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .btn-review-appeal.action-primary:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
 }
 
 /* Empty State & Loading State */
@@ -633,14 +641,18 @@
 }
 
 .btn-cancel {
-  padding: 8px 16px;
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 4px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
   color: #475569;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.85rem;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .btn-cancel:hover {
@@ -648,35 +660,43 @@
 }
 
 .btn-approve-confirm {
-  padding: 8px 18px;
-  border-radius: 8px;
-  border: none;
-  background: #10b981;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid #16a34a;
+  background: #16a34a;
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
 
 .btn-approve-confirm:hover:not(:disabled) {
-  background: #059669;
+  background: #15803d;
+  border-color: #15803d;
 }
 
 .btn-reject-confirm {
-  padding: 8px 18px;
-  border-radius: 8px;
-  border: none;
-  background: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid #dc2626;
+  background: #dc2626;
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
 
 .btn-reject-confirm:hover:not(:disabled) {
-  background: #dc2626;
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 
 .appeal-resolved-info {

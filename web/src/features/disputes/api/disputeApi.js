@@ -89,6 +89,23 @@ export const disputeApi = {
     return response.data?.data;
   },
 
+  /** Tải lên tệp / ảnh đính kèm minh chứng từ thiết bị (EO / Worker) */
+  uploadDisputeAttachment: async (disputeId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await apiClient.post(`/v1/disputes/${disputeId}/chat/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data?.data?.url;
+    } catch {
+      const fallback = await apiClient.post('/v1/public/account-appeals/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return fallback.data?.data?.url;
+    }
+  },
+
   /** Đánh dấu đã đọc tin nhắn trong phiên tranh chấp */
   markDisputeChatRead: async (disputeId, party = null) => {
     const url = party

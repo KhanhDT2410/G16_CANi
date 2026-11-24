@@ -81,5 +81,17 @@ public class DisputeChatController {
         disputeChatService.markChatRead(disputeId, userId, party);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã đánh dấu đọc tin nhắn"));
     }
+
+    /**
+     * Tải lên tài liệu / hình ảnh đính kèm trong phiên tranh chấp.
+     * POST /api/v1/disputes/{disputeId}/chat/upload
+     */
+    @PostMapping(value = "/{disputeId}/chat/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> uploadAttachment(
+            @PathVariable("disputeId") UUID disputeId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        String url = disputeChatService.uploadAttachment(disputeId, file);
+        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of("url", url), "Tải tệp đính kèm thành công"));
+    }
 }
 

@@ -117,56 +117,70 @@
 }
 
 .btn-filter-submit {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
   background: #2563eb;
   color: #ffffff;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .btn-filter-submit:hover:not(:disabled) {
   background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .btn-filter-reset {
-  padding: 0.5rem 0.85rem;
-  font-size: 0.875rem;
+  padding: 6px 14px;
+  font-size: 0.85rem;
   font-weight: 500;
-  background: #f8fafc;
-  color: #475569;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .btn-filter-reset:hover:not(:disabled) {
-  background: #f1f5f9;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-create-wage {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.55rem 1.15rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  background: #0f172a;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: #2563eb;
   color: #ffffff;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
   cursor: pointer;
+  line-height: 1.25;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
 
 .btn-create-wage:hover {
-  background: #1e293b;
-  transform: translateY(-1px);
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 /* 3. Table Styling */
@@ -232,12 +246,16 @@
 
 .wage-slot-badge,
 .wage-lead-badge {
-  display: inline-block;
-  padding: 0.25rem 0.65rem;
-  font-size: 0.775rem;
-  font-weight: 600;
-  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 4px;
   border: 1px solid transparent;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .wage-rate-text {
@@ -249,24 +267,29 @@
 .wage-status-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
-  padding: 0.25rem 0.65rem;
-  font-size: 0.775rem;
-  font-weight: 600;
-  border-radius: 9999px;
-  border: none;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .wage-status-pill.active {
-  background: #dcfce7;
+  background: #f0fdf4;
   color: #15803d;
+  border-color: #bbf7d0;
 }
 
 .wage-status-pill.inactive {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #f8fafc;
+  color: #475569;
+  border-color: #e2e8f0;
 }
 
 .wage-status-pill .status-dot {
@@ -283,32 +306,40 @@
 
 .btn-action-edit,
 .btn-action-delete {
-  padding: 0.3rem 0.65rem;
-  font-size: 0.775rem;
-  font-weight: 600;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 4px;
   cursor: pointer;
+  line-height: 1.25;
+  white-space: nowrap;
   transition: all 0.15s ease;
 }
 
 .btn-action-edit {
-  color: #2563eb;
-  border-color: #bfdbfe;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
 }
 
 .btn-action-edit:hover {
-  background: #eff6ff;
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e40af;
 }
 
 .btn-action-delete {
-  color: #dc2626;
-  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
 }
 
 .btn-action-delete:hover {
-  background: #fef2f2;
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 /* 4. Pagination */
@@ -332,18 +363,26 @@
 }
 
 .btn-page-nav {
-  padding: 0.35rem 0.75rem;
-  font-size: 0.825rem;
+  padding: 4px 10px;
+  font-size: 0.78rem;
   font-weight: 500;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
-  color: #334155;
-  border-radius: 6px;
+  color: #475569;
+  border-radius: 4px;
   cursor: pointer;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .btn-page-nav:hover:not(:disabled) {
   background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .btn-page-nav:disabled {
@@ -507,14 +546,16 @@
 }
 
 .btn-job-chip {
-  background: #f1f5f9;
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 9999px;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.725rem;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: #334155;
   cursor: pointer;
   transition: all 0.12s ease;
+  line-height: 1.25;
 }
 
 .btn-job-chip:hover {
@@ -546,31 +587,46 @@
 }
 
 .btn-modal-cancel {
-  padding: 0.55rem 1rem;
-  font-size: 0.875rem;
+  padding: 6px 14px;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: #475569;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  color: #374151;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
   cursor: pointer;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .btn-modal-cancel:hover:not(:disabled) {
-  background: #f1f5f9;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-modal-submit {
-  padding: 0.55rem 1.25rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: #ffffff;
   background: #2563eb;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
   cursor: pointer;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .btn-modal-submit:hover:not(:disabled) {
   background: #1d4ed8;
+  border-color: #1d4ed8;
 }

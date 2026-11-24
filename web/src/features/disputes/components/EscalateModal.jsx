@@ -42,7 +42,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
               Mã đơn: <code>{dispute.id}</code> (Thời hạn: Trong vòng 7 ngày kể từ quyết định của CSKH)
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -78,7 +78,7 @@ const EscalateModal = ({ dispute, onClose, onSubmit }) => {
               className="btn-escalate-submit"
               disabled={submitting || !reason.trim()}
             >
-              {submitting ? 'Đang gửi...' : 'Gửi kháng nghị lên Admin'}
+              {submitting ? 'Đang gửi...' : 'Gửi kháng nghị lên Ban Quản trị'}
             </button>
           </div>
         </form>

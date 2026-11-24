@@ -267,7 +267,7 @@ const DisputeDecisionModal = ({ dispute, onClose, onSubmit }) => {
               </span>
             </div>
             <button type="button" className="dispute-modal-close" onClick={onClose}>
-              &times;
+              ✕
             </button>
           </div>
 

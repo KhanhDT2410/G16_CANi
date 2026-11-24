@@ -50,7 +50,7 @@ const TransferDisputeModal = ({ dispute, staff = [], onClose, onSubmit }) => {
               Mã đơn: <code>{dispute.id}</code> — Tiêu đề: {dispute.title}
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>

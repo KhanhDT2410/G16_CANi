@@ -45,7 +45,7 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
         <div className="user-modal-header">
           <h3>Chi Tiết Tài Khoản Người Dùng</h3>
           <button type="button" className="btn-modal-close" onClick={onClose} aria-label="Đóng cửa sổ">
-            &times;
+            ✕
           </button>
         </div>
 

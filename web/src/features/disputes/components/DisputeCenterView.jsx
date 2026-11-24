@@ -4,6 +4,7 @@ import { useDisputes } from '../hooks/useDisputes';
 import DisputeQueueSidebar from './DisputeQueueSidebar';
 import DisputeConversationWorkspace from './DisputeConversationWorkspace';
 import DisputeQueueTable from './DisputeQueueTable';
+import DisputeTopHeader from './DisputeTopHeader';
 import CreateDisputeWizard from './CreateDisputeWizard';
 import DisputeDecisionModal from './DisputeDecisionModal';
 import EscalateModal from './EscalateModal';
@@ -37,11 +38,17 @@ export const DisputeCenterView = () => {
 
   const scopedList = !isArbitrator ? myDisputes : queueScope === 'MINE' ? myQueue : queue;
   const riskCount = useMemo(() => scopedList.filter((item) => item.slaAtRisk).length, [scopedList]);
+  const unreadTotalCount = useMemo(
+    () => scopedList.filter((item) => (item.unreadCount || 0) > 0 || (item.workerUnreadCount || 0) > 0 || (item.eoUnreadCount || 0) > 0).length,
+    [scopedList]
+  );
   const handleRefreshDisputes = () => (isArbitrator ? loadQueue() : loadMyDisputes());
 
   const filteredQueue = useMemo(() => {
     let list = scopedList;
-    if (queueFilter === 'OPEN') list = list.filter((i) => i.status === 'OPEN');
+    if (queueFilter === 'UNREAD') {
+      list = list.filter((i) => (i.unreadCount || 0) > 0 || (i.workerUnreadCount || 0) > 0 || (i.eoUnreadCount || 0) > 0);
+    } else if (queueFilter === 'OPEN') list = list.filter((i) => i.status === 'OPEN');
     else if (queueFilter === 'INVESTIGATING') list = list.filter((i) => i.status === 'INVESTIGATING');
     else if (queueFilter === 'ESCALATED') list = list.filter((i) => i.status === 'ESCALATED');
     else if (queueFilter === 'SLA_RISK') list = list.filter((i) => i.slaAtRisk);
@@ -50,8 +57,41 @@ export const DisputeCenterView = () => {
       const q = searchTerm.toLowerCase();
       list = list.filter((i) => i.title?.toLowerCase().includes(q) || i.id?.toLowerCase().includes(q));
     }
-    return list;
+
+    return [...list].sort((a, b) => {
+      // 1. Đơn có tin nhắn mới chưa đọc luôn nhảy lên đầu danh sách
+      const aUnread = (a.unreadCount || 0) > 0 || (a.workerUnreadCount || 0) > 0 || (a.eoUnreadCount || 0) > 0;
+      const bUnread = (b.unreadCount || 0) > 0 || (b.workerUnreadCount || 0) > 0 || (b.eoUnreadCount || 0) > 0;
+      if (aUnread !== bUnread) return aUnread ? -1 : 1;
+
+      // 2. Ca có tin nhắn mới nhất (lastMessageAt DESC) luôn lên trước
+      const aMsg = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const bMsg = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      if (aMsg !== bMsg) return bMsg - aMsg;
+
+      // 3. Nếu chưa có tin nhắn, ca có rủi ro SLA ưu tiên trước
+      if (a.slaAtRisk !== b.slaAtRisk) return a.slaAtRisk ? -1 : 1;
+
+      // 4. Mới tạo lên trước (createdAt DESC)
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bCreated - aCreated;
+    });
   }, [scopedList, queueFilter, searchTerm]);
+
+  // Tự động làm mới danh sách định kỳ để bắt kịp tin nhắn mới theo thời gian thực
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        if (isArbitrator) {
+          loadQueue();
+        } else {
+          loadMyDisputes();
+        }
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isArbitrator, loadQueue, loadMyDisputes]);
 
   // Tự động chọn đơn đầu tiên khi có dữ liệu từ CSDL
   useEffect(() => {
@@ -98,38 +138,13 @@ export const DisputeCenterView = () => {
   return (
     <div className="disputes-container">
       {/* Thanh công cụ chuyển đổi chế độ & thao tác */}
-      <div className="disputes-header">
-        <div className="view-mode-toggle">
-          <button
-            type="button"
-            className={`toggle-btn ${viewMode === 'SPLIT' ? 'active' : ''}`}
-            onClick={() => setViewMode('SPLIT')}
-          >
-            Không gian hội thoại
-          </button>
-          <button
-            type="button"
-            className={`toggle-btn ${viewMode === 'TABLE' ? 'active' : ''}`}
-            onClick={() => setViewMode('TABLE')}
-          >
-            Bảng hàng đợi
-          </button>
-        </div>
-        <div className="disputes-actions-group">
-          <button type="button" className="dispute-btn-secondary" onClick={handleRefreshDisputes}>
-            Làm mới
-          </button>
-          {!isArbitrator && (
-            <button
-              type="button"
-              className="dispute-btn-primary"
-              onClick={() => setModalType('create')}
-            >
-              + Gửi khiếu nại mới
-            </button>
-          )}
-        </div>
-      </div>
+      <DisputeTopHeader
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        onRefresh={handleRefreshDisputes}
+        isArbitrator={isArbitrator}
+        onOpenCreate={() => setModalType('create')}
+      />
 
       {/* CHẾ ĐỘ 1: GIAO DIỆN HỘI THOẠI SPLIT-VIEW (ADM-03) */}
       {viewMode === 'SPLIT' ? (
@@ -145,6 +160,7 @@ export const DisputeCenterView = () => {
             totalCount={scopedList.length}
             myCount={isArbitrator ? myQueue.length : myDisputes.length}
             riskCount={riskCount}
+            unreadCount={unreadTotalCount}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             showScopeSwitcher={isArbitrator}

@@ -147,7 +147,7 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                             className="proof-img-link"
                             onClick={() => setPreviewImage(w.proofImageUrl)}
                           >
-                            📸 Xem ảnh check-in
+                            Xem ảnh check-in
                           </button>
                         )}
                       </div>
@@ -195,7 +195,7 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
           <div className="proof-lightbox-card" onClick={(e) => e.stopPropagation()}>
             <div className="proof-lightbox-header">
               <span>Ảnh Bằng Chứng Điểm Danh</span>
-              <button type="button" onClick={() => setPreviewImage(null)}>&times;</button>
+              <button type="button" onClick={() => setPreviewImage(null)}>✕</button>
             </div>
             <img src={previewImage} alt="Bằng chứng check-in" className="proof-full-img" />
           </div>

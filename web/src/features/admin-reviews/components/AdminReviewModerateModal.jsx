@@ -30,7 +30,7 @@ const AdminReviewModerateModal = ({ actionType, review, onClose, onSubmit, loadi
       <div className="admin-review-modal-card admin-review-modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="admin-review-modal-header">
           <h3>{title}</h3>
-          <button className="admin-review-btn-close" onClick={onClose}>×</button>
+          <button className="admin-review-btn-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>

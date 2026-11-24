@@ -45,42 +45,51 @@
 }
 
 .rev-date-pill {
-  padding: 6px 14px;
-  font-size: 0.85rem;
-  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 4px;
   border: 1px solid #d1d5db;
   background: #ffffff;
   color: #374151;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .rev-date-pill:hover {
-  background: #f3f4f6;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .rev-date-pill.active {
-  background: #4f46e5;
+  background: #2563eb;
   color: #ffffff;
-  border-color: #4f46e5;
-  font-weight: 600;
+  border-color: #2563eb;
+  font-weight: 500;
 }
 
 .rev-btn-refresh-clean {
-  padding: 6px 14px;
-  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 4px;
   border: 1px solid #d1d5db;
-  background: #fff;
+  background: #ffffff;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 500;
   color: #374151;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .rev-btn-refresh-clean:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .rev-btn-refresh-icon {
@@ -556,17 +565,52 @@
 }
 
 .rev-btn-page {
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #475569;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
+}
+
+.rev-btn-page:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .rev-btn-page:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.rev-btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
+}
+
+.rev-btn-refresh:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .rev-loading-box,

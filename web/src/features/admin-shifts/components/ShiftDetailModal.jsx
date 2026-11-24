@@ -85,7 +85,7 @@ export const ShiftDetailModal = ({
             )}
           </div>
           <button type="button" className="shift-modal-close-btn" onClick={onClose} aria-label="Đóng cửa sổ">
-            &times;
+            ✕
           </button>
         </div>
 

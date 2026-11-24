@@ -44,22 +44,24 @@
 }
 
 .btn-refresh-plans {
-  padding: 0.55rem 1rem;
+  padding: 6px 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: #475569;
+  color: #374151;
   background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
   cursor: pointer;
+  line-height: 1.25;
+  white-space: nowrap;
   transition: all 0.15s ease;
 }
 
 .btn-refresh-plans:hover:not(:disabled) {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #0f172a;
   border-color: #94a3b8;
 }
@@ -67,20 +69,23 @@
 .btn-add-plan {
   background: #2563eb;
   color: #ffffff;
-  border: none;
-  padding: 0.55rem 1.15rem;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.875rem;
+  border: 1px solid #2563eb;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
-  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.25;
+  transition: all 0.15s ease;
 }
 
 .btn-add-plan:hover {
   background: #1d4ed8;
-  transform: translateY(-1px);
+  border-color: #1d4ed8;
 }
 
 /* Grid & Cards */
@@ -126,18 +131,22 @@
 }
 
 .plan-type-pill {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.2rem 0.6rem;
-  border-radius: 20px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: normal;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .badge-enterprise {
-  background: #ede9fe;
-  color: #6d28d9;
-  border: 1px solid #ddd6fe;
+  background: #faf5ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
 }
 
 .badge-trial {
@@ -153,7 +162,7 @@
 }
 
 .badge-invite {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #475569;
   border: 1px solid #e2e8f0;
 }
@@ -298,38 +307,48 @@
 
 .btn-plan-edit {
   flex: 1;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #1e293b;
-  padding: 0.55rem 0.85rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
   cursor: pointer;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 
 .btn-plan-edit:hover {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
 }
 
 .btn-plan-delete {
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  color: #e11d48;
-  padding: 0.55rem 1rem;
-  border-radius: 6px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 6px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 
 .btn-plan-delete:hover:not(:disabled) {
-  background: #ffe4e6;
-  border-color: #fda4af;
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 .btn-plan-delete:disabled {
@@ -407,21 +426,25 @@
 }
 
 .btn-modal-close {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0.35rem 0.75rem;
-  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  padding: 4px 10px;
+  border-radius: 4px;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #374151;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-modal-close:hover {
-  background: #e2e8f0;
+  background: #f8fafc;
   color: #0f172a;
+  border-color: #94a3b8;
 }
 
 .plan-modal-form {
@@ -549,33 +572,43 @@
 
 .btn-modal-cancel {
   background: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #475569;
-  padding: 0.6rem 1.25rem;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.875rem;
+  border: 1px solid #d1d5db;
+  color: #374151;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.85rem;
   cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-modal-cancel:hover:not(:disabled) {
   background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .btn-modal-submit {
   background: #2563eb;
-  border: none;
+  border: 1px solid #2563eb;
   color: #ffffff;
-  padding: 0.6rem 1.25rem;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.875rem;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.85rem;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-modal-submit:hover:not(:disabled) {
   background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .btn-modal-submit:disabled,

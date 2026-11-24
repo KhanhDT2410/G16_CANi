@@ -373,12 +373,44 @@ public class DisputeService {
 
     private List<DisputeQueueItemDto> toQueueItems(List<Dispute> disputes) {
         Instant slaRiskCutoff = Instant.now().plus(Duration.ofHours(24));
-        return disputes.stream()
-                .sorted(Comparator
-                        .<Dispute>comparingInt(d -> slaAtRisk(d, slaRiskCutoff) ? 0 : 1)
-                        .thenComparing(Dispute::getCreatedAt,
-                                Comparator.nullsLast(Comparator.naturalOrder())))
+        List<DisputeQueueItemDto> items = disputes.stream()
                 .map(d -> toQueueItemDto(d, slaRiskCutoff))
+                .toList();
+
+        return items.stream()
+                .sorted((a, b) -> {
+                    // 1. Đơn có tin nhắn mới chưa đọc luôn nhảy lên trên cùng
+                    boolean aUnread = a.getUnreadCount() != null && a.getUnreadCount() > 0;
+                    boolean bUnread = b.getUnreadCount() != null && b.getUnreadCount() > 0;
+                    if (aUnread != bUnread) {
+                        return aUnread ? -1 : 1;
+                    }
+
+                    // 2. Ca có tin nhắn mới nhất (lastMessageAt DESC) luôn lên trước
+                    Instant aMsg = a.getLastMessageAt();
+                    Instant bMsg = b.getLastMessageAt();
+                    if (aMsg != null || bMsg != null) {
+                        if (aMsg != null && bMsg != null) {
+                            int cmp = bMsg.compareTo(aMsg);
+                            if (cmp != 0) return cmp;
+                        } else {
+                            return aMsg != null ? -1 : 1;
+                        }
+                    }
+
+                    // 3. Nếu chưa có tin nhắn nào, ca có rủi ro SLA ưu tiên trước
+                    if (a.isSlaAtRisk() != b.isSlaAtRisk()) {
+                        return a.isSlaAtRisk() ? -1 : 1;
+                    }
+
+                    // 4. Mới tạo lên trước (createdAt DESC)
+                    Instant aCreated = a.getCreatedAt();
+                    Instant bCreated = b.getCreatedAt();
+                    if (aCreated != null && bCreated != null) {
+                        return bCreated.compareTo(aCreated);
+                    }
+                    return 0;
+                })
                 .toList();
     }
 
@@ -1066,6 +1098,45 @@ public class DisputeService {
             }
         }
 
+        String workerName = null;
+        String eoName = null;
+
+        if (dispute.getAssignmentId() != null) {
+            ShiftAssignment sa = shiftAssignmentRepository.findById(dispute.getAssignmentId()).orElse(null);
+            if (sa != null) {
+                if (sa.getWorker() != null) {
+                    workerName = sa.getWorker().getFullName() != null ? sa.getWorker().getFullName()
+                            : (sa.getWorker().getUser() != null ? sa.getWorker().getUser().getFullName() : null);
+                }
+                if (sa.getShift() != null && sa.getShift().getEvent() != null
+                        && sa.getShift().getEvent().getEventOrganizer() != null) {
+                    EventOrganizer eo = sa.getShift().getEvent().getEventOrganizer();
+                    eoName = eo.getCompanyName() != null ? eo.getCompanyName()
+                            : (eo.getUser() != null ? eo.getUser().getFullName() : null);
+                }
+            }
+        }
+
+        if (workerName == null || eoName == null) {
+            User comp = dispute.getComplainantId() != null ? userRepository.findById(dispute.getComplainantId()).orElse(null) : null;
+            User resp = dispute.getRespondentId() != null ? userRepository.findById(dispute.getRespondentId()).orElse(null) : null;
+            if (comp != null) {
+                if (comp.getRole() == UserRole.WORKER) workerName = comp.getFullName();
+                else if (comp.getRole() == UserRole.EVENT_ORGANIZER) eoName = comp.getFullName();
+            }
+            if (resp != null) {
+                if (resp.getRole() == UserRole.WORKER) workerName = resp.getFullName();
+                else if (resp.getRole() == UserRole.EVENT_ORGANIZER) eoName = resp.getFullName();
+            }
+        }
+
+        String lastSenderName = null;
+        if ("WORKER".equalsIgnoreCase(lastSender)) {
+            lastSenderName = workerName;
+        } else if ("EO".equalsIgnoreCase(lastSender)) {
+            lastSenderName = eoName;
+        }
+
         return DisputeQueueItemDto.builder()
                 .id(dispute.getDisputeId())
                 .type(dispute.getType())
@@ -1081,7 +1152,10 @@ public class DisputeService {
                 .unreadCount(unreadStaff)
                 .workerUnreadCount(workerUnread)
                 .eoUnreadCount(eoUnread)
+                .workerName(workerName)
+                .eoName(eoName)
                 .lastMessageSenderParty(lastSender)
+                .lastMessageSenderName(lastSenderName)
                 .lastMessageAt(lastMsgAt)
                 .build();
     }

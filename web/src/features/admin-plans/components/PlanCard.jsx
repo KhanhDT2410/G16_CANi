@@ -23,13 +23,13 @@ export default function PlanCard({ plan, onEdit, onDelete, isDeleting }) {
   const getPlanTypeBadge = (type) => {
     switch (type) {
       case 'ENTERPRISE':
-        return { label: 'Doanh Nghiệp (Pro)', cls: 'badge-enterprise' };
+        return { label: 'Doanh nghiệp', cls: 'badge-enterprise' };
       case 'FREE_TRIAL':
-        return { label: 'Dùng Thử (Trial)', cls: 'badge-trial' };
+        return { label: 'Dùng thử', cls: 'badge-trial' };
       case 'INVITE_ONLY':
-        return { label: 'Mời Trực Tiếp', cls: 'badge-invite' };
+        return { label: 'Mời trực tiếp', cls: 'badge-invite' };
       default:
-        return { label: 'Tiêu Chuẩn (Standard)', cls: 'badge-matching' };
+        return { label: 'Tiêu chuẩn', cls: 'badge-matching' };
     }
   };
 
@@ -45,7 +45,7 @@ export default function PlanCard({ plan, onEdit, onDelete, isDeleting }) {
         <h3 className="plan-name">{plan.planName}</h3>
         <div className="plan-price-row">
           {isFree ? (
-            <span className="plan-price free-text">0 đ (Miễn phí)</span>
+            <span className="plan-price free-text">0 đ · Miễn phí</span>
           ) : (
             <>
               <span className="plan-price">{formatCurrency(plan.price)}</span>

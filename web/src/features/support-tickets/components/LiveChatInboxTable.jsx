@@ -131,16 +131,15 @@ export const LiveChatInboxTable = ({
                     {/* Cột 2: Vai Trò (Kéo sát lại) */}
                     <td style={{ width: '120px', textAlign: 'center' }}>
                       <span
-                        className="ticket-badge ticket-badge-medium"
+                        className="ticket-badge"
                         style={{
-                          background: isEO ? '#eff6ff' : '#f0fdf4',
-                          color: isEO ? '#1e40af' : '#166534',
-                          borderColor: isEO ? '#bfdbfe' : '#bbf7d0',
-                          fontWeight: 600,
+                          background: isEO ? '#fffbeb' : '#eff6ff',
+                          color: isEO ? '#b45309' : '#1d4ed8',
+                          borderColor: isEO ? '#fde68a' : '#bfdbfe',
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {isEO ? 'Nhà tổ chức' : 'Nhân viên'}
+                        {isEO ? 'Nhà tổ chức' : 'Người lao động'}
                       </span>
                     </td>
 
@@ -153,23 +152,23 @@ export const LiveChatInboxTable = ({
                             onClick={() => onOpenShiftDetail && onOpenShiftDetail(conv.currentShiftId)}
                             style={{
                               background: '#eff6ff',
-                              color: '#2563eb',
+                              color: '#1d4ed8',
                               border: '1px solid #bfdbfe',
-                              borderRadius: '6px',
-                              padding: '3px 10px',
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
+                              borderRadius: '4px',
+                              padding: '2px 8px',
+                              fontSize: '0.78rem',
+                              fontWeight: 500,
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
                               width: 'fit-content',
                               transition: 'all 0.15s',
-                              boxShadow: '0 1px 2px rgba(37, 99, 235, 0.08)',
+                              fontFamily: "var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif)",
                             }}
                             title="Bấm để xem chi tiết ca làm việc"
                           >
-                            <span>🏷️ {conv.currentShiftCode}</span>
+                            <span>{conv.currentShiftCode}</span>
                             <span style={{ fontSize: '0.7rem' }}>↗</span>
                           </button>
                           {conv.currentShiftName && (

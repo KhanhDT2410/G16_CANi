@@ -96,7 +96,7 @@ export const ShiftActionModal = ({
             disabled={loading}
             aria-label="Đóng cửa sổ"
           >
-            &times;
+            ✕
           </button>
         </div>
 

@@ -75,7 +75,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
     e.preventDefault();
     const trimmedId = assignmentId.trim();
     if (!trimmedId) {
-      showToast('Vui lòng chọn ca làm việc hoặc nhập Mã ca làm việc (Assignment ID)', 'warning');
+      showToast('Vui lòng chọn ca làm việc hoặc nhập Mã phân công ca làm việc', 'warning');
       return;
     }
     if (!UUID_REGEX.test(trimmedId)) {
@@ -113,7 +113,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
       <div className="dispute-modal" onClick={(e) => e.stopPropagation()}>
         <div className="dispute-modal-header">
           <h3>Nộp Đơn Tranh Chấp & Khiếu Nại</h3>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -184,7 +184,7 @@ const CreateDisputeModal = ({ onClose, onSubmit }) => {
                   />
                   {assignments.length === 0 && (
                     <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 4 }}>
-                      Chưa ghi nhận ca phân công nào trong tài khoản của bạn. Bạn có thể dán mã Assignment ID (UUID) nếu có.
+                      Chưa ghi nhận ca phân công nào trong tài khoản của bạn. Bạn có thể dán mã phân công ca làm việc nếu có.
                     </div>
                   )}
                 </>

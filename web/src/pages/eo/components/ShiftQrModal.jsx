@@ -60,7 +60,6 @@ const ShiftQrModal = ({
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1.25rem' }}>🛡️</span>
             <h3 style={{ margin: 0, textAlign: 'left', fontSize: '1.15rem', fontWeight: 700, color: '#1e293b' }}>
               Mã QR Điểm Danh Động (Dynamic QR)
             </h3>

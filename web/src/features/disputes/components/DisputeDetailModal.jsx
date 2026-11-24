@@ -47,7 +47,7 @@ const DisputeDetailModal = ({
               ID: <code>{dispute.id}</code>
             </span>
           </div>
-          <button type="button" className="dispute-modal-close" onClick={onClose}>&times;</button>
+          <button type="button" className="dispute-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <div className="dispute-modal-body">

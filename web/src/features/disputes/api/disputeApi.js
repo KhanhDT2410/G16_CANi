@@ -50,6 +50,12 @@ export const disputeApi = {
     return response.data?.data;
   },
 
+  /** Danh sách tranh chấp đã giải quyết / hoàn thiện (Option 1) */
+  getResolvedDisputes: async () => {
+    const response = await apiClient.get('/v1/admin/disputes/resolved');
+    return response.data?.data || [];
+  },
+
   /** UC-109: Hàng đợi riêng — chỉ đơn đang được giao cho CC hiện tại */
   getMyDisputeQueue: async () => {
     const response = await apiClient.get('/v1/admin/disputes/queue/mine');
@@ -87,6 +93,23 @@ export const disputeApi = {
   sendDisputeChatMessage: async (disputeId, payload) => {
     const response = await apiClient.post(`/v1/disputes/${disputeId}/chat/messages`, payload);
     return response.data?.data;
+  },
+
+  /** Tải lên tệp / ảnh đính kèm minh chứng từ thiết bị (EO / Worker) */
+  uploadDisputeAttachment: async (disputeId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await apiClient.post(`/v1/disputes/${disputeId}/chat/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data?.data?.url;
+    } catch {
+      const fallback = await apiClient.post('/v1/public/account-appeals/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return fallback.data?.data?.url;
+    }
   },
 
   /** Đánh dấu đã đọc tin nhắn trong phiên tranh chấp */

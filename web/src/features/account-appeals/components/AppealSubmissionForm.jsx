@@ -181,7 +181,7 @@ export default function AppealSubmissionForm({ email, appealToken, onSubmitSucce
                   onClick={() => handleRemoveFile(idx)}
                   title="Xóa tài liệu"
                 >
-                  &times;
+                  ✕
                 </button>
               </div>
             ))}

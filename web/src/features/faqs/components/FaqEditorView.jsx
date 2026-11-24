@@ -141,7 +141,7 @@ export const FaqEditorView = ({ faq, onBack, onSubmit, loading }) => {
           <label className="faq-field-label">Tài liệu hướng dẫn đính kèm (Tùy chọn)</label>
           <div className="faq-form-row">
             <input
-              type="url" className="faq-form-input flex-1" placeholder="Đường dẫn tệp đính kèm (URL)"
+              type="url" className="faq-form-input flex-1" placeholder="Đường dẫn tệp đính kèm"
               value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} disabled={loading}
             />
             {attachmentUrl && (

@@ -137,7 +137,6 @@ export default function EmergencyDispatchConfirmModal({
                 marginBottom: '0.45rem',
               }}
             >
-              <span>⚠️</span>
               {isAutoPrompt ? 'CẢNH BÁO HỆ QUẢ • TỰ ĐỘNG ĐỀ XUẤT' : 'CẢNH BÁO HỆ QUẢ • EMERGENCY DISPATCH'}
             </span>
             <h3 id="emergency-warning-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
@@ -154,7 +153,7 @@ export default function EmergencyDispatchConfirmModal({
             style={{ background: 'transparent', border: 'none', fontSize: '1.4rem', color: '#94a3b8', cursor: isBusy ? 'not-allowed' : 'pointer' }}
             aria-label="Đóng hộp thoại"
           >
-            &times;
+            ✕
           </button>
         </div>
 

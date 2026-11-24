@@ -1,70 +1,16 @@
 import React, { useState } from 'react';
 import { WORKER_ASSIGNMENT_STATUS_CONFIG } from '../types/adminShift.constants';
+import { formatDateTime, parseWorkerChecklistProgress } from '../utils/shiftModalHelpers';
+import ShiftProofLightbox from './ShiftProofLightbox';
 
 /**
  * Bảng đối soát nhân sự & tiến độ công việc trong ca làm việc cho Admin.
+ * Hỗ trợ xem trực tiếp ảnh minh chứng của từng đầu việc kèm mốc thời gian.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
-
-  const formatDateTime = (isoStr) => {
-    if (!isoStr) return '—';
-    try {
-      return new Date(isoStr).toLocaleString('vi-VN', {
-        hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit',
-      });
-    } catch {
-      return '—';
-    }
-  };
-
-  const parseProgress = (rawProgress) => {
-    if (!templateChecklist || templateChecklist.length === 0) {
-      return { total: 0, done: 0, percent: 0, items: [] };
-    }
-    const total = templateChecklist.length;
-    let done = 0;
-    let progressMap = {};
-
-    try {
-      if (rawProgress) {
-        const parsed = typeof rawProgress === 'string' ? JSON.parse(rawProgress) : rawProgress;
-        if (Array.isArray(parsed)) {
-          parsed.forEach((p) => {
-            if (p && typeof p === 'object') {
-              progressMap[p.id] = { completed: p.completed !== false, completedAt: p.completedAt };
-            } else if (typeof p === 'string') {
-              progressMap[p] = { completed: true };
-            }
-          });
-        } else if (typeof parsed === 'object') {
-          Object.keys(parsed).forEach((k) => {
-            const v = parsed[k];
-            progressMap[k] = { completed: v === true || v?.completed === true, completedAt: v?.completedAt };
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Lỗi phân tích checklist_progress:', e);
-    }
-
-    const items = templateChecklist.map((tpl) => {
-      const prog = progressMap[tpl.id];
-      const isDone = Boolean(prog && prog.completed);
-      if (isDone) done++;
-      return {
-        id: tpl.id,
-        title: tpl.title,
-        completed: isDone,
-        completedAt: prog?.completedAt || null,
-      };
-    });
-
-    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { total, done, percent, items };
-  };
 
   if (!workers || workers.length === 0) {
     return (
@@ -77,15 +23,15 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
   return (
     <div className="shift-workers-wrapper">
       <div className="shift-workers-table-card">
-        <table className="tickets-table" style={{ margin: 0 }}>
+        <table className="tickets-table" style={{ margin: 0, minWidth: '860px', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ minWidth: '170px' }}>Nhân Viên</th>
-              <th style={{ width: '120px' }}>SĐT</th>
-              <th style={{ width: '110px' }}>Trạng Thái</th>
-              <th style={{ width: '150px' }}>Tiến Độ Việc</th>
-              <th style={{ minWidth: '170px' }}>Điểm Danh QR</th>
-              <th style={{ width: '110px' }}>EO Duyệt</th>
+              <th style={{ minWidth: '180px' }}>Nhân Viên</th>
+              <th style={{ width: '120px', minWidth: '120px' }}>SĐT</th>
+              <th style={{ width: '120px', minWidth: '120px' }}>Trạng Thái</th>
+              <th style={{ width: '180px', minWidth: '180px' }}>Tiến Độ Việc</th>
+              <th style={{ minWidth: '180px' }}>Điểm Danh QR</th>
+              <th style={{ width: '110px', minWidth: '110px' }}>EO Duyệt</th>
             </tr>
           </thead>
           <tbody>
@@ -93,7 +39,7 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
               const wStatus = WORKER_ASSIGNMENT_STATUS_CONFIG[w.status] || {
                 label: w.status, color: '#475569', bg: '#f1f5f9',
               };
-              const { total, done, percent, items } = parseProgress(w.checklistProgress);
+              const { total, done, percent, items } = parseWorkerChecklistProgress(templateChecklist, w.checklistProgress);
               const isExpanded = selectedWorkerId === w.assignmentId;
 
               return (
@@ -145,9 +91,13 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                           <button
                             type="button"
                             className="proof-img-link"
-                            onClick={() => setPreviewImage(w.proofImageUrl)}
+                            onClick={() => setPreviewImage({
+                              url: w.proofImageUrl,
+                              title: `Ảnh điểm danh QR check-in - ${w.workerName}`,
+                              time: w.checkinTime,
+                            })}
                           >
-                            📸 Xem ảnh check-in
+                            Xem ảnh check-in
                           </button>
                         )}
                       </div>
@@ -170,12 +120,71 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                           </div>
                           <div className="worker-tasks-list">
                             {items.map((task) => (
-                              <div key={task.id} className={`worker-task-item ${task.completed ? 'is-done' : 'is-pending'}`}>
-                                <span className="task-check-icon">{task.completed ? '✓' : '○'}</span>
-                                <span className="task-title">{task.title}</span>
-                                {task.completed && task.completedAt && (
-                                  <span className="task-time">({formatDateTime(task.completedAt)})</span>
-                                )}
+                              <div
+                                key={task.id}
+                                className={`worker-task-item ${task.completed ? 'is-done' : 'is-pending'}`}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: 1, minWidth: '220px' }}>
+                                  <span className="task-check-icon">{task.completed ? '✓' : '○'}</span>
+                                  <span className="task-title">{task.title}</span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                  {task.isRequiredEvidence && !task.evidenceImageUrl && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.72rem',
+                                        fontWeight: 600,
+                                        padding: '2px 6px',
+                                        borderRadius: 4,
+                                        background: '#fef2f2',
+                                        color: '#dc2626',
+                                        border: '1px solid #fecaca',
+                                      }}
+                                    >
+                                      Cần minh chứng
+                                    </span>
+                                  )}
+
+                                  {task.evidenceImageUrl && (
+                                    <button
+                                      type="button"
+                                      className="proof-img-link"
+                                      onClick={() => setPreviewImage({
+                                        url: task.evidenceImageUrl,
+                                        title: `Ảnh minh chứng: ${task.title} (${w.workerName})`,
+                                        time: task.evidenceSubmittedAt || task.completedAt,
+                                      })}
+                                      style={{
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        padding: '2px 8px',
+                                        background: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #bfdbfe',
+                                        borderRadius: 4,
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      Xem ảnh minh chứng
+                                    </button>
+                                  )}
+
+                                  {task.completed && task.completedAt && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.75rem',
+                                        color: '#64748b',
+                                        whiteSpace: 'nowrap',
+                                        minWidth: '115px',
+                                        textAlign: 'right',
+                                      }}
+                                    >
+                                      ({formatDateTime(task.completedAt)})
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -190,17 +199,10 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
         </table>
       </div>
 
-      {previewImage && (
-        <div className="proof-lightbox-overlay" onClick={() => setPreviewImage(null)}>
-          <div className="proof-lightbox-card" onClick={(e) => e.stopPropagation()}>
-            <div className="proof-lightbox-header">
-              <span>Ảnh Bằng Chứng Điểm Danh</span>
-              <button type="button" onClick={() => setPreviewImage(null)}>&times;</button>
-            </div>
-            <img src={previewImage} alt="Bằng chứng check-in" className="proof-full-img" />
-          </div>
-        </div>
-      )}
+      <ShiftProofLightbox
+        previewImage={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
     </div>
   );
 };

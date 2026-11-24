@@ -41,7 +41,7 @@ export const RsAppealReviewModal = ({ appeal, isOpen, onClose, onSubmit, submitt
             <div>
               <h3 className="appeal-modal-title">Thẩm Định Kháng Cáo Điểm RS</h3>
               <p className="appeal-modal-sub">
-                Worker: {appeal.workerName} | Mức phạt: -{appeal.penaltyAmount} RS
+                Nhân sự: {appeal.workerName} | Mức phạt: -{appeal.penaltyAmount} RS
               </p>
             </div>
             <button type="button" className="btn-modal-close" onClick={onClose}>✕</button>
@@ -56,7 +56,7 @@ export const RsAppealReviewModal = ({ appeal, isOpen, onClose, onSubmit, submitt
                   className={`btn-choice approve ${approved ? 'active' : ''}`}
                   onClick={() => setApproved(true)}
                 >
-                  Chấp Thuận (+{appeal.penaltyAmount} RS)
+                  Chấp Thuận Kháng Cáo
                 </button>
                 <button
                   type="button"

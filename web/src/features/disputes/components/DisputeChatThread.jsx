@@ -20,7 +20,13 @@ export const DisputeChatThread = ({
 
   const workerChat = chatData?.workerConversation;
   const eoChat = chatData?.eoConversation;
-  const isClosed = dispute?.status === 'FINAL_RESOLVED' || chatData?.disputeStatus === 'FINAL_RESOLVED';
+  const isClosed =
+    dispute?.status === 'FINAL_RESOLVED' ||
+    dispute?.status === 'RESOLVED' ||
+    dispute?.status === 'UNVERIFIED' ||
+    chatData?.disputeStatus === 'FINAL_RESOLVED' ||
+    chatData?.disputeStatus === 'RESOLVED' ||
+    chatData?.disputeStatus === 'UNVERIFIED';
 
   // Tự động đánh dấu đọc tin khi người dùng hoặc trọng tài mở hội thoại
   useEffect(() => {
@@ -123,7 +129,7 @@ export const DisputeChatThread = ({
             targetParty="WORKER"
             partyRolePrefix="Nhân sự"
             partyName={workerName}
-            partyRoleLabel="Worker"
+            partyRoleLabel="Người lao động"
             onSendMessage={onSendMessage}
             isSending={isSending}
             isArbitrator={true}
@@ -136,7 +142,7 @@ export const DisputeChatThread = ({
             targetParty="EO"
             partyRolePrefix="Nhà tổ chức"
             partyName={eoName}
-            partyRoleLabel="Event Organizer"
+            partyRoleLabel="Nhà tổ chức"
             onSendMessage={onSendMessage}
             isSending={isSending}
             isArbitrator={true}

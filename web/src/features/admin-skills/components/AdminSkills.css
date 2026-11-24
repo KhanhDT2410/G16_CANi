@@ -15,19 +15,24 @@
 }
 
 .admin-skills-btn-primary {
-  padding: 0.55rem 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
   background-color: #2563eb;
   color: #ffffff;
-  border: 1px solid #1d4ed8;
-  border-radius: 6px;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .admin-skills-btn-primary:hover {
   background-color: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .admin-skills-btn-primary:disabled {
@@ -81,18 +86,25 @@
 }
 
 .admin-skills-btn-secondary {
-  padding: 0.5rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
   background-color: #ffffff;
-  color: #334155;
+  color: #374151;
   border: 1px solid #cbd5e1;
-  border-radius: 5px;
+  border-radius: 4px;
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.25;
 }
 
 .admin-skills-btn-secondary:hover {
-  background-color: #f1f5f9;
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 /* Table Area */
@@ -132,32 +144,40 @@
 
 /* Badges (No Icons, Pure Text) */
 .skill-badge-category {
-  display: inline-block;
-  padding: 0.2rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   white-space: nowrap;
+  line-height: 1.25;
+  box-sizing: border-box;
 }
 
 .skill-badge-status {
-  display: inline-block;
-  padding: 0.2rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   white-space: nowrap;
+  line-height: 1.25;
+  box-sizing: border-box;
 }
 
 .skill-badge-status.active {
-  background-color: #dcfce7;
+  background-color: #f0fdf4;
   color: #15803d;
   border: 1px solid #bbf7d0;
 }
 
 .skill-badge-status.inactive {
-  background-color: #f1f5f9;
-  color: #64748b;
+  background-color: #f8fafc;
+  color: #475569;
   border: 1px solid #e2e8f0;
 }
 
@@ -170,13 +190,18 @@
 }
 
 .skill-action-btn {
-  padding: 0.3rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 500;
   border-radius: 4px;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background-color 0.15s ease;
+  transition: all 0.15s ease;
+  line-height: 1.25;
+  box-sizing: border-box;
 }
 
 .skill-action-btn.edit {
@@ -190,23 +215,23 @@
 }
 
 .skill-action-btn.toggle-hide {
-  background-color: #fee2e2;
+  background-color: #fef2f2;
   color: #b91c1c;
   border-color: #fecaca;
 }
 
 .skill-action-btn.toggle-hide:hover {
-  background-color: #fecaca;
+  background-color: #fee2e2;
 }
 
 .skill-action-btn.toggle-active {
-  background-color: #ecfdf5;
-  color: #047857;
-  border-color: #a7f3d0;
+  background-color: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
 }
 
 .skill-action-btn.toggle-active:hover {
-  background-color: #d1fae5;
+  background-color: #dcfce7;
 }
 
 /* Empty & Loading states */

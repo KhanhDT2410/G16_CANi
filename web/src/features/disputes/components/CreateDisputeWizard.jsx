@@ -6,6 +6,14 @@ import { DISPUTE_TYPES, DISPUTE_TYPE_LABELS } from '../types/dispute.constants';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const ASSIGNMENT_STATUS_MAP = {
+  COMPLETED: 'Đã hoàn thành',
+  CHECKED_IN: 'Đã điểm danh',
+  CONFIRMED: 'Đã xác nhận',
+  APPLIED: 'Đã ứng tuyển',
+  ASSIGNED: 'Đã phân công',
+};
+
 const TYPE_DESCRIPTIONS = {
   [DISPUTE_TYPES.PAYMENT]: 'Thiếu tiền công, chậm thanh toán hoặc sai lệch số tiền thỏa thuận.',
   [DISPUTE_TYPES.WORK_QUALITY]: 'Chất lượng thực hiện nhiệm vụ không đúng thỏa thuận hoặc bàn giao thiếu.',
@@ -117,7 +125,7 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
     if (step === 1) {
       const trimmedId = assignmentId.trim();
       if (!trimmedId) {
-        showToast('Vui lòng chọn ca làm việc hoặc nhập Mã ca làm việc (UUID)', 'warning');
+        showToast('Vui lòng chọn ca làm việc hoặc nhập Mã phân công ca làm việc', 'warning');
         return;
       }
       if (!UUID_REGEX.test(trimmedId)) {
@@ -273,7 +281,7 @@ const CreateDisputeWizard = ({ onCancel, onSubmit }) => {
                               {a.eventName || 'Sự kiện không tên'}
                             </span>
                             <span className={`dispute-assignment-status ${isComp ? 'completed' : isCheck ? 'checked-in' : ''}`}>
-                              {a.status}
+                              {ASSIGNMENT_STATUS_MAP[a.status] || a.status}
                             </span>
                           </div>
                           <div className="dispute-assignment-meta">

@@ -27,8 +27,8 @@ export const RsAppealsTable = ({
           <thead>
             <tr>
               <th>Thời Gian Nộp</th>
-              <th>Nhân Sự (Worker)</th>
-              <th>Mức Phạt (RS)</th>
+              <th>Nhân Sự</th>
+              <th>Mức Phạt</th>
               <th>Lý Do Khiếu Nại</th>
               <th>Trạng Thái</th>
               <th>Thao Tác</th>
@@ -104,7 +104,7 @@ export const RsAppealsTable = ({
             disabled={currentPage >= totalPages - 1}
             onClick={() => setCurrentPage((p) => p + 1)}
           >
-            Trang Kế
+            Trang Sau
           </button>
         </div>
       </div>

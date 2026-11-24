@@ -6,6 +6,7 @@ export const useDisputes = (initialTab = 'queue') => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [queue, setQueue] = useState([]);
   const [myQueue, setMyQueue] = useState([]);
+  const [resolvedQueue, setResolvedQueue] = useState([]);
   const [ccStaff, setCcStaff] = useState([]);
   const [myDisputes, setMyDisputes] = useState([]);
   const [selectedDispute, setSelectedDispute] = useState(null);
@@ -39,6 +40,18 @@ export const useDisputes = (initialTab = 'queue') => {
       setMyQueue([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Tải danh sách tranh chấp đã giải quyết / hoàn tất
+  const loadResolvedQueue = useCallback(async () => {
+    try {
+      const data = await disputeApi.getResolvedDisputes();
+      setResolvedQueue(data || []);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Không thể tải danh sách tranh chấp đã giải quyết';
+      showToast(msg, 'warning');
+      setResolvedQueue([]);
     }
   }, []);
 
@@ -176,18 +189,20 @@ export const useDisputes = (initialTab = 'queue') => {
   useEffect(() => {
     if (activeTab === 'queue') {
       loadQueue();
+      loadResolvedQueue();
     } else if (activeTab === 'my-queue') {
       loadMyQueue();
     } else if (activeTab === 'my') {
       loadMyDisputes();
     }
-  }, [activeTab, loadQueue, loadMyQueue, loadMyDisputes]);
+  }, [activeTab, loadQueue, loadMyQueue, loadResolvedQueue, loadMyDisputes]);
 
   return {
     activeTab,
     setActiveTab,
     queue,
     myQueue,
+    resolvedQueue,
     ccStaff,
     myDisputes,
     selectedDispute,
@@ -196,6 +211,7 @@ export const useDisputes = (initialTab = 'queue') => {
     detailLoading,
     loadQueue,
     loadMyQueue,
+    loadResolvedQueue,
     loadCcStaff,
     loadMyDisputes,
     loadDisputeDetail,

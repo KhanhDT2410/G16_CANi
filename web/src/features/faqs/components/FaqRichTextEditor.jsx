@@ -82,37 +82,37 @@ export const FaqRichTextEditor = ({ value, onChange, placeholder, disabled }) =>
 
         <span className="faq-toolbar-divider" />
 
-        <button type="button" title="In đậm (Bold)" onClick={() => exec('bold')} disabled={disabled}>
+        <button type="button" title="In đậm" onClick={() => exec('bold')} disabled={disabled}>
           <strong>B</strong>
         </button>
-        <button type="button" title="In nghiêng (Italic)" onClick={() => exec('italic')} disabled={disabled}>
+        <button type="button" title="In nghiêng" onClick={() => exec('italic')} disabled={disabled}>
           <em>I</em>
         </button>
-        <button type="button" title="Chèn liên kết (Link)" onClick={handleInsertLink} disabled={disabled}>
+        <button type="button" title="Chèn liên kết" onClick={handleInsertLink} disabled={disabled}>
           Link
         </button>
-        <button type="button" title="Danh sách chấm (Bullet list)" onClick={() => exec('insertUnorderedList')} disabled={disabled}>
+        <button type="button" title="Danh sách gạch đầu dòng" onClick={() => exec('insertUnorderedList')} disabled={disabled}>
           List
         </button>
-        <button type="button" title="Danh sách số (Numbered list)" onClick={() => exec('insertOrderedList')} disabled={disabled}>
+        <button type="button" title="Danh sách đánh số" onClick={() => exec('insertOrderedList')} disabled={disabled}>
           1.
         </button>
-        <button type="button" title="Chèn bảng (Table)" onClick={handleInsertTable} disabled={disabled}>
+        <button type="button" title="Chèn bảng" onClick={handleInsertTable} disabled={disabled}>
           Bảng
         </button>
-        <button type="button" title="Trích dẫn (Quote)" onClick={handleBlockquote} disabled={disabled}>
+        <button type="button" title="Trích dẫn" onClick={handleBlockquote} disabled={disabled}>
           Quote
         </button>
-        <button type="button" title="Chèn ảnh (Image)" onClick={handleInsertImage} disabled={disabled}>
+        <button type="button" title="Chèn ảnh" onClick={handleInsertImage} disabled={disabled}>
           Ảnh
         </button>
 
         <span className="faq-toolbar-divider" />
 
-        <button type="button" title="Hoàn tác (Undo)" onClick={() => exec('undo')} disabled={disabled}>
+        <button type="button" title="Hoàn tác" onClick={() => exec('undo')} disabled={disabled}>
           Undo
         </button>
-        <button type="button" title="Làm lại (Redo)" onClick={() => exec('redo')} disabled={disabled}>
+        <button type="button" title="Làm lại" onClick={() => exec('redo')} disabled={disabled}>
           Redo
         </button>
       </div>

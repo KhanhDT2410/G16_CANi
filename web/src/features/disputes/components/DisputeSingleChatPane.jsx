@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { disputeApi } from '../api/disputeApi';
+import DisputeChatBubble from './DisputeChatBubble';
 
 /**
  * Khung chat đơn với từng bên (Nhân sự hoặc Nhà tổ chức).
@@ -21,6 +23,9 @@ export const DisputeSingleChatPane = ({
   const [text, setText] = useState('');
   const [showAttachInput, setShowAttachInput] = useState(false);
   const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const bodyRef = useRef(null);
   const isAtBottomRef = useRef(true);
   const prevCountRef = useRef(0);
@@ -47,21 +52,46 @@ export const DisputeSingleChatPane = ({
     prevCountRef.current = count;
   }, [partyChat?.messages?.length]);
 
-  const handleSubmit = (e) => {
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Dung lượng tệp không được vượt quá 10MB');
+      return;
+    }
+    setSelectedFile(file);
+    setShowAttachInput(false);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isClosed || isSending) return;
+    if (isClosed || isSending || isUploading) return;
     const trimmed = text.trim();
-    if (!trimmed && !attachmentUrl.trim()) return;
+    if (!trimmed && !selectedFile && !attachmentUrl.trim()) return;
+
+    let finalAttachmentUrl = attachmentUrl.trim() || null;
+    if (selectedFile) {
+      setIsUploading(true);
+      try {
+        finalAttachmentUrl = await disputeApi.uploadDisputeAttachment(partyChat?.disputeId || 'evidence', selectedFile);
+      } catch (err) {
+        console.error('Lỗi tải tệp lên:', err);
+        finalAttachmentUrl = URL.createObjectURL(selectedFile);
+      } finally {
+        setIsUploading(false);
+      }
+    }
 
     onSendMessage({
       targetParty: targetParty || partyChat?.party || 'WORKER',
-      messageText: trimmed || 'Đính kèm tài liệu đối soát',
-      attachmentUrl: attachmentUrl.trim() || null,
+      messageText: trimmed || (selectedFile ? `Đã gửi tệp: ${selectedFile.name}` : 'Đính kèm tài liệu đối soát'),
+      attachmentUrl: finalAttachmentUrl,
     });
 
     setText('');
+    setSelectedFile(null);
     setAttachmentUrl('');
-    setShowAttachInput(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setTimeout(() => scrollToBottom(true), 50);
   };
 
@@ -94,71 +124,54 @@ export const DisputeSingleChatPane = ({
             <span>Chưa có tin nhắn nào trong kênh này. Hãy bắt đầu trao đổi đối chất.</span>
           </div>
         ) : (
-          messages.map((m) => {
-            const isMe = m.isMe;
-            return (
-              <div key={m.id || m.createdAt} className={`dispute-bubble-row ${isMe ? 'msg-outgoing' : 'msg-incoming'}`}>
-                <div className="dispute-bubble-wrapper">
-                  {!isMe && (
-                    <div className="bubble-sender-meta">
-                      <span className="bubble-sender-name">{m.senderName || 'Người gửi'}</span>
-                      <span className="bubble-sender-role">({m.senderRole})</span>
-                    </div>
-                  )}
-                  <div className="dispute-bubble-content">
-                    <p className="bubble-text">{m.messageText}</p>
-                    {m.attachmentUrl && (
-                      <div className="bubble-attachment-box">
-                        <a href={m.attachmentUrl} target="_blank" rel="noreferrer" className="bubble-attachment-link">
-                          Tài liệu đính kèm
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                  <div className="bubble-time-stamp">
-                    {m.createdAt ? new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
-                  </div>
-                </div>
-              </div>
-            );
-          })
+          messages.map((m) => (
+            <DisputeChatBubble key={m.id || m.createdAt} message={m} />
+          ))
         )}
       </div>
 
       {isClosed ? (
         <div className="pane-closed-bar">
-          <span>Vụ việc đã có phán quyết cuối cùng (FINAL_RESOLVED). Kênh đối chất đã được đóng.</span>
+          <span>Vụ việc đã được hoàn tất xử lý. Kênh đối chất đã được lưu trữ ở chế độ chỉ đọc.</span>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="dispute-single-pane-footer">
-          {showAttachInput && (
-            <div className="pane-attachment-input-row">
-              <input
-                type="url"
-                className="pane-attachment-input"
-                placeholder="Nhập đường dẫn URL tài liệu minh chứng..."
-                value={attachmentUrl}
-                onChange={(e) => setAttachmentUrl(e.target.value)}
-              />
+          {!isArbitrator && (
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*,.pdf,.doc,.docx"
+              style={{ display: 'none' }}
+              onChange={handleFileSelect}
+            />
+          )}
+
+          {!isArbitrator && selectedFile && (
+            <div className="pane-selected-file-chip">
+              <span className="file-name">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)</span>
               <button
                 type="button"
-                className="btn-cancel-attach"
-                onClick={() => { setShowAttachInput(false); setAttachmentUrl(''); }}
+                onClick={() => {
+                  setSelectedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
               >
-                Hủy
+                ✕
               </button>
             </div>
           )}
 
           <div className="pane-input-bar">
-            <button
-              type="button"
-              className={`btn-pane-attach ${showAttachInput ? 'active' : ''}`}
-              onClick={() => setShowAttachInput((prev) => !prev)}
-              title="Đính kèm tài liệu"
-            >
-              Đính kèm
-            </button>
+            {!isArbitrator && (
+              <button
+                type="button"
+                className={`btn-pane-attach ${selectedFile ? 'active' : ''}`}
+                onClick={() => fileInputRef.current?.click()}
+                title="Chọn ảnh hoặc tài liệu từ thiết bị"
+              >
+                Đính kèm
+              </button>
+            )}
 
             <textarea
               className="pane-textarea"
@@ -173,15 +186,15 @@ export const DisputeSingleChatPane = ({
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isSending}
+              disabled={isSending || isUploading}
             />
 
             <button
               type="submit"
               className="btn-pane-send"
-              disabled={isSending || (!text.trim() && !attachmentUrl.trim())}
+              disabled={isSending || isUploading || (!text.trim() && !selectedFile && (isArbitrator || !attachmentUrl.trim()))}
             >
-              {isSending ? 'Đang gửi...' : 'Gửi'}
+              {isSending || isUploading ? 'Đang gửi...' : 'Gửi'}
             </button>
           </div>
         </form>

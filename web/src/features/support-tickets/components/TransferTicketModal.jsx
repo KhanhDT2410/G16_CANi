@@ -34,7 +34,7 @@ export const TransferTicketModal = ({ isOpen, onClose, onConfirm, ticket, staff 
         <div className="ticket-modal-header">
           <h3>Chuyển Phiếu Hỗ Trợ: {ticket.referenceNo}</h3>
           <button type="button" className="ticket-modal-close-btn" onClick={onClose}>
-            &times;
+            ✕
           </button>
         </div>
 

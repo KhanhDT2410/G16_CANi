@@ -192,16 +192,17 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
                   onClick={() => onOpenShiftDetail && onOpenShiftDetail(activeChat.currentShiftId || activeChat.shiftId)}
                   style={{
                     background: '#eff6ff',
-                    color: '#2563eb',
+                    color: '#1d4ed8',
                     border: '1px solid #bfdbfe',
                     borderRadius: '4px',
-                    padding: '1px 6px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
+                    padding: '2px 8px',
+                    fontSize: '0.78rem',
+                    fontWeight: 500,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '3px',
+                    fontFamily: "var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif)",
                   }}
                   title="Bấm để xem chi tiết ca làm việc"
                 >
@@ -248,12 +249,14 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
                   <span
                     style={{
                       marginLeft: 6,
-                      fontSize: '0.68rem',
+                      fontSize: '0.75rem',
                       background: '#eff6ff',
-                      color: '#2563eb',
-                      padding: '1px 5px',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      padding: '1px 6px',
                       borderRadius: 4,
-                      fontWeight: 700,
+                      fontWeight: 500,
+                      fontFamily: "var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif)",
                       cursor: onOpenShiftDetail ? 'pointer' : 'default',
                     }}
                     onClick={() => m.shiftId && onOpenShiftDetail && onOpenShiftDetail(m.shiftId)}

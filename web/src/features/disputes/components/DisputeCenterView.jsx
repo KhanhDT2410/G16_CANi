@@ -4,6 +4,7 @@ import { useDisputes } from '../hooks/useDisputes';
 import DisputeQueueSidebar from './DisputeQueueSidebar';
 import DisputeConversationWorkspace from './DisputeConversationWorkspace';
 import DisputeQueueTable from './DisputeQueueTable';
+import DisputeTopHeader from './DisputeTopHeader';
 import CreateDisputeWizard from './CreateDisputeWizard';
 import DisputeDecisionModal from './DisputeDecisionModal';
 import EscalateModal from './EscalateModal';
@@ -20,47 +21,78 @@ export const DisputeCenterView = () => {
   const isArbitrator = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
 
   const {
-    queue, myQueue, myDisputes, ccStaff, loading,
-    loadQueue, loadMyDisputes, loadCcStaff, loadDisputeDetail,
-    createDispute, addEvidence, assignDispute,
-    issueDecision, escalateDispute,
+    queue, myQueue, resolvedQueue, myDisputes, ccStaff, loading,
+    loadQueue, loadResolvedQueue, loadMyDisputes, loadCcStaff, loadDisputeDetail,
+    createDispute, addEvidence, assignDispute, issueDecision, escalateDispute,
   } = useDisputes(isArbitrator ? 'queue' : 'my');
 
   const [activeDisputeId, setActiveDisputeId] = useState(null);
   const [selectedDisputeDetail, setSelectedDisputeDetail] = useState(null);
-  const [viewMode, setViewMode] = useState('SPLIT'); // 'SPLIT' | 'TABLE'
+  const [viewMode, setViewMode] = useState('SPLIT');
   const [modalType, setModalType] = useState(null);
   const [modalDispute, setModalDispute] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [queueFilter, setQueueFilter] = useState('ALL');
   const [queueScope, setQueueScope] = useState('ALL');
 
-  const scopedList = !isArbitrator ? myDisputes : queueScope === 'MINE' ? myQueue : queue;
+  const scopedList = !isArbitrator ? myDisputes : queueScope === 'MINE' ? myQueue : queueScope === 'RESOLVED' ? resolvedQueue : queue;
   const riskCount = useMemo(() => scopedList.filter((item) => item.slaAtRisk).length, [scopedList]);
-  const handleRefreshDisputes = () => (isArbitrator ? loadQueue() : loadMyDisputes());
+  const unreadTotalCount = useMemo(
+    () => scopedList.filter((i) => (i.unreadCount || 0) > 0 || (i.workerUnreadCount || 0) > 0 || (i.eoUnreadCount || 0) > 0).length,
+    [scopedList]
+  );
+  const handleRefreshDisputes = () => {
+    if (!isArbitrator) return loadMyDisputes();
+    loadQueue();
+    loadResolvedQueue();
+  };
 
   const filteredQueue = useMemo(() => {
     let list = scopedList;
-    if (queueFilter === 'OPEN') list = list.filter((i) => i.status === 'OPEN');
-    else if (queueFilter === 'INVESTIGATING') list = list.filter((i) => i.status === 'INVESTIGATING');
-    else if (queueFilter === 'ESCALATED') list = list.filter((i) => i.status === 'ESCALATED');
-    else if (queueFilter === 'SLA_RISK') list = list.filter((i) => i.slaAtRisk);
+    if (queueFilter === 'UNREAD') {
+      list = list.filter((i) => (i.unreadCount || 0) > 0 || (i.workerUnreadCount || 0) > 0 || (i.eoUnreadCount || 0) > 0);
+    } else if (queueFilter !== 'ALL') {
+      if (queueFilter === 'SLA_RISK') list = list.filter((i) => i.slaAtRisk);
+      else list = list.filter((i) => i.status === queueFilter);
+    }
 
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter((i) => i.title?.toLowerCase().includes(q) || i.id?.toLowerCase().includes(q));
     }
-    return list;
+
+    return [...list].sort((a, b) => {
+      const aUnread = (a.unreadCount || 0) > 0 || (a.workerUnreadCount || 0) > 0 || (a.eoUnreadCount || 0) > 0;
+      const bUnread = (b.unreadCount || 0) > 0 || (b.workerUnreadCount || 0) > 0 || (b.eoUnreadCount || 0) > 0;
+      if (aUnread !== bUnread) return aUnread ? -1 : 1;
+      const aMsg = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const bMsg = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      if (aMsg !== bMsg) return bMsg - aMsg;
+      if (a.slaAtRisk !== b.slaAtRisk) return a.slaAtRisk ? -1 : 1;
+      return (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    });
   }, [scopedList, queueFilter, searchTerm]);
 
-  // Tự động chọn đơn đầu tiên khi có dữ liệu từ CSDL
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        if (isArbitrator) {
+          loadQueue();
+          if (queueScope === 'RESOLVED') loadResolvedQueue();
+        } else {
+          loadMyDisputes();
+        }
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isArbitrator, queueScope, loadQueue, loadResolvedQueue, loadMyDisputes]);
+
   useEffect(() => {
     if (filteredQueue.length > 0 && (!activeDisputeId || !filteredQueue.some((i) => i.id === activeDisputeId))) {
       setActiveDisputeId(filteredQueue[0].id);
     }
   }, [filteredQueue, activeDisputeId]);
 
-  // Chi tiết đơn đang hiển thị trong khung hội thoại
   const currentDispute = useMemo(() => {
     if (!activeDisputeId) return null;
     return selectedDisputeDetail?.id === activeDisputeId
@@ -87,51 +119,21 @@ export const DisputeCenterView = () => {
   if (modalType === 'create') {
     return (
       <div className="disputes-container">
-        <CreateDisputeWizard
-          onCancel={() => setModalType(null)}
-          onSubmit={createDispute}
-        />
+        <CreateDisputeWizard onCancel={() => setModalType(null)} onSubmit={createDispute} />
       </div>
     );
   }
 
   return (
     <div className="disputes-container">
-      {/* Thanh công cụ chuyển đổi chế độ & thao tác */}
-      <div className="disputes-header">
-        <div className="view-mode-toggle">
-          <button
-            type="button"
-            className={`toggle-btn ${viewMode === 'SPLIT' ? 'active' : ''}`}
-            onClick={() => setViewMode('SPLIT')}
-          >
-            Không gian hội thoại
-          </button>
-          <button
-            type="button"
-            className={`toggle-btn ${viewMode === 'TABLE' ? 'active' : ''}`}
-            onClick={() => setViewMode('TABLE')}
-          >
-            Bảng hàng đợi
-          </button>
-        </div>
-        <div className="disputes-actions-group">
-          <button type="button" className="dispute-btn-secondary" onClick={handleRefreshDisputes}>
-            Làm mới
-          </button>
-          {!isArbitrator && (
-            <button
-              type="button"
-              className="dispute-btn-primary"
-              onClick={() => setModalType('create')}
-            >
-              + Gửi khiếu nại mới
-            </button>
-          )}
-        </div>
-      </div>
+      <DisputeTopHeader
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        onRefresh={handleRefreshDisputes}
+        isArbitrator={isArbitrator}
+        onOpenCreate={() => setModalType('create')}
+      />
 
-      {/* CHẾ ĐỘ 1: GIAO DIỆN HỘI THOẠI SPLIT-VIEW (ADM-03) */}
       {viewMode === 'SPLIT' ? (
         <div className="dispute-split-layout">
           <DisputeQueueSidebar
@@ -141,10 +143,12 @@ export const DisputeCenterView = () => {
             queueFilter={queueFilter}
             setQueueFilter={setQueueFilter}
             queueScope={queueScope}
-            setQueueScope={setQueueScope}
-            totalCount={scopedList.length}
+            setQueueScope={(scope) => { setQueueScope(scope); setQueueFilter('ALL'); }}
+            totalCount={queue.length}
+            resolvedCount={resolvedQueue.length}
             myCount={isArbitrator ? myQueue.length : myDisputes.length}
             riskCount={riskCount}
+            unreadCount={unreadTotalCount}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             showScopeSwitcher={isArbitrator}
@@ -170,7 +174,6 @@ export const DisputeCenterView = () => {
           </div>
         </div>
       ) : (
-        /* CHẾ ĐỘ 2: BẢNG HÀNG ĐỢI */
         <DisputeQueueTable
           queue={filteredQueue}
           loading={loading}
@@ -194,4 +197,5 @@ export const DisputeCenterView = () => {
     </div>
   );
 };
+
 export default DisputeCenterView;

@@ -18,7 +18,6 @@ export default function EmergencyConsequencesCallout({ radiusKm, wageFormatted }
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800, color: '#92400e', fontSize: '0.88rem' }}>
-        <span>⚠️</span>
         <span>Các hệ quả khi mở rộng tìm kiếm khẩn cấp:</span>
       </div>
       <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.81rem', color: '#78350f', lineHeight: 1.5 }}>

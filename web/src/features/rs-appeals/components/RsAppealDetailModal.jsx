@@ -46,7 +46,7 @@ export const RsAppealDetailModal = ({ appeal, isOpen, onClose, onReview }) => {
             </div>
             <div className="detail-row">
               <span className="detail-label">Mức điểm bị trừ:</span>
-              <span className="detail-val penalty">-{appeal.penaltyAmount} RS</span>
+              <span className="penalty-amount-tag">-{appeal.penaltyAmount} RS</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Thời điểm bị phạt:</span>

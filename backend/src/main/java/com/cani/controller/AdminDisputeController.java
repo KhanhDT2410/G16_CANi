@@ -41,6 +41,16 @@ public class AdminDisputeController {
     }
 
     /**
+     * Danh sách tranh chấp đã giải quyết / hoàn thiện (RESOLVED, FINAL_RESOLVED, UNVERIFIED).
+     * GET /api/v1/admin/disputes/resolved
+     */
+    @GetMapping("/resolved")
+    public ResponseEntity<ApiResponse<List<DisputeQueueItemDto>>> getResolvedDisputes() {
+        List<DisputeQueueItemDto> resolved = disputeService.getResolvedDisputes();
+        return ResponseEntity.ok(ApiResponse.ok(resolved, "Lấy danh sách tranh chấp đã giải quyết thành công"));
+    }
+
+    /**
      * UC-109 (phân tầng CC): Hàng đợi chỉ gồm đơn đang được giao cho CC này.
      * GET /api/v1/admin/disputes/queue/mine
      */

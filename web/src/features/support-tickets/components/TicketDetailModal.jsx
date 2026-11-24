@@ -73,7 +73,7 @@ export const TicketDetailModal = ({
             </span>
           </div>
           <button type="button" className="ticket-modal-close-btn" onClick={onClose}>
-            &times;
+            ✕
           </button>
         </div>
 

@@ -351,7 +351,7 @@ const ShiftChecklistEditor = ({
             </button>
           ) : (
             <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
-              ✓ Đã thêm đủ mẫu {matchedCategoryObj.label}
+              Đã thêm đủ mẫu {matchedCategoryObj.label}
             </span>
           )}
         </div>

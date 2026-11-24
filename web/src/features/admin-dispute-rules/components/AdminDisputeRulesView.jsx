@@ -20,6 +20,28 @@ const STATUS_OPTIONS = [
   { value: 'DISABLED', label: 'Đã vô hiệu hóa' },
 ];
 
+const VIOLATING_PARTY_MAP = {
+  WORKER: 'Nhân sự',
+  EO: 'Nhà tổ chức',
+  BOTH: 'Cả hai bên',
+};
+
+const RULE_TYPE_MAP = {
+  ATTENDANCE: 'Điểm danh',
+  WORK_QUALITY: 'Chất lượng',
+  PAYMENT: 'Thù lao',
+  CONDUCT: 'Ứng xử',
+  OTHER: 'Khác',
+};
+
+const FAULT_OUTCOME_MAP = {
+  WORKER_FAULT: 'Lỗi Nhân sự',
+  EO_FAULT: 'Lỗi Nhà tổ chức',
+  PARTIAL: 'Lỗi cả hai',
+  UNVERIFIED: 'Chưa xác minh',
+  UPHOLD: 'Bác khiếu nại',
+};
+
 export const AdminDisputeRulesView = () => {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -114,7 +136,7 @@ export const AdminDisputeRulesView = () => {
           className="btn-primary-action"
           onClick={() => setModalRule({})}
         >
-          + Thêm Quy Tắc Mới
+          Thêm quy tắc mới
         </button>
       </div>
 
@@ -201,8 +223,8 @@ export const AdminDisputeRulesView = () => {
                   <td className="rule-meta-cell">
                     <div className="rule-meta-col">
                       <span className="rule-code-badge">{rule.code}</span>
-                      <span className="rule-type-badge">{rule.ruleType}</span>
-                      <span className="rule-outcome-badge">{rule.faultOutcome}</span>
+                      <span className="rule-type-badge">{RULE_TYPE_MAP[rule.ruleType] || rule.ruleType}</span>
+                      <span className="rule-outcome-badge">{FAULT_OUTCOME_MAP[rule.faultOutcome] || rule.faultOutcome}</span>
                     </div>
                   </td>
                   <td>
@@ -211,7 +233,7 @@ export const AdminDisputeRulesView = () => {
                   </td>
                   <td>
                     <span className={`party-badge party-${rule.violatingParty.toLowerCase()}`}>
-                      {rule.violatingParty}
+                      {VIOLATING_PARTY_MAP[rule.violatingParty] || rule.violatingParty}
                     </span>
                   </td>
                   <td>
@@ -274,7 +296,7 @@ export const AdminDisputeRulesView = () => {
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            &laquo; Trước
+            Trước
           </button>
           <span className="pagination-info">
             Trang <strong>{page}</strong> / {totalPages} (Tổng {filteredRules.length} quy tắc)
@@ -285,7 +307,7 @@ export const AdminDisputeRulesView = () => {
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
-            Sau &raquo;
+            Sau
           </button>
         </div>
       )}

@@ -577,7 +577,6 @@ label:has(input[type="radio"]) {
 .cani-modal-dialog,
 .ekyc-required-card,
 .plan-modal-box,
-.shift-modal-box,
 .user-modal-box,
 .wage-modal-box,
 .ticket-modal-box,
@@ -597,6 +596,13 @@ label:has(input[type="radio"]) {
   border-radius: 16px !important;
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(226, 232, 240, 0.8) !important;
   box-sizing: border-box !important;
+}
+
+/* Modal đặc thù cần mở rộng chiều ngang tối đa (Chi tiết ca làm việc Admin) */
+.shift-modal-box,
+.shift-modal-box-wide {
+  width: 96vw !important;
+  max-width: 1440px !important;
 }
 
 .dispute-modal form,

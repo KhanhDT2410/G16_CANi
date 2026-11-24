@@ -49,12 +49,12 @@ export const RsAppealsView = () => {
             <option value="">Tất cả trạng thái</option>
             <option value="SUBMITTED">Chờ xét duyệt</option>
             <option value="UNDER_REVIEW">Đang xem xét</option>
-            <option value="APPROVED">Đã chấp thuận (Hoàn điểm)</option>
+            <option value="APPROVED">Đã chấp thuận</option>
             <option value="REJECTED">Đã từ chối</option>
           </select>
 
           <button className="btn-appeals-refresh" onClick={fetchAppeals} title="Làm mới">
-            ↻ Làm Mới
+            Làm Mới
           </button>
         </div>
       </div>

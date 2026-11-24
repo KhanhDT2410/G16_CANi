@@ -186,11 +186,11 @@ export const AdminReviewView = () => {
       {totalPages > 1 && (
         <div className="admin-review-pagination">
           <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-            ‹ Trang trước
+            Trang trước
           </button>
           <span>Trang {page + 1} / {totalPages}</span>
           <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-            Trang sau ›
+            Trang sau
           </button>
         </div>
       )}

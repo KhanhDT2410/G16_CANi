@@ -145,10 +145,10 @@ export const DirectMessengerDock = ({ activeChat, onClose, onOpenShiftDetail }) 
 
         <div className="dock-header-actions" onClick={(e) => e.stopPropagation()}>
           {activeChat.shiftId && onOpenShiftDetail && !isMinimized && (
-            <button type="button" className="dock-btn" onClick={() => onOpenShiftDetail(activeChat.shiftId)} title="Xem ca làm">↗</button>
+            <button type="button" className="dock-btn" onClick={() => onOpenShiftDetail(activeChat.shiftId)} title="Xem ca làm">Ca</button>
           )}
           <button type="button" className="dock-btn" onClick={() => setIsMinimized(!isMinimized)} title={isMinimized ? 'Mở rộng' : 'Thu nhỏ'}>
-            {isMinimized ? '🗖' : '—'}
+            {isMinimized ? '+' : '—'}
           </button>
           <button type="button" className="dock-btn" onClick={onClose} title="Đóng chat">✕</button>
         </div>

@@ -236,7 +236,7 @@ export default function EOPaymentsTab({
                             })}
                             style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
-                            🧾 Xem chứng từ
+                            Xem chứng từ
                           </button>
                         )}
                         {buildWorkerVietQrUrl(p) && (

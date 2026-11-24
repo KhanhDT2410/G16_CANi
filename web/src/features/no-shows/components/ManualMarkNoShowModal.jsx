@@ -21,7 +21,7 @@ export const ManualMarkNoShowModal = ({ isOpen, onClose, onSubmit, submitting })
         <form onSubmit={handleSubmit}>
           <div className="modal-header">
             <h3>Xác Nhận Đánh Dấu No-Show Thủ Công</h3>
-            <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+            <button type="button" className="modal-close-btn" onClick={onClose}>✕</button>
           </div>
 
           <div className="modal-body">

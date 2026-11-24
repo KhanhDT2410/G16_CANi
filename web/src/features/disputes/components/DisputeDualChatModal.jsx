@@ -46,7 +46,13 @@ export const DisputeDualChatModal = ({
   const workerName = workerChat?.userName || dispute?.complainantName || 'Nhân sự';
   const eoName = eoChat?.userName || dispute?.respondentName || 'Nhà tổ chức';
 
-  const isClosed = chatData?.disputeStatus === 'FINAL_RESOLVED' || dispute?.status === 'FINAL_RESOLVED';
+  const isClosed =
+    chatData?.disputeStatus === 'FINAL_RESOLVED' ||
+    chatData?.disputeStatus === 'RESOLVED' ||
+    chatData?.disputeStatus === 'UNVERIFIED' ||
+    dispute?.status === 'FINAL_RESOLVED' ||
+    dispute?.status === 'RESOLVED' ||
+    dispute?.status === 'UNVERIFIED';
 
   const modalNode = (
     <div className="dispute-dual-fullscreen-overlay">
@@ -78,7 +84,7 @@ export const DisputeDualChatModal = ({
               partyChat={workerChat}
               targetParty="WORKER"
               partyTitle={`Nhân sự: ${workerName}`}
-              partyRoleLabel="Worker"
+              partyRoleLabel="Người lao động"
               onSendMessage={onSendMessage}
               isSending={isSending}
               isArbitrator={isArbitrator}
@@ -92,7 +98,7 @@ export const DisputeDualChatModal = ({
               partyChat={eoChat}
               targetParty="EO"
               partyTitle={`Nhà tổ chức: ${eoName}`}
-              partyRoleLabel="Event Organizer"
+              partyRoleLabel="Nhà tổ chức"
               onSendMessage={onSendMessage}
               isSending={isSending}
               isArbitrator={isArbitrator}

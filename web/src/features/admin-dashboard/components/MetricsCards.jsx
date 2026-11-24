@@ -31,7 +31,7 @@ export const MetricsCards = ({ metrics, onNavigateTab }) => {
           </div>
           {onNavigateTab && (
             <button type="button" className="metric-navigate-btn" onClick={() => onNavigateTab('users')} title="Đi đến Quản trị người dùng">
-              <span>Quản lý ↗</span>
+              <span>Quản lý</span>
             </button>
           )}
         </div>
@@ -63,7 +63,7 @@ export const MetricsCards = ({ metrics, onNavigateTab }) => {
           </div>
           {onNavigateTab && (
             <button type="button" className="metric-navigate-btn" onClick={() => onNavigateTab('revenue')} title="Đi đến Báo cáo doanh thu & tài chính">
-              <span>Xem chi tiết ↗</span>
+              <span>Xem chi tiết</span>
             </button>
           )}
         </div>

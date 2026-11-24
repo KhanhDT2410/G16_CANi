@@ -3,13 +3,24 @@
  */
 
 export const PLAN_TYPE_LABELS = {
-  INVITE_ONLY: 'Gói Giới Hạn Mời (Invite Only)',
-  MATCHING_PLUS: 'Gói Đối Soát & Ghép Nâng Cao (Matching + Invite)',
+  INVITE_ONLY: 'Gói Giới Hạn Mời',
+  MATCHING_PLUS: 'Gói Đối Soát & Ghép Nâng Cao',
 };
 
 export const TRANSACTION_TYPE_LABELS = {
   PACKAGE_SALE: 'Mua gói dịch vụ',
   DIRECT_PAYMENT: 'Chi trả thù lao ca',
+};
+
+export const TRANSACTION_STATUS_LABELS = {
+  ACTIVE: 'Hoạt động',
+  CONFIRMED_FULL: 'Xác nhận đủ',
+  CONFIRMED_PARTIAL: 'Xác nhận một phần',
+  DECLARED_PENDING_WORKER: 'Chờ Worker duyệt',
+  DISPUTED: 'Đang tranh chấp',
+  UNVERIFIED: 'Chưa xác minh',
+  CANCELLED: 'Đã hủy',
+  EXPIRED: 'Hết hạn',
 };
 
 export const PAYMENT_STATUS_COLORS = {

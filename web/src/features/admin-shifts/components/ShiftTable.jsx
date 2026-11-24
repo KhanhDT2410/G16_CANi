@@ -2,6 +2,7 @@ import React from 'react';
 import { resolveShiftStatus } from '../types/adminShift.constants';
 import { formatTimeOnly, formatDateOnly } from '../utils/shiftModalHelpers';
 import ShiftPagination from './ShiftPagination';
+import './ShiftDetailModal.css';
 
 /**
  * Bảng hiển thị danh sách ca làm việc cho Admin.
@@ -51,10 +52,7 @@ export const ShiftTable = ({
                   title="Nhấp để xem chi tiết ca làm việc"
                 >
                   <td style={{ width: '95px', minWidth: '95px' }}>
-                    <span style={{
-                      fontWeight: 700, color: '#2563eb', background: '#eff6ff',
-                      padding: '3px 8px', borderRadius: 6, fontSize: '0.82rem', display: 'inline-block',
-                    }}>
+                    <span className="shift-code-badge">
                       {shift.shiftCode || 'SH-0000'}
                     </span>
                   </td>
@@ -108,16 +106,11 @@ export const ShiftTable = ({
                   </td>
                   <td style={{ width: '130px', minWidth: '130px', whiteSpace: 'nowrap' }}>
                     <span
+                      className="shift-status-badge"
                       style={{
-                        padding: '4px 10px',
-                        borderRadius: 12,
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
                         background: statusCfg.bg,
                         color: statusCfg.color,
-                        border: `1px solid ${statusCfg.color}33`,
-                        display: 'inline-block',
-                        whiteSpace: 'nowrap',
+                        borderColor: statusCfg.border || '#cbd5e1',
                       }}
                     >
                       {statusCfg.label}

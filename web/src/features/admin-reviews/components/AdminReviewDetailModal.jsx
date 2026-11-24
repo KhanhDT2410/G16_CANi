@@ -1,5 +1,13 @@
 import React from 'react';
 
+const formatRole = (role) => {
+  if (!role) return '—';
+  const upper = String(role).toUpperCase();
+  if (upper === 'EVENT_ORGANIZER' || upper === 'EO') return 'Nhà tổ chức';
+  if (upper === 'WORKER') return 'Người lao động';
+  return role;
+};
+
 const AdminReviewDetailModal = ({ review, onClose, onOpenModerate, onUnhide, onUnflag }) => {
   if (!review) return null;
 
@@ -44,15 +52,21 @@ const AdminReviewDetailModal = ({ review, onClose, onOpenModerate, onUnhide, onU
             </div>
             <div className="admin-review-info-item">
               <span className="info-label">Người đánh giá:</span>
-              <span className="info-value">
-                {review.reviewerName || 'N/A'} ({review.reviewerRole})
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                <span className="info-value">{review.reviewerName || 'N/A'}</span>
+                <span className={`role-badge role-${review.reviewerRole?.toLowerCase()}`}>
+                  {formatRole(review.reviewerRole)}
+                </span>
+              </div>
             </div>
             <div className="admin-review-info-item">
               <span className="info-label">Người nhận:</span>
-              <span className="info-value">
-                {review.revieweeName || 'N/A'} ({review.revieweeRole})
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                <span className="info-value">{review.revieweeName || 'N/A'}</span>
+                <span className={`role-badge role-${review.revieweeRole?.toLowerCase()}`}>
+                  {formatRole(review.revieweeRole)}
+                </span>
+              </div>
             </div>
             <div className="admin-review-info-item">
               <span className="info-label">Thời gian gửi:</span>

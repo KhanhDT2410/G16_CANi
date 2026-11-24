@@ -405,3 +405,17 @@ export const DISPUTE_RULES = [
     adminActionText: 'Quản trị viên khóa vĩnh viễn tài khoản và thêm định danh vào Danh sách đen',
   },
 ];
+
+/**
+ * Loại bỏ các đoạn đóng mở ngoặc chứa tiếng Anh hoặc mã kỹ thuật
+ * (vd: (lockUntil = now + 7d), (tương đương no-show), (ATTENDANCE)...)
+ * Giữ nguyên các chú thích thuần tiếng Việt như (mặc định), (Tự động), (60 ngày), (Có xét...)
+ */
+export const stripEnglishParentheses = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  return text
+    .replace(/\s*\([^)]*(?:lockUntil|now|no-show|null)[^)]*\)/gi, '')
+    .replace(/\s*\([A-Z0-9_]{3,}\)/g, '')
+    .trim();
+};
+

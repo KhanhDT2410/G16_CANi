@@ -79,7 +79,7 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
                 <div className="user-detail-section">
                   <div className="detail-section-title">
                     <h4>Hồ Sơ Nhân Sự</h4>
-                    <span className="detail-section-subtitle">(Worker Profile)</span>
+                    <span className="detail-section-subtitle">Thông tin chi tiết người lao động</span>
                   </div>
                   <div className="detail-grid">
                     <DetailItem label="Số CCCD (đã che)" value={user.workerProfile.cccdNumber} />
@@ -106,12 +106,16 @@ const UserDetailModal = ({ user, loading, onClose, onOpenStatusModal }) => {
                 <div className="user-detail-section">
                   <div className="detail-section-title">
                     <h4>Hồ Sơ Nhà Tổ Chức</h4>
-                    <span className="detail-section-subtitle">(Event Organizer)</span>
+                    <span className="detail-section-subtitle">Thông tin chi tiết đơn vị tổ chức</span>
                   </div>
                   <div className="detail-grid">
                     <DetailItem label="Tên đơn vị / Thương hiệu" value={user.eoProfile.companyName} />
                     <DetailItem label="Địa chỉ" value={user.eoProfile.address} />
-                    <DetailItem label="Trạng thái định danh (eKYC)" value={user.eoProfile.verificationStatus} />
+                    <DetailItem
+                      label="Trạng thái định danh (eKYC)"
+                      value={KYC_STATUS_LABELS[user.eoProfile.verificationStatus]?.label || user.eoProfile.verificationStatus || 'Chưa xác thực'}
+                      badgeClass={KYC_STATUS_LABELS[user.eoProfile.verificationStatus]?.badgeClass || 'badge-status-pending'}
+                    />
                     <DetailItem label="Đánh giá trung bình" value={`${user.eoProfile.ratingAvg} (${user.eoProfile.ratingCount || 0} lượt)`} color="#d97706" />
                     <DetailItem label="Sự kiện đã hoàn tất" value={`${user.eoProfile.totalEventsCompleted} sự kiện`} />
                   </div>

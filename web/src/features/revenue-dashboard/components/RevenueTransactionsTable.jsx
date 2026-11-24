@@ -1,4 +1,4 @@
-import { formatCurrency, formatDateTime } from '../types/revenue.constants';
+import { formatCurrency, formatDateTime, TRANSACTION_STATUS_LABELS } from '../types/revenue.constants';
 
 export const RevenueTransactionsTable = ({
   transactions,
@@ -46,7 +46,7 @@ export const RevenueTransactionsTable = ({
             }}
           >
             <option value="">Tất cả trạng thái</option>
-            <option value="ACTIVE">Hoạt động (Active)</option>
+            <option value="ACTIVE">Hoạt động</option>
             <option value="CONFIRMED_FULL">Xác nhận đủ</option>
             <option value="CONFIRMED_PARTIAL">Xác nhận một phần</option>
             <option value="DECLARED_PENDING_WORKER">Chờ Worker duyệt</option>
@@ -97,7 +97,7 @@ export const RevenueTransactionsTable = ({
                   </td>
                   <td>
                     <span className={`rev-badge status-${(tx.status || '').toLowerCase()}`}>
-                      {tx.status}
+                      {TRANSACTION_STATUS_LABELS[tx.status] || tx.status}
                     </span>
                   </td>
                 </tr>

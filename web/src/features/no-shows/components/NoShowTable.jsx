@@ -62,7 +62,7 @@ export const NoShowTable = ({ items, loading, onSelectDetail }) => {
               <td>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span className="penalty-tag">-{item.penaltyAmount || 25} RS</span>
-                  {item.isAccountLocked && <span className="badge-lock">KHÓA TK</span>}
+                  {item.isAccountLocked && <span className="badge-lock">Khóa tài khoản</span>}
                 </div>
                 <div className="rs-score-change">
                   {item.reliabilityScoreBefore !== null && item.reliabilityScoreAfter !== null
@@ -71,13 +71,13 @@ export const NoShowTable = ({ items, loading, onSelectDetail }) => {
                 </div>
               </td>
               <td>
-                <span className={`badge ${NO_SHOW_DETECTED_BY_BADGE[item.detectedBy] || 'badge-sys'}`}>
+                <span className={`noshow-badge ${NO_SHOW_DETECTED_BY_BADGE[item.detectedBy] || 'badge-sys'}`}>
                   {NO_SHOW_DETECTED_BY_LABELS[item.detectedBy] || item.detectedBy}
                 </span>
               </td>
               <td>
                 {item.appealId ? (
-                  <span className={`badge ${APPEAL_STATUS_BADGE[item.appealStatus] || 'badge-warning'}`}>
+                  <span className={`noshow-badge ${APPEAL_STATUS_BADGE[item.appealStatus] || 'badge-warning'}`}>
                     {APPEAL_STATUS_LABELS[item.appealStatus] || item.appealStatus}
                   </span>
                 ) : (

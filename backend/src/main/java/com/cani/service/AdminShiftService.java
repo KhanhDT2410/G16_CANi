@@ -174,7 +174,6 @@ public class AdminShiftService {
                 .allowance(shift.getAllowance())
                 .totalCost(shift.getTotalCost())
                 .status(resolveRealtimeStatus(shift))
-                .minExperienceLevel(shift.getMinExperienceLevel())
                 .minReliabilityScore(shift.getMinReliabilityScore())
                 .dressCode(shift.getDressCode())
                 .checklist(shift.getChecklist())

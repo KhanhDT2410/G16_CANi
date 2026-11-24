@@ -2,15 +2,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { disputeRuleApi } from '../api/disputeRuleApi';
 import { DisputeRuleModal } from './DisputeRuleModal';
 import { showToast } from '../../../components/common/Toast';
+import { stripEnglishParentheses } from '../../disputes/types/dispute.constants';
 import './AdminDisputeRules.css';
 
 const TYPE_OPTIONS = [
   { value: 'ALL', label: 'Tất cả danh mục' },
-  { value: 'ATTENDANCE', label: 'Điểm danh / Bỏ ca (ATTENDANCE)' },
-  { value: 'WORK_QUALITY', label: 'Chất lượng công việc (WORK_QUALITY)' },
-  { value: 'PAYMENT', label: 'Thù lao tiền công (PAYMENT)' },
-  { value: 'CONDUCT', label: 'Hành vi ứng xử (CONDUCT)' },
-  { value: 'OTHER', label: 'Khác / Vu khống / Giả mạo (OTHER)' },
+  { value: 'ATTENDANCE', label: 'Điểm danh / Bỏ ca' },
+  { value: 'WORK_QUALITY', label: 'Chất lượng công việc' },
+  { value: 'PAYMENT', label: 'Thù lao tiền công' },
+  { value: 'CONDUCT', label: 'Hành vi ứng xử' },
+  { value: 'OTHER', label: 'Khác / Vu khống / Giả mạo' },
 ];
 
 const STATUS_OPTIONS = [
@@ -184,7 +185,7 @@ export const AdminDisputeRulesView = () => {
           <table className="admin-dispute-rules-table">
             <thead>
               <tr>
-                <th style={{ width: '130px' }}>Mã & Phân loại</th>
+                <th style={{ width: '150px' }}>Mã & Phân loại</th>
                 <th>Hành vi vi phạm</th>
                 <th style={{ width: '90px' }}>Bên lỗi</th>
                 <th style={{ width: '100px' }}>Tái phạm</th>
@@ -197,14 +198,16 @@ export const AdminDisputeRulesView = () => {
             <tbody>
               {pagedRules.map((rule) => (
                 <tr key={rule.id} className={!rule.enabled ? 'row-disabled' : ''}>
-                  <td>
-                    <strong className="rule-code-badge">{rule.code}</strong>
-                    <div className="rule-type-tag">{rule.ruleType}</div>
-                    <span className="rule-outcome-tag">{rule.faultOutcome}</span>
+                  <td className="rule-meta-cell">
+                    <div className="rule-meta-col">
+                      <span className="rule-code-badge">{rule.code}</span>
+                      <span className="rule-type-badge">{rule.ruleType}</span>
+                      <span className="rule-outcome-badge">{rule.faultOutcome}</span>
+                    </div>
                   </td>
                   <td>
-                    <div className="rule-behavior-text">{rule.behavior}</div>
-                    <small className="rule-sanction-form">{rule.sanctionForm}</small>
+                    <div className="rule-behavior-text">{stripEnglishParentheses(rule.behavior)}</div>
+                    <small className="rule-sanction-form">{stripEnglishParentheses(rule.sanctionForm)}</small>
                   </td>
                   <td>
                     <span className={`party-badge party-${rule.violatingParty.toLowerCase()}`}>
@@ -213,17 +216,19 @@ export const AdminDisputeRulesView = () => {
                   </td>
                   <td>
                     <div className="repeat-badge">
-                      Lần {rule.repeatIndex}
-                      {rule.repeatWindowDays ? ` (${rule.repeatWindowDays} ngày)` : ' (mặc định)'}
+                      <span className="repeat-count">Lần {rule.repeatIndex}</span>
+                      <span className="repeat-desc">
+                        {rule.repeatWindowDays ? `(${rule.repeatWindowDays} ngày)` : '(mặc định)'}
+                      </span>
                     </div>
                   </td>
                   <td>
-                    <div className="rule-sanction-text">{rule.sanctionText}</div>
-                    <div className="rule-specific-penalty">{rule.specificPenalty}</div>
+                    <div className="rule-sanction-text">{stripEnglishParentheses(rule.sanctionText)}</div>
+                    <div className="rule-specific-penalty">{stripEnglishParentheses(rule.specificPenalty)}</div>
                   </td>
                   <td>
                     {rule.adminActionText ? (
-                      <span className="admin-action-badge">{rule.adminActionText}</span>
+                      <span className="admin-action-badge">{stripEnglishParentheses(rule.adminActionText)}</span>
                     ) : (
                       <span className="text-muted">—</span>
                     )}

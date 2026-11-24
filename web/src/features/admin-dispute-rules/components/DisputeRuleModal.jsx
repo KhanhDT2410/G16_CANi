@@ -99,9 +99,9 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
                   onChange={handleChange}
                   required
                 >
-                  <option value="WORKER">Nhân sự (Worker)</option>
-                  <option value="EO">Nhà tổ chức (EO)</option>
-                  <option value="BOTH">Cả hai bên (Worker & EO)</option>
+                  <option value="WORKER">Nhân sự</option>
+                  <option value="EO">Nhà tổ chức</option>
+                  <option value="BOTH">Cả hai bên</option>
                 </select>
               </div>
             </div>
@@ -121,7 +121,7 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
 
             <div className="dispute-rule-form-row">
               <div className="dispute-field-group">
-                <label>Loại tranh chấp (Rule Type) *</label>
+                <label>Loại tranh chấp *</label>
                 <select
                   name="ruleType"
                   className="dispute-select"
@@ -129,11 +129,11 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
                   onChange={handleChange}
                   required
                 >
-                  <option value="ATTENDANCE">Điểm danh / Bỏ ca / Đi trễ (ATTENDANCE)</option>
-                  <option value="WORK_QUALITY">Chất lượng công việc (WORK_QUALITY)</option>
-                  <option value="PAYMENT">Tranh chấp thù lao (PAYMENT)</option>
-                  <option value="CONDUCT">Hành vi ứng xử (CONDUCT)</option>
-                  <option value="OTHER">Khác / Vu khống / Giả mạo (OTHER)</option>
+                  <option value="ATTENDANCE">Điểm danh / Bỏ ca / Đi trễ</option>
+                  <option value="WORK_QUALITY">Chất lượng công việc</option>
+                  <option value="PAYMENT">Tranh chấp thù lao</option>
+                  <option value="CONDUCT">Hành vi ứng xử</option>
+                  <option value="OTHER">Khác / Vu khống / Giả mạo</option>
                 </select>
               </div>
 
@@ -146,11 +146,11 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
                   onChange={handleChange}
                   required
                 >
-                  <option value="WORKER_FAULT">Lỗi thuộc về Worker (WORKER_FAULT)</option>
-                  <option value="EO_FAULT">Lỗi thuộc về Nhà tổ chức (EO_FAULT)</option>
-                  <option value="PARTIAL">Lỗi cả hai phía (PARTIAL)</option>
-                  <option value="UNVERIFIED">Không đủ chứng cứ (UNVERIFIED)</option>
-                  <option value="UPHOLD">Bác đơn / Giữ nguyên (UPHOLD)</option>
+                  <option value="WORKER_FAULT">Lỗi thuộc về Nhân sự</option>
+                  <option value="EO_FAULT">Lỗi thuộc về Nhà tổ chức</option>
+                  <option value="PARTIAL">Lỗi cả hai phía</option>
+                  <option value="UNVERIFIED">Không đủ căn cứ xác minh</option>
+                  <option value="UPHOLD">Bác đơn / Giữ nguyên</option>
                 </select>
               </div>
             </div>
@@ -231,7 +231,7 @@ export const DisputeRuleModal = ({ rule, onClose, onSave }) => {
                 type="text"
                 name="adminActionText"
                 className="dispute-input"
-                placeholder="VD: Admin điều chỉnh -25 RS và tạm khóa 7 ngày (lockUntil = now + 7d)"
+                placeholder="VD: Admin điều chỉnh -25 RS và tạm khóa 7 ngày"
                 value={formData.adminActionText}
                 onChange={handleChange}
               />

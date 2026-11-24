@@ -55,25 +55,36 @@ export const NoShowDetailModal = ({ item, onClose, onNavigateAppeal }) => {
 
           <div className="detail-row">
             <span className="label">Hình thức phát hiện</span>
-            <span className="value">{NO_SHOW_DETECTED_BY_LABELS[item.detectedBy] || item.detectedBy}</span>
+            <span className="value">
+              <span className={`noshow-badge ${NO_SHOW_DETECTED_BY_BADGE[item.detectedBy] || 'badge-sys'}`}>
+                {NO_SHOW_DETECTED_BY_LABELS[item.detectedBy] || item.detectedBy}
+              </span>
+            </span>
           </div>
 
           <div className="detail-row">
-            <span className="label">Mức phạt điểm uy tín (RS)</span>
-            <span className="value" style={{ color: '#dc2626' }}>
-              -{item.penaltyAmount} RS ({item.reliabilityScoreBefore} → {item.reliabilityScoreAfter})
+            <span className="label">Mức phạt điểm uy tín</span>
+            <span className="value">
+              <span className="penalty-tag">-{item.penaltyAmount || 25} RS</span>
+              <span style={{ marginLeft: '8px', fontSize: '0.8125rem', color: '#64748b' }}>
+                ({item.reliabilityScoreBefore} → {item.reliabilityScoreAfter})
+              </span>
             </span>
           </div>
 
           <div className="detail-row">
             <span className="label">Khóa tài khoản</span>
-            <span className="value" style={{ color: item.isAccountLocked ? '#dc2626' : '#166534' }}>
-              {item.isAccountLocked ? 'Đã tự động khóa tài khoản (RS < 20)' : 'Không khóa'}
+            <span className="value">
+              {item.isAccountLocked ? (
+                <span className="badge-lock" style={{ margin: 0 }}>Đã tự động khóa tài khoản</span>
+              ) : (
+                <span className="noshow-badge badge-success">Bình thường</span>
+              )}
             </span>
           </div>
 
           <div className="detail-row">
-            <span className="label">Điều phối thay thế (Emergency Dispatch)</span>
+            <span className="label">Điều phối thay thế</span>
             <span className="value">
               {item.emergencyDispatched ? 'Đã kích hoạt gửi đề xuất tìm nhân sự mới' : 'Chưa điều phối'}
             </span>
@@ -83,11 +94,11 @@ export const NoShowDetailModal = ({ item, onClose, onNavigateAppeal }) => {
             <span className="label">Trạng thái Kháng cáo</span>
             <span className="value">
               {item.appealId ? (
-                <span style={{ fontWeight: 700, color: '#4f46e5' }}>
+                <span className={`noshow-badge ${APPEAL_STATUS_BADGE[item.appealStatus] || 'badge-warning'}`}>
                   {APPEAL_STATUS_LABELS[item.appealStatus] || item.appealStatus}
                 </span>
               ) : (
-                'Chưa nộp đơn kháng cáo'
+                <span style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>Chưa nộp đơn kháng cáo</span>
               )}
             </span>
           </div>

@@ -71,10 +71,6 @@ public class Event {
     @Builder.Default
     private EventStatus status = EventStatus.DRAFT;
 
-    @Column(name = "readiness_score")
-    @Builder.Default
-    private Integer readinessScore = 0;
-
     @Column(name = "total_shifts")
     @Builder.Default
     private Integer totalShifts = 0;

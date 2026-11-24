@@ -108,7 +108,14 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                     </td>
                     <td>{w.workerPhone || '—'}</td>
                     <td>
-                      <span className="worker-status-badge" style={{ background: wStatus.bg, color: wStatus.color }}>
+                      <span
+                        className="worker-status-badge"
+                        style={{
+                          background: wStatus.bg,
+                          color: wStatus.color,
+                          borderColor: wStatus.border || '#cbd5e1',
+                        }}
+                      >
                         {wStatus.label}
                       </span>
                     </td>

@@ -1,5 +1,13 @@
 import React from 'react';
 
+const formatRole = (role) => {
+  if (!role) return '—';
+  const upper = String(role).toUpperCase();
+  if (upper === 'EVENT_ORGANIZER' || upper === 'EO') return 'Nhà tổ chức';
+  if (upper === 'WORKER') return 'Người lao động';
+  return role;
+};
+
 const AdminReviewTable = ({
   reviews,
   loading,
@@ -68,11 +76,11 @@ const AdminReviewTable = ({
               </td>
               <td>
                 <div className="user-name">{r.reviewerName || 'N/A'}</div>
-                <span className={`role-badge role-${r.reviewerRole?.toLowerCase()}`}>{r.reviewerRole}</span>
+                <span className={`role-badge role-${r.reviewerRole?.toLowerCase()}`}>{formatRole(r.reviewerRole)}</span>
               </td>
               <td>
                 <div className="user-name">{r.revieweeName || 'N/A'}</div>
-                <span className={`role-badge role-${r.revieweeRole?.toLowerCase()}`}>{r.revieweeRole}</span>
+                <span className={`role-badge role-${r.revieweeRole?.toLowerCase()}`}>{formatRole(r.revieweeRole)}</span>
               </td>
               <td>
                 <div className={`rating-chip rating-${r.rating}`}>
@@ -85,10 +93,18 @@ const AdminReviewTable = ({
                   {r.comment ? (r.comment.length > 60 ? r.comment.substring(0, 60) + '...' : r.comment) : <em className="text-muted">Không có nhận xét</em>}
                 </p>
                 {r.hiddenReason && (
-                  <small className="text-danger">Lý do ẩn: {r.hiddenReason}</small>
+                  <div>
+                    <span className="review-reason-tag danger" title={r.hiddenReason}>
+                      Lý do ẩn: {r.hiddenReason}
+                    </span>
+                  </div>
                 )}
                 {r.flagReason && (
-                  <small className="text-warning">Cảnh báo: {r.flagReason}</small>
+                  <div>
+                    <span className="review-reason-tag warning" title={r.flagReason}>
+                      Cảnh báo: {r.flagReason}
+                    </span>
+                  </div>
                 )}
               </td>
               <td>{getStatusBadge(r)}</td>

@@ -1,6 +1,5 @@
 package com.cani.entity;
 
-import com.cani.entity.enums.ExperienceLevel;
 import com.cani.entity.enums.ShiftStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -72,10 +71,6 @@ public class Shift {
     @Builder.Default
     private ShiftStatus status = ShiftStatus.DRAFT;
 
-    @Column(name = "risk_score")
-    @Builder.Default
-    private Integer riskScore = 0;
-
     @Column(name = "location_address", columnDefinition = "TEXT")
     private String locationAddress;
 
@@ -100,12 +95,6 @@ public class Shift {
 
     @Column(name = "max_distance_km")
     private Double maxDistanceKm;
-
-    @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "min_experience_level")
-    @Builder.Default
-    private ExperienceLevel minExperienceLevel = ExperienceLevel.BEGINNER;
 
     @Column(name = "arrival_time")
     private Instant arrivalTime;

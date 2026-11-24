@@ -1,6 +1,5 @@
 package com.cani.dto.event;
 
-import com.cani.entity.enums.ExperienceLevel;
 import com.cani.entity.enums.ShiftStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -32,12 +31,10 @@ public class ShiftResponseDto {
     private BigDecimal allowance;
     private BigDecimal totalCost;
     private ShiftStatus status;
-    private Integer riskScore;
     private String locationAddress;
     private Double locationLat;
     private Double locationLng;
     private Integer minReliabilityScore;
-    private ExperienceLevel minExperienceLevel;
     private String dressCode;
     private String imageUrl;
     private String checklist;

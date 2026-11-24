@@ -19,7 +19,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Nguồn sự thật duy nhất (Single Source of Truth) kiểm tra điều kiện hợp lệ (Eligibility)
+ * Nguồn sự thật duy nhất (Single Source of Truth) kiểm tra điều kiện hợp lệ
+ * (Eligibility)
  * và chấm điểm phù hợp kỹ năng (SkillFitBonus) trên toàn bộ 6 kênh:
  * Matching Dispatch, Reverse Matching, Emergency Dispatch, Proposal Acceptance,
  * Emergency Direct Apply, và Invite Mode.
@@ -32,8 +33,8 @@ public class WorkerShiftEligibilityService {
     private static final int DEFAULT_MIN_RELIABILITY = 60;
     private static final double WEIGHT_REQUIRED_QUALITY = 6.0;
     private static final double WEIGHT_PREFERRED_FIT = 4.0;
-    private static final DateTimeFormatter CONFLICT_FMT =
-            DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
+    private static final DateTimeFormatter CONFLICT_FMT = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")
+            .withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Autowired(required = false)
     private WorkerSkillRepository workerSkillRepository;
@@ -59,8 +60,7 @@ public class WorkerShiftEligibilityService {
             ShiftAssignmentRepository shiftAssignmentRepository,
             WorkerAvailabilityRepository workerAvailabilityRepository,
             BlockListService blockListService,
-            SkillRepository skillRepository
-    ) {
+            SkillRepository skillRepository) {
         this.workerSkillRepository = workerSkillRepository;
         this.shiftSkillRequirementRepository = shiftSkillRequirementRepository;
         this.shiftAssignmentRepository = shiftAssignmentRepository;
@@ -75,16 +75,14 @@ public class WorkerShiftEligibilityService {
             ShiftAssignmentRepository shiftAssignmentRepository,
             WorkerAvailabilityRepository workerAvailabilityRepository,
             BlockListService blockListService,
-            SkillRepository skillRepository
-    ) {
+            SkillRepository skillRepository) {
         return new WorkerShiftEligibilityService(
                 workerSkillRepository,
                 shiftSkillRequirementRepository,
                 shiftAssignmentRepository,
                 workerAvailabilityRepository,
                 blockListService,
-                skillRepository
-        );
+                skillRepository);
     }
 
     public enum MatchingChannel {
@@ -100,8 +98,7 @@ public class WorkerShiftEligibilityService {
             boolean eligible,
             String reasonCode,
             String reasonMessageVi,
-            boolean overrideApplied
-    ) {
+            boolean overrideApplied) {
         public static EligibilityResult pass() {
             return new EligibilityResult(true, "ELIGIBLE", null, false);
         }
@@ -120,8 +117,7 @@ public class WorkerShiftEligibilityService {
             String skillName,
             SkillRequirementType requirementType,
             VerificationTier minVerificationTier,
-            boolean requiresValidCertificate
-    ) {
+            boolean requiresValidCertificate) {
         public ShiftSkillRequirementDto toDto() {
             return ShiftSkillRequirementDto.builder()
                     .skillId(skillId)
@@ -140,8 +136,7 @@ public class WorkerShiftEligibilityService {
             List<UUID> matchedSkillIds,
             List<String> matchedSkillNames,
             List<String> requiredSkillNames,
-            List<String> preferredSkillNames
-    ) {
+            List<String> preferredSkillNames) {
         public static SkillFitResult empty() {
             return new SkillFitResult(0.0, 0.0, 0.0, List.of(), List.of(), List.of(), List.of());
         }
@@ -155,8 +150,7 @@ public class WorkerShiftEligibilityService {
             Worker worker,
             Shift shift,
             MatchingChannel channel,
-            String inviteOverrideReason
-    ) {
+            String inviteOverrideReason) {
         if (worker == null || shift == null || channel == null) {
             return EligibilityResult.fail("INVALID_INPUT", "Thông tin nhân sự hoặc ca làm việc không hợp lệ.");
         }
@@ -213,12 +207,14 @@ public class WorkerShiftEligibilityService {
                         || shiftEvent.getStatus() == EventStatus.COMPLETED
                         || shiftEvent.getStatus() == EventStatus.SUSPENDED) {
                     return EligibilityResult.fail("EVENT_NOT_ACTIVE",
-                            "Sự kiện của ca làm việc này không còn hoạt động (Trạng thái: " + shiftEvent.getStatus() + ").");
+                            "Sự kiện của ca làm việc này không còn hoạt động (Trạng thái: " + shiftEvent.getStatus()
+                                    + ").");
                 }
             } else if (shiftEvent.getStatus() != EventStatus.ACTIVE
                     && shiftEvent.getStatus() != EventStatus.ONGOING) {
                 return EligibilityResult.fail("EVENT_NOT_ACTIVE",
-                        "Sự kiện của ca làm việc này không còn hoạt động (Trạng thái: " + shiftEvent.getStatus() + ").");
+                        "Sự kiện của ca làm việc này không còn hoạt động (Trạng thái: " + shiftEvent.getStatus()
+                                + ").");
             }
         }
 
@@ -238,20 +234,21 @@ public class WorkerShiftEligibilityService {
             List<AssignmentStatus> activeStatuses = List.of(
                     AssignmentStatus.CONFIRMED,
                     AssignmentStatus.CHECKED_IN,
-                    AssignmentStatus.PENDING
-            );
+                    AssignmentStatus.PENDING);
             List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
                     worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
             if (conflicts != null) {
                 for (ShiftAssignment conflict : conflicts) {
-                    if (conflict.getShift() != null && Objects.equals(conflict.getShift().getShiftId(), shift.getShiftId())) {
+                    if (conflict.getShift() != null
+                            && Objects.equals(conflict.getShift().getShiftId(), shift.getShiftId())) {
                         continue;
                     }
                     Shift cShift = conflict.getShift();
                     String cJob = cShift != null ? cShift.getJobType() : "Ca làm việc";
                     String cEvent = (cShift != null && cShift.getEvent() != null) ? cShift.getEvent().getName() : "";
                     String timeRange = (cShift != null && cShift.getStartTime() != null && cShift.getEndTime() != null)
-                            ? CONFLICT_FMT.format(cShift.getStartTime()) + " - " + CONFLICT_FMT.format(cShift.getEndTime())
+                            ? CONFLICT_FMT.format(cShift.getStartTime()) + " - "
+                                    + CONFLICT_FMT.format(cShift.getEndTime())
                             : "";
                     return EligibilityResult.fail("SCHEDULE_CONFLICT", String.format(
                             "Không thể nhận ca: Bạn đã có ca làm việc khác trùng khung giờ (\"%s\" - %s, %s). Mỗi thời điểm chỉ được làm 1 ca duy nhất!",
@@ -277,7 +274,8 @@ public class WorkerShiftEligibilityService {
             }
         }
 
-        // 6. Điều kiện Kỹ năng Bắt buộc, Mức Xác Minh tối thiểu & Chứng chỉ an toàn còn hiệu lực
+        // 6. Điều kiện Kỹ năng Bắt buộc, Mức Xác Minh tối thiểu & Chứng chỉ an toàn còn
+        // hiệu lực
         List<EffectiveRequirement> allReqs = resolveEffectiveRequirements(shift);
         List<EffectiveRequirement> requiredReqs = allReqs.stream()
                 .filter(r -> r.requirementType() == SkillRequirementType.REQUIRED)
@@ -288,7 +286,8 @@ public class WorkerShiftEligibilityService {
 
         if (!requiredReqs.isEmpty()) {
             if (workerSkillRepository == null) {
-                log.error("Fail-closed eligibility check: thiếu WorkerSkillRepository khi kiểm tra ca {}", shift.getShiftId());
+                log.error("Fail-closed eligibility check: thiếu WorkerSkillRepository khi kiểm tra ca {}",
+                        shift.getShiftId());
                 return EligibilityResult.fail("SKILL_DATA_UNAVAILABLE",
                         "Hệ thống tạm thời chưa xác minh được hồ sơ kỹ năng của bạn.");
             }
@@ -321,7 +320,8 @@ public class WorkerShiftEligibilityService {
                         usedOverride = true;
                     } else {
                         return EligibilityResult.fail("MISSING_REQUIRED_SKILL",
-                                "Hồ sơ của bạn chưa có hoặc đã hết hạn kỹ năng bắt buộc: \"" + displaySkillName + "\".");
+                                "Hồ sơ của bạn chưa có hoặc đã hết hạn kỹ năng bắt buộc: \"" + displaySkillName
+                                        + "\".");
                     }
                 } else if (!meetsTier) {
                     if (channel == MatchingChannel.INVITE_MODE && hasOverrideReason) {
@@ -337,31 +337,14 @@ public class WorkerShiftEligibilityService {
 
         // 7. Điểm uy tín (RS) & Kinh nghiệm tối thiểu
         int minRs = (shift.getMinReliabilityScore() != null && shift.getMinReliabilityScore() > 0)
-                ? shift.getMinReliabilityScore() : DEFAULT_MIN_RELIABILITY;
+                ? shift.getMinReliabilityScore()
+                : DEFAULT_MIN_RELIABILITY;
         if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
             if (channel == MatchingChannel.INVITE_MODE && hasOverrideReason) {
                 usedOverride = true;
             } else {
                 return EligibilityResult.fail("INSUFFICIENT_RELIABILITY",
                         "Điểm uy tín hiện tại không đáp ứng yêu cầu tối thiểu (" + minRs + " điểm) của ca làm việc.");
-            }
-        }
-
-        if (shift.getMinExperienceLevel() != null) {
-            int requiredShifts = switch (shift.getMinExperienceLevel()) {
-                case INTERMEDIATE -> 3;
-                case ADVANCED -> 5;
-                case EXPERT -> 10;
-                default -> 0;
-            };
-            int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
-            if (completed < requiredShifts) {
-                if (channel == MatchingChannel.INVITE_MODE && hasOverrideReason) {
-                    usedOverride = true;
-                } else {
-                    return EligibilityResult.fail("INSUFFICIENT_EXPERIENCE",
-                            "Kinh nghiệm hiện tại (" + completed + " ca) chưa đáp ứng yêu cầu tối thiểu (" + requiredShifts + " ca).");
-                }
             }
         }
 
@@ -376,7 +359,8 @@ public class WorkerShiftEligibilityService {
      * - SELF_DECLARED -> 0.0
      * - AI_DOCUMENT (chưa hết hạn) -> 0.5
      * - PLATFORM_PROVEN -> 1.0
-     * Không tính bonus nếu ca không có yêu cầu kỹ năng; không tính trùng 1 skill hai lần.
+     * Không tính bonus nếu ca không có yêu cầu kỹ năng; không tính trùng 1 skill
+     * hai lần.
      */
     public SkillFitResult evaluateSkillFit(Worker worker, Shift shift) {
         if (shift == null) {
@@ -452,8 +436,7 @@ public class WorkerShiftEligibilityService {
                 matchedIds,
                 matchedNames,
                 requiredNames,
-                preferredNames
-        );
+                preferredNames);
     }
 
     public List<EffectiveRequirement> resolveEffectiveRequirements(Shift shift) {
@@ -469,8 +452,7 @@ public class WorkerShiftEligibilityService {
     public List<EffectiveRequirement> resolveEffectiveRequirements(
             Shift shift,
             List<ShiftSkillRequirement> preloadedRows,
-            Map<UUID, String> preloadedSkillNames
-    ) {
+            Map<UUID, String> preloadedSkillNames) {
         if (shift == null) {
             return List.of();
         }
@@ -486,9 +468,9 @@ public class WorkerShiftEligibilityService {
                         skId,
                         row.getSkill().getName(),
                         row.getRequirementType() != null ? row.getRequirementType() : SkillRequirementType.REQUIRED,
-                        row.getMinVerificationTier() != null ? row.getMinVerificationTier() : VerificationTier.SELF_DECLARED,
-                        Boolean.TRUE.equals(row.getRequiresValidCertificate())
-                ));
+                        row.getMinVerificationTier() != null ? row.getMinVerificationTier()
+                                : VerificationTier.SELF_DECLARED,
+                        Boolean.TRUE.equals(row.getRequiresValidCertificate())));
             }
             return new ArrayList<>(ordered.values());
         }
@@ -512,8 +494,7 @@ public class WorkerShiftEligibilityService {
                         skillNameLookup.get(skId),
                         SkillRequirementType.REQUIRED,
                         VerificationTier.SELF_DECLARED,
-                        false
-                ));
+                        false));
             }
         }
 

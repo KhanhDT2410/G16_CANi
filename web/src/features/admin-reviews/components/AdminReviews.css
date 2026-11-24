@@ -158,49 +158,66 @@
 }
 
 .role-badge {
-  display: inline-block;
-  padding: 0.15rem 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  box-sizing: border-box;
   margin-top: 0.2rem;
+  white-space: nowrap;
 }
 
-.role-event_organizer {
-  background-color: #e0e7ff;
-  color: #3730a3;
+.role-event_organizer,
+.role-eo {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
 }
 
 .role-worker {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
 }
 
 .rating-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 20px;
-  font-weight: 700;
-  font-size: 0.85rem;
+  gap: 0.35rem;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .rating-chip.rating-5,
 .rating-chip.rating-4 {
-  background-color: #fef9c3;
-  color: #854d0e;
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
 }
 
 .rating-chip.rating-3 {
-  background-color: #f1f5f9;
-  color: #475569;
+  background-color: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
 }
 
 .rating-chip.rating-2,
 .rating-chip.rating-1 {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
 }
 
 .rating-stars-small {
@@ -214,28 +231,66 @@
   line-height: 1.4;
 }
 
+/* Lý do cảnh báo / ẩn đánh giá - Format chuẩn chú thích vi phạm */
+.review-reason-tag {
+  display: inline-block;
+  margin-top: 4px;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.review-reason-tag.danger {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.review-reason-tag.warning {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+
 /* Status Badges */
 .status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.65rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-sizing: border-box;
   white-space: nowrap;
+  border: 1px solid transparent;
 }
 
 .status-active {
-  background-color: #ecfdf5;
-  color: #065f46;
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
 }
 
 .status-hidden {
   background-color: #fef2f2;
-  color: #991b1b;
+  border-color: #fecaca;
+  color: #b91c1c;
 }
 
 .status-flagged {
   background-color: #fffbeb;
+  border-color: #fde68a;
   color: #b45309;
 }
 
@@ -417,21 +472,23 @@
 }
 
 .admin-review-alert {
-  padding: 0.85rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .admin-review-alert-danger {
   background-color: #fef2f2;
   border: 1px solid #fecaca;
-  color: #991b1b;
+  color: #b91c1c;
 }
 
 .admin-review-alert-warning {
   background-color: #fffbeb;
   border: 1px solid #fde68a;
-  color: #92400e;
+  color: #b45309;
 }
 
 .admin-review-info-grid {
@@ -485,12 +542,18 @@
 }
 
 .review-tag-badge {
-  background-color: #e0f2fe;
-  color: #0369a1;
-  padding: 0.2rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  box-sizing: border-box;
 }
 
 .quick-reasons-container {
@@ -502,18 +565,22 @@
 
 .quick-reason-btn {
   text-align: left;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.8rem;
-  background-color: #f1f5f9;
+  padding: 4px 10px;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  background-color: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   color: #334155;
-  transition: background-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .quick-reason-btn:hover {
-  background-color: #e2e8f0;
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .admin-review-notice-box {
@@ -554,4 +621,3 @@
   cursor: pointer;
   color: inherit;
 }
-

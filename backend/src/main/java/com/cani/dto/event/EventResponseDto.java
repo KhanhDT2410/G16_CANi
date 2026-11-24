@@ -30,7 +30,6 @@ public class EventResponseDto {
     private String imageUrl;
     private EventMode mode;
     private EventStatus status;
-    private Integer readinessScore;
     private Integer totalShifts;
     private Integer totalRequiredWorkers;
     private Integer totalConfirmedWorkers;

@@ -297,38 +297,6 @@ class MatchingDispatchServiceTest {
                 }
 
                 @Test
-                @DisplayName("MATCH008: Ca làm việc yêu cầu EXPERT (10 ca) -> Worker mới có 2 ca bị loại")
-                void passHardFilter_InsufficientExperienceLevel_FilteredOut() {
-                        sampleShift.setMinExperienceLevel(ExperienceLevel.EXPERT); // Cần tối thiểu 10 ca
-                        when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
-                        when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(onlineWorker)); // mới có 2 ca
-
-                        int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
-
-                        assertEquals(0, dispatched);
-                        verify(dispatchProposalRepository, never()).save(any());
-                }
-
-                @Test
-                @DisplayName("MATCH009: Ca làm việc yêu cầu INTERMEDIATE (3 ca) -> Worker có 25 ca thỏa mãn điều kiện")
-                void passHardFilter_SufficientExperienceLevel_PassesFilter() {
-                        sampleShift.setMinExperienceLevel(ExperienceLevel.INTERMEDIATE);
-                        when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
-                        when(workerRepository.findByIsOnlineTrue()).thenReturn(List.of(experiencedWorker));
-                        when(shiftAssignmentRepository.findConflictingAssignments(any(), any(), any(), any()))
-                                        .thenReturn(Collections.emptyList());
-                        when(dispatchProposalRepository.existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(any(), any(),
-                                        anyList())).thenReturn(false);
-                        when(shiftAssignmentRepository.existsByShift_ShiftIdAndWorker_WorkerId(any(), any()))
-                                        .thenReturn(false);
-
-                        int dispatched = matchingDispatchService.dispatchForShift(sampleShift.getShiftId());
-
-                        assertEquals(1, dispatched);
-                        verify(dispatchProposalRepository, times(1)).save(any(DispatchProposal.class));
-                }
-
-                @Test
                 @DisplayName("MATCH009b: Ca làm việc có requiredSkills -> Chỉ Worker có đủ kỹ năng mới được nhận đề xuất")
                 void passHardFilter_RequiredSkills_FiltersCorrectly() {
                         UUID reqSkillId = UUID.randomUUID();

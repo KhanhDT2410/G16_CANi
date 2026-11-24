@@ -60,12 +60,26 @@ export const ShiftDetailModal = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <h3>Ca Làm: {shift?.shiftCode || '—'}</h3>
             {statusCfg && (
-              <span className="shift-status-pill" style={{ background: statusCfg.bg, color: statusCfg.color }}>
+              <span
+                className="shift-status-badge"
+                style={{
+                  background: statusCfg.bg,
+                  color: statusCfg.color,
+                  borderColor: statusCfg.border || '#cbd5e1',
+                }}
+              >
                 {statusCfg.label}
               </span>
             )}
             {paymentCfg && (
-              <span className="shift-payment-pill" style={{ background: paymentCfg.bg, color: paymentCfg.color }}>
+              <span
+                className="shift-payment-badge"
+                style={{
+                  background: paymentCfg.bg,
+                  color: paymentCfg.color,
+                  borderColor: paymentCfg.border || '#cbd5e1',
+                }}
+              >
                 {paymentCfg.label}
               </span>
             )}

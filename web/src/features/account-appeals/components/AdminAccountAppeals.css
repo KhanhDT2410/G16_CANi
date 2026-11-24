@@ -65,13 +65,29 @@
   display: inline-block;
 }
 
-.dot-all { background: #94a3b8; }
-.dot-submitted { background: #f59e0b; }
-.dot-under-review { background: #0284c7; }
-.dot-approved { background: #10b981; }
-.dot-rejected { background: #ef4444; }
+.dot-all {
+  background: #94a3b8;
+}
 
-.status-tab-btn.active .dot-all { background: #e2e8f0; }
+.dot-submitted {
+  background: #f59e0b;
+}
+
+.dot-under-review {
+  background: #0284c7;
+}
+
+.dot-approved {
+  background: #10b981;
+}
+
+.dot-rejected {
+  background: #ef4444;
+}
+
+.status-tab-btn.active .dot-all {
+  background: #e2e8f0;
+}
 
 /* Khu vực thao tác bên phải */
 .admin-appeals-right-actions {
@@ -219,41 +235,49 @@
 }
 
 .appeal-role-badge {
-  display: inline-block;
-  padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  box-sizing: border-box;
   width: fit-content;
   margin-top: 2px;
 }
 
 .appeal-role-badge.eo {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
 }
 
 .appeal-role-badge.worker {
-  background: #f5f3ff;
-  color: #7c3aed;
-  border: 1px solid #ddd6fe;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
 }
 
-/* Cột lý do khóa */
+/* Cột lý do khóa - Badge chuẩn chỉ dẫn/lý do vi phạm */
 .appeal-lock-snippet {
-  max-width: 200px;
-  font-size: 0.8rem;
-  color: #dc2626;
+  display: inline-block;
+  max-width: 220px;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: #b91c1c;
   background: #fef2f2;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid #fee2e2;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  border: 1px solid #fecaca;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-sizing: border-box;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Cột nội dung giải trình */
@@ -268,17 +292,44 @@
   line-height: 1.4;
 }
 
-/* Status Badge */
+/* Status Badge - Định dạng chuẩn CANi Badge */
 .appeal-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  border: 1px solid transparent;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-sizing: border-box;
   white-space: nowrap;
+  width: fit-content;
+}
+
+.badge-appeal-submitted {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+
+.badge-appeal-reviewing {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.badge-appeal-approved {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.badge-appeal-rejected {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
 }
 
 /* Nút Thao tác thẩm định */
@@ -395,6 +446,7 @@
     opacity: 0;
     transform: scale(0.96) translateY(12px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -470,13 +522,16 @@
 }
 
 .appeal-lock-box {
+  display: inline-block;
   background: #fef2f2;
-  border: 1px solid #fee2e2;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  color: #dc2626;
-  line-height: 1.5;
+  border: 1px solid #fecaca;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #b91c1c;
+  line-height: 1.4;
 }
 
 .appeal-content-box {
@@ -500,14 +555,15 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.825rem;
-  color: #2563eb;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #1d4ed8;
   text-decoration: none;
-  font-weight: 600;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
   width: fit-content;
   transition: all 0.15s ease;
 }
@@ -636,6 +692,13 @@
 }
 
 @keyframes appealFadeIn {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

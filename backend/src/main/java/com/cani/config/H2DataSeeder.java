@@ -552,7 +552,6 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .startTime(Instant.now().plus(Duration.ofHours(3)))
                                                 .endTime(Instant.now().plus(Duration.ofHours(9)))
                                                 .status(ShiftStatus.ACTIVE)
-                                                .minExperienceLevel(ExperienceLevel.BEGINNER)
                                                 .requiredSkills(shift1Skills)
                                                 .emergency(false)
                                                 .build();
@@ -589,7 +588,6 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .startTime(Instant.now().plus(Duration.ofHours(5)))
                                                 .endTime(Instant.now().plus(Duration.ofHours(11)))
                                                 .status(ShiftStatus.ACTIVE)
-                                                .minExperienceLevel(ExperienceLevel.INTERMEDIATE)
                                                 .build();
 
                                 // Event 3: White Palace Tân Bình / Phú Nhuận (~4.5 km from center)
@@ -624,7 +622,6 @@ public class H2DataSeeder implements CommandLineRunner {
                                                 .startTime(Instant.now().plus(Duration.ofHours(4)))
                                                 .endTime(Instant.now().plus(Duration.ofHours(10)))
                                                 .status(ShiftStatus.ACTIVE)
-                                                .minExperienceLevel(ExperienceLevel.BEGINNER)
                                                 .emergency(true)
                                                 .build();
 

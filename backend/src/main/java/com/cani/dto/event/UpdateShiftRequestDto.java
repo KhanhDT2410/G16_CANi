@@ -1,6 +1,5 @@
 package com.cani.dto.event;
 
-import com.cani.entity.enums.ExperienceLevel;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -56,8 +55,6 @@ public class UpdateShiftRequestDto {
     private Integer minReliabilityScore;
 
     private Double maxDistanceKm;
-
-    private ExperienceLevel minExperienceLevel;
 
     private String dressCode;
 

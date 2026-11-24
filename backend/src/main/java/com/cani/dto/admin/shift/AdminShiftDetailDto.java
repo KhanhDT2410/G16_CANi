@@ -1,6 +1,5 @@
 package com.cani.dto.admin.shift;
 
-import com.cani.entity.enums.ExperienceLevel;
 import com.cani.entity.enums.PaymentStatus;
 import com.cani.entity.enums.ShiftStatus;
 import lombok.AllArgsConstructor;
@@ -48,7 +47,6 @@ public class AdminShiftDetailDto {
     private BigDecimal allowance;
     private BigDecimal totalCost;
     private ShiftStatus status;
-    private ExperienceLevel minExperienceLevel;
     private Integer minReliabilityScore;
     private String dressCode;
     private String checklist;

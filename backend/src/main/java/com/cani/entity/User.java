@@ -55,10 +55,6 @@ public class User {
     @Column(name = "fcm_token")
     private String fcmToken;
 
-    @Column(name = "language", length = 10)
-    @Builder.Default
-    private String language = "vi";
-
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 

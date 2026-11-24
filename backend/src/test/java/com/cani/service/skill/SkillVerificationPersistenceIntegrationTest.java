@@ -7,16 +7,23 @@ import com.cani.client.skill.UnsupportedCertificateLookupSource;
 import com.cani.dto.skill.SkillVerificationResponseDto;
 import com.cani.entity.Skill;
 import com.cani.entity.SkillVerificationRequest;
+import com.cani.entity.User;
 import com.cani.entity.Worker;
+import com.cani.entity.WorkerEkycVerification;
 import com.cani.entity.WorkerSkill;
 import com.cani.entity.WorkerSkillPoint;
+import com.cani.entity.enums.IdentityVerificationStatus;
 import com.cani.entity.enums.RoutingDecision;
+import com.cani.entity.enums.SkillTier;
 import com.cani.entity.enums.SkillVerificationStatus;
+import com.cani.entity.enums.UserRole;
+import com.cani.entity.enums.UserStatus;
 import com.cani.entity.enums.VerificationTier;
 import com.cani.exception.AppException;
 import com.cani.repository.AuditLogRepository;
 import com.cani.repository.SkillRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
+import com.cani.repository.WorkerEkycVerificationRepository;
 import com.cani.repository.WorkerRepository;
 import com.cani.repository.WorkerSkillPointRepository;
 import com.cani.repository.WorkerSkillRepository;
@@ -77,6 +84,9 @@ class SkillVerificationPersistenceIntegrationTest {
 
     @Autowired
     private AuditLogRepository auditLogRepository;
+
+    @Autowired
+    private WorkerEkycVerificationRepository workerEkycVerificationRepository;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -194,6 +204,13 @@ class SkillVerificationPersistenceIntegrationTest {
         Worker worker = workerRepository.findAll().stream().findFirst().orElseThrow();
         Skill barista = skillRepository.findByName("Pha chế (Bartender/Barista)").orElseThrow();
 
+        // Đảm bảo Worker có hồ sơ eKYC đã xác thực (bắt buộc để đối soát tên & cấp SP)
+        workerEkycVerificationRepository.saveAndFlush(WorkerEkycVerification.builder()
+                .worker(worker)
+                .fullName(worker.getFullName())
+                .status("APPROVED")
+                .build());
+
         // Cấu hình mock nguồn tra cứu xác thực thành công đúng người, đúng kỹ năng
         when(certificateLookupSource.verifyCertificate(any())).thenReturn(
                 CertificateLookupResult.builder()
@@ -254,5 +271,52 @@ class SkillVerificationPersistenceIntegrationTest {
         // 4. Đối soát bảng workers (SkillTier tổng thể)
         Worker updatedWorker = workerRepository.findById(worker.getWorkerId()).orElseThrow();
         assertNotNull(updatedWorker.getSkillTier());
+    }
+
+    @Test
+    @DisplayName("Post-Test DB Audit: Thiếu eKYC đã xác thực -> lưu REJECTED và 0 SP dù nguồn trả VERIFIED")
+    void testVerifiedSourceWithoutEkyc_PersistsRejectedZeroSp() {
+        User userWithoutEkyc = userRepository.saveAndFlush(User.builder()
+                .userId(UUID.randomUUID())
+                .email("no-ekyc-" + UUID.randomUUID() + "@cani.test")
+                .fullName("TRAN VAN CHUA EKYC")
+                .role(UserRole.WORKER)
+                .status(UserStatus.ACTIVE)
+                .emailVerified(true)
+                .build());
+        Worker workerWithoutEkyc = workerRepository.saveAndFlush(Worker.builder()
+                .user(userWithoutEkyc)
+                .fullName(userWithoutEkyc.getFullName())
+                .skillTier(SkillTier.STARTER)
+                .build());
+        Skill targetSkill = skillRepository.findByName("Pha chế (Bartender/Barista)").orElseThrow();
+
+        when(certificateLookupSource.verifyCertificate(any())).thenReturn(
+                CertificateLookupResult.builder()
+                        .outcome(CertificateLookupOutcome.VERIFIED)
+                        .verificationSource("QR_OFFICIAL_REGISTRY")
+                        .recipientName(workerWithoutEkyc.getFullName())
+                        .institution("Academy")
+                        .certificateNumber("WAIT-NO-EKYC-1")
+                        .expiryDate("31/12/2030")
+                        .matchedSkillNames(List.of(targetSkill.getName()))
+                        .build()
+        );
+
+        MockMultipartFile file = new MockMultipartFile("file", "cert_no_ekyc.jpg", "image/jpeg", validJpegBytes((byte) 0x55));
+        SkillVerificationResponseDto res = verificationService.submitVerification(
+                workerWithoutEkyc.getWorkerId(), file, targetSkill.getSkillId(), "No eKYC test"
+        );
+
+        assertEquals(SkillVerificationStatus.REJECTED, res.getStatus());
+        assertEquals(0, res.getSpAwarded());
+
+        SkillVerificationRequest persistedReq = requestRepository.findById(res.getId()).orElseThrow();
+        assertEquals(SkillVerificationStatus.REJECTED, persistedReq.getStatus());
+        assertEquals(IdentityVerificationStatus.UNVERIFIED, persistedReq.getIdentityVerificationStatus());
+        assertEquals(0, persistedReq.getSpAwarded());
+        assertTrue(workerSkillRepository
+                .findByWorker_WorkerIdAndSkill_SkillId(workerWithoutEkyc.getWorkerId(), targetSkill.getSkillId())
+                .isEmpty());
     }
 }

@@ -1,19 +1,20 @@
 package com.cani.service.skill.eval;
 
+import com.cani.entity.enums.SkillVerificationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Báo cáo chi tiết kết quả đánh giá hệ thống thẩm định kỹ năng.
- * Báo cáo riêng: trường nào AI đọc đúng/sai, số hồ sơ bị duyệt nhầm,
- * số chứng chỉ hợp lệ được duyệt, số chứng chỉ hợp lệ bị bỏ sót, số ca chưa thể xác minh.
- * Ghi cả số ca và mẫu số khi báo tỷ lệ.
- * Phân biệt kết quả test với mock và kết quả chạy qua AI hoặc nguồn cấp thật.
+ * Tách bạch rõ chế độ chạy (synthetic offline parser vs live AI thật vs live issuer),
+ * báo kết quả theo từng ca, độ chính xác từng trường, và an toàn cấp SP.
  */
 @Data
 @Builder
@@ -21,14 +22,24 @@ import java.util.Map;
 @AllArgsConstructor
 public class SkillEvaluationReport {
 
+    public static final String MODE_SYNTHETIC_OFFLINE = "SYNTHETIC_BENCHMARK_OFFLINE";
+    public static final String MODE_LIVE_AI_UNCONFIGURED = "LIVE_AI_UNCONFIGURED";
+    public static final String MODE_LIVE_AI_CONNECTED = "LIVE_AI_CONNECTED";
+    public static final String MODE_LIVE_END_TO_END = "LIVE_END_TO_END";
+
     private String datasetSplit;                 // "DEV" hoặc "EVAL"
     private String promptVersion;
     private String modelName;
-    private String executionMode;                // "SYNTHETIC_BENCHMARK_OFFLINE", "LIVE_AI_UNCONFIGURED", "LIVE_AI_CONNECTED"
+    private String executionMode;                // MODE_*
     private String environmentNote;              // Ghi chú môi trường
+    private String liveAiStatus;                 // Đã kiểm chứng thật hay CHƯA ĐÁNH GIÁ
+    private String liveIssuerStatus;             // Đã kiểm chứng nguồn cấp thật hay CHƯA ĐÁNH GIÁ
 
     private int totalCases;
     private int evaluatedCases;
+
+    @Builder.Default
+    private List<CaseEvaluationResult> caseResults = new ArrayList<>();
 
     // Chỉ số đọc trường tài liệu của AI
     @Builder.Default
@@ -42,6 +53,22 @@ public class SkillEvaluationReport {
     private int validCertificatesMissed;         // False Negatives (chứng chỉ hợp lệ nhưng bị bỏ sót/từ chối)
     private int unverifiedCases;                 // Số ca chưa thể xác minh (UNSUPPORTED_SOURCE hoặc TEMPORARY_FAILURE)
     private int correctSpDecisions;              // Số ca quyết định đúng mức điểm SP (25 hoặc 0)
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CaseEvaluationResult {
+        private String caseId;
+        private String extractedDocumentType;
+        private SkillVerificationStatus expectedStatus;
+        private SkillVerificationStatus actualStatus;
+        private int expectedSp;
+        private int actualSp;
+        private boolean evidenceGrounded;
+        private boolean spDecisionCorrect;
+        private String note;
+    }
 
     @Data
     @Builder
@@ -69,11 +96,19 @@ public class SkillEvaluationReport {
         StringBuilder sb = new StringBuilder();
         sb.append("### Báo Cáo Đánh Giá Kỹ Năng [Tập: ").append(datasetSplit)
           .append(" | Prompt: ").append(promptVersion)
-          .append(" | Model: ").append(modelName).append("]\n\n");
+          .append(" | Model: ").append(modelName)
+          .append(" | Mode: ").append(executionMode).append("]\n\n");
 
-        sb.append("> **Môi trường & Điều kiện chạy**: ").append(environmentNote).append("\n\n");
+        sb.append("> **Môi trường & Điều kiện chạy**: ").append(environmentNote).append("\n");
+        if (liveAiStatus != null && !liveAiStatus.isBlank()) {
+            sb.append("> **Trạng thái AI thật**: ").append(liveAiStatus).append("\n");
+        }
+        if (liveIssuerStatus != null && !liveIssuerStatus.isBlank()) {
+            sb.append("> **Trạng thái nguồn cấp thật**: ").append(liveIssuerStatus).append("\n");
+        }
+        sb.append("\n");
 
-        sb.append("#### 1. Khả năng đọc tài liệu của AI (Theo từng trường)\n\n");
+        sb.append("#### 1. Khả năng đọc tài liệu theo từng trường\n\n");
         sb.append("| Trường Dữ Liệu | Số ca đọc đúng / Tổng | Tỷ lệ chính xác |\n");
         sb.append("|---|:---:|:---:|\n");
         fieldMetrics.forEach((field, metric) -> {
@@ -95,6 +130,19 @@ public class SkillEvaluationReport {
           .append(unverifiedCases).append(" ca\n");
         sb.append("- **Độ chính xác cấp SP (Đúng 25 SP hoặc giữ 0 SP)**: ")
           .append(formatRatio(correctSpDecisions, totalCases)).append("\n");
+
+        if (caseResults != null && !caseResults.isEmpty()) {
+            sb.append("\n#### 3. Kết quả chi tiết theo từng ca\n\n");
+            sb.append("| Ca kiểm thử | Loại TL | Trạng thái | SP (Thực/Kỳ vọng) | Trích dẫn nguyên văn |\n");
+            sb.append("|---|---|---|:---:|:---:|\n");
+            for (CaseEvaluationResult c : caseResults) {
+                sb.append("| `").append(c.getCaseId()).append("` | ")
+                  .append(c.getExtractedDocumentType()).append(" | ")
+                  .append(c.getActualStatus()).append(" | ")
+                  .append(c.getActualSp()).append("/").append(c.getExpectedSp()).append(" | ")
+                  .append(c.isEvidenceGrounded() ? "ĐẠT" : "KHÔNG").append(" |\n");
+            }
+        }
 
         return sb.toString();
     }

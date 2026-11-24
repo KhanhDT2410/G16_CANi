@@ -40,8 +40,11 @@ cani:
   skill:
     ai:
       enabled: ${SKILL_AI_ENABLED:false}
-      api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_SKILL_MODEL:gemini-2.5-flash}
+      provider: ${SKILL_AI_PROVIDER:}
+      endpoint: ${SKILL_AI_ENDPOINT:}
+      api-key: ${SKILL_AI_API_KEY:}
+      model: ${SKILL_AI_MODEL:}
+      connection-verified: ${SKILL_AI_CONNECTION_VERIFIED:false}
   subscription:
     demo-enabled: true
   sla-scan:

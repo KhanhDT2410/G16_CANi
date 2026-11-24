@@ -57,19 +57,27 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.cani.service.skill.eval.DocumentExtractionResult;
+import com.cani.service.skill.eval.SkillDocumentExtractor;
+
 /**
  * Orchestrator cho module Xác minh tự động Chứng chỉ Kỹ năng Worker (UC-43 & UC-46).
  * - FileSecurityValidator + CertificateStorageService + DocumentAccessTokenService (Bảo mật tệp)
- * - CertificateLookupSource (Gemini Vision AI cho chứng chỉ kỹ năng, tách biệt hoàn toàn với VNPT eKYC):
- *   Chỉ cấp trạng thái APPROVED & SP_verify khi chứng chỉ đạt xác thực và đối soát khớp tên eKYC/hồ sơ Worker, hạn hiệu lực & kỹ năng.
- * - Khi thiếu API key hoặc tắt AI: trả "Chưa thể xác minh tự động" (0 SP) một cách trung thực (không giả lập duyệt).
- * - Khi dịch vụ AI lỗi tạm thời: trả VERIFICATION_FAILED để Worker thử lại (retry).
+ * - SkillDocumentExtractor (OCR / Vision đa phương thức không dùng Gemini, tách biệt hoàn toàn với VNPT eKYC):
+ *   Chỉ trích xuất dữ liệu có cấu trúc; confidence hay kỹ năng tự khai trên CV không tự cấp điểm SP.
+ * - CertificateLookupSource (Nguồn tra cứu chứng chỉ chính thức):
+ *   Chỉ cấp trạng thái APPROVED & SP_verify khi nguồn chính thức trả VERIFIED, Worker có danh tính eKYC đã xác thực
+ *   khớp tên người nhận, hạn hiệu lực hợp lệ (strict date / nguồn xác nhận vô thời hạn) & khớp kỹ năng yêu cầu.
+ * - Khi chưa tích hợp nguồn cấp chính thức hoặc thiếu AI provider/credentials:
+ *   trả "Chưa thể xác minh tự động" (0 SP) một cách trung thực (không đưa vào hàng đợi duyệt tay).
+ * - Khi nguồn tra cứu lỗi tạm thời: trả VERIFICATION_FAILED để Worker thử lại (retry).
  */
 @Service
 @RequiredArgsConstructor
@@ -84,8 +92,8 @@ public class SkillVerificationService {
     );
     private static final List<DateTimeFormatter> SUPPORTED_DATE_FORMATS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE,
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-            DateTimeFormatter.ofPattern("d/M/yyyy")
+            DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT),
+            DateTimeFormatter.ofPattern("d/M/uuuu").withResolverStyle(ResolverStyle.STRICT)
     );
 
     private final WorkerRepository workerRepository;
@@ -107,12 +115,19 @@ public class SkillVerificationService {
     @Autowired(required = false)
     private WorkerEkycVerificationRepository workerEkycVerificationRepository;
 
+    @Autowired(required = false)
+    private SkillDocumentExtractor skillDocumentExtractor;
+
     public void setSystemConfigRepository(SystemConfigRepository systemConfigRepository) {
         this.systemConfigRepository = systemConfigRepository;
     }
 
     public void setWorkerEkycVerificationRepository(WorkerEkycVerificationRepository workerEkycVerificationRepository) {
         this.workerEkycVerificationRepository = workerEkycVerificationRepository;
+    }
+
+    public void setSkillDocumentExtractor(SkillDocumentExtractor skillDocumentExtractor) {
+        this.skillDocumentExtractor = skillDocumentExtractor;
     }
 
     private int getAiDocumentSp() {
@@ -197,7 +212,8 @@ public class SkillVerificationService {
     }
 
     /**
-     * Nộp chứng chỉ nghề nghiệp để xác minh tự động bằng Gemini Vision AI & quy tắc đối soát (UC-43 / UC-46).
+     * Nộp chứng chỉ nghề nghiệp để trích xuất tài liệu (OCR/Vision nếu cấu hình)
+     * và xác minh tự động qua nguồn tra cứu chính thức (UC-43 / UC-46).
      */
     public SkillVerificationResponseDto submitVerification(
             UUID workerId,
@@ -223,7 +239,7 @@ public class SkillVerificationService {
         Skill requestedSkill = requestedSkillId != null
                 ? skillRepository.findById(requestedSkillId).orElse(null)
                 : null;
-        String workerName = resolveWorkerFullName(worker);
+        String verifiedEkycName = resolveVerifiedEkycFullName(worker).orElse("");
 
         // 3. Lưu tệp riêng tư bằng UUID filename (fail-fast nếu lỗi ghi đĩa)
         String storedDocumentUrl = certificateStorageService.storeDocument(
@@ -231,10 +247,17 @@ public class SkillVerificationService {
                 validatedDoc.getSafeExtension()
         );
 
-        // 4. Tra cứu chứng chỉ ngoài transaction DB
+        // 4. Trích xuất cấu trúc qua AI (ngoài transaction DB; KHÔNG decode PDF/ảnh thành UTF-8)
+        DocumentExtractionResult extractionResult = extractDocumentSafely(
+                validatedDoc.getBytes(),
+                validatedDoc.getSanitizedOriginalFilename(),
+                validatedDoc.getDetectedMimeType()
+        );
+
+        // 5. Tra cứu chứng chỉ qua nguồn chính thức ngoài transaction DB
         CertificateLookupResult lookupResult = executeLookupSafely(CertificateLookupRequest.builder()
                 .workerId(workerId)
-                .workerFullName(workerName)
+                .workerFullName(verifiedEkycName)
                 .documentName(validatedDoc.getSanitizedOriginalFilename())
                 .mimeType(validatedDoc.getDetectedMimeType())
                 .sha256Hash(validatedDoc.getSha256Hash())
@@ -253,6 +276,7 @@ public class SkillVerificationService {
                         validatedDoc,
                         storedDocumentUrl,
                         notes,
+                        extractionResult,
                         lookupResult
                 );
             });
@@ -296,7 +320,7 @@ public class SkillVerificationService {
                     || existing.getStatus() == SkillVerificationStatus.REVOKED) {
                 throw new BadRequestException("Hồ sơ đã ở trạng thái cuối (" + existing.getStatus() + "), không thể nộp lại.");
             }
-            String wName = existing.getWorker() != null ? resolveWorkerFullName(existing.getWorker()) : "";
+            String wName = existing.getWorker() != null ? resolveVerifiedEkycFullName(existing.getWorker()).orElse("") : "";
             UUID reqSkillId = existing.getSkill() != null ? existing.getSkill().getSkillId() : null;
             return new ResubmitContext(
                     wName,
@@ -322,6 +346,12 @@ public class SkillVerificationService {
                 validatedDoc.getSafeExtension()
         );
 
+        DocumentExtractionResult extractionResult = extractDocumentSafely(
+                validatedDoc.getBytes(),
+                validatedDoc.getSanitizedOriginalFilename(),
+                validatedDoc.getDetectedMimeType()
+        );
+
         CertificateLookupResult lookupResult = executeLookupSafely(CertificateLookupRequest.builder()
                 .verificationId(verificationId)
                 .workerId(workerId)
@@ -339,7 +369,7 @@ public class SkillVerificationService {
             return executeInTransaction(() -> {
                 deleteStoredDocumentAfterRollback(storedDocumentUrl);
                 return updateResubmittedVerification(
-                        verificationId, workerId, validatedDoc, storedDocumentUrl, notes, lookupResult
+                        verificationId, workerId, validatedDoc, storedDocumentUrl, notes, extractionResult, lookupResult
                 );
             });
         } catch (RuntimeException ex) {
@@ -364,7 +394,7 @@ public class SkillVerificationService {
             if (req.getStatus() != SkillVerificationStatus.VERIFICATION_FAILED) {
                 throw new BadRequestException("Chỉ có thể thử lại khi hồ sơ đang gặp lỗi tạm thời (VERIFICATION_FAILED).");
             }
-            String wName = req.getWorker() != null ? resolveWorkerFullName(req.getWorker()) : "";
+            String wName = req.getWorker() != null ? resolveVerifiedEkycFullName(req.getWorker()).orElse("") : "";
             UUID reqSkillId = req.getSkill() != null ? req.getSkill().getSkillId() : null;
             return new ResubmitContext(
                     wName,
@@ -385,6 +415,12 @@ public class SkillVerificationService {
             throw new BadRequestException("Hồ sơ không còn tệp chứng chỉ để thử lại. Vui lòng nộp lại chứng chỉ mới.");
         }
         byte[] storedBytes = certificateStorageService.readBytes(filename);
+
+        DocumentExtractionResult extractionResult = extractDocumentSafely(
+                storedBytes,
+                ctx.documentName(),
+                ctx.documentType()
+        );
 
         CertificateLookupResult lookupResult = executeLookupSafely(CertificateLookupRequest.builder()
                 .verificationId(verificationId)
@@ -410,7 +446,8 @@ public class SkillVerificationService {
             }
             Worker worker = req.getWorker();
             req.setRetryCount((req.getRetryCount() != null ? req.getRetryCount() : 0) + 1);
-            applyLookupEvaluation(req, worker, req.getSkill(), lookupResult);
+            applyExtractionMetadata(req, extractionResult);
+            applyLookupEvaluation(req, worker, req.getSkill(), lookupResult, extractionResult);
             SkillVerificationRequest saved = verificationRequestRepository.save(req);
 
             recordAudit(
@@ -454,6 +491,7 @@ public class SkillVerificationService {
             FileSecurityValidator.ValidatedDocument validatedDoc,
             String storedDocumentUrl,
             String notes,
+            DocumentExtractionResult extractionResult,
             CertificateLookupResult lookupResult
     ) {
         if (verificationRequestRepository.existsByWorker_WorkerIdAndDocumentHashAndStatusIn(
@@ -488,8 +526,9 @@ public class SkillVerificationService {
                 .retryCount(0)
                 .build();
 
+        applyExtractionMetadata(entity, extractionResult);
         SkillVerificationRequest saved = verificationRequestRepository.save(entity);
-        applyLookupEvaluation(saved, worker, requestedSkill, lookupResult);
+        applyLookupEvaluation(saved, worker, requestedSkill, lookupResult, extractionResult);
         saved = verificationRequestRepository.save(saved);
 
         recordAudit(
@@ -518,6 +557,7 @@ public class SkillVerificationService {
             FileSecurityValidator.ValidatedDocument validatedDoc,
             String storedDocumentUrl,
             String notes,
+            DocumentExtractionResult extractionResult,
             CertificateLookupResult lookupResult
     ) {
         SkillVerificationRequest req = verificationRequestRepository.findById(verificationId)
@@ -551,7 +591,8 @@ public class SkillVerificationService {
         req.setReviewNotes(null);
         req.setSpAwarded(0);
 
-        applyLookupEvaluation(req, worker, req.getSkill(), lookupResult);
+        applyExtractionMetadata(req, extractionResult);
+        applyLookupEvaluation(req, worker, req.getSkill(), lookupResult, extractionResult);
         SkillVerificationRequest saved = verificationRequestRepository.save(req);
 
         if (previousDocumentUrl != null && !previousDocumentUrl.equals(storedDocumentUrl)) {
@@ -573,11 +614,60 @@ public class SkillVerificationService {
         return mapToResponseDto(saved, null, null, worker);
     }
 
+    private DocumentExtractionResult extractDocumentSafely(byte[] bytes, String filename, String mimeType) {
+        if (skillDocumentExtractor == null) {
+            return null;
+        }
+        try {
+            return skillDocumentExtractor.extract(bytes, filename, mimeType, SkillDocumentExtractor.PROMPT_V2);
+        } catch (RuntimeException ex) {
+            log.warn("Lỗi trích xuất tài liệu bằng AI [file={}]: {}", filename, ex.getMessage());
+            return DocumentExtractionResult.builder()
+                    .status(DocumentExtractionResult.ExtractionStatus.UNCONFIGURED)
+                    .documentType("UNKNOWN")
+                    .modelName("NONE")
+                    .failureMessage(ex.getMessage())
+                    .build();
+        }
+    }
+
+    private void applyExtractionMetadata(SkillVerificationRequest entity, DocumentExtractionResult extraction) {
+        if (extraction == null) {
+            return;
+        }
+        if (extraction.getModelName() != null && !extraction.getModelName().isBlank()) {
+            entity.setModelName(extraction.getModelName());
+        }
+        if (extraction.getPromptVersion() != null && !extraction.getPromptVersion().isBlank()) {
+            entity.setPromptVersion(extraction.getPromptVersion());
+        }
+        if (extraction.getStatus() == DocumentExtractionResult.ExtractionStatus.SUCCESS
+                && extraction.getExtractedSkills() != null
+                && !extraction.getExtractedSkills().isEmpty()) {
+            try {
+                String snippet = extraction.getEvidenceSnippets() != null
+                        ? extraction.getEvidenceSnippets().get("skills")
+                        : null;
+                List<ExtractedSkillDto> dtos = extraction.getExtractedSkills().stream()
+                        .map(skillName -> ExtractedSkillDto.builder()
+                                .skillName(skillName)
+                                .taxonomyRole(extraction.getDocumentType())
+                                .evidenceSnippet(snippet)
+                                .build())
+                        .toList();
+                entity.setExtractedSkills(objectMapper.writeValueAsString(dtos));
+            } catch (Exception ex) {
+                log.debug("Không thể tuần tự hóa extractedSkills: {}", ex.getMessage());
+            }
+        }
+    }
+
     private void applyLookupEvaluation(
             SkillVerificationRequest req,
             Worker worker,
             Skill requestedSkill,
-            CertificateLookupResult result
+            CertificateLookupResult result,
+            DocumentExtractionResult extractionResult
     ) {
         req.setVerificationSource(result.getVerificationSource());
         req.setVerificationReference(result.getVerificationReference());
@@ -613,7 +703,10 @@ public class SkillVerificationService {
             String reason = (result.getReason() != null && !result.getReason().isBlank())
                     ? result.getReason()
                     : "Chưa thể xác minh tự động: Chứng chỉ không có nguồn tra cứu được hỗ trợ. Vui lòng nộp lại chứng chỉ có nguồn tra cứu chính thức.";
-            if (!reason.contains("Chưa thể xác minh tự động")) {
+            if (extractionResult != null
+                    && "CV_SELF_DECLARED".equalsIgnoreCase(extractionResult.getDocumentType())) {
+                reason = "Chưa thể xác minh tự động: CV tự khai có thể liệt kê kỹ năng nhưng bản thân CV chưa xác nhận chứng chỉ (0 SP). Vui lòng nộp chứng chỉ có nguồn tra cứu chính thức.";
+            } else if (!reason.contains("Chưa thể xác minh tự động")) {
                 reason = "Chưa thể xác minh tự động: " + reason;
             }
             req.setRoutingReason(reason);
@@ -638,14 +731,54 @@ public class SkillVerificationService {
             return;
         }
 
-        // VERIFIED từ nguồn tin cậy -> bắt buộc đối soát tên chủ sở hữu, hạn hiệu lực & kỹ năng trước khi cấp điểm
-        String workerName = resolveWorkerFullName(worker);
-        if (!isNameMatching(workerName, result.getRecipientName())) {
+        // CV tự khai có thể chứa kỹ năng, nhưng bản thân CV chưa xác nhận chứng chỉ -> tuyệt đối không cấp SP
+        if (extractionResult != null
+                && "CV_SELF_DECLARED".equalsIgnoreCase(extractionResult.getDocumentType())) {
+            req.setStatus(SkillVerificationStatus.REJECTED);
+            req.setRoutingDecision(RoutingDecision.REJECT);
+            req.setFailureReason(null);
+            req.setRoutingReason("Tài liệu là CV tự khai (có thể chứa kỹ năng tự khai) nhưng bản thân CV chưa xác nhận chứng chỉ nên chưa thể cấp điểm SP.");
+            req.setIssuerVerificationStatus(IssuerVerificationStatus.UNVERIFIED);
+            req.setIdentityVerificationStatus(IdentityVerificationStatus.UNVERIFIED);
+            req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.UNVERIFIED);
+            req.setSpAwarded(0);
+            return;
+        }
+
+        // Tài liệu hỏng / không đọc được -> không cấp SP
+        if (extractionResult != null && extractionResult.isCorrupted()) {
+            req.setStatus(SkillVerificationStatus.REJECTED);
+            req.setRoutingDecision(RoutingDecision.REJECT);
+            req.setFailureReason(null);
+            req.setRoutingReason("Tài liệu tải lên bị hỏng hoặc không đọc được, chưa thể cấp điểm SP.");
+            req.setIssuerVerificationStatus(IssuerVerificationStatus.UNVERIFIED);
+            req.setIdentityVerificationStatus(IdentityVerificationStatus.UNVERIFIED);
+            req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.UNREADABLE);
+            req.setSpAwarded(0);
+            return;
+        }
+
+        // VERIFIED từ nguồn tin cậy -> bắt buộc Worker đã xác thực danh tính eKYC trước khi đối soát
+        Optional<String> verifiedEkycNameOpt = resolveVerifiedEkycFullName(worker);
+        if (verifiedEkycNameOpt.isEmpty()) {
+            req.setStatus(SkillVerificationStatus.REJECTED);
+            req.setRoutingDecision(RoutingDecision.REJECT);
+            req.setFailureReason(null);
+            req.setRoutingReason("Thiếu danh tính eKYC đã xác thực: Worker cần hoàn tất eKYC trước khi đối soát người nhận chứng chỉ và nhận điểm SP.");
+            req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
+            req.setIdentityVerificationStatus(IdentityVerificationStatus.UNVERIFIED);
+            req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
+            req.setSpAwarded(0);
+            return;
+        }
+
+        String verifiedEkycName = verifiedEkycNameOpt.get();
+        if (!isNameMatching(verifiedEkycName, result.getRecipientName())) {
             req.setStatus(SkillVerificationStatus.REJECTED);
             req.setRoutingDecision(RoutingDecision.REJECT);
             req.setFailureReason(null);
             req.setRoutingReason("Tên người nhận trên nguồn tra cứu chứng chỉ (" + result.getRecipientName()
-                    + ") không khớp với danh tính eKYC/hồ sơ Worker (" + workerName + ").");
+                    + ") không khớp với danh tính eKYC đã xác thực (" + verifiedEkycName + ").");
             req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
             req.setIdentityVerificationStatus(IdentityVerificationStatus.MISMATCH);
             req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
@@ -653,26 +786,44 @@ public class SkillVerificationService {
             return;
         }
 
-        // Phân biệt chứng chỉ được nguồn xác nhận không có hạn (vô thời hạn) vs ngày hết hạn sai định dạng / không đọc được
-        boolean isPermanent = result.isPermanent() || isPermanentExpiry(result.getExpiryDate());
+        // Chứng chỉ vô thời hạn CHỈ hợp lệ khi có xác nhận rõ từ nguồn tra cứu chính thức (permanentExpiry = true)
+        boolean isPermanent = result.isPermanent();
         LocalDate parsedExpiry = null;
-        if (result.getExpiryDate() != null && !result.getExpiryDate().isBlank()) {
-            if (isPermanent) {
-                parsedExpiry = null;
-            } else {
-                parsedExpiry = parseFlexibleDate(result.getExpiryDate());
-                if (parsedExpiry == null) {
-                    req.setStatus(SkillVerificationStatus.REJECTED);
-                    req.setRoutingDecision(RoutingDecision.REJECT);
-                    req.setFailureReason(null);
-                    req.setRoutingReason("Ngày hết hạn từ nguồn tra cứu chứng chỉ không đọc được hoặc sai định dạng ("
-                            + result.getExpiryDate() + ").");
-                    req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
-                    req.setIdentityVerificationStatus(IdentityVerificationStatus.EXACT_MATCH);
-                    req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
-                    req.setSpAwarded(0);
-                    return;
-                }
+        if (!isPermanent) {
+            if (result.getExpiryDate() == null || result.getExpiryDate().isBlank()) {
+                req.setStatus(SkillVerificationStatus.REJECTED);
+                req.setRoutingDecision(RoutingDecision.REJECT);
+                req.setFailureReason(null);
+                req.setRoutingReason("Hạn hiệu lực từ nguồn tra cứu đang để trống trong khi nguồn chưa xác nhận chứng chỉ vô thời hạn (giữ 0 SP).");
+                req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
+                req.setIdentityVerificationStatus(IdentityVerificationStatus.EXACT_MATCH);
+                req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
+                req.setSpAwarded(0);
+                return;
+            }
+            if (isPermanentExpiry(result.getExpiryDate())) {
+                req.setStatus(SkillVerificationStatus.REJECTED);
+                req.setRoutingDecision(RoutingDecision.REJECT);
+                req.setFailureReason(null);
+                req.setRoutingReason("Chứng chỉ ghi vô thời hạn nhưng chưa có xác nhận rõ từ nguồn tra cứu chính thức (giữ 0 SP).");
+                req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
+                req.setIdentityVerificationStatus(IdentityVerificationStatus.EXACT_MATCH);
+                req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
+                req.setSpAwarded(0);
+                return;
+            }
+            parsedExpiry = parseFlexibleDate(result.getExpiryDate());
+            if (parsedExpiry == null) {
+                req.setStatus(SkillVerificationStatus.REJECTED);
+                req.setRoutingDecision(RoutingDecision.REJECT);
+                req.setFailureReason(null);
+                req.setRoutingReason("Ngày hết hạn từ nguồn tra cứu chứng chỉ không đọc được hoặc sai định dạng theo chế độ STRICT ("
+                        + result.getExpiryDate() + ").");
+                req.setIssuerVerificationStatus(IssuerVerificationStatus.VERIFIED_ONLINE);
+                req.setIdentityVerificationStatus(IdentityVerificationStatus.EXACT_MATCH);
+                req.setDocumentAuthenticityStatus(DocumentAuthenticityStatus.LIKELY_GENUINE_FORMAT);
+                req.setSpAwarded(0);
+                return;
             }
         }
 
@@ -1361,28 +1512,21 @@ public class SkillVerificationService {
                 .build());
     }
 
-    private String resolveWorkerFullName(Worker worker) {
-        if (worker == null) {
-            return "";
+    private Optional<String> resolveVerifiedEkycFullName(Worker worker) {
+        if (worker == null || workerEkycVerificationRepository == null) {
+            return Optional.empty();
         }
-        if (workerEkycVerificationRepository != null) {
-            try {
-                Optional<WorkerEkycVerification> ekycOpt = workerEkycVerificationRepository
-                        .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
-                                worker.getWorkerId(), List.of("VERIFIED", "APPROVED"));
-                if (ekycOpt.isPresent() && ekycOpt.get().getFullName() != null && !ekycOpt.get().getFullName().isBlank()) {
-                    return ekycOpt.get().getFullName().trim();
-                }
-            } catch (Exception ex) {
-                log.warn("Không thể lấy danh tính eKYC của Worker {}: {}", worker.getWorkerId(), ex.getMessage());
-            }
+        try {
+            return workerEkycVerificationRepository
+                    .findTopByWorker_WorkerIdAndStatusInOrderByCreatedAtDesc(
+                            worker.getWorkerId(), List.of("VERIFIED", "APPROVED"))
+                    .map(WorkerEkycVerification::getFullName)
+                    .map(String::trim)
+                    .filter(name -> !name.isBlank());
+        } catch (Exception ex) {
+            log.warn("Không thể lấy danh tính eKYC đã xác thực của Worker {}: {}", worker.getWorkerId(), ex.getMessage());
+            return Optional.empty();
         }
-        if (worker.getFullName() != null && !worker.getFullName().isBlank()) {
-            return worker.getFullName().trim();
-        }
-        return (worker.getUser() != null && worker.getUser().getFullName() != null)
-                ? worker.getUser().getFullName().trim()
-                : "";
     }
 
     private WorkerSkillResponseDto mapToWorkerSkillDto(WorkerSkill ws) {

@@ -92,11 +92,13 @@ cani:
     ekyc-max-file-size-bytes: ${EKYC_MAX_FILE_SIZE_BYTES:5242880}
   skill:
     ai:
-      enabled: ${SKILL_AI_ENABLED:true}
-      api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_SKILL_MODEL:gemini-2.5-flash}
-      url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
-      timeout-ms: ${GEMINI_TIMEOUT_MS:25000}
+      enabled: ${SKILL_AI_ENABLED:false}
+      provider: ${SKILL_AI_PROVIDER:}
+      endpoint: ${SKILL_AI_ENDPOINT:}
+      api-key: ${SKILL_AI_API_KEY:}
+      model: ${SKILL_AI_MODEL:}
+      timeout-ms: ${SKILL_AI_TIMEOUT_MS:25000}
+      connection-verified: ${SKILL_AI_CONNECTION_VERIFIED:false}
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
     strict: ${EKYC_STRICT:false}

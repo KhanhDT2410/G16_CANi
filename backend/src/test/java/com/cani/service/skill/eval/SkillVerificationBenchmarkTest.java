@@ -1,12 +1,18 @@
 package com.cani.service.skill.eval;
 
+import com.cani.client.skill.CertificateLookupSource.CertificateLookupOutcome;
+import com.cani.client.skill.OpenAiCompatibleSkillAiProvider;
+import com.cani.client.skill.SkillAiProperties;
+import com.cani.client.skill.UnsupportedCertificateLookupSource;
 import com.cani.entity.enums.SkillVerificationStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -159,5 +165,194 @@ class SkillVerificationBenchmarkTest {
                 .filter(c -> c.getId().equalsIgnoreCase(id))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Không tìm thấy ca kiểm thử " + id));
+    }
+
+    @Test
+    @DisplayName("Evidence Verbatim Test (AAU-2026-777): Tài liệu ghi 'Số hiệu', đầu ra ghi 'Mã hiệu' -> KHÔNG tính đạt trích dẫn")
+    void testEvidenceSnippets_AAU2026777_SoHieuVsMaHieuFails() {
+        List<SkillEvaluationCase> evalCases = runner.loadDataset("skill-eval/eval_dataset.json");
+        SkillEvaluationCase baristaCase = findCase(evalCases, "EVAL-03-VALID-CERT-BARISTA");
+        String docText = runner.loadSampleContent(baristaCase.getSampleDocumentPath());
+        assertTrue(docText.contains("Số hiệu: AAU-2026-777"));
+
+        DocumentExtractionResult wrongQuote = DocumentExtractionResult.builder()
+                .status(DocumentExtractionResult.ExtractionStatus.SUCCESS)
+                .documentType("CERTIFICATE")
+                .recipientName("NGUYỄN VĂN AN")
+                .institution("Trung tâm Đào tạo Ẩm thực Á Âu")
+                .certificateNumber("AAU-2026-777")
+                .expiryDate("31/12/2030")
+                .extractedSkills(List.of("Pha chế (Bartender/Barista)"))
+                .evidenceSnippets(Map.of("certificateNumber", "Mã hiệu: AAU-2026-777"))
+                .build();
+
+        assertFalse(runner.isEvidenceGrounded(docText, baristaCase.getGroundTruth(), wrongQuote),
+                "Đầu ra tự đổi 'Số hiệu' thành 'Mã hiệu' không phải trích dẫn nguyên văn -> KHÔNG được tính đạt");
+
+        DocumentExtractionResult exactQuote = DocumentExtractionResult.builder()
+                .status(DocumentExtractionResult.ExtractionStatus.SUCCESS)
+                .documentType("CERTIFICATE")
+                .recipientName("NGUYỄN VĂN AN")
+                .institution("Trung tâm Đào tạo Ẩm thực Á Âu")
+                .certificateNumber("AAU-2026-777")
+                .expiryDate("31/12/2030")
+                .extractedSkills(List.of("Pha chế (Bartender/Barista)"))
+                .evidenceSnippets(Map.of(
+                        "recipientName", "Cấp cho: NGUYỄN VĂN AN",
+                        "certificateNumber", "Số hiệu: AAU-2026-777",
+                        "expiryDate", "Ngày hết hạn: 31/12/2030"
+                ))
+                .build();
+
+        assertTrue(runner.isEvidenceGrounded(docText, baristaCase.getGroundTruth(), exactQuote),
+                "Trích dẫn đúng nguyên văn 'Số hiệu: AAU-2026-777' phải ĐẠT");
+    }
+
+    @Test
+    @DisplayName("Strict Rules Benchmark: 31/02/2030, hạn trống, thiếu eKYC -> 0 SP; nguồn xác nhận vô thời hạn -> 25 SP")
+    void testStrictRules_31022030_BlankExpiry_MissingEkyc_Permanent() {
+        SkillEvaluationCase baseValid = SkillEvaluationCase.builder()
+                .id("TEST-BASE")
+                .workerFullName("NGUYỄN VĂN AN")
+                .workerEkycVerified(true)
+                .workerRequestedSkill("Pha chế (Bartender/Barista)")
+                .lookupOutcome(CertificateLookupOutcome.VERIFIED)
+                .lookupSource("QR_OFFICIAL_REGISTRY")
+                .lookupRecipientName("NGUYỄN VĂN AN")
+                .lookupMatchedSkills(List.of("Pha chế (Bartender/Barista)"))
+                .build();
+
+        // 1. 31/02/2030 (Strict Date) -> REJECTED, 0 SP
+        SkillEvaluationCase feb31 = SkillEvaluationCase.builder()
+                .id("TEST-31-02")
+                .workerFullName(baseValid.getWorkerFullName())
+                .workerEkycVerified(true)
+                .workerRequestedSkill(baseValid.getWorkerRequestedSkill())
+                .lookupOutcome(CertificateLookupOutcome.VERIFIED)
+                .lookupSource("QR_OFFICIAL_REGISTRY")
+                .lookupRecipientName("NGUYỄN VĂN AN")
+                .lookupExpiryDate("31/02/2030")
+                .lookupMatchedSkills(baseValid.getLookupMatchedSkills())
+                .build();
+        var r1 = runner.simulateBackendVerification(feb31);
+        assertEquals(SkillVerificationStatus.REJECTED, r1.status());
+        assertEquals(0, r1.spAwarded());
+
+        // 2. Hạn để trống mà nguồn chưa xác nhận vô thời hạn -> REJECTED, 0 SP
+        SkillEvaluationCase blankExp = SkillEvaluationCase.builder()
+                .id("TEST-BLANK-EXP")
+                .workerFullName(baseValid.getWorkerFullName())
+                .workerEkycVerified(true)
+                .workerRequestedSkill(baseValid.getWorkerRequestedSkill())
+                .lookupOutcome(CertificateLookupOutcome.VERIFIED)
+                .lookupSource("QR_OFFICIAL_REGISTRY")
+                .lookupRecipientName("NGUYỄN VĂN AN")
+                .lookupExpiryDate("")
+                .lookupPermanent(false)
+                .lookupMatchedSkills(baseValid.getLookupMatchedSkills())
+                .build();
+        var r2 = runner.simulateBackendVerification(blankExp);
+        assertEquals(SkillVerificationStatus.REJECTED, r2.status());
+        assertEquals(0, r2.spAwarded());
+
+        // 3. Thiếu eKYC đã xác thực -> REJECTED, 0 SP
+        SkillEvaluationCase noEkyc = SkillEvaluationCase.builder()
+                .id("TEST-NO-EKYC")
+                .workerFullName("NGUYỄN VĂN AN")
+                .workerEkycVerified(false)
+                .workerRequestedSkill(baseValid.getWorkerRequestedSkill())
+                .lookupOutcome(CertificateLookupOutcome.VERIFIED)
+                .lookupSource("QR_OFFICIAL_REGISTRY")
+                .lookupRecipientName("NGUYỄN VĂN AN")
+                .lookupExpiryDate("31/12/2030")
+                .lookupMatchedSkills(baseValid.getLookupMatchedSkills())
+                .build();
+        var r3 = runner.simulateBackendVerification(noEkyc);
+        assertEquals(SkillVerificationStatus.REJECTED, r3.status());
+        assertEquals(0, r3.spAwarded());
+
+        // 4. Nguồn xác nhận vô thời hạn (lookupPermanent=true) dù expiryDate trống -> APPROVED, 25 SP
+        SkillEvaluationCase confirmedPerm = SkillEvaluationCase.builder()
+                .id("TEST-PERM-TRUE")
+                .workerFullName("NGUYỄN VĂN AN")
+                .workerEkycVerified(true)
+                .workerRequestedSkill(baseValid.getWorkerRequestedSkill())
+                .lookupOutcome(CertificateLookupOutcome.VERIFIED)
+                .lookupSource("QR_OFFICIAL_REGISTRY")
+                .lookupRecipientName("NGUYỄN VĂN AN")
+                .lookupExpiryDate(null)
+                .lookupPermanent(true)
+                .lookupMatchedSkills(baseValid.getLookupMatchedSkills())
+                .build();
+        var r4 = runner.simulateBackendVerification(confirmedPerm);
+        assertEquals(SkillVerificationStatus.APPROVED, r4.status());
+        assertEquals(25, r4.spAwarded());
+    }
+
+    @Test
+    @DisplayName("Config Safety: Có API key nhưng chưa xác thực kết nối / chạy mô phỏng -> vẫn báo SYNTHETIC_BENCHMARK_OFFLINE & UNCONFIGURED")
+    void testConfiguredApiKeyAlone_DoesNotMarkLiveOrBreakOfflineMode() {
+        SkillAiProperties props = new SkillAiProperties();
+        props.setEnabled(true);
+        props.setProvider("openai-compatible");
+        props.setEndpoint("https://api.example.invalid/v1/chat/completions");
+        props.setModel("gpt-4o-mini");
+        props.setApiKey("sk-non-empty-unverified-key");
+        props.setConnectionVerified(false);
+
+        OpenAiCompatibleSkillAiProvider provider = new OpenAiCompatibleSkillAiProvider(props, objectMapper);
+        SkillDocumentExtractor configuredKeyOnlyExtractor = new SkillDocumentExtractor(objectMapper, provider);
+        SkillEvaluationSuiteRunner customRunner = new SkillEvaluationSuiteRunner(configuredKeyOnlyExtractor, objectMapper);
+
+        // 1. Chuỗi apiKey không rỗng KHÔNG đủ để coi là sẵn sàng
+        assertFalse(configuredKeyOnlyExtractor.isConfigured());
+
+        // 2. Nếu cấu hình gemini phải bị từ chối rõ ràng
+        SkillAiProperties geminiProps = new SkillAiProperties();
+        geminiProps.setEnabled(true);
+        geminiProps.setProvider("gemini");
+        geminiProps.setEndpoint("https://generativelanguage.googleapis.com/v1beta/models");
+        geminiProps.setModel("gemini-2.5-flash");
+        geminiProps.setApiKey("AIzaSyFakeKey");
+        OpenAiCompatibleSkillAiProvider geminiRejected = new OpenAiCompatibleSkillAiProvider(geminiProps, objectMapper);
+        assertFalse(geminiRejected.hasValidConfiguration());
+        assertTrue(geminiRejected.getUnconfiguredReason().contains("Gemini"));
+
+        // 3. Không giải mã byte JPEG/PDF sang UTF-8 làm nội dung khi trích xuất thật
+        byte[] fakeJpgWithText = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0};
+        byte[] payloadWithEmbeddedText = concat(fakeJpgWithText, "Trao cho: NGUYEN VAN AN\nKy nang: Pha che".getBytes(StandardCharsets.UTF_8));
+        DocumentExtractionResult liveRes = new SkillDocumentExtractor(objectMapper, geminiRejected)
+                .extract(payloadWithEmbeddedText, "cert.jpg", "image/jpeg", SkillDocumentExtractor.PROMPT_V2);
+        assertEquals(DocumentExtractionResult.ExtractionStatus.UNCONFIGURED, liveRes.getStatus());
+        assertTrue(liveRes.getExtractedSkills().isEmpty());
+
+        // 4. Dù đã set apiKey nhưng chạy benchmark offline vẫn phải ghi nhãn SYNTHETIC_BENCHMARK_OFFLINE
+        List<SkillEvaluationCase> evalCases = customRunner.loadDataset("skill-eval/eval_dataset.json");
+        SkillEvaluationReport offlineReport = customRunner.runEvaluation(evalCases, SkillDocumentExtractor.PROMPT_V2, "gpt-4o-mini");
+        assertEquals(SkillEvaluationReport.MODE_SYNTHETIC_OFFLINE, offlineReport.getExecutionMode());
+        assertTrue(offlineReport.getLiveAiStatus().contains("CHƯA ĐÁNH GIÁ"));
+        assertTrue(offlineReport.getLiveIssuerStatus().contains("CHƯA ĐÁNH GIÁ"));
+
+        // 5. Lệnh so sánh Eval in ra đầy đủ từng ca & metrics
+        String diffSummary = customRunner.comparePromptVersionsOnEval(
+                evalCases, SkillDocumentExtractor.PROMPT_V1, SkillDocumentExtractor.PROMPT_V2, "synthetic-keyword-parser"
+        );
+        assertTrue(diffSummary.contains("EVAL-03-VALID-CERT"));
+        assertTrue(diffSummary.contains("evidenceSnippets"));
+
+        // 6. Kiểm chứng đầu cuối với UnsupportedCertificateLookupSource báo nguồn chưa đánh giá & 0 SP
+        SkillEvaluationReport e2eReport = customRunner.runEndToEndVerification(
+                evalCases, Map.of(), new UnsupportedCertificateLookupSource(), SkillDocumentExtractor.PROMPT_V2
+        );
+        assertEquals(SkillEvaluationReport.MODE_LIVE_END_TO_END, e2eReport.getExecutionMode());
+        assertEquals(10, e2eReport.getUnverifiedCases());
+        assertTrue(e2eReport.getLiveIssuerStatus().contains("CHƯA ĐÁNH GIÁ"));
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+        byte[] out = new byte[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
     }
 }

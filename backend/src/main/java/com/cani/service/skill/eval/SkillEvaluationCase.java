@@ -28,6 +28,7 @@ public class SkillEvaluationCase {
     private String description;                  // Mô tả chi tiết kịch bản
     private String sampleDocumentPath;           // Đường dẫn tệp mẫu (tổng hợp/ẩn danh)
     private String workerFullName;               // Danh tính Worker
+    private Boolean workerEkycVerified;          // null = suy ra theo workerFullName có giá trị; false = thiếu eKYC đã xác thực
     private String workerRequestedSkill;         // Kỹ năng Worker chọn trên UI
 
     // Ground Truth (Đáp án đã đối chiếu thực tế)

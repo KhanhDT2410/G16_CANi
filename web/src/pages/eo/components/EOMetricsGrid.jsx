@@ -1,11 +1,10 @@
 export default function EOMetricsGrid({ metrics, onOpenActiveEventDetail }) {
-  const { totalEvents, activeEventsCount, totalRequiredWorkers, totalConfirmedWorkers, totalEstimatedCost, fillRate } = metrics || {};
+  const { totalEvents, activeEventsCount, totalRequiredWorkers, totalConfirmedWorkers, fillRate } = metrics || {};
 
   const safeEvents = totalEvents ?? 0;
   const safeActive = activeEventsCount ?? 0;
   const safeRequired = totalRequiredWorkers ?? 0;
   const safeConfirmed = totalConfirmedWorkers ?? 0;
-  const safeCost = totalEstimatedCost ?? 0;
   const safeFillRate = fillRate ?? 0;
 
   return (
@@ -76,27 +75,6 @@ export default function EOMetricsGrid({ metrics, onOpenActiveEventDetail }) {
           </div>
         </div>
         <div className="metric-bottom-sub">Tỷ lệ lấp đầy: {safeFillRate}%</div>
-      </div>
-
-      {/* 4. Dự toán chi phí */}
-      <div className="eo-metric-card-modern">
-        <div className="metric-card-top">
-          <div className="metric-icon-box orange">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-              <line x1="2" y1="10" x2="22" y2="10"></line>
-            </svg>
-          </div>
-          <div className="metric-meta-group">
-            <span className="metric-title-text">Dự toán chi phí</span>
-            <div className="metric-data-row">
-              <span className="metric-big-number text-accent-green">
-                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(safeCost)}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="metric-bottom-sub">Thanh toán trực tiếp sau ca</div>
       </div>
     </section>
   );

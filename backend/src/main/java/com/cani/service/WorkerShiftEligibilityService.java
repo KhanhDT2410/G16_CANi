@@ -502,11 +502,19 @@ public class WorkerShiftEligibilityService {
     }
 
     public boolean isShiftCoveredByAvailability(Worker worker, Shift shift) {
-        if (workerAvailabilityRepository == null || shift.getStartTime() == null || shift.getEndTime() == null) {
+        if (workerAvailabilityRepository == null || worker == null || worker.getWorkerId() == null
+                || shift == null || shift.getStartTime() == null || shift.getEndTime() == null) {
             return true;
         }
         List<WorkerAvailability> slots = workerAvailabilityRepository
                 .findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId());
+        return isShiftCoveredByAvailability(slots, shift);
+    }
+
+    public boolean isShiftCoveredByAvailability(List<WorkerAvailability> slots, Shift shift) {
+        if (shift == null || shift.getStartTime() == null || shift.getEndTime() == null) {
+            return true;
+        }
         if (slots == null || slots.isEmpty()) {
             return true;
         }

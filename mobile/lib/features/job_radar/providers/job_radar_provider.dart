@@ -118,6 +118,7 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
   int _scanRequestSeq = 0;
   String? _inFlightScanKey;
   Future<void>? _inFlightScanFuture;
+  final Set<String> _dismissedShiftIds = <String>{};
 
   JobRadarNotifier(this._repo, this._proposalRepo, this._ref) : super(const JobRadarState()) {
     initLocationAndScan();
@@ -325,10 +326,18 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         lng: state.usingPreferenceLocation ? state.preferredLng : (state.gpsLng ?? state.userLng),
       );
       if (mounted) {
-        state = state.copyWith(isOnline: confirmedStatus, errorMessage: null);
+        state = state.copyWith(
+          isOnline: confirmedStatus,
+          nearbyShifts: confirmedStatus ? state.nearbyShifts : const [],
+          clearSelectedShift: !confirmedStatus,
+          errorMessage: null,
+        );
       }
       if (confirmedStatus) {
         await scanNearbyShifts(force: true);
+        _ref.invalidate(proposalsListProvider);
+      } else {
+        _invalidateInFlightScans();
         _ref.invalidate(proposalsListProvider);
       }
     } catch (e) {
@@ -387,6 +396,13 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     );
   }
 
+  /// Từ chối / bỏ qua một ca trên Radar trong phiên hiện tại.
+  void dismissShiftFromRadar(String shiftId) {
+    if (shiftId.isEmpty) return;
+    _dismissedShiftIds.add(shiftId);
+    removeShiftFromRadar(shiftId);
+  }
+
   Future<void> scanNearbyShifts({bool silent = false, bool force = false}) {
     final reqKey = _buildScanKey(state.userLat, state.userLng, state.searchRadiusKm);
     if (!force && _inFlightScanKey == reqKey && _inFlightScanFuture != null) {
@@ -415,16 +431,42 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     required double radiusKm,
     required bool silent,
   }) async {
+    if (!state.isOnline) {
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          hasLoadedShifts: true,
+          nearbyShifts: const [],
+          clearSelectedShift: true,
+          clearRadarLoadError: true,
+        );
+      }
+      return;
+    }
     if (!silent) {
       state = state.copyWith(isLoading: true, clearRadarLoadError: true);
     }
     try {
-      final shifts = await _repo.getNearbyShifts(
+      final rawShifts = await _repo.getNearbyShifts(
         lat: lat,
         lng: lng,
         radiusKm: radiusKm,
       );
       if (!mounted || mySeq != _scanRequestSeq) return;
+      if (!state.isOnline) {
+        state = state.copyWith(
+          isLoading: false,
+          hasLoadedShifts: true,
+          nearbyShifts: const [],
+          clearSelectedShift: true,
+          clearRadarLoadError: true,
+        );
+        return;
+      }
+
+      final shifts = rawShifts
+          .where((s) => !_dismissedShiftIds.contains(s.shiftId))
+          .toList();
 
       NearbyShiftItem? resolvedSelection;
       var clearSelection = false;

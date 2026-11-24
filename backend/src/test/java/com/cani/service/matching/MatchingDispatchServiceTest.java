@@ -1468,5 +1468,31 @@ class MatchingDispatchServiceTest {
                         verify(workerGroupRepository).findAllByIsActiveTrue();
                         verify(dispatchProposalRepository).save(any(DispatchProposal.class));
                 }
+
+                @Test
+                @DisplayName("GROUP004: Leader isOnline=false -> bỏ qua không gửi đề xuất & không bắn thông báo")
+                void dispatch_groups_skips_when_leader_is_offline() {
+                        Worker leader = groupWorker("Leader Offline", KycStatus.APPROVED, false, 90);
+                        Worker member = groupWorker("Member Online", KycStatus.APPROVED, true, 88);
+                        WorkerGroup group = WorkerGroup.builder()
+                                        .groupId(UUID.randomUUID())
+                                        .name("Đội Leader Offline")
+                                        .leaderWorkerId(leader.getWorkerId())
+                                        .isActive(true)
+                                        .build();
+                        lenient().when(workerRepository.findById(leader.getWorkerId())).thenReturn(Optional.of(leader));
+
+                        when(shiftRepository.findById(sampleShift.getShiftId())).thenReturn(Optional.of(sampleShift));
+                        when(workerGroupRepository.findAllByIsActiveTrue()).thenReturn(List.of(group));
+                        when(workerGroupMembershipRepository.findByWorkerGroup_GroupIdInAndStatus(anyList(),
+                                        eq(MembershipStatus.ACTIVE)))
+                                        .thenReturn(List.of(membership(group, member)));
+
+                        int count = matchingDispatchService.dispatchGroupsForShift(sampleShift.getShiftId(), false);
+
+                        assertEquals(0, count);
+                        verify(dispatchProposalRepository, never()).save(any(DispatchProposal.class));
+                        verify(notificationService, never()).createAndSend(any(), any(), any(), any(), any(), any(), any());
+                }
         }
 }

@@ -3,14 +3,17 @@ package com.cani.service;
 import com.cani.dto.notification.NotificationResponseDto;
 import com.cani.entity.Notification;
 import com.cani.entity.User;
+import com.cani.entity.Worker;
 import com.cani.entity.enums.NotificationType;
 import com.cani.entity.enums.UserRole;
 import com.cani.entity.enums.UserStatus;
 import com.cani.repository.NotificationRepository;
 import com.cani.repository.UserRepository;
+import com.cani.repository.WorkerRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -30,6 +33,22 @@ public class NotificationService {
     private final FcmService fcmService;
     private final ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private WorkerRepository workerRepository;
+
+    private boolean isWorkerJobReceivingDisabled(UUID userId) {
+        if (workerRepository == null || userId == null) {
+            return false;
+        }
+        return workerRepository.findByUser_UserId(userId)
+                .map(w -> !Boolean.TRUE.equals(w.getIsOnline()))
+                .orElse(false);
+    }
+
+    private boolean shouldSuppressForOfflineWorker(UUID userId, NotificationType type) {
+        return type == NotificationType.PROPOSAL && isWorkerJobReceivingDisabled(userId);
+    }
+
     /**
      * Tạo thông báo lưu vào Database (In-App) và đồng thời bắn Push Notification (FCM) đến điện thoại
      */
@@ -43,6 +62,11 @@ public class NotificationService {
             UUID referenceId,
             Map<String, String> dataPayload
     ) {
+        if (shouldSuppressForOfflineWorker(targetUserId, type)) {
+            log.debug("[NotificationService] Bỏ qua thông báo nhận việc {} vì Worker {} đang tắt Nhận việc.", type, targetUserId);
+            return null;
+        }
+
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + targetUserId));
 
@@ -85,6 +109,10 @@ public class NotificationService {
     public Notification sendNotification(User user, String title, String body, NotificationType type, String refType, UUID refId) {
         if (user == null) {
             log.warn("Bỏ qua gửi notification vì user null [title={}]", title);
+            return null;
+        }
+        if (shouldSuppressForOfflineWorker(user.getUserId(), type)) {
+            log.debug("[NotificationService] Bỏ qua gửi thông báo nhận việc {} vì Worker {} đang tắt Nhận việc.", type, user.getUserId());
             return null;
         }
         try {
@@ -164,14 +192,22 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponseDto> getMyNotifications(UUID userId) {
+        boolean hideProposals = isWorkerJobReceivingDisabled(userId);
         return notificationRepository.findByUser_UserIdOrderByCreatedAtDesc(userId)
                 .stream()
+                .filter(n -> !hideProposals || n.getType() != NotificationType.PROPOSAL)
                 .map(this::toDto)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public long getUnreadCount(UUID userId) {
+        if (isWorkerJobReceivingDisabled(userId)) {
+            return notificationRepository.findByUser_UserIdOrderByCreatedAtDesc(userId)
+                    .stream()
+                    .filter(n -> !Boolean.TRUE.equals(n.getIsRead()) && n.getType() != NotificationType.PROPOSAL)
+                    .count();
+        }
         return notificationRepository.countByUser_UserIdAndIsReadFalse(userId);
     }
 

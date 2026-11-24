@@ -29,9 +29,41 @@ void showJobRadarShiftDetails(
       shift: shift,
       userLat: state.userLat,
       userLng: state.userLng,
+      onReject: () {
+        Navigator.pop(ctx);
+        ref.read(jobRadarProvider.notifier).dismissShiftFromRadar(shift.shiftId);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã bỏ qua ca làm việc này.')),
+          );
+        }
+      },
       onApply: () {
         Navigator.pop(ctx);
         applyQuickForRadarShift(context, ref, shift);
+      },
+    ),
+  );
+}
+
+void showJobRadarProposalDetails(
+  BuildContext context,
+  WidgetRef ref,
+  JobProposalItem proposal,
+) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => JobProposalDetailBottomSheet(
+      proposal: proposal,
+      onReject: () async {
+        Navigator.pop(ctx);
+        await rejectProposalOnRadar(context, ref, proposal);
+      },
+      onAccept: () async {
+        Navigator.pop(ctx);
+        await acceptProposalOnRadar(context, ref, proposal);
       },
     ),
   );
@@ -232,22 +264,41 @@ class JobRadarShiftCard extends ConsumerWidget {
   }
 }
 
-class JobRadarUnifiedBottomCard extends ConsumerWidget {
+class JobRadarUnifiedBottomCard extends ConsumerStatefulWidget {
   const JobRadarUnifiedBottomCard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<JobRadarUnifiedBottomCard> createState() => _JobRadarUnifiedBottomCardState();
+}
+
+class _JobRadarUnifiedBottomCardState extends ConsumerState<JobRadarUnifiedBottomCard> {
+  int _carouselIndex = 0;
+
+  void _stepCarousel(int delta, int total) {
+    if (total <= 1) return;
+    setState(() {
+      _carouselIndex = (_carouselIndex + delta) % total;
+      if (_carouselIndex < 0) _carouselIndex += total;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final shiftSlice = ref.watch(
       jobRadarProvider.select(
         (s) => (
+          isOnline: s.isOnline,
           selectedShift: s.selectedShift,
-          firstNearbyShift: s.nearbyShifts.isNotEmpty ? s.nearbyShifts.first : null,
+          nearbyShifts: s.nearbyShifts,
         ),
       ),
     );
     final proposals = ref.watch(
       proposalsListProvider.select((asyncVal) => asyncVal.asData?.value ?? const <JobProposalItem>[]),
     );
+    if (!shiftSlice.isOnline) {
+      return const SizedBox.shrink();
+    }
     final now = DateTime.now();
     final activeProposals = proposals.where((p) => p.isActiveAt(now)).toList();
     final notifier = ref.read(jobRadarProvider.notifier);
@@ -264,22 +315,71 @@ class JobRadarUnifiedBottomCard extends ConsumerWidget {
       );
     }
 
-    // 2. Ưu tiên lời mời đang chờ phản hồi và còn hiệu lực
-    if (activeProposals.isNotEmpty) {
-      final topInvite = activeProposals.first;
-      return JobProposalInviteCard(
-        compact: true,
-        proposal: topInvite,
-        totalPendingCount: activeProposals.length,
-        onViewAll: activeProposals.length > 1 ? () => showJobRadarProposalsSheet(context) : null,
-        onAccept: () => acceptProposalOnRadar(context, ref, topInvite),
-        onReject: () => rejectProposalOnRadar(context, ref, topInvite),
+    // 2. Popup trượt từng thẻ (1/N) cho toàn bộ Lời mời làm việc & Ca khẩn cấp nhận được ngay
+    final proposalShiftIds = activeProposals.map((p) => p.shiftId).toSet();
+    final emergencyShifts = shiftSlice.isOnline
+        ? shiftSlice.nearbyShifts
+            .where((s) => s.emergency && !proposalShiftIds.contains(s.shiftId))
+            .toList()
+        : const <NearbyShiftItem>[];
+
+    final popupEntries = <({JobProposalItem? proposal, NearbyShiftItem? shift})>[
+      ...activeProposals.map((p) => (proposal: p, shift: null)),
+      ...emergencyShifts.map((s) => (proposal: null, shift: s)),
+    ];
+
+    if (popupEntries.isNotEmpty) {
+      final safeIndex = _carouselIndex.clamp(0, popupEntries.length - 1);
+      final entry = popupEntries[safeIndex];
+      final total = popupEntries.length;
+
+      final Widget card = entry.proposal != null
+          ? JobProposalInviteCard(
+              key: ValueKey('prop-${entry.proposal!.proposalId}'),
+              compact: true,
+              proposal: entry.proposal!,
+              totalPendingCount: activeProposals.length,
+              carouselIndex: safeIndex,
+              carouselTotal: total,
+              onPrev: () => _stepCarousel(-1, total),
+              onNext: () => _stepCarousel(1, total),
+              onViewAll: activeProposals.length > 1 ? () => showJobRadarProposalsSheet(context) : null,
+              onViewDetails: () => showJobRadarProposalDetails(context, ref, entry.proposal!),
+              onAccept: () => acceptProposalOnRadar(context, ref, entry.proposal!),
+              onReject: () => rejectProposalOnRadar(context, ref, entry.proposal!),
+            )
+          : RadarSlidingJobCard(
+              key: ValueKey('shift-${entry.shift!.shiftId}'),
+              shift: entry.shift!,
+              carouselIndex: safeIndex,
+              carouselTotal: total,
+              onPrev: () => _stepCarousel(-1, total),
+              onNext: () => _stepCarousel(1, total),
+              onViewDetails: () => showJobRadarShiftDetails(context, ref, entry.shift!),
+              onApply: () => applyQuickForRadarShift(context, ref, entry.shift!),
+            );
+
+      return GestureDetector(
+        onHorizontalDragEnd: total > 1
+            ? (details) {
+                final v = details.primaryVelocity ?? 0;
+                if (v < -120) {
+                  _stepCarousel(1, total);
+                } else if (v > 120) {
+                  _stepCarousel(-1, total);
+                }
+              }
+            : null,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: card,
+        ),
       );
     }
 
-    // 3. Không có lời mời hiệu lực -> hiển thị thẻ "Ca gần bạn" nếu có ca quanh bạn
-    if (shiftSlice.firstNearbyShift != null) {
-      final firstShift = shiftSlice.firstNearbyShift!;
+    // 3. Nếu chỉ có ca Matching thường quanh bạn khi đang Bật nhận việc -> giữ thẻ "Ca gần bạn"
+    if (shiftSlice.isOnline && shiftSlice.nearbyShifts.isNotEmpty) {
+      final firstShift = shiftSlice.nearbyShifts.first;
       return RadarSlidingJobCard(
         shift: firstShift,
         onViewDetails: () => showJobRadarShiftDetails(context, ref, firstShift),
@@ -299,6 +399,7 @@ class JobRadarShiftListView extends ConsumerWidget {
     final listSlice = ref.watch(
       jobRadarProvider.select(
         (s) => (
+          isOnline: s.isOnline,
           isLoading: s.isLoading,
           hasLoadedShifts: s.hasLoadedShifts,
           radarLoadError: s.radarLoadError,
@@ -311,9 +412,11 @@ class JobRadarShiftListView extends ConsumerWidget {
     final cani = Theme.of(context).cani;
 
     final now = DateTime.now();
-    final activeProposals = (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
-        .where((p) => p.isActiveAt(now))
-        .toList();
+    final activeProposals = listSlice.isOnline
+        ? (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
+            .where((p) => p.isActiveAt(now))
+            .toList()
+        : const <JobProposalItem>[];
 
     final isLoadingAny = listSlice.isLoading || proposalsAsync.isLoading;
     final hasAnyError = proposalsAsync.hasError || listSlice.radarLoadError != null;
@@ -351,17 +454,30 @@ class JobRadarShiftListView extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.radar_rounded, size: 44, color: cani.brand.withValues(alpha: 0.7)),
+              Icon(
+                listSlice.isOnline ? Icons.radar_rounded : Icons.pause_circle_outline_rounded,
+                size: 44,
+                color: (listSlice.isOnline ? cani.brand : cani.textMuted).withValues(alpha: 0.75),
+              ),
               const SizedBox(height: 10),
               Text(
-                'Đang tìm ca quanh bạn',
+                listSlice.isOnline
+                    ? 'Đang tìm ca quanh bạn'
+                    : 'Bạn đang tạm tắt Nhận việc',
                 style: TextStyle(fontWeight: FontWeight.w700, color: cani.textMain),
               ),
               const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => notifier.setRadius(15.0),
-                child: const Text('Mở rộng bán kính 15 km'),
-              ),
+              if (listSlice.isOnline)
+                TextButton(
+                  onPressed: () => notifier.setRadius(15.0),
+                  child: const Text('Mở rộng bán kính 15 km'),
+                )
+              else
+                FilledButton(
+                  onPressed: () => notifier.toggleOnlineStatus(),
+                  style: FilledButton.styleFrom(backgroundColor: cani.brand),
+                  child: const Text('Bật Nhận việc ngay'),
+                ),
             ],
           ),
         ),

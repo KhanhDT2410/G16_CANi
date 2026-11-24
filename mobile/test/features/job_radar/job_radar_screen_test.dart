@@ -314,7 +314,7 @@ void main() {
     expect(find.text('Ca gần bạn'), findsNothing);
   });
 
-  testWidgets('Nearby shifts only -> shows single Ca gần bạn card with Xem chi tiết and Ứng tuyển', (tester) async {
+  testWidgets('Nearby shifts only -> shows single Ca gần bạn card with Xem chi tiết and Nhận ca', (tester) async {
     final proposalRepo = _FakeProposalRepository();
     final radarRepo = _FakeJobRadarRepository()..shifts = [_makeShift('s1', emergency: true)];
 
@@ -325,52 +325,69 @@ void main() {
     expect(find.text('Ca gần bạn'), findsOneWidget);
     expect(find.text('Sự Kiện Âm Nhạc'), findsOneWidget);
     expect(find.text('Xem chi tiết'), findsOneWidget);
-    expect(find.text('Ứng tuyển'), findsOneWidget);
+    expect(find.text('Nhận ca'), findsOneWidget);
     expect(find.text('DS (1)'), findsOneWidget);
   });
 
-  testWidgets('Both invites & nearby shifts -> prioritizes single Lời mời làm việc card with Xem tất cả (N), marker tap switches card', (tester) async {
+  testWidgets('Carousel steps through proposals and emergency shifts (1/3), Xem chi tiết opens Từ chối', (tester) async {
     final proposalRepo = _FakeProposalRepository()
       ..proposals = [
         _makeProposal('p1', eventName: 'Gala Công Nghệ'),
         _makeProposal('p2', eventName: 'Hội Nghị AI'),
       ];
     final radarRepo = _FakeJobRadarRepository()
-      ..shifts = [_makeShift('s1', eventName: 'Show Ca Nhạc', emergency: false)];
+      ..shifts = [
+        _makeShift('s-em', eventName: 'Ca Khẩn Cấp', emergency: true),
+      ];
 
     final container = await _pumpRadarScreen(tester, proposalRepo: proposalRepo, radarRepo: radarRepo);
     addTearDown(container.dispose);
 
-    // Priority 1: Single invite card with Xem tất cả (2)
+    // Carousel starts on item 1/3 with Xem chi tiết + Nhận ca (no Từ chối outside)
     expect(find.text('Lời mời làm việc'), findsOneWidget);
     expect(find.text('Gala Công Nghệ'), findsOneWidget);
-    expect(find.text('Xem tất cả (2)'), findsOneWidget);
-    expect(find.text('Đang tìm ca quanh bạn'), findsNothing);
-    expect(find.text('Ca gần bạn'), findsNothing);
+    expect(find.text('1/3'), findsOneWidget);
+    expect(find.text('Xem chi tiết'), findsOneWidget);
+    expect(find.text('Nhận ca'), findsOneWidget);
+    expect(find.text('Từ chối'), findsNothing);
 
-    // Simulate Worker tapping shift marker -> bottom card updates to that shift while keeping invites accessible
-    container.read(jobRadarProvider.notifier).selectShift(radarRepo.shifts.first);
+    // Step next -> item 2/3, then step next -> item 3/3 (emergency nearby shift)
+    await tester.tap(find.byIcon(Icons.chevron_right_rounded).last);
     await tester.pump();
+    expect(find.text('2/3'), findsOneWidget);
+    expect(find.text('Hội Nghị AI'), findsOneWidget);
 
-    expect(find.text('Ca gần bạn'), findsOneWidget);
-    expect(find.text('Show Ca Nhạc'), findsWidgets); // route banner + bottom card
-    expect(find.text('Chờ lời mời'), findsOneWidget);
-    expect(find.text('Lời mời (2)'), findsOneWidget);
-
-    // If selected shift disappears from latest scan -> recomputes back to active invite!
-    radarRepo.shifts = const [];
-    await container.read(jobRadarProvider.notifier).scanNearbyShifts();
+    await tester.tap(find.byIcon(Icons.chevron_right_rounded).last);
     await tester.pump();
+    expect(find.text('3/3'), findsOneWidget);
+    expect(find.text('Ca Khẩn Cấp'), findsOneWidget);
 
-    expect(find.text('Lời mời làm việc'), findsOneWidget);
-    expect(find.text('Ca gần bạn'), findsNothing);
+    // Step back to item 1/3 and open Xem chi tiết -> Từ chối lives inside detail sheet
+    await tester.tap(find.byIcon(Icons.chevron_left_rounded).last);
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.chevron_left_rounded).last);
+    await tester.pump();
+    expect(find.text('1/3'), findsOneWidget);
 
-    // Rejecting/removing proposals recalculates down to empty line when both empty
+    await tester.tap(find.text('Xem chi tiết'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    expect(find.text('Từ chối'), findsOneWidget);
     await tester.tap(find.text('Từ chối'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
     expect(proposalRepo.rejectCalled, isTrue);
     expect(find.text('Hội Nghị AI'), findsOneWidget);
+
+    // Tapping map marker still focuses that shift while keeping invites link accessible
+    container.read(jobRadarProvider.notifier).selectShift(radarRepo.shifts.first);
+    await tester.pump();
+    expect(find.text('Ca gần bạn'), findsOneWidget);
+    expect(find.text('Lời mời (1)'), findsOneWidget);
   });
 
   testWidgets('API error shows failure state with Thử lại button and recovers cleanly', (tester) async {
@@ -427,7 +444,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Toggle Nhận việc off updates switch, new invite updates live via proposalsListProvider, and list view keeps invites accessible', (tester) async {
+  testWidgets('Toggle Nhận việc off hides nearby shifts, pending proposals, and job popups across map and list views', (tester) async {
     final proposalRepo = _FakeProposalRepository();
     final radarRepo = _FakeJobRadarRepository()..shifts = [_makeShift('s1', eventName: 'Ca Mở Radar')];
 
@@ -438,28 +455,31 @@ void main() {
     expect(find.text('Đang bật'), findsOneWidget);
     expect(find.text('Ca gần bạn'), findsOneWidget);
 
-    // Tap Nhận việc switch -> Tạm tắt
+    // Tap Nhận việc switch -> Tạm tắt & clears nearby shifts from map
     await tester.tap(find.text('Nhận việc'));
     for (var i = 0; i < 4; i++) {
       await tester.pump(const Duration(milliseconds: 40));
     }
     expect(radarRepo.onlineStatus, isFalse);
     expect(find.text('Tạm tắt'), findsOneWidget);
+    expect(find.text('Ca gần bạn'), findsNothing);
+    expect(find.text('Đang tạm tắt nhận việc · Bật Nhận việc để tìm ca'), findsOneWidget);
 
-    // Simulate new invite arriving while screen is still open
+    // Even if proposals exist in repository while offline, Radar MUST NOT show proposal card or popup
     proposalRepo.proposals = [_makeProposal('p-live-push', eventName: 'Sự Kiện Mới Tới')];
     container.invalidate(proposalsListProvider);
     for (var i = 0; i < 4; i++) {
       await tester.pump(const Duration(milliseconds: 40));
     }
-    expect(find.text('Lời mời làm việc'), findsOneWidget);
-    expect(find.text('Sự Kiện Mới Tới'), findsOneWidget);
+    expect(find.text('Lời mời làm việc'), findsNothing);
+    expect(find.text('Sự Kiện Mới Tới'), findsNothing);
 
-    // Switch to List View -> both active invite and nearby shift are visible
-    await tester.tap(find.text('DS (1)'));
+    // Switch to List View -> shows only offline pause message, zero invites or nearby shifts
+    await tester.tap(find.text('DS (0)'));
     await tester.pump();
-    expect(find.text('Lời mời làm việc (1)'), findsOneWidget);
-    expect(find.text('Ca quanh bạn (1)'), findsOneWidget);
+    expect(find.text('Bạn đang tạm tắt Nhận việc'), findsOneWidget);
+    expect(find.text('Lời mời làm việc (1)'), findsNothing);
+    expect(find.text('Ca quanh bạn (1)'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -1,4 +1,5 @@
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/features/job_proposals/widgets/job_proposal_invite_card.dart';
 import 'package:flutter/material.dart';
 
 import 'package:cani/features/job_radar/models/job_radar_models.dart';
@@ -9,6 +10,10 @@ class RadarSlidingJobCard extends StatefulWidget {
   final VoidCallback onApply;
   final int activeInviteCount;
   final VoidCallback? onViewInvites;
+  final int? carouselIndex;
+  final int? carouselTotal;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
 
   const RadarSlidingJobCard({
     super.key,
@@ -17,6 +22,10 @@ class RadarSlidingJobCard extends StatefulWidget {
     required this.onApply,
     this.activeInviteCount = 0,
     this.onViewInvites,
+    this.carouselIndex,
+    this.carouselTotal,
+    this.onPrev,
+    this.onNext,
   });
 
   @override
@@ -227,7 +236,15 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                 ],
               ),
             ),
-            if (widget.activeInviteCount > 0 && widget.onViewInvites != null) ...[
+            if ((widget.carouselTotal ?? 0) > 1 && widget.carouselIndex != null) ...[
+              const SizedBox(width: 4),
+              CarouselPagerChip(
+                index: widget.carouselIndex!,
+                total: widget.carouselTotal!,
+                onPrev: widget.onPrev,
+                onNext: widget.onNext,
+              ),
+            ] else if (widget.activeInviteCount > 0 && widget.onViewInvites != null) ...[
               const SizedBox(width: 6),
               InkWell(
                 onTap: widget.onViewInvites,
@@ -422,7 +439,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                   label: Text(
                     s.isConflicting
                         ? 'Trùng lịch'
-                        : (s.emergency ? 'Ứng tuyển' : 'Chờ lời mời'),
+                        : (s.emergency ? 'Nhận ca' : 'Chờ lời mời'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

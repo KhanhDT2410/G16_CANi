@@ -281,8 +281,8 @@ class ShiftAssignmentCard extends StatelessWidget {
                     ),
                   ),
 
-                // Nút Quét QR Lớn cao 48px đồng bộ Brand Gradient CANi chỉ hiện khi ca còn hiệu lực
-                if (!isCompleted && !isExpired) ...[
+                // Nút Chi tiết & Checklist công việc nổi bật nhất (48px Brand Gradient) khi ca còn hiệu lực
+                if (!isCompleted && !isExpired && (onOpenChecklist != null || onTap != null)) ...[
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -304,28 +304,16 @@ class ShiftAssignmentCard extends StatelessWidget {
                         ],
                       ),
                       child: ElevatedButton.icon(
-                        onPressed: !isCheckedIn
-                            ? onQrScan
-                            : (!a.eoConfirmed
-                                ? (onOpenChecklist ?? onTap)
-                                : (!isPaymentConfirmed ? onConfirmPayment : onQrScan)),
-                        icon: Icon(
-                          !isCheckedIn || (a.eoConfirmed && isPaymentConfirmed)
-                              ? Icons.qr_code_scanner_rounded
-                              : (!a.eoConfirmed ? Icons.fact_check_outlined : Icons.payments_outlined),
-                          size: 18,
+                        onPressed: onOpenChecklist ?? onTap,
+                        icon: const Icon(
+                          Icons.fact_check_rounded,
+                          size: 19,
                           color: Colors.white,
                         ),
-                        label: Text(
-                          !isCheckedIn
-                              ? 'Quét QR Check-in (Vào ca)'
-                              : (!a.eoConfirmed
-                                  ? 'Đầu việc & Chờ duyệt (Bước 2–3)'
-                                  : (!isPaymentConfirmed
-                                      ? 'Thanh toán thù lao (Bước 4)'
-                                      : 'Quét QR Check-out (Bước 5)')),
-                          style: const TextStyle(
-                            fontSize: 13,
+                        label: const Text(
+                          'Chi tiết & Checklist công việc',
+                          style: TextStyle(
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
@@ -340,30 +328,67 @@ class ShiftAssignmentCard extends StatelessWidget {
                   ),
                 ],
 
-                // Hàng nút phụ: Checklist việc / Hủy ca / Đánh giá BTC
-                if (onOpenChecklist != null ||
+                // Hàng nút phụ: Quét QR Check-in / Thanh toán / Check-out (hoặc Chi tiết nếu đã kết thúc/hết hạn), Hủy nhận ca, Đánh giá BTC
+                if ((!isCompleted && !isExpired) ||
+                    ((isCompleted || isExpired) && onOpenChecklist != null) ||
                     (isNotStarted && onCancelAssignment != null) ||
                     (isCompleted && onRateOrganizer != null && a.hasWorkerReviewed != true)) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      if (onOpenChecklist != null)
+                      if (!isCompleted && !isExpired)
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: !isCheckedIn
+                                ? onQrScan
+                                : (!a.eoConfirmed
+                                    ? (onOpenChecklist ?? onTap)
+                                    : (!isPaymentConfirmed ? onConfirmPayment : onQrScan)),
+                            icon: Icon(
+                              !isCheckedIn || (a.eoConfirmed && isPaymentConfirmed)
+                                  ? Icons.qr_code_scanner_rounded
+                                  : (!a.eoConfirmed ? Icons.hourglass_top_rounded : Icons.payments_outlined),
+                              size: 16,
+                              color: cani.brand,
+                            ),
+                            label: Text(
+                              !isCheckedIn
+                                  ? 'Quét QR Check-in'
+                                  : (!a.eoConfirmed
+                                      ? 'Chờ BTC duyệt công'
+                                      : (!isPaymentConfirmed
+                                          ? 'Thanh toán thù lao (Bước 4)'
+                                          : 'Quét QR Check-out (Bước 5)')),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.brand),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: cani.brandSoft,
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        )
+                      else if (onOpenChecklist != null)
                         Expanded(
                           child: TextButton.icon(
                             onPressed: onOpenChecklist,
                             icon: Icon(Icons.fact_check_outlined, size: 16, color: cani.brand),
                             label: Text(
                               'Chi tiết & Đầu việc',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.brand),
                             ),
                             style: TextButton.styleFrom(
                               backgroundColor: cani.brandSoft,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),
-                      if (onOpenChecklist != null &&
+                      if (((!isCompleted && !isExpired) || ((isCompleted || isExpired) && onOpenChecklist != null)) &&
                           ((isNotStarted && onCancelAssignment != null) ||
                               (isCompleted && onRateOrganizer != null && a.hasWorkerReviewed != true)))
                         const SizedBox(width: 8),

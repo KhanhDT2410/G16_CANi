@@ -441,6 +441,7 @@ class JobRadarMapTopOverlay extends ConsumerWidget {
     final overlaySlice = ref.watch(
       jobRadarProvider.select(
         (s) => (
+          isOnline: s.isOnline,
           isLoading: s.isLoading,
           hasLoadedShifts: s.hasLoadedShifts,
           radarLoadError: s.radarLoadError,
@@ -452,8 +453,9 @@ class JobRadarMapTopOverlay extends ConsumerWidget {
     final cani = Theme.of(context).cani;
 
     final now = DateTime.now();
-    final hasActiveProposals = (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
-        .any((p) => p.isActiveAt(now));
+    final hasActiveProposals = overlaySlice.isOnline &&
+        (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
+            .any((p) => p.isActiveAt(now));
 
     final isLoadingAny = overlaySlice.isLoading || proposalsAsync.isLoading;
     final hasAnyError = overlaySlice.radarLoadError != null;
@@ -578,7 +580,9 @@ class JobRadarMapTopOverlay extends ConsumerWidget {
             ],
           ),
           child: Text(
-            'Đang tìm ca quanh bạn',
+            !overlaySlice.isOnline
+                ? 'Đang tạm tắt nhận việc · Bật Nhận việc để tìm ca'
+                : 'Đang tìm ca quanh bạn',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(

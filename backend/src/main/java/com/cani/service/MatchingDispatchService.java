@@ -924,12 +924,15 @@ public class MatchingDispatchService {
                 continue;
             }
 
-            // Leader phải tồn tại & user ACTIVE
+            // Leader phải tồn tại, user ACTIVE và đang bật Nhận việc (isOnline=true)
             if (group.getLeaderWorkerId() == null) {
                 continue;
             }
             Worker leader = workerRepository.findById(group.getLeaderWorkerId()).orElse(null);
-            if (leader == null || leader.getUser() == null || leader.getUser().getStatus() != UserStatus.ACTIVE) {
+            if (leader == null
+                    || !Boolean.TRUE.equals(leader.getIsOnline())
+                    || leader.getUser() == null
+                    || leader.getUser().getStatus() != UserStatus.ACTIVE) {
                 continue;
             }
 

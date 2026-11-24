@@ -16,7 +16,9 @@ import com.cani.repository.ShiftAssignmentRepository;
 import com.cani.repository.ShiftRepository;
 import com.cani.repository.ShiftSkillRequirementRepository;
 import com.cani.repository.SkillRepository;
+import com.cani.repository.WorkerAvailabilityRepository;
 import com.cani.repository.WorkerRepository;
+import com.cani.repository.WorkerSkillRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -70,6 +72,15 @@ public class WorkerNearbyShiftQueryService {
     @Autowired(required = false)
     private WorkerShiftEligibilityService workerShiftEligibilityService;
 
+    @Autowired(required = false)
+    private WorkerSkillRepository workerSkillRepository;
+
+    @Autowired(required = false)
+    private WorkerAvailabilityRepository workerAvailabilityRepository;
+
+    @Autowired(required = false)
+    private BlockListService blockListService;
+
     public WorkerNearbyShiftQueryService() {
     }
 
@@ -81,6 +92,30 @@ public class WorkerNearbyShiftQueryService {
             SkillRepository skillRepository,
             WorkerShiftEligibilityService workerShiftEligibilityService
     ) {
+        return withFallbackDependencies(
+                workerRepository,
+                shiftRepository,
+                shiftAssignmentRepository,
+                shiftSkillRequirementRepository,
+                skillRepository,
+                workerShiftEligibilityService,
+                null,
+                null,
+                null
+        );
+    }
+
+    public static WorkerNearbyShiftQueryService withFallbackDependencies(
+            WorkerRepository workerRepository,
+            ShiftRepository shiftRepository,
+            ShiftAssignmentRepository shiftAssignmentRepository,
+            ShiftSkillRequirementRepository shiftSkillRequirementRepository,
+            SkillRepository skillRepository,
+            WorkerShiftEligibilityService workerShiftEligibilityService,
+            WorkerSkillRepository workerSkillRepository,
+            WorkerAvailabilityRepository workerAvailabilityRepository,
+            BlockListService blockListService
+    ) {
         WorkerNearbyShiftQueryService service = new WorkerNearbyShiftQueryService();
         service.workerRepository = workerRepository;
         service.shiftRepository = shiftRepository;
@@ -88,6 +123,9 @@ public class WorkerNearbyShiftQueryService {
         service.shiftSkillRequirementRepository = shiftSkillRequirementRepository;
         service.skillRepository = skillRepository;
         service.workerShiftEligibilityService = workerShiftEligibilityService;
+        service.workerSkillRepository = workerSkillRepository;
+        service.workerAvailabilityRepository = workerAvailabilityRepository;
+        service.blockListService = blockListService;
         return service;
     }
 
@@ -96,11 +134,11 @@ public class WorkerNearbyShiftQueryService {
             return workerShiftEligibilityService;
         }
         return WorkerShiftEligibilityService.withFallbackDependencies(
-                null,
+                workerSkillRepository,
                 shiftSkillRequirementRepository,
                 shiftAssignmentRepository,
-                null,
-                null,
+                workerAvailabilityRepository,
+                blockListService,
                 skillRepository
         );
     }
@@ -143,28 +181,33 @@ public class WorkerNearbyShiftQueryService {
         double centerLat = (userLat != null) ? userLat : DEFAULT_CENTER_LAT;
         double centerLng = (userLng != null) ? userLng : DEFAULT_CENTER_LNG;
 
+        Worker currentWorker = null;
         List<ShiftAssignment> workerActiveAssignments = Collections.emptyList();
         Set<UUID> workerAssignedShiftIds = new HashSet<>();
         if (userId != null && workerRepository != null) {
-            Worker worker = workerRepository.findByUser_UserId(userId).orElse(null);
-            if (worker != null) {
-                if ((radiusKm == null || radiusKm <= 0) && worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0) {
-                    searchRadius = worker.getMaxDistanceKm();
+            currentWorker = workerRepository.findByUser_UserId(userId).orElse(null);
+            if (currentWorker != null) {
+                if ((radiusKm == null || radiusKm <= 0) && currentWorker.getMaxDistanceKm() != null && currentWorker.getMaxDistanceKm() > 0) {
+                    searchRadius = currentWorker.getMaxDistanceKm();
                 }
-                if (userLat == null && worker.getBaseLat() != null) {
-                    centerLat = worker.getBaseLat();
+                if (userLat == null && currentWorker.getBaseLat() != null) {
+                    centerLat = currentWorker.getBaseLat();
                 }
-                if (userLng == null && worker.getBaseLng() != null) {
-                    centerLng = worker.getBaseLng();
+                if (userLng == null && currentWorker.getBaseLng() != null) {
+                    centerLng = currentWorker.getBaseLng();
                 }
 
-                if (worker.getKycStatus() != KycStatus.APPROVED) {
-                    log.info("Worker {} chưa hoàn tất eKYC (KycStatus={}), ẩn danh sách công việc gần đó", userId, worker.getKycStatus());
+                if (currentWorker.getKycStatus() != KycStatus.APPROVED) {
+                    log.info("Worker {} chưa hoàn tất eKYC (KycStatus={}), ẩn danh sách công việc gần đó", userId, currentWorker.getKycStatus());
+                    return Collections.emptyList();
+                }
+                if (!Boolean.TRUE.equals(currentWorker.getIsOnline())) {
+                    log.info("Worker {} đang tạm tắt Nhận việc (isOnline=false), ẩn danh sách ca làm việc trên Radar", userId);
                     return Collections.emptyList();
                 }
                 if (shiftAssignmentRepository != null) {
                     List<ShiftAssignment> loadedActive = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
-                            worker.getWorkerId(),
+                            currentWorker.getWorkerId(),
                             List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING)
                     );
                     if (loadedActive != null) {
@@ -175,7 +218,7 @@ public class WorkerNearbyShiftQueryService {
                             }
                         }
                     }
-                    List<UUID> allAssignedShiftIds = shiftAssignmentRepository.findShiftIdsByWorkerId(worker.getWorkerId());
+                    List<UUID> allAssignedShiftIds = shiftAssignmentRepository.findShiftIdsByWorkerId(currentWorker.getWorkerId());
                     if (allAssignedShiftIds != null) {
                         for (UUID assignedShiftId : allAssignedShiftIds) {
                             if (assignedShiftId != null) {
@@ -272,6 +315,15 @@ public class WorkerNearbyShiftQueryService {
 
         for (NearbyShiftCandidate candidate : matchedCandidates) {
             Shift s = candidate.shift();
+            if (currentWorker != null) {
+                WorkerShiftEligibilityService.MatchingChannel channel = Boolean.TRUE.equals(s.getEmergency())
+                        ? WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_DISPATCH
+                        : WorkerShiftEligibilityService.MatchingChannel.REVERSE_MATCHING;
+                WorkerShiftEligibilityService.EligibilityResult eligibility = eligibilityService.evaluate(currentWorker, s, channel);
+                if (!eligibility.eligible()) {
+                    continue;
+                }
+            }
             double distance = candidate.distance();
             Double sLat = candidate.sLat();
             Double sLng = candidate.sLng();

@@ -407,6 +407,50 @@ class DisputeServiceTest {
         assertThat(summary.getStrikes()).hasSize(2);
     }
 
+    @Test
+    @DisplayName("UC-104: getMyDisputes() - Trả đầy đủ chi tiết & unreadCount bằng batch query an toàn")
+    void testGetMyDisputes_BatchedMappingAndUserUnreadCount() {
+        Dispute dispute = openDispute();
+        event.setName("Festival Âm Nhạc");
+        shift.setJobType("Hậu cần / Setup");
+
+        when(disputeRepository.findByComplainantIdOrRespondentIdOrderByCreatedAtDesc(eoUserId, eoUserId))
+                .thenReturn(List.of(dispute));
+        when(evidenceRepository.findByDisputeIdInOrderByCreatedAtAsc(List.of(dispute.getDisputeId())))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findByAssignmentIdIn(any()))
+                .thenReturn(List.of(assignment));
+        when(userRepository.findAllById(any()))
+                .thenReturn(List.of(
+                        User.builder().userId(workerUserId).fullName("Worker A").role(UserRole.WORKER).build(),
+                        User.builder().userId(eoUserId).fullName("EO Quy").role(UserRole.EVENT_ORGANIZER).build()
+                ));
+        when(supportConversationRepository.findByDisputeIdIn(List.of(dispute.getDisputeId())))
+                .thenReturn(List.of(
+                        SupportConversation.builder()
+                                .id(UUID.randomUUID())
+                                .disputeId(dispute.getDisputeId())
+                                .disputeParty("EO")
+                                .userId(eoUserId)
+                                .unreadUserCount(3)
+                                .unreadStaffCount(1)
+                                .build()
+                ));
+        when(eventOrganizerRepository.findByUser_UserIdIn(any())).thenReturn(List.of(eo));
+        when(eoStrikeRepository.countByEo_EoIdAndCreatedAtAfter(eq(eo.getEoId()), any())).thenReturn(1L);
+
+        List<DisputeDetailResponseDto> result = disputeService.getMyDisputes(eoUserId);
+
+        assertThat(result).hasSize(1);
+        DisputeDetailResponseDto dto = result.get(0);
+        assertThat(dto.getEventName()).isEqualTo("Festival Âm Nhạc");
+        assertThat(dto.getJobType()).isEqualTo("Hậu cần / Setup");
+        assertThat(dto.getComplainantName()).isEqualTo("Worker A");
+        assertThat(dto.getRespondentName()).isEqualTo("EO Quy");
+        assertThat(dto.getUnreadCount()).isEqualTo(3);
+        assertThat(dto.getEoStrikeCount90d()).isEqualTo(1L);
+    }
+
     // ------------------------------------------------------------------
 
     private Dispute openDispute() {

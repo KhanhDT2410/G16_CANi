@@ -17,15 +17,13 @@ Future<void> acceptProposalOnRadar(
   try {
     await ref.read(proposalRepositoryProvider).acceptProposal(item.proposalId);
     if (!context.mounted) return;
-    final currentSelected = ref.read(jobRadarProvider).selectedShift;
-    if (currentSelected?.shiftId == item.shiftId) {
-      ref.read(jobRadarProvider.notifier).clearSelectedShift();
-    }
+    final radarNotifier = ref.read(jobRadarProvider.notifier);
+    radarNotifier.removeShiftFromRadar(item.shiftId);
     ref.invalidate(proposalsListProvider);
     ref.invalidate(assignmentsListProvider);
     ref.invalidate(incomeSummaryProvider);
     ref.read(assignmentsSubTabProvider.notifier).state = 0;
-    ref.read(jobRadarProvider.notifier).scanNearbyShifts();
+    unawaited(radarNotifier.scanNearbyShifts(silent: true, force: true));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Nhận ca "${item.jobType}" thành công! Đã chuyển vào mục Ca làm.'),

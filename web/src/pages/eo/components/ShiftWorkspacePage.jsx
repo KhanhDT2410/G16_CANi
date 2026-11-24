@@ -6,7 +6,7 @@ import { showToast } from '../../../components/common/Toast';
 import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
 import { getDynamicShiftStatus, getShiftStaffingSummary, formatVndWhole } from '../utils/eventHelpers';
 import WorkerReviewForm from './WorkerReviewForm';
-import ConfirmVerifySkillModal from './ConfirmVerifySkillModal';
+import ConfirmVerifySkillModal, { resolvePreassignedPerformedSkillId } from './ConfirmVerifySkillModal';
 import ReportNoShowModal from './ReportNoShowModal';
 import ShiftEmergencyBanner from './ShiftEmergencyBanner';
 import EmergencyTriggerButton from './EmergencyTriggerButton';
@@ -1224,7 +1224,17 @@ export default function ShiftWorkspacePage({
                             <button
                               type="button"
                               disabled={!canVerify || verifyingId === item.assignmentId}
-                              onClick={() => setSelectedForVerify(item)}
+                              onClick={() => {
+                                const preassignedSkillId = resolvePreassignedPerformedSkillId(item, shift);
+                                if (preassignedSkillId) {
+                                  handleVerify(item.assignmentId, {
+                                    confirmedPerformedSkillId: preassignedSkillId,
+                                    confirmPerformedSkill: true,
+                                  });
+                                } else {
+                                  setSelectedForVerify(item);
+                                }
+                              }}
                               title={
                                 !isCheckedIn
                                   ? 'Nhân sự chưa check-in vào ca'

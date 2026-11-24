@@ -35,6 +35,9 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
     List<ShiftAssignment> findByGroupId(UUID groupId);
     List<ShiftAssignment> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
+    @EntityGraph(attributePaths = {"shift", "shift.event"})
+    List<ShiftAssignment> findByAssignmentIdIn(Collection<UUID> assignmentIds);
+
     @EntityGraph(attributePaths = {"shift"})
     List<ShiftAssignment> findByWorker_WorkerIdAndStatusIn(UUID workerId, List<AssignmentStatus> statuses);
 
@@ -44,6 +47,9 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
     long countByShift_ShiftIdAndStatusIn(UUID shiftId, List<AssignmentStatus> statuses);
     boolean existsByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);
     boolean existsByShift_ShiftIdAndWorker_WorkerIdAndStatusIn(UUID shiftId, UUID workerId, java.util.Collection<AssignmentStatus> statuses);
+
+    @Query("SELECT sa.shift.shiftId FROM ShiftAssignment sa WHERE sa.worker.workerId = :workerId")
+    List<UUID> findShiftIdsByWorkerId(@Param("workerId") UUID workerId);
 
     @Query("SELECT sa.shift.shiftId AS shiftId, " +
            "COUNT(sa) AS totalCount, " +

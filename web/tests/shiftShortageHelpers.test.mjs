@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  getActiveEmergencyAlerts,
   getShiftStaffingSummary,
   getShiftStaffingAlerts,
   getEventUnderstaffedSummary,
@@ -93,7 +94,7 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
     assert.equal(summary.canTriggerEmergency, false);
   });
 
-  it('Ca IN_PROGRESS còn thiếu người: chặn kích hoạt khẩn cấp thủ công (chỉ cho auto khi No-show)', () => {
+  it('Ca IN_PROGRESS còn >= 30 phút cho phép kích hoạt khẩn cấp thủ công; còn < 30 phút thì chặn', () => {
     const sRunning = {
       shiftId: 's-run',
       jobType: 'Bảo vệ',
@@ -108,8 +109,59 @@ describe('Shift Understaffed Alerts & Emergency Eligibility Helpers', () => {
     const summary = getShiftStaffingSummary(sRunning, event, now, 4);
 
     assert.equal(summary.isInProgress, true);
+    assert.equal(summary.hasEnoughRemainingForInProgress, true);
     assert.equal(summary.nearStartUnderstaffed, true);
-    assert.equal(summary.canTriggerEmergency, false);
+    assert.equal(summary.canTriggerEmergency, true);
+
+    const sTooShort = {
+      ...sRunning,
+      shiftId: 's-run-short',
+      endTime: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+    };
+    const shortSummary = getShiftStaffingSummary(sTooShort, event, now, 4);
+    assert.equal(shortSummary.isInProgress, true);
+    assert.equal(shortSummary.hasEnoughRemainingForInProgress, false);
+    assert.equal(shortSummary.canTriggerEmergency, false);
+    assert.ok(shortSummary.emergencyBlockReason?.includes('30 phút'));
+  });
+
+  it('Khung điều phối khẩn cấp trong chi tiết chỉ hiển thị sau khi bật emergency (hoặc vừa bù đủ trong phiên)', () => {
+    const sPendingManual = {
+      shiftId: 's-not-em',
+      jobType: 'Lễ tân',
+      status: 'ACTIVE',
+      requiredWorkers: 2,
+      confirmedWorkers: 0,
+      startTime: new Date(now.getTime() + 1 * 3600 * 1000).toISOString(),
+      endTime: new Date(now.getTime() + 5 * 3600 * 1000).toISOString(),
+      emergency: false,
+    };
+    const sActiveEmergency = {
+      ...sPendingManual,
+      shiftId: 's-em-on',
+      emergency: true,
+    };
+    const sRefilledInSession = {
+      ...sPendingManual,
+      shiftId: 's-em-done',
+      confirmedWorkers: 2,
+      status: 'FULLY_STAFFED',
+      emergency: false,
+    };
+    const event = { eventId: 'e1', mode: 'MATCHING', status: 'ACTIVE' };
+
+    assert.equal(getActiveEmergencyAlerts([sPendingManual], event, {}, now, 4).length, 0);
+    assert.equal(getActiveEmergencyAlerts([sPendingManual, sActiveEmergency], event, {}, now, 4).length, 1);
+    assert.equal(
+      getActiveEmergencyAlerts(
+        [sPendingManual, sRefilledInSession],
+        event,
+        { 's-em-done': { hasCandidates: true } },
+        now,
+        4
+      ).length,
+      1
+    );
   });
 
   it('Worker tự hủy làm thiếu người (hệ thống tự bật emergency) -> hiện cảnh báo và chặn kích hoạt trùng', () => {

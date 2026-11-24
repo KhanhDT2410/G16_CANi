@@ -462,4 +462,30 @@ void main() {
     expect(find.text('Ca quanh bạn (1)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('removeShiftFromRadar immediately removes accepted shift from map selection and list view', (tester) async {
+    final proposalRepo = _FakeProposalRepository();
+    final radarRepo = _FakeJobRadarRepository()
+      ..shifts = [
+        _makeShift('s-accepted', eventName: 'Ngày làm việc'),
+        _makeShift('s-other', eventName: 'Ca Còn Lại'),
+      ];
+
+    final container = await _pumpRadarScreen(tester, proposalRepo: proposalRepo, radarRepo: radarRepo);
+    addTearDown(container.dispose);
+
+    container.read(jobRadarProvider.notifier).selectShift(radarRepo.shifts.first);
+    await tester.pump();
+
+    expect(find.text('DS (2)'), findsOneWidget);
+    expect(find.text('Ngày làm việc'), findsWidgets);
+
+    container.read(jobRadarProvider.notifier).removeShiftFromRadar('s-accepted');
+    await tester.pump();
+
+    expect(find.text('DS (1)'), findsOneWidget);
+    expect(find.text('Ngày làm việc'), findsNothing);
+    expect(find.text('Ca Còn Lại'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }

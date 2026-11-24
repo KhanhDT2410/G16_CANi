@@ -12,7 +12,7 @@ import {
  * - Chuẩn hóa danh mục đầu việc mẫu theo vị trí nghiệp vụ sự kiện (EO-001)
  * - Cho phép nhấp chọn và chỉnh sửa trực tiếp (Inline Edit) task vừa thêm (EO-003)
  * - Bật/tắt yêu cầu minh chứng hình ảnh (isRequiredEvidence) cho từng đầu việc
- * - Kéo thả (Drag & Drop) hoặc bấm nút Lên/Xuống để đảo vị trí thứ tự đầu việc
+ * - Kéo thả (Drag & Drop) để đảo vị trí thứ tự đầu việc
  */
 const ShiftChecklistEditor = ({
   items = [],
@@ -26,14 +26,13 @@ const ShiftChecklistEditor = ({
   const [draggedIdx, setDraggedIdx] = useState(null);
   const [dragOverIdx, setDragOverIdx] = useState(null);
 
-  // EO-001: Quản lý danh mục checklist mẫu theo vai trò công việc
-  const [selectedCategory, setSelectedCategory] = useState(() => resolveCategoryByJobType(jobType));
+  // EO-001: Thanh gợi ý mẫu 1 dòng gọn gàng; bấm nút mới xổ bảng chọn theo từng vị trí
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState(null);
 
-  // Tự động chuyển tab checklist phù hợp khi vai trò ca làm việc (jobType) thay đổi
   useEffect(() => {
-    if (jobType) {
-      setSelectedCategory(resolveCategoryByJobType(jobType));
-    }
+    setIsSuggestionsOpen(false);
+    setExpandedCategory(null);
   }, [jobType]);
 
   // EO-003: Quản lý chỉnh sửa trực tiếp nội dung đầu việc
@@ -80,8 +79,8 @@ const ShiftChecklistEditor = ({
     ]);
   };
 
-  const handleAddAllInCategory = () => {
-    const currentTemplates = STANDARDIZED_CHECKLIST_TEMPLATES[selectedCategory] || [];
+  const handleAddAllInCategory = (categoryId) => {
+    const currentTemplates = STANDARDIZED_CHECKLIST_TEMPLATES[categoryId] || [];
     const existingTitles = new Set(normalizedList.map((i) => i.title.toLowerCase()));
     const toAdd = currentTemplates.filter((item) => !existingTitles.has(item.title.toLowerCase()));
     if (toAdd.length === 0) return;
@@ -179,9 +178,24 @@ const ShiftChecklistEditor = ({
     setDragOverIdx(null);
   };
 
-  const currentCategorySuggestions = STANDARDIZED_CHECKLIST_TEMPLATES[selectedCategory] || [];
   const existingTitlesSet = new Set(normalizedList.map((i) => i.title.toLowerCase()));
-  const unaddedCount = currentCategorySuggestions.filter((i) => !existingTitlesSet.has(i.title.toLowerCase())).length;
+  const matchedCategoryId = resolveCategoryByJobType(jobType);
+  const matchedCategoryObj =
+    CHECKLIST_ROLE_CATEGORIES.find((c) => c.id === matchedCategoryId) || CHECKLIST_ROLE_CATEGORIES[0];
+  const matchedSuggestions = STANDARDIZED_CHECKLIST_TEMPLATES[matchedCategoryObj.id] || [];
+  const matchedUnaddedCount = matchedSuggestions.filter(
+    (i) => !existingTitlesSet.has(i.title.toLowerCase())
+  ).length;
+
+  const handleToggleSuggestionsPanel = () => {
+    setIsSuggestionsOpen((prev) => {
+      const next = !prev;
+      if (next && expandedCategory === null) {
+        setExpandedCategory(matchedCategoryObj.id);
+      }
+      return next;
+    });
+  };
 
   return (
     <div
@@ -267,131 +281,249 @@ const ShiftChecklistEditor = ({
         </button>
       </div>
 
-      {/* EO-001: Bộ chọn danh mục checklist chuẩn hóa theo vị trí nhân sự sự kiện */}
-      <div
-        style={{
-          marginTop: '0.4rem',
-          marginBottom: '0.65rem',
-          padding: '0.6rem',
-          backgroundColor: '#f8fafc',
-          borderRadius: '0.5rem',
-          border: '1px solid #e2e8f0',
-        }}
-      >
+      {/* EO-001 (Phương án A): Thanh 1 dòng gọn nhẹ + nút thêm nhanh + panel xổ theo từng vị trí khi cần */}
+      <div style={{ marginTop: '0.35rem', marginBottom: '0.65rem' }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '0.4rem',
-            marginBottom: '0.45rem',
+            gap: '0.45rem',
+            padding: '0.4rem 0.6rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: isSuggestionsOpen ? '0.5rem 0.5rem 0 0' : '0.5rem',
+            border: '1px solid #e2e8f0',
           }}
         >
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
-            Gợi ý mẫu theo vị trí sự kiện:
-          </span>
-          {unaddedCount > 0 && (
+          <button
+            type="button"
+            onClick={handleToggleSuggestionsPanel}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              color: isSuggestionsOpen ? '#1d4ed8' : '#334155',
+              fontSize: '0.76rem',
+              fontWeight: 700,
+            }}
+          >
+            <span style={{ fontSize: '0.7rem', color: isSuggestionsOpen ? '#2563eb' : '#64748b' }}>
+              {isSuggestionsOpen ? '▾' : '▸'}
+            </span>
+            <span>Chọn từ mẫu gợi ý</span>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                padding: '0.08rem 0.42rem',
+                borderRadius: '999px',
+                backgroundColor: '#e0f2fe',
+                color: '#0369a1',
+                fontWeight: 600,
+              }}
+            >
+              Gợi ý: {matchedCategoryObj.label}
+            </span>
+          </button>
+
+          {matchedUnaddedCount > 0 ? (
             <button
               type="button"
-              onClick={handleAddAllInCategory}
+              onClick={() => handleAddAllInCategory(matchedCategoryObj.id)}
               style={{
-                fontSize: '0.72rem',
+                fontSize: '0.71rem',
                 padding: '0.2rem 0.55rem',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 border: '1px solid #bfdbfe',
                 backgroundColor: '#eff6ff',
                 color: '#1d4ed8',
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
               }}
-              title="Thêm toàn bộ các đầu việc trong nhóm này vào ca làm"
+              title={`Thêm toàn bộ ${matchedUnaddedCount} đầu việc mẫu của nhóm "${matchedCategoryObj.label}"`}
             >
-              Thêm tất cả nhóm ({unaddedCount})
+              + Thêm {matchedUnaddedCount} việc {matchedCategoryObj.label}
             </button>
+          ) : (
+            <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
+              ✓ Đã thêm đủ mẫu {matchedCategoryObj.label}
+            </span>
           )}
         </div>
 
-        {/* Tab phân loại vị trí */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.45rem' }}>
-          {CHECKLIST_ROLE_CATEGORIES.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  fontSize: '0.72rem',
-                  padding: '0.22rem 0.5rem',
-                  borderRadius: '999px',
-                  border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
-                  backgroundColor: isSelected ? '#2563eb' : '#ffffff',
-                  color: isSelected ? '#ffffff' : '#475569',
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <span>{cat.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {isSuggestionsOpen && (
+          <div
+            style={{
+              padding: '0.5rem',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderTop: 'none',
+              borderRadius: '0 0 0.5rem 0.5rem',
+              maxHeight: '280px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.35rem',
+            }}
+          >
+            {CHECKLIST_ROLE_CATEGORIES.map((cat) => {
+              const isExpanded = expandedCategory === cat.id;
+              const suggestions = STANDARDIZED_CHECKLIST_TEMPLATES[cat.id] || [];
+              const catUnaddedCount = suggestions.filter((i) => !existingTitlesSet.has(i.title.toLowerCase())).length;
+              const isRecommended = matchedCategoryObj.id === cat.id;
 
-        {/* Danh sách gợi ý của vị trí được chọn */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-          {currentCategorySuggestions.map((suggestion) => {
-            const isAdded = existingTitlesSet.has(suggestion.title.toLowerCase());
-            return (
-              <button
-                key={suggestion.title}
-                type="button"
-                disabled={isAdded}
-                onClick={() => handleQuickAdd(suggestion)}
-                style={{
-                  fontSize: '0.73rem',
-                  padding: '0.25rem 0.55rem',
-                  borderRadius: '4px',
-                  border: isAdded ? '1px dashed #cbd5e1' : '1px solid #cbd5e1',
-                  background: isAdded ? '#f1f5f9' : '#ffffff',
-                  cursor: isAdded ? 'default' : 'pointer',
-                  color: isAdded ? '#94a3b8' : '#1e293b',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  transition: 'all 0.15s ease',
-                }}
-                title={
-                  isAdded
-                    ? 'Đầu việc này đã có trong danh sách'
-                    : suggestion.isRequiredEvidence
-                    ? 'Nhấp để thêm (Có yêu cầu ảnh minh chứng)'
-                    : 'Nhấp để thêm nhanh'
-                }
-              >
-                <span>{suggestion.title}</span>
-                {suggestion.isRequiredEvidence && (
-                  <span
+              return (
+                <div
+                  key={cat.id}
+                  style={{
+                    flexShrink: 0,
+                    borderRadius: '0.45rem',
+                    border: isExpanded ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+                    backgroundColor: '#ffffff',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
                     style={{
-                      fontSize: '0.65rem',
-                      color: isAdded ? '#94a3b8' : '#15803d',
-                      backgroundColor: isAdded ? '#e2e8f0' : '#dcfce7',
-                      padding: '0.05rem 0.3rem',
-                      borderRadius: '3px',
-                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                      padding: '0.38rem 0.55rem',
+                      backgroundColor: isExpanded ? '#eff6ff' : '#ffffff',
                     }}
                   >
-                    Ảnh
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCategory((prev) => (prev === cat.id ? null : cat.id))}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        color: isExpanded ? '#1d4ed8' : '#1e293b',
+                        fontSize: '0.75rem',
+                        fontWeight: isExpanded || isRecommended ? 700 : 600,
+                      }}
+                    >
+                      <span style={{ fontSize: '0.68rem', width: '12px', color: isExpanded ? '#2563eb' : '#64748b' }}>
+                        {isExpanded ? '▾' : '▸'}
+                      </span>
+                      <span>{cat.label}</span>
+                      {isRecommended && (
+                        <span
+                          style={{
+                            fontSize: '0.64rem',
+                            padding: '0.04rem 0.35rem',
+                            borderRadius: '999px',
+                            backgroundColor: '#dbeafe',
+                            color: '#1d4ed8',
+                            fontWeight: 700,
+                          }}
+                        >
+                          Phù hợp ca
+                        </span>
+                      )}
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>
+                        ({catUnaddedCount}/{suggestions.length})
+                      </span>
+                    </button>
+
+                    {catUnaddedCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddAllInCategory(cat.id)}
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '0.14rem 0.45rem',
+                          borderRadius: '4px',
+                          border: '1px solid #bfdbfe',
+                          backgroundColor: '#eff6ff',
+                          color: '#1d4ed8',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        + Thêm ({catUnaddedCount})
+                      </button>
+                    )}
+                  </div>
+
+                  {isExpanded && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.35rem',
+                        padding: '0.45rem 0.55rem',
+                        borderTop: '1px solid #e2e8f0',
+                        backgroundColor: '#f8fafc',
+                      }}
+                    >
+                      {suggestions.map((suggestion) => {
+                        const isAdded = existingTitlesSet.has(suggestion.title.toLowerCase());
+                        return (
+                          <button
+                            key={suggestion.title}
+                            type="button"
+                            disabled={isAdded}
+                            onClick={() => handleQuickAdd(suggestion)}
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '0.22rem 0.5rem',
+                              borderRadius: '4px',
+                              border: isAdded ? '1px dashed #cbd5e1' : '1px solid #cbd5e1',
+                              background: isAdded ? '#f1f5f9' : '#ffffff',
+                              cursor: isAdded ? 'default' : 'pointer',
+                              color: isAdded ? '#94a3b8' : '#1e293b',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                            }}
+                            title={
+                              isAdded
+                                ? 'Đầu việc này đã có trong danh sách'
+                                : suggestion.isRequiredEvidence
+                                ? 'Nhấp để thêm (Có yêu cầu ảnh minh chứng)'
+                                : 'Nhấp để thêm nhanh'
+                            }
+                          >
+                            <span>{suggestion.title}</span>
+                            {suggestion.isRequiredEvidence && (
+                              <span
+                                style={{
+                                  fontSize: '0.64rem',
+                                  color: isAdded ? '#94a3b8' : '#15803d',
+                                  backgroundColor: isAdded ? '#e2e8f0' : '#dcfce7',
+                                  padding: '0.04rem 0.28rem',
+                                  borderRadius: '3px',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Ảnh
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Danh sách đầu việc có Chỉnh sửa trực tiếp (EO-003) + Kéo Thả (Drag & Drop) */}
@@ -420,6 +552,7 @@ const ShiftChecklistEditor = ({
                 onDrop={(e) => handleDrop(e, idx)}
                 onDragEnd={handleDragEnd}
                 style={{
+                  flexShrink: 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -441,6 +574,15 @@ const ShiftChecklistEditor = ({
               >
                 {/* Phần hiển thị / chỉnh sửa inline tiêu đề task (EO-003) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                  {!isEditing && (
+                    <span
+                      aria-hidden="true"
+                      style={{ color: '#94a3b8', fontSize: '0.85rem', letterSpacing: '-1px', flexShrink: 0, userSelect: 'none' }}
+                      title="Kéo để sắp xếp lại thứ tự"
+                    >
+                      ⋮⋮
+                    </span>
+                  )}
                   <strong style={{ color: '#2563eb', flexShrink: 0 }}>#{idx + 1}</strong>
 
                   {isEditing ? (
@@ -573,44 +715,6 @@ const ShiftChecklistEditor = ({
                       Sửa
                     </button>
                   )}
-
-                  {/* Nút đảo vị trí nhanh Lên / Xuống */}
-                  <div style={{ display: 'inline-flex', gap: '2px' }}>
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => handleMoveItem(idx, idx - 1)}
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
-                        padding: '0.15rem 0.4rem',
-                        fontSize: '0.72rem',
-                        cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                        color: idx === 0 ? '#cbd5e1' : '#475569',
-                      }}
-                      title="Đưa đầu việc lên trên"
-                    >
-                      Lên
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === normalizedList.length - 1}
-                      onClick={() => handleMoveItem(idx, idx + 1)}
-                      style={{
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
-                        padding: '0.15rem 0.4rem',
-                        fontSize: '0.72rem',
-                        cursor: idx === normalizedList.length - 1 ? 'not-allowed' : 'pointer',
-                        color: idx === normalizedList.length - 1 ? '#cbd5e1' : '#475569',
-                      }}
-                      title="Đưa đầu việc xuống dưới"
-                    >
-                      Xuống
-                    </button>
-                  </div>
 
                   {/* Nút xóa đầu việc */}
                   <button

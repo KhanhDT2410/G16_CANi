@@ -2041,13 +2041,13 @@ class EoEventServiceTest {
     }
 
     @Test
-    @DisplayName("UTC075 - triggerEmergencyDispatch() - EO chỉ được bật thủ công trước giờ bắt đầu; IN_PROGRESS/COMPLETED/DB-stale bị chặn")
-    void triggerEmergencyDispatch_InProgressOrEndedShift_ThrowsBadRequest() {
+    @DisplayName("UTC075 - triggerEmergencyDispatch() - Ca IN_PROGRESS còn >= 30 phút cho phép bật thủ công; còn < 30 phút hoặc đã kết thúc bị chặn")
+    void triggerEmergencyDispatch_InProgressOrEndedShift_ChecksRemainingTime() {
         UUID shiftId = UUID.randomUUID();
         Event ongoingEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).mode(EventMode.MATCHING).status(EventStatus.ONGOING).build();
-        Shift inProgressShift = Shift.builder()
+        Shift inProgressEnoughTime = Shift.builder()
                 .shiftId(shiftId)
-                .status(ShiftStatus.ACTIVE) // DB chưa kịp chuyển sang IN_PROGRESS nhưng startTime đã qua
+                .status(ShiftStatus.ACTIVE) // DB chưa kịp chuyển sang IN_PROGRESS nhưng startTime đã qua và còn 3 giờ
                 .startTime(Instant.now().minus(10, ChronoUnit.MINUTES))
                 .endTime(Instant.now().plus(3, ChronoUnit.HOURS))
                 .requiredWorkers(4)
@@ -2057,12 +2057,30 @@ class EoEventServiceTest {
                 .build();
 
         when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
-        when(shiftRepository.findByIdForUpdate(shiftId)).thenReturn(Optional.of(inProgressShift));
+        when(shiftRepository.findByIdForUpdate(shiftId)).thenReturn(Optional.of(inProgressEnoughTime));
+        when(matchingDispatchService.triggerEmergencyDispatch(shiftId, 25.0)).thenReturn(2);
 
-        BadRequestException exInProgress = assertThrows(BadRequestException.class,
-                () -> eoEventService.triggerEmergencyDispatch(userId, shiftId, 25.0));
-        assertTrue(exInProgress.getMessage().contains("đã đến giờ bắt đầu") || exInProgress.getMessage().contains("IN_PROGRESS"));
-        verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+        int dispatched = eoEventService.triggerEmergencyDispatch(userId, shiftId, 25.0);
+        assertEquals(2, dispatched);
+        assertTrue(Boolean.TRUE.equals(inProgressEnoughTime.getEmergency()));
+        verify(matchingDispatchService).triggerEmergencyDispatch(shiftId, 25.0);
+
+        UUID shortInProgressId = UUID.randomUUID();
+        Shift shortInProgressShift = Shift.builder()
+                .shiftId(shortInProgressId)
+                .status(ShiftStatus.IN_PROGRESS)
+                .startTime(Instant.now().minus(2, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(15, ChronoUnit.MINUTES))
+                .requiredWorkers(4)
+                .confirmedWorkers(2)
+                .emergency(false)
+                .event(ongoingEvent)
+                .build();
+        when(shiftRepository.findByIdForUpdate(shortInProgressId)).thenReturn(Optional.of(shortInProgressShift));
+
+        BadRequestException exShort = assertThrows(BadRequestException.class,
+                () -> eoEventService.triggerEmergencyDispatch(userId, shortInProgressId, 25.0));
+        assertTrue(exShort.getMessage().contains("30 phút"));
 
         UUID endedShiftId = UUID.randomUUID();
         Shift endedShift = Shift.builder()
@@ -2079,7 +2097,7 @@ class EoEventServiceTest {
         BadRequestException exEnded = assertThrows(BadRequestException.class,
                 () -> eoEventService.triggerEmergencyDispatch(userId, endedShiftId, 25.0));
         assertTrue(exEnded.getMessage().contains("kết thúc"));
-        verify(matchingDispatchService, never()).triggerEmergencyDispatch(any(), any());
+        verify(matchingDispatchService, times(1)).triggerEmergencyDispatch(any(), any());
     }
 
     @Test

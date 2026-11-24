@@ -12,6 +12,7 @@ import '../widgets/shift_assignment_card.dart';
 import '../widgets/shift_navigation_sheet.dart';
 import '../widgets/shift_workflow_stepper.dart';
 import 'attendance_qr_scanner_screen.dart';
+import 'invite_qr_scanner_screen.dart';
 import 'rate_eo_screen.dart';
 import 'shift_detail_execution_screen.dart';
 import 'shift_payment_screen.dart';
@@ -105,6 +106,33 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     }
   }
 
+  Future<void> _openInviteQrScanner() async {
+    final t = Theme.of(context).cani;
+    final joined = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InviteQrScannerScreen(
+          onManualEntryRequested: () {
+            if (mounted) {
+              _openInviteCodeDialog();
+            }
+          },
+        ),
+      ),
+    );
+    if (joined == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Tham gia ca làm việc thành công!'),
+          backgroundColor: t.success,
+        ),
+      );
+      ref.invalidate(assignmentsListProvider);
+      ref.invalidate(incomeSummaryProvider);
+      ref.read(assignmentsSubTabProvider.notifier).state = 0;
+    }
+  }
+
   void _handleHeaderQrScan(List<ShiftAssignmentItem> activeAssignments) {
     final now = DateTime.now();
     final scannable = activeAssignments.where((a) {
@@ -113,7 +141,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       return false;
     }).toList();
     if (scannable.isEmpty) {
-      _openInviteCodeDialog();
+      _openInviteQrScanner();
       return;
     }
     final active = scannable.first;

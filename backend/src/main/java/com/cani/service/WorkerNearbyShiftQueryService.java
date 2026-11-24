@@ -144,6 +144,7 @@ public class WorkerNearbyShiftQueryService {
         double centerLng = (userLng != null) ? userLng : DEFAULT_CENTER_LNG;
 
         List<ShiftAssignment> workerActiveAssignments = Collections.emptyList();
+        Set<UUID> workerAssignedShiftIds = new HashSet<>();
         if (userId != null && workerRepository != null) {
             Worker worker = workerRepository.findByUser_UserId(userId).orElse(null);
             if (worker != null) {
@@ -162,10 +163,26 @@ public class WorkerNearbyShiftQueryService {
                     return Collections.emptyList();
                 }
                 if (shiftAssignmentRepository != null) {
-                    workerActiveAssignments = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
+                    List<ShiftAssignment> loadedActive = shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
                             worker.getWorkerId(),
                             List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING)
                     );
+                    if (loadedActive != null) {
+                        workerActiveAssignments = loadedActive;
+                        for (ShiftAssignment sa : loadedActive) {
+                            if (sa != null && sa.getShift() != null && sa.getShift().getShiftId() != null) {
+                                workerAssignedShiftIds.add(sa.getShift().getShiftId());
+                            }
+                        }
+                    }
+                    List<UUID> allAssignedShiftIds = shiftAssignmentRepository.findShiftIdsByWorkerId(worker.getWorkerId());
+                    if (allAssignedShiftIds != null) {
+                        for (UUID assignedShiftId : allAssignedShiftIds) {
+                            if (assignedShiftId != null) {
+                                workerAssignedShiftIds.add(assignedShiftId);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -179,6 +196,9 @@ public class WorkerNearbyShiftQueryService {
         List<NearbyShiftCandidate> matchedCandidates = new ArrayList<>();
 
         for (Shift s : candidateShifts) {
+            if (s.getShiftId() != null && workerAssignedShiftIds.contains(s.getShiftId())) {
+                continue;
+            }
             if (s.getRemainingWorkers() == null || s.getRemainingWorkers() <= 0) {
                 continue;
             }

@@ -133,46 +133,6 @@ export default function ShiftInviteModal({ isOpen, onClose, shift }) {
               </span>
             </div>
 
-            {/* Link chia sẻ trực tiếp */}
-            <div style={{ textAlign: 'left', background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '0.35rem' }}>
-                Đường dẫn chia sẻ (Zalo, Messenger, SMS):
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={invite.shareLink}
-                  style={{
-                    flex: 1,
-                    fontSize: '0.85rem',
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#334155',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleCopy(invite.shareLink, 'Đường dẫn mời')}
-                  style={{
-                    background: '#0284c7',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '6px 12px',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Sao chép Link
-                </button>
-              </div>
-            </div>
-
             {/* Thông tin ca */}
             <div
               style={{

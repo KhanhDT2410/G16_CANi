@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import RateWorkerModal from './RateWorkerModal';
-import ConfirmVerifySkillModal from './ConfirmVerifySkillModal';
+import ConfirmVerifySkillModal, { resolvePreassignedPerformedSkillId } from './ConfirmVerifySkillModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
@@ -364,7 +364,17 @@ const LiveAttendanceModal = ({
                             {!item.eoConfirmed ? (
                               <button
                                 type="button"
-                                onClick={() => setSelectedForVerify(item)}
+                                onClick={() => {
+                                  const preassignedSkillId = resolvePreassignedPerformedSkillId(item, shift);
+                                  if (preassignedSkillId) {
+                                    handleVerify(item.assignmentId, {
+                                      confirmedPerformedSkillId: preassignedSkillId,
+                                      confirmPerformedSkill: true,
+                                    });
+                                  } else {
+                                    setSelectedForVerify(item);
+                                  }
+                                }}
                                 disabled={verifyingId === item.assignmentId}
                                 style={{
                                   background: '#16a34a',

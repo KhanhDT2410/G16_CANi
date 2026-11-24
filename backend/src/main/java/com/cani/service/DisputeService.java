@@ -139,6 +139,7 @@ public class DisputeService {
     /**
      * Lấy danh sách ca phân công của Worker hoặc EO hiện tại để chọn khi tạo tranh chấp.
      */
+    @Transactional(readOnly = true)
     public List<DisputeEligibleAssignmentDto> getEligibleAssignmentsForDispute(UUID requesterId) {
         User user = currentUserOrThrow(requesterId);
         List<ShiftAssignment> assignments = new ArrayList<>();
@@ -194,11 +195,12 @@ public class DisputeService {
     // UC-97/104: Xem chi tiết + lịch sử tranh chấp của một người dùng
     // =========================================================================
 
+    @Transactional(readOnly = true)
     public DisputeDetailResponseDto getDisputeDetail(UUID disputeId, UUID requesterId) {
         Dispute dispute = getDisputeOrThrow(disputeId);
-        DisputeStatus status = dispute.getStatus();
 
-        boolean isParty = dispute.getComplainantId().equals(requesterId) || dispute.getRespondentId().equals(requesterId);
+        boolean isParty = Objects.equals(dispute.getComplainantId(), requesterId)
+                || Objects.equals(dispute.getRespondentId(), requesterId);
         if (isParty) {
             return toDetailDto(dispute);
         }
@@ -210,26 +212,19 @@ public class DisputeService {
         return toDetailDto(dispute);
     }
 
+    @Transactional(readOnly = true)
     public List<DisputeDetailResponseDto> getMyDisputes(UUID userId) {
-        List<Dispute> own = new ArrayList<>();
-        own.addAll(disputeRepository.findByComplainantIdOrderByCreatedAtDesc(userId));
-        own.addAll(disputeRepository.findByRespondentIdOrderByCreatedAtDesc(userId));
+        List<Dispute> rawOwn = disputeRepository.findByComplainantIdOrRespondentIdOrderByCreatedAtDesc(userId, userId);
+        if (rawOwn == null || rawOwn.isEmpty()) {
+            return List.of();
+        }
         Set<UUID> seen = new HashSet<>();
-        return own.stream()
-                .filter(d -> seen.add(d.getDisputeId()))
+        List<Dispute> own = rawOwn.stream()
+                .filter(d -> d != null && d.getDisputeId() != null && seen.add(d.getDisputeId()))
                 .sorted(Comparator.comparing(Dispute::getCreatedAt,
                         Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-                .map(d -> {
-                    DisputeDetailResponseDto dto = toDetailDto(d);
-                    supportConversationRepository.findByDisputeIdAndDisputeParty(d.getDisputeId(), "EO")
-                            .filter(c -> c.getUserId().equals(userId))
-                            .ifPresent(c -> dto.setUnreadCount(c.getUnreadUserCount() != null ? c.getUnreadUserCount() : 0));
-                    supportConversationRepository.findByDisputeIdAndDisputeParty(d.getDisputeId(), "WORKER")
-                            .filter(c -> c.getUserId().equals(userId))
-                            .ifPresent(c -> dto.setUnreadCount(c.getUnreadUserCount() != null ? c.getUnreadUserCount() : 0));
-                    return dto;
-                })
                 .toList();
+        return toDetailDtosBatch(own, userId);
     }
 
     // =========================================================================
@@ -528,10 +523,10 @@ public class DisputeService {
     }
 
     private UUID resolveEoPartyId(UUID complainantId, UUID respondentId) {
-        if (eventOrganizerRepository.findByUser_UserId(complainantId).isPresent()) {
+        if (complainantId != null && eventOrganizerRepository.findByUser_UserId(complainantId).isPresent()) {
             return complainantId;
         }
-        if (eventOrganizerRepository.findByUser_UserId(respondentId).isPresent()) {
+        if (respondentId != null && eventOrganizerRepository.findByUser_UserId(respondentId).isPresent()) {
             return respondentId;
         }
         return null;
@@ -785,18 +780,149 @@ public class DisputeService {
     // Mapping
     // ------------------------------------------------------------------
 
+    private List<DisputeDetailResponseDto> toDetailDtosBatch(List<Dispute> disputes, UUID currentUserIdForUnread) {
+        if (disputes == null || disputes.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> disputeIds = disputes.stream()
+                .map(Dispute::getDisputeId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        Map<UUID, List<DisputeEvidence>> evidencesByDisputeId = disputeIds.isEmpty()
+                ? Map.of()
+                : evidenceRepository.findByDisputeIdInOrderByCreatedAtAsc(disputeIds).stream()
+                        .filter(e -> e.getDisputeId() != null)
+                        .collect(Collectors.groupingBy(DisputeEvidence::getDisputeId));
+
+        Set<UUID> assignmentIds = disputes.stream()
+                .map(Dispute::getAssignmentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, ShiftAssignment> assignmentsById = assignmentIds.isEmpty()
+                ? Map.of()
+                : shiftAssignmentRepository.findByAssignmentIdIn(assignmentIds).stream()
+                        .filter(sa -> sa.getAssignmentId() != null)
+                        .collect(Collectors.toMap(ShiftAssignment::getAssignmentId, sa -> sa, (a, b) -> a));
+
+        Set<UUID> userIds = new HashSet<>();
+        Set<UUID> partyUserIds = new HashSet<>();
+        for (Dispute d : disputes) {
+            if (d.getComplainantId() != null) {
+                userIds.add(d.getComplainantId());
+                partyUserIds.add(d.getComplainantId());
+            }
+            if (d.getRespondentId() != null) {
+                userIds.add(d.getRespondentId());
+                partyUserIds.add(d.getRespondentId());
+            }
+            if (d.getAssignedTo() != null) {
+                userIds.add(d.getAssignedTo());
+            }
+        }
+        Map<UUID, User> usersById = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream()
+                        .filter(u -> u.getUserId() != null)
+                        .collect(Collectors.toMap(User::getUserId, u -> u, (a, b) -> a));
+
+        Map<UUID, List<SupportConversation>> convsByDisputeId = disputeIds.isEmpty()
+                ? Map.of()
+                : supportConversationRepository.findByDisputeIdIn(disputeIds).stream()
+                        .filter(c -> c.getDisputeId() != null)
+                        .collect(Collectors.groupingBy(SupportConversation::getDisputeId));
+
+        Map<UUID, EventOrganizer> eoByUserId = partyUserIds.isEmpty()
+                ? Map.of()
+                : eventOrganizerRepository.findByUser_UserIdIn(partyUserIds).stream()
+                        .filter(eo -> eo.getUser() != null && eo.getUser().getUserId() != null)
+                        .collect(Collectors.toMap(eo -> eo.getUser().getUserId(), eo -> eo, (a, b) -> a));
+
+        Map<UUID, Long> strikeCountByEoId = new HashMap<>();
+        Instant since90d = Instant.now().minus(Duration.ofDays(90));
+        for (EventOrganizer eo : eoByUserId.values()) {
+            if (eo.getEoId() != null && !strikeCountByEoId.containsKey(eo.getEoId())) {
+                strikeCountByEoId.put(eo.getEoId(), eoStrikeRepository.countByEo_EoIdAndCreatedAtAfter(eo.getEoId(), since90d));
+            }
+        }
+
+        return disputes.stream().map(dispute -> {
+            UUID dId = dispute.getDisputeId();
+            EventOrganizer eo = eoByUserId.get(dispute.getComplainantId());
+            if (eo == null) {
+                eo = eoByUserId.get(dispute.getRespondentId());
+            }
+            Long eoStrikeCount90d = (eo != null && eo.getEoId() != null)
+                    ? strikeCountByEoId.get(eo.getEoId())
+                    : null;
+
+            return buildDetailResponseDto(
+                    dispute,
+                    evidencesByDisputeId.getOrDefault(dId, List.of()),
+                    dispute.getAssignmentId() != null ? assignmentsById.get(dispute.getAssignmentId()) : null,
+                    usersById,
+                    convsByDisputeId.getOrDefault(dId, List.of()),
+                    eoStrikeCount90d,
+                    currentUserIdForUnread
+            );
+        }).toList();
+    }
+
     private DisputeDetailResponseDto toDetailDto(Dispute dispute) {
-        List<DisputeDetailResponseDto.EvidenceDto> evidences =
-                new ArrayList<>(evidenceRepository.findByDisputeIdOrderByCreatedAtAsc(dispute.getDisputeId()).stream()
-                        .map(e -> DisputeDetailResponseDto.EvidenceDto.builder()
-                                .id(e.getEvidenceId())
-                                .party(e.getParty())
-                                .fileType(e.getFileType())
-                                .fileUrl(e.getFileUrl())
-                                .label(e.getLabel())
-                                .createdAt(e.getCreatedAt())
-                                .build())
-                        .toList());
+        List<DisputeEvidence> rawEvidences = evidenceRepository.findByDisputeIdOrderByCreatedAtAsc(dispute.getDisputeId());
+        ShiftAssignment assignment = dispute.getAssignmentId() != null
+                ? shiftAssignmentRepository.findById(dispute.getAssignmentId()).orElse(null)
+                : null;
+
+        Map<UUID, User> usersById = new HashMap<>();
+        if (dispute.getComplainantId() != null) {
+            userRepository.findById(dispute.getComplainantId()).ifPresent(u -> usersById.put(u.getUserId(), u));
+        }
+        if (dispute.getRespondentId() != null) {
+            userRepository.findById(dispute.getRespondentId()).ifPresent(u -> usersById.put(u.getUserId(), u));
+        }
+        if (dispute.getAssignedTo() != null) {
+            userRepository.findById(dispute.getAssignedTo()).ifPresent(u -> usersById.put(u.getUserId(), u));
+        }
+
+        List<SupportConversation> convs = supportConversationRepository.findByDisputeId(dispute.getDisputeId());
+
+        Long eoStrikeCount90d = null;
+        UUID eoPartyUserId = resolveEoPartyId(dispute.getComplainantId(), dispute.getRespondentId());
+        if (eoPartyUserId != null) {
+            EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(eoPartyUserId).orElse(null);
+            if (eo != null) {
+                eoStrikeCount90d = eoStrikeRepository.countByEo_EoIdAndCreatedAtAfter(
+                        eo.getEoId(), Instant.now().minus(Duration.ofDays(90)));
+            }
+        }
+
+        return buildDetailResponseDto(dispute, rawEvidences, assignment, usersById, convs, eoStrikeCount90d, null);
+    }
+
+    private DisputeDetailResponseDto buildDetailResponseDto(
+            Dispute dispute,
+            List<DisputeEvidence> rawEvidences,
+            ShiftAssignment assignment,
+            Map<UUID, User> usersById,
+            List<SupportConversation> convs,
+            Long eoStrikeCount90d,
+            UUID currentUserIdForUnread
+    ) {
+        List<DisputeDetailResponseDto.EvidenceDto> evidences = new ArrayList<>();
+        if (rawEvidences != null) {
+            for (DisputeEvidence e : rawEvidences) {
+                evidences.add(DisputeDetailResponseDto.EvidenceDto.builder()
+                        .id(e.getEvidenceId())
+                        .party(e.getParty())
+                        .fileType(e.getFileType())
+                        .fileUrl(e.getFileUrl())
+                        .label(e.getLabel())
+                        .createdAt(e.getCreatedAt())
+                        .build());
+            }
+        }
 
         // Đảm bảo nếu bằng chứng được lưu ở cột evidence của đơn thì Admin vẫn xem được đầy đủ
         if (evidences.isEmpty() && dispute.getEvidence() != null && !dispute.getEvidence().isBlank()) {
@@ -815,85 +941,62 @@ public class DisputeService {
         Instant shiftEndTime = null;
         String shiftLocation = null;
 
-        if (dispute.getAssignmentId() != null) {
-            ShiftAssignment assignment = shiftAssignmentRepository.findById(dispute.getAssignmentId()).orElse(null);
-            if (assignment != null && assignment.getShift() != null) {
-                Shift shift = assignment.getShift();
-                jobType = shift.getJobType();
-                shiftStartTime = shift.getStartTime();
-                shiftEndTime = shift.getEndTime();
-                shiftLocation = shift.getLocationAddress();
-                if (shift.getEvent() != null) {
-                    eventName = shift.getEvent().getName();
-                }
+        if (assignment != null && assignment.getShift() != null) {
+            Shift shift = assignment.getShift();
+            jobType = shift.getJobType();
+            shiftStartTime = shift.getStartTime();
+            shiftEndTime = shift.getEndTime();
+            shiftLocation = shift.getLocationAddress();
+            if (shift.getEvent() != null) {
+                eventName = shift.getEvent().getName();
             }
         }
 
-        String complainantName = null;
-        String complainantRole = null;
-        String complainantPhone = null;
-        if (dispute.getComplainantId() != null) {
-            User complainant = userRepository.findById(dispute.getComplainantId()).orElse(null);
-            if (complainant != null) {
-                complainantName = complainant.getFullName();
-                complainantRole = complainant.getRole() != null ? complainant.getRole().name() : null;
-                complainantPhone = complainant.getPhone();
-            }
-        }
+        User complainant = dispute.getComplainantId() != null ? usersById.get(dispute.getComplainantId()) : null;
+        String complainantName = complainant != null ? complainant.getFullName() : null;
+        String complainantRole = complainant != null && complainant.getRole() != null ? complainant.getRole().name() : null;
+        String complainantPhone = complainant != null ? complainant.getPhone() : null;
 
-        String respondentName = null;
-        String respondentRole = null;
-        String respondentPhone = null;
-        if (dispute.getRespondentId() != null) {
-            User respondent = userRepository.findById(dispute.getRespondentId()).orElse(null);
-            if (respondent != null) {
-                respondentName = respondent.getFullName();
-                respondentRole = respondent.getRole() != null ? respondent.getRole().name() : null;
-                respondentPhone = respondent.getPhone();
-            }
-        }
+        User respondent = dispute.getRespondentId() != null ? usersById.get(dispute.getRespondentId()) : null;
+        String respondentName = respondent != null ? respondent.getFullName() : null;
+        String respondentRole = respondent != null && respondent.getRole() != null ? respondent.getRole().name() : null;
+        String respondentPhone = respondent != null ? respondent.getPhone() : null;
 
-        String assignedToName = null;
-        if (dispute.getAssignedTo() != null) {
-            User assignedUser = userRepository.findById(dispute.getAssignedTo()).orElse(null);
-            if (assignedUser != null) {
-                assignedToName = assignedUser.getFullName();
-            }
-        }
+        User assignedUser = dispute.getAssignedTo() != null ? usersById.get(dispute.getAssignedTo()) : null;
+        String assignedToName = assignedUser != null ? assignedUser.getFullName() : null;
 
-        List<SupportConversation> convs = supportConversationRepository.findByDisputeId(dispute.getDisputeId());
         int unreadStaff = 0;
         int workerUnread = 0;
         int eoUnread = 0;
         String lastSender = null;
         Instant lastMsgAt = null;
+        Integer userUnreadOverride = null;
 
-        for (SupportConversation c : convs) {
-            if (c.getUnreadStaffCount() != null) {
-                unreadStaff += c.getUnreadStaffCount();
-                if ("WORKER".equalsIgnoreCase(c.getDisputeParty())) {
-                    workerUnread += c.getUnreadStaffCount();
-                } else if ("EO".equalsIgnoreCase(c.getDisputeParty())) {
-                    eoUnread += c.getUnreadStaffCount();
+        if (convs != null) {
+            for (SupportConversation c : convs) {
+                if (c.getUnreadStaffCount() != null) {
+                    unreadStaff += c.getUnreadStaffCount();
+                    if ("WORKER".equalsIgnoreCase(c.getDisputeParty())) {
+                        workerUnread += c.getUnreadStaffCount();
+                    } else if ("EO".equalsIgnoreCase(c.getDisputeParty())) {
+                        eoUnread += c.getUnreadStaffCount();
+                    }
                 }
-            }
-            if (c.getLastMessageAt() != null) {
-                if (lastMsgAt == null || c.getLastMessageAt().isAfter(lastMsgAt)) {
-                    lastMsgAt = c.getLastMessageAt();
-                    lastSender = c.getDisputeParty();
+                if (currentUserIdForUnread != null
+                        && Objects.equals(c.getUserId(), currentUserIdForUnread)
+                        && ("EO".equalsIgnoreCase(c.getDisputeParty()) || "WORKER".equalsIgnoreCase(c.getDisputeParty()))) {
+                    userUnreadOverride = c.getUnreadUserCount() != null ? c.getUnreadUserCount() : 0;
+                }
+                if (c.getLastMessageAt() != null) {
+                    if (lastMsgAt == null || c.getLastMessageAt().isAfter(lastMsgAt)) {
+                        lastMsgAt = c.getLastMessageAt();
+                        lastSender = c.getDisputeParty();
+                    }
                 }
             }
         }
 
-        Long eoStrikeCount90d = null;
-        UUID eoPartyUserId = resolveEoPartyId(dispute.getComplainantId(), dispute.getRespondentId());
-        if (eoPartyUserId != null) {
-            EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(eoPartyUserId).orElse(null);
-            if (eo != null) {
-                eoStrikeCount90d = eoStrikeRepository.countByEo_EoIdAndCreatedAtAfter(
-                        eo.getEoId(), Instant.now().minus(java.time.Duration.ofDays(90)));
-            }
-        }
+        int finalUnreadCount = userUnreadOverride != null ? userUnreadOverride : unreadStaff;
 
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())
@@ -929,7 +1032,7 @@ public class DisputeService {
                 .eoStrikeCount90d(eoStrikeCount90d)
                 .createdAt(dispute.getCreatedAt())
                 .updatedAt(dispute.getUpdatedAt())
-                .unreadCount(unreadStaff)
+                .unreadCount(finalUnreadCount)
                 .workerUnreadCount(workerUnread)
                 .eoUnreadCount(eoUnread)
                 .lastMessageSenderParty(lastSender)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -56,7 +57,9 @@ Future<void> applyQuickForRadarShift(
   }
   try {
     await ref.read(jobRadarRepositoryProvider).applyForShift(shift.shiftId);
-    ref.read(jobRadarProvider.notifier).scanNearbyShifts();
+    final radarNotifier = ref.read(jobRadarProvider.notifier);
+    radarNotifier.removeShiftFromRadar(shift.shiftId);
+    unawaited(radarNotifier.scanNearbyShifts(silent: true, force: true));
     ref.invalidate(proposalsListProvider);
     ref.invalidate(assignmentsListProvider);
     ref.invalidate(incomeSummaryProvider);
@@ -78,10 +81,16 @@ Future<void> applyQuickForRadarShift(
       );
     }
   } catch (e) {
+    final msg = e.toString().replaceAll("Exception: ", "");
+    if (msg.contains('đã nhận hoặc ứng tuyển')) {
+      final radarNotifier = ref.read(jobRadarProvider.notifier);
+      radarNotifier.removeShiftFromRadar(shift.shiftId);
+      unawaited(radarNotifier.scanNearbyShifts(silent: true, force: true));
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Không thể ứng tuyển: ${e.toString().replaceAll("Exception: ", "")}'),
+          content: Text('Không thể ứng tuyển: $msg'),
           backgroundColor: Theme.of(context).cani.danger,
         ),
       );

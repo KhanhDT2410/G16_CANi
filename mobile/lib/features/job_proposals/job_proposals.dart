@@ -1,6 +1,7 @@
 export 'data/proposal_repository.dart';
 export 'models/proposal_models.dart';
 export 'screens/attendance_qr_scanner_screen.dart';
+export 'screens/invite_qr_scanner_screen.dart';
 export 'screens/my_assignments_screen.dart';
 export 'screens/rate_eo_screen.dart';
 export 'screens/shift_detail_execution_screen.dart';

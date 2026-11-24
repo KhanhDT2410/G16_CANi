@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
+
+export const resolvePreassignedPerformedSkillId = (assignment, shift) =>
+  assignment?.confirmedPerformedSkillId ||
+  assignment?.performedSkillId ||
+  shift?.performedSkillId ||
+  '';
 
 /**
  * Modal xác nhận kỹ năng thực hiện chính trước khi Duyệt Công & cấp SP kinh nghiệm (+20 SP/ca).
- * Không yêu cầu Worker nộp lại chứng chỉ, không chặn thanh toán ngay cả khi ca cũ chưa gán skill.
+ * Chỉ mở khi ca cũ chưa gắn sẵn performedSkillId; render qua React Portal để không bị cắt bởi parent transform/backdrop.
  */
 const ConfirmVerifySkillModal = ({
   isOpen,
@@ -25,6 +32,20 @@ const ConfirmVerifySkillModal = ({
     }
   }, [isOpen, skillTaxonomy, fetchedTaxonomy.length]);
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && !submitting) onClose?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isOpen, onClose, submitting]);
+
   const resolvedTaxonomy =
     Array.isArray(skillTaxonomy) && skillTaxonomy.length > 0 ? skillTaxonomy : fetchedTaxonomy;
 
@@ -32,11 +53,7 @@ const ConfirmVerifySkillModal = ({
     (s) => s && s.skillId && s.isActive !== false
   );
 
-  const defaultSkillId =
-    assignment?.confirmedPerformedSkillId ||
-    assignment?.performedSkillId ||
-    shift?.performedSkillId ||
-    '';
+  const defaultSkillId = resolvePreassignedPerformedSkillId(assignment, shift);
 
   const [selectedSkillId, setSelectedSkillId] = useState(defaultSkillId);
 
@@ -58,9 +75,38 @@ const ConfirmVerifySkillModal = ({
     });
   };
 
-  return (
-    <div className="eo-modal-overlay" style={{ zIndex: 1300 }}>
-      <div className="eo-modal-box" style={{ maxWidth: 480, padding: '1.5rem' }}>
+  const modalNode = (
+    <div
+      className="eo-modal-overlay"
+      onClick={() => !submitting && onClose?.()}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '1rem',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        className="eo-modal-box"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 480,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          padding: '1.5rem',
+          margin: 'auto',
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
           <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
             Xác Nhận Kỹ Năng &amp; Duyệt Công
@@ -68,6 +114,7 @@ const ConfirmVerifySkillModal = ({
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontWeight: 600 }}
           >
             Đóng
@@ -127,6 +174,8 @@ const ConfirmVerifySkillModal = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
 };
 
 export default ConfirmVerifySkillModal;

@@ -904,6 +904,39 @@ class WorkerJobServiceTest {
         assertThat(list.get(0).getLocationLng()).isEqualTo(mockEvent.getVenueLng());
     }
 
+    @Test
+    @DisplayName("UTC026e - getNearbyShifts() - Ẩn hoàn toàn các ca Worker đã nhận hoặc từng ứng tuyển khỏi danh sách gần bạn")
+    void getNearbyShifts_ExcludesShiftsAlreadyAssignedToWorker() {
+        Shift openShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Ca chưa nhận")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(Instant.now().plus(24, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(28, ChronoUnit.HOURS))
+                .requiredWorkers(3)
+                .confirmedWorkers(1)
+                .remainingWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .status(ShiftStatus.ACTIVE)
+                .emergency(true)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(eq(worker.getWorkerId()), anyList()))
+                .thenReturn(List.of());
+        when(shiftAssignmentRepository.findShiftIdsByWorkerId(worker.getWorkerId()))
+                .thenReturn(List.of(activeShift.getShiftId()));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class)))
+                .thenReturn(List.of(activeShift, openShift));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 15.0);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getShiftId()).isEqualTo(openShift.getShiftId());
+    }
+
     // =========================================================================
     // 9. applyForShift() - UTC027 to UTC030
     // =========================================================================

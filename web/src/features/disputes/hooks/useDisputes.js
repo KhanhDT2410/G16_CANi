@@ -59,7 +59,11 @@ export const useDisputes = (initialTab = 'queue') => {
       const data = await disputeApi.getMyDisputes();
       setMyDisputes(data || []);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Không thể tải lịch sử tranh chấp cá nhân';
+      const msg =
+        err.response?.data?.message ||
+        (err.code === 'ECONNABORTED'
+          ? 'Kết nối tải lịch sử tranh chấp bị quá thời gian. Vui lòng bấm Làm mới.'
+          : 'Không thể tải lịch sử tranh chấp cá nhân');
       showToast(msg, 'warning');
       setMyDisputes([]);
     } finally {

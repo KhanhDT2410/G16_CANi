@@ -641,7 +641,7 @@ public class MatchingDispatchService {
     }
 
     /**
-     * UC-59: Kích hoạt điều phối khẩn cấp thủ công (EO bấm trước giờ bắt đầu ca)
+     * UC-59: Kích hoạt điều phối khẩn cấp thủ công (EO bấm trước giờ bắt đầu hoặc trong ca khi còn >= 30 phút)
      */
     @Transactional
     public int triggerEmergencyDispatch(UUID shiftId, Double customRadiusKm) {
@@ -658,17 +658,31 @@ public class MatchingDispatchService {
         }
 
         ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, now);
-        if (effectiveStatus != ShiftStatus.ACTIVE
-                || (shift.getStartTime() != null && !now.isBefore(shift.getStartTime()))) {
+        if ((effectiveStatus != ShiftStatus.ACTIVE && effectiveStatus != ShiftStatus.IN_PROGRESS)
+                || (shift.getEndTime() != null && !now.isBefore(shift.getEndTime()))) {
             log.warn(
-                    "Không thể kích hoạt Emergency Dispatch thủ công: Ca làm việc {} không ở trạng thái ACTIVE trước giờ bắt đầu (status={}, effective={}, startTime={})",
-                    shiftId, shift.getStatus(), effectiveStatus, shift.getStartTime());
+                    "Không thể kích hoạt Emergency Dispatch thủ công: Ca làm việc {} không ở trạng thái ACTIVE/IN_PROGRESS hợp lệ (status={}, effective={}, endTime={})",
+                    shiftId, shift.getStatus(), effectiveStatus, shift.getEndTime());
+            return 0;
+        }
+
+        boolean inProgressWindow = effectiveStatus == ShiftStatus.IN_PROGRESS
+                || (shift.getStartTime() != null && !now.isBefore(shift.getStartTime()));
+        if (inProgressWindow && !policy.hasEnoughRemainingTimeForInProgressEmergency(shift, now)) {
+            log.warn(
+                    "Không thể kích hoạt Emergency Dispatch thủ công: Ca làm việc {} đã vào giờ và không còn đủ 30 phút (endTime={})",
+                    shiftId, shift.getEndTime());
             return 0;
         }
 
         int needed = Math.max(0, policy.resolveRequiredWorkers(shift) - policy.resolveConfirmedWorkersCount(shift));
         if (needed <= 0) {
             return 0;
+        }
+
+        if (effectiveStatus == ShiftStatus.IN_PROGRESS
+                && (shift.getStatus() == ShiftStatus.ACTIVE || shift.getStatus() == ShiftStatus.FULLY_STAFFED)) {
+            shift.setStatus(ShiftStatus.IN_PROGRESS);
         }
 
         return executeEmergencyDispatch(shift, policy, customRadiusKm, needed);

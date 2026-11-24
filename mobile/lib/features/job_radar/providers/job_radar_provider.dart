@@ -371,6 +371,22 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     state = state.copyWith(clearSelectedShift: true);
   }
 
+  /// Xóa ngay ca đã nhận/ứng tuyển khỏi bản đồ & danh sách Job Radar để không hiện trùng trước khi API đồng bộ xong.
+  void removeShiftFromRadar(String shiftId) {
+    if (shiftId.isEmpty) return;
+    final updatedShifts = state.nearbyShifts
+        .where((s) => s.shiftId != shiftId)
+        .toList();
+    final shouldClearSelection = state.selectedShift?.shiftId == shiftId;
+    if (updatedShifts.length == state.nearbyShifts.length && !shouldClearSelection) {
+      return;
+    }
+    state = state.copyWith(
+      nearbyShifts: updatedShifts,
+      clearSelectedShift: shouldClearSelection,
+    );
+  }
+
   Future<void> scanNearbyShifts({bool silent = false, bool force = false}) {
     final reqKey = _buildScanKey(state.userLat, state.userLng, state.searchRadiusKm);
     if (!force && _inFlightScanKey == reqKey && _inFlightScanFuture != null) {

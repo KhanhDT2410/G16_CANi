@@ -261,6 +261,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
 
 export const DEFAULT_UNDERSTAFFED_ALERT_HOURS = 4;
 export const DEFAULT_EMERGENCY_RADIUS_KM = 25;
+export const MIN_REMAINING_MINUTES_FOR_EMERGENCY = 30;
 
 export function formatShiftStartTime(timeStr, fallback = '--:--') {
   if (!timeStr) return fallback;
@@ -321,6 +322,13 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     startValid &&
     now.getTime() >= start.getTime() - hoursWindow * 3600 * 1000;
 
+  const remainingMinutes = endValid
+    ? Math.floor((end.getTime() - now.getTime()) / 60000)
+    : null;
+  const hasEnoughRemainingForInProgress =
+    !isInProgress ||
+    (remainingMinutes !== null && remainingMinutes >= MIN_REMAINING_MINUTES_FOR_EMERGENCY);
+
   const isEmergency = Boolean(shift?.emergency) && missing > 0;
   const nearStartUnderstaffed =
     missing > 0 &&
@@ -337,10 +345,15 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     !isCancelled &&
     !isCompleted &&
     !isSuspended &&
-    !isInProgress &&
+    hasEnoughRemainingForInProgress &&
     missing > 0 &&
     !isEmergency &&
     (typeof shift?.canTriggerEmergency === 'boolean' ? shift.canTriggerEmergency : true);
+
+  const defaultBlockReason =
+    isInProgress && !hasEnoughRemainingForInProgress
+      ? `Ca làm việc đã vào giờ và không còn đủ thời gian tối thiểu (${MIN_REMAINING_MINUTES_FOR_EMERGENCY} phút) để kích hoạt điều phối khẩn cấp.`
+      : null;
 
   const isFullyStaffed = !isDraft && !isCancelled && !isCompleted && !isSuspended && missing === 0 && required > 0;
 
@@ -367,12 +380,13 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
     isSuspended,
     isCompleted,
     isInProgress,
+    hasEnoughRemainingForInProgress,
     isEmergency,
     isFullyStaffed,
     withinAlertWindow,
     nearStartUnderstaffed,
     canTriggerEmergency,
-    emergencyBlockReason: shift?.emergencyBlockReason || null,
+    emergencyBlockReason: shift?.emergencyBlockReason || defaultBlockReason,
     hasCandidates,
     defaultRadiusKm,
     startTimeText,
@@ -381,12 +395,37 @@ export function getShiftStaffingSummary(shift = {}, event = {}, now = new Date()
 }
 
 /**
- * Lọc danh sách các ca làm việc đang bị thiếu hụt nhân sự sát giờ (mặc định <= 4h trước startTime đến trước endTime)
+ * Lọc danh sách các ca làm việc đang bị thiếu hụt nhân sự sát giờ (dùng cho thông báo & tổng quan sự kiện)
  */
 export function getShiftStaffingAlerts(shifts = [], event = {}, now = new Date(), alertHours = DEFAULT_UNDERSTAFFED_ALERT_HOURS) {
   return (shifts || [])
     .map((s) => getShiftStaffingSummary(s, event, now, alertHours))
     .filter((summary) => summary.nearStartUnderstaffed);
+}
+
+/**
+ * Lọc danh sách các ca làm việc hiển thị khung Điều phối khẩn cấp trong Chi tiết sự kiện:
+ * Chỉ hiển thị sau khi đã bật Emergency (hoặc vừa bù đủ nhân sự trong phiên).
+ */
+export function getActiveEmergencyAlerts(
+  shifts = [],
+  event = {},
+  dispatchResultsByShiftId = {},
+  now = new Date(),
+  alertHours = DEFAULT_UNDERSTAFFED_ALERT_HOURS
+) {
+  return (shifts || [])
+    .map((s) => getShiftStaffingSummary(s, event, now, alertHours))
+    .filter((summary) => {
+      if (summary.isDraft || summary.isCancelled || summary.isCompleted) {
+        return false;
+      }
+      if (summary.isEmergency) {
+        return true;
+      }
+      const shiftId = summary.shift?.shiftId;
+      return Boolean(shiftId && dispatchResultsByShiftId?.[shiftId] && summary.missing <= 0);
+    });
 }
 
 /**

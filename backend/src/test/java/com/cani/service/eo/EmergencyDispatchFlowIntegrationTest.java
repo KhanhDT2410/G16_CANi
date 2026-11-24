@@ -359,8 +359,8 @@ class EmergencyDispatchFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("Ranh giới thời gian thực tế: ngay trước start, đúng lúc start (DB chưa sync), sau start <30p, đã kết thúc và đã hủy")
-    void timeBoundaries_ManualBlockedAfterStart_AutoStopsWhenEndedCancelledOrTooShort() {
+    @DisplayName("Ranh giới thời gian thực tế: trước start, trong ca >= 30p (DB chưa sync), sau start <30p, đã kết thúc và đã hủy")
+    void timeBoundaries_ManualAllowedInProgressWithMinRemaining_AutoStopsWhenEndedCancelledOrTooShort() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         User eoUser = saveUser("eo-tb-" + suffix, UserRole.EVENT_ORGANIZER);
         EventOrganizer eo = eventOrganizerRepository.save(EventOrganizer.builder()
@@ -386,21 +386,25 @@ class EmergencyDispatchFlowIntegrationTest {
         Map<String, Object> beforeRes = eoEventService.triggerEmergencyDispatchWithDetails(eoUser.getUserId(), beforeStart.getShiftId(), 25.0);
         assertEquals(true, beforeRes.get("emergency"));
 
-        // 2. Đúng lúc / sau giờ bắt đầu dù DB status còn ACTIVE -> manual trigger bị chặn
+        // 2. Sau giờ bắt đầu nhưng còn >= 30 phút (dù DB status còn ACTIVE) -> manual trigger thành công & đồng bộ IN_PROGRESS
         Shift atOrAfterStartDbStale = shiftRepository.save(Shift.builder()
                 .event(ev).jobType("Vào ca DB cũ").startTime(now.minus(Duration.ofSeconds(10))).endTime(now.plus(Duration.ofHours(3)))
                 .requiredWorkers(2).confirmedWorkers(0).remainingWorkers(2)
                 .hourlyWage(BigDecimal.valueOf(50000)).locationLat(10.7769).locationLng(106.7009)
                 .status(ShiftStatus.ACTIVE).emergency(false).build());
-        assertThrows(BadRequestException.class,
-                () -> eoEventService.triggerEmergencyDispatchWithDetails(eoUser.getUserId(), atOrAfterStartDbStale.getShiftId(), 25.0));
+        Map<String, Object> inProgressRes = eoEventService.triggerEmergencyDispatchWithDetails(eoUser.getUserId(), atOrAfterStartDbStale.getShiftId(), 25.0);
+        assertEquals(true, inProgressRes.get("emergency"));
+        Shift syncedInProgress = shiftRepository.findById(atOrAfterStartDbStale.getShiftId()).orElseThrow();
+        assertEquals(ShiftStatus.IN_PROGRESS, syncedInProgress.getStatus());
 
-        // 3. Sau giờ bắt đầu chỉ còn 15 phút (< 30p) -> no-show KHÔNG kích hoạt auto emergency dispatch
+        // 3. Sau giờ bắt đầu chỉ còn 15 phút (< 30p) -> cả manual và no-show auto emergency dispatch đều bị chặn
         Shift shortRemaining = shiftRepository.save(Shift.builder()
                 .event(ev).jobType("Sắp hết ca").startTime(now.minus(Duration.ofHours(2))).endTime(now.plus(Duration.ofMinutes(15)))
                 .requiredWorkers(2).confirmedWorkers(1).remainingWorkers(1)
                 .hourlyWage(BigDecimal.valueOf(50000)).locationLat(10.7769).locationLng(106.7009)
                 .status(ShiftStatus.IN_PROGRESS).emergency(false).build());
+        assertThrows(BadRequestException.class,
+                () -> eoEventService.triggerEmergencyDispatchWithDetails(eoUser.getUserId(), shortRemaining.getShiftId(), 25.0));
         ShiftAssignment saShort = shiftAssignmentRepository.save(ShiftAssignment.builder()
                 .shift(shortRemaining).worker(w).source(AssignmentSource.MATCHING)
                 .status(AssignmentStatus.CONFIRMED).eoConfirmed(false).build());

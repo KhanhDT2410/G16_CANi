@@ -7,6 +7,7 @@ import 'package:cani/app/theme.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/dispute_models.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
+import 'package:cani/features/job_proposals/screens/invite_qr_scanner_screen.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_proposals/screens/my_disputes_screen.dart';
 import 'package:cani/features/job_proposals/screens/shift_payment_screen.dart';
@@ -158,7 +159,7 @@ void main() {
     expect(repo.lastCreatedDispute?.assignmentId, 'a1');
   });
 
-  testWidgets('MyAssignmentsScreen QR/invite code dialog closes cleanly after submit', (tester) async {
+  testWidgets('MyAssignmentsScreen invite code button opens dialog cleanly & Quét QR opens QR scanner', (tester) async {
     final repo = _FakeProposalRepository();
     await tester.pumpWidget(
       ProviderScope(
@@ -171,8 +172,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Khi chưa có ca active, nút Quét QR mở dialog nhập mã mời vào ca
-    await tester.tap(find.text('Quét QR'));
+    // 1. Nút icon Nhập mã mời ca làm mở dialog nhập mã thủ công và join thành công
+    await tester.tap(find.byTooltip('Nhập mã mời ca làm'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'CANI-8XK2PW');
@@ -181,6 +182,21 @@ void main() {
 
     expect(repo.lastJoinedInviteCode, 'CANI-8XK2PW');
     expect(find.text('Tham gia ca làm việc thành công!'), findsOneWidget);
+
+    // 2. Khi chưa có ca active, nút Quét QR mở màn Camera InviteQrScannerScreen thay vì hộp nhập mã
+    await tester.tap(find.text('Quét QR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Quét QR Tham Gia Ca'), findsOneWidget);
+    expect(find.text('Nhập mã thủ công'), findsOneWidget);
+  });
+
+  test('parseInviteCodeFromQr extracts code from CANI_INVITE, URL, and raw code while rejecting checkin/checkout', () {
+    expect(parseInviteCodeFromQr('CANI_INVITE:CANI-J6VEQ5'), 'CANI-J6VEQ5');
+    expect(parseInviteCodeFromQr('cani-8xk2pw'), 'CANI-8XK2PW');
+    expect(parseInviteCodeFromQr('http://localhost:5173/join?code=CANI-J6VEQ5'), 'CANI-J6VEQ5');
+    expect(parseInviteCodeFromQr('CANI_CHECKIN:123'), isNull);
+    expect(parseInviteCodeFromQr('CANI_CHECKOUT:123'), isNull);
   });
 
   testWidgets('JobRadar invite code dialog closes cleanly after submit', (tester) async {

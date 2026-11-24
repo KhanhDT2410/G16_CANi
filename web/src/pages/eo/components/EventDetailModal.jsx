@@ -8,6 +8,7 @@ import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import ShiftEmergencyBanner from './ShiftEmergencyBanner';
 import EmergencyTriggerButton from './EmergencyTriggerButton';
 import {
+  getActiveEmergencyAlerts,
   getDynamicEventStatus,
   getDynamicShiftStatus,
   getShiftStaffingAlerts,
@@ -118,6 +119,10 @@ export default function EventDetailModal({
   const cancelledShifts = rawShifts.filter((sh) => sh.status === 'CANCELLED');
   const shifts = activeAndDraftShifts;
   const staffingAlerts = useMemo(() => getShiftStaffingAlerts(shifts, event), [shifts, event]);
+  const activeEmergencyAlerts = useMemo(
+    () => getActiveEmergencyAlerts(shifts, event, dispatchResultsByShiftId),
+    [shifts, event, dispatchResultsByShiftId]
+  );
 
   // Map skillId -> tên kỹ năng (taxonomy) để hiển thị badge requiredSkills
   const skillNameMap = useMemo(() => {
@@ -591,8 +596,8 @@ export default function EventDetailModal({
                 </button>
               </div>
 
-              {/* Cảnh báo thiếu nhân sự sát giờ riêng cho từng ca */}
-              {staffingAlerts.length > 0 && (
+              {/* Khung điều phối khẩn cấp: chỉ hiển thị sau khi ca đã được kích hoạt khẩn cấp */}
+              {activeEmergencyAlerts.length > 0 && (
                 <div
                   style={{
                     marginBottom: '1.15rem',
@@ -602,9 +607,9 @@ export default function EventDetailModal({
                   }}
                 >
                   <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#be123c' }}>
-                    Thiếu nhân sự sát giờ ({staffingAlerts.length} ca)
+                    Đang điều phối khẩn cấp ({activeEmergencyAlerts.length} ca)
                   </div>
-                  {staffingAlerts.map((alertSummary) => (
+                  {activeEmergencyAlerts.map((alertSummary) => (
                     <ShiftEmergencyBanner
                       key={alertSummary.shift.shiftId}
                       shift={alertSummary.shift}

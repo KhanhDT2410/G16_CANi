@@ -37,7 +37,6 @@ class CreateDisputeSheet extends StatefulWidget {
 class _CreateDisputeSheetState extends State<CreateDisputeSheet> {
   final TextEditingController _titleCtrl = TextEditingController();
   final TextEditingController _descCtrl = TextEditingController();
-  final TextEditingController _evidenceCtrl = TextEditingController();
 
   String? _selectedAssignmentId;
   String _selectedType = 'PAYMENT';
@@ -57,7 +56,6 @@ class _CreateDisputeSheetState extends State<CreateDisputeSheet> {
   void dispose() {
     _titleCtrl.dispose();
     _descCtrl.dispose();
-    _evidenceCtrl.dispose();
     super.dispose();
   }
 
@@ -83,7 +81,6 @@ class _CreateDisputeSheetState extends State<CreateDisputeSheet> {
         _isUploadingPhoto = false;
         _uploadedEvidenceUrl = url;
         _previewBytes = scanResult.bytes;
-        _evidenceCtrl.text = url;
       });
     } catch (e) {
       if (!mounted) return;
@@ -129,7 +126,7 @@ class _CreateDisputeSheetState extends State<CreateDisputeSheet> {
           type: _selectedType,
           title: title,
           description: desc,
-          evidence: _evidenceCtrl.text.trim().isNotEmpty ? _evidenceCtrl.text.trim() : null,
+          evidence: _uploadedEvidenceUrl,
         ),
       );
       if (mounted) {
@@ -388,31 +385,11 @@ class _CreateDisputeSheetState extends State<CreateDisputeSheet> {
                     onPressed: () => setState(() {
                       _previewBytes = null;
                       _uploadedEvidenceUrl = null;
-                      _evidenceCtrl.clear();
                     }),
                     icon: Icon(Icons.close_rounded, size: 18, color: cani.danger),
                   ),
                 ],
               ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _evidenceCtrl,
-              decoration: InputDecoration(
-                hintText: 'Hoặc dán link / mô tả bằng chứng bổ sung...',
-                filled: true,
-                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cani.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cani.border),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                prefixIcon: const Icon(Icons.link, size: 18),
-              ),
             ),
             const SizedBox(height: 16),
             if (_modalError != null) ...[

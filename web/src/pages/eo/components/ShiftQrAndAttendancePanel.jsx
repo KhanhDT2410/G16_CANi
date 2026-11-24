@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import RateWorkerModal from './RateWorkerModal';
-import ConfirmVerifySkillModal from './ConfirmVerifySkillModal';
+import ConfirmVerifySkillModal, { resolvePreassignedPerformedSkillId } from './ConfirmVerifySkillModal';
 import ReportNoShowModal from './ReportNoShowModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
@@ -882,7 +882,17 @@ export default function ShiftQrAndAttendancePanel({
                               <button
                                 type="button"
                                 disabled={!canVerify || verifyingId === item.assignmentId}
-                                onClick={() => setSelectedForVerify(item)}
+                                onClick={() => {
+                                  const preassignedSkillId = resolvePreassignedPerformedSkillId(item, shift);
+                                  if (preassignedSkillId) {
+                                    handleVerify(item.assignmentId, {
+                                      confirmedPerformedSkillId: preassignedSkillId,
+                                      confirmPerformedSkill: true,
+                                    });
+                                  } else {
+                                    setSelectedForVerify(item);
+                                  }
+                                }}
                                 title={
                                   !isCheckedIn
                                     ? 'Nhân sự chưa check-in vào ca'

@@ -19,7 +19,8 @@ export function openEmergencyPromptForShift(shiftId, eventId) {
 
 /**
  * Nút "Kích hoạt khẩn cấp" cho ca làm việc:
- * - Bật (enabled) khi ca thiếu nhân sự ở chế độ MATCHING và đã vào khung cận giờ (<= 4h trước giờ bắt đầu).
+ * - Bật (enabled) khi ca thiếu nhân sự ở chế độ MATCHING, đang trong khung cận giờ (<= 4h trước startTime)
+ *   hoặc đang trong ca (IN_PROGRESS) còn tối thiểu 30 phút làm việc.
  * - Khóa (disabled) khi chưa tới khung cận giờ (> 4h trước giờ bắt đầu), kèm giải thích rõ ràng.
  */
 export default function EmergencyTriggerButton({ shift, event, compact = false }) {
@@ -32,7 +33,6 @@ export default function EmergencyTriggerButton({ shift, event, compact = false }
     summary.isCancelled ||
     summary.isCompleted ||
     summary.isSuspended ||
-    summary.isInProgress ||
     summary.missing <= 0 ||
     summary.isEmergency
   ) {
@@ -40,6 +40,11 @@ export default function EmergencyTriggerButton({ shift, event, compact = false }
   }
 
   const canActivateNow = Boolean(summary.nearStartUnderstaffed && summary.canTriggerEmergency);
+  // Khi ca đã vào giờ (IN_PROGRESS) nhưng không còn đủ thời gian (>= 30p) -> ẩn nút gọn gàng thay vì hiện nút khóa "Gần giờ"
+  if (summary.isInProgress && !canActivateNow) {
+    return null;
+  }
+
   const disabledReason =
     summary.emergencyBlockReason ||
     'Chỉ kích hoạt được khi gần đến giờ bắt đầu ca (trong vòng 4 giờ trước giờ bắt đầu).';

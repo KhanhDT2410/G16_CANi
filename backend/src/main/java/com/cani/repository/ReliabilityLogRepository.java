@@ -11,4 +11,10 @@ import java.util.UUID;
 public interface ReliabilityLogRepository extends JpaRepository<ReliabilityLog, UUID> {
 
     List<ReliabilityLog> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT r FROM ReliabilityLog r WHERE r.worker.workerId = :workerId AND r.referenceType IN :refTypes AND r.createdAt >= :since ORDER BY r.createdAt DESC")
+    List<ReliabilityLog> findViolationsByWorkerId(
+            @org.springframework.data.repository.query.Param("workerId") UUID workerId,
+            @org.springframework.data.repository.query.Param("refTypes") java.util.Collection<String> refTypes,
+            @org.springframework.data.repository.query.Param("since") java.time.Instant since);
 }

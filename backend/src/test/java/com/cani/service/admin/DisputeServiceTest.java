@@ -41,6 +41,7 @@ class DisputeServiceTest {
     @Mock private EventOrganizerRepository eventOrganizerRepository;
     @Mock private UserRepository userRepository;
     @Mock private ReliabilityLogRepository reliabilityLogRepository;
+    @Mock private com.cani.repository.EoStrikeRepository eoStrikeRepository;
     @Mock private NotificationRepository notificationRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private SupportConversationRepository supportConversationRepository;
@@ -356,6 +357,54 @@ class DisputeServiceTest {
         assertThat(staff.get(0).getUserId()).isEqualTo(ccUserId);
         assertThat(staff.get(0).getFullName()).isEqualTo("Lê Thị Hồng");
         assertThat(staff.get(0).getAssignedCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("issueDecision - Outcome EO_FAULT ghi nhận 1 EoStrike cho EO liên quan")
+    void testIssueDecision_EoFault_RecordsStrike() {
+        Dispute dispute = openDispute();
+        dispute.setStatus(DisputeStatus.INVESTIGATING);
+        when(disputeRepository.findById(dispute.getDisputeId())).thenReturn(Optional.of(dispute));
+
+        UUID ccUserId = UUID.randomUUID();
+        User cc = User.builder().userId(ccUserId).role(UserRole.CUSTOMER_CARE).build();
+        when(userRepository.findById(ccUserId)).thenReturn(Optional.of(cc));
+
+        when(eventOrganizerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.empty());
+        when(eventOrganizerRepository.findByUser_UserId(eoUserId)).thenReturn(Optional.of(eo));
+        when(eoStrikeRepository.existsByDispute_DisputeId(dispute.getDisputeId())).thenReturn(false);
+        when(disputeRepository.save(any(Dispute.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        IssueDecisionRequestDto request = IssueDecisionRequestDto.builder()
+                .outcome(DisputeOutcome.EO_FAULT)
+                .rationale("Nhà tổ chức không trả thù lao đúng hẹn, không có lý do chính đáng sau 48h.")
+                .build();
+
+        disputeService.issueDecision(ccUserId, dispute.getDisputeId(), request);
+
+        verify(eoStrikeRepository, times(1)).save(any(com.cani.entity.EoStrike.class));
+    }
+
+    @Test
+    @DisplayName("getEoStrikesForDispute - Đếm chính xác 2 strike của EO trong 90 ngày")
+    void testGetEoStrikesForDispute_CountsCorrectly() {
+        Dispute dispute = openDispute();
+        when(disputeRepository.findById(dispute.getDisputeId())).thenReturn(Optional.of(dispute));
+
+        when(eventOrganizerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.empty());
+        when(eventOrganizerRepository.findByUser_UserId(eoUserId)).thenReturn(Optional.of(eo));
+
+        when(eoStrikeRepository.countByEo_EoIdAndCreatedAtAfter(eq(eo.getEoId()), any())).thenReturn(2L);
+        when(eoStrikeRepository.findByEo_EoIdAndCreatedAtAfterOrderByCreatedAtDesc(eq(eo.getEoId()), any()))
+                .thenReturn(List.of(
+                        com.cani.entity.EoStrike.builder().strikeId(UUID.randomUUID()).dispute(dispute).reason("Vi phạm 1").createdAt(Instant.now()).build(),
+                        com.cani.entity.EoStrike.builder().strikeId(UUID.randomUUID()).dispute(dispute).reason("Vi phạm 2").createdAt(Instant.now()).build()
+                ));
+
+        var summary = disputeService.getEoStrikesForDispute(dispute.getDisputeId());
+
+        assertThat(summary.getStrikeCount90d()).isEqualTo(2L);
+        assertThat(summary.getStrikes()).hasSize(2);
     }
 
     // ------------------------------------------------------------------

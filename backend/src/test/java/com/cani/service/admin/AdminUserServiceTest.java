@@ -9,6 +9,7 @@ import com.cani.dto.admin.user.UserSummaryResponseDto;
 import com.cani.dto.response.PageResponse;
 import com.cani.entity.AuditLog;
 import com.cani.entity.EventOrganizer;
+import com.cani.entity.ReliabilityLog;
 import com.cani.entity.SkillVerificationRequest;
 import com.cani.entity.User;
 import com.cani.entity.Worker;
@@ -21,6 +22,7 @@ import com.cani.exception.BadRequestException;
 import com.cani.exception.ResourceNotFoundException;
 import com.cani.repository.AuditLogRepository;
 import com.cani.repository.EventOrganizerRepository;
+import com.cani.repository.ReliabilityLogRepository;
 import com.cani.repository.SkillVerificationRequestRepository;
 import com.cani.repository.UserRepository;
 import com.cani.repository.WorkerRepository;
@@ -64,6 +66,12 @@ class AdminUserServiceTest {
 
         @Mock
         private SkillVerificationRequestRepository skillVerificationRequestRepository;
+
+        @Mock
+        private ReliabilityLogRepository reliabilityLogRepository;
+
+        @Mock
+        private AuditLogRepository auditLogRepository;
 
         @Mock
         private AuditLogService auditLogService;
@@ -314,5 +322,126 @@ class AdminUserServiceTest {
 
                 verify(userRepository, never()).save(any());
                 verify(auditLogService, never()).logAction(any());
+        }
+
+        @Test
+        @DisplayName("adjustReliabilityScore - Thành công khi trừ điểm RS và ghi log")
+        void testAdjustReliabilityScore_Success_Deduct() {
+                Worker worker = Worker.builder()
+                                .workerId(UUID.randomUUID())
+                                .user(sampleWorkerUser)
+                                .reliabilityScore(85)
+                                .build();
+                when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(worker));
+                when(reliabilityLogRepository.save(any(ReliabilityLog.class))).thenAnswer(inv -> {
+                        ReliabilityLog log = inv.getArgument(0);
+                        log.setLogId(UUID.randomUUID());
+                        log.setCreatedAt(Instant.now());
+                        return log;
+                });
+
+                com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto request = com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto.builder()
+                                .delta(-25)
+                                .reason("Tái phạm bỏ ca <50% lần 2")
+                                .referenceType("DISPUTE")
+                                .referenceId(UUID.randomUUID())
+                                .build();
+
+                var response = adminUserService.adjustReliabilityScore(workerUserId, adminUserId, request);
+
+                assertThat(response.getScoreBefore()).isEqualTo(85);
+                assertThat(response.getScoreAfter()).isEqualTo(60);
+                assertThat(response.getDelta()).isEqualTo(-25);
+                assertThat(worker.getReliabilityScore()).isEqualTo(60);
+                verify(workerRepository, times(1)).save(worker);
+                verify(reliabilityLogRepository, times(1)).save(any(ReliabilityLog.class));
+                verify(auditLogService, times(1)).logAction(any(AuditLog.class));
+        }
+
+        @Test
+        @DisplayName("adjustReliabilityScore - Chặn ngưỡng [0, 100] khi delta vượt biên")
+        void testAdjustReliabilityScore_ClampBounds() {
+                Worker worker = Worker.builder()
+                                .workerId(UUID.randomUUID())
+                                .user(sampleWorkerUser)
+                                .reliabilityScore(10)
+                                .build();
+                when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(worker));
+                when(reliabilityLogRepository.save(any(ReliabilityLog.class))).thenAnswer(inv -> inv.getArgument(0));
+
+                com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto request = com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto.builder()
+                                .delta(-30)
+                                .reason("Vi phạm nghiêm trọng")
+                                .build();
+
+                var response = adminUserService.adjustReliabilityScore(workerUserId, adminUserId, request);
+
+                assertThat(response.getScoreBefore()).isEqualTo(10);
+                assertThat(response.getScoreAfter()).isEqualTo(0);
+                assertThat(worker.getReliabilityScore()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("adjustReliabilityScore - Báo lỗi 404 khi không tìm thấy Worker")
+        void testAdjustReliabilityScore_WorkerNotFound_Throws404() {
+                when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.empty());
+
+                com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto request = com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto.builder()
+                                .delta(10)
+                                .reason("Khôi phục điểm")
+                                .build();
+
+                assertThatThrownBy(() -> adminUserService.adjustReliabilityScore(workerUserId, adminUserId, request))
+                                .isInstanceOf(ResourceNotFoundException.class)
+                                .hasMessageContaining("Hồ sơ nhân sự (Worker)");
+
+                verify(workerRepository, never()).save(any());
+                verify(reliabilityLogRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("getViolationHistory - Đếm đúng 2 no-show trong 60 ngày")
+        void testGetViolationHistory_TwoNoShows_ReturnsCountTwo() {
+                when(userRepository.existsById(workerUserId)).thenReturn(true);
+                Worker worker = Worker.builder()
+                                .workerId(UUID.randomUUID())
+                                .user(sampleWorkerUser)
+                                .build();
+                when(workerRepository.findByUser_UserId(workerUserId)).thenReturn(Optional.of(worker));
+
+                ReliabilityLog noShow1 = ReliabilityLog.builder()
+                                .logId(UUID.randomUUID())
+                                .worker(worker)
+                                .changeAmount(-25)
+                                .reason("Vắng mặt không phép")
+                                .referenceType("NO_SHOW")
+                                .scoreBefore(100)
+                                .scoreAfter(75)
+                                .createdAt(Instant.now().minus(java.time.Duration.ofDays(10)))
+                                .build();
+
+                ReliabilityLog noShow2 = ReliabilityLog.builder()
+                                .logId(UUID.randomUUID())
+                                .worker(worker)
+                                .changeAmount(-25)
+                                .reason("Vắng mặt không phép")
+                                .referenceType("NO_SHOW")
+                                .scoreBefore(75)
+                                .scoreAfter(50)
+                                .createdAt(Instant.now().minus(java.time.Duration.ofDays(30)))
+                                .build();
+
+                when(reliabilityLogRepository.findViolationsByWorkerId(eq(worker.getWorkerId()), any(), any()))
+                                .thenReturn(List.of(noShow1, noShow2));
+                when(auditLogRepository.findViolationsByUserId(eq(workerUserId), eq("DISPUTE"), any()))
+                                .thenReturn(List.of());
+
+                var history = adminUserService.getViolationHistory(workerUserId, 60);
+
+                assertThat(history.getUserId()).isEqualTo(workerUserId);
+                assertThat(history.getDays()).isEqualTo(60);
+                assertThat(history.getNoShowCount()).isEqualTo(2L);
+                assertThat(history.getTotalViolations()).isEqualTo(2L);
+                assertThat(history.getReliabilityLogs()).hasSize(2);
         }
 }

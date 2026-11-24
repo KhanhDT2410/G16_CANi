@@ -27,6 +27,7 @@ public class UserDetailResponseDto {
     private String language;
     private String fcmToken;
     private Instant lastLoginAt;
+    private Instant lockUntil;
     private Instant createdAt;
     private Instant updatedAt;
 

@@ -45,6 +45,7 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { id: 'tickets', label: 'Phiếu Hỗ Trợ Khách Hàng', icon: <TicketIcon />, hasChildren: true },
       { id: 'disputes', label: 'Tranh Chấp & Khiếu Nại', icon: <DisputeIcon /> },
+      { id: 'dispute_rules', label: 'Quy tắc xử lý khiếu nại', icon: <SkillReviewIcon /> },
       { id: 'faqs', label: 'Câu Hỏi Thường Gặp', icon: <FaqIcon /> },
     ],
   },
@@ -108,6 +109,10 @@ export const ADMIN_TAB_METADATA = {
   disputes: {
     title: 'Tranh Chấp & Khiếu Nại',
     subtitle: 'Tiếp nhận đơn khiếu nại hợp đồng ca làm việc, phân công và ra phán quyết cuối cùng',
+  },
+  dispute_rules: {
+    title: 'Quy Tắc Xử Lý Khiếu Nại',
+    subtitle: 'Quản trị danh mục chế tài, điều kiện áp dụng và mức phạt quy chuẩn cho Ban giải quyết tranh chấp',
   },
   faqs: {
     title: 'Câu Hỏi Thường Gặp',

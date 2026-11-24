@@ -14,6 +14,7 @@ import { AdminPlansView } from '../../features/admin-plans';
 import { WageMatrixView } from '../../features/admin-wage-matrix';
 import { AdminSkillView } from '../../features/admin-skills';
 import { AdminReviewView } from '../../features/admin-reviews';
+import { AdminDisputeRulesView } from '../../features/admin-dispute-rules';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
 
@@ -57,6 +58,10 @@ const TAB_METADATA = {
   disputes: {
     title: 'Tranh Chấp & Khiếu Nại',
     subtitle: 'Tiếp nhận đơn khiếu nại hợp đồng ca làm việc, phân công và ra phán quyết cuối cùng',
+  },
+  dispute_rules: {
+    title: 'Quy Tắc Xử Lý Khiếu Nại',
+    subtitle: 'Quản trị danh mục chế tài, điều kiện áp dụng và mức phạt quy chuẩn cho Ban giải quyết tranh chấp',
   },
   faqs: {
     title: 'Câu Hỏi Thường Gặp',
@@ -121,6 +126,8 @@ const AdminPage = () => {
         setActiveTab('tickets');
       } else if (tab === 'disputes') {
         setActiveTab('disputes');
+      } else if (tab === 'dispute_rules') {
+        setActiveTab('dispute_rules');
       } else if (tab === 'events' || tab === 'shifts') {
         setActiveTab('shifts');
       } else if (tab === 'payments' || tab === 'revenue') {
@@ -210,6 +217,7 @@ const AdminPage = () => {
           {activeTab === 'shifts' && <AdminShiftView />}
           {activeTab === 'reviews' && <AdminReviewView />}
           {activeTab === 'disputes' && <DisputeCenterView />}
+          {activeTab === 'dispute_rules' && <AdminDisputeRulesView />}
           {activeTab === 'tickets' && (
             <SupportTicketsCenterView
               activeFilter={ticketFilter}

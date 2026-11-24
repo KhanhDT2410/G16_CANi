@@ -94,6 +94,18 @@ public class AdminDisputeController {
         return ResponseEntity.ok(ApiResponse.ok(response, "Đã ghi nhận quyết định xử lý tranh chấp"));
     }
 
+    /**
+     * Lấy danh sách và đếm số Strike của Nhà tổ chức sự kiện liên quan trong 90 ngày.
+     * GET /api/v1/admin/disputes/{id}/eo-strikes
+     */
+    @GetMapping("/{id}/eo-strikes")
+    public ResponseEntity<ApiResponse<EoStrikeSummaryDto>> getEoStrikes(
+            @PathVariable("id") UUID id
+    ) {
+        EoStrikeSummaryDto summary = disputeService.getEoStrikesForDispute(id);
+        return ResponseEntity.ok(ApiResponse.ok(summary, "Lấy thông tin strike của Nhà tổ chức thành công"));
+    }
+
     private UUID currentUserId(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof User u)) {
             return null;

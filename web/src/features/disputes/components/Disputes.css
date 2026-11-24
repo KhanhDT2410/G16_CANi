@@ -97,7 +97,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.dispute-table-card > table {
+.dispute-table-card>table {
   min-width: 640px;
 }
 
@@ -186,9 +186,17 @@
 }
 
 @keyframes pulse-escalated {
-  0% { opacity: 0.85; }
-  50% { opacity: 1; }
-  100% { opacity: 0.85; }
+  0% {
+    opacity: 0.85;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.85;
+  }
 }
 
 /* Dispute Modal */
@@ -243,8 +251,15 @@
 }
 
 @keyframes modal-pop {
-  from { transform: scale(0.96); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .dispute-modal-header {
@@ -456,6 +471,151 @@
   color: var(--color-warning-text);
 }
 
+.dispute-rule-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md, 6px);
+  margin-bottom: 14px;
+}
+
+.dispute-rule-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.dispute-rule-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dispute-rule-banner-tag {
+  display: inline-block;
+  background: #dcfce7;
+  color: #166534;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dispute-rule-banner-text {
+  font-size: 0.86rem;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.dispute-rule-admin-action {
+  font-size: 0.83rem;
+  color: #b91c1c;
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.4;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+.dispute-rule-picker-group {
+  margin-bottom: 12px;
+}
+
+.dispute-rule-picker-group label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-main, #1e293b);
+  margin-bottom: 4px;
+}
+
+.dispute-level-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.dispute-level-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #64748b);
+  font-weight: 500;
+}
+
+.dispute-level-btn {
+  background: #ffffff;
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-main, #334155);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dispute-level-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.dispute-level-btn.active {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.dispute-level-btn.suggested {
+  position: relative;
+}
+
+.dispute-level-badge-suggested {
+  margin-left: 4px;
+  font-size: 0.7rem;
+  background: #fef08a;
+  color: #854d0e;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.btn-apply-sanction {
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-apply-sanction:hover {
+  background: #15803d;
+}
+
+.dispute-waiver-alert {
+  padding: 8px 12px;
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: var(--radius-md, 6px);
+  font-size: 0.82rem;
+  color: #854d0e;
+  margin-bottom: 10px;
+}
+
 .dispute-escalate-notice {
   padding: 0.65rem 0.85rem;
   background: #fae8ff;
@@ -611,6 +771,7 @@
   color: #1d4ed8;
   border-color: #bfdbfe;
 }
+
 .btn-ws-assign:hover {
   background: #dbeafe;
 }
@@ -620,6 +781,7 @@
   color: #047857;
   border-color: #a7f3d0;
 }
+
 .btn-ws-decide:hover {
   background: #d1fae5;
 }
@@ -629,6 +791,7 @@
   color: #86198f;
   border-color: #f0abfc;
 }
+
 .btn-ws-escalate:hover {
   background: #f5d0fe;
 }
@@ -638,6 +801,7 @@
   color: #b45309;
   border-color: #fde68a;
 }
+
 .btn-ws-transfer:hover {
   background: #fef3c7;
 }
@@ -1815,7 +1979,8 @@
 }
 
 .dispute-wizard-btn-submit {
-  width: auto !important; /* Đè hoàn toàn width: 100% của auth.css */
+  width: auto !important;
+  /* Đè hoàn toàn width: 100% của auth.css */
   min-width: 150px;
   padding: 0.7rem 1.6rem;
   border: none;
@@ -1854,14 +2019,17 @@
     flex-direction: column;
     padding: 0.85rem 1rem;
   }
+
   .dispute-wizard-body,
   .dispute-wizard-header,
   .dispute-wizard-footer {
     padding: 1rem;
   }
+
   .dispute-wizard-footer {
     flex-direction: column-reverse;
   }
+
   .dispute-wizard-btn-cancel,
   .dispute-wizard-btn-submit {
     width: 100% !important;
@@ -2584,9 +2752,3 @@
   background: #d97706;
   color: #ffffff;
 }
-
-
-
-
-
-

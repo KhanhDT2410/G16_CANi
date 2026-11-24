@@ -52,6 +52,7 @@ public class DisputeDetailResponseDto {
     private String finalDecisionRationale;
     private Instant finalDecidedAt;
     private Boolean rsPenaltyApplied;
+    private Long eoStrikeCount90d;
     private Instant createdAt;
     private Instant updatedAt;
 

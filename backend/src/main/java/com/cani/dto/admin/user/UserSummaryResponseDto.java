@@ -27,6 +27,7 @@ public class UserSummaryResponseDto {
     private String kycStatus;
     private String skillStatus;
     private Instant lastLoginAt;
+    private Instant lockUntil;
     private Instant createdAt;
     private Instant updatedAt;
 }

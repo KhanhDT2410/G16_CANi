@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -158,5 +159,37 @@ class AdminUserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Dữ liệu đầu vào không hợp lệ"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/admin/users/{userId}/reliability - Điều chỉnh RS thành công")
+    @WithMockUser(roles = "ADMIN")
+    void testAdjustReliabilityScore_Success() throws Exception {
+        UUID userId = UUID.randomUUID();
+        com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto request = com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto.builder()
+                .delta(-15)
+                .reason("Trừ điểm tái phạm")
+                .referenceType("DISPUTE")
+                .referenceId(UUID.randomUUID())
+                .build();
+
+        com.cani.dto.admin.user.AdminAdjustReliabilityResponseDto response = com.cani.dto.admin.user.AdminAdjustReliabilityResponseDto.builder()
+                .userId(userId)
+                .scoreBefore(80)
+                .scoreAfter(65)
+                .delta(-15)
+                .build();
+
+        when(adminUserService.adjustReliabilityScore(eq(userId), any(), any()))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/admin/users/{userId}/reliability", userId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.scoreAfter").value(65))
+                .andExpect(jsonPath("$.data.delta").value(-15));
     }
 }

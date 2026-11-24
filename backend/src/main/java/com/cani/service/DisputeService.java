@@ -56,6 +56,7 @@ public class DisputeService {
     private final EventOrganizerRepository eventOrganizerRepository;
     private final UserRepository userRepository;
     private final ReliabilityLogRepository reliabilityLogRepository;
+    private final com.cani.repository.EoStrikeRepository eoStrikeRepository;
     private final NotificationRepository notificationRepository;
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
@@ -432,6 +433,9 @@ public class DisputeService {
             penaltyApplied = applyWorkerRsPenalty(dispute, actorId, request.getRationale());
             dispute.setRsPenaltyApplied(true);
         }
+        if (request.getOutcome() == DisputeOutcome.EO_FAULT) {
+            recordEoStrikeIfAbsent(dispute, request.getRationale());
+        }
 
         dispute.setStatus(newStatus);
         dispute.setOutcome(request.getOutcome());
@@ -521,6 +525,78 @@ public class DisputeService {
             return respondentId;
         }
         return null;
+    }
+
+    private UUID resolveEoPartyId(UUID complainantId, UUID respondentId) {
+        if (eventOrganizerRepository.findByUser_UserId(complainantId).isPresent()) {
+            return complainantId;
+        }
+        if (eventOrganizerRepository.findByUser_UserId(respondentId).isPresent()) {
+            return respondentId;
+        }
+        return null;
+    }
+
+    private void recordEoStrikeIfAbsent(Dispute dispute, String rationale) {
+        if (eoStrikeRepository.existsByDispute_DisputeId(dispute.getDisputeId())) {
+            log.info("Dispute {} đã có Strike ghi nhận cho EO, bỏ qua dedup", dispute.getDisputeId());
+            return;
+        }
+        UUID eoUserId = resolveEoPartyId(dispute.getComplainantId(), dispute.getRespondentId());
+        if (eoUserId == null) {
+            log.warn("Dispute {}: outcome EO_FAULT nhưng không xác định được EO liên quan", dispute.getDisputeId());
+            return;
+        }
+        EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(eoUserId).orElse(null);
+        if (eo == null) {
+            log.warn("Dispute {}: không tìm thấy hồ sơ EO cho userId {}", dispute.getDisputeId(), eoUserId);
+            return;
+        }
+        EoStrike strike = EoStrike.builder()
+                .eo(eo)
+                .dispute(dispute)
+                .reason("Bị kết luận vi phạm trong tranh chấp: " + (rationale != null ? rationale : "EO_FAULT"))
+                .build();
+        eoStrikeRepository.save(strike);
+        log.info("Ghi nhận Strike cho EO {} từ tranh chấp {}", eo.getEoId(), dispute.getDisputeId());
+    }
+
+    public EoStrikeSummaryDto getEoStrikesForDispute(UUID disputeId) {
+        Dispute dispute = getDisputeOrThrow(disputeId);
+        UUID eoUserId = resolveEoPartyId(dispute.getComplainantId(), dispute.getRespondentId());
+        if (eoUserId == null) {
+            return EoStrikeSummaryDto.builder()
+                    .strikeCount90d(0L)
+                    .strikes(List.of())
+                    .build();
+        }
+        EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(eoUserId).orElse(null);
+        if (eo == null) {
+            return EoStrikeSummaryDto.builder()
+                    .eoUserId(eoUserId)
+                    .strikeCount90d(0L)
+                    .strikes(List.of())
+                    .build();
+        }
+        Instant since90d = Instant.now().minus(java.time.Duration.ofDays(90));
+        long count = eoStrikeRepository.countByEo_EoIdAndCreatedAtAfter(eo.getEoId(), since90d);
+        List<EoStrike> list = eoStrikeRepository.findByEo_EoIdAndCreatedAtAfterOrderByCreatedAtDesc(eo.getEoId(), since90d);
+
+        List<EoStrikeSummaryDto.StrikeItemDto> items = list.stream()
+                .map(s -> EoStrikeSummaryDto.StrikeItemDto.builder()
+                        .strikeId(s.getStrikeId())
+                        .disputeId(s.getDispute().getDisputeId())
+                        .reason(s.getReason())
+                        .createdAt(s.getCreatedAt())
+                        .build())
+                .toList();
+
+        return EoStrikeSummaryDto.builder()
+                .eoId(eo.getEoId())
+                .eoUserId(eoUserId)
+                .strikeCount90d(count)
+                .strikes(items)
+                .build();
     }
 
     private void markPaymentDisputed(UUID assignmentId) {
@@ -809,6 +885,16 @@ public class DisputeService {
             }
         }
 
+        Long eoStrikeCount90d = null;
+        UUID eoPartyUserId = resolveEoPartyId(dispute.getComplainantId(), dispute.getRespondentId());
+        if (eoPartyUserId != null) {
+            EventOrganizer eo = eventOrganizerRepository.findByUser_UserId(eoPartyUserId).orElse(null);
+            if (eo != null) {
+                eoStrikeCount90d = eoStrikeRepository.countByEo_EoIdAndCreatedAtAfter(
+                        eo.getEoId(), Instant.now().minus(java.time.Duration.ofDays(90)));
+            }
+        }
+
         return DisputeDetailResponseDto.builder()
                 .id(dispute.getDisputeId())
                 .assignmentId(dispute.getAssignmentId())
@@ -840,6 +926,7 @@ public class DisputeService {
                 .finalDecisionRationale(dispute.getFinalDecisionRationale())
                 .finalDecidedAt(dispute.getFinalDecidedAt())
                 .rsPenaltyApplied(dispute.getRsPenaltyApplied())
+                .eoStrikeCount90d(eoStrikeCount90d)
                 .createdAt(dispute.getCreatedAt())
                 .updatedAt(dispute.getUpdatedAt())
                 .unreadCount(unreadStaff)

@@ -1,9 +1,12 @@
 package com.cani.controller;
 
+import com.cani.dto.admin.user.AdminAdjustReliabilityRequestDto;
+import com.cani.dto.admin.user.AdminAdjustReliabilityResponseDto;
 import com.cani.dto.admin.user.UpdateUserStatusRequestDto;
 import com.cani.dto.admin.user.UserDetailResponseDto;
 import com.cani.dto.admin.user.UserFilterRequest;
 import com.cani.dto.admin.user.UserSummaryResponseDto;
+import com.cani.dto.admin.user.UserViolationHistoryResponseDto;
 import com.cani.dto.response.ApiResponse;
 import com.cani.dto.response.PageResponse;
 import com.cani.entity.User;
@@ -87,6 +90,35 @@ public class AdminUserController {
                 : "Mở khóa / Cập nhật trạng thái tài khoản";
 
         return ResponseEntity.ok(ApiResponse.ok(updatedUser, actionDesc + " người dùng thành công"));
+    }
+
+    /**
+     * API 4: Admin điều chỉnh điểm uy tín RS của Worker mức tùy ý.
+     * POST /api/v1/admin/users/{userId}/reliability
+     */
+    @PostMapping("/{userId}/reliability")
+    public ResponseEntity<ApiResponse<AdminAdjustReliabilityResponseDto>> adjustReliabilityScore(
+            @PathVariable("userId") UUID userId,
+            @Valid @RequestBody AdminAdjustReliabilityRequestDto request,
+            @RequestParam(value = "adminId", required = false) UUID explicitAdminId,
+            Authentication authentication
+    ) {
+        UUID adminUserId = resolveAdminId(authentication, explicitAdminId);
+        AdminAdjustReliabilityResponseDto response = adminUserService.adjustReliabilityScore(userId, adminUserId, request);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Điều chỉnh điểm uy tín thành công"));
+    }
+
+    /**
+     * API 5: Lấy lịch sử vi phạm của người dùng trong N ngày (để CC/Admin đếm tái phạm 60/90 ngày).
+     * GET /api/v1/admin/users/{userId}/violation-history?days=60
+     */
+    @GetMapping("/{userId}/violation-history")
+    public ResponseEntity<ApiResponse<UserViolationHistoryResponseDto>> getViolationHistory(
+            @PathVariable("userId") UUID userId,
+            @RequestParam(value = "days", defaultValue = "60") int days
+    ) {
+        UserViolationHistoryResponseDto response = adminUserService.getViolationHistory(userId, days);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Lấy lịch sử vi phạm thành công"));
     }
 
     private UUID resolveAdminId(Authentication authentication, UUID explicitAdminId) {

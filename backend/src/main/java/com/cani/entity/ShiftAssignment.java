@@ -70,13 +70,6 @@ public class ShiftAssignment {
     @Column(name = "cancellation_type", length = 50)
     private String cancellationType;
 
-    @Column(name = "replaced_by")
-    private UUID replacedBy;
-
-    @Column(name = "is_replacement")
-    @Builder.Default
-    private Boolean isReplacement = false;
-
     @Column(name = "eo_confirmed")
     @Builder.Default
     private Boolean eoConfirmed = false;

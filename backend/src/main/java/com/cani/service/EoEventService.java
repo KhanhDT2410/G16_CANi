@@ -181,7 +181,6 @@ public class EoEventService {
                 .imageUrl(dto.getImageUrl() != null && !dto.getImageUrl().isBlank() ? dto.getImageUrl().trim() : null)
                 .mode(dto.getMode())
                 .status(EventStatus.DRAFT)
-                .readinessScore(0)
                 .totalShifts(0)
                 .totalRequiredWorkers(0)
                 .totalConfirmedWorkers(0)
@@ -328,7 +327,6 @@ public class EoEventService {
                 .allowance(allowance)
                 .totalCost(shiftCost)
                 .status(event.getStatus() == EventStatus.ACTIVE ? ShiftStatus.ACTIVE : ShiftStatus.DRAFT)
-                .riskScore(0) // ponytail: server luôn trả 0; web tự tính risk client-side (useShifts.js)
                 .locationAddress(dto.getLocationAddress() != null ? dto.getLocationAddress() : event.getVenueAddress())
                 .locationLat(dto.getLocationLat() != null ? dto.getLocationLat() : event.getVenueLat())
                 .locationLng(dto.getLocationLng() != null ? dto.getLocationLng() : event.getVenueLng())
@@ -337,7 +335,6 @@ public class EoEventService {
                 .customSkillNotes(skillConfig.customSkillNotes())
                 .minReliabilityScore(dto.getMinReliabilityScore())
                 .maxDistanceKm(dto.getMaxDistanceKm())
-                .minExperienceLevel(dto.getMinExperienceLevel())
                 .dressCode(dto.getDressCode())
                 .imageUrl(dto.getImageUrl())
                 .checklist(dto.getChecklist())
@@ -423,7 +420,6 @@ public class EoEventService {
                     .allowance(allowance)
                     .totalCost(shiftCost)
                     .status(event.getStatus() == EventStatus.ACTIVE ? ShiftStatus.ACTIVE : ShiftStatus.DRAFT)
-                    .riskScore(0)
                     .locationAddress(dto.getLocationAddress() != null ? dto.getLocationAddress() : event.getVenueAddress())
                     .locationLat(dto.getLocationLat() != null ? dto.getLocationLat() : event.getVenueLat())
                     .locationLng(dto.getLocationLng() != null ? dto.getLocationLng() : event.getVenueLng())
@@ -432,7 +428,6 @@ public class EoEventService {
                     .customSkillNotes(skillConfig.customSkillNotes())
                     .minReliabilityScore(dto.getMinReliabilityScore())
                     .maxDistanceKm(dto.getMaxDistanceKm())
-                    .minExperienceLevel(dto.getMinExperienceLevel())
                     .checklist(dto.getChecklist())
                     .build();
 
@@ -545,7 +540,6 @@ public class EoEventService {
         shift.setTotalCost(newShiftCost);
         if (dto.getMinReliabilityScore() != null) shift.setMinReliabilityScore(dto.getMinReliabilityScore());
         if (dto.getMaxDistanceKm() != null) shift.setMaxDistanceKm(dto.getMaxDistanceKm());
-        if (dto.getMinExperienceLevel() != null) shift.setMinExperienceLevel(dto.getMinExperienceLevel());
         if (dto.getDressCode() != null) shift.setDressCode(dto.getDressCode());
         if (dto.getLocationAddress() != null) shift.setLocationAddress(dto.getLocationAddress());
         if (dto.getLocationLat() != null) shift.setLocationLat(dto.getLocationLat());

@@ -95,8 +95,7 @@ public class MatchingDispatchService {
         }
         return ShiftStaffingPolicy.withFallbackDependencies(
                 shiftAssignmentRepository,
-                dispatchProposalRepository
-        );
+                dispatchProposalRepository);
     }
 
     private WorkerShiftEligibilityService getEligibilityService() {
@@ -109,8 +108,7 @@ public class MatchingDispatchService {
                 shiftAssignmentRepository,
                 workerAvailabilityRepository,
                 blockListService,
-                skillRepository
-        );
+                skillRepository);
     }
 
     private static final List<ProposalStatus> ACTIVE_PROPOSAL_STATUSES = List.of(
@@ -133,10 +131,10 @@ public class MatchingDispatchService {
         private String scoreBreakdownJson;
     }
 
-
     /**
      * Kích hoạt matching hàng loạt cho toàn bộ ca làm việc ACTIVE của một sự kiện.
-     * Thường được gọi sau khi Event Organizer nạp cọc thành công và Event chuyển sang PUBLISHED/ACTIVE.
+     * Thường được gọi sau khi Event Organizer nạp cọc thành công và Event chuyển
+     * sang PUBLISHED/ACTIVE.
      */
     @Transactional
     public int dispatchForEvent(UUID eventId) {
@@ -179,7 +177,8 @@ public class MatchingDispatchService {
         ShiftStaffingPolicy policy = getStaffingPolicy();
         ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, Instant.now());
         if (effectiveStatus != ShiftStatus.ACTIVE) {
-            log.info("Bỏ qua dispatch: Ca làm việc {} không ở trạng thái ACTIVE trước giờ bắt đầu (status={}, effective={})",
+            log.info(
+                    "Bỏ qua dispatch: Ca làm việc {} không ở trạng thái ACTIVE trước giờ bắt đầu (status={}, effective={})",
                     shiftId, shift.getStatus(), effectiveStatus);
             return 0;
         }
@@ -195,9 +194,12 @@ public class MatchingDispatchService {
             return 0;
         }
 
-        // Tọa độ mục tiêu của ca làm việc (Bắt buộc hợp lệ, tuyệt đối không fallback 0 km)
-        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
-        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+        // Tọa độ mục tiêu của ca làm việc (Bắt buộc hợp lệ, tuyệt đối không fallback 0
+        // km)
+        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat()
+                : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng()
+                : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
         if (!isValidCoordinate(targetLat, targetLng)) {
             log.warn("Bỏ qua dispatch ca {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).", shiftId, targetLat, targetLng);
             return 0;
@@ -208,7 +210,8 @@ public class MatchingDispatchService {
                 ? shift.getMaxDistanceKm().doubleValue()
                 : MAX_DISTANCE_KM;
 
-        // 1. Chỉ lấy danh sách Worker đang Online (tuyệt đối không fallback full-table scan Worker offline)
+        // 1. Chỉ lấy danh sách Worker đang Online (tuyệt đối không fallback full-table
+        // scan Worker offline)
         List<Worker> onlineWorkers = workerRepository.findByIsOnlineTrue();
         if (onlineWorkers == null || onlineWorkers.isEmpty()) {
             log.info("Bỏ qua dispatch ca {}: hiện không có Worker nào đang Online.", shiftId);
@@ -252,12 +255,14 @@ public class MatchingDispatchService {
         matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed()
                 .thenComparingDouble(CandidateMatch::getDistanceKm));
 
-        // 6-7. Loại Worker đã có Proposal PENDING/ACCEPTED hoặc đã có Assignment trước khi cắt Top N
+        // 6-7. Loại Worker đã có Proposal PENDING/ACCEPTED hoặc đã có Assignment trước
+        // khi cắt Top N
         List<CandidateMatch> eligibleCandidates = matchedCandidates.stream()
                 .filter(candidate -> !hasExistingProposalOrAssignment(shiftId, candidate.getWorker().getWorkerId()))
                 .toList();
 
-        // 8. Dispatch ratio: tuyển N người -> chọn Top min(N * 2 + 3, số ứng viên hợp lệ)
+        // 8. Dispatch ratio: tuyển N người -> chọn Top min(N * 2 + 3, số ứng viên hợp
+        // lệ)
         int targetDispatchCount = Math.max(needed * 2 + 3, needed);
         List<CandidateMatch> topCandidates = eligibleCandidates.stream()
                 .limit(targetDispatchCount)
@@ -312,29 +317,32 @@ public class MatchingDispatchService {
 
         if (matchedCandidates.isEmpty()) {
             log.warn("Matching ca {}: KHÔNG TÌM THẤY ứng viên nào đạt điều kiện. "
-                            + "Kiểm tra: worker đang online? kycStatus APPROVED? có GPS hợp lệ? requiredSkills khớp worker_skills? "
-                            + "khung giờ rảnh trùng ca? minWage không vượt lương ca? blocklist? "
-                            + "Tổng worker online đã xét: {}",
+                    + "Kiểm tra: worker đang online? kycStatus APPROVED? có GPS hợp lệ? requiredSkills khớp worker_skills? "
+                    + "khung giờ rảnh trùng ca? minWage không vượt lương ca? blocklist? "
+                    + "Tổng worker online đã xét: {}",
                     shiftId, onlineWorkers.size());
         }
 
         createdCount += dispatchGroupsForShift(shiftId, false);
 
-        log.info("Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên phù hợp ({} chưa trùng), đã gửi {} đề xuất (Proposals).",
+        log.info(
+                "Matching hoàn tất cho ca {}: Tìm thấy {} ứng viên phù hợp ({} chưa trùng), đã gửi {} đề xuất (Proposals).",
                 shiftId, matchedCandidates.size(), eligibleCandidates.size(), createdCount);
         return createdCount;
     }
 
     /**
      * Reverse-Matching: Khi Worker bật trạng thái Online (isOnline = true),
-     * tự động quét các ca ACTIVE còn thiếu người và chưa hết hạn để gửi DispatchProposal phù hợp.
+     * tự động quét các ca ACTIVE còn thiếu người và chưa hết hạn để gửi
+     * DispatchProposal phù hợp.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int dispatchActiveShiftsForWorker(Worker worker) {
         if (worker == null) {
             return 0;
         }
-        // Tải lại thực thể Worker trong transaction mới để tránh LazyInitializationException hoặc rollback ngược transaction cha
+        // Tải lại thực thể Worker trong transaction mới để tránh
+        // LazyInitializationException hoặc rollback ngược transaction cha
         if (worker.getWorkerId() != null) {
             worker = workerRepository.findById(worker.getWorkerId()).orElse(worker);
         }
@@ -369,19 +377,24 @@ public class MatchingDispatchService {
             if (!passHardFilter(worker, shift, WorkerShiftEligibilityService.MatchingChannel.REVERSE_MATCHING)) {
                 continue;
             }
-            Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
-            Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+            Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat()
+                    : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+            Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng()
+                    : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
             if (!isValidCoordinate(targetLat, targetLng)) {
                 continue;
             }
-            double maxAllowedDistanceKm = (shift.getMaxDistanceKm() != null && shift.getMaxDistanceKm().doubleValue() > 0)
-                    ? shift.getMaxDistanceKm().doubleValue() : MAX_DISTANCE_KM;
+            double maxAllowedDistanceKm = (shift.getMaxDistanceKm() != null
+                    && shift.getMaxDistanceKm().doubleValue() > 0)
+                            ? shift.getMaxDistanceKm().doubleValue()
+                            : MAX_DISTANCE_KM;
             double distanceKm = calculateDistance(targetLat, targetLng, worker.getBaseLat(), worker.getBaseLng());
             if (!Double.isFinite(distanceKm)) {
                 continue;
             }
             double workerMaxDist = (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0)
-                    ? worker.getMaxDistanceKm() : maxAllowedDistanceKm;
+                    ? worker.getMaxDistanceKm()
+                    : maxAllowedDistanceKm;
             double effectiveAllowedDistanceKm = Math.min(maxAllowedDistanceKm, workerMaxDist);
             if (distanceKm > effectiveAllowedDistanceKm) {
                 continue;
@@ -413,16 +426,18 @@ public class MatchingDispatchService {
                                     + shift.getHourlyWage() + " đ/giờ.",
                             NotificationType.PROPOSAL,
                             "PROPOSAL",
-                            savedProposal != null && savedProposal.getProposalId() != null ? savedProposal.getProposalId() : shift.getShiftId(),
-                            Map.of("shiftId", shift.getShiftId().toString(), "type", "NEW_PROPOSAL")
-                    );
+                            savedProposal != null && savedProposal.getProposalId() != null
+                                    ? savedProposal.getProposalId()
+                                    : shift.getShiftId(),
+                            Map.of("shiftId", shift.getShiftId().toString(), "type", "NEW_PROPOSAL"));
                 } catch (Exception ex) {
                     log.warn("Không thể gửi thông báo FCM reverse-matching: {}", ex.getMessage());
                 }
             }
         }
         if (createdCount > 0) {
-            log.info("Reverse-matching khi Worker {} online: đã tạo {} DispatchProposal mới.", worker.getWorkerId(), createdCount);
+            log.info("Reverse-matching khi Worker {} online: đã tạo {} DispatchProposal mới.", worker.getWorkerId(),
+                    createdCount);
         }
         return createdCount;
     }
@@ -477,7 +492,8 @@ public class MatchingDispatchService {
     }
 
     /**
-     * Kiểm tra ca làm có nằm trong lịch rảnh cố định hàng tuần của Worker hay không.
+     * Kiểm tra ca làm có nằm trong lịch rảnh cố định hàng tuần của Worker hay
+     * không.
      * Dùng cho kênh Group và kiểm tra tính tương thích ngược.
      */
     private boolean isShiftCoveredByAvailability(Worker worker, Shift shift) {
@@ -519,7 +535,8 @@ public class MatchingDispatchService {
                 continue;
             }
 
-            // Trường hợp 1: Slot trong cùng 1 ngày (ví dụ 08:00 -> 17:00 hoặc 18:00 -> 23:00)
+            // Trường hợp 1: Slot trong cùng 1 ngày (ví dụ 08:00 -> 17:00 hoặc 18:00 ->
+            // 23:00)
             if (!slotEnd.isBefore(slotStart)) {
                 if (shiftStart.toLocalDate().equals(shiftEnd.toLocalDate())) {
                     if (!shiftStartTime.isBefore(slotStart) && !shiftEndTime.isAfter(slotEnd)) {
@@ -538,24 +555,32 @@ public class MatchingDispatchService {
     }
 
     /**
-     * Soft Ranking Score: Tính điểm xếp hạng ứng viên dựa trên 4 thành phần + Điểm thưởng
+     * Soft Ranking Score: Tính điểm xếp hạng ứng viên dựa trên 4 thành phần + Điểm
+     * thưởng
      */
-    private CandidateMatch calculateSoftScore(Worker worker, double distanceKm, double maxAllowedDistanceKm, Shift shift) {
+    private CandidateMatch calculateSoftScore(Worker worker, double distanceKm, double maxAllowedDistanceKm,
+            Shift shift) {
         double effectiveMaxDist = (Double.isFinite(maxAllowedDistanceKm) && maxAllowedDistanceKm > 0)
-                ? maxAllowedDistanceKm : MAX_DISTANCE_KM;
+                ? maxAllowedDistanceKm
+                : MAX_DISTANCE_KM;
         double safeDistanceKm = Double.isFinite(distanceKm) ? Math.max(0.0, distanceKm) : effectiveMaxDist;
 
-        // 1. Distance Score: 100 - (distance / maxAllowedDistanceKm) * 100 (Trọng số 0.4)
+        // 1. Distance Score: 100 - (distance / maxAllowedDistanceKm) * 100 (Trọng số
+        // 0.4)
         double distanceScore = clamp(100.0 - (safeDistanceKm / effectiveMaxDist) * 100.0, 0.0, 100.0);
 
-        // 2. Rating Score: Nếu Worker chưa có rating history (ratingCount <= 0), dùng mức trung tính (3.5/5.0 = 70 điểm)
-        double neutralRating = clamp(getConfigDouble("matching.neutral_unrated_rating", DEFAULT_NEUTRAL_RATING), 0.0, 5.0);
-        boolean hasRatingHistory = worker.getRatingCount() != null && worker.getRatingCount() > 0 && worker.getRatingAvg() != null;
+        // 2. Rating Score: Nếu Worker chưa có rating history (ratingCount <= 0), dùng
+        // mức trung tính (3.5/5.0 = 70 điểm)
+        double neutralRating = clamp(getConfigDouble("matching.neutral_unrated_rating", DEFAULT_NEUTRAL_RATING), 0.0,
+                5.0);
+        boolean hasRatingHistory = worker.getRatingCount() != null && worker.getRatingCount() > 0
+                && worker.getRatingAvg() != null;
         double rating = hasRatingHistory ? clamp(worker.getRatingAvg().doubleValue(), 0.0, 5.0) : neutralRating;
         double ratingScore = clamp((rating / 5.0) * 100.0, 0.0, 100.0);
 
         // 3. Experience Score: (completed_shifts / 10) * 100 (Trọng số 0.2)
-        int completedShifts = worker.getTotalShiftsCompleted() != null ? Math.max(0, worker.getTotalShiftsCompleted()) : 0;
+        int completedShifts = worker.getTotalShiftsCompleted() != null ? Math.max(0, worker.getTotalShiftsCompleted())
+                : 0;
         double expScore = clamp((completedShifts / 10.0) * 100.0, 0.0, 100.0);
 
         // 4. Reliability Score: Trọng số 0.1
@@ -585,8 +610,8 @@ public class MatchingDispatchService {
                 Locale.US,
                 "{\"algorithmVersion\":\"v3.0\",\"distanceKm\":%.2f,\"baseScore\":%.2f,\"distScore\":%.1f,\"ratingScore\":%.1f,\"expScore\":%.1f,\"rsScore\":%.1f,\"newWorkerBonus\":%.1f,\"idleBonus\":%.1f,\"requiredSkillQuality\":%.2f,\"preferredSkillFit\":%.2f,\"skillFitBonus\":%.2f,\"skillBonus\":%.2f,\"finalScore\":%.2f,\"matchedSkillIds\":%s}",
                 safeDistanceKm, baseScore, distanceScore, ratingScore, expScore, rsScore,
-                newWorkerBonus, idleBonus, requiredSkillQuality, preferredSkillFit, skillFitBonus, skillFitBonus, finalScore, matchedSkillIdsJson
-        );
+                newWorkerBonus, idleBonus, requiredSkillQuality, preferredSkillFit, skillFitBonus, skillFitBonus,
+                finalScore, matchedSkillIdsJson);
 
         return CandidateMatch.builder()
                 .worker(worker)
@@ -600,9 +625,11 @@ public class MatchingDispatchService {
         if (completedShifts < 3 || !Boolean.TRUE.equals(worker.getIsOnline()) || worker.getWorkerId() == null) {
             return false;
         }
-        int idleDays = (int) Math.max(1.0, getConfigDouble("fairness.idle_days_threshold", DEFAULT_IDLE_DAYS_THRESHOLD));
+        int idleDays = (int) Math.max(1.0,
+                getConfigDouble("fairness.idle_days_threshold", DEFAULT_IDLE_DAYS_THRESHOLD));
         Instant idleCutoff = Instant.now().minus(Duration.ofDays(idleDays));
-        List<ShiftAssignment> history = shiftAssignmentRepository.findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
+        List<ShiftAssignment> history = shiftAssignmentRepository
+                .findByWorker_WorkerIdOrderByCreatedAtDesc(worker.getWorkerId());
         if (history != null && !history.isEmpty()) {
             ShiftAssignment latest = history.get(0);
             Instant lastActivity = (latest.getShift() != null && latest.getShift().getEndTime() != null)
@@ -631,8 +658,10 @@ public class MatchingDispatchService {
         }
 
         ShiftStatus effectiveStatus = policy.resolveEffectiveShiftStatus(shift, now);
-        if (effectiveStatus != ShiftStatus.ACTIVE || (shift.getStartTime() != null && !now.isBefore(shift.getStartTime()))) {
-            log.warn("Không thể kích hoạt Emergency Dispatch thủ công: Ca làm việc {} không ở trạng thái ACTIVE trước giờ bắt đầu (status={}, effective={}, startTime={})",
+        if (effectiveStatus != ShiftStatus.ACTIVE
+                || (shift.getStartTime() != null && !now.isBefore(shift.getStartTime()))) {
+            log.warn(
+                    "Không thể kích hoạt Emergency Dispatch thủ công: Ca làm việc {} không ở trạng thái ACTIVE trước giờ bắt đầu (status={}, effective={}, startTime={})",
                     shiftId, shift.getStatus(), effectiveStatus, shift.getStartTime());
             return 0;
         }
@@ -646,8 +675,10 @@ public class MatchingDispatchService {
     }
 
     /**
-     * UC-59 / UC-88: Kích hoạt điều phối khẩn cấp tự động từ hệ thống (No-show hoặc Worker tự hủy làm thiếu người).
-     * Cho phép sau giờ bắt đầu ca nếu vẫn còn đủ thời gian làm việc (>= 30 phút), nhưng dừng khi ca kết thúc hoặc bị hủy.
+     * UC-59 / UC-88: Kích hoạt điều phối khẩn cấp tự động từ hệ thống (No-show hoặc
+     * Worker tự hủy làm thiếu người).
+     * Cho phép sau giờ bắt đầu ca nếu vẫn còn đủ thời gian làm việc (>= 30 phút),
+     * nhưng dừng khi ca kết thúc hoặc bị hủy.
      */
     @Transactional
     public int triggerEmergencyDispatchForSystem(UUID shiftId, Double customRadiusKm) {
@@ -658,7 +689,8 @@ public class MatchingDispatchService {
         ShiftStaffingPolicy policy = getStaffingPolicy();
         Instant now = Instant.now();
 
-        ShiftStaffingPolicy.AutoEmergencyEligibility autoEligibility = policy.evaluateAutoEmergencyEligibility(shift, now);
+        ShiftStaffingPolicy.AutoEmergencyEligibility autoEligibility = policy.evaluateAutoEmergencyEligibility(shift,
+                now);
         if (!autoEligibility.eligible()) {
             log.info("Bỏ qua Auto Emergency Dispatch cho ca {}: {}", shiftId, autoEligibility.blockReason());
             return 0;
@@ -675,10 +707,13 @@ public class MatchingDispatchService {
     private int executeEmergencyDispatch(Shift shift, ShiftStaffingPolicy policy, Double customRadiusKm, int needed) {
         UUID shiftId = shift.getShiftId();
 
-        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat() : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
-        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng() : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+        Double targetLat = shift.getLocationLat() != null ? shift.getLocationLat()
+                : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+        Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng()
+                : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
         if (!isValidCoordinate(targetLat, targetLng)) {
-            log.warn("Bỏ qua Emergency Dispatch ca {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).", shiftId, targetLat, targetLng);
+            log.warn("Bỏ qua Emergency Dispatch ca {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).", shiftId, targetLat,
+                    targetLng);
             return 0;
         }
 
@@ -692,7 +727,8 @@ public class MatchingDispatchService {
         }
 
         double emergencyRadius = policy.resolveEffectiveEmergencyRadiusKm(customRadiusKm);
-        log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km (Capped max 50km)", shiftId, emergencyRadius);
+        log.info("KÍCH HOẠT EMERGENCY DISPATCH cho ca {}: Bán kính mở rộng {} km (Capped max 50km)", shiftId,
+                emergencyRadius);
 
         List<Worker> onlineWorkers = workerRepository.findByIsOnlineTrue();
         if (onlineWorkers == null || onlineWorkers.isEmpty()) {
@@ -720,7 +756,8 @@ public class MatchingDispatchService {
         matchedCandidates.sort(Comparator.comparingDouble(CandidateMatch::getFinalScore).reversed()
                 .thenComparingDouble(CandidateMatch::getDistanceKm));
 
-        // Loại ứng viên đã có Proposal PENDING/ACCEPTED hoặc Assignment trước khi lấy Top N
+        // Loại ứng viên đã có Proposal PENDING/ACCEPTED hoặc Assignment trước khi lấy
+        // Top N
         List<CandidateMatch> eligibleCandidates = matchedCandidates.stream()
                 .filter(candidate -> !hasExistingProposalOrAssignment(shiftId, candidate.getWorker().getWorkerId()))
                 .toList();
@@ -786,8 +823,10 @@ public class MatchingDispatchService {
     }
 
     /**
-     * Kênh Group Dispatch: gửi 1 lời mời cho tối đa 5 đội (Group) có thành viên đủ điều kiện.
-     * Proposal gán worker = leader nhóm; FCM gửi leader để cử 1 đến [claimableSlots] thành viên.
+     * Kênh Group Dispatch: gửi 1 lời mời cho tối đa 5 đội (Group) có thành viên đủ
+     * điều kiện.
+     * Proposal gán worker = leader nhóm; FCM gửi leader để cử 1 đến
+     * [claimableSlots] thành viên.
      */
     @Transactional
     public int dispatchGroupsForShift(UUID shiftId, boolean emergency, Double customRadiusKm) {
@@ -804,7 +843,8 @@ public class MatchingDispatchService {
             return 0;
         }
         if (!isDispatchAllowedForEvent(shift)) {
-            log.info("Bỏ qua group dispatch: Sự kiện của ca {} đang ở chế độ INVITE hoặc trạng thái không hợp lệ.", shiftId);
+            log.info("Bỏ qua group dispatch: Sự kiện của ca {} đang ở chế độ INVITE hoặc trạng thái không hợp lệ.",
+                    shiftId);
             return 0;
         }
         int remaining = shift.getRemainingWorkers() != null
@@ -824,7 +864,8 @@ public class MatchingDispatchService {
         Double targetLng = shift.getLocationLng() != null ? shift.getLocationLng()
                 : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
         if (!isValidCoordinate(targetLat, targetLng)) {
-            log.warn("Bỏ qua group dispatch ca {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).", shiftId, targetLat, targetLng);
+            log.warn("Bỏ qua group dispatch ca {}: thiếu tọa độ GPS hợp lệ (lat={}, lng={}).", shiftId, targetLat,
+                    targetLng);
             return 0;
         }
 
@@ -1105,7 +1146,8 @@ public class MatchingDispatchService {
     }
 
     /**
-     * Kênh group: trả code lý do thành viên KHÔNG đủ điều kiện; null = đủ điều kiện.
+     * Kênh group: trả code lý do thành viên KHÔNG đủ điều kiện; null = đủ điều
+     * kiện.
      * Dùng chung: dispatch group và re-check khi leader accept.
      */
     public String groupMemberEligibilityReason(Worker worker, Shift shift) {
@@ -1120,18 +1162,6 @@ public class MatchingDispatchService {
                 : MIN_RELIABILITY_SCORE;
         if (worker.getReliabilityScore() == null || worker.getReliabilityScore() < minRs) {
             return "LOW_RELIABILITY";
-        }
-        if (shift.getMinExperienceLevel() != null) {
-            int requiredShifts = switch (shift.getMinExperienceLevel()) {
-                case INTERMEDIATE -> 3;
-                case ADVANCED -> 5;
-                case EXPERT -> 10;
-                default -> 0;
-            };
-            int completed = worker.getTotalShiftsCompleted() != null ? worker.getTotalShiftsCompleted() : 0;
-            if (completed < requiredShifts) {
-                return "LOW_EXPERIENCE";
-            }
         }
         if (shift.getRequiredSkills() != null && shift.getRequiredSkills().length > 0
                 && workerSkillRepository != null) {

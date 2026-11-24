@@ -87,7 +87,6 @@ class WorkerShiftEligibilityServiceTest {
                 .endTime(Instant.now().plus(16, ChronoUnit.HOURS))
                 .hourlyWage(BigDecimal.valueOf(60000))
                 .minReliabilityScore(70)
-                .minExperienceLevel(ExperienceLevel.INTERMEDIATE)
                 .emergency(true)
                 .build();
     }

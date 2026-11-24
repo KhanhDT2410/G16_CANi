@@ -24,7 +24,6 @@ public class UserDetailResponseDto {
     private UserStatus status;
     private String avatarUrl;
     private Boolean emailVerified;
-    private String language;
     private String fcmToken;
     private Instant lastLoginAt;
     private Instant lockUntil;

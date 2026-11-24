@@ -46,9 +46,6 @@ public class AuditLog {
     @Column(name = "ip_address", length = 50)
     private String ipAddress;
 
-    @Column(name = "user_agent", columnDefinition = "TEXT")
-    private String userAgent;
-
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

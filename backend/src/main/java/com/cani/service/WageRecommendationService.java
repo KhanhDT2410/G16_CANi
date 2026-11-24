@@ -2,13 +2,11 @@ package com.cani.service;
 
 import com.cani.dto.wage.WageRecommendationRequestDto;
 import com.cani.dto.wage.WageRecommendationResponseDto;
-import com.cani.entity.WageRecommendation;
 import com.cani.entity.enums.City;
 import com.cani.entity.enums.LeadTime;
 import com.cani.entity.enums.ShiftStatus;
 import com.cani.entity.enums.TimeSlot;
 import com.cani.repository.ShiftRepository;
-import com.cani.repository.WageRecommendationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +25,6 @@ import java.util.*;
 public class WageRecommendationService {
 
     private final WageMatrixService wageMatrixService;
-    private final WageRecommendationRepository wageRecommendationRepository;
 
     @Autowired(required = false)
     private ShiftRepository shiftRepository;
@@ -159,24 +156,12 @@ public class WageRecommendationService {
                 sampleCount
         );
 
-        String storedJobType = normalizedRole.length() > 100 ? normalizedRole.substring(0, 100) : normalizedRole;
-        WageRecommendation recommendation = WageRecommendation.builder()
-                .city(request.getCity())
-                .jobType(storedJobType)
-                .timeSlot(timeSlot)
-                .leadTime(leadTime)
-                .suggestedWage(suggestedWage)
-                .matchedRowId(lookup.getMatchedRowId())
-                .fallbackLevel(lookup.getFallbackLevel())
-                .shiftId(request.getShiftId())
-                .build();
-
-        WageRecommendation saved = wageRecommendationRepository.save(recommendation);
-        log.info("Đã lưu khuyến nghị thù lao: id={}, suggestedWage={}, source={}",
-                saved.getRecommendationId(), suggestedWage, benchmarkSource);
+        UUID generatedId = UUID.randomUUID();
+        log.info("Khuyến nghị thù lao: id={}, suggestedWage={}, source={}",
+                generatedId, suggestedWage, benchmarkSource);
 
         return WageRecommendationResponseDto.builder()
-                .recommendationId(saved.getRecommendationId())
+                .recommendationId(generatedId)
                 .shiftId(request.getShiftId())
                 .city(request.getCity())
                 .jobType(normalizedRole)

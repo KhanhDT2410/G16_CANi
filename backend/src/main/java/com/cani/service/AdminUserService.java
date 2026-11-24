@@ -437,7 +437,6 @@ public class AdminUserService {
                                 .status(user.getStatus())
                                 .avatarUrl(user.getAvatarUrl())
                                 .emailVerified(user.getEmailVerified())
-                                .language(user.getLanguage())
                                 .fcmToken(null)
                                 .lastLoginAt(user.getLastLoginAt())
                                 .lockUntil(user.getLockUntil())

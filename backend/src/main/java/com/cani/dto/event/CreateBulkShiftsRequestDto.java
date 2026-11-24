@@ -1,6 +1,5 @@
 package com.cani.dto.event;
 
-import com.cani.entity.enums.ExperienceLevel;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -57,9 +56,6 @@ public class CreateBulkShiftsRequestDto {
 
     @Builder.Default
     private Double maxDistanceKm = 15.0;
-
-    @Builder.Default
-    private ExperienceLevel minExperienceLevel = ExperienceLevel.BEGINNER;
 
     private String checklist;
 

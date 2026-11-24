@@ -1,4 +1,4 @@
-import { formatCurrency, formatDateTime } from '../types/revenue.constants';
+import { formatCurrency, formatDateTime, TRANSACTION_STATUS_LABELS } from '../types/revenue.constants';
 
 export const RevenueFlaggedTable = ({ flaggedTransactions }) => {
   if (!flaggedTransactions || flaggedTransactions.length === 0) {
@@ -48,7 +48,9 @@ export const RevenueFlaggedTable = ({ flaggedTransactions }) => {
                   <span className="rev-badge method">{tx.paymentMethod || '—'}</span>
                 </td>
                 <td>
-                  <span className="rev-badge status-disputed">{tx.status}</span>
+                  <span className="rev-badge status-disputed">
+                    {TRANSACTION_STATUS_LABELS[tx.status] || tx.status}
+                  </span>
                 </td>
                 <td className="rev-flag-reason">{tx.flagReason || 'Cần kiểm tra đối soát'}</td>
               </tr>

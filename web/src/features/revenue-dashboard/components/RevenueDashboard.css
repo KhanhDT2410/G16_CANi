@@ -133,25 +133,34 @@
 }
 
 .rev-growth-tag {
-  font-size: 0.75rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 
 .rev-growth-tag.positive {
-  background: #ecfdf5;
-  color: #059669;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
 }
 
 .rev-growth-tag.negative {
   background: #fef2f2;
-  color: #dc2626;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
 }
 
 .rev-growth-tag.neutral {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
 }
 
 .rev-card-value {
@@ -267,12 +276,19 @@
 }
 
 .rev-vnpay-badge {
-  background: #e0f2fe;
-  color: #0369a1;
-  font-weight: 700;
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  box-sizing: border-box;
 }
 
 .rev-vnpay-stats {
@@ -353,18 +369,33 @@
 }
 
 .rev-flagged-count {
-  background: #fee2e2;
-  color: #991b1b;
-  font-weight: 700;
-  font-size: 0.8rem;
-  padding: 4px 10px;
-  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  box-sizing: border-box;
 }
 
 .rev-flag-reason {
-  color: #b91c1c;
-  font-size: 0.8rem;
+  display: inline-block;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
   font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  box-sizing: border-box;
 }
 
 .flagged-row {
@@ -426,48 +457,85 @@
 }
 
 .rev-type-tag {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 
 .rev-type-tag.package {
-  background: #ede9fe;
-  color: #6d28d9;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  color: #7e22ce;
 }
 
 .rev-type-tag.payment {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
 }
 
 .rev-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family, 'Be Vietnam Pro', -apple-system, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
   padding: 2px 8px;
   border-radius: 4px;
+  box-sizing: border-box;
 }
 
 .rev-badge.method {
-  background: #f3f4f6;
-  color: #374151;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
 }
 
 .rev-badge.status-disputed {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
 }
 
 .rev-badge.status-active,
 .rev-badge.status-confirmed_full {
-  background: #dcfce7;
-  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.rev-badge.status-confirmed_partial {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.rev-badge.status-declared_pending_worker,
+.rev-badge.status-pending {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
 }
 
 .rev-badge.status-unverified {
-  background: #fce7f3;
-  color: #9d174d;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  color: #7e22ce;
+}
+
+.rev-badge.status-cancelled {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
 }
 
 .rev-pagination {

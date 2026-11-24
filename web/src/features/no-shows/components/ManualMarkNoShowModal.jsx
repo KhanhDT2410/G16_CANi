@@ -32,7 +32,7 @@ export const ManualMarkNoShowModal = ({ isOpen, onClose, onSubmit, submitting })
 
             <div>
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '6px' }}>
-                Mã Phân Công Ca (Assignment ID) <span style={{ color: '#dc2626' }}>*</span>
+                Mã Phân Công Ca <span style={{ color: '#dc2626' }}>*</span>
               </label>
               <input
                 type="text"

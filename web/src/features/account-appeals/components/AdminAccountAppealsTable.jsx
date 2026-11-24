@@ -192,23 +192,7 @@ export default function AdminAccountAppealsTable() {
                       </td>
 
                       <td>
-                        <span
-                          className="appeal-status-badge"
-                          style={{
-                            backgroundColor: cfg.bg,
-                            color: cfg.color,
-                            borderColor: `${cfg.color}33`,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              backgroundColor: cfg.color,
-                              display: 'inline-block',
-                            }}
-                          />
+                        <span className={`appeal-status-badge ${cfg.badgeClass}`}>
                           {cfg.label}
                         </span>
                       </td>

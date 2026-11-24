@@ -73,7 +73,9 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
             </div>
             <div>
               <span className="appeal-detail-label">Vai trò tài khoản:</span>
-              <span className="appeal-role-pill">{appeal.userRole}</span>
+              <span className={`appeal-role-badge ${appeal.userRole === 'EVENT_ORGANIZER' ? 'eo' : 'worker'}`}>
+                {appeal.userRole === 'EVENT_ORGANIZER' ? 'Nhà tổ chức' : 'Người lao động'}
+              </span>
             </div>
             <div>
               <span className="appeal-detail-label">Email tài khoản:</span>
@@ -81,7 +83,9 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
             </div>
             <div>
               <span className="appeal-detail-label">Trạng thái hiện tại:</span>
-              <span style={{ color: cfg.color, fontWeight: 700 }}>{cfg.label}</span>
+              <span className={`appeal-status-badge ${cfg.badgeClass}`}>
+                {cfg.label}
+              </span>
             </div>
           </div>
 
@@ -127,7 +131,7 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
                       checked={decision === 'APPROVED'}
                       onChange={() => setDecision('APPROVED')}
                     />
-                    <span>Chấp Thuận &amp; Mở Khóa Tài Khoản (ACTIVE)</span>
+                    <span>Chấp Thuận &amp; Mở Khóa Tài Khoản</span>
                   </label>
                   <label className={`appeal-radio-label ${decision === 'REJECTED' ? 'selected-reject' : ''}`}>
                     <input
@@ -137,7 +141,7 @@ export default function AdminAccountAppealReviewModal({ appeal, onClose, onRevie
                       checked={decision === 'REJECTED'}
                       onChange={() => setDecision('REJECTED')}
                     />
-                    <span>Từ Chối &amp; Giữ Nguyên Khóa (LOCKED)</span>
+                    <span>Từ Chối &amp; Giữ Nguyên Khóa</span>
                   </label>
                 </div>
               </div>

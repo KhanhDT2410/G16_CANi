@@ -30,6 +30,9 @@ public class PayOSOrder {
     @Column(name = "eo_id", nullable = false)
     private UUID eoId;
 
+    @Column(name = "plan_id")
+    private UUID planId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "plan_type", nullable = false)
     private PlanType planType;

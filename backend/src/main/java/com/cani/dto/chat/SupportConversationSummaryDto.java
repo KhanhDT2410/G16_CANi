@@ -26,6 +26,11 @@ public class SupportConversationSummaryDto {
     private Integer unreadUserCount;
     private String status;
 
+    // Liên kết Ticket SLA (mô hình Omnichannel)
+    private UUID activeTicketId;
+    private String activeTicketRefNo;
+    private String activeTicketStatus;
+
     // Ngữ cảnh ca làm việc gắn kèm (nếu người dùng đang trong ca làm việc hoặc có tin nhắn gần nhất từ ca)
     private UUID currentShiftId;
     private String currentShiftCode;

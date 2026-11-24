@@ -56,6 +56,12 @@ public class SupportTicketService {
     private final AuditLogService auditLogService;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.SupportConversationRepository supportConversationRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.cani.repository.SupportMessageRepository supportMessageRepository;
+
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneOffset.UTC);
 
     // ------------------------------------------------------------------
@@ -245,6 +251,17 @@ public class SupportTicketService {
                 Map.of("status", oldStatus.name()),
                 Map.of("status", TicketStatus.CLOSED.name(), "resolvedBy", userId.toString()));
 
+        if (ticket.getConversationId() != null && supportConversationRepository != null) {
+            Optional<com.cani.entity.SupportConversation> convOpt = supportConversationRepository.findById(ticket.getConversationId());
+            if (convOpt.isPresent()) {
+                com.cani.entity.SupportConversation conv = convOpt.get();
+                if (ticket.getId().equals(conv.getActiveTicketId())) {
+                    conv.setActiveTicketId(null);
+                    supportConversationRepository.save(conv);
+                }
+            }
+        }
+
         return toResponseDto(ticket, false);
     }
 
@@ -285,6 +302,122 @@ public class SupportTicketService {
         recordAudit(ccId, "CLOSE_TICKET", ticket,
                 Map.of("status", oldStatus.name()),
                 Map.of("status", TicketStatus.CLOSED.name(), "rationale", req.getRationale()));
+
+        // Tự động gỡ active_ticket_id và bắn thông báo vào Live Chat nếu có liên kết
+        if (ticket.getConversationId() != null && supportConversationRepository != null) {
+            Optional<com.cani.entity.SupportConversation> convOpt = supportConversationRepository.findById(ticket.getConversationId());
+            if (convOpt.isPresent()) {
+                com.cani.entity.SupportConversation conv = convOpt.get();
+                if (ticket.getId().equals(conv.getActiveTicketId())) {
+                    conv.setActiveTicketId(null);
+                    supportConversationRepository.save(conv);
+                }
+                if (supportMessageRepository != null) {
+                    supportMessageRepository.save(com.cani.entity.SupportMessage.builder()
+                            .conversationId(conv.getId())
+                            .senderId(ccId)
+                            .senderRole("CUSTOMER_CARE")
+                            .senderName("Hệ thống CANi Support")
+                            .messageText("✅ Phiếu hỗ trợ #" + ticket.getReferenceNo() + " đã được xử lý hoàn tất và đóng. Lý do: " + req.getRationale())
+                            .isRead(false)
+                            .build());
+                }
+            }
+        }
+
+        return toResponseDto(ticket, true);
+    }
+
+    // ------------------------------------------------------------------
+    // OMNICHANNEL: Leo thang phiên Live Chat thành Ticket SLA (Escalate to Ticket)
+    // ------------------------------------------------------------------
+    @Transactional
+    public SupportTicketResponseDto escalateChatToTicket(UUID conversationId, EscalateChatToTicketRequestDto req, UUID staffId) {
+        if (supportConversationRepository == null) {
+            throw new IllegalStateException("Hệ thống hội thoại chưa được cấu hình");
+        }
+        com.cani.entity.SupportConversation conv = supportConversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hội thoại", "id", conversationId));
+
+        if (conv.getActiveTicketId() != null) {
+            Optional<SupportTicket> existingTicketOpt = supportTicketRepository.findById(conv.getActiveTicketId());
+            if (existingTicketOpt.isPresent() && existingTicketOpt.get().getStatus() != TicketStatus.CLOSED) {
+                throw new BadRequestException("Phiên chat này đã có ticket đang xử lý (#" + existingTicketOpt.get().getReferenceNo() + ")");
+            }
+        }
+
+        TicketPriority priority = req.getPriority() != null ? req.getPriority() : mapCategoryToPriority(req.getCategory());
+        Instant slaDeadline = calculateSlaDeadline(priority);
+        String referenceNo = generateReferenceNo();
+
+        // Lấy tóm tắt tin nhắn gần nhất nếu không có customDescription
+        String description = req.getCustomDescription();
+        if (description == null || description.isBlank()) {
+            if (supportMessageRepository != null) {
+                List<com.cani.entity.SupportMessage> recentMsgs = supportMessageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+                if (!recentMsgs.isEmpty()) {
+                    int startIdx = Math.max(0, recentMsgs.size() - 8);
+                    StringBuilder sb = new StringBuilder("--- Ngữ cảnh trích xuất từ phiên Live Chat ---\n");
+                    for (int i = startIdx; i < recentMsgs.size(); i++) {
+                        com.cani.entity.SupportMessage m = recentMsgs.get(i);
+                        sb.append("[").append(m.getSenderRole()).append("] ")
+                                .append(m.getSenderName() != null ? m.getSenderName() : "User")
+                                .append(": ").append(m.getMessageText()).append("\n");
+                    }
+                    description = sb.toString();
+                } else {
+                    description = "Chuyển đổi từ phiên Live Chat.";
+                }
+            } else {
+                description = "Chuyển đổi từ phiên Live Chat.";
+            }
+        }
+
+        SupportTicket ticket = SupportTicket.builder()
+                .referenceNo(referenceNo)
+                .userId(conv.getUserId())
+                .conversationId(conversationId)
+                .category(req.getCategory())
+                .priority(priority)
+                .subject(req.getSubject())
+                .description(description)
+                .status(TicketStatus.IN_PROGRESS)
+                .assignedTo(staffId)
+                .slaDeadline(slaDeadline)
+                .build();
+
+        ticket = supportTicketRepository.save(ticket);
+
+        // Tạo tin nhắn mở đầu thread
+        supportTicketMessageRepository.save(SupportTicketMessage.builder()
+                .ticketId(ticket.getId())
+                .senderId(staffId)
+                .body("Chuyên viên CSKH đã chuyển sự cố từ phiên Live Chat sang Ticket SLA #" + referenceNo + ".\n" + description)
+                .isInternal(false)
+                .build());
+
+        // Cập nhật active_ticket_id cho conversation
+        conv.setActiveTicketId(ticket.getId());
+        supportConversationRepository.save(conv);
+
+        // Bắn tin nhắn bot vào Live Chat để thông báo cho User
+        if (supportMessageRepository != null) {
+            supportMessageRepository.save(com.cani.entity.SupportMessage.builder()
+                    .conversationId(conversationId)
+                    .senderId(staffId)
+                    .senderRole("CUSTOMER_CARE")
+                    .senderName("Hệ thống CANi Support")
+                    .messageText("🔔 Yêu cầu hỗ trợ của bạn đã được chuyển thành Phiếu hỗ trợ chính thức mã #" + referenceNo
+                            + " (" + req.getCategory() + " · Mức độ: " + priority + "). Chuyên viên đang thụ lý.")
+                    .isRead(false)
+                    .build());
+        }
+
+        // Ghi Audit log
+        recordAudit(staffId, "ESCALATE_CHAT_TO_TICKET", ticket, null, Map.of(
+                "conversationId", conversationId.toString(),
+                "referenceNo", referenceNo
+        ));
 
         return toResponseDto(ticket, true);
     }
@@ -397,6 +530,7 @@ public class SupportTicketService {
                     return SupportTicketQueueItemDto.builder()
                             .id(ticket.getId())
                             .referenceNo(ticket.getReferenceNo())
+                            .conversationId(ticket.getConversationId())
                             .category(ticket.getCategory())
                             .priority(ticket.getPriority())
                             .subject(ticket.getSubject())
@@ -439,28 +573,29 @@ public class SupportTicketService {
         if (category == null) {
             return TicketPriority.LOW;
         }
-        return switch (category) {
-            case BILLING, ACCOUNT -> TicketPriority.HIGH;
-            case TECHNICAL, GENERAL -> TicketPriority.MEDIUM;
-            case OTHER -> TicketPriority.LOW;
-        };
+        if (category == TicketCategory.BILLING || category == TicketCategory.ACCOUNT) {
+            return TicketPriority.HIGH;
+        }
+        if (category == TicketCategory.TECHNICAL || category == TicketCategory.GENERAL) {
+            return TicketPriority.MEDIUM;
+        }
+        return TicketPriority.LOW;
     }
 
     public Instant calculateSlaDeadline(TicketPriority priority) {
         Instant now = Instant.now();
-        if (priority == null) {
-            return now.plus(3, ChronoUnit.DAYS);
+        if (priority == TicketPriority.HIGH) {
+            return now.plus(4, ChronoUnit.HOURS);
         }
-        return switch (priority) {
-            case HIGH -> now.plus(4, ChronoUnit.HOURS);
-            case MEDIUM -> now.plus(1, ChronoUnit.DAYS);
-            case LOW -> now.plus(3, ChronoUnit.DAYS);
-        };
+        if (priority == TicketPriority.MEDIUM) {
+            return now.plus(1, ChronoUnit.DAYS);
+        }
+        return now.plus(3, ChronoUnit.DAYS);
     }
 
     private String generateReferenceNo() {
         String dateStr = DATE_FORMATTER.format(Instant.now());
-        String randomSuffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String randomSuffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         return "TKT-" + dateStr + "-" + randomSuffix;
     }
 
@@ -539,11 +674,12 @@ public class SupportTicketService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private SupportTicketResponseDto toResponseDto(SupportTicket ticket, boolean isStaff) {
         List<String> attachmentsList = Collections.emptyList();
         if (ticket.getAttachments() != null && !ticket.getAttachments().isBlank()) {
             try {
-                attachmentsList = objectMapper.readValue(ticket.getAttachments(), new TypeReference<List<String>>() {});
+                attachmentsList = objectMapper.readValue(ticket.getAttachments(), List.class);
             } catch (Exception e) {
                 log.warn("Không thể parse attachments cho ticket {}: {}", ticket.getId(), e.getMessage());
             }
@@ -551,17 +687,35 @@ public class SupportTicketService {
 
         List<SupportTicketMessage> messages = supportTicketMessageRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId());
 
+        Set<UUID> senderIds = messages.stream()
+                .map(SupportTicketMessage::getSenderId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<UUID, User> senderMap = userRepository.findAllById(senderIds).stream()
+                .collect(java.util.stream.Collectors.toMap(User::getUserId, u -> u, (a, b) -> a));
+
         List<SupportTicketResponseDto.MessageDto> messageDtos = messages.stream()
                 .filter(m -> isStaff || !Boolean.TRUE.equals(m.getIsInternal()))
-                .map(m -> SupportTicketResponseDto.MessageDto.builder()
-                        .id(m.getId())
-                        .ticketId(m.getTicketId())
-                        .senderId(m.getSenderId())
-                        .body(m.getBody())
-                        .isInternal(m.getIsInternal())
-                        .attachmentUrl(m.getAttachmentUrl())
-                        .createdAt(m.getCreatedAt())
-                        .build())
+                .map(m -> {
+                    User sender = m.getSenderId() != null ? senderMap.get(m.getSenderId()) : null;
+                    boolean staffMsg = isStaff(sender);
+                    String senderRoleName = staffMsg ? "CUSTOMER_CARE" : "USER";
+                    String senderDisplayName = staffMsg ? "Chuyên viên hỗ trợ" : "Người gửi";
+
+                    return SupportTicketResponseDto.MessageDto.builder()
+                            .id(m.getId())
+                            .ticketId(m.getTicketId())
+                            .senderId(m.getSenderId())
+                            .senderName(senderDisplayName)
+                            .senderRole(senderRoleName)
+                            .isStaffReply(staffMsg)
+                            .body(m.getBody())
+                            .message(m.getBody())
+                            .isInternal(m.getIsInternal())
+                            .attachmentUrl(m.getAttachmentUrl())
+                            .createdAt(m.getCreatedAt())
+                            .build();
+                })
                 .toList();
 
         boolean slaAtRisk = ticket.getStatus() != TicketStatus.CLOSED
@@ -577,6 +731,7 @@ public class SupportTicketService {
         return SupportTicketResponseDto.builder()
                 .id(ticket.getId())
                 .referenceNo(ticket.getReferenceNo())
+                .conversationId(ticket.getConversationId())
                 .userId(ticket.getUserId())
                 .userName(customer != null ? customer.getFullName() : null)
                 .userPhone(customer != null ? customer.getPhone() : null)

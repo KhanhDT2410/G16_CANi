@@ -39,7 +39,7 @@ export const TicketReplyForm = ({ isStaff, onSubmit, submitting }) => {
       </label>
       <textarea
         className="ticket-form-textarea"
-        placeholder={isInternal ? 'Nhập ghi chú nội bộ (chỉ CC/Admin thấy)...' : 'Nhập tin nhắn phản hồi sự cố...'}
+        placeholder={isInternal ? 'Nhập ghi chú nội bộ...' : 'Nhập tin nhắn phản hồi sự cố...'}
         value={replyBody}
         onChange={(e) => setReplyBody(e.target.value)}
         rows={3}
@@ -63,7 +63,7 @@ export const TicketReplyForm = ({ isStaff, onSubmit, submitting }) => {
               checked={isInternal}
               onChange={(e) => setIsInternal(e.target.checked)}
             />
-            Đặt làm ghi chú nội bộ (Người dùng không nhìn thấy)
+            Đặt làm ghi chú nội bộ
           </label>
         ) : <div />}
         <button

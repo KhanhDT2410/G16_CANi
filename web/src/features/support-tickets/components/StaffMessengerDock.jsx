@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supportChatApi } from '../api/supportChatApi';
 import { showToast } from '../../../components/common/Toast';
 import SupportChatFaqModal from './SupportChatFaqModal';
+import EscalateChatModal from './EscalateChatModal';
 
 /**
  * Cửa sổ chat Messenger thu nhỏ ở góc dưới màn hình dành cho CSKH / Quản trị viên.
@@ -15,6 +16,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
   const [convId, setConvId] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showFaqModal, setShowFaqModal] = useState(false);
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -220,14 +222,25 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
         </div>
 
         <div className="dock-header-actions-col">
-          {onOpenTicket && activeChat.referenceNo && (
+          {(activeChat.activeTicketRefNo || activeChat.referenceNo) ? (
             <button
               type="button"
               className="dock-text-btn"
-              onClick={() => onOpenTicket(activeChat)}
-              title="Xem chi tiết phiếu hỗ trợ"
+              onClick={() => onOpenTicket && onOpenTicket({ id: activeChat.activeTicketId, referenceNo: activeChat.activeTicketRefNo || activeChat.referenceNo })}
+              title="Xem chi tiết phiếu hỗ trợ liên kết"
+              style={{ color: '#059669', fontWeight: 700 }}
             >
-              Xem Phiếu
+              #{activeChat.activeTicketRefNo || activeChat.referenceNo}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="dock-text-btn"
+              onClick={() => setShowEscalateModal(true)}
+              title="Chuyển hội thoại thành phiếu hỗ trợ"
+              style={{ color: '#4f46e5', fontWeight: 700 }}
+            >
+              Tạo Phiếu Hỗ Trợ
             </button>
           )}
           <button type="button" className="dock-text-btn" onClick={() => setIsMinimized(true)}>Thu Nhỏ</button>
@@ -382,6 +395,36 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
           setShowFaqModal(false);
           const answer = faq.answer || faq.a || '';
           setInputText((prev) => (prev.trim() ? `${prev}\n\n${answer}` : answer));
+        }}
+      />
+
+      <EscalateChatModal
+        isOpen={showEscalateModal}
+        onClose={() => setShowEscalateModal(false)}
+        convId={convId || activeChat?.id || activeChat?.conversationId}
+        conversationId={convId || activeChat?.id || activeChat?.conversationId}
+        customerName={activeChat?.userName || 'Khách hàng'}
+        onSuccess={(ticket) => {
+          setShowEscalateModal(false);
+          if (activeChat) {
+            activeChat.activeTicketId = ticket.id;
+            activeChat.activeTicketRefNo = ticket.refNo;
+            activeChat.activeTicketStatus = ticket.status;
+          }
+          if (onOpenTicket) {
+            onOpenTicket(ticket);
+          }
+        }}
+        onEscalated={(ticket) => {
+          setShowEscalateModal(false);
+          if (activeChat) {
+            activeChat.activeTicketId = ticket.id;
+            activeChat.activeTicketRefNo = ticket.refNo;
+            activeChat.activeTicketStatus = ticket.status;
+          }
+          if (onOpenTicket) {
+            onOpenTicket(ticket);
+          }
         }}
       />
     </div>

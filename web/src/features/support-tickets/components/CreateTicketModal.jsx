@@ -91,7 +91,7 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillD
 
             <div className="ticket-form-group">
               <label className="ticket-form-label">
-                Mô Tả Chi Tiết Sự Cố * (Tối thiểu 30 ký tự)
+                Mô Tả Chi Tiết Sự Cố *
               </label>
               <textarea
                 className="ticket-form-textarea"
@@ -108,7 +108,7 @@ export const CreateTicketModal = ({ isOpen, onClose, onSubmit, loading, prefillD
 
             <div className="ticket-form-group">
               <label className="ticket-form-label">
-                Tệp Đính Kèm & Hình Ảnh Minh Chứng (Tùy chọn)
+                Tệp Đính Kèm và Hình Ảnh Minh Chứng
               </label>
               <TicketAttachmentUpload
                 attachments={attachments}

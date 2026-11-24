@@ -32,7 +32,7 @@ export const TicketAttachmentsView = ({ attachments }) => {
                 </div>
               ) : (
                 <div className="ticket-attachment-doc-wrapper">
-                  <span className="ticket-attachment-doc-badge">[{ext}]</span>
+                  <span className="ticket-attachment-doc-badge">{ext}</span>
                 </div>
               )}
               <div className="ticket-attachment-view-info">

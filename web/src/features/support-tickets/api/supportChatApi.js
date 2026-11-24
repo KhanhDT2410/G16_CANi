@@ -62,6 +62,12 @@ export const supportChatApi = {
     const response = await apiClient.post(`/v1/admin/support/chat/conversations/${id}/reply`, payload);
     return response.data?.data;
   },
+
+  /** CSKH chuyển đổi (Escalate) phiên Live Chat thành Phiếu hỗ trợ SLA (Support Ticket) */
+  escalateToTicket: async (id, payload) => {
+    const response = await apiClient.post(`/v1/admin/support/chat/conversations/${id}/escalate`, payload);
+    return response.data?.data;
+  },
 };
 
 export default supportChatApi;

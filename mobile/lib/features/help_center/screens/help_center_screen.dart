@@ -57,11 +57,12 @@ class HelpCenterScreen extends ConsumerWidget {
 
             // 3. THẺ YÊU CẦU HỖ TRỢ CỦA TÔI
             MyTicketsCard(
-              onViewAll: () {
-                Navigator.push(
+              onViewAll: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
                 );
+                ref.invalidate(myTicketsProvider);
               },
               onCreateTicket: () async {
                 final created = await Navigator.push(
@@ -73,7 +74,7 @@ class HelpCenterScreen extends ConsumerWidget {
                 }
               },
               onSelectTicket: (ticket) {
-                MyTicketsScreen.showDetailModal(context, ticket.id);
+                MyTicketsScreen.showDetailModal(context, ref, ticket.id);
               },
             ),
             const SizedBox(height: 18),

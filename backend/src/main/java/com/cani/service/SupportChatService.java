@@ -48,6 +48,9 @@ public class SupportChatService {
         private final UserRepository userRepository;
         private final ShiftRepository shiftRepository;
 
+        @org.springframework.beans.factory.annotation.Autowired(required = false)
+        private com.cani.repository.SupportTicketRepository supportTicketRepository;
+
         /**
          * Lấy hoặc khởi tạo phiên chat của Người dùng hiện tại.
          */
@@ -415,6 +418,18 @@ public class SupportChatService {
                                 shiftName = evName + " - " + shift.getJobType();
                         }
                 }
+
+                UUID activeTicketId = conv.getActiveTicketId();
+                String activeTicketRefNo = null;
+                String activeTicketStatus = null;
+                if (activeTicketId != null && supportTicketRepository != null) {
+                        java.util.Optional<com.cani.entity.SupportTicket> tOpt = supportTicketRepository.findById(activeTicketId);
+                        if (tOpt.isPresent()) {
+                                activeTicketRefNo = tOpt.get().getReferenceNo();
+                                activeTicketStatus = tOpt.get().getStatus().name();
+                        }
+                }
+
                 return SupportConversationSummaryDto.builder()
                                 .id(conv.getId())
                                 .userId(conv.getUserId())
@@ -429,6 +444,9 @@ public class SupportChatService {
                                 .unreadStaffCount(conv.getUnreadStaffCount() != null ? conv.getUnreadStaffCount() : 0)
                                 .unreadUserCount(conv.getUnreadUserCount() != null ? conv.getUnreadUserCount() : 0)
                                 .status(conv.getStatus())
+                                .activeTicketId(activeTicketId)
+                                .activeTicketRefNo(activeTicketRefNo)
+                                .activeTicketStatus(activeTicketStatus)
                                 .currentShiftId(shiftId)
                                 .currentShiftCode(shiftCode)
                                 .currentShiftName(shiftName)

@@ -71,6 +71,29 @@ export const TicketDetailModal = ({
             <span className={`ticket-badge ${statusConfig.badgeClass}`}>
               {statusConfig.label}
             </span>
+            {ticket.conversationId && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  window.dispatchEvent(new CustomEvent('cani_open_staff_chat', { detail: { userId: ticket.userId } }));
+                }}
+                style={{
+                  marginLeft: '0.5rem',
+                  fontSize: '0.75rem',
+                  background: '#e0e7ff',
+                  color: '#4338ca',
+                  border: '1px solid #c7d2fe',
+                  borderRadius: '4px',
+                  padding: '2px 8px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+                title="Mở cuộc trò chuyện trực tuyến của khách hàng"
+              >
+                Mở cuộc trò chuyện gốc
+              </button>
+            )}
           </div>
           <button type="button" className="ticket-modal-close-btn" onClick={onClose}>
             ✕

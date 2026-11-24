@@ -28,6 +28,7 @@ import java.util.UUID;
 public class AdminSupportChatController {
 
     private final SupportChatService supportChatService;
+    private final com.cani.service.SupportTicketService supportTicketService;
 
     /**
      * Lấy tóm tắt số tin nhắn chưa đọc và danh sách người gửi gần nhất cho icon Header & Sidebar.
@@ -92,6 +93,21 @@ public class AdminSupportChatController {
         UUID staffId = currentUserId(authentication);
         ChatMessageResponseDto dto = supportChatService.sendStaffMessage(staffId, id, request);
         return ResponseEntity.ok(ApiResponse.ok(dto, "Phản hồi tin nhắn thành công"));
+    }
+
+    /**
+     * CSKH chuyển đổi (Escalate) phiên Live Chat thành Phiếu hỗ trợ SLA (Support Ticket).
+     * POST /api/v1/admin/support/chat/conversations/{id}/escalate
+     */
+    @PostMapping("/conversations/{id}/escalate")
+    public ResponseEntity<ApiResponse<com.cani.dto.support.SupportTicketResponseDto>> escalateToTicket(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody com.cani.dto.support.EscalateChatToTicketRequestDto request,
+            Authentication authentication
+    ) {
+        UUID staffId = currentUserId(authentication);
+        com.cani.dto.support.SupportTicketResponseDto dto = supportTicketService.escalateChatToTicket(id, request, staffId);
+        return ResponseEntity.ok(ApiResponse.ok(dto, "Chuyển phiên chat thành Ticket thành công"));
     }
 
     private UUID currentUserId(Authentication authentication) {

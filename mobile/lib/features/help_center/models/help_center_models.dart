@@ -177,12 +177,22 @@ class TicketMessageModel {
   });
 
   factory TicketMessageModel.fromJson(Map<String, dynamic> json) {
+    final bodyText = (json['body'] ?? json['message'])?.toString() ?? '';
+    final isStaff = json['isStaffReply'] == true ||
+        json['senderRole'] == 'CUSTOMER_CARE' ||
+        json['senderRole'] == 'ADMIN' ||
+        json['authorRole'] == 'CUSTOMER_CARE' ||
+        json['authorRole'] == 'ADMIN';
+    final name = json['senderName']?.toString() ??
+        json['authorName']?.toString() ??
+        (isStaff ? 'Chuyên viên hỗ trợ' : 'Tôi');
+
     return TicketMessageModel(
       id: json['id']?.toString() ?? '',
-      authorName: json['authorName']?.toString() ?? 'Hệ thống',
-      authorRole: json['authorRole']?.toString() ?? 'USER',
-      message: json['message']?.toString() ?? '',
-      isStaffReply: json['isStaffReply'] == true,
+      authorName: name,
+      authorRole: isStaff ? 'Chuyên viên hỗ trợ' : 'Người gửi',
+      message: bodyText,
+      isStaffReply: isStaff,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),

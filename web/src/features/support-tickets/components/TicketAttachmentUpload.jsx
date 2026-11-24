@@ -105,7 +105,7 @@ export const TicketAttachmentUpload = ({ attachments = [], onChange, disabled = 
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || uploading || attachments.length >= maxFiles}
         >
-          {uploading ? 'Đang tải tệp lên...' : '+ Tải tệp từ thiết bị (Ảnh / PDF / Tài liệu)'}
+          {uploading ? 'Đang tải tệp lên...' : 'Tải tệp từ thiết bị'}
         </button>
         <button
           type="button"
@@ -113,7 +113,7 @@ export const TicketAttachmentUpload = ({ attachments = [], onChange, disabled = 
           onClick={() => setShowUrlInput(!showUrlInput)}
           disabled={disabled || uploading}
         >
-          {showUrlInput ? 'Ẩn nhập link' : 'Hoặc dán URL'}
+          {showUrlInput ? 'Ẩn nhập liên kết' : 'Dán liên kết tệp'}
         </button>
       </div>
 
@@ -156,7 +156,7 @@ export const TicketAttachmentUpload = ({ attachments = [], onChange, disabled = 
                   />
                 ) : (
                   <span className="ticket-attachment-file-tag">
-                    [{getFileExtension(fileUrl)}]
+                    {getFileExtension(fileUrl)}
                   </span>
                 )}
                 <div className="ticket-attachment-meta">
@@ -164,7 +164,7 @@ export const TicketAttachmentUpload = ({ attachments = [], onChange, disabled = 
                     {fileName}
                   </span>
                   {fileSize && (
-                    <span className="ticket-attachment-size">({fileSize})</span>
+                    <span className="ticket-attachment-size">{fileSize}</span>
                   )}
                 </div>
                 {!disabled && (

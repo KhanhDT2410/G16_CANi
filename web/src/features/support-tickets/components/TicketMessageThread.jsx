@@ -26,11 +26,11 @@ export const TicketMessageThread = ({ messages, ticketUserId, formatDateTime }) 
               >
                 <div className="ticket-message-header">
                   <span className="ticket-message-sender">
-                    {msg.senderId === ticketUserId ? 'Người gửi yêu cầu' : 'Chuyên viên CSKH / Quản trị viên'}
+                    {msg.senderId === ticketUserId ? 'Người gửi yêu cầu' : 'Chuyên viên hỗ trợ'}
                   </span>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     {msg.isInternal && (
-                      <span className="ticket-internal-tag">[GHI CHÚ NỘI BỘ]</span>
+                      <span className="ticket-internal-tag">Ghi chú nội bộ</span>
                     )}
                     <span>{formatDateTime(msg.createdAt)}</span>
                   </div>
@@ -55,7 +55,7 @@ export const TicketMessageThread = ({ messages, ticketUserId, formatDateTime }) 
                       </a>
                     ) : (
                       <div className="ticket-message-doc-row">
-                        <span className="ticket-attachment-doc-badge">[{ext}]</span>
+                        <span className="ticket-attachment-doc-badge">{ext}</span>
                         <span className="ticket-message-doc-name" title={fileName}>
                           {fileName}
                         </span>

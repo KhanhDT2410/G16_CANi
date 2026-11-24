@@ -50,6 +50,12 @@ export const disputeApi = {
     return response.data?.data;
   },
 
+  /** Danh sách tranh chấp đã giải quyết / hoàn thiện (Option 1) */
+  getResolvedDisputes: async () => {
+    const response = await apiClient.get('/v1/admin/disputes/resolved');
+    return response.data?.data || [];
+  },
+
   /** UC-109: Hàng đợi riêng — chỉ đơn đang được giao cho CC hiện tại */
   getMyDisputeQueue: async () => {
     const response = await apiClient.get('/v1/admin/disputes/queue/mine');

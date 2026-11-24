@@ -21,37 +21,40 @@ export const DisputeCenterView = () => {
   const isArbitrator = user?.role === 'ADMIN' || user?.role === 'CUSTOMER_CARE';
 
   const {
-    queue, myQueue, myDisputes, ccStaff, loading,
-    loadQueue, loadMyDisputes, loadCcStaff, loadDisputeDetail,
-    createDispute, addEvidence, assignDispute,
-    issueDecision, escalateDispute,
+    queue, myQueue, resolvedQueue, myDisputes, ccStaff, loading,
+    loadQueue, loadResolvedQueue, loadMyDisputes, loadCcStaff, loadDisputeDetail,
+    createDispute, addEvidence, assignDispute, issueDecision, escalateDispute,
   } = useDisputes(isArbitrator ? 'queue' : 'my');
 
   const [activeDisputeId, setActiveDisputeId] = useState(null);
   const [selectedDisputeDetail, setSelectedDisputeDetail] = useState(null);
-  const [viewMode, setViewMode] = useState('SPLIT'); // 'SPLIT' | 'TABLE'
+  const [viewMode, setViewMode] = useState('SPLIT');
   const [modalType, setModalType] = useState(null);
   const [modalDispute, setModalDispute] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [queueFilter, setQueueFilter] = useState('ALL');
   const [queueScope, setQueueScope] = useState('ALL');
 
-  const scopedList = !isArbitrator ? myDisputes : queueScope === 'MINE' ? myQueue : queue;
+  const scopedList = !isArbitrator ? myDisputes : queueScope === 'MINE' ? myQueue : queueScope === 'RESOLVED' ? resolvedQueue : queue;
   const riskCount = useMemo(() => scopedList.filter((item) => item.slaAtRisk).length, [scopedList]);
   const unreadTotalCount = useMemo(
-    () => scopedList.filter((item) => (item.unreadCount || 0) > 0 || (item.workerUnreadCount || 0) > 0 || (item.eoUnreadCount || 0) > 0).length,
+    () => scopedList.filter((i) => (i.unreadCount || 0) > 0 || (i.workerUnreadCount || 0) > 0 || (i.eoUnreadCount || 0) > 0).length,
     [scopedList]
   );
-  const handleRefreshDisputes = () => (isArbitrator ? loadQueue() : loadMyDisputes());
+  const handleRefreshDisputes = () => {
+    if (!isArbitrator) return loadMyDisputes();
+    loadQueue();
+    loadResolvedQueue();
+  };
 
   const filteredQueue = useMemo(() => {
     let list = scopedList;
     if (queueFilter === 'UNREAD') {
       list = list.filter((i) => (i.unreadCount || 0) > 0 || (i.workerUnreadCount || 0) > 0 || (i.eoUnreadCount || 0) > 0);
-    } else if (queueFilter === 'OPEN') list = list.filter((i) => i.status === 'OPEN');
-    else if (queueFilter === 'INVESTIGATING') list = list.filter((i) => i.status === 'INVESTIGATING');
-    else if (queueFilter === 'ESCALATED') list = list.filter((i) => i.status === 'ESCALATED');
-    else if (queueFilter === 'SLA_RISK') list = list.filter((i) => i.slaAtRisk);
+    } else if (queueFilter !== 'ALL') {
+      if (queueFilter === 'SLA_RISK') list = list.filter((i) => i.slaAtRisk);
+      else list = list.filter((i) => i.status === queueFilter);
+    }
 
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
@@ -59,48 +62,37 @@ export const DisputeCenterView = () => {
     }
 
     return [...list].sort((a, b) => {
-      // 1. Đơn có tin nhắn mới chưa đọc luôn nhảy lên đầu danh sách
       const aUnread = (a.unreadCount || 0) > 0 || (a.workerUnreadCount || 0) > 0 || (a.eoUnreadCount || 0) > 0;
       const bUnread = (b.unreadCount || 0) > 0 || (b.workerUnreadCount || 0) > 0 || (b.eoUnreadCount || 0) > 0;
       if (aUnread !== bUnread) return aUnread ? -1 : 1;
-
-      // 2. Ca có tin nhắn mới nhất (lastMessageAt DESC) luôn lên trước
       const aMsg = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
       const bMsg = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
       if (aMsg !== bMsg) return bMsg - aMsg;
-
-      // 3. Nếu chưa có tin nhắn, ca có rủi ro SLA ưu tiên trước
       if (a.slaAtRisk !== b.slaAtRisk) return a.slaAtRisk ? -1 : 1;
-
-      // 4. Mới tạo lên trước (createdAt DESC)
-      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bCreated - aCreated;
+      return (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0);
     });
   }, [scopedList, queueFilter, searchTerm]);
 
-  // Tự động làm mới danh sách định kỳ để bắt kịp tin nhắn mới theo thời gian thực
   useEffect(() => {
     const timer = setInterval(() => {
       if (typeof document === 'undefined' || document.visibilityState === 'visible') {
         if (isArbitrator) {
           loadQueue();
+          if (queueScope === 'RESOLVED') loadResolvedQueue();
         } else {
           loadMyDisputes();
         }
       }
     }, 4000);
     return () => clearInterval(timer);
-  }, [isArbitrator, loadQueue, loadMyDisputes]);
+  }, [isArbitrator, queueScope, loadQueue, loadResolvedQueue, loadMyDisputes]);
 
-  // Tự động chọn đơn đầu tiên khi có dữ liệu từ CSDL
   useEffect(() => {
     if (filteredQueue.length > 0 && (!activeDisputeId || !filteredQueue.some((i) => i.id === activeDisputeId))) {
       setActiveDisputeId(filteredQueue[0].id);
     }
   }, [filteredQueue, activeDisputeId]);
 
-  // Chi tiết đơn đang hiển thị trong khung hội thoại
   const currentDispute = useMemo(() => {
     if (!activeDisputeId) return null;
     return selectedDisputeDetail?.id === activeDisputeId
@@ -127,17 +119,13 @@ export const DisputeCenterView = () => {
   if (modalType === 'create') {
     return (
       <div className="disputes-container">
-        <CreateDisputeWizard
-          onCancel={() => setModalType(null)}
-          onSubmit={createDispute}
-        />
+        <CreateDisputeWizard onCancel={() => setModalType(null)} onSubmit={createDispute} />
       </div>
     );
   }
 
   return (
     <div className="disputes-container">
-      {/* Thanh công cụ chuyển đổi chế độ & thao tác */}
       <DisputeTopHeader
         viewMode={viewMode}
         setViewMode={setViewMode}
@@ -146,7 +134,6 @@ export const DisputeCenterView = () => {
         onOpenCreate={() => setModalType('create')}
       />
 
-      {/* CHẾ ĐỘ 1: GIAO DIỆN HỘI THOẠI SPLIT-VIEW (ADM-03) */}
       {viewMode === 'SPLIT' ? (
         <div className="dispute-split-layout">
           <DisputeQueueSidebar
@@ -156,8 +143,9 @@ export const DisputeCenterView = () => {
             queueFilter={queueFilter}
             setQueueFilter={setQueueFilter}
             queueScope={queueScope}
-            setQueueScope={setQueueScope}
-            totalCount={scopedList.length}
+            setQueueScope={(scope) => { setQueueScope(scope); setQueueFilter('ALL'); }}
+            totalCount={queue.length}
+            resolvedCount={resolvedQueue.length}
             myCount={isArbitrator ? myQueue.length : myDisputes.length}
             riskCount={riskCount}
             unreadCount={unreadTotalCount}
@@ -186,7 +174,6 @@ export const DisputeCenterView = () => {
           </div>
         </div>
       ) : (
-        /* CHẾ ĐỘ 2: BẢNG HÀNG ĐỢI */
         <DisputeQueueTable
           queue={filteredQueue}
           loading={loading}
@@ -210,4 +197,5 @@ export const DisputeCenterView = () => {
     </div>
   );
 };
+
 export default DisputeCenterView;

@@ -55,38 +55,22 @@ export const ShiftDetailModal = ({
 
   const modalContent = (
     <div className="shift-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="shift-modal-box" onClick={(e) => e.stopPropagation()}>
+      <div className="shift-modal-box shift-modal-box-wide" onClick={(e) => e.stopPropagation()}>
         <div className="shift-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <h3>Ca Làm: {shift?.shiftCode || '—'}</h3>
             {statusCfg && (
-              <span
-                className="shift-status-badge"
-                style={{
-                  background: statusCfg.bg,
-                  color: statusCfg.color,
-                  borderColor: statusCfg.border || '#cbd5e1',
-                }}
-              >
+              <span className="shift-status-badge" style={{ background: statusCfg.bg, color: statusCfg.color, borderColor: statusCfg.border || '#cbd5e1' }}>
                 {statusCfg.label}
               </span>
             )}
             {paymentCfg && (
-              <span
-                className="shift-payment-badge"
-                style={{
-                  background: paymentCfg.bg,
-                  color: paymentCfg.color,
-                  borderColor: paymentCfg.border || '#cbd5e1',
-                }}
-              >
+              <span className="shift-payment-badge" style={{ background: paymentCfg.bg, color: paymentCfg.color, borderColor: paymentCfg.border || '#cbd5e1' }}>
                 {paymentCfg.label}
               </span>
             )}
           </div>
-          <button type="button" className="shift-modal-close-btn" onClick={onClose} aria-label="Đóng cửa sổ">
-            ✕
-          </button>
+          <button type="button" className="shift-modal-close-btn" onClick={onClose} aria-label="Đóng cửa sổ">✕</button>
         </div>
 
         <div className="shift-modal-body">
@@ -111,9 +95,7 @@ export const ShiftDetailModal = ({
 
               <div className="shift-task-assignment-section">
                 <div className="section-title-sm">Nhiệm Vụ & Đầu Việc EO Đã Giao:</div>
-                {shift.description && (
-                  <div className="shift-description-box">{shift.description}</div>
-                )}
+                {shift.description && <div className="shift-description-box">{shift.description}</div>}
                 {templateChecklist.length > 0 ? (
                   <div className="shift-checklist-template-box">
                     <div className="checklist-subhead">Checklist đầu việc chuẩn ({templateChecklist.length} mục):</div>
@@ -122,6 +104,11 @@ export const ShiftDetailModal = ({
                         <div key={task.id} className="checklist-chip-item">
                           <span className="chip-index">{idx + 1}.</span>
                           <span className="chip-title">{task.title}</span>
+                          {task.isRequiredEvidence && (
+                            <span style={{ fontSize: '0.7rem', color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>
+                              Cần ảnh
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -152,41 +139,26 @@ export const ShiftDetailModal = ({
           >
             Cảnh Báo EO
           </button>
-
           <button
             type="button"
             className="ticket-btn ticket-btn-warning"
             onClick={() => canSuspend && setActiveAction('SUSPEND')}
             disabled={actionLoading || !canSuspend}
             style={{ opacity: canSuspend ? 1 : 0.45, cursor: canSuspend ? 'pointer' : 'not-allowed' }}
-            title={
-              isFinished
-                ? 'Ca làm việc đã kết thúc hoàn thành, không thể đình chỉ'
-                : shift?.status === 'CANCELLED'
-                ? 'Ca làm việc đã bị hủy trước đó, không thể đình chỉ'
-                : 'Tạm đình chỉ ca làm việc này'
-            }
+            title={isFinished ? 'Ca làm việc đã kết thúc hoàn thành, không thể đình chỉ' : shift?.status === 'CANCELLED' ? 'Ca làm việc đã bị hủy trước đó, không thể đình chỉ' : 'Tạm đình chỉ ca làm việc này'}
           >
             Tạm Đình Chỉ Ca
           </button>
-
           <button
             type="button"
             className="ticket-btn ticket-btn-danger"
             onClick={() => canCancel && setActiveAction('CANCEL')}
             disabled={actionLoading || !canCancel}
             style={{ opacity: canCancel ? 1 : 0.45, cursor: canCancel ? 'pointer' : 'not-allowed' }}
-            title={
-              isFinished
-                ? 'Ca làm việc đã kết thúc hoàn thành, không thể hủy'
-                : shift?.status === 'CANCELLED'
-                ? 'Ca làm việc đã bị hủy trước đó'
-                : 'Hủy ca làm việc cưỡng chế'
-            }
+            title={isFinished ? 'Ca làm việc đã kết thúc hoàn thành, không thể hủy' : shift?.status === 'CANCELLED' ? 'Ca làm việc đã bị hủy trước đó' : 'Hủy ca làm việc cưỡng chế'}
           >
             Hủy Ca Cưỡng Chế
           </button>
-
           <button type="button" className="ticket-btn ticket-btn-secondary" onClick={onClose} disabled={actionLoading}>
             Đóng
           </button>

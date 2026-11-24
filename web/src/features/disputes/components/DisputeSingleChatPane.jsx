@@ -132,7 +132,7 @@ export const DisputeSingleChatPane = ({
 
       {isClosed ? (
         <div className="pane-closed-bar">
-          <span>Vụ việc đã có phán quyết cuối cùng (FINAL_RESOLVED). Kênh đối chất đã được đóng.</span>
+          <span>Vụ việc đã được hoàn tất xử lý. Kênh đối chất đã được lưu trữ ở chế độ chỉ đọc.</span>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="dispute-single-pane-footer">

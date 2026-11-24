@@ -74,6 +74,8 @@ public class DisputeService {
             List.of(DisputeStatus.OPEN, DisputeStatus.INVESTIGATING, DisputeStatus.ESCALATED);
     private static final List<DisputeStatus> RESOLVED_STATUSES =
             List.of(DisputeStatus.RESOLVED, DisputeStatus.UNVERIFIED);
+    private static final List<DisputeStatus> COMPLETED_STATUSES =
+            List.of(DisputeStatus.RESOLVED, DisputeStatus.UNVERIFIED, DisputeStatus.FINAL_RESOLVED);
 
     // =========================================================================
     // UC-96: Nộp tranh chấp (Worker / Event Organizer)
@@ -354,6 +356,13 @@ public class DisputeService {
 
     public List<DisputeQueueItemDto> getDisputeQueue() {
         return toQueueItems(disputeRepository.findByStatusIn(QUEUE_STATUSES));
+    }
+
+    /**
+     * Danh sách tranh chấp đã giải quyết / hoàn thiện (RESOLVED, FINAL_RESOLVED, UNVERIFIED).
+     */
+    public List<DisputeQueueItemDto> getResolvedDisputes() {
+        return toQueueItems(disputeRepository.findByStatusIn(COMPLETED_STATUSES));
     }
 
     /**

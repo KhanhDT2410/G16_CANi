@@ -20,7 +20,13 @@ export const DisputeChatThread = ({
 
   const workerChat = chatData?.workerConversation;
   const eoChat = chatData?.eoConversation;
-  const isClosed = dispute?.status === 'FINAL_RESOLVED' || chatData?.disputeStatus === 'FINAL_RESOLVED';
+  const isClosed =
+    dispute?.status === 'FINAL_RESOLVED' ||
+    dispute?.status === 'RESOLVED' ||
+    dispute?.status === 'UNVERIFIED' ||
+    chatData?.disputeStatus === 'FINAL_RESOLVED' ||
+    chatData?.disputeStatus === 'RESOLVED' ||
+    chatData?.disputeStatus === 'UNVERIFIED';
 
   // Tự động đánh dấu đọc tin khi người dùng hoặc trọng tài mở hội thoại
   useEffect(() => {

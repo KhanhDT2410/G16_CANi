@@ -46,7 +46,13 @@ export const DisputeDualChatModal = ({
   const workerName = workerChat?.userName || dispute?.complainantName || 'Nhân sự';
   const eoName = eoChat?.userName || dispute?.respondentName || 'Nhà tổ chức';
 
-  const isClosed = chatData?.disputeStatus === 'FINAL_RESOLVED' || dispute?.status === 'FINAL_RESOLVED';
+  const isClosed =
+    chatData?.disputeStatus === 'FINAL_RESOLVED' ||
+    chatData?.disputeStatus === 'RESOLVED' ||
+    chatData?.disputeStatus === 'UNVERIFIED' ||
+    dispute?.status === 'FINAL_RESOLVED' ||
+    dispute?.status === 'RESOLVED' ||
+    dispute?.status === 'UNVERIFIED';
 
   const modalNode = (
     <div className="dispute-dual-fullscreen-overlay">

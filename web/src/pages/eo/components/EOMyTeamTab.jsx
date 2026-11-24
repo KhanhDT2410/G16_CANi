@@ -472,7 +472,7 @@ export default function EOMyTeamTab() {
                           }}
                           title="Mở khung nhắn tin trực tiếp với nhân sự này"
                         >
-                          💬 Nhắn Tin
+                          Nhắn Tin
                         </button>
                         <button
                           type="button"
@@ -623,7 +623,7 @@ export default function EOMyTeamTab() {
                         }}
                         title="Mở khung nhắn tin trực tiếp với nhân sự này"
                       >
-                        💬 Nhắn Tin
+                        Nhắn Tin
                       </button>
                       <button
                         type="button"

@@ -28,16 +28,16 @@ export const EOMessagesTab = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                💬 Tin Nhắn & Trao Đổi Nhân Sự
+                Tin Nhắn & Trao Đổi Nhân Sự
               </h2>
               <span
                 style={{
                   background: '#eff6ff',
                   color: '#1d4ed8',
                   padding: '0.2rem 0.65rem',
-                  borderRadius: '999px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
+                  borderRadius: '4px',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
                 }}
               >
                 {counts.all || 0} cuộc trò chuyện

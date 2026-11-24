@@ -448,7 +448,7 @@ export default function EventDetailModal({
           </div>
           {!asPage && (
             <button type="button" className="event-detail-close-btn" onClick={onClose}>
-              &times;
+              ✕
             </button>
           )}
         </div>
@@ -1065,13 +1065,13 @@ export default function EventDetailModal({
                                 style={{ cursor: 'pointer', color: '#0066FF' }}
                                 title="Bấm để xem hồ sơ năng lực chi tiết"
                               >
-                                {w.workerName} ↗
+                                {w.workerName}
                               </span>
                               <span className="worker-age-badge">
                                 {w.meetsMinimumAge === true
-                                  ? '✓ Đủ tuổi quy định'
+                                  ? 'Đủ tuổi quy định'
                                   : w.meetsMinimumAge === false
-                                    ? '⚠ Chưa đủ tuổi tối thiểu'
+                                    ? 'Chưa đủ tuổi tối thiểu'
                                     : w.workerAge
                                       ? `${w.workerAge} tuổi`
                                       : 'Chưa xác minh tuổi'}
@@ -1141,11 +1141,11 @@ export default function EventDetailModal({
                               backgroundColor: '#eff6ff',
                               border: '1px solid #bfdbfe',
                               color: '#1d4ed8',
-                              borderRadius: '999px',
-                              fontSize: '0.775rem',
-                              fontWeight: 700,
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 500,
                             }}>
-                              ✓ Đã nhận ca (Chờ check-in)
+                              Đã nhận ca (Chờ check-in)
                             </span>
                           ) : (
                             <span style={{
@@ -1154,9 +1154,9 @@ export default function EventDetailModal({
                               padding: '0.35rem 0.75rem',
                               backgroundColor: '#f1f5f9',
                               color: '#64748b',
-                              borderRadius: '999px',
-                              fontSize: '0.775rem',
-                              fontWeight: 600,
+                              borderRadius: '4px',
+                              fontSize: '0.78rem',
+                              fontWeight: 500,
                             }}>
                               {w.assignmentStatus || 'Đã phân công'}
                             </span>
@@ -1176,7 +1176,7 @@ export default function EventDetailModal({
                             }}
                             title="Xem chi tiết hồ sơ năng lực"
                           >
-                            Xem Hồ Sơ ↗
+                            Xem Hồ Sơ
                           </button>
 
                           {w.userId && (

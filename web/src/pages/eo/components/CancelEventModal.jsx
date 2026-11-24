@@ -92,7 +92,6 @@ const CancelEventModal = ({ isOpen, event, onClose, onConfirm, loading = false }
             gap: '0.5rem',
           }}
         >
-          <span style={{ color: '#d97706', fontSize: '1rem', lineHeight: 1 }}>⚠️</span>
           <p style={{ margin: 0, fontSize: '0.82rem', color: '#92400e', lineHeight: 1.45 }}>
             <strong>Lưu ý:</strong> Tất cả ca làm việc sẽ bị hủy. Những nhân sự đã được giao ca hoặc chấp nhận lời mời sẽ nhận được thông báo hủy kèm lý do bên dưới. Sự kiện sau khi hủy sẽ được lưu trữ trong danh sách <em>"Sự kiện đã hủy"</em> để đối soát.
           </p>

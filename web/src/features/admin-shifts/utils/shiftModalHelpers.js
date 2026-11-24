@@ -2,6 +2,25 @@
  * Helper utils cho modal chi tiết ca làm việc Admin
  */
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
+export const resolveAssetUrl = (url) => {
+  if (!url) return '';
+  const trimmed = String(url).trim();
+  if (
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/api/')) {
+    return `${API_BASE_URL}${trimmed}`;
+  }
+  return `${API_BASE_URL}/${trimmed.replace(/^\/+/, '')}`;
+};
+
 export const formatDateTime = (isoStr) => {
   if (!isoStr) return '—';
   try {

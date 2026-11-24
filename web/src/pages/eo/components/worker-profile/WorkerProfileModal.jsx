@@ -56,7 +56,7 @@ export const WorkerProfileModal = ({
             onClick={onClose}
             aria-label="Đóng cửa sổ"
           >
-            &times;
+            ✕
           </button>
         </div>
 
@@ -64,11 +64,11 @@ export const WorkerProfileModal = ({
         <div className="worker-modal-body">
           {loading ? (
             <div style={{ padding: '3.5rem 0', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
-              ⏳ Đang tải dữ liệu hồ sơ từ Database CANi...
+              Đang tải dữ liệu hồ sơ từ Database CANi...
             </div>
           ) : error ? (
             <div style={{ padding: '2.5rem 0', textAlign: 'center', color: '#dc2626', fontSize: '0.9rem' }}>
-              ⚠️ {error}
+              {error}
             </div>
           ) : profile ? (
             <>
@@ -119,7 +119,7 @@ export const WorkerProfileModal = ({
                   gap: 4,
                 }}
               >
-                📞 Gọi {profile.phone}
+                Gọi {profile.phone}
               </a>
             )}
             {profile && (
@@ -145,7 +145,7 @@ export const WorkerProfileModal = ({
                 }}
                 title="Mở khung chat trực tiếp với nhân sự này"
               >
-                💬 Nhắn Tin
+                Nhắn Tin
               </button>
             )}
             {profile && !profile.isMyTeamMember && onAddToMyTeam && (
@@ -155,7 +155,7 @@ export const WorkerProfileModal = ({
                 style={{ fontSize: '0.825rem', padding: '0.45rem 0.85rem' }}
                 onClick={() => onAddToMyTeam(profile)}
               >
-                + Thêm vào Thợ Quen
+                Thêm vào Thợ Quen
               </button>
             )}
           </div>

@@ -173,21 +173,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       _lastSyncedCreatedAt = newestCreatedAt;
 
       if (newlyArrived.isNotEmpty) {
-        ref.invalidate(proposalsListProvider);
+        final isOnline = ref.read(jobRadarProvider).isOnline;
+        final visibleArrived = newlyArrived.where((entry) {
+          final typeStr = entry['type']?.toString().toUpperCase();
+          if (!isOnline && typeStr == 'PROPOSAL') {
+            return false;
+          }
+          return true;
+        }).toList();
+
+        if (visibleArrived.isEmpty) {
+          return;
+        }
+
+        if (isOnline) {
+          ref.invalidate(proposalsListProvider);
+        }
         ref.invalidate(assignmentsListProvider);
         ref.invalidate(incomeSummaryProvider);
         ref.invalidate(myTicketsProvider);
-        for (final n in newlyArrived) {
+        for (final n in visibleArrived) {
           final refType = n['referenceType']?.toString();
           final refId = n['referenceId']?.toString();
           if (refType == 'SUPPORT_TICKET' && refId != null) {
             ref.invalidate(ticketDetailProvider(refId));
           }
         }
-        if (ref.read(ekycProvider).result?.isApproved == true) {
+        if (isOnline && ref.read(ekycProvider).result?.isApproved == true) {
           ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
         }
-        for (final n in newlyArrived.take(3)) {
+        for (final n in visibleArrived.take(3)) {
           final idStr = n['notificationId'].toString();
           final title = n['title']?.toString() ?? 'Thông báo mới từ CANi';
           final body = n['body']?.toString() ?? '';

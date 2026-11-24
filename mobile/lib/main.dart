@@ -31,6 +31,16 @@ void main() async {
 
   final container = ProviderContainer();
 
+  bool isProposalNotificationData(Map<String, dynamic> data) {
+    final rawPayload = data['payload'];
+    final type = (data['type'] ?? (rawPayload is Map ? rawPayload['type'] : null))?.toString().toUpperCase();
+    return type == 'PROPOSAL' ||
+        type == 'NEW_PROPOSAL' ||
+        type == 'EMERGENCY_PROPOSAL' ||
+        type == 'GROUP_PROPOSAL' ||
+        type == 'EMERGENCY_GROUP_PROPOSAL';
+  }
+
   // Khởi tạo phần core nhẹ của FCM & LocalNotification (không chặn first frame bởi permission/getToken)
   await FcmService.initialize(
     canNavigate: () {
@@ -39,12 +49,23 @@ void main() async {
           authState.isAuthenticated &&
           rootNavigatorKey.currentState != null;
     },
-    onForegroundMessage: (_) {
+    shouldSuppressForegroundNotification: (data) {
+      if (!container.read(authStateProvider).isAuthenticated) return true;
+      if (isProposalNotificationData(data) && !container.read(jobRadarProvider).isOnline) {
+        return true;
+      }
+      return false;
+    },
+    onForegroundMessage: (data) {
       if (!container.read(authStateProvider).isAuthenticated) return;
-      container.invalidate(proposalsListProvider);
+      final isOnline = container.read(jobRadarProvider).isOnline;
+      if (isProposalNotificationData(data) && !isOnline) return;
+      if (isOnline) {
+        container.invalidate(proposalsListProvider);
+      }
       container.invalidate(assignmentsListProvider);
       container.invalidate(incomeSummaryProvider);
-      if (container.read(ekycProvider).result?.isApproved == true) {
+      if (isOnline && container.read(ekycProvider).result?.isApproved == true) {
         container.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
       }
     },

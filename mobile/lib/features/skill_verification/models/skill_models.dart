@@ -53,12 +53,16 @@ class SkillVerificationResult {
   final String? recipientName;
   final String? identityNumber;
   final String? institution;
+  final String? certificateNumber;
   final String? issueDate;
+  final String? expiryDate;
   final bool hasSealOrSignature;
   final double overallConfidence;
   final String routingDecision;
   final String routingReason;
   final String status;
+  final String? failureCode;
+  final String? failureReason;
   final int spAwarded;
   final int currentTotalSp;
   final String currentTier;
@@ -75,12 +79,16 @@ class SkillVerificationResult {
     this.recipientName,
     this.identityNumber,
     this.institution,
+    this.certificateNumber,
     this.issueDate,
+    this.expiryDate,
     required this.hasSealOrSignature,
     required this.overallConfidence,
     required this.routingDecision,
     required this.routingReason,
     required this.status,
+    this.failureCode,
+    this.failureReason,
     required this.spAwarded,
     required this.currentTotalSp,
     required this.currentTier,
@@ -88,6 +96,28 @@ class SkillVerificationResult {
     this.createdAt,
     required this.extractedSkills,
   });
+
+  bool get isApproved => status.toUpperCase() == 'APPROVED';
+
+  bool get isTempFailure =>
+      status.toUpperCase() == 'VERIFICATION_FAILED' ||
+      failureCode == 'TEMPORARY_FAILURE';
+
+  bool get isSelfDeclaredCv =>
+      failureCode == 'CV_SELF_DECLARED' ||
+      routingReason.contains('CV tự khai');
+
+  bool get isEkycRequired => failureCode == 'EKYC_REQUIRED';
+
+  bool get isUnsupportedIssuer =>
+      !isApproved &&
+      !isTempFailure &&
+      !isSelfDeclaredCv &&
+      !isEkycRequired &&
+      (failureCode == 'UNSUPPORTED_SOURCE' ||
+          (failureCode == null &&
+              (verificationSource == 'UNSUPPORTED_SOURCE' ||
+                  routingReason.contains('CANi chưa hỗ trợ'))));
 
   factory SkillVerificationResult.fromJson(Map<String, dynamic> json) {
     var rawSkills = json['extractedSkills'] as List<dynamic>? ?? [];
@@ -104,12 +134,16 @@ class SkillVerificationResult {
       recipientName: json['recipientName'] as String?,
       identityNumber: json['identityNumber'] as String?,
       institution: json['institution'] as String?,
+      certificateNumber: json['certificateNumber'] as String?,
       issueDate: json['issueDate'] as String?,
+      expiryDate: json['expiryDate'] as String?,
       hasSealOrSignature: json['hasSealOrSignature'] as bool? ?? false,
       overallConfidence: (json['overallConfidence'] as num?)?.toDouble() ?? 0.0,
       routingDecision: json['routingDecision'] as String? ?? 'REJECT',
       routingReason: json['routingReason'] as String? ?? '',
       status: json['status'] as String? ?? 'REJECTED',
+      failureCode: json['failureCode'] as String?,
+      failureReason: json['failureReason'] as String?,
       spAwarded: json['spAwarded'] as int? ?? 0,
       currentTotalSp: json['currentTotalSp'] as int? ?? 0,
       currentTier: json['currentTier'] as String? ?? 'STARTER',

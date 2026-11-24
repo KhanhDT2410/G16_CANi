@@ -589,7 +589,6 @@ export default function ShiftQrAndAttendancePanel({
                             title="Bấm để xem hồ sơ năng lực chi tiết của nhân sự"
                           >
                             <span>{item.workerName}</span>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>↗</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.workerPhone}</div>
                           <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 2 }}>
@@ -599,8 +598,8 @@ export default function ShiftQrAndAttendancePanel({
 
                         <td style={{ padding: '12px 14px' }}>
                           {isNoShow && (
-                            <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem' }}>
-                              ✕ Vắng mặt
+                            <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '2px 8px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
+                              Vắng mặt
                             </span>
                           )}
                           {!isNoShow && isCheckedIn && (
@@ -744,18 +743,18 @@ export default function ShiftQrAndAttendancePanel({
                                 )}
 
                                 {item.workerConfirmStatus === 'RECEIVED_FULL' && (
-                                  <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.72rem' }}>
-                                    ✓ Worker nhận đủ
+                                  <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
+                                    Worker nhận đủ
                                   </span>
                                 )}
                                 {item.workerConfirmStatus === 'RECEIVED_PARTIAL' && (
-                                  <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.72rem' }}>
+                                  <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
                                     Nhận thiếu: {item.workerComment || ''}
                                   </span>
                                 )}
                                 {item.workerConfirmStatus === 'NOT_RECEIVED' && (
-                                  <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.72rem' }}>
-                                    ✕ Chưa nhận: {item.workerComment || ''}
+                                  <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '2px 6px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
+                                    Chưa nhận: {item.workerComment || ''}
                                   </span>
                                 )}
 
@@ -965,8 +964,8 @@ export default function ShiftQrAndAttendancePanel({
                             )}
 
                             {isCompleted && item.hasReviewedWorker && (
-                              <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 700, padding: '4px' }}>
-                                ✓ Đã đánh giá
+                              <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 600, padding: '4px' }}>
+                                Đã đánh giá
                               </span>
                             )}
                           </div>

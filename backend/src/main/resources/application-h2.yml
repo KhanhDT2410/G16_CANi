@@ -45,6 +45,12 @@ cani:
       api-key: ${SKILL_AI_API_KEY:}
       model: ${SKILL_AI_MODEL:}
       connection-verified: ${SKILL_AI_CONNECTION_VERIFIED:false}
+    gemini:
+      enabled: ${SKILL_GEMINI_ENABLED:false}
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_SKILL_MODEL:gemini-flash-lite-latest}
+      url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
+      timeout-ms: ${GEMINI_TIMEOUT_MS:25000}
   subscription:
     demo-enabled: true
   sla-scan:

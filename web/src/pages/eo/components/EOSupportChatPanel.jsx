@@ -165,10 +165,10 @@ export default function EOSupportChatPanel() {
 
         <div className="eo-chat-header-actions">
           <button type="button" className="eo-chat-action-btn" onClick={handleOpenFloating} title="Mở chat dạng bong bóng nổi để vừa chat vừa duyệt ca">
-            <span>↗</span> Mở cửa sổ nổi
+            Mở cửa sổ nổi
           </button>
           <button type="button" className="eo-chat-action-btn" onClick={loadConversation} title="Tải lại tin nhắn">
-            ↻ Làm mới
+            Làm mới
           </button>
         </div>
       </div>
@@ -213,7 +213,7 @@ export default function EOSupportChatPanel() {
             onClick={() => handleSendMessage(prompt)}
             disabled={sending}
           >
-            📌 {prompt}
+            {prompt}
           </button>
         ))}
       </div>

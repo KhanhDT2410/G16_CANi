@@ -215,28 +215,27 @@ const LiveAttendanceModal = ({
                             title="Bấm để xem hồ sơ năng lực chi tiết"
                           >
                             <span>{item.workerName}</span>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>↗</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.workerPhone}</div>
                           <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 2 }}>
-                            ⭐ {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
+                            Đánh giá: {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
                           </div>
                         </td>
 
                         {/* Trạng thái điểm danh */}
                         <td style={{ padding: '12px 14px' }}>
                           {isCheckedIn && (
-                            <span style={{ background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
+                            <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
                               Đã Check-in {item.isOnTime ? '(Đúng giờ)' : '(Trễ ca)'}
                             </span>
                           )}
                           {isCompleted && (
-                            <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
+                            <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
                               Đã Hoàn Thành
                             </span>
                           )}
                           {!isCheckedIn && !isCompleted && (
-                            <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
+                            <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
                               Chờ Đến Ca
                             </span>
                           )}
@@ -293,17 +292,17 @@ const LiveAttendanceModal = ({
                                       cursor: 'pointer',
                                     }}
                                   >
-                                    🧾 Xem chứng từ
+                                    Xem chứng từ
                                   </button>
                                 )}
                                 {item.workerConfirmStatus === 'RECEIVED_FULL' && (
-                                  <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.75rem' }}>✓ Worker đã nhận đủ</span>
+                                  <span style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.75rem' }}>Worker đã nhận đủ</span>
                                 )}
                                 {item.workerConfirmStatus === 'RECEIVED_PARTIAL' && (
-                                  <span style={{ color: '#b45309', fontWeight: 600, fontSize: '0.72rem' }}>⚠️ Nhận thiếu: {item.workerComment || ''}</span>
+                                  <span style={{ color: '#b45309', fontWeight: 600, fontSize: '0.72rem' }}>Nhận thiếu: {item.workerComment || ''}</span>
                                 )}
                                 {item.workerConfirmStatus === 'NOT_RECEIVED' && (
-                                  <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '0.72rem' }}>✕ Chưa nhận: {item.workerComment || ''}</span>
+                                  <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '0.72rem' }}>Chưa nhận: {item.workerComment || ''}</span>
                                 )}
                                 {item.paymentStatus === 'CONFIRMED_FULL' && !item.workerConfirmStatus && (
                                   <span style={{ color: '#16a34a', fontWeight: 600 }}>Đã thanh toán</span>
@@ -398,7 +397,7 @@ const LiveAttendanceModal = ({
                             {/* Nút đánh giá Worker: Chỉ mở khi Worker đã Check-out hoặc ca đã hoàn thành */}
                             {item.hasReviewedWorker ? (
                               <span style={{ color: '#eab308', fontSize: '0.75rem', fontWeight: 600, padding: '4px 0' }}>
-                                ⭐ Đã đánh giá
+                                Đã đánh giá
                               </span>
                             ) : isCompleted ? (
                               <button
@@ -416,7 +415,7 @@ const LiveAttendanceModal = ({
                                 }}
                                 title="Đánh giá năng lực và thái độ của Worker sau ca làm việc"
                               >
-                                ⭐ Đánh giá
+                                Đánh giá
                               </button>
                             ) : (
                               <span

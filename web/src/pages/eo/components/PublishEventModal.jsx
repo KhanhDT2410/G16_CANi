@@ -127,8 +127,7 @@ const PublishEventModal = ({
                 gap: '0.5rem',
               }}
             >
-              <div style={{ color: '#059669', fontSize: '0.9rem' }}>✓</div>
-              <div>
+              <div style={{ color: '#64748b' }}>
                 (Ban tổ chức thanh toán trực tiếp cho nhân sự sau khi kết thúc ca làm việc)
               </div>
             </div>
@@ -173,7 +172,7 @@ const PublishEventModal = ({
                 Sự kiện này được xuất bản ở chế độ <strong>Mời trực tiếp (Invite)</strong>. Bạn có thể tự do tìm kiếm ứng viên và gửi lời mời mà <strong>hoàn toàn không mất phí và không trừ hạn mức gói</strong>.
               </p>
               <div style={{ marginTop: '0.5rem', fontSize: '0.775rem', color: '#16a34a', fontWeight: 600 }}>
-                ✓ Miễn phí tìm kiếm và mời nhân sự không giới hạn.
+                Miễn phí tìm kiếm và mời nhân sự không giới hạn.
               </div>
             </div>
           ) : hasActiveQuota ? (
@@ -194,7 +193,7 @@ const PublishEventModal = ({
                     fontSize: '0.775rem',
                     fontWeight: 700,
                     padding: '0.25rem 0.65rem',
-                    borderRadius: '20px',
+                    borderRadius: '4px',
                     textTransform: 'uppercase',
                   }}
                 >
@@ -208,7 +207,7 @@ const PublishEventModal = ({
                 Khi xác nhận, hệ thống sẽ <strong>trừ 1 lượt sự kiện</strong> trong gói cước của bạn và tự động kích hoạt Matching Engine để kết nối các Worker phù hợp nhất trong bán kính 15km.
               </p>
               <div style={{ marginTop: '0.5rem', fontSize: '0.775rem', color: '#16a34a', fontWeight: 600 }}>
-                ✓ Bao gồm Matching Engine, Job Radar di động, FCM Push & Hỗ trợ biến động ca làm.
+                Bao gồm Matching Engine, Job Radar di động, FCM Push & Hỗ trợ biến động ca làm.
               </div>
             </div>
           ) : isOutOfQuota ? (
@@ -222,7 +221,6 @@ const PublishEventModal = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '1.25rem' }}>⚠️</span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#b45309' }}>
                   HẠN MỨC SỰ KIỆN ĐÃ HẾT (0 LƯỢT CÒN LẠI)
                 </span>

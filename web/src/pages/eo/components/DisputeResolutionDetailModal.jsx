@@ -100,7 +100,7 @@ export default function DisputeResolutionDetailModal({
             style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#94a3b8' }}
             title="Đóng cửa sổ"
           >
-            &times;
+            ✕
           </button>
         </div>
 

@@ -46,7 +46,6 @@ export default function EmergencyRadiusSelector({ radiusKm, onChange, disabled }
                 <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>{opt.label}</div>
                 <div style={{ fontSize: '0.72rem', color: selected ? '#be123c' : '#64748b' }}>{opt.desc}</div>
               </div>
-              {selected && <span style={{ color: '#dc2626', fontWeight: 900, fontSize: '0.9rem' }}>✓</span>}
             </button>
           );
         })}

@@ -18,9 +18,8 @@ public class UnsupportedCertificateLookupSource implements CertificateLookupSour
                 .outcome(CertificateLookupOutcome.UNSUPPORTED_SOURCE)
                 .verificationSource(SOURCE_CODE)
                 .failureCode("LOOKUP_SOURCE_NOT_INTEGRATED")
-                .reason("Chưa thể xác minh tự động: Chứng chỉ không có nguồn tra cứu chính thức được CANi hỗ trợ "
-                        + "(chưa tích hợp API đơn vị cấp, giải mã QR tra cứu chính thức hoặc kiểm tra chữ ký số). "
-                        + "Vui lòng nộp lại chứng chỉ có nguồn tra cứu hợp lệ khi hệ thống hỗ trợ.")
+                .reason("Chưa thể xác minh tự động: CANi chưa hỗ trợ tra cứu chứng chỉ của đơn vị này "
+                        + "(chưa tích hợp API đơn vị cấp, giải mã QR tra cứu chính thức hoặc kiểm tra chữ ký số).")
                 .build();
     }
 }

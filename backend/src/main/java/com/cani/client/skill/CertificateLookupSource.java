@@ -34,6 +34,12 @@ public interface CertificateLookupSource {
         UUID requestedSkillId;
         String requestedSkillName;
         String notes;
+        String extractedDocumentType;
+        String extractedRecipientName;
+        String extractedInstitution;
+        String extractedCertificateNumber;
+        String extractedExpiryDate;
+        List<String> extractedSkills;
     }
 
     @Value

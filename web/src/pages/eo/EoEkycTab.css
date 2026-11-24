@@ -15,11 +15,12 @@
 .eo-ekyc-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.85rem;
-  border-radius: 9999px;
-  font-size: 0.875rem;
-  font-weight: 600;
+  gap: 0.35rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
 }
 
 .badge-approved {

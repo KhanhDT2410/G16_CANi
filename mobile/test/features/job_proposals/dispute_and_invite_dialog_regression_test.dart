@@ -11,6 +11,7 @@ import 'package:cani/features/job_proposals/screens/invite_qr_scanner_screen.dar
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
 import 'package:cani/features/job_proposals/screens/my_disputes_screen.dart';
 import 'package:cani/features/job_proposals/screens/shift_payment_screen.dart';
+import 'package:cani/features/job_proposals/widgets/shift_assignment_card.dart';
 import 'package:cani/features/job_radar/widgets/job_radar_proposals_sheet.dart';
 
 class _FakeProposalRepository extends ProposalRepository {
@@ -289,5 +290,59 @@ void main() {
 
     expect(repo.lastPaymentStatus, 'RECEIVED_PARTIAL');
     expect(repo.lastPaymentComment, contains('Thiếu 50k tiền mặt'));
+  });
+
+  testWidgets('ShiftAssignmentCard places Chi tiết & Checklist công việc in primary top slot above Quét QR Check-in', (tester) async {
+    var checklistOpened = false;
+    var qrOpened = false;
+    final upcomingAssignment = ShiftAssignmentItem(
+      assignmentId: 'a-upcoming',
+      shiftId: 's-upcoming',
+      eventId: 'e-upcoming',
+      eventName: 'Tech Summit 2026',
+      venueAddress: '123 Lê Lợi, Q.1',
+      jobType: 'Lễ tân',
+      startTime: DateTime.now().add(const Duration(hours: 2)),
+      endTime: DateTime.now().add(const Duration(hours: 6)),
+      hourlyWage: 50000,
+      totalPay: 200000,
+      status: 'CONFIRMED',
+      eoConfirmed: false,
+      paymentStatus: 'NOT_DECLARED',
+      declaredAmount: 0,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ShiftAssignmentCard(
+              assignment: upcomingAssignment,
+              onTap: () {},
+              onNavigate: () {},
+              onQrScan: () => qrOpened = true,
+              onConfirmPayment: () {},
+              onOpenChecklist: () => checklistOpened = true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final checklistFinder = find.text('Chi tiết & Checklist công việc');
+    final qrFinder = find.text('Quét QR Check-in');
+    expect(checklistFinder, findsOneWidget);
+    expect(qrFinder, findsOneWidget);
+    expect(tester.getTopLeft(checklistFinder).dy, lessThan(tester.getTopLeft(qrFinder).dy));
+
+    await tester.tap(checklistFinder);
+    await tester.pump();
+    expect(checklistOpened, isTrue);
+
+    await tester.tap(qrFinder);
+    await tester.pump();
+    expect(qrOpened, isTrue);
   });
 }

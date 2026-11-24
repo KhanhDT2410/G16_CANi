@@ -195,7 +195,7 @@ const PaymentDeclarationModal = ({
                             cursor: 'pointer',
                           }}
                         >
-                          {copied ? 'Đã copy ✓' : 'Copy'}
+                          {copied ? 'Đã sao chép' : 'Sao chép'}
                         </button>
                       </div>
                       <div>
@@ -213,7 +213,6 @@ const PaymentDeclarationModal = ({
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '0.85rem', color: '#64748b', fontSize: '0.82rem' }}>
-                  <div style={{ fontSize: '1.4rem', marginBottom: '0.35rem' }}>⚠️</div>
                   <strong style={{ color: '#b45309' }}>Worker thiếu thông tin ngân hàng</strong>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, lineHeight: 1.45 }}>
                     Nhân sự này chưa cập nhật tài khoản nhận lương trên ứng dụng di động CANi. Hệ thống đã ẩn mã QR chuyển khoản.
@@ -326,7 +325,7 @@ const PaymentDeclarationModal = ({
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                     <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
-                      ✓ Đã tải chứng từ xác nhận
+                      Đã tải chứng từ xác nhận
                     </span>
                     <button
                       type="button"
@@ -353,7 +352,7 @@ const PaymentDeclarationModal = ({
               margin: '0.75rem 0',
             }}
           >
-            <strong>ℹ️ Quy trình đối soát 2 bên:</strong> Sau khi Ban tổ chức bấm <strong>{paymentForm.paymentMethod === 'BANK_TRANSFER' ? '"Xác nhận đã thanh toán"' : '"Xác nhận đã trả tiền mặt"'}</strong>, hệ thống sẽ gửi thông báo đến ứng dụng của Worker để Worker kiểm tra và xác nhận hoàn tất.
+            <strong>Quy trình đối soát 2 bên:</strong> Sau khi Ban tổ chức bấm <strong>{paymentForm.paymentMethod === 'BANK_TRANSFER' ? '"Xác nhận đã thanh toán"' : '"Xác nhận đã trả tiền mặt"'}</strong>, hệ thống sẽ gửi thông báo đến ứng dụng của Worker để Worker kiểm tra và xác nhận hoàn tất.
           </div>
 
           <div className="eo-modal-footer">

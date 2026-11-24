@@ -103,8 +103,9 @@ class _JobRadarMapSection extends ConsumerWidget {
     final cani = Theme.of(context).cani;
 
     final now = DateTime.now();
-    final hasActiveProposals = (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
-        .any((p) => p.isActiveAt(now));
+    final hasActiveProposals = mapSlice.isOnline &&
+        (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
+            .any((p) => p.isActiveAt(now));
 
     final isLoadingAny = mapSlice.isLoading || proposalsAsync.isLoading;
     final hasAnyError = mapSlice.radarLoadError != null;
@@ -115,9 +116,10 @@ class _JobRadarMapSection extends ConsumerWidget {
         isLoadingAny ||
         (mapSlice.hasLoadedShifts && !hasAnyVisibleData);
     final showBottomOverlay =
-        mapSlice.selectedShift != null ||
-        hasActiveProposals ||
-        mapSlice.nearbyShifts.isNotEmpty;
+        mapSlice.isOnline &&
+        (mapSlice.selectedShift != null ||
+            hasActiveProposals ||
+            mapSlice.nearbyShifts.isNotEmpty);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),

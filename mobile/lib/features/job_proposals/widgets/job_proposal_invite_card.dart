@@ -9,18 +9,28 @@ class JobProposalInviteCard extends StatefulWidget {
   final JobProposalItem proposal;
   final VoidCallback onAccept;
   final VoidCallback onReject;
+  final VoidCallback? onViewDetails;
   final bool compact;
   final int totalPendingCount;
   final VoidCallback? onViewAll;
+  final int? carouselIndex;
+  final int? carouselTotal;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
 
   const JobProposalInviteCard({
     super.key,
     required this.proposal,
     required this.onAccept,
     required this.onReject,
+    this.onViewDetails,
     this.compact = false,
     this.totalPendingCount = 1,
     this.onViewAll,
+    this.carouselIndex,
+    this.carouselTotal,
+    this.onPrev,
+    this.onNext,
   });
 
   @override
@@ -183,7 +193,15 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   ],
                 ),
               ),
-              if (widget.totalPendingCount > 1 && widget.onViewAll != null) ...[
+              if ((widget.carouselTotal ?? 0) > 1 && widget.carouselIndex != null) ...[
+                const SizedBox(width: 4),
+                CarouselPagerChip(
+                  index: widget.carouselIndex!,
+                  total: widget.carouselTotal!,
+                  onPrev: widget.onPrev,
+                  onNext: widget.onNext,
+                ),
+              ] else if (widget.totalPendingCount > 1 && widget.onViewAll != null) ...[
                 const SizedBox(width: 6),
                 InkWell(
                   onTap: widget.onViewAll,
@@ -274,23 +292,52 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
               ),
             ],
           ),
+          if (p.isConflicting) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: cani.warningBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.event_busy_rounded, size: 14.5, color: cani.warning),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      p.conflictReason ?? 'Bạn đã có ca nhận rồi',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: cani.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
 
-          // Nút Từ chối & Nhận ca ngay
+          // Nút Xem chi tiết & Nhận ca (nút Từ chối nằm trong màn chi tiết)
           Row(
             children: [
               Expanded(
                 child: SizedBox(
                   height: 40,
                   child: OutlinedButton(
-                    onPressed: widget.onReject,
+                    onPressed: widget.onViewDetails ?? widget.onReject,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       side: BorderSide(color: isDark ? cani.borderStrong : cani.border, width: 1.3),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: Text(
-                      'Từ chối',
+                      widget.onViewDetails != null ? 'Xem chi tiết' : 'Từ chối',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -304,17 +351,33 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                flex: 2,
+                flex: 1,
                 child: SizedBox(
                   height: 40,
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: isExpired ? null : LinearGradient(colors: cani.brandGradient),
-                      color: isExpired ? cani.skeleton : null,
+                      gradient: (isExpired || p.isConflicting) ? null : LinearGradient(colors: cani.brandGradient),
+                      color: p.isConflicting
+                          ? cani.warningBg
+                          : (isExpired ? cani.skeleton : null),
                       borderRadius: BorderRadius.circular(12),
+                      border: p.isConflicting
+                          ? Border.all(color: cani.warning.withValues(alpha: 0.45))
+                          : null,
                     ),
                     child: ElevatedButton(
-                      onPressed: isExpired ? null : widget.onAccept,
+                      onPressed: (isExpired || p.isConflicting)
+                          ? (p.isConflicting
+                              ? () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(p.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
+                                      backgroundColor: cani.warning,
+                                    ),
+                                  );
+                                }
+                              : null)
+                          : widget.onAccept,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
@@ -322,13 +385,15 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: Text(
-                        isExpired ? 'Đã hết hạn' : 'Nhận ca ngay',
+                        p.isConflicting
+                            ? 'Bạn đã có ca nhận rồi'
+                            : (isExpired ? 'Đã hết hạn' : 'Nhận ca'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12.5,
+                        style: TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: p.isConflicting ? cani.warning : Colors.white,
                         ),
                       ),
                     ),
@@ -661,31 +726,46 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   height: 44,
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: cani.brandGradient,
-                      ),
+                      gradient: p.isConflicting ? null : LinearGradient(colors: cani.brandGradient),
+                      color: p.isConflicting ? cani.warningBg : null,
                       borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cani.brand.withValues(alpha: 0x50 / 255),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      border: p.isConflicting
+                          ? Border.all(color: cani.warning.withValues(alpha: 0.45))
+                          : null,
+                      boxShadow: p.isConflicting
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: cani.brand.withValues(alpha: 0x50 / 255),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                     ),
                     child: ElevatedButton(
-                      onPressed: widget.onAccept,
+                      onPressed: p.isConflicting
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(p.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
+                                  backgroundColor: cani.warning,
+                                ),
+                              );
+                            }
+                          : widget.onAccept,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: const Text(
-                        'Nhận ca ngay',
+                      child: Text(
+                        p.isConflicting ? 'Bạn đã có ca nhận rồi' : 'Nhận ca ngay',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: p.isConflicting ? cani.warning : Colors.white,
                         ),
                       ),
                     ),
@@ -693,6 +773,65 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CarouselPagerChip extends StatelessWidget {
+  final int index;
+  final int total;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+
+  const CarouselPagerChip({
+    super.key,
+    required this.index,
+    required this.total,
+    this.onPrev,
+    this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cani = Theme.of(context).cani;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: cani.brandSoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: onPrev,
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(Icons.chevron_left_rounded, size: 16, color: cani.brand),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              '${index + 1}/$total',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: cani.brand,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: onNext,
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(Icons.chevron_right_rounded, size: 16, color: cani.brand),
+            ),
           ),
         ],
       ),

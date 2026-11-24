@@ -374,16 +374,16 @@ export default function EOWorkerReviewsTab({ onReloadEvents }) {
                   {item.hasReviewedWorker ? (
                     <span
                       style={{
-                        padding: '0.4rem 0.85rem',
-                        borderRadius: '8px',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
                         background: '#ecfdf5',
                         border: '1px solid #a7f3d0',
                         color: '#047857',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        fontWeight: 500,
                       }}
                     >
-                      ✓ Đã đánh giá
+                      Đã đánh giá
                     </span>
                   ) : item.canReview ? (
                     <button

@@ -1089,27 +1089,27 @@ export default function ShiftWorkspacePage({
                                 </div>
                               ) : hasDeclared && isCash ? (
                                 <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
-                                  ✓ Tiền mặt (xác nhận trên hệ thống)
+                                  Tiền mặt (xác nhận trên hệ thống)
                                 </span>
                               ) : null}
 
                               {/* Trạng thái xác nhận của Worker */}
                               {item.workerConfirmStatus === 'RECEIVED_FULL' && (
-                                <span style={{ background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: 6, fontWeight: 700, fontSize: '0.74rem', display: 'inline-block' }}>
-                                  ✓ Worker đã nhận đủ
+                                <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem', display: 'inline-block' }}>
+                                  Worker đã nhận đủ
                                 </span>
                               )}
 
                               {item.workerConfirmStatus === 'RECEIVED_PARTIAL' && (
-                                <div style={{ background: '#fef3c7', color: '#b45309', padding: '4px 8px', borderRadius: 6, fontSize: '0.72rem' }}>
+                                <div style={{ background: '#fef3c7', color: '#b45309', padding: '4px 8px', borderRadius: 4, fontSize: '0.72rem' }}>
                                   <div style={{ fontWeight: 700 }}>Worker nhận thiếu:</div>
                                   <div>{item.workerComment || 'Chưa ghi chú'}</div>
                                 </div>
                               )}
 
                               {item.workerConfirmStatus === 'NOT_RECEIVED' && (
-                                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 8px', borderRadius: 6, fontSize: '0.72rem' }}>
-                                  <div style={{ fontWeight: 700 }}>✕ Worker chưa nhận được:</div>
+                                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 8px', borderRadius: 4, fontSize: '0.72rem' }}>
+                                  <div style={{ fontWeight: 700 }}>Worker chưa nhận được:</div>
                                   <div>{item.workerComment || 'Chưa ghi chú'}</div>
                                 </div>
                               )}
@@ -1287,8 +1287,8 @@ export default function ShiftWorkspacePage({
                           )}
 
                           {isCompleted && item.hasReviewedWorker && (
-                            <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 700, padding: '4px' }}>
-                              ✓ Đã đánh giá
+                            <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 600, padding: '4px' }}>
+                              Đã đánh giá
                             </span>
                           )}
 
@@ -1420,9 +1420,9 @@ export default function ShiftWorkspacePage({
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: '1.2rem', cursor: 'pointer', color: '#475569' }}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: '1rem', cursor: 'pointer', color: '#475569', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                &times;
+                ✕
               </button>
             </div>
 

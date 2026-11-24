@@ -112,6 +112,15 @@ public class WorkerShiftEligibilityService {
         }
     }
 
+    public record ScheduleConflictInfo(
+            boolean conflicting,
+            String reasonMessageVi,
+            String shortReasonVi) {
+        public static ScheduleConflictInfo none() {
+            return new ScheduleConflictInfo(false, null, null);
+        }
+    }
+
     public record EffectiveRequirement(
             UUID skillId,
             String skillName,
@@ -143,7 +152,7 @@ public class WorkerShiftEligibilityService {
     }
 
     public EligibilityResult evaluate(Worker worker, Shift shift, MatchingChannel channel) {
-        return evaluate(worker, shift, channel, null);
+        return evaluate(worker, shift, channel, null, false);
     }
 
     public EligibilityResult evaluate(
@@ -151,6 +160,15 @@ public class WorkerShiftEligibilityService {
             Shift shift,
             MatchingChannel channel,
             String inviteOverrideReason) {
+        return evaluate(worker, shift, channel, inviteOverrideReason, false);
+    }
+
+    public EligibilityResult evaluate(
+            Worker worker,
+            Shift shift,
+            MatchingChannel channel,
+            String inviteOverrideReason,
+            boolean ignoreScheduleConflict) {
         if (worker == null || shift == null || channel == null) {
             return EligibilityResult.fail("INVALID_INPUT", "Thông tin nhân sự hoặc ca làm việc không hợp lệ.");
         }
@@ -229,31 +247,17 @@ public class WorkerShiftEligibilityService {
             }
         }
 
-        // 4. Xung đột lịch làm việc (không bao giờ bypass)
-        if (shiftAssignmentRepository != null && worker.getWorkerId() != null) {
+        // 4. Xung đột lịch làm việc (không bao giờ bypass khi nhận/dispatch; query Radar có thể đánh dấu isConflicting)
+        if (!ignoreScheduleConflict && shiftAssignmentRepository != null && worker.getWorkerId() != null) {
             List<AssignmentStatus> activeStatuses = List.of(
                     AssignmentStatus.CONFIRMED,
                     AssignmentStatus.CHECKED_IN,
                     AssignmentStatus.PENDING);
             List<ShiftAssignment> conflicts = shiftAssignmentRepository.findConflictingAssignments(
                     worker.getWorkerId(), shift.getStartTime(), shift.getEndTime(), activeStatuses);
-            if (conflicts != null) {
-                for (ShiftAssignment conflict : conflicts) {
-                    if (conflict.getShift() != null
-                            && Objects.equals(conflict.getShift().getShiftId(), shift.getShiftId())) {
-                        continue;
-                    }
-                    Shift cShift = conflict.getShift();
-                    String cJob = cShift != null ? cShift.getJobType() : "Ca làm việc";
-                    String cEvent = (cShift != null && cShift.getEvent() != null) ? cShift.getEvent().getName() : "";
-                    String timeRange = (cShift != null && cShift.getStartTime() != null && cShift.getEndTime() != null)
-                            ? CONFLICT_FMT.format(cShift.getStartTime()) + " - "
-                                    + CONFLICT_FMT.format(cShift.getEndTime())
-                            : "";
-                    return EligibilityResult.fail("SCHEDULE_CONFLICT", String.format(
-                            "Không thể nhận ca: Bạn đã có ca làm việc khác trùng khung giờ (\"%s\" - %s, %s). Mỗi thời điểm chỉ được làm 1 ca duy nhất!",
-                            cJob, cEvent, timeRange));
-                }
+            ScheduleConflictInfo conflictInfo = findScheduleConflict(shift, conflicts, true);
+            if (conflictInfo.conflicting()) {
+                return EligibilityResult.fail("SCHEDULE_CONFLICT", conflictInfo.reasonMessageVi());
             }
         }
 
@@ -501,12 +505,74 @@ public class WorkerShiftEligibilityService {
         return new ArrayList<>(ordered.values());
     }
 
+    public ScheduleConflictInfo findScheduleConflict(Shift targetShift, List<ShiftAssignment> activeAssignments) {
+        return findScheduleConflict(targetShift, activeAssignments, false);
+    }
+
+    private ScheduleConflictInfo findScheduleConflict(
+            Shift targetShift,
+            List<ShiftAssignment> assignments,
+            boolean prefilteredByDbOverlap) {
+        if (targetShift == null || assignments == null || assignments.isEmpty()) {
+            return ScheduleConflictInfo.none();
+        }
+        for (ShiftAssignment assignment : assignments) {
+            if (assignment == null) {
+                continue;
+            }
+            Shift existingShift = assignment.getShift();
+            if (existingShift != null && Objects.equals(existingShift.getShiftId(), targetShift.getShiftId())) {
+                continue;
+            }
+            if (!prefilteredByDbOverlap) {
+                if (targetShift.getStartTime() == null || targetShift.getEndTime() == null
+                        || existingShift == null || existingShift.getStartTime() == null
+                        || existingShift.getEndTime() == null) {
+                    continue;
+                }
+                boolean overlaps = targetShift.getStartTime().isBefore(existingShift.getEndTime())
+                        && targetShift.getEndTime().isAfter(existingShift.getStartTime());
+                if (!overlaps) {
+                    continue;
+                }
+            }
+            String cJob = existingShift != null && existingShift.getJobType() != null
+                    ? existingShift.getJobType()
+                    : "Ca làm việc";
+            String cEvent = (existingShift != null && existingShift.getEvent() != null
+                    && existingShift.getEvent().getName() != null)
+                    ? existingShift.getEvent().getName()
+                    : "";
+            String timeRange = (existingShift != null && existingShift.getStartTime() != null
+                    && existingShift.getEndTime() != null)
+                    ? CONFLICT_FMT.format(existingShift.getStartTime()) + " - "
+                            + CONFLICT_FMT.format(existingShift.getEndTime())
+                    : "";
+            String shortReason = timeRange.isEmpty()
+                    ? "Bạn đã có ca nhận rồi (" + cJob + ")"
+                    : "Bạn đã có ca nhận rồi (" + cJob + " · " + timeRange + ")";
+            String fullMessage = String.format(
+                    "Không thể nhận ca: Bạn đã có ca làm việc khác trùng khung giờ (\"%s\" - %s, %s). Mỗi thời điểm chỉ được làm 1 ca duy nhất!",
+                    cJob, cEvent, timeRange);
+            return new ScheduleConflictInfo(true, fullMessage, shortReason);
+        }
+        return ScheduleConflictInfo.none();
+    }
+
     public boolean isShiftCoveredByAvailability(Worker worker, Shift shift) {
-        if (workerAvailabilityRepository == null || shift.getStartTime() == null || shift.getEndTime() == null) {
+        if (workerAvailabilityRepository == null || worker == null || worker.getWorkerId() == null
+                || shift == null || shift.getStartTime() == null || shift.getEndTime() == null) {
             return true;
         }
         List<WorkerAvailability> slots = workerAvailabilityRepository
                 .findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId());
+        return isShiftCoveredByAvailability(slots, shift);
+    }
+
+    public boolean isShiftCoveredByAvailability(List<WorkerAvailability> slots, Shift shift) {
+        if (shift == null || shift.getStartTime() == null || shift.getEndTime() == null) {
+            return true;
+        }
         if (slots == null || slots.isEmpty()) {
             return true;
         }

@@ -289,6 +289,120 @@ class WorkerJobServiceTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    @DisplayName("UTC006b - getMyProposals() - Offline (isOnline=false) ẩn toàn bộ lời mời làm việc")
+    void getMyProposals_WhenOffline_ReturnsEmptyList() {
+        worker.setIsOnline(false);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        List<JobProposalResponseDto> result = workerJobService.getMyProposals(userId);
+
+        assertThat(result).isEmpty();
+        verify(dispatchProposalRepository, never()).findByWorker_WorkerIdAndStatusOrderByCreatedAtDesc(any(), any());
+    }
+
+    @Test
+    @DisplayName("UTC006c - getMyProposals() - Lọc bỏ đề xuất đã gửi trước đó nếu lịch rảnh mới không còn khớp")
+    void getMyProposals_WhenAvailabilityChangedToMondayOnly_FiltersOutWednesdayProposal() {
+        java.time.ZoneId vnZone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        java.time.ZonedDateTime nextWednesday = java.time.ZonedDateTime.now(vnZone)
+                .with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.WEDNESDAY))
+                .withHour(9).withMinute(0).withSecond(0).withNano(0);
+        activeShift.setStartTime(nextWednesday.toInstant());
+        activeShift.setEndTime(nextWednesday.plusHours(4).toInstant());
+
+        WorkerAvailability mondayOnly = WorkerAvailability.builder()
+                .worker(worker)
+                .dayOfWeek(1)
+                .startTime(java.time.LocalTime.of(8, 0))
+                .endTime(java.time.LocalTime.of(22, 0))
+                .isAvailable(true)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerAvailabilityRepository.findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId()))
+                .thenReturn(List.of(mondayOnly));
+        when(dispatchProposalRepository.findByWorker_WorkerIdAndStatusOrderByCreatedAtDesc(worker.getWorkerId(), ProposalStatus.PENDING))
+                .thenReturn(List.of(pendingProposal));
+
+        List<JobProposalResponseDto> result = workerJobService.getMyProposals(userId);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("UTC006d - getMyProposals() - Đánh dấu isConflicting=true với thông báo Bạn đã có ca nhận rồi khi trùng giờ")
+    void getMyProposals_WhenWorkerHasOverlappingAssignment_MarksConflictingWithMessage() {
+        Shift acceptedShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Pha chế đã nhận")
+                .startTime(activeShift.getStartTime())
+                .endTime(activeShift.getEndTime())
+                .build();
+        ShiftAssignment acceptedAssignment = ShiftAssignment.builder()
+                .assignmentId(UUID.randomUUID())
+                .worker(worker)
+                .shift(acceptedShift)
+                .status(AssignmentStatus.CONFIRMED)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findByWorker_WorkerIdAndStatusOrderByCreatedAtDesc(worker.getWorkerId(), ProposalStatus.PENDING))
+                .thenReturn(List.of(pendingProposal));
+        when(shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(eq(worker.getWorkerId()), any()))
+                .thenReturn(List.of(acceptedAssignment));
+
+        List<JobProposalResponseDto> result = workerJobService.getMyProposals(userId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getIsConflicting()).isTrue();
+        assertThat(result.get(0).getConflictReason()).contains("Bạn đã có ca nhận rồi");
+    }
+
+    @Test
+    @DisplayName("UTC026i - getNearbyShifts() - Ca trùng giờ với ca đã nhận đổi trạng thái isConflicting=true (Bạn đã có ca nhận rồi)")
+    void getNearbyShifts_WhenWorkerHasOverlappingAssignment_MarksConflictingWithMessage() {
+        Shift acceptedShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Lễ tân đã nhận")
+                .startTime(activeShift.getStartTime())
+                .endTime(activeShift.getEndTime())
+                .build();
+        ShiftAssignment acceptedAssignment = ShiftAssignment.builder()
+                .assignmentId(UUID.randomUUID())
+                .worker(worker)
+                .shift(acceptedShift)
+                .status(AssignmentStatus.CONFIRMED)
+                .build();
+
+        Shift conflictingOpenShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Điều phối trùng giờ")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(activeShift.getStartTime())
+                .endTime(activeShift.getEndTime())
+                .requiredWorkers(3).confirmedWorkers(1).remainingWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(60000))
+                .status(ShiftStatus.ACTIVE).emergency(true).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(eq(worker.getWorkerId()), any()))
+                .thenReturn(List.of(acceptedAssignment));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class)))
+                .thenReturn(List.of(conflictingOpenShift));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 15.0);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getShiftId()).isEqualTo(conflictingOpenShift.getShiftId());
+        assertThat(list.get(0).getIsConflicting()).isTrue();
+        assertThat(list.get(0).getConflictReason()).contains("Bạn đã có ca nhận rồi");
+    }
+
     // =========================================================================
     // 3. acceptProposal() - UTC007 to UTC010
     // =========================================================================
@@ -935,6 +1049,140 @@ class WorkerJobServiceTest {
 
         assertThat(list).hasSize(1);
         assertThat(list.get(0).getShiftId()).isEqualTo(openShift.getShiftId());
+    }
+
+    @Test
+    @DisplayName("UTC026f - getNearbyShifts() - Worker đang tạm tắt Nhận việc (isOnline=false) -> trả về rỗng")
+    void getNearbyShifts_ReturnsEmpty_WhenWorkerIsOffline() {
+        worker.setIsOnline(false);
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 15.0);
+
+        assertThat(list).isEmpty();
+        verify(shiftRepository, never()).findNearbyCandidateShifts(any(Instant.class));
+    }
+
+    @Test
+    @DisplayName("UTC026g - getNearbyShifts() - Chỉ set lịch rảnh Thứ 2 -> ẩn các ca ngày Thứ 3 khỏi Radar")
+    void getNearbyShifts_FiltersOutShiftsOutsideWeeklyAvailability() {
+        // Thứ 2 = dayOfWeek 1 (08:00 - 22:00)
+        WorkerAvailability mondaySlot = WorkerAvailability.builder()
+                .worker(worker)
+                .dayOfWeek(1)
+                .startTime(java.time.LocalTime.of(8, 0))
+                .endTime(java.time.LocalTime.of(22, 0))
+                .isAvailable(true)
+                .build();
+
+        java.time.ZoneId vnZone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        java.time.ZonedDateTime nextMonday = java.time.ZonedDateTime.now(vnZone)
+                .with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY))
+                .withHour(9).withMinute(0).withSecond(0).withNano(0);
+        java.time.ZonedDateTime nextTuesday = nextMonday.plusDays(1);
+
+        Shift mondayShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Ca Thứ 2 hợp lệ")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(nextMonday.toInstant())
+                .endTime(nextMonday.plusHours(4).toInstant())
+                .requiredWorkers(3)
+                .confirmedWorkers(1)
+                .remainingWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .status(ShiftStatus.ACTIVE)
+                .emergency(true)
+                .build();
+
+        Shift tuesdayShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Ca Thứ 3 lệch lịch")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(nextTuesday.toInstant())
+                .endTime(nextTuesday.plusHours(4).toInstant())
+                .requiredWorkers(3)
+                .confirmedWorkers(1)
+                .remainingWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .status(ShiftStatus.ACTIVE)
+                .emergency(true)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(workerAvailabilityRepository.findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId()))
+                .thenReturn(List.of(mondaySlot));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class)))
+                .thenReturn(List.of(mondayShift, tuesdayShift));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 15.0);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getShiftId()).isEqualTo(mondayShift.getShiftId());
+    }
+
+    @Test
+    @DisplayName("UTC026h - getNearbyShifts() - Lọc theo mức lương tối thiểu & kỹ năng bắt buộc")
+    void getNearbyShifts_FiltersOutShiftsBelowMinWageOrMissingRequiredSkill() {
+        worker.setMinWage(BigDecimal.valueOf(60000));
+        UUID requiredSkillId = UUID.randomUUID();
+        Skill reqSkill = Skill.builder().skillId(requiredSkillId).name("Pha chế").build();
+
+        Shift lowWageShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Lương thấp")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(Instant.now().plus(24, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(28, ChronoUnit.HOURS))
+                .requiredWorkers(3).confirmedWorkers(0).remainingWorkers(3)
+                .hourlyWage(BigDecimal.valueOf(45000))
+                .status(ShiftStatus.ACTIVE).emergency(true).build();
+
+        Shift missingSkillShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Thiếu kỹ năng")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(Instant.now().plus(24, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(28, ChronoUnit.HOURS))
+                .requiredWorkers(3).confirmedWorkers(0).remainingWorkers(3)
+                .hourlyWage(BigDecimal.valueOf(70000))
+                .requiredSkills(new UUID[]{requiredSkillId})
+                .status(ShiftStatus.ACTIVE).emergency(true).build();
+
+        Shift suitableShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Ca phù hợp")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(Instant.now().plus(24, ChronoUnit.HOURS))
+                .endTime(Instant.now().plus(28, ChronoUnit.HOURS))
+                .requiredWorkers(3).confirmedWorkers(0).remainingWorkers(3)
+                .hourlyWage(BigDecimal.valueOf(70000))
+                .status(ShiftStatus.ACTIVE).emergency(true).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        WorkerSkillRepository mockWorkerSkillRepo = mock(WorkerSkillRepository.class);
+        SkillRepository mockSkillRepo = mock(SkillRepository.class);
+        when(mockWorkerSkillRepo.findByWorker_WorkerId(worker.getWorkerId())).thenReturn(List.of());
+        when(mockSkillRepo.findAllById(any())).thenReturn(List.of(reqSkill));
+        org.springframework.test.util.ReflectionTestUtils.setField(workerJobService, "workerSkillRepository", mockWorkerSkillRepo);
+        org.springframework.test.util.ReflectionTestUtils.setField(workerJobService, "skillRepository", mockSkillRepo);
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class)))
+                .thenReturn(List.of(lowWageShift, missingSkillShift, suitableShift));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 15.0);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getShiftId()).isEqualTo(suitableShift.getShiftId());
     }
 
     // =========================================================================

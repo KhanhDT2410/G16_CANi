@@ -350,7 +350,7 @@ const EventShiftsDrawer = ({
                 }}
                 title="Mở khung trao đổi tin nhắn trực tiếp với nhân sự trong ca"
               >
-                💬 Chat Ca
+                Chat Ca
               </button>
             )}
 

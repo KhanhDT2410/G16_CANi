@@ -149,7 +149,10 @@ public class WorkerJobService {
                 shiftAssignmentRepository,
                 shiftSkillRequirementRepository,
                 skillRepository,
-                getEligibilityService()
+                getEligibilityService(),
+                workerSkillRepository,
+                workerAvailabilityRepository,
+                blockListService
         );
     }
 
@@ -193,14 +196,68 @@ public class WorkerJobService {
     public List<JobProposalResponseDto> getMyProposals(UUID userId) {
         Worker worker = getWorkerOrThrow(userId);
 
+        if (!Boolean.TRUE.equals(worker.getIsOnline())) {
+            log.debug("Worker {} đang tạm tắt Nhận việc (isOnline=false), ẩn toàn bộ đề xuất chờ phản hồi.", userId);
+            return Collections.emptyList();
+        }
+
         List<DispatchProposal> proposals = dispatchProposalRepository.findByWorker_WorkerIdAndStatusOrderByCreatedAtDesc(
                 worker.getWorkerId(), ProposalStatus.PENDING);
+
+        List<WorkerAvailability> availabilitySlots = workerAvailabilityRepository != null
+                ? workerAvailabilityRepository.findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId())
+                : Collections.emptyList();
+        List<ShiftAssignment> activeAssignments = shiftAssignmentRepository != null
+                ? shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
+                        worker.getWorkerId(),
+                        List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING))
+                : Collections.emptyList();
+        WorkerShiftEligibilityService eligibilityService = getEligibilityService();
 
         Instant now = Instant.now();
         return proposals.stream()
                 .filter(p -> p.getExpiresAt() == null || p.getExpiresAt().isAfter(now))
-                .map(this::mapToProposalDto)
+                .filter(p -> isProposalStillMatchingWorkerPreferences(p, worker, availabilitySlots, eligibilityService, now))
+                .map(p -> mapToProposalDto(p, activeAssignments, eligibilityService))
                 .collect(Collectors.toList());
+    }
+
+    private boolean isProposalStillMatchingWorkerPreferences(
+            DispatchProposal proposal,
+            Worker worker,
+            List<WorkerAvailability> availabilitySlots,
+            WorkerShiftEligibilityService eligibilityService,
+            Instant now) {
+        Shift shift = proposal.getShift();
+        if (shift == null) {
+            return true;
+        }
+        if (shift.getEndTime() != null && !now.isBefore(shift.getEndTime())) {
+            return false;
+        }
+        if (!eligibilityService.isShiftCoveredByAvailability(availabilitySlots, shift)) {
+            return false;
+        }
+        if (worker.getMinWage() != null && worker.getMinWage().compareTo(BigDecimal.ZERO) > 0
+                && shift.getHourlyWage() != null
+                && shift.getHourlyWage().compareTo(worker.getMinWage()) < 0) {
+            return false;
+        }
+        if (worker.getMaxDistanceKm() != null && worker.getMaxDistanceKm() > 0) {
+            Double sLat = shift.getLocationLat() != null ? shift.getLocationLat()
+                    : (shift.getEvent() != null ? shift.getEvent().getVenueLat() : null);
+            Double sLng = shift.getLocationLng() != null ? shift.getLocationLng()
+                    : (shift.getEvent() != null ? shift.getEvent().getVenueLng() : null);
+            if (MatchingDispatchService.isValidCoordinate(worker.getBaseLat(), worker.getBaseLng())
+                    && MatchingDispatchService.isValidCoordinate(sLat, sLng)) {
+                double distanceKm = MatchingDispatchService.calculateDistance(
+                        worker.getBaseLat(), worker.getBaseLng(), sLat, sLng);
+                if (Double.isFinite(distanceKm) && distanceKm > worker.getMaxDistanceKm()) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -1539,6 +1596,13 @@ public class WorkerJobService {
     }
 
     private JobProposalResponseDto mapToProposalDto(DispatchProposal p) {
+        return mapToProposalDto(p, Collections.emptyList(), getEligibilityService());
+    }
+
+    private JobProposalResponseDto mapToProposalDto(
+            DispatchProposal p,
+            List<ShiftAssignment> activeAssignments,
+            WorkerShiftEligibilityService eligibilityService) {
         Shift s = p.getShift();
         Event e = s != null ? s.getEvent() : null;
         EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
@@ -1547,14 +1611,17 @@ public class WorkerJobService {
                 : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
 
         WorkerShiftEligibilityService.SkillFitResult skillFit = (s != null)
-                ? getEligibilityService().evaluateSkillFit(p.getWorker(), s)
+                ? eligibilityService.evaluateSkillFit(p.getWorker(), s)
                 : WorkerShiftEligibilityService.SkillFitResult.empty();
         List<WorkerShiftEligibilityService.EffectiveRequirement> reqEntries = (s != null)
-                ? getEligibilityService().resolveEffectiveRequirements(s)
+                ? eligibilityService.resolveEffectiveRequirements(s)
                 : Collections.emptyList();
         List<String> requiredNames = !skillFit.requiredSkillNames().isEmpty()
                 ? skillFit.requiredSkillNames()
                 : (s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList());
+        WorkerShiftEligibilityService.ScheduleConflictInfo conflictInfo = (s != null && eligibilityService != null)
+                ? eligibilityService.findScheduleConflict(s, activeAssignments)
+                : WorkerShiftEligibilityService.ScheduleConflictInfo.none();
 
         return JobProposalResponseDto.builder()
                 .proposalId(p.getProposalId())
@@ -1588,6 +1655,8 @@ public class WorkerJobService {
                 .source(p.getSource())
                 .createdAt(p.getCreatedAt())
                 .imageUrl(s != null ? s.getImageUrl() : null)
+                .isConflicting(conflictInfo.conflicting())
+                .conflictReason(conflictInfo.shortReasonVi())
                 .build();
     }
 

@@ -256,7 +256,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                               color: isSelected ? cani.textMain : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isSelected ? cani.accent : const Color(0xFFCBD5E1),
+                                color: isSelected
+                                    ? cani.accent
+                                    : (shift.isConflicting ? cani.warning : const Color(0xFFCBD5E1)),
                                 width: isSelected ? 2 : 1,
                               ),
                               boxShadow: [
@@ -276,7 +278,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
-                                  color: isSelected ? Colors.white : cani.textMain,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (shift.isConflicting ? cani.warning : cani.textMain),
                                 ),
                               ),
                             ),
@@ -284,7 +288,9 @@ class _JobRadarMapWidgetState extends State<JobRadarMapWidget> with SingleTicker
                           Icon(
                             Icons.location_on_rounded,
                             size: isSelected ? 34 : 26,
-                            color: isSelected ? cani.brand : const Color(0xFF2563EB),
+                            color: isSelected
+                                ? cani.brand
+                                : (shift.isConflicting ? cani.warning : const Color(0xFF2563EB)),
                             shadows: [
                               Shadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 4),
                             ],

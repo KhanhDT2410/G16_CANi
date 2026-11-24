@@ -132,19 +132,34 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
         skillId: skillId,
         notes: notes,
       );
-
-      // Re-fetch points, history, and my-skills to update overall dashboard
-      final points = await _repository.getSkillPoints().catchError((_) => state.skillPoints);
-      final history = await _repository.getHistory().catchError((_) => [result, ...state.history]);
-      final mySkills = await _repository.getMySkills().catchError((_) => state.mySkills);
-
+      await _applyVerificationOutcome(result);
+      return true;
+    } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        lastResult: result,
-        skillPoints: points,
-        history: history,
-        mySkills: mySkills,
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
+      return false;
+    }
+  }
+
+  Future<bool> resubmitVerification({
+    required String verificationId,
+    required Uint8List fileBytes,
+    required String fileName,
+    String? skillId,
+    String? notes,
+  }) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final result = await _repository.resubmitVerification(
+        verificationId: verificationId,
+        fileBytes: fileBytes,
+        fileName: fileName,
+        skillId: skillId,
+        notes: notes,
+      );
+      await _applyVerificationOutcome(result);
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -159,17 +174,7 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
       final result = await _repository.retryVerification(verificationId);
-      final points = await _repository.getSkillPoints().catchError((_) => state.skillPoints);
-      final history = await _repository.getHistory().catchError((_) => state.history);
-      final mySkills = await _repository.getMySkills().catchError((_) => state.mySkills);
-
-      state = state.copyWith(
-        isSubmitting: false,
-        lastResult: result,
-        skillPoints: points,
-        history: history,
-        mySkills: mySkills,
-      );
+      await _applyVerificationOutcome(result);
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -178,6 +183,23 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
       );
       return false;
     }
+  }
+
+  Future<void> _applyVerificationOutcome(SkillVerificationResult result) async {
+    final points = await _repository.getSkillPoints().catchError((_) => state.skillPoints);
+    final history = await _repository.getHistory().catchError((_) {
+      final updated = state.history.where((item) => item.id != result.id).toList();
+      return [result, ...updated];
+    });
+    final mySkills = await _repository.getMySkills().catchError((_) => state.mySkills);
+
+    state = state.copyWith(
+      isSubmitting: false,
+      lastResult: result,
+      skillPoints: points,
+      history: history,
+      mySkills: mySkills,
+    );
   }
 
   void clearLastResult() {

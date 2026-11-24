@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { WORKER_ASSIGNMENT_STATUS_CONFIG } from '../types/adminShift.constants';
 import { formatDateTime, parseWorkerChecklistProgress } from '../utils/shiftModalHelpers';
+import ShiftProofLightbox from './ShiftProofLightbox';
 
 /**
  * Bảng đối soát nhân sự & tiến độ công việc trong ca làm việc cho Admin.
- * Hiển thị nút xem ảnh minh chứng & căn chỉnh thời gian sát lề phải chuẩn xác.
+ * Hỗ trợ xem trực tiếp ảnh minh chứng của từng đầu việc kèm mốc thời gian.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
@@ -12,7 +13,11 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
   const [previewImage, setPreviewImage] = useState(null);
 
   if (!workers || workers.length === 0) {
-    return <div className="shift-workers-empty">Chưa có nhân viên nào được duyệt vào ca này.</div>;
+    return (
+      <div className="shift-workers-empty">
+        Chưa có nhân viên nào được duyệt vào ca này.
+      </div>
+    );
   }
 
   return (
@@ -51,7 +56,11 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                     <td>
                       <span
                         className="worker-status-badge"
-                        style={{ background: wStatus.bg, color: wStatus.color, borderColor: wStatus.border || '#cbd5e1' }}
+                        style={{
+                          background: wStatus.bg,
+                          color: wStatus.color,
+                          borderColor: wStatus.border || '#cbd5e1',
+                        }}
                       >
                         {wStatus.label}
                       </span>
@@ -94,9 +103,11 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                       </div>
                     </td>
                     <td>
-                      <span className={`eo-confirmed-badge ${w.eoConfirmed ? 'done' : 'pending'}`}>
-                        {w.eoConfirmed ? 'Đã duyệt' : 'Chờ duyệt'}
-                      </span>
+                      {w.eoConfirmed ? (
+                        <span className="eo-confirmed-badge done">Đã duyệt</span>
+                      ) : (
+                        <span className="eo-confirmed-badge pending">Chờ duyệt</span>
+                      )}
                     </td>
                   </tr>
 
@@ -112,22 +123,14 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                               <div
                                 key={task.id}
                                 className={`worker-task-item ${task.completed ? 'is-done' : 'is-pending'}`}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: '0.65rem',
-                                  padding: '0.4rem 0.75rem',
-                                }}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}
                               >
-                                {/* Cột trái: Checkbox icon & Tên đầu việc */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: 1, minWidth: '220px' }}>
                                   <span className="task-check-icon">{task.completed ? '✓' : '○'}</span>
                                   <span className="task-title">{task.title}</span>
                                 </div>
 
-                                {/* Cột phải: Nút minh chứng & Thời gian luôn bám sát lề phải */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, marginLeft: 'auto' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                                   {task.isRequiredEvidence && !task.evidenceImageUrl && (
                                     <span
                                       style={{
@@ -138,7 +141,6 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                                         background: '#fef2f2',
                                         color: '#dc2626',
                                         border: '1px solid #fecaca',
-                                        whiteSpace: 'nowrap',
                                       }}
                                     >
                                       Cần minh chứng
@@ -163,7 +165,6 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
                                         border: '1px solid #bfdbfe',
                                         borderRadius: 4,
                                         cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
                                       }}
                                     >
                                       Xem ảnh minh chứng
@@ -198,26 +199,10 @@ export const ShiftWorkerTable = ({ workers = [], templateChecklist = [] }) => {
         </table>
       </div>
 
-      {previewImage && (
-        <div className="proof-lightbox-overlay" onClick={() => setPreviewImage(null)}>
-          <div className="proof-lightbox-card" onClick={(e) => e.stopPropagation()}>
-            <div className="proof-lightbox-header">
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a' }}>
-                  {previewImage.title || 'Ảnh Bằng Chứng'}
-                </div>
-                {previewImage.time && (
-                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', fontWeight: 500 }}>
-                    Thời gian nộp: {formatDateTime(previewImage.time)}
-                  </div>
-                )}
-              </div>
-              <button type="button" onClick={() => setPreviewImage(null)} aria-label="Đóng">✕</button>
-            </div>
-            <img src={previewImage.url || previewImage} alt="Bằng chứng" className="proof-full-img" />
-          </div>
-        </div>
-      )}
+      <ShiftProofLightbox
+        previewImage={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
     </div>
   );
 };

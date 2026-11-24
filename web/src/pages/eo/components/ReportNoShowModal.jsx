@@ -39,7 +39,6 @@ export default function ReportNoShowModal({ isOpen, onClose, assignment, shift, 
       <div className="eo-modal-box" style={{ maxWidth: 520 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: '1.4rem' }}>⚠️</span>
             <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.15rem', fontWeight: 800 }}>
               Báo Cáo Nhân Sự Vắng Mặt
             </h3>
@@ -68,7 +67,7 @@ export default function ReportNoShowModal({ isOpen, onClose, assignment, shift, 
           {/* Cảnh báo chế tài & Cơ chế bù người */}
           <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '0.85rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', color: '#991b1b', lineHeight: 1.5 }}>
             <div style={{ fontWeight: 800, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>🚨</span> Hệ thống CANi sẽ tự động thực hiện:
+              Hệ thống CANi sẽ tự động thực hiện:
             </div>
             <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
               <li>Đánh dấu vi phạm <strong>No-Show</strong> và trừ <strong>25 điểm uy tín (RS)</strong> của Worker.</li>

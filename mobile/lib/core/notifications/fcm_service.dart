@@ -24,6 +24,7 @@ class FcmService {
   static void Function(Map<String, dynamic> data)? _onNotificationNavigate;
   static void Function(String newToken)? _onTokenRefresh;
   static bool Function()? _canNavigate;
+  static bool Function(Map<String, dynamic> data)? _shouldSuppressForegroundNotification;
 
   /// Khởi tạo nhẹ phần core của Firebase & LocalNotification trước `runApp()`.
   /// Tuyệt đối không chặn khung hình đầu tiên (first frame) bởi hộp thoại xin quyền OS
@@ -33,10 +34,12 @@ class FcmService {
     void Function(Map<String, dynamic> data)? onForegroundMessage,
     void Function(String newToken)? onTokenRefresh,
     bool Function()? canNavigate,
+    bool Function(Map<String, dynamic> data)? shouldSuppressForegroundNotification,
   }) async {
     _onNotificationNavigate = onNotificationNavigate;
     _onTokenRefresh = onTokenRefresh;
     _canNavigate = canNavigate;
+    _shouldSuppressForegroundNotification = shouldSuppressForegroundNotification;
 
     if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
       debugPrint('[FcmService] FCM is skipped on this non-mobile platform.');
@@ -73,6 +76,10 @@ class FcmService {
       // 4. Lắng nghe thông báo khi ứng dụng đang mở ở tiền cảnh (Foreground)
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('[FcmService] Foreground message received: ${message.notification?.title}');
+        if (_shouldSuppressForegroundNotification?.call(message.data) ?? false) {
+          debugPrint('[FcmService] Suppressed foreground job notification while Nhận việc is OFF.');
+          return;
+        }
         final noti = message.notification;
         if (noti != null) {
           LocalNotificationService.showNotification(

@@ -292,6 +292,35 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
               ),
             ],
           ),
+          if (p.isConflicting) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: cani.warningBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.event_busy_rounded, size: 14.5, color: cani.warning),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      p.conflictReason ?? 'Bạn đã có ca nhận rồi',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: cani.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
 
           // Nút Xem chi tiết & Nhận ca (nút Từ chối nằm trong màn chi tiết)
@@ -327,12 +356,28 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   height: 40,
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: isExpired ? null : LinearGradient(colors: cani.brandGradient),
-                      color: isExpired ? cani.skeleton : null,
+                      gradient: (isExpired || p.isConflicting) ? null : LinearGradient(colors: cani.brandGradient),
+                      color: p.isConflicting
+                          ? cani.warningBg
+                          : (isExpired ? cani.skeleton : null),
                       borderRadius: BorderRadius.circular(12),
+                      border: p.isConflicting
+                          ? Border.all(color: cani.warning.withValues(alpha: 0.45))
+                          : null,
                     ),
                     child: ElevatedButton(
-                      onPressed: isExpired ? null : widget.onAccept,
+                      onPressed: (isExpired || p.isConflicting)
+                          ? (p.isConflicting
+                              ? () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(p.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
+                                      backgroundColor: cani.warning,
+                                    ),
+                                  );
+                                }
+                              : null)
+                          : widget.onAccept,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
@@ -340,13 +385,15 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: Text(
-                        isExpired ? 'Đã hết hạn' : 'Nhận ca',
+                        p.isConflicting
+                            ? 'Bạn đã có ca nhận rồi'
+                            : (isExpired ? 'Đã hết hạn' : 'Nhận ca'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12.5,
+                        style: TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: p.isConflicting ? cani.warning : Colors.white,
                         ),
                       ),
                     ),
@@ -679,31 +726,46 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                   height: 44,
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: cani.brandGradient,
-                      ),
+                      gradient: p.isConflicting ? null : LinearGradient(colors: cani.brandGradient),
+                      color: p.isConflicting ? cani.warningBg : null,
                       borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: cani.brand.withValues(alpha: 0x50 / 255),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      border: p.isConflicting
+                          ? Border.all(color: cani.warning.withValues(alpha: 0.45))
+                          : null,
+                      boxShadow: p.isConflicting
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: cani.brand.withValues(alpha: 0x50 / 255),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                     ),
                     child: ElevatedButton(
-                      onPressed: widget.onAccept,
+                      onPressed: p.isConflicting
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(p.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
+                                  backgroundColor: cani.warning,
+                                ),
+                              );
+                            }
+                          : widget.onAccept,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: const Text(
-                        'Nhận ca ngay',
+                      child: Text(
+                        p.isConflicting ? 'Bạn đã có ca nhận rồi' : 'Nhận ca ngay',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: p.isConflicting ? cani.warning : Colors.white,
                         ),
                       ),
                     ),

@@ -48,4 +48,8 @@ public class JobProposalResponseDto {
     private AssignmentSource source;
     private Instant createdAt;
     private String imageUrl;
+
+    @Builder.Default
+    private Boolean isConflicting = false;
+    private String conflictReason;
 }

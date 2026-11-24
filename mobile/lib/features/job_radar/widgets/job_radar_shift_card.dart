@@ -234,22 +234,30 @@ class JobRadarShiftCard extends ConsumerWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: shift.emergency
-                            ? cani.dangerBg
-                            : (isDark ? cani.surface : const Color(0xFFF1F5F9)),
+                        color: shift.isConflicting
+                            ? cani.warningBg
+                            : (shift.emergency
+                                ? cani.dangerBg
+                                : (isDark ? cani.surface : const Color(0xFFF1F5F9))),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: shift.emergency ? const Color(0xFFFCA5A5) : cani.borderStrong,
+                          color: shift.isConflicting
+                              ? cani.warning.withValues(alpha: 0.45)
+                              : (shift.emergency ? const Color(0xFFFCA5A5) : cani.borderStrong),
                         ),
                       ),
                       child: Text(
-                        shift.emergency ? 'Khẩn cấp (Mở ứng tuyển)' : 'Chờ lời mời (Matching)',
+                        shift.isConflicting
+                            ? 'Bạn đã có ca nhận rồi'
+                            : (shift.emergency ? 'Khẩn cấp (Mở ứng tuyển)' : 'Chờ lời mời (Matching)'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: shift.emergency ? cani.danger : cani.textMuted,
+                          color: shift.isConflicting
+                              ? cani.warning
+                              : (shift.emergency ? cani.danger : cani.textMuted),
                         ),
                       ),
                     ),

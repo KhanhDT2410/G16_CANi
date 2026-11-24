@@ -1,4 +1,5 @@
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/app/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -52,6 +53,16 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
     super.dispose();
   }
 
+  void _returnToAssignmentsList() {
+    ref.invalidate(assignmentsListProvider);
+    ref.invalidate(incomeSummaryProvider);
+    ref.read(homeTabIndexProvider.notifier).state = 1;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.popUntil((route) => route.isFirst);
+    }
+  }
+
   Future<void> _submit() async {
     final cani = Theme.of(context).cani;
     if (_isAlreadyReviewed) {
@@ -61,7 +72,7 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
           backgroundColor: cani.warning,
         ),
       );
-      Navigator.pop(context, true);
+      _returnToAssignmentsList();
       return;
     }
 
@@ -76,8 +87,6 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
             comment: _commentCtrl.text.trim(),
             tags: _selectedTags.toList(),
           );
-      ref.invalidate(assignmentsListProvider);
-      ref.invalidate(incomeSummaryProvider);
       if (mounted) {
         setState(() => _isAlreadyReviewed = true);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -86,7 +95,7 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
             backgroundColor: cani.success,
           ),
         );
-        Navigator.pop(context, true);
+        _returnToAssignmentsList();
       }
     } catch (e) {
       if (mounted) {
@@ -95,14 +104,13 @@ class _RateEoScreenState extends ConsumerState<RateEoScreen> {
             : e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
         if (cleanMsg.toLowerCase().contains('đã gửi đánh giá')) {
           setState(() => _isAlreadyReviewed = true);
-          ref.invalidate(assignmentsListProvider);
-          ref.invalidate(incomeSummaryProvider);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(cleanMsg),
               backgroundColor: cani.warning,
             ),
           );
+          _returnToAssignmentsList();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

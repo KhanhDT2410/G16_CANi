@@ -204,13 +204,18 @@ public class WorkerJobService {
         List<WorkerAvailability> availabilitySlots = workerAvailabilityRepository != null
                 ? workerAvailabilityRepository.findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(worker.getWorkerId())
                 : Collections.emptyList();
+        List<ShiftAssignment> activeAssignments = shiftAssignmentRepository != null
+                ? shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(
+                        worker.getWorkerId(),
+                        List.of(AssignmentStatus.CONFIRMED, AssignmentStatus.CHECKED_IN, AssignmentStatus.PENDING))
+                : Collections.emptyList();
         WorkerShiftEligibilityService eligibilityService = getEligibilityService();
 
         Instant now = Instant.now();
         return proposals.stream()
                 .filter(p -> p.getExpiresAt() == null || p.getExpiresAt().isAfter(now))
                 .filter(p -> isProposalStillMatchingWorkerPreferences(p, worker, availabilitySlots, eligibilityService, now))
-                .map(this::mapToProposalDto)
+                .map(p -> mapToProposalDto(p, activeAssignments, eligibilityService))
                 .collect(Collectors.toList());
     }
 
@@ -1574,6 +1579,13 @@ public class WorkerJobService {
     }
 
     private JobProposalResponseDto mapToProposalDto(DispatchProposal p) {
+        return mapToProposalDto(p, Collections.emptyList(), getEligibilityService());
+    }
+
+    private JobProposalResponseDto mapToProposalDto(
+            DispatchProposal p,
+            List<ShiftAssignment> activeAssignments,
+            WorkerShiftEligibilityService eligibilityService) {
         Shift s = p.getShift();
         Event e = s != null ? s.getEvent() : null;
         EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
@@ -1582,14 +1594,17 @@ public class WorkerJobService {
                 : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
 
         WorkerShiftEligibilityService.SkillFitResult skillFit = (s != null)
-                ? getEligibilityService().evaluateSkillFit(p.getWorker(), s)
+                ? eligibilityService.evaluateSkillFit(p.getWorker(), s)
                 : WorkerShiftEligibilityService.SkillFitResult.empty();
         List<WorkerShiftEligibilityService.EffectiveRequirement> reqEntries = (s != null)
-                ? getEligibilityService().resolveEffectiveRequirements(s)
+                ? eligibilityService.resolveEffectiveRequirements(s)
                 : Collections.emptyList();
         List<String> requiredNames = !skillFit.requiredSkillNames().isEmpty()
                 ? skillFit.requiredSkillNames()
                 : (s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList());
+        WorkerShiftEligibilityService.ScheduleConflictInfo conflictInfo = (s != null && eligibilityService != null)
+                ? eligibilityService.findScheduleConflict(s, activeAssignments)
+                : WorkerShiftEligibilityService.ScheduleConflictInfo.none();
 
         return JobProposalResponseDto.builder()
                 .proposalId(p.getProposalId())
@@ -1623,6 +1638,8 @@ public class WorkerJobService {
                 .source(p.getSource())
                 .createdAt(p.getCreatedAt())
                 .imageUrl(s != null ? s.getImageUrl() : null)
+                .isConflicting(conflictInfo.conflicting())
+                .conflictReason(conflictInfo.shortReasonVi())
                 .build();
     }
 

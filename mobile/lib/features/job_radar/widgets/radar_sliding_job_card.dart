@@ -143,11 +143,11 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                     ),
                     Text(
                       s.isConflicting
-                          ? (s.conflictReason ?? 'Trùng thời gian ca khác')
+                          ? (s.conflictReason ?? 'Bạn đã có ca nhận rồi')
                           : 'Cách bạn ${s.distanceKm.toStringAsFixed(1)} km · ${_formatWage(s.hourlyWage)} đ/h',
                       style: TextStyle(
                         fontSize: 10.5,
-                        color: s.isConflicting ? cani.danger : cani.textMuted,
+                        color: s.isConflicting ? cani.warning : cani.textMuted,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -219,17 +219,23 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: s.emergency
-                          ? cani.dangerBg
-                          : (isDark ? cani.canvas : const Color(0xFFF1F5F9)),
+                      color: s.isConflicting
+                          ? cani.warningBg
+                          : (s.emergency
+                              ? cani.dangerBg
+                              : (isDark ? cani.canvas : const Color(0xFFF1F5F9))),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      s.emergency ? 'Khẩn cấp' : 'Matching',
+                      s.isConflicting
+                          ? 'Bạn đã có ca nhận rồi'
+                          : (s.emergency ? 'Khẩn cấp' : 'Matching'),
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w700,
-                        color: s.emergency ? cani.danger : cani.textMuted,
+                        color: s.isConflicting
+                            ? cani.warning
+                            : (s.emergency ? cani.danger : cani.textMuted),
                       ),
                     ),
                   ),
@@ -349,21 +355,21 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
-              color: cani.dangerBg,
+              color: cani.warningBg,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: cani.danger.withValues(alpha: 0.4)),
+              border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
             ),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, size: 15, color: cani.danger),
+                Icon(Icons.event_busy_rounded, size: 15, color: cani.warning),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    s.conflictReason ?? 'Trùng thời gian với ca bạn đã nhận',
+                    s.conflictReason ?? 'Bạn đã có ca nhận rồi',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: cani.danger,
+                      color: cani.warning,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -413,8 +419,8 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                       ? () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(s.conflictReason ?? 'Bạn đã có ca khác trùng khung giờ này!'),
-                              backgroundColor: cani.danger,
+                              content: Text(s.conflictReason ?? 'Bạn đã có ca nhận rồi!'),
+                              backgroundColor: cani.warning,
                             ),
                           );
                         }
@@ -431,14 +437,14 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                             }),
                   icon: Icon(
                     s.isConflicting
-                        ? Icons.block
+                        ? Icons.event_busy_rounded
                         : (s.emergency ? Icons.flash_on_rounded : Icons.schedule_send_rounded),
                     size: 15,
                     color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
                   ),
                   label: Text(
                     s.isConflicting
-                        ? 'Trùng lịch'
+                        ? 'Bạn đã có ca nhận rồi'
                         : (s.emergency ? 'Nhận ca' : 'Chờ lời mời'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

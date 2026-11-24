@@ -319,7 +319,8 @@ public class WorkerNearbyShiftQueryService {
                 WorkerShiftEligibilityService.MatchingChannel channel = Boolean.TRUE.equals(s.getEmergency())
                         ? WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_DISPATCH
                         : WorkerShiftEligibilityService.MatchingChannel.REVERSE_MATCHING;
-                WorkerShiftEligibilityService.EligibilityResult eligibility = eligibilityService.evaluate(currentWorker, s, channel);
+                WorkerShiftEligibilityService.EligibilityResult eligibility = eligibilityService.evaluate(
+                        currentWorker, s, channel, null, true);
                 if (!eligibility.eligible()) {
                     continue;
                 }
@@ -329,22 +330,10 @@ public class WorkerNearbyShiftQueryService {
             Double sLng = candidate.sLng();
             Event e = s.getEvent();
 
-            boolean isConflicting = false;
-            String conflictReason = null;
-            if (!workerActiveAssignments.isEmpty() && s.getStartTime() != null && s.getEndTime() != null) {
-                for (ShiftAssignment activeAssign : workerActiveAssignments) {
-                    Shift existingShift = activeAssign.getShift();
-                    if (existingShift != null && existingShift.getStartTime() != null && existingShift.getEndTime() != null) {
-                        if (s.getStartTime().isBefore(existingShift.getEndTime()) && s.getEndTime().isAfter(existingShift.getStartTime())) {
-                            isConflicting = true;
-                            String cJob = existingShift.getJobType() != null ? existingShift.getJobType() : "Ca làm việc";
-                            String cRange = fmt.format(existingShift.getStartTime()) + " - " + fmt.format(existingShift.getEndTime());
-                            conflictReason = "Trùng giờ với " + cJob + " (" + cRange + ")";
-                            break;
-                        }
-                    }
-                }
-            }
+            WorkerShiftEligibilityService.ScheduleConflictInfo conflictInfo =
+                    eligibilityService.findScheduleConflict(s, workerActiveAssignments);
+            boolean isConflicting = conflictInfo.conflicting();
+            String conflictReason = conflictInfo.shortReasonVi();
 
             EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
             String eoName = eo != null && eo.getCompanyName() != null && !eo.getCompanyName().isBlank()

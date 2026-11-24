@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:cani/app/home_screen.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/rate_eo_screen.dart';
@@ -11,11 +12,27 @@ import 'package:cani/features/job_proposals/widgets/shift_assignment_card.dart';
 
 class _FakeProposalRepository extends ProposalRepository {
   final List<ShiftAssignmentItem> items;
+  bool submitReviewCalled = false;
   _FakeProposalRepository(this.items) : super(Dio());
 
   @override
   Future<List<ShiftAssignmentItem>> fetchAssignments({String? token}) async {
     return items;
+  }
+
+  @override
+  Future<bool> submitReview({
+    required String assignmentId,
+    required int rating,
+    required int criteriaWorkEnvironment,
+    required int criteriaSupport,
+    required int criteriaPaymentTiming,
+    String? comment,
+    List<String>? tags,
+    String? token,
+  }) async {
+    submitReviewCalled = true;
+    return true;
   }
 }
 
@@ -203,5 +220,77 @@ void main() {
     expect(find.text('Bạn đã hoàn thành ca và gửi đánh giá Ban tổ chức rồi.'), findsOneWidget);
     expect(find.text('Gửi Đánh Giá & Hoàn Tất'), findsNothing);
     expect(find.text('Để sau'), findsNothing);
+  });
+
+  testWidgets('RateEoScreen returns directly to shifts list (root route + tab 1) after submitting review', (tester) async {
+    final completedItem = _makeAssignment(
+      status: 'COMPLETED',
+      eoConfirmed: true,
+      paymentStatus: 'CONFIRMED_FULL',
+      workerConfirmStatus: 'RECEIVED_FULL',
+      checkoutTime: DateTime(2026, 11, 20, 16, 5),
+      hasWorkerReviewed: false,
+    );
+
+    final fakeRepo = _FakeProposalRepository([completedItem]);
+    final container = ProviderContainer(
+      overrides: [
+        proposalRepositoryProvider.overrideWithValue(fakeRepo),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Builder(
+            builder: (rootCtx) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    rootCtx,
+                    MaterialPageRoute(
+                      builder: (detailCtx) => Scaffold(
+                        body: ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              detailCtx,
+                              MaterialPageRoute(
+                                builder: (_) => RateEoScreen(
+                                  assignment: completedItem,
+                                  checkoutHoursWorked: 4.0,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text('Mở đánh giá'),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Trang danh sách ca'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Trang danh sách ca'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mở đánh giá'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đánh giá Ban tổ chức · Bước 6/6'), findsOneWidget);
+    await tester.tap(find.text('Gửi Đánh Giá & Hoàn Tất'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRepo.submitReviewCalled, isTrue);
+    expect(container.read(homeTabIndexProvider), 1);
+    expect(find.text('Trang danh sách ca'), findsOneWidget);
+    expect(find.text('Đánh giá Ban tổ chức · Bước 6/6'), findsNothing);
+    expect(find.text('Mở đánh giá'), findsNothing);
   });
 }

@@ -508,4 +508,23 @@ void main() {
     expect(find.text('Ca Còn Lại'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Conflicting shift on Home Radar shows Bạn đã có ca nhận rồi across map card and list view', (tester) async {
+    final proposalRepo = _FakeProposalRepository();
+    final radarRepo = _FakeJobRadarRepository()
+      ..shifts = [
+        _makeShift('s-conflict', eventName: 'Sự Kiện Trùng Giờ', conflicting: true),
+      ];
+
+    final container = await _pumpRadarScreen(tester, proposalRepo: proposalRepo, radarRepo: radarRepo);
+    addTearDown(container.dispose);
+
+    expect(find.text('Bạn đã có ca nhận rồi'), findsWidgets);
+    expect(find.text('Nhận ca'), findsNothing);
+
+    await tester.tap(find.text('DS (1)'));
+    await tester.pump();
+    expect(find.text('Bạn đã có ca nhận rồi'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }

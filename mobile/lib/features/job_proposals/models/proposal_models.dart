@@ -27,6 +27,8 @@ class JobProposalItem {
   final double matchScore;
   final String status;
   final String? imageUrl;
+  final bool isConflicting;
+  final String? conflictReason;
 
   bool isActiveAt(DateTime now) {
     if (status.toUpperCase() != 'PENDING') return false;
@@ -63,6 +65,8 @@ class JobProposalItem {
     required this.matchScore,
     required this.status,
     this.imageUrl,
+    this.isConflicting = false,
+    this.conflictReason,
   });
 
   factory JobProposalItem.fromJson(Map<String, dynamic> json) {
@@ -94,6 +98,8 @@ class JobProposalItem {
       matchScore: (json['matchScore'] is num) ? (json['matchScore'] as num).toDouble() : 0.0,
       status: json['status'] ?? 'PENDING',
       imageUrl: json['imageUrl'] as String?,
+      isConflicting: json['isConflicting'] == true || json['conflicting'] == true,
+      conflictReason: json['conflictReason'] as String?,
     );
   }
 }

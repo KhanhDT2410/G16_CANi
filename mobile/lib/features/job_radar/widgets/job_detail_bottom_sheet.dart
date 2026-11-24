@@ -508,6 +508,34 @@ class JobDetailBottomSheet extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (shift.isConflicting) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: cani.warningBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.event_busy_rounded, size: 18, color: cani.warning),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            shift.conflictReason ?? 'Bạn đã có ca nhận rồi',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: cani.warning,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Hàng nút thao tác: Chỉ đường Google Maps + Từ chối + Nhận ca
@@ -582,67 +610,96 @@ class JobDetailBottomSheet extends StatelessWidget {
                         ),
                       ),
                     const SizedBox(width: 8),
-                    // Nút Nhận ca (Chỉ mở khi ca đang ở chế độ Khẩn cấp / Emergency)
+                    // Nút Nhận ca (Chặn khi đã có ca trùng giờ hoặc chưa mở khẩn cấp)
                     Expanded(
                       flex: 6,
                       child: SizedBox(
                         height: 48,
-                        child: shift.emergency
-                            ? FilledButton.icon(
-                                onPressed: onApply,
-                                icon: const Icon(
-                                  Icons.flash_on_rounded,
-                                  size: 18,
-                                ),
-                                label: const Text(
-                                  'Nhận ca',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: cani.danger,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              )
-                            : Container(
+                        child: shift.isConflicting
+                            ? Container(
                                 alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
                                 decoration: BoxDecoration(
-                                  color: cani.border,
+                                  color: cani.warningBg,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: const Color(0xFFCBD5E1),
-                                  ),
+                                  border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
-                                      Icons.schedule_send_rounded,
-                                      size: 16,
-                                      color: cani.textMuted,
-                                    ),
+                                    Icon(Icons.event_busy_rounded, size: 16, color: cani.warning),
                                     const SizedBox(width: 6),
-                                    const Flexible(
+                                    Flexible(
                                       child: Text(
-                                        'Chờ lời mời (Matching)',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12,
-                                          color: Color(0xFF475569),
-                                        ),
+                                        'Bạn đã có ca nhận rồi',
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                          color: cani.warning,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
+                              )
+                            : (shift.emergency
+                                ? FilledButton.icon(
+                                    onPressed: onApply,
+                                    icon: const Icon(
+                                      Icons.flash_on_rounded,
+                                      size: 18,
+                                    ),
+                                    label: const Text(
+                                      'Nhận ca',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: cani.danger,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: cani.border,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xFFCBD5E1),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.schedule_send_rounded,
+                                          size: 16,
+                                          color: cani.textMuted,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Flexible(
+                                          child: Text(
+                                            'Chờ lời mời (Matching)',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                              color: Color(0xFF475569),
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )),
                       ),
                     ),
                   ],
@@ -939,6 +996,34 @@ class JobProposalDetailBottomSheet extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (p.isConflicting) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: cani.warningBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.event_busy_rounded, size: 18, color: cani.warning),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            p.conflictReason ?? 'Bạn đã có ca nhận rồi',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: cani.warning,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 Row(
@@ -966,24 +1051,44 @@ class JobProposalDetailBottomSheet extends StatelessWidget {
                       flex: 6,
                       child: SizedBox(
                         height: 48,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: cani.brandGradient),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ElevatedButton(
-                            onPressed: onAccept,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: const Text(
-                              'Nhận ca',
-                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Colors.white),
-                            ),
-                          ),
-                        ),
+                        child: p.isConflicting
+                            ? Container(
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: cani.warningBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
+                                ),
+                                child: Text(
+                                  'Bạn đã có ca nhận rồi',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12.5,
+                                    color: cani.warning,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(colors: cani.brandGradient),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: onAccept,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: const Text(
+                                    'Nhận ca',
+                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Colors.white),
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ],

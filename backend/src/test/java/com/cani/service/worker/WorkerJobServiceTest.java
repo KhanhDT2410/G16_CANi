@@ -330,6 +330,79 @@ class WorkerJobServiceTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    @DisplayName("UTC006d - getMyProposals() - Đánh dấu isConflicting=true với thông báo Bạn đã có ca nhận rồi khi trùng giờ")
+    void getMyProposals_WhenWorkerHasOverlappingAssignment_MarksConflictingWithMessage() {
+        Shift acceptedShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Pha chế đã nhận")
+                .startTime(activeShift.getStartTime())
+                .endTime(activeShift.getEndTime())
+                .build();
+        ShiftAssignment acceptedAssignment = ShiftAssignment.builder()
+                .assignmentId(UUID.randomUUID())
+                .worker(worker)
+                .shift(acceptedShift)
+                .status(AssignmentStatus.CONFIRMED)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(dispatchProposalRepository.findByWorker_WorkerIdAndStatusOrderByCreatedAtDesc(worker.getWorkerId(), ProposalStatus.PENDING))
+                .thenReturn(List.of(pendingProposal));
+        when(shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(eq(worker.getWorkerId()), any()))
+                .thenReturn(List.of(acceptedAssignment));
+
+        List<JobProposalResponseDto> result = workerJobService.getMyProposals(userId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getIsConflicting()).isTrue();
+        assertThat(result.get(0).getConflictReason()).contains("Bạn đã có ca nhận rồi");
+    }
+
+    @Test
+    @DisplayName("UTC026i - getNearbyShifts() - Ca trùng giờ với ca đã nhận đổi trạng thái isConflicting=true (Bạn đã có ca nhận rồi)")
+    void getNearbyShifts_WhenWorkerHasOverlappingAssignment_MarksConflictingWithMessage() {
+        Shift acceptedShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Lễ tân đã nhận")
+                .startTime(activeShift.getStartTime())
+                .endTime(activeShift.getEndTime())
+                .build();
+        ShiftAssignment acceptedAssignment = ShiftAssignment.builder()
+                .assignmentId(UUID.randomUUID())
+                .worker(worker)
+                .shift(acceptedShift)
+                .status(AssignmentStatus.CONFIRMED)
+                .build();
+
+        Shift conflictingOpenShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Điều phối trùng giờ")
+                .locationLat(10.7769)
+                .locationLng(106.7009)
+                .startTime(activeShift.getStartTime())
+                .endTime(activeShift.getEndTime())
+                .requiredWorkers(3).confirmedWorkers(1).remainingWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(60000))
+                .status(ShiftStatus.ACTIVE).emergency(true).build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findByWorker_WorkerIdAndStatusIn(eq(worker.getWorkerId()), any()))
+                .thenReturn(List.of(acceptedAssignment));
+        when(shiftRepository.findNearbyCandidateShifts(any(Instant.class)))
+                .thenReturn(List.of(conflictingOpenShift));
+
+        List<NearbyShiftResponseDto> list = workerJobService.getNearbyShifts(userId, 10.7769, 106.7009, 15.0);
+
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getShiftId()).isEqualTo(conflictingOpenShift.getShiftId());
+        assertThat(list.get(0).getIsConflicting()).isTrue();
+        assertThat(list.get(0).getConflictReason()).contains("Bạn đã có ca nhận rồi");
+    }
+
     // =========================================================================
     // 3. acceptProposal() - UTC007 to UTC010
     // =========================================================================

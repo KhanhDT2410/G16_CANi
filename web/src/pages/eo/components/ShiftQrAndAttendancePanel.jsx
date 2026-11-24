@@ -8,6 +8,7 @@ import ReportNoShowModal from './ReportNoShowModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
+import { formatVndWhole } from '../utils/eventHelpers';
 
 /**
  * ShiftQrAndAttendancePanel
@@ -337,7 +338,7 @@ export default function ShiftQrAndAttendancePanel({
             className="eo-btn-secondary"
             style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            🔄 Làm mới điểm danh
+            Làm mới điểm danh
           </button>
 
           {onClose && (
@@ -517,7 +518,7 @@ export default function ShiftQrAndAttendancePanel({
               lineHeight: 1.45,
             }}
           >
-            <strong>🛡️ Bảo mật chống giả mạo:</strong> Mã QR xoay vòng 20 giây và được ký số bảo mật <strong>HMAC-SHA256</strong> từ máy chủ. Ngăn chặn tuyệt đối việc Worker tự sinh mã QR hoặc gian lận điểm danh từ xa.
+            <strong>Bảo mật chống giả mạo:</strong> Mã QR xoay vòng 20 giây và được ký số bảo mật <strong>HMAC-SHA256</strong> từ máy chủ. Ngăn chặn tuyệt đối việc Worker tự sinh mã QR hoặc gian lận điểm danh từ xa.
           </div>
         </div>
 
@@ -592,7 +593,7 @@ export default function ShiftQrAndAttendancePanel({
                           </div>
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.workerPhone}</div>
                           <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 2 }}>
-                            ⭐ {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
+                            Đánh giá: {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
                           </div>
                         </td>
 
@@ -667,11 +668,11 @@ export default function ShiftQrAndAttendancePanel({
                                           onClick={() => setPreviewImage({ url: prog.evidenceImageUrl, title: `Minh chứng việc "${t.label}" - ${item.workerName}` })}
                                           style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 4, padding: '1px 5px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', marginTop: 2 }}
                                         >
-                                          📷 Xem ảnh
+                                          Xem ảnh
                                         </button>
                                       ) : (
                                         <span style={{ color: '#dc2626', fontSize: '0.68rem', fontWeight: 700, display: 'block', marginTop: 1 }}>
-                                          ⚠️ Chưa nộp minh chứng
+                                          Chưa nộp minh chứng
                                         </span>
                                       )
                                     ) : (
@@ -697,7 +698,7 @@ export default function ShiftQrAndAttendancePanel({
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                                 {item.declaredAmount != null && (
                                   <div style={{ fontSize: '0.75rem', color: '#0369a1' }}>
-                                    Đã khai: <strong>{Number(item.declaredAmount).toLocaleString('vi-VN')} đ</strong>
+                                    Đã khai: <strong>{formatVndWhole(item.declaredAmount)}</strong>
                                     {(isTransfer || isCash) && (
                                       <span style={{ marginLeft: 4, fontSize: '0.68rem', color: '#475569' }}>
                                         ({isTransfer ? 'CK' : 'Tiền mặt'})
@@ -738,7 +739,7 @@ export default function ShiftQrAndAttendancePanel({
                                       alt="Biên lai"
                                       style={{ width: 18, height: 18, objectFit: 'cover', borderRadius: 3 }}
                                     />
-                                    <span>🧾 Xem chứng từ</span>
+                                    <span>Xem chứng từ</span>
                                   </button>
                                 )}
 
@@ -749,7 +750,7 @@ export default function ShiftQrAndAttendancePanel({
                                 )}
                                 {item.workerConfirmStatus === 'RECEIVED_PARTIAL' && (
                                   <span style={{ background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.72rem' }}>
-                                    ⚠️ Nhận thiếu: {item.workerComment || ''}
+                                    Nhận thiếu: {item.workerComment || ''}
                                   </span>
                                 )}
                                 {item.workerConfirmStatus === 'NOT_RECEIVED' && (
@@ -784,7 +785,7 @@ export default function ShiftQrAndAttendancePanel({
                                         cursor: 'pointer',
                                       }}
                                     >
-                                      📱 QR
+                                      QR
                                     </button>
                                   )}
 
@@ -874,7 +875,7 @@ export default function ShiftQrAndAttendancePanel({
                               }}
                               title="Nhắn tin với nhân sự này"
                             >
-                              💬
+                              Nhắn tin
                             </button>
 
                             {!isEoConfirmed && (isCheckedIn || isCompleted) && (
@@ -924,7 +925,7 @@ export default function ShiftQrAndAttendancePanel({
                                 }}
                                 title="Báo cáo nhân sự không đến & Kích hoạt tìm người thay thế khẩn cấp"
                               >
-                                <span>⚠️</span> Báo Vắng Mặt
+                                Báo Vắng Mặt
                               </button>
                             )}
 
@@ -934,7 +935,7 @@ export default function ShiftQrAndAttendancePanel({
                               </span>
                             )}
 
-                            {isEoConfirmed && isCompleted && !item.hasReviewedWorker && (
+                            {isCompleted && !item.hasReviewedWorker && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedForReview(item)}
@@ -949,11 +950,11 @@ export default function ShiftQrAndAttendancePanel({
                                   cursor: 'pointer',
                                 }}
                               >
-                                ⭐ Đánh Giá
+                                Đánh Giá
                               </button>
                             )}
 
-                            {isEoConfirmed && isCompleted && item.hasReviewedWorker && (
+                            {isCompleted && item.hasReviewedWorker && (
                               <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 700, padding: '4px' }}>
                                 ✓ Đã đánh giá
                               </span>
@@ -987,7 +988,7 @@ export default function ShiftQrAndAttendancePanel({
         onClose={() => setSelectedForReview(null)}
         assignment={selectedForReview}
         submitting={submittingReview}
-        onSubmit={handleSubmitReview}
+        onSubmitReview={handleSubmitReview}
       />
 
       <ReportNoShowModal

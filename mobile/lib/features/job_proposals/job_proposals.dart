@@ -7,4 +7,5 @@ export 'screens/shift_detail_execution_screen.dart';
 export 'screens/shift_payment_screen.dart';
 export 'widgets/history_kpi_bar.dart';
 export 'widgets/history_shift_card.dart';
+export 'widgets/invite_code_dialog.dart';
 export 'widgets/shift_assignment_card.dart';

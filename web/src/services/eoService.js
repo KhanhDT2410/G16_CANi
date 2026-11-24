@@ -227,6 +227,12 @@ export const eoService = {
     return response.data?.data;
   },
 
+  // Lấy tổng hợp danh sách nhân sự chờ đánh giá & đã đánh giá qua các sự kiện của EO
+  getWorkerReviewOverview: async () => {
+    const response = await apiClient.get('/v1/eo/events/worker-reviews');
+    return response.data?.data || [];
+  },
+
   // ==========================================
   // W-06: QUẢN LÝ GÓI CƯỚC & THANH TOÁN VNPAY (UC-10, UC-11, UC-12)
   // ==========================================

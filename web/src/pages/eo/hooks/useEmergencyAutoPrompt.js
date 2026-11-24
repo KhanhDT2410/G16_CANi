@@ -37,10 +37,12 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
 
       if (foundPair) {
         const summary = getShiftStaffingSummary(foundPair.shift, foundPair.event, new Date());
-        if (!summary.canTriggerEmergency || summary.isEmergency || summary.isInviteMode) {
+        if (!summary.canTriggerEmergency || !summary.nearStartUnderstaffed || summary.isEmergency || summary.isInviteMode) {
           showToast(
             summary.isEmergency
               ? 'Ca làm việc đang được điều phối khẩn cấp.'
+              : !summary.nearStartUnderstaffed && summary.canTriggerEmergency
+              ? 'Chỉ có thể kích hoạt điều phối khẩn cấp khi gần đến giờ bắt đầu ca (trong vòng 4 giờ trước giờ bắt đầu).'
               : summary.emergencyBlockReason || 'Ca làm việc hiện không đủ điều kiện kích hoạt khẩn cấp thủ công.',
             'info'
           );
@@ -72,10 +74,12 @@ export function useEmergencyAutoPrompt({ events = [], onReloadEvents }) {
         if (shift) {
           pendingPromptShiftIdRef.current = null;
           const summary = getShiftStaffingSummary(shift, evt, new Date());
-          if (!summary.canTriggerEmergency || summary.isEmergency || summary.isInviteMode) {
+          if (!summary.canTriggerEmergency || !summary.nearStartUnderstaffed || summary.isEmergency || summary.isInviteMode) {
             showToast(
               summary.isEmergency
                 ? 'Ca làm việc đang được điều phối khẩn cấp.'
+                : !summary.nearStartUnderstaffed && summary.canTriggerEmergency
+                ? 'Chỉ có thể kích hoạt điều phối khẩn cấp khi gần đến giờ bắt đầu ca (trong vòng 4 giờ trước giờ bắt đầu).'
                 : summary.emergencyBlockReason || 'Ca làm việc hiện không đủ điều kiện kích hoạt khẩn cấp thủ công.',
               'info'
             );

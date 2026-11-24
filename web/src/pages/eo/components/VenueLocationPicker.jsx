@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import {
+  MAX_VENUE_ACCURACY_METERS,
+  requestVenuePosition,
+} from '../../../features/event-creation/utils/requestVenuePosition';
 import {
   searchAddressSuggestions,
   getAddressFromCoordinates,
@@ -34,9 +38,8 @@ export const VenueLocationPicker = ({
   address = '',
   lat = 10.7328,
   lng = 106.7214,
+  coordinatesConfirmed = false,
   onLocationChange,
-  onGetCurrentLocation,
-  locating = false,
   required = true,
 }) => {
   const [inputValue, setInputValue] = useState(address);
@@ -46,7 +49,9 @@ export const VenueLocationPicker = ({
   const [resolvingAddress, setResolvingAddress] = useState(false);
   const [resolveFailedHint, setResolveFailedHint] = useState(false);
   const [mapType, setMapType] = useState('roadmap');
-  const [localLocating, setLocalLocating] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [locationHint, setLocationHint] = useState('');
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -54,12 +59,13 @@ export const VenueLocationPicker = ({
   const tileLayerRef = useRef(null);
   const dropdownRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const blurTimerRef = useRef(null);
+  const locationControllerRef = useRef(null);
+  const selectionVersionRef = useRef(0);
 
   // Giữ ref mới nhất để handler Leaflet không bị stale closure & không gọi setState cha trong updater
   const onLocationChangeRef = useRef(onLocationChange);
   onLocationChangeRef.current = onLocationChange;
-  const inputValueRef = useRef(inputValue);
-  inputValueRef.current = inputValue;
   const latRef = useRef(lat);
   latRef.current = lat;
   const lngRef = useRef(lng);
@@ -77,22 +83,45 @@ export const VenueLocationPicker = ({
 
   useEffect(() => {
     setInputValue(address);
+    lastGeocodedTextRef.current = coordinatesConfirmed ? address.trim() : '';
     if (address) setResolveFailedHint(false);
-  }, [address]);
+  }, [address, coordinatesConfirmed]);
 
-  const handlePinMoved = async (newLat, newLng) => {
-    setResolvingAddress(true);
+  const startLocationSelection = () => {
+    locationControllerRef.current?.abort();
+    locationControllerRef.current = null;
+    clearTimeout(debounceTimerRef.current);
+    clearTimeout(blurTimerRef.current);
+    setLocating(false);
+    setLocationError('');
+    setLocationHint('');
+    setSearching(false);
+    setResolvingAddress(false);
     setResolveFailedHint(false);
+    return ++selectionVersionRef.current;
+  };
+
+  const handlePinMoved = async (newLat, newLng, initialHint = '') => {
+    const version = startLocationSelection();
+    if (initialHint) setLocationHint(initialHint);
+    const coordinateLabel = `Vị trí GPS (${newLat.toFixed(5)}, ${newLng.toFixed(5)})`;
+    lastGeocodedTextRef.current = coordinateLabel;
+    setInputValue(coordinateLabel);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setResolvingAddress(true);
 
     // Cập nhật tọa độ ngay lập tức để Sidebar hiển thị đúng Vùng lương & GPS
     onLocationChangeRef.current?.({
-      address: inputValueRef.current,
+      address: coordinateLabel,
       lat: newLat,
       lng: newLng,
       locationPicked: true,
+      venueCoordinatesConfirmed: true,
     });
 
     const resolvedAddress = await getAddressFromCoordinates(newLat, newLng);
+    if (version !== selectionVersionRef.current) return;
     setResolvingAddress(false);
 
     if (resolvedAddress) {
@@ -103,6 +132,7 @@ export const VenueLocationPicker = ({
         lat: newLat,
         lng: newLng,
         locationPicked: true,
+        venueCoordinatesConfirmed: true,
       });
     } else {
       setResolveFailedHint(true);
@@ -115,8 +145,8 @@ export const VenueLocationPicker = ({
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const initialLat = latRef.current || 10.7328;
-    const initialLng = lngRef.current || 106.7214;
+    const initialLat = latRef.current ?? 10.7328;
+    const initialLng = lngRef.current ?? 106.7214;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
@@ -165,6 +195,10 @@ export const VenueLocationPicker = ({
 
     return () => {
       clearTimeout(resizeTimer);
+      clearTimeout(debounceTimerRef.current);
+      clearTimeout(blurTimerRef.current);
+      locationControllerRef.current?.abort();
+      selectionVersionRef.current += 1;
       map.remove();
       mapInstanceRef.current = null;
       markerRef.current = null;
@@ -185,7 +219,7 @@ export const VenueLocationPicker = ({
   };
 
   useEffect(() => {
-    if (mapInstanceRef.current && markerRef.current && lat && lng) {
+    if (mapInstanceRef.current && markerRef.current && lat != null && lng != null) {
       const currentPos = markerRef.current.getLatLng();
       if (Math.abs(currentPos.lat - lat) > 0.0001 || Math.abs(currentPos.lng - lng) > 0.0001) {
         markerRef.current.setLatLng([lat, lng]);
@@ -217,10 +251,11 @@ export const VenueLocationPicker = ({
   const commitTypedAddress = async (rawText) => {
     const trimmed = String(rawText || '').trim();
     if (trimmed.length < 3 || trimmed === lastGeocodedTextRef.current) return;
+    const version = startLocationSelection();
     setSearching(true);
     try {
       const coords = await getCoordinatesFromAddress(trimmed);
-      if (coords && coords.lat && coords.lng) {
+      if (version === selectionVersionRef.current && coords?.lat != null && coords?.lng != null) {
         lastGeocodedTextRef.current = trimmed;
         movePinToCoords(coords.lat, coords.lng, 16);
         onLocationChangeRef.current?.({
@@ -228,28 +263,27 @@ export const VenueLocationPicker = ({
           lat: coords.lat,
           lng: coords.lng,
           locationPicked: true,
+          venueCoordinatesConfirmed: true,
         });
       }
     } finally {
-      setSearching(false);
+      if (version === selectionVersionRef.current) setSearching(false);
     }
   };
 
   const handleInputChange = (e) => {
     const val = e.target.value;
+    const version = startLocationSelection();
+    lastGeocodedTextRef.current = '';
     setInputValue(val);
-    setResolveFailedHint(false);
 
     onLocationChangeRef.current?.({
       address: val,
       lat: latRef.current,
       lng: lngRef.current,
       locationPicked: Boolean(val.trim()),
+      venueCoordinatesConfirmed: false,
     });
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
 
     if (!val || val.trim().length < 2) {
       setSuggestions([]);
@@ -262,74 +296,85 @@ export const VenueLocationPicker = ({
     debounceTimerRef.current = setTimeout(async () => {
       try {
         const results = await searchAddressSuggestions(val);
+        if (version !== selectionVersionRef.current) return;
         setSuggestions(results);
         setShowSuggestions(results.length > 0);
       } finally {
-        setSearching(false);
+        if (version === selectionVersionRef.current) setSearching(false);
       }
     }, 400);
   };
 
   const handleSelectSuggestion = (item) => {
+    startLocationSelection();
     lastGeocodedTextRef.current = item.displayName;
     setInputValue(item.displayName);
     setShowSuggestions(false);
     setSuggestions([]);
-    setResolveFailedHint(false);
 
     onLocationChangeRef.current?.({
       address: item.displayName,
       lat: item.lat,
       lng: item.lng,
       locationPicked: true,
+      venueCoordinatesConfirmed: true,
     });
 
     movePinToCoords(item.lat, item.lng, 16);
   };
 
   const handleClear = () => {
+    startLocationSelection();
     lastGeocodedTextRef.current = '';
     setInputValue('');
     setSuggestions([]);
     setShowSuggestions(false);
-    setResolveFailedHint(false);
     onLocationChangeRef.current?.({
       address: '',
       lat: latRef.current,
       lng: lngRef.current,
       locationPicked: false,
+      venueCoordinatesConfirmed: false,
     });
   };
 
-  const handleLocateButtonClick = () => {
-    if (onGetCurrentLocation) {
-      onGetCurrentLocation();
+  const handleLocateButtonClick = async () => {
+    startLocationSelection();
+    setShowSuggestions(false);
+    setSuggestions([]);
+
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setLocationError(window.isSecureContext
+        ? 'Trình duyệt không hỗ trợ định vị. Hãy tìm địa chỉ hoặc chọn ghim trên bản đồ.'
+        : 'Hãy mở trang bằng HTTPS để dùng định vị hoặc chọn địa điểm trên bản đồ.');
       return;
     }
-    if (!navigator.geolocation) return;
-    setLocalLocating(true);
-    const onCoords = (pos) => {
-      const newLat = parseFloat(pos.coords.latitude.toFixed(6));
-      const newLng = parseFloat(pos.coords.longitude.toFixed(6));
-      setLocalLocating(false);
-      movePinToCoords(newLat, newLng, 16);
-      handlePinMovedRef.current(newLat, newLng);
-    };
-    navigator.geolocation.getCurrentPosition(
-      onCoords,
-      (err) => {
-        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
-          navigator.geolocation.getCurrentPosition(
-            onCoords,
-            () => setLocalLocating(false),
-            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-          );
-        } else {
-          setLocalLocating(false);
-        }
-      },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
-    );
+
+    const controller = new AbortController();
+    locationControllerRef.current = controller;
+    setLocating(true);
+    let coords;
+    try {
+      coords = await requestVenuePosition(navigator.geolocation, controller.signal);
+    } catch (error) {
+      if (!controller.signal.aborted) setLocationError(error.message);
+      return;
+    } finally {
+      if (locationControllerRef.current === controller && !controller.signal.aborted) {
+        locationControllerRef.current = null;
+        setLocating(false);
+      }
+    }
+
+    if (controller.signal.aborted) return;
+    const newLat = Number(coords.latitude.toFixed(6));
+    const newLng = Number(coords.longitude.toFixed(6));
+    const isApproximate = Number.isFinite(coords.accuracy) && coords.accuracy > MAX_VENUE_ACCURACY_METERS;
+    const approximateHint = isApproximate
+      ? `Đã đưa ghim về gần vị trí hiện tại (sai số khoảng ${Math.ceil(coords.accuracy).toLocaleString('vi-VN')} m). Hãy kéo ghim hoặc tìm địa chỉ để chốt đúng địa điểm.`
+      : '';
+    movePinToCoords(newLat, newLng, isApproximate ? 15 : 16);
+    handlePinMoved(newLat, newLng, approximateHint);
   };
 
   return (
@@ -342,8 +387,8 @@ export const VenueLocationPicker = ({
           type="button"
           className="venue-picker-gps-btn"
           onClick={handleLocateButtonClick}
-          disabled={locating || localLocating}
-          title="Định vị tọa độ GPS thiết bị hiện tại"
+          disabled={locating}
+          title="Lấy vị trí hiện tại của thiết bị"
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="7" />
@@ -352,7 +397,7 @@ export const VenueLocationPicker = ({
             <line x1="1" y1="12" x2="4" y2="12" />
             <line x1="20" y1="12" x2="23" y2="12" />
           </svg>
-          <span>{locating || localLocating ? 'Đang định vị...' : 'Vị trí hiện tại'}</span>
+          <span>{locating ? 'Đang định vị...' : 'Vị trí hiện tại'}</span>
         </button>
       </div>
 
@@ -379,7 +424,8 @@ export const VenueLocationPicker = ({
               }
             }}
             onBlur={() => {
-              setTimeout(() => {
+              clearTimeout(blurTimerRef.current);
+              blurTimerRef.current = setTimeout(() => {
                 if (!showSuggestions && inputValue.trim().length >= 3) {
                   commitTypedAddress(inputValue);
                 }
@@ -452,12 +498,14 @@ export const VenueLocationPicker = ({
       </div>
 
       <div className="venue-map-statusbar">
-        <span className="venue-map-hint">
-          {resolvingAddress
+        <span className="venue-map-hint" role="status">
+          {locationError || (resolvingAddress
             ? 'Đang tự động dò tên đường từ vị trí ghim...'
+            : locationHint
+            ? locationHint
             : resolveFailedHint
             ? 'Đã ghim tọa độ mới — chưa dò được tên đường tự động, vui lòng gõ địa chỉ cụ thể ở trên.'
-            : 'Click hoặc kéo thả ghim trên bản đồ (hoặc nhấn Enter khi gõ) để định vị đúng địa điểm'}
+            : 'Click hoặc kéo thả ghim trên bản đồ (hoặc nhấn Enter khi gõ) để định vị đúng địa điểm')}
         </span>
         <span className="venue-gps-badge" title={inputValue || 'Địa chỉ tổ chức cụ thể'}>
           {inputValue

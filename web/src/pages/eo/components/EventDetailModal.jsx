@@ -6,6 +6,7 @@ import { showToast } from '../../../components/common/Toast';
 import { showPrompt } from '../../../components/common/PromptModal';
 import ShiftQrAndAttendancePanel from './ShiftQrAndAttendancePanel';
 import ShiftEmergencyBanner from './ShiftEmergencyBanner';
+import EmergencyTriggerButton from './EmergencyTriggerButton';
 import {
   getDynamicEventStatus,
   getDynamicShiftStatus,
@@ -740,8 +741,8 @@ export default function EventDetailModal({
 
                             {/* Thao tác ca */}
                             <div className="shift-card-actions">
-                              {/* Trạng thái mở rộng khẩn cấp */}
-                              {shift.emergency && shiftRequired > shiftConfirmed && (() => {
+                              {/* Trạng thái mở rộng khẩn cấp hoặc nút kích hoạt khẩn cấp (chỉ bật khi gần giờ) */}
+                              {shift.emergency && shiftRequired > shiftConfirmed ? (() => {
                                 const summary = getShiftStaffingSummary(shift, event);
                                 const localRes = dispatchResultsByShiftId[shift.shiftId];
                                 const hasCandidates =
@@ -765,7 +766,9 @@ export default function EventDetailModal({
                                     {hasCandidates ? 'Đang điều phối khẩn cấp' : 'Đã bật điều phối · Chưa tìm được Worker phù hợp'}
                                   </span>
                                 );
-                              })()}
+                              })() : (
+                                <EmergencyTriggerButton shift={shift} event={event} compact />
+                              )}
 
                               {/* Mã mời nhân sự: Ẩn khi sự kiện hoặc ca là Bản nháp (DRAFT) */}
                               {!isDraft && onOpenInvite && (

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
 import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
+import { roundVndAmount } from '../utils/eventHelpers';
 
 /**
  * PaymentDeclarationModal
@@ -38,7 +39,9 @@ const PaymentDeclarationModal = ({
   const bankCode = selectedAssignment.bankCode;
   const accountNumber = selectedAssignment.bankAccountNumber;
   const accountName = selectedAssignment.bankAccountName || selectedAssignment.workerName || '';
-  const amount = paymentForm.declaredAmount || selectedAssignment.agreedWage || selectedAssignment.agreedAmount || 0;
+  const amount = roundVndAmount(
+    paymentForm.declaredAmount || selectedAssignment.agreedWage || selectedAssignment.agreedAmount || 0
+  );
   const hasBankInfo = Boolean(bankCode && accountNumber);
 
   const dynamicVietQrUrl = buildWorkerVietQrUrl(selectedAssignment, amount);

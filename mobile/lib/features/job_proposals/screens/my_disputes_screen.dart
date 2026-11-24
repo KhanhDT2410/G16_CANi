@@ -1,12 +1,11 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
-import '../../ekyc/screens/card_scanner_screen.dart';
 import '../data/proposal_repository.dart';
 import '../models/dispute_models.dart';
 import '../models/proposal_models.dart';
+import '../widgets/create_dispute_sheet.dart';
 import '../widgets/shift_checklist_section.dart';
 import 'dispute_chat_screen.dart';
 
@@ -73,434 +72,35 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen> {
 
     if (!mounted) return;
 
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final evidenceCtrl = TextEditingController();
-    String selectedType = 'PAYMENT';
-    bool isSubmitting = false;
-    bool isUploadingPhoto = false;
-    String? uploadedEvidenceUrl;
-    Uint8List? previewBytes;
-    String? modalError;
+    final cani = Theme.of(context).cani;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    await showModalBottomSheet(
+    final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (bottomSheetCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            final cani = Theme.of(ctx).cani;
-            final isDark = Theme.of(ctx).brightness == Brightness.dark;
-            final descLength = descCtrl.text.trim().length;
-            final isDescValid = descLength >= 50;
-
-            return Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.90,
-              ),
-              padding: EdgeInsets.only(
-                top: 12,
-                left: 20,
-                right: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: cani.danger.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(Icons.gavel_rounded, color: cani.danger, size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tạo Khiếu Nại Ca Làm',
-                                style: TextStyle(
-                                  fontSize: 17.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: cani.textMain,
-                                ),
-                              ),
-                              Text(
-                                'Gửi CSKH xem xét trong thời hạn 14 ngày',
-                                style: TextStyle(fontSize: 12, color: cani.textMuted),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Ca làm việc được gắn trực tiếp vào Dispute
-                    if (widget.assignment != null)
-                      _buildShiftReferenceCard(widget.assignment!, cani, isDark)
-                    else
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedAssignmentId,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Ca làm việc cần khiếu nại (*)',
-                          prefixIcon: const Icon(Icons.work_outline_rounded, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        ),
-                        items: eligibleOptions.map((item) {
-                          final timeLabel = item.startTime != null ? ' • ${_formatDate(item.startTime!)}' : '';
-                          return DropdownMenuItem<String>(
-                            value: item.assignmentId,
-                            child: Text(
-                              '${item.jobType} - ${item.eventName}$timeLabel',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setModalState(() => selectedAssignmentId = val);
-                        },
-                      ),
-
-                    const SizedBox(height: 16),
-                    Text(
-                      'Phân loại vấn đề (*)',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cani.textMain),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _disputeTypes.map((t) {
-                        final isSelected = selectedType == t.value;
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () => setModalState(() => selectedType = t.value),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? cani.brand.withValues(alpha: 0.12)
-                                  : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isSelected ? cani.brand : cani.border,
-                                width: isSelected ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(t.icon, size: 15, color: isSelected ? cani.brand : cani.textMuted),
-                                const SizedBox(width: 6),
-                                Text(
-                                  t.label,
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                                    color: isSelected ? cani.brand : cani.textMain,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: titleCtrl,
-                      maxLength: 200,
-                      decoration: InputDecoration(
-                        labelText: 'Tiêu đề tóm tắt (*)',
-                        hintText: 'Ví dụ: Chưa nhận đủ thù lao ca làm việc',
-                        counterText: '',
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cani.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cani.border),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: descCtrl,
-                      maxLines: 4,
-                      maxLength: 3000,
-                      onChanged: (_) => setModalState(() {}),
-                      decoration: InputDecoration(
-                        labelText: 'Mô tả chi tiết vụ việc (*)',
-                        hintText: 'Trình bày rõ thời gian, thỏa thuận với BTC và vấn đề phát sinh (tối thiểu 50 ký tự)...',
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cani.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cani.border),
-                        ),
-                        counterText: '',
-                        contentPadding: const EdgeInsets.all(14),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          isDescValid
-                              ? 'Đạt yêu cầu độ dài mô tả'
-                              : 'Cần thêm ${50 - descLength} ký tự',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: isDescValid ? const Color(0xFF16A34A) : cani.textMuted,
-                          ),
-                        ),
-                        Text(
-                          '$descLength / 50+',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: isDescValid ? const Color(0xFF16A34A) : const Color(0xFFD97706),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-                    Text(
-                      'Bằng chứng đính kèm (Tùy chọn)',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cani.textMain),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: isUploadingPhoto || isSubmitting
-                              ? null
-                              : () async {
-                                  final scanResult = await Navigator.of(ctx).push<CardScanResult>(
-                                    MaterialPageRoute(
-                                      builder: (_) => const CardScannerScreen(scanType: ScanType.workProof),
-                                    ),
-                                  );
-                                  if (scanResult == null || !ctx.mounted) return;
-                                  setModalState(() {
-                                    isUploadingPhoto = true;
-                                    modalError = null;
-                                  });
-                                  try {
-                                    final url = await repo.uploadProofBytes(
-                                      scanResult.bytes,
-                                      scanResult.fileName,
-                                    );
-                                    if (!ctx.mounted) return;
-                                    setModalState(() {
-                                      isUploadingPhoto = false;
-                                      uploadedEvidenceUrl = url;
-                                      previewBytes = scanResult.bytes;
-                                      evidenceCtrl.text = url;
-                                    });
-                                  } catch (e) {
-                                    if (!ctx.mounted) return;
-                                    setModalState(() {
-                                      isUploadingPhoto = false;
-                                      modalError = 'Không thể tải ảnh minh chứng: $e';
-                                    });
-                                  }
-                                },
-                          icon: isUploadingPhoto
-                              ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.camera_alt_outlined, size: 17),
-                          label: Text(uploadedEvidenceUrl != null ? 'Chụp lại ảnh' : 'Chụp ảnh minh chứng'),
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                        ),
-                        if (previewBytes != null) ...[
-                          const SizedBox(width: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.memory(previewBytes!, width: 42, height: 42, fit: BoxFit.cover),
-                          ),
-                          IconButton(
-                            tooltip: 'Xóa ảnh',
-                            onPressed: () => setModalState(() {
-                              previewBytes = null;
-                              uploadedEvidenceUrl = null;
-                              evidenceCtrl.clear();
-                            }),
-                            icon: Icon(Icons.close_rounded, size: 18, color: cani.danger),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: evidenceCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Hoặc dán link / mô tả bằng chứng bổ sung...',
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cani.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cani.border),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        prefixIcon: const Icon(Icons.link, size: 18),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-                    if (modalError != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFFECACA)),
-                        ),
-                        child: Text(
-                          modalError!,
-                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFB91C1C)),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: cani.danger,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: isSubmitting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.send_rounded, size: 18),
-                      label: Text(
-                        isSubmitting ? 'ĐANG GỬI...' : 'GỬI KHIẾU NẠI NGAY',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
-                      ),
-                      onPressed: isSubmitting || isUploadingPhoto
-                          ? null
-                          : () async {
-                              final title = titleCtrl.text.trim();
-                              final desc = descCtrl.text.trim();
-                              final targetAssignmentId = selectedAssignmentId;
-                              if (targetAssignmentId == null || targetAssignmentId.isEmpty) {
-                                setModalState(() {
-                                  modalError = 'Vui lòng chọn ca làm việc liên quan đến khiếu nại.';
-                                });
-                                return;
-                              }
-                              if (title.isEmpty) {
-                                setModalState(() {
-                                  modalError = 'Vui lòng nhập tiêu đề tóm tắt.';
-                                });
-                                return;
-                              }
-                              if (desc.length < 50) {
-                                setModalState(() {
-                                  modalError = 'Mô tả chi tiết phải có ít nhất 50 ký tự để CSKH đủ thông tin phân xử.';
-                                });
-                                return;
-                              }
-
-                              setModalState(() {
-                                isSubmitting = true;
-                                modalError = null;
-                              });
-                              try {
-                                await repo.createDispute(CreateDisputePayload(
-                                  assignmentId: targetAssignmentId,
-                                  type: selectedType,
-                                  title: title,
-                                  description: desc,
-                                  evidence: evidenceCtrl.text.trim().isNotEmpty ? evidenceCtrl.text.trim() : null,
-                                ));
-
-                                if (ctx.mounted) Navigator.pop(ctx);
-                                if (!mounted) return;
-                                ref.invalidate(myDisputesListProvider);
-                                ref.invalidate(assignmentsListProvider);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Đã gửi khiếu nại thành công! CSKH sẽ phản hồi trong thời gian sớm nhất.'),
-                                    backgroundColor: Color(0xFF16A34A),
-                                  ),
-                                );
-                              } catch (e) {
-                                if (ctx.mounted) {
-                                  setModalState(() {
-                                    isSubmitting = false;
-                                    modalError = e.toString().replaceFirst('RepositoryException: ', '');
-                                  });
-                                }
-                              }
-                            },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => CreateDisputeSheet(
+        repository: repo,
+        disputeTypes: _disputeTypes,
+        eligibleOptions: eligibleOptions,
+        initialAssignmentId: selectedAssignmentId,
+        formatDate: _formatDate,
+        shiftReferenceCard: widget.assignment != null
+            ? _buildShiftReferenceCard(widget.assignment!, cani, isDark)
+            : null,
+      ),
     );
 
-    titleCtrl.dispose();
-    descCtrl.dispose();
-    evidenceCtrl.dispose();
+    if (created == true && mounted) {
+      ref.invalidate(myDisputesListProvider);
+      ref.invalidate(assignmentsListProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã gửi khiếu nại thành công! CSKH sẽ phản hồi trong thời gian sớm nhất.'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+    }
   }
 
   Widget _buildShiftReferenceCard(ShiftAssignmentItem a, CaniTokens cani, bool isDark) {

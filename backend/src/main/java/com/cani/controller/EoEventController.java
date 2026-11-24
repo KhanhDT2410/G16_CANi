@@ -222,6 +222,19 @@ public class EoEventController {
     }
 
     /**
+     * Tổng hợp danh sách nhân sự cần đánh giá & đã đánh giá trên tất cả sự kiện của EO
+     */
+    @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")
+    @GetMapping("/worker-reviews")
+    public ResponseEntity<ApiResponse<List<EoWorkerReviewItemDto>>> getWorkerReviewOverview(
+            Authentication authentication
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId(authentication);
+        List<EoWorkerReviewItemDto> list = eoEventService.getWorkerReviewOverview(userId);
+        return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách đánh giá nhân sự thành công"));
+    }
+
+    /**
      * Danh sách tất cả sự kiện của EO đang đăng nhập
      */
     @PreAuthorize("hasAnyRole('EVENT_ORGANIZER', 'ADMIN')")

@@ -26,8 +26,16 @@ export default function EOModals({
   disputeModal,
   setDisputeModal,
 }) {
+  const eventList = events?.eventsList || events?.events || [];
   const activeEvent =
-    events?.eventsList?.find((e) => e.eventId === shifts?.selectedEventId) || null;
+    eventList.find((e) => e.eventId === shifts?.selectedEventId) || null;
+  const editingShiftEvent = shifts?.editingShift
+    ? eventList.find(
+        (e) =>
+          e.eventId === shifts.editingShift.eventId ||
+          (Array.isArray(e.shifts) && e.shifts.some((s) => s.shiftId === shifts.editingShift.shiftId))
+      ) || null
+    : null;
 
   const {
     promptTarget,
@@ -56,6 +64,7 @@ export default function EOModals({
             venueAddress={activeEvent?.venueAddress || ''}
             venueLat={activeEvent?.venueLat ?? null}
             venueLng={activeEvent?.venueLng ?? null}
+            existingShifts={activeEvent?.shifts || []}
             onSubmit={shifts.handleAddShift}
           />
         </Suspense>
@@ -163,9 +172,11 @@ export default function EOModals({
             isOpen={Boolean(shifts.editingShift)}
             onClose={() => shifts.setEditingShift(null)}
             shift={shifts.editingShift}
+            event={editingShiftEvent}
             roles={ROLES}
             submitting={shifts.submittingEditShift}
             skillTaxonomy={shifts.skillTaxonomy}
+            existingShifts={editingShiftEvent?.shifts || []}
             onSubmit={shifts.handleUpdateShift}
           />
         </Suspense>

@@ -17,6 +17,7 @@ export default function ShiftArrivalTimeField({
   arrivalTime,
   onChange,
   error = null,
+  disabled = false,
 }) {
   const offsetInfo = useMemo(() => {
     const s = startTime ? new Date(startTime) : null;
@@ -70,16 +71,18 @@ export default function ShiftArrivalTimeField({
               <button
                 key={preset.minutes}
                 type="button"
-                onClick={() => applyPresetMinutes(preset.minutes)}
+                disabled={disabled}
+                onClick={() => !disabled && applyPresetMinutes(preset.minutes)}
                 style={{
                   padding: '0.25rem 0.6rem',
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   borderRadius: '999px',
                   border: isActive ? '1px solid #2563eb' : '1px solid #cbd5e1',
-                  backgroundColor: isActive ? '#eff6ff' : '#ffffff',
-                  color: isActive ? '#1d4ed8' : '#475569',
-                  cursor: 'pointer',
+                  backgroundColor: disabled ? '#f1f5f9' : isActive ? '#eff6ff' : '#ffffff',
+                  color: disabled ? '#94a3b8' : isActive ? '#1d4ed8' : '#475569',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: disabled ? 0.8 : 1,
                 }}
               >
                 {preset.label}
@@ -91,11 +94,15 @@ export default function ShiftArrivalTimeField({
 
       <input
         type="datetime-local"
+        disabled={disabled}
         className={`eo-form-input ${error ? 'has-error' : ''}`}
         max={startTime || undefined}
         style={{
           borderColor: error ? '#ef4444' : undefined,
           boxShadow: error ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
+          backgroundColor: disabled ? '#f1f5f9' : undefined,
+          color: disabled ? '#64748b' : undefined,
+          cursor: disabled ? 'not-allowed' : undefined,
         }}
         value={arrivalTime || startTime || ''}
         onChange={(e) => {

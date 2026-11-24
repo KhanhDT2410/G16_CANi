@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { showConfirm } from '../../../components/common/PromptModal';
-import { getAddressFromCoordinates, getCoordinatesFromAddress } from '../utils/geoUtils';
+import { getCoordinatesFromAddress } from '../utils/geoUtils';
 import {
   createDefaultNewEvent,
   filterAndSortEvents,
@@ -70,7 +70,6 @@ export function useEvents() {
 
   const [confirmPublish, setConfirmPublish] = useState({ isOpen: false, event: null });
   const [publishPayMethod, setPublishPayMethod] = useState('VIETQR');
-  const [locating, setLocating] = useState(false);
   const [cancelModal, setCancelModal] = useState({ isOpen: false, event: null, loading: false });
 
   const [newEvent, setNewEvent] = useState(() => createDefaultNewEvent());
@@ -181,77 +180,11 @@ export function useEvents() {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, sortBy]);
 
-  const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      showToast('Trình duyệt của bạn không hỗ trợ định vị GPS.', 'error');
-      return;
-    }
-    setLocating(true);
-
-    const onCoordsSuccess = (pos) => {
-      const lat = parseFloat(pos.coords.latitude.toFixed(6));
-      const lng = parseFloat(pos.coords.longitude.toFixed(6));
-
-      // 1. CẬP NHẬT TỌA ĐỘ VÀ ĐỊA CHỈ TẠM NGAY LẬP TỨC để ô tìm kiếm không bị rỗng
-      const initialGpsLabel = `Vị trí GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
-      setNewEvent((prev) => ({
-        ...prev,
-        venueAddress: prev.venueAddress && prev.venueAddress !== DEFAULT_NEW_EVENT.venueAddress ? prev.venueAddress : initialGpsLabel,
-        venueLat: lat,
-        venueLng: lng,
-        locationPicked: true,
-      }));
-      setLocating(false);
-      showToast('Đã định vị tọa độ GPS trên bản đồ!', 'info');
-
-      // 2. Dò địa chỉ chi tiết chạy ngầm (non-blocking) qua BigDataCloud & OSM
-      (async () => {
-        try {
-          const addr = await getAddressFromCoordinates(lat, lng);
-          const finalAddress = addr || initialGpsLabel;
-          setNewEvent((prev) => ({
-            ...prev,
-            venueAddress: finalAddress,
-            venueLat: lat,
-            venueLng: lng,
-            locationPicked: true,
-          }));
-          showToast(`Đã lấy địa chỉ: ${finalAddress}`, 'success');
-        } catch (geoErr) {
-          console.warn('Lỗi reverse geocoding:', geoErr);
-        }
-      })();
-    };
-
-    const onCoordsError = (err) => {
-      // Fallback: Nếu bật enableHighAccuracy: true bị timeout (đặc thù laptop/PC không có GPS vệ tinh), thử lại bằng Wi-Fi/IP
-      if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
-        navigator.geolocation.getCurrentPosition(
-          onCoordsSuccess,
-          (fallbackErr) => {
-            setLocating(false);
-            showToast('Không thể lấy vị trí: ' + (fallbackErr.message || 'Quyền GPS bị từ chối'), 'error');
-          },
-          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-        );
-      } else {
-        setLocating(false);
-        showToast('Không thể lấy vị trí: ' + (err.message || 'Quyền GPS bị từ chối'), 'error');
-      }
-    };
-
-    navigator.geolocation.getCurrentPosition(
-      onCoordsSuccess,
-      onCoordsError,
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
-    );
-  };
-
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     try {
-      let eventPayload = { ...newEvent };
-      if (eventPayload.venueAddress?.trim()) {
+      const { venueCoordinatesConfirmed, ...eventPayload } = newEvent;
+      if (!venueCoordinatesConfirmed && eventPayload.venueAddress?.trim()) {
         try {
           const coords = await getCoordinatesFromAddress(eventPayload.venueAddress);
           if (coords && coords.lat && coords.lng) {
@@ -262,8 +195,8 @@ export function useEvents() {
           // Bỏ qua lỗi mạng
         }
       }
-      eventPayload.venueLat = eventPayload.venueLat || 10.7328;
-      eventPayload.venueLng = eventPayload.venueLng || 106.7214;
+      eventPayload.venueLat ??= 10.7328;
+      eventPayload.venueLng ??= 106.7214;
 
       await eoService.createEvent(eventPayload);
       setShowEventModal(false);
@@ -424,8 +357,6 @@ export function useEvents() {
     submittingEditEvent,
     newEvent,
     setNewEvent,
-    locating,
-    handleGetCurrentLocation,
     handleCreateEvent,
     handleUpdateEvent,
     handleCancelEvent,

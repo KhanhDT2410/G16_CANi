@@ -47,11 +47,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
 }
 
 export async function getAddressFromCoordinates(lat, lng) {
-  if (lat == null || lng == null || isNaN(Number(lat)) || isNaN(Number(lng))) {
-    return '';
-  }
   const numLat = Number(lat);
   const numLng = Number(lng);
+  if (lat == null || lng == null || !Number.isFinite(numLat) || !Number.isFinite(numLng)
+    || Math.abs(numLat) > 90 || Math.abs(numLng) > 180) {
+    return '';
+  }
 
   const matchedPopular = POPULAR_VENUES.find(
     (v) => Math.abs(v.lat - numLat) < 0.002 && Math.abs(v.lng - numLng) < 0.002
@@ -75,8 +76,8 @@ export async function getAddressFromCoordinates(lat, lng) {
       if (data.principalSubdivision && !parts.includes(data.principalSubdivision)) {
         parts.push(data.principalSubdivision);
       }
-      if (data.countryName && !parts.includes(data.countryName)) parts.push(data.countryName);
-      if (parts.length > 0) {
+      if (data.lookupSource === 'reverseGeocoding' && parts.length > 0) {
+        if (data.countryName && !parts.includes(data.countryName)) parts.push(data.countryName);
         return parts.join(', ');
       }
     }
@@ -117,8 +118,7 @@ export async function getAddressFromCoordinates(lat, lng) {
     // Bỏ qua lỗi mạng
   }
 
-  // 4. Fallback tối thượng: Ghi rõ tọa độ GPS để không bao giờ bị rỗng ô nhập liệu
-  return `Vị trí GPS (${numLat.toFixed(5)}, ${numLng.toFixed(5)})`;
+  return '';
 }
 
 /**

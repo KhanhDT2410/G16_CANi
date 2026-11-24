@@ -64,12 +64,12 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Orchestrator cho module Xác minh tự động Chứng chỉ Kỹ năng Worker (không dùng Gemini, không qua hàng đợi Admin).
+ * Orchestrator cho module Xác minh tự động Chứng chỉ Kỹ năng Worker (UC-43 & UC-46).
  * - FileSecurityValidator + CertificateStorageService + DocumentAccessTokenService (Bảo mật tệp)
- * - CertificateLookupSource: Chỉ cấp trạng thái APPROVED & SP_verify khi có bằng chứng từ nguồn tra cứu tin cậy
- *   (QR chính thức / API đơn vị cấp / chữ ký số) và thông tin khớp hồ sơ Worker.
- * - Khi không có nguồn tra cứu hỗ trợ: trả "Chưa thể xác minh tự động" (0 SP) để Worker nộp chứng chỉ hợp lệ.
- * - Khi nguồn tra cứu lỗi tạm thời: trả VERIFICATION_FAILED để Worker thử lại (retry).
+ * - CertificateLookupSource (Gemini Vision AI cho chứng chỉ kỹ năng, tách biệt hoàn toàn với VNPT eKYC):
+ *   Chỉ cấp trạng thái APPROVED & SP_verify khi chứng chỉ đạt xác thực và đối soát khớp tên eKYC/hồ sơ Worker, hạn hiệu lực & kỹ năng.
+ * - Khi thiếu API key hoặc tắt AI: trả "Chưa thể xác minh tự động" (0 SP) một cách trung thực (không giả lập duyệt).
+ * - Khi dịch vụ AI lỗi tạm thời: trả VERIFICATION_FAILED để Worker thử lại (retry).
  */
 @Service
 @RequiredArgsConstructor
@@ -197,8 +197,7 @@ public class SkillVerificationService {
     }
 
     /**
-     * Nộp chứng chỉ nghề nghiệp để xác minh tự động qua nguồn tra cứu tin cậy (UC-43).
-     * Tuyệt đối không dùng Gemini và không đưa vào hàng đợi Admin duyệt thủ công.
+     * Nộp chứng chỉ nghề nghiệp để xác minh tự động bằng Gemini Vision AI & quy tắc đối soát (UC-43 / UC-46).
      */
     public SkillVerificationResponseDto submitVerification(
             UUID workerId,

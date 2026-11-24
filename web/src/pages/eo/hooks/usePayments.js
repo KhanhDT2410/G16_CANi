@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
+import { roundVndAmount } from '../utils/eventHelpers';
 
 const DEMO_PAYMENTS = [
   {
@@ -194,7 +195,9 @@ export function usePayments() {
     const hasBank = Boolean(attendanceItem.bankCode && attendanceItem.bankAccountNumber);
     setPaymentForm({
       assignmentId: attendanceItem.assignmentId,
-      declaredAmount: attendanceItem.declaredAmount ?? attendanceItem.agreedWage ?? attendanceItem.agreedAmount ?? 200000,
+      declaredAmount: roundVndAmount(
+        attendanceItem.declaredAmount ?? attendanceItem.agreedWage ?? attendanceItem.agreedAmount ?? 200000
+      ),
       paymentMethod: attendanceItem.paymentMethod || (hasBank ? 'BANK_TRANSFER' : 'CASH'),
       externalRef: attendanceItem.externalRef || `VCB-${Date.now().toString().slice(-6)}`,
       paymentProofUrl: attendanceItem.paymentProofUrl || '',

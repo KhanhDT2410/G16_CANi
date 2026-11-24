@@ -1467,8 +1467,8 @@ class WorkerJobServiceTest {
     }
 
     @Test
-    @DisplayName("UTC054c - createReview() - Abnormal: Chưa đến giờ kết thúc ca theo lịch trình bị chặn đánh giá")
-    void createReview_Abnormal_BeforeEndTimeThrowsBadRequestException() {
+    @DisplayName("UTC054c - createReview() - Normal: Cho phép đánh giá Ban tổ chức ngay sau khi Check-out dù chưa hết giờ ca")
+    void createReview_Normal_AllowsImmediateReviewAfterCheckoutBeforeShiftEndTime() {
         UUID assignmentId = UUID.randomUUID();
         activeShift.setEndTime(Instant.now().plus(2, ChronoUnit.HOURS));
         ShiftAssignment sa = ShiftAssignment.builder().assignmentId(assignmentId).shift(activeShift).worker(worker).status(AssignmentStatus.COMPLETED).build();
@@ -1476,10 +1476,24 @@ class WorkerJobServiceTest {
         when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
         when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
         when(reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, userId)).thenReturn(Optional.empty());
+        when(reviewRepository.save(any(Review.class))).thenAnswer(inv -> {
+            Review r = inv.getArgument(0);
+            r.setReviewId(UUID.randomUUID());
+            return r;
+        });
 
-        assertThatThrownBy(() -> workerJobService.createReview(userId, assignmentId, CreateReviewRequestDto.builder().build()))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Chỉ có thể đánh giá Ban tổ chức sau khi ca làm việc đã kết thúc theo lịch trình");
+        CreateReviewRequestDto req = CreateReviewRequestDto.builder()
+                .rating(5)
+                .criteriaWorkEnvironment(5)
+                .criteriaSupport(5)
+                .criteriaPaymentTiming(5)
+                .comment("Check-out xong đánh giá luôn")
+                .build();
+
+        ReviewResponseDto res = workerJobService.createReview(userId, assignmentId, req);
+        assertThat(res.getRating()).isEqualTo(5);
+        assertThat(res.getComment()).contains("Check-out xong");
+        verify(reviewRepository).save(any(Review.class));
     }
 
     @Test

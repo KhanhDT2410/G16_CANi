@@ -1358,9 +1358,6 @@ public class WorkerJobService {
         }
 
         Shift shift = assignment.getShift();
-        if (shift != null && shift.getEndTime() != null && Instant.now().isBefore(shift.getEndTime())) {
-            throw new BadRequestException("Chỉ có thể đánh giá Ban tổ chức sau khi ca làm việc đã kết thúc theo lịch trình.");
-        }
         Event event = shift != null ? shift.getEvent() : null;
         EventOrganizer eo = event != null ? event.getEventOrganizer() : null;
         if (eo == null || eo.getUser() == null) {

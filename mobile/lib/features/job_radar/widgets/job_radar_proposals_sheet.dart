@@ -5,8 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cani/app/cani_tokens.dart';
 import 'package:cani/app/home_screen.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
-import 'package:cani/features/job_proposals/data/proposal_repository.dart';
-import 'package:cani/features/job_proposals/models/proposal_models.dart';
+import 'package:cani/features/job_proposals/job_proposals.dart';
 import 'package:cani/features/job_proposals/widgets/job_proposal_invite_card.dart';
 import 'package:cani/features/job_radar/providers/job_radar_provider.dart';
 
@@ -82,50 +81,7 @@ Future<void> rejectProposalOnRadar(
 }
 
 Future<void> showJobRadarInviteCodeDialog(BuildContext context, WidgetRef ref) async {
-  final controller = TextEditingController();
-  final cani = Theme.of(context).cani;
-  final result = await showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text(
-        'Tham gia ca bằng Mã Mời',
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Nhập mã mời do Ban tổ chức sự kiện cung cấp (ví dụ: CANI-8XK2PW) để vào ca làm ngay:',
-              style: TextStyle(fontSize: 13, color: cani.textBody),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                hintText: 'CANI-XXXXXX',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.confirmation_number_outlined),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-        FilledButton(
-          onPressed: () {
-            final code = controller.text.trim();
-            if (code.isNotEmpty) Navigator.pop(ctx, code);
-          },
-          style: FilledButton.styleFrom(backgroundColor: cani.brand),
-          child: const Text('Tham Gia'),
-        ),
-      ],
-    ),
-  );
-  controller.dispose();
+  final result = await InviteCodeDialog.show(context);
 
   if (result != null && result.isNotEmpty && context.mounted) {
     try {

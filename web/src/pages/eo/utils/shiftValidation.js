@@ -464,3 +464,60 @@ export function validateShiftWageAgainstFloor({
     floorWage: minFloor,
   };
 }
+
+/**
+ * Chuẩn hóa tên vị trí công việc để so sánh trùng lặp (không phân biệt hoa/thường & khoảng trắng dư).
+ */
+export function normalizeShiftJobType(jobType) {
+  return String(jobType || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function toMinuteEpoch(dateInput) {
+  if (!dateInput) return null;
+  const ms = new Date(dateInput).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return Math.floor(ms / 60000);
+}
+
+/**
+ * Kiểm tra ca làm việc có bị trùng vị trí + khung giờ với một ca khác trong cùng sự kiện không.
+ * Trả về thông báo lỗi nếu trùng, hoặc null nếu hợp lệ.
+ */
+export function validateDuplicateShift(
+  candidate,
+  existingShifts = [],
+  { excludeShiftId = null, excludeIndex = null } = {}
+) {
+  if (!candidate || !Array.isArray(existingShifts) || existingShifts.length === 0) {
+    return null;
+  }
+  const candidateRole = normalizeShiftJobType(candidate.jobType);
+  const candidateStart = toMinuteEpoch(candidate.startTime);
+  const candidateEnd = toMinuteEpoch(candidate.endTime);
+  if (!candidateRole || candidateStart === null || candidateEnd === null) {
+    return null;
+  }
+
+  const duplicate = existingShifts.find((sh, idx) => {
+    if (!sh) return false;
+    if (String(sh.status || '').toUpperCase() === 'CANCELLED') return false;
+    if (excludeIndex !== null && excludeIndex !== undefined && idx === excludeIndex) return false;
+    if (excludeShiftId && sh.shiftId && String(sh.shiftId) === String(excludeShiftId)) return false;
+
+    const existingRole = normalizeShiftJobType(sh.jobType);
+    const existingStart = toMinuteEpoch(sh.startTime);
+    const existingEnd = toMinuteEpoch(sh.endTime);
+    return (
+      existingRole === candidateRole &&
+      existingStart === candidateStart &&
+      existingEnd === candidateEnd
+    );
+  });
+
+  if (!duplicate) return null;
+  const trimmedRole = String(candidate.jobType || '').trim();
+  return `Đã tồn tại ca "${trimmedRole}" trong cùng khung giờ này. Vui lòng chọn giờ khác hoặc tăng số nhân sự cần tuyển ở ca đã có.`;
+}

@@ -12,6 +12,7 @@ import {
 import {
   isGibberishOrSpam,
   validateJobType,
+  validateDuplicateShift,
   resolveWageRegionInfo,
   validateShiftWageAgainstFloor,
   detectCityFromAddress,
@@ -48,8 +49,6 @@ const EventCreationWizardModal = ({
   onEventCreated,
   newEvent,
   setNewEvent,
-  onGetCurrentLocation,
-  locating,
   skillTaxonomy = [],
 }) => {
   const skillNameMap = useMemo(() => {
@@ -436,13 +435,14 @@ const EventCreationWizardModal = ({
 
     setSubmitting(true);
     try {
-      let eventPayload = {
-        ...newEvent,
+      const { venueCoordinatesConfirmed, ...eventDetails } = newEvent;
+      const eventPayload = {
+        ...eventDetails,
         startTime: evtStart.toISOString(),
         endTime: evtEnd.toISOString(),
         eventDate: evtStart.toISOString().substring(0, 10),
       };
-      if (eventPayload.venueAddress?.trim()) {
+      if (!venueCoordinatesConfirmed && eventPayload.venueAddress?.trim()) {
         try {
           const coords = await getCoordinatesFromAddress(eventPayload.venueAddress);
           if (coords && coords.lat && coords.lng) {
@@ -454,8 +454,8 @@ const EventCreationWizardModal = ({
           // Sử dụng fallback an toàn khi geocoding lỗi mạng
         }
       }
-      eventPayload.venueLat = eventPayload.venueLat || 10.7328;
-      eventPayload.venueLng = eventPayload.venueLng || 106.7214;
+      eventPayload.venueLat ??= 10.7328;
+      eventPayload.venueLng ??= 106.7214;
 
       let evt = createdEvent;
       if (!evt) {
@@ -499,7 +499,14 @@ const EventCreationWizardModal = ({
 
     const nextShiftErrs = {};
     const jobTypeErr = validateJobType(currentShift.jobType);
-    if (jobTypeErr) nextShiftErrs.jobType = jobTypeErr;
+    if (jobTypeErr) {
+      nextShiftErrs.jobType = jobTypeErr;
+    } else {
+      const dupErr = validateDuplicateShift(currentShift, shiftsList, {
+        excludeIndex: editingShiftIndex,
+      });
+      if (dupErr) nextShiftErrs.jobType = dupErr;
+    }
 
     const descTrimmed = currentShift.description?.trim() || '';
     if (!descTrimmed) {
@@ -1056,20 +1063,20 @@ const EventCreationWizardModal = ({
             address={newEvent.venueAddress}
             lat={newEvent.venueLat}
             lng={newEvent.venueLng}
-            onLocationChange={({ address, lat, lng, locationPicked }) => {
+            coordinatesConfirmed={newEvent.venueCoordinatesConfirmed}
+            onLocationChange={({ address, lat, lng, locationPicked, venueCoordinatesConfirmed }) => {
               setNewEvent((prev) => ({
                 ...prev,
                 venueAddress: address,
                 venueLat: lat,
                 venueLng: lng,
-                locationPicked: locationPicked !== undefined ? locationPicked : prev.locationPicked,
+                locationPicked,
+                venueCoordinatesConfirmed,
               }));
               if (step1Errors.venueAddress) {
                 setStep1Errors((prev) => ({ ...prev, venueAddress: null }));
               }
             }}
-            onGetCurrentLocation={onGetCurrentLocation}
-            locating={locating}
             required
           />
           {step1Errors.venueAddress && <div className="ecw-field-error">{step1Errors.venueAddress}</div>}

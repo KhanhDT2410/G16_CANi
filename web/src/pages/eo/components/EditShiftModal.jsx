@@ -9,8 +9,8 @@ import {
 import ShiftChecklistEditor from './ShiftChecklistEditor';
 import ShiftSkillSelector from './ShiftSkillSelector';
 import ShiftArrivalTimeField from './ShiftArrivalTimeField';
-import { validateShiftArrivalTime, validateShiftTimeRange } from '../utils/eventHelpers';
-import { validateJobType, validateShiftWageAgainstFloor } from '../utils/shiftValidation';
+import { getShiftEditRestrictions, validateShiftArrivalTime, validateShiftTimeRange } from '../utils/eventHelpers';
+import { validateJobType, validateDuplicateShift, validateShiftWageAgainstFloor } from '../utils/shiftValidation';
 
 /**
  * EditShiftModal
@@ -20,10 +20,12 @@ const EditShiftModal = ({
   isOpen,
   onClose,
   shift,
+  event = null,
   roles = [],
   onSubmit,
   submitting,
   skillTaxonomy = [],
+  existingShifts = [],
 }) => {
   const defaultRole = roles[0] || 'Lễ tân / Check-in';
 
@@ -129,9 +131,12 @@ const EditShiftModal = ({
 
   if (!isOpen || !shift) return null;
 
+  const editRestrictions = getShiftEditRestrictions(shift, event);
+  const { lockTimeAndMoney, minRequiredWorkers, confirmedWorkers } = editRestrictions;
   const durationHours = getDurationHours(formData.startTime, formData.endTime);
 
   const handleTimeChange = (field, value) => {
+    if (lockTimeAndMoney) return;
     const nextStart = field === 'startTime' ? value : formData.startTime;
     const nextEnd = field === 'endTime' ? value : formData.endTime;
     const nextDur = getDurationHours(nextStart, nextEnd);
@@ -168,6 +173,7 @@ const EditShiftModal = ({
   };
 
   const handleSwitchWageMode = (mode) => {
+    if (lockTimeAndMoney) return;
     setWageMode(mode);
     if (mode === 'PER_SHIFT') {
       setShiftPackageWage(Math.round(Number(formData.hourlyWage || 50000) * durationHours));
@@ -175,6 +181,7 @@ const EditShiftModal = ({
   };
 
   const handlePackageWageChange = (val) => {
+    if (lockTimeAndMoney) return;
     let raw = typeof val === 'string' ? val.replace(/^0+(?=\d)/, '') : String(val ?? '');
     const pkg = raw === '' ? '' : Math.max(0, parseFloat(raw) || 0);
     setShiftPackageWage(pkg);
@@ -196,22 +203,35 @@ const EditShiftModal = ({
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const jErr = validateJobType(formData.jobType);
-    const tErr = validateShiftTimeRange(formData.startTime, formData.endTime, shift?.eventStartTime, shift?.eventEndTime, {
-      allowPastStart: true,
-    });
-    const aErr = formData.arrivalTime ? validateShiftArrivalTime(formData.arrivalTime, formData.startTime) : null;
+    const jErr =
+      validateJobType(formData.jobType) ||
+      validateDuplicateShift(formData, existingShifts, { excludeShiftId: shift?.shiftId });
+    const tErr = lockTimeAndMoney
+      ? null
+      : validateShiftTimeRange(formData.startTime, formData.endTime, shift?.eventStartTime, shift?.eventEndTime, {
+          allowPastStart: true,
+        });
+    const aErr = lockTimeAndMoney
+      ? null
+      : formData.arrivalTime
+      ? validateShiftArrivalTime(formData.arrivalTime, formData.startTime)
+      : null;
     const wageCheck = validateShiftWageAgainstFloor({
-      hourlyWage: formData.hourlyWage,
+      hourlyWage: lockTimeAndMoney ? Number(shift.hourlyWage || 0) : formData.hourlyWage,
       venueAddress: shift?.locationAddress || '',
       venueLat: shift?.locationLat,
       venueLng: shift?.locationLng,
     });
-    const wErr = wageCheck.isValid ? null : wageCheck.error;
-    const wkErr = !formData.requiredWorkers || Number(formData.requiredWorkers) < 1
+    const wErr = lockTimeAndMoney ? null : wageCheck.isValid ? null : wageCheck.error;
+    const parsedWorkers = Number(formData.requiredWorkers);
+    const wkErr = !formData.requiredWorkers || parsedWorkers < 1
       ? 'Số nhân sự cần tuyển tối thiểu là 1 người.'
+      : parsedWorkers < minRequiredWorkers
+      ? `Ca đã vào giờ diễn ra, số nhân sự cần tuyển không được nhỏ hơn ${confirmedWorkers} người đã nhận ca.`
       : null;
-    const alErr = Number(formData.allowance) < 0
+    const alErr = lockTimeAndMoney
+      ? null
+      : Number(formData.allowance) < 0
       ? 'Phụ cấp thêm không được là số âm!'
       : null;
 
@@ -232,19 +252,24 @@ const EditShiftModal = ({
     const sDate = new Date(formData.startTime);
     const eDate = new Date(formData.endTime);
 
+    const parsedWorkersCount = Math.max(minRequiredWorkers, Number(formData.requiredWorkers) || 1);
     onSubmit(shift.shiftId, {
       ...formData,
-      startTime: sDate.toISOString(),
-      endTime: eDate.toISOString(),
-      arrivalTime: formData.arrivalTime ? new Date(formData.arrivalTime).toISOString() : null,
+      startTime: lockTimeAndMoney && shift.startTime ? shift.startTime : sDate.toISOString(),
+      endTime: lockTimeAndMoney && shift.endTime ? shift.endTime : eDate.toISOString(),
+      arrivalTime: lockTimeAndMoney
+        ? shift.arrivalTime || null
+        : formData.arrivalTime
+        ? new Date(formData.arrivalTime).toISOString()
+        : null,
       requiredSkills: Array.isArray(formData.requiredSkills) ? formData.requiredSkills : [],
       performedSkillId: formData.performedSkillId || null,
       skillRequirements: Array.isArray(formData.skillRequirements) ? formData.skillRequirements : [],
       customSkillNotes: formData.customSkillNotes?.trim() || null,
       dressCode: formData.dressCode || '',
-      requiredWorkers: Math.max(1, Number(formData.requiredWorkers) || 1),
-      hourlyWage: Number(formData.hourlyWage || 0),
-      allowance: Math.max(0, Number(formData.allowance) || 0),
+      requiredWorkers: parsedWorkersCount,
+      hourlyWage: lockTimeAndMoney ? Number(shift.hourlyWage || 0) : Number(formData.hourlyWage || 0),
+      allowance: lockTimeAndMoney ? Math.max(0, Number(shift.allowance || 0)) : Math.max(0, Number(formData.allowance || 0)),
       minReliabilityScore: Number(formData.minReliabilityScore || 60),
       checklist: serializeChecklistItems(formData.checklistItems),
     });
@@ -288,6 +313,26 @@ const EditShiftModal = ({
             Đóng
           </button>
         </div>
+
+        {lockTimeAndMoney && (
+          <div
+            style={{
+              marginBottom: '1rem',
+              padding: '0.75rem 0.95rem',
+              borderRadius: '8px',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              color: '#1e3a8a',
+              fontSize: '0.82rem',
+              lineHeight: 1.5,
+            }}
+          >
+            <strong>Ca làm việc đã vào giờ diễn ra:</strong> Hệ thống khóa chỉnh sửa <strong>Thời gian</strong> và{' '}
+            <strong>Số tiền (thù lao / phụ cấp)</strong> để giữ đúng cam kết với nhân sự. Bạn vẫn có thể điều chỉnh{' '}
+            <strong>Số nhân sự cần tuyển</strong> (ví dụ tăng thêm để tuyển bổ sung)
+            {confirmedWorkers > 0 ? ` — tối thiểu ${minRequiredWorkers} người đã nhận ca.` : '.'}
+          </div>
+        )}
 
         {formError && (
           <div className="eo-form-alert-error" role="alert">
@@ -343,14 +388,18 @@ const EditShiftModal = ({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="eo-form-group" style={{ marginBottom: timeError ? '0.25rem' : '1.15rem' }}>
-              <label>Thời Gian Bắt Đầu *</label>
+              <label>Thời Gian Bắt Đầu * {lockTimeAndMoney && <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>(Đã khóa)</span>}</label>
               <input
                 type="datetime-local"
                 required
+                disabled={lockTimeAndMoney}
                 className={`eo-form-input ${timeError ? 'has-error' : ''}`}
                 style={{
                   borderColor: timeError ? '#ef4444' : undefined,
                   boxShadow: timeError ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
+                  backgroundColor: lockTimeAndMoney ? '#f1f5f9' : undefined,
+                  color: lockTimeAndMoney ? '#64748b' : undefined,
+                  cursor: lockTimeAndMoney ? 'not-allowed' : undefined,
                 }}
                 value={formData.startTime}
                 onChange={(e) => handleTimeChange('startTime', e.target.value)}
@@ -358,14 +407,18 @@ const EditShiftModal = ({
             </div>
 
             <div className="eo-form-group" style={{ marginBottom: timeError ? '0.25rem' : '1.15rem' }}>
-              <label>Thời Gian Kết Thúc *</label>
+              <label>Thời Gian Kết Thúc * {lockTimeAndMoney && <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>(Đã khóa)</span>}</label>
               <input
                 type="datetime-local"
                 required
+                disabled={lockTimeAndMoney}
                 className={`eo-form-input ${timeError ? 'has-error' : ''}`}
                 style={{
                   borderColor: timeError ? '#ef4444' : undefined,
                   boxShadow: timeError ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
+                  backgroundColor: lockTimeAndMoney ? '#f1f5f9' : undefined,
+                  color: lockTimeAndMoney ? '#64748b' : undefined,
+                  cursor: lockTimeAndMoney ? 'not-allowed' : undefined,
                 }}
                 value={formData.endTime}
                 onChange={(e) => handleTimeChange('endTime', e.target.value)}
@@ -382,8 +435,9 @@ const EditShiftModal = ({
           <ShiftArrivalTimeField
             startTime={formData.startTime}
             arrivalTime={formData.arrivalTime}
-            onChange={(val) => setFormData({ ...formData, arrivalTime: val })}
-            error={validateShiftArrivalTime(formData.arrivalTime, formData.startTime)}
+            onChange={(val) => !lockTimeAndMoney && setFormData({ ...formData, arrivalTime: val })}
+            error={lockTimeAndMoney ? null : validateShiftArrivalTime(formData.arrivalTime, formData.startTime)}
+            disabled={lockTimeAndMoney}
           />
 
           {/* Yêu cầu kỹ năng V3 */}
@@ -403,10 +457,13 @@ const EditShiftModal = ({
           {/* Tùy chọn cách tính lương: Theo giờ hoặc Theo ca */}
           <div className="eo-form-group" style={{ marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <label style={{ margin: 0 }}>Hình Thức Tính Thù Lao *</label>
-              <div style={{ display: 'inline-flex', backgroundColor: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <label style={{ margin: 0 }}>
+                Hình Thức Tính Thù Lao * {lockTimeAndMoney && <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>(Đã khóa tiền)</span>}
+              </label>
+              <div style={{ display: 'inline-flex', backgroundColor: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #cbd5e1', opacity: lockTimeAndMoney ? 0.7 : 1 }}>
                 <button
                   type="button"
+                  disabled={lockTimeAndMoney}
                   onClick={() => handleSwitchWageMode('HOURLY')}
                   style={{
                     padding: '0.3rem 0.75rem',
@@ -414,7 +471,7 @@ const EditShiftModal = ({
                     fontWeight: 700,
                     borderRadius: '6px',
                     border: 'none',
-                    cursor: 'pointer',
+                    cursor: lockTimeAndMoney ? 'not-allowed' : 'pointer',
                     backgroundColor: wageMode === 'HOURLY' ? '#2563eb' : 'transparent',
                     color: wageMode === 'HOURLY' ? '#ffffff' : '#475569',
                   }}
@@ -423,6 +480,7 @@ const EditShiftModal = ({
                 </button>
                 <button
                   type="button"
+                  disabled={lockTimeAndMoney}
                   onClick={() => handleSwitchWageMode('PER_SHIFT')}
                   style={{
                     padding: '0.3rem 0.75rem',
@@ -430,7 +488,7 @@ const EditShiftModal = ({
                     fontWeight: 700,
                     borderRadius: '6px',
                     border: 'none',
-                    cursor: 'pointer',
+                    cursor: lockTimeAndMoney ? 'not-allowed' : 'pointer',
                     backgroundColor: wageMode === 'PER_SHIFT' ? '#2563eb' : 'transparent',
                     color: wageMode === 'PER_SHIFT' ? '#ffffff' : '#475569',
                   }}
@@ -445,11 +503,11 @@ const EditShiftModal = ({
                 <label>Số Nhân Sự Cần Tuyển *</label>
                 <input
                   type="number"
-                  min="1"
+                  min={minRequiredWorkers}
                   required
                   className={`eo-form-input ${workersError ? 'has-error' : ''}`}
                   style={{
-                    borderColor: workersError ? '#ef4444' : undefined,
+                    borderColor: workersError ? '#ef4444' : lockTimeAndMoney ? '#2563eb' : undefined,
                     boxShadow: workersError ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
                   }}
                   value={formData.requiredWorkers ?? ''}
@@ -462,7 +520,7 @@ const EditShiftModal = ({
                     if (e.target.value !== raw) e.target.value = raw;
                     if (raw === '') {
                       setFormData({ ...formData, requiredWorkers: '' });
-                      setWorkersError('Số nhân sự cần tuyển tối thiểu là 1 người.');
+                      setWorkersError(`Số nhân sự cần tuyển tối thiểu là ${minRequiredWorkers} người.`);
                       return;
                     }
                     const parsed = parseInt(raw, 10);
@@ -471,25 +529,31 @@ const EditShiftModal = ({
                       ...formData,
                       requiredWorkers: val,
                     });
-                    if (val >= 1) {
+                    if (val >= minRequiredWorkers) {
                       setWorkersError(null);
                       if (formError) setFormError(null);
-                    } else {
+                    } else if (val < 1) {
                       setWorkersError('Số nhân sự cần tuyển tối thiểu là 1 người.');
+                    } else {
+                      setWorkersError(`Ca đã vào giờ diễn ra, không thể giảm thấp hơn ${confirmedWorkers} người đã nhận ca.`);
                     }
                   }}
                   onBlur={() => {
-                    if (!formData.requiredWorkers || Number(formData.requiredWorkers) < 1) {
-                      setFormData((prev) => ({ ...prev, requiredWorkers: 1 }));
+                    if (!formData.requiredWorkers || Number(formData.requiredWorkers) < minRequiredWorkers) {
+                      setFormData((prev) => ({ ...prev, requiredWorkers: minRequiredWorkers }));
                       setWorkersError(null);
                     }
                   }}
                 />
-                {workersError && (
+                {workersError ? (
                   <div className="eo-field-error ecw-field-error">
                     <span>{workersError}</span>
                   </div>
-                )}
+                ) : lockTimeAndMoney ? (
+                  <div style={{ fontSize: '0.72rem', color: '#0369a1', marginTop: '0.25rem', fontWeight: 600 }}>
+                    Đã nhận {confirmedWorkers} người • Tăng số lượng để tuyển thêm
+                  </div>
+                ) : null}
               </div>
 
               {wageMode === 'HOURLY' ? (
@@ -500,10 +564,14 @@ const EditShiftModal = ({
                     step="any"
                     min="1"
                     required
+                    disabled={lockTimeAndMoney}
                     className={`eo-form-input ${wageError ? 'has-error' : ''}`}
                     style={{
                       borderColor: wageError ? '#ef4444' : undefined,
                       boxShadow: wageError ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
+                      backgroundColor: lockTimeAndMoney ? '#f1f5f9' : undefined,
+                      color: lockTimeAndMoney ? '#64748b' : undefined,
+                      cursor: lockTimeAndMoney ? 'not-allowed' : undefined,
                     }}
                     value={formData.hourlyWage ?? ''}
                     onFocus={(e) => e.target.select()}
@@ -511,6 +579,7 @@ const EditShiftModal = ({
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
                     onChange={(e) => {
+                      if (lockTimeAndMoney) return;
                       let raw = e.target.value.replace(/^0+(?=\d)/, '');
                       if (e.target.value !== raw) e.target.value = raw;
                       const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
@@ -526,6 +595,7 @@ const EditShiftModal = ({
                       if (formError && wageCheck.isValid) setFormError(null);
                     }}
                     onBlur={() => {
+                      if (lockTimeAndMoney) return;
                       if (formData.hourlyWage === '' || isNaN(formData.hourlyWage)) {
                         setFormData((prev) => ({ ...prev, hourlyWage: 0 }));
                       }
@@ -556,10 +626,14 @@ const EditShiftModal = ({
                     step="any"
                     min="1"
                     required
+                    disabled={lockTimeAndMoney}
                     className={`eo-form-input ${wageError ? 'has-error' : ''}`}
                     style={{
                       borderColor: wageError ? '#ef4444' : undefined,
                       boxShadow: wageError ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
+                      backgroundColor: lockTimeAndMoney ? '#f1f5f9' : undefined,
+                      color: lockTimeAndMoney ? '#64748b' : undefined,
+                      cursor: lockTimeAndMoney ? 'not-allowed' : undefined,
                     }}
                     value={shiftPackageWage ?? ''}
                     onFocus={(e) => e.target.select()}
@@ -567,11 +641,13 @@ const EditShiftModal = ({
                       if (e.key === '-' || e.key === 'e') e.preventDefault();
                     }}
                     onChange={(e) => {
+                      if (lockTimeAndMoney) return;
                       let raw = e.target.value.replace(/^0+(?=\d)/, '');
                       if (e.target.value !== raw) e.target.value = raw;
                       handlePackageWageChange(raw);
                     }}
                     onBlur={() => {
+                      if (lockTimeAndMoney) return;
                       if (shiftPackageWage === '' || isNaN(shiftPackageWage)) {
                         setShiftPackageWage(0);
                       }
@@ -602,10 +678,14 @@ const EditShiftModal = ({
                   type="number"
                   min="0"
                   step="5000"
+                  disabled={lockTimeAndMoney}
                   className={`eo-form-input ${allowanceError ? 'has-error' : ''}`}
                   style={{
                     borderColor: allowanceError ? '#ef4444' : undefined,
                     boxShadow: allowanceError ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : undefined,
+                    backgroundColor: lockTimeAndMoney ? '#f1f5f9' : undefined,
+                    color: lockTimeAndMoney ? '#64748b' : undefined,
+                    cursor: lockTimeAndMoney ? 'not-allowed' : undefined,
                   }}
                   value={formData.allowance ?? ''}
                   onFocus={(e) => e.target.select()}
@@ -615,6 +695,7 @@ const EditShiftModal = ({
                     }
                   }}
                   onChange={(e) => {
+                    if (lockTimeAndMoney) return;
                     let raw = e.target.value.replace(/^0+(?=\d)/, '');
                     if (e.target.value !== raw) e.target.value = raw;
                     const val = raw === '' ? '' : parseFloat(raw);
@@ -627,6 +708,7 @@ const EditShiftModal = ({
                     }
                   }}
                   onBlur={() => {
+                    if (lockTimeAndMoney) return;
                     if (formData.allowance === '' || isNaN(formData.allowance)) {
                       setFormData((prev) => ({ ...prev, allowance: 0 }));
                       setAllowanceError(null);

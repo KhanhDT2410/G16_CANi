@@ -26,6 +26,7 @@ const EOPaymentsTab = lazy(() => import('./components/EOPaymentsTab'));
 const EOSubscriptionTab = lazy(() => import('./components/EOSubscriptionTab'));
 const EoProfileTab = lazy(() => import('./components/EoProfileTab'));
 const EOMyTeamTab = lazy(() => import('./components/EOMyTeamTab'));
+const EOWorkerReviewsTab = lazy(() => import('./components/EOWorkerReviewsTab'));
 const EventCreationWizardModal = lazy(() => import('./components/EventCreationWizardModal'));
 const EventDetailModal = lazy(() => import('./components/EventDetailModal'));
 const ShiftWorkspacePage = lazy(() => import('./components/ShiftWorkspacePage'));
@@ -257,7 +258,7 @@ export default function EOPage() {
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
-    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'messages', 'settings', 'support'].includes(tabParam)) {
+    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'worker-reviews', 'messages', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     } else if (!tabParam) {
@@ -446,6 +447,8 @@ export default function EOPage() {
       target = 'profile';
     } else if (navKey === 'my-team') {
       target = 'my-team';
+    } else if (navKey === 'worker-reviews') {
+      target = 'worker-reviews';
     } else if (navKey === 'messages') {
       target = 'messages';
     } else if (navKey === 'support') {
@@ -596,8 +599,6 @@ export default function EOPage() {
                   }}
                   newEvent={events.newEvent}
                   setNewEvent={events.setNewEvent}
-                  locating={events.locating}
-                  onGetCurrentLocation={events.handleGetCurrentLocation}
                   skillTaxonomy={shifts.skillTaxonomy}
                 />
               );
@@ -786,6 +787,12 @@ export default function EOPage() {
           {activeTab === 'my-team' && (
             <Suspense fallback={<EOTabFallback />}>
               <EOMyTeamTab />
+            </Suspense>
+          )}
+
+          {activeTab === 'worker-reviews' && (
+            <Suspense fallback={<EOTabFallback />}>
+              <EOWorkerReviewsTab onReloadEvents={events.loadEvents} />
             </Suspense>
           )}
 

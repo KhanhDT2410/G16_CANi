@@ -6,6 +6,7 @@ import ConfirmVerifySkillModal from './ConfirmVerifySkillModal';
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
+import { formatVndWhole } from '../utils/eventHelpers';
 
 /**
  * LiveAttendanceModal
@@ -263,7 +264,7 @@ const LiveAttendanceModal = ({
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                                 {item.declaredAmount != null && (
                                   <div style={{ fontSize: '0.75rem', color: '#0369a1' }}>
-                                    Đã khai: <strong>{Number(item.declaredAmount).toLocaleString('vi-VN')} đ</strong>
+                                    Đã khai: <strong>{formatVndWhole(item.declaredAmount)}</strong>
                                   </div>
                                 )}
                                 {item.externalRef && (

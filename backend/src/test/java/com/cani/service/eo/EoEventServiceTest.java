@@ -2338,4 +2338,210 @@ class EoEventServiceTest {
         verify(paymentRepository, never()).findByAssignmentId(any());
     }
 
+    @Test
+    @DisplayName("UTC080 - addShiftToEvent() - Chặn tạo ca trùng vị trí và trùng khung giờ trong cùng sự kiện")
+    void addShiftToEvent_ThrowsBadRequest_WhenDuplicateRoleAndTimeSlot() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).name("Sự kiện Test").status(EventStatus.DRAFT).build();
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MINUTES);
+        Instant end = start.plus(4, ChronoUnit.HOURS);
+
+        Shift existingShift = Shift.builder()
+                .shiftId(UUID.randomUUID())
+                .event(mockEvent)
+                .jobType("Lễ tân / Check-in")
+                .startTime(start)
+                .endTime(end)
+                .status(ShiftStatus.ACTIVE)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoId(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+        when(shiftRepository.findByEvent_EventIdAndStatusNot(eventId, ShiftStatus.CANCELLED))
+                .thenReturn(List.of(existingShift));
+
+        CreateShiftRequestDto duplicateDto = CreateShiftRequestDto.builder()
+                .jobType("  lễ tân /   check-in ")
+                .startTime(start.plusSeconds(15))
+                .endTime(end.plusSeconds(15))
+                .requiredWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> eoEventService.addShiftToEvent(userId, eventId, duplicateDto));
+        assertTrue(ex.getMessage().contains("Đã tồn tại ca làm việc vị trí"));
+        verify(shiftRepository, never()).save(any(Shift.class));
+    }
+
+    @Test
+    @DisplayName("UTC081 - getWorkerReviewOverview() - Tổng hợp lượt chờ đánh giá và đã đánh giá")
+    void getWorkerReviewOverview_ReturnsPendingFirstAndPopulatesExistingReviews() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).name("Tech Expo").status(EventStatus.ACTIVE).build();
+        Instant pastStart = Instant.now().minus(6, ChronoUnit.HOURS);
+        Instant pastEnd = Instant.now().minus(2, ChronoUnit.HOURS);
+        Shift shift = Shift.builder().shiftId(UUID.randomUUID()).event(mockEvent).jobType("Lễ tân").startTime(pastStart).endTime(pastEnd).status(ShiftStatus.COMPLETED).build();
+
+        UUID aPendingId = UUID.randomUUID();
+        UUID aReviewedId = UUID.randomUUID();
+        Worker w1 = Worker.builder().workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).fullName("Nguyễn Văn A").build()).build();
+        Worker w2 = Worker.builder().workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).fullName("Trần Thị B").build()).build();
+        ShiftAssignment saPending = ShiftAssignment.builder().assignmentId(aPendingId).shift(shift).worker(w1).status(AssignmentStatus.COMPLETED).eoConfirmed(true).build();
+        ShiftAssignment saReviewed = ShiftAssignment.builder().assignmentId(aReviewedId).shift(shift).worker(w2).status(AssignmentStatus.COMPLETED).eoConfirmed(true).build();
+
+        AttendanceLog log1 = AttendanceLog.builder().shiftAssignment(saPending).worker(w1).checkoutTime(pastEnd).build();
+        AttendanceLog log2 = AttendanceLog.builder().shiftAssignment(saReviewed).worker(w2).checkoutTime(pastEnd).build();
+        Review rev2 = Review.builder().assignmentId(aReviewedId).reviewerId(userId).rating(5).comment("Làm việc rất tốt").tags(new String[]{"Đúng giờ"}).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftAssignmentRepository.findCollaboratedWorkersByEoId(eq(eoId), anyList())).thenReturn(List.of(saReviewed, saPending));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(anyCollection())).thenReturn(List.of(log1, log2));
+        when(reviewRepository.findByReviewerIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(rev2));
+
+        List<EoWorkerReviewItemDto> list = eoEventService.getWorkerReviewOverview(userId);
+
+        assertEquals(2, list.size());
+        assertEquals(aPendingId, list.get(0).getAssignmentId());
+        assertTrue(list.get(0).isCanReview());
+        assertFalse(list.get(0).isHasReviewedWorker());
+
+        assertEquals(aReviewedId, list.get(1).getAssignmentId());
+        assertFalse(list.get(1).isCanReview());
+        assertTrue(list.get(1).isHasReviewedWorker());
+        assertEquals(5, list.get(1).getRating());
+        assertEquals("Làm việc rất tốt", list.get(1).getComment());
+    }
+
+    @Test
+    @DisplayName("UTC082 - updateShift() - Khi ca đã vào giờ -> cho phép tăng số lượng nhân sự để tuyển thêm, mở lại trạng thái ACTIVE")
+    void updateShift_AllowsIncreasingWorkersWhenShiftAlreadyStarted() {
+        UUID shiftId = UUID.randomUUID();
+        Instant pastStart = Instant.now().minus(30, ChronoUnit.MINUTES);
+        Instant futureEnd = Instant.now().plus(3, ChronoUnit.HOURS);
+        Event mockEvent = Event.builder()
+                .eventId(UUID.randomUUID()).eventOrganizer(mockEo).status(EventStatus.ACTIVE)
+                .totalRequiredWorkers(2).totalEstimatedCost(new BigDecimal("400000")).build();
+        Shift startedShift = Shift.builder()
+                .shiftId(shiftId).event(mockEvent).jobType("Lễ tân")
+                .status(ShiftStatus.FULLY_STAFFED)
+                .startTime(pastStart).endTime(futureEnd).arrivalTime(pastStart)
+                .hourlyWage(BigDecimal.valueOf(50000)).allowance(BigDecimal.ZERO)
+                .requiredWorkers(2).confirmedWorkers(2).remainingWorkers(0)
+                .totalCost(new BigDecimal("400000")).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(startedShift));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(i -> i.getArgument(0));
+
+        UpdateShiftRequestDto dto = UpdateShiftRequestDto.builder()
+                .jobType("Lễ tân")
+                .startTime(pastStart.truncatedTo(ChronoUnit.MINUTES))
+                .endTime(futureEnd.truncatedTo(ChronoUnit.MINUTES))
+                .requiredWorkers(5)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .allowance(BigDecimal.ZERO)
+                .build();
+
+        ShiftResponseDto res = eoEventService.updateShift(userId, shiftId, dto);
+        assertEquals(5, res.getRequiredWorkers());
+        assertEquals(3, res.getRemainingWorkers());
+        assertEquals(ShiftStatus.ACTIVE, startedShift.getStatus());
+        assertEquals(ShiftStatus.IN_PROGRESS, res.getStatus());
+    }
+
+    @Test
+    @DisplayName("UTC083 - updateShift() - Khi ca đã vào giờ -> chặn sửa thời gian, số tiền hoặc hạ dưới số người đã nhận")
+    void updateShift_RejectsTimeWageOrUnderConfirmedWorkersWhenStarted() {
+        UUID shiftId = UUID.randomUUID();
+        Instant pastStart = Instant.now().minus(30, ChronoUnit.MINUTES);
+        Instant futureEnd = Instant.now().plus(3, ChronoUnit.HOURS);
+        Event mockEvent = Event.builder()
+                .eventId(UUID.randomUUID()).eventOrganizer(mockEo).status(EventStatus.ACTIVE).build();
+        Shift startedShift = Shift.builder()
+                .shiftId(shiftId).event(mockEvent).jobType("Lễ tân")
+                .status(ShiftStatus.IN_PROGRESS)
+                .startTime(pastStart).endTime(futureEnd).arrivalTime(pastStart)
+                .hourlyWage(BigDecimal.valueOf(50000)).allowance(BigDecimal.ZERO)
+                .requiredWorkers(3).confirmedWorkers(2).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(startedShift));
+
+        UpdateShiftRequestDto timeChangedDto = UpdateShiftRequestDto.builder()
+                .jobType("Lễ tân")
+                .startTime(pastStart.plus(10, ChronoUnit.MINUTES))
+                .endTime(futureEnd)
+                .requiredWorkers(4)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .allowance(BigDecimal.ZERO)
+                .build();
+        BadRequestException timeEx = assertThrows(BadRequestException.class,
+                () -> eoEventService.updateShift(userId, shiftId, timeChangedDto));
+        assertTrue(timeEx.getMessage().contains("không thể chỉnh sửa thời gian"));
+
+        UpdateShiftRequestDto wageChangedDto = UpdateShiftRequestDto.builder()
+                .jobType("Lễ tân")
+                .startTime(pastStart)
+                .endTime(futureEnd)
+                .requiredWorkers(4)
+                .hourlyWage(BigDecimal.valueOf(70000))
+                .allowance(BigDecimal.ZERO)
+                .build();
+        BadRequestException wageEx = assertThrows(BadRequestException.class,
+                () -> eoEventService.updateShift(userId, shiftId, wageChangedDto));
+        assertTrue(wageEx.getMessage().contains("không thể chỉnh sửa mức thù lao"));
+
+        UpdateShiftRequestDto reduceBelowConfirmedDto = UpdateShiftRequestDto.builder()
+                .jobType("Lễ tân")
+                .startTime(pastStart)
+                .endTime(futureEnd)
+                .requiredWorkers(1)
+                .hourlyWage(BigDecimal.valueOf(50000))
+                .allowance(BigDecimal.ZERO)
+                .build();
+        BadRequestException workersEx = assertThrows(BadRequestException.class,
+                () -> eoEventService.updateShift(userId, shiftId, reduceBelowConfirmedDto));
+        assertTrue(workersEx.getMessage().contains("không được nhỏ hơn số nhân sự đã nhận ca"));
+    }
+
+    @Test
+    @DisplayName("UTC084 - rateWorker() & getWorkerReviewOverview() - Cho phép EO đánh giá ngay sau khi Worker Check-out dù chưa hết giờ ca")
+    void rateWorkerAndOverview_AllowImmediateReviewAfterCheckoutBeforeShiftEndTime() {
+        UUID assignmentId = UUID.randomUUID();
+        UUID shiftId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(UUID.randomUUID()).eventOrganizer(mockEo).name("Tech Expo").status(EventStatus.ACTIVE).build();
+        Instant futureEnd = Instant.now().plus(2, ChronoUnit.HOURS);
+        Shift ongoingShift = Shift.builder()
+                .shiftId(shiftId).event(mockEvent).jobType("Lễ tân")
+                .startTime(Instant.now().minus(1, ChronoUnit.HOURS)).endTime(futureEnd)
+                .status(ShiftStatus.IN_PROGRESS).build();
+        Worker mockWorker = Worker.builder()
+                .workerId(UUID.randomUUID()).user(User.builder().userId(UUID.randomUUID()).fullName("Nguyễn Văn B").build())
+                .ratingAvg(BigDecimal.valueOf(4.0)).ratingCount(1).reliabilityScore(90).build();
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId).shift(ongoingShift).worker(mockWorker)
+                .status(AssignmentStatus.COMPLETED).build();
+        AttendanceLog att = AttendanceLog.builder()
+                .shiftAssignment(sa).worker(mockWorker).checkoutTime(Instant.now()).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(shiftAssignmentRepository.findCollaboratedWorkersByEoId(eq(eoId), anyList())).thenReturn(List.of(sa));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(anyCollection())).thenReturn(List.of(att));
+        when(reviewRepository.findByReviewerIdOrderByCreatedAtDesc(userId)).thenReturn(Collections.emptyList());
+
+        List<EoWorkerReviewItemDto> overview = eoEventService.getWorkerReviewOverview(userId);
+        assertEquals(1, overview.size());
+        assertTrue(overview.get(0).isCanReview());
+        assertNull(overview.get(0).getReviewBlockReason());
+
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+        when(attendanceLogRepository.findByShiftAssignment_AssignmentId(assignmentId)).thenReturn(Optional.of(att));
+        when(reviewRepository.findByAssignmentIdAndReviewerId(assignmentId, userId)).thenReturn(Optional.empty());
+        when(reviewRepository.save(any(Review.class))).thenAnswer(i -> i.getArgument(0));
+
+        Review saved = eoEventService.rateWorker(userId, assignmentId, CreateEoReviewRequestDto.builder().rating(5).comment("Xong sớm").build());
+        assertEquals(5, saved.getRating());
+    }
+
 }

@@ -11,8 +11,6 @@ const EventCreateModal = ({
   onSubmit,
   newEvent,
   setNewEvent,
-  onGetCurrentLocation,
-  locating,
 }) => {
   if (!isOpen) return null;
 
@@ -48,16 +46,17 @@ const EventCreateModal = ({
             address={newEvent.venueAddress}
             lat={newEvent.venueLat}
             lng={newEvent.venueLng}
-            onLocationChange={({ address, lat, lng }) => {
+            coordinatesConfirmed={newEvent.venueCoordinatesConfirmed}
+            onLocationChange={({ address, lat, lng, locationPicked, venueCoordinatesConfirmed }) => {
               setNewEvent((prev) => ({
                 ...prev,
                 venueAddress: address,
                 venueLat: lat,
                 venueLng: lng,
+                locationPicked,
+                venueCoordinatesConfirmed,
               }));
             }}
-            onGetCurrentLocation={onGetCurrentLocation}
-            locating={locating}
             required
           />
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { getShiftStaffingSummary } from '../utils/eventHelpers';
+import EmergencyTriggerButton from './EmergencyTriggerButton';
 
 /**
  * ShiftEmergencyBanner (Ticket EO-009)
@@ -148,35 +149,9 @@ export default function ShiftEmergencyBanner({
           </span>
         )}
 
-        {/* Ca cận giờ trước lúc bắt đầu chưa bật Emergency Dispatch (Được quản lý tự động qua Popup) */}
+        {/* Ca cận giờ trước lúc bắt đầu chưa bật Emergency Dispatch -> Nút kích hoạt khẩn cấp */}
         {!summary.isInviteMode && !summary.isEmergency && !summary.isInProgress && summary.nearStartUnderstaffed && (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.4rem 0.85rem',
-              borderRadius: 8,
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              backgroundColor: '#fff1f2',
-              color: '#be123c',
-              border: '1px solid #fecdd3',
-              whiteSpace: 'nowrap',
-            }}
-            title="Hệ thống tự động đề xuất mở rộng phạm vi tìm kiếm khi cận giờ bắt đầu"
-          >
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                backgroundColor: '#e11d48',
-                display: 'inline-block',
-              }}
-            />
-            Cận giờ · Tự động đề xuất
-          </span>
+          <EmergencyTriggerButton shift={shift} event={event} compact />
         )}
       </div>
     </div>

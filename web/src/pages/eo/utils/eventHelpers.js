@@ -25,6 +25,7 @@ export function createDefaultNewEvent() {
     venueLat: 10.7328,
     venueLng: 106.7214,
     locationPicked: false,
+    venueCoordinatesConfirmed: false,
     eventDate: toDateTimeLocalInput(tomorrowStart).slice(0, 10),
     startTime: toDateTimeLocalInput(tomorrowStart),
     endTime: toDateTimeLocalInput(tomorrowEnd),
@@ -632,5 +633,66 @@ export function calculateEventMetrics(events) {
     totalConfirmedWorkers,
     totalEstimatedCost,
     fillRate,
+  };
+}
+
+/**
+ * Định dạng tiền VNĐ theo số nguyên tròn (không hiển thị phần thập phân lẻ).
+ */
+export function formatVndWhole(value, fallback = '—') {
+  if (value === null || value === undefined || value === '') return fallback;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return `${Math.round(num).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} đ`;
+}
+
+/**
+ * Làm tròn số tiền VNĐ về số nguyên gần nhất.
+ */
+export function roundVndAmount(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? Math.round(num) : 0;
+}
+
+/**
+ * Quy tắc chỉnh sửa ca theo trạng thái thời gian:
+ * Khi ca đã vào giờ diễn ra (không phải DRAFT/CANCELLED), khóa chỉnh sửa thời gian và thù lao/phụ cấp,
+ * vẫn cho phép điều chỉnh số lượng nhân sự cần tuyển (tối thiểu bằng số người đã xác nhận).
+ */
+export function getShiftEditRestrictions(shift = {}, event = null, now = new Date()) {
+  const rawShiftStatus = String(shift?.status || '').toUpperCase();
+  const rawEventStatus = String(event?.status || shift?.eventStatus || '').toUpperCase();
+  const isDraft = rawShiftStatus === 'DRAFT' || rawEventStatus === 'DRAFT';
+  const isCancelled = rawShiftStatus === 'CANCELLED' || rawEventStatus === 'CANCELLED';
+
+  const start = shift?.startTime ? new Date(shift.startTime) : null;
+  const end = shift?.endTime ? new Date(shift.endTime) : null;
+  const startValid = Boolean(start && !isNaN(start.getTime()));
+  const endValid = Boolean(end && !isNaN(end.getTime()));
+
+  const isCompleted =
+    rawShiftStatus === 'COMPLETED' ||
+    rawEventStatus === 'COMPLETED' ||
+    (endValid && now.getTime() > end.getTime());
+
+  const hasStarted =
+    !isDraft &&
+    !isCancelled &&
+    (rawShiftStatus === 'IN_PROGRESS' ||
+      rawShiftStatus === 'ONGOING' ||
+      isCompleted ||
+      (startValid && now.getTime() >= start.getTime()));
+
+  const confirmedWorkers = Math.max(0, Number(shift?.confirmedWorkers ?? 0));
+
+  return {
+    isDraft,
+    isCancelled,
+    isCompleted,
+    hasStarted,
+    lockTimeAndMoney: hasStarted,
+    canEditWorkers: !isCancelled,
+    minRequiredWorkers: hasStarted ? Math.max(1, confirmedWorkers) : 1,
+    confirmedWorkers,
   };
 }

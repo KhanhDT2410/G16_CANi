@@ -221,7 +221,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('Để trống để nhận diện từ nguồn tra cứu', overflow: TextOverflow.ellipsis)),
+                    const DropdownMenuItem(value: null, child: Text('Để trống để AI tự nhận diện kỹ năng', overflow: TextOverflow.ellipsis)),
                     ...state.taxonomy.map((s) => DropdownMenuItem(value: s.skillId, child: Text(s.name, overflow: TextOverflow.ellipsis))),
                   ],
                   onChanged: (val) => setState(() => _selectedSkillId = val),
@@ -321,14 +321,14 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
             ),
             SizedBox(width: 10),
             Text(
-              'Đang đối chiếu chứng chỉ với nguồn tra cứu...',
+              'Đang quét & phân tích chứng chỉ bằng AI...',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: SkillHubColors.textPrimary),
             ),
           ],
         ),
         const SizedBox(height: 6),
         const Text(
-          'Hệ thống đang kiểm tra nguồn xác thực chính thức của chứng chỉ...',
+          'Hệ thống đang đọc nội dung, con dấu và đối chiếu thông tin trên chứng chỉ...',
           style: TextStyle(fontSize: 11, color: SkillHubColors.textSecondary),
         ),
       ],

@@ -108,105 +108,11 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
     }
 
     String comment = 'Đã nhận đủ thù lao theo thỏa thuận.';
-    if (status == 'RECEIVED_PARTIAL') {
-      final amountCtrl = TextEditingController();
-      final reasonCtrl = TextEditingController();
+    if (status == 'RECEIVED_PARTIAL' || status == 'NOT_RECEIVED') {
       final dialogResult = await showDialog<String>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            'Xác nhận chỉ nhận một phần thù lao',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Vui lòng nhập số tiền thực tế bạn đã nhận và lý do để hệ thống đối soát:',
-                  style: TextStyle(fontSize: 12.5),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Số tiền thực nhận (VNĐ) *',
-                    hintText: 'Ví dụ: 100000',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: reasonCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Lý do / Ghi chú thiếu hụt (*)',
-                    hintText: 'Ví dụ: BTC mới thanh toán tiền mặt 100.000đ, còn thiếu 60.000đ...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            FilledButton(
-              onPressed: () {
-                final amtText = amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
-                final amt = double.tryParse(amtText) ?? 0.0;
-                final rsn = reasonCtrl.text.trim();
-                if (amt > 0 && rsn.length >= 3) {
-                  Navigator.pop(ctx, 'Thực nhận: ${formatVndCurrency(amt)}. Lý do: $rsn');
-                }
-              },
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD97706)),
-              child: const Text('Xác nhận gửi'),
-            ),
-          ],
-        ),
+        builder: (_) => _PaymentIssueDialog(isPartial: status == 'RECEIVED_PARTIAL'),
       );
-      amountCtrl.dispose();
-      reasonCtrl.dispose();
-      if (dialogResult == null || dialogResult.isEmpty) return;
-      comment = dialogResult;
-    } else if (status == 'NOT_RECEIVED') {
-      final ctrl = TextEditingController();
-      final dialogResult = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text(
-            'Báo cáo chưa nhận thù lao',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            controller: ctrl,
-            maxLines: 3,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Chi tiết lý do khiếu nại (*)',
-              hintText: 'Ví dụ: Ca làm đã kết thúc nhưng chưa nhận được chuyển khoản hoặc tiền mặt...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            FilledButton(
-              onPressed: () {
-                if (ctrl.text.trim().length >= 4) {
-                  Navigator.pop(ctx, ctrl.text.trim());
-                }
-              },
-              style: FilledButton.styleFrom(backgroundColor: cani.danger),
-              child: const Text('Xác nhận gửi'),
-            ),
-          ],
-        ),
-      );
-      ctrl.dispose();
       if (dialogResult == null || dialogResult.isEmpty) return;
       comment = dialogResult;
     }
@@ -1245,6 +1151,115 @@ class _PartyConfirmRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PaymentIssueDialog extends StatefulWidget {
+  final bool isPartial;
+
+  const _PaymentIssueDialog({required this.isPartial});
+
+  @override
+  State<_PaymentIssueDialog> createState() => _PaymentIssueDialogState();
+}
+
+class _PaymentIssueDialogState extends State<_PaymentIssueDialog> {
+  final TextEditingController _amountCtrl = TextEditingController();
+  final TextEditingController _reasonCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _reasonCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (widget.isPartial) {
+      final amtText = _amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final amt = double.tryParse(amtText) ?? 0.0;
+      final rsn = _reasonCtrl.text.trim();
+      if (amt > 0 && rsn.length >= 3) {
+        Navigator.pop(context, 'Thực nhận: ${formatVndCurrency(amt)}. Lý do: $rsn');
+      }
+      return;
+    }
+
+    final reason = _reasonCtrl.text.trim();
+    if (reason.length >= 4) {
+      Navigator.pop(context, reason);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cani = Theme.of(context).cani;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        widget.isPartial
+            ? 'Xác nhận chỉ nhận một phần thù lao'
+            : 'Báo cáo chưa nhận thù lao',
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      content: widget.isPartial
+          ? SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Vui lòng nhập số tiền thực tế bạn đã nhận và lý do để hệ thống đối soát:',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Số tiền thực nhận (VNĐ) *',
+                      hintText: 'Ví dụ: 100000',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _reasonCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Lý do / Ghi chú thiếu hụt (*)',
+                      hintText: 'Ví dụ: BTC mới thanh toán tiền mặt 100.000đ, còn thiếu 60.000đ...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : TextField(
+              controller: _reasonCtrl,
+              maxLines: 3,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Chi tiết lý do khiếu nại (*)',
+                hintText: 'Ví dụ: Ca làm đã kết thúc nhưng chưa nhận được chuyển khoản hoặc tiền mặt...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          style: FilledButton.styleFrom(
+            backgroundColor: widget.isPartial ? const Color(0xFFD97706) : cani.danger,
+          ),
+          child: const Text('Xác nhận gửi'),
+        ),
+      ],
     );
   }
 }

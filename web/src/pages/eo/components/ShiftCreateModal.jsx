@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { calculateShiftRiskAnalysis } from '../hooks/useShifts';
-import { validateJobType, validateShiftWageAgainstFloor } from '../utils/shiftValidation';
+import { validateJobType, validateDuplicateShift, validateShiftWageAgainstFloor } from '../utils/shiftValidation';
 import {
   toDateTimeLocalInput,
   validateShiftArrivalTime,
@@ -32,6 +32,7 @@ const ShiftCreateModal = ({
   venueAddress = '',
   venueLat = null,
   venueLng = null,
+  existingShifts = [],
 }) => {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [jobTypeError, setJobTypeError] = useState(null);
@@ -104,6 +105,13 @@ const ShiftCreateModal = ({
       e.preventDefault();
       setJobTypeError(err);
       showToast(err, 'error');
+      return;
+    }
+    const dupErr = validateDuplicateShift(newShift, existingShifts);
+    if (dupErr) {
+      e.preventDefault();
+      setJobTypeError(dupErr);
+      showToast(dupErr, 'error');
       return;
     }
     const wageCheck = validateShiftWageAgainstFloor({

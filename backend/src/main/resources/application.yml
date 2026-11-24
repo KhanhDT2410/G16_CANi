@@ -90,6 +90,13 @@ cani:
     certificate-dir: ${CERTIFICATE_STORAGE_DIR:uploads/certificates}
     ekyc-dir: ${EKYC_STORAGE_DIR:uploads/ekyc-private}
     ekyc-max-file-size-bytes: ${EKYC_MAX_FILE_SIZE_BYTES:5242880}
+  skill:
+    ai:
+      enabled: ${SKILL_AI_ENABLED:true}
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_SKILL_MODEL:gemini-2.5-flash}
+      url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
+      timeout-ms: ${GEMINI_TIMEOUT_MS:25000}
   ekyc:
     provider: ${EKYC_PROVIDER:vnpt}
     strict: ${EKYC_STRICT:false}

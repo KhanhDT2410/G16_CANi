@@ -37,6 +37,11 @@ cani:
     consent:
       required: ${EKYC_CONSENT_REQUIRED:true}
       notice-version: ${EKYC_CONSENT_NOTICE_VERSION:2026.11-nd13-v1}
+  skill:
+    ai:
+      enabled: ${SKILL_AI_ENABLED:false}
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_SKILL_MODEL:gemini-2.5-flash}
   subscription:
     demo-enabled: true
   sla-scan:

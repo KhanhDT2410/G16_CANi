@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:cani/core/constants/api_constants.dart';
 import 'package:cani/core/network/auth_interceptor.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 
 import 'package:cani/features/auth/data/auth_api.dart';
 import 'package:cani/features/auth/models/auth_request.dart';
@@ -51,12 +52,9 @@ class AuthRepository {
         user: response.user.copyWith(authProvider: 'password'),
       );
     } on DioException catch (e) {
-      final message = (e.response?.data is Map)
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.'));
     } catch (e) {
-      throw Exception('Lỗi đăng nhập: ${e.toString()}');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Đăng nhập không thành công. Vui lòng thử lại.'));
     }
   }
 
@@ -64,12 +62,9 @@ class AuthRepository {
     try {
       await _api.sendOtp(email, 'REGISTER');
     } on DioException catch (e) {
-      final message = (e.response?.data is Map)
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Không thể gửi mã OTP. Vui lòng kiểm tra lại email.');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể gửi mã OTP. Vui lòng kiểm tra lại email.'));
     } catch (e) {
-      throw Exception('Lỗi gửi OTP: ${e.toString()}');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể gửi mã OTP. Vui lòng thử lại.'));
     }
   }
 
@@ -77,12 +72,9 @@ class AuthRepository {
     try {
       await _api.sendOtp(email, 'RESET_PASSWORD');
     } on DioException catch (e) {
-      final message = (e.response?.data is Map)
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Không thể gửi mã OTP đặt lại mật khẩu. Vui lòng kiểm tra lại email.');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể gửi mã OTP đặt lại mật khẩu. Vui lòng kiểm tra lại email.'));
     } catch (e) {
-      throw Exception('Lỗi gửi OTP: ${e.toString()}');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể gửi mã OTP đặt lại mật khẩu. Vui lòng thử lại.'));
     }
   }
 
@@ -98,12 +90,9 @@ class AuthRepository {
         newPassword: newPassword,
       );
     } on DioException catch (e) {
-      final message = (e.response?.data is Map)
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.'));
     } catch (e) {
-      throw Exception('Lỗi đặt lại mật khẩu: ${e.toString()}');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể đặt lại mật khẩu. Vui lòng thử lại.'));
     }
   }
 
@@ -126,12 +115,9 @@ class AuthRepository {
         ),
       );
     } on DioException catch (e) {
-      final message = (e.response?.data is Map)
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
-      throw Exception(message ?? 'Đăng ký tài khoản thất bại.');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Đăng ký tài khoản thất bại.'));
     } catch (e) {
-      throw Exception('Lỗi đăng ký: ${e.toString()}');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Đăng ký tài khoản thất bại.'));
     }
   }
 
@@ -201,19 +187,9 @@ class AuthRepository {
         user: response.user.copyWith(authProvider: 'google'),
       );
     } on DioException catch (e) {
-      final message = (e.response?.data is Map)
-          ? (e.response?.data as Map)['message']?.toString()
-          : null;
-      if (message != null && message.isNotEmpty) {
-        throw Exception(message);
-      }
-      if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout) {
-        throw Exception('Không thể kết nối đến máy chủ CANi. Vui lòng kiểm tra kết nối mạng.');
-      }
-      throw Exception('Đồng bộ tài khoản Google với hệ thống CANi thất bại (${e.response?.statusCode ?? e.type.name}).');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Đồng bộ tài khoản Google với hệ thống CANi thất bại.'));
     } catch (e) {
-      if (e is Exception) rethrow;
-      throw Exception('Lỗi Google Sign-In: ${e.toString()}');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Đăng nhập Google thất bại. Vui lòng thử lại.'));
     }
   }
 

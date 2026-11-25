@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:cani/core/constants/banks.dart';
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/profile/providers/worker_bank_provider.dart';
 
@@ -165,7 +166,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lỗi cập nhật tài khoản ngân hàng: ${e.toString()}'),
+          content: Text(AppErrorFormatter.format(e, fallback: 'Không thể cập nhật tài khoản ngân hàng.')),
           backgroundColor: const Color(0xFFDC2626),
         ),
       );

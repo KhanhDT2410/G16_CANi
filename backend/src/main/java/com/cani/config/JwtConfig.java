@@ -94,7 +94,7 @@ public class JwtConfig {
                         throw e;
                     } catch (Exception e) {
                         log.warn("[H2 Profile] Lỗi parse payload của token: {}", e.getMessage());
-                        throw new BadJwtException("Token JWT không hợp lệ: " + e.getMessage(), e);
+                        throw new BadJwtException("Phiên đăng nhập không hợp lệ hoặc đã hết hạn.", e);
                     }
                 }
             }

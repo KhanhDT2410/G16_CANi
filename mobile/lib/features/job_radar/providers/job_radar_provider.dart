@@ -255,7 +255,7 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     } catch (e) {
       if ((updateSearchCenter || !hasPrefCenter) && mounted) {
         state = state.copyWith(
-          errorMessage: 'Không lấy được GPS chính xác ($e).',
+          errorMessage: 'Không lấy được vị trí GPS chính xác. Vui lòng thử lại.',
         );
       }
     }

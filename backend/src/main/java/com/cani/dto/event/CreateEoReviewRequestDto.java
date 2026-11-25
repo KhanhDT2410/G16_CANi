@@ -21,13 +21,16 @@ public class CreateEoReviewRequestDto {
 
     private String comment;
 
-    @Min(1) @Max(5)
+    @Min(value = 1, message = "Điểm hoàn thành công việc tối thiểu là 1")
+    @Max(value = 5, message = "Điểm hoàn thành công việc tối đa là 5")
     private Integer criteriaWorkCompletion;
 
-    @Min(1) @Max(5)
+    @Min(value = 1, message = "Điểm đúng giờ tối thiểu là 1")
+    @Max(value = 5, message = "Điểm đúng giờ tối đa là 5")
     private Integer criteriaPunctuality;
 
-    @Min(1) @Max(5)
+    @Min(value = 1, message = "Điểm chuyên nghiệp tối thiểu là 1")
+    @Max(value = 5, message = "Điểm chuyên nghiệp tối đa là 5")
     private Integer criteriaProfessionalism;
 
     private String[] tags;

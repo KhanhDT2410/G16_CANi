@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/profile/models/worker_experience_model.dart';
 
 class WorkerExperienceState {
@@ -57,7 +58,7 @@ class WorkerExperienceNotifier extends StateNotifier<WorkerExperienceState> {
       debugPrint('Lỗi tải thông tin kinh nghiệm worker: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Không thể tải thông tin kinh nghiệm: $e',
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể tải thông tin kinh nghiệm.'),
       );
     }
   }
@@ -91,7 +92,7 @@ class WorkerExperienceNotifier extends StateNotifier<WorkerExperienceState> {
       debugPrint('Lỗi cập nhật kinh nghiệm worker: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Lỗi cập nhật: $e',
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể cập nhật hồ sơ kinh nghiệm.'),
       );
       return false;
     }

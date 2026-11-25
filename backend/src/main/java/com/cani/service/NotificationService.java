@@ -68,7 +68,7 @@ public class NotificationService {
         }
 
         User user = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + targetUserId));
+                .orElseThrow(() -> new com.cani.exception.ResourceNotFoundException("Người dùng", "id", targetUserId));
 
         // Chuẩn hóa JSON hợp lệ cho cột PostgreSQL jsonb
         String jsonData = null;

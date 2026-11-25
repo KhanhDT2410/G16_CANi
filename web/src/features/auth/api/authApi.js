@@ -49,7 +49,7 @@ export const authApi = {
       },
     });
     if (error) {
-      throw new Error(error.message);
+      throw new Error('Không thể khởi tạo đăng nhập Google. Vui lòng thử lại.');
     }
   },
 

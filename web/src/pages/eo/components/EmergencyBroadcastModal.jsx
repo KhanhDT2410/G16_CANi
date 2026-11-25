@@ -52,7 +52,7 @@ export default function EmergencyBroadcastModal({
       onClose();
     } catch (err) {
       showToast(
-        'Lỗi kích hoạt Emergency Broadcast: ' + (err.response?.data?.message || err.message),
+        'Không thể kích hoạt điều phối khẩn cấp: ' + (err.response?.data?.message || err.message),
         'error'
       );
     } finally {

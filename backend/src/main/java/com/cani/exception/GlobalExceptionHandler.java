@@ -107,15 +107,7 @@ public class GlobalExceptionHandler {
         } else if (rawMsg.contains("users_username_key") || rawMsg.contains("username")) {
             friendlyMessage = "Tên tài khoản này đã tồn tại trong hệ thống. Vui lòng chọn tên khác.";
         } else {
-            String detail = rootCause != null && rootCause.getMessage() != null
-                    ? rootCause.getMessage()
-                    : (ex.getMessage() != null ? ex.getMessage() : "");
-            if (detail.length() > 180) {
-                detail = detail.substring(0, 180) + "...";
-            }
-            friendlyMessage = detail.isBlank()
-                    ? "Dữ liệu gửi lên vi phạm ràng buộc toàn vẹn của hệ thống (dữ liệu có thể đã tồn tại). Vui lòng kiểm tra lại."
-                    : "Dữ liệu gửi lên không hợp lệ hoặc vi phạm ràng buộc hệ thống: " + detail;
+            friendlyMessage = "Dữ liệu gửi lên vi phạm ràng buộc toàn vẹn của hệ thống (có thể bị trùng hoặc không hợp lệ). Vui lòng kiểm tra lại.";
         }
 
         return ResponseEntity
@@ -126,11 +118,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
         log.error("Unhandled exception occurred: ", ex);
-        String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
-                ? "Lỗi hệ thống: " + ex.getMessage()
-                : "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(msg));
+                .body(ApiResponse.error("Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."));
     }
 }

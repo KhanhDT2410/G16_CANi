@@ -41,7 +41,7 @@ public class DirectChatService {
     @Transactional
     public ChatConversationDetailDto getOrCreateDirectConversation(UUID currentUserId, UUID targetUserId) {
         if (currentUserId.equals(targetUserId)) {
-            throw new IllegalArgumentException("Không thể tự chat với chính mình");
+            throw new com.cani.exception.BadRequestException("Không thể tự nhắn tin với chính mình.");
         }
 
         userRepository.findById(targetUserId)

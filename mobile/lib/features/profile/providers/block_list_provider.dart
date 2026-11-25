@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/profile/models/blocked_user_model.dart';
 
 class BlockListState {
@@ -58,7 +59,7 @@ class BlockListNotifier extends StateNotifier<BlockListState> {
       debugPrint('Lỗi tải danh sách chặn: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Không thể tải danh sách chặn: $e',
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách chặn.'),
       );
     }
   }

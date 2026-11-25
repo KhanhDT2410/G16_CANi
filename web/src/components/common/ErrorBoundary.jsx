@@ -58,23 +58,6 @@ export class ErrorBoundary extends React.Component {
             <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
               Hệ thống CANi gặp lỗi không mong muốn khi dựng trang. Bạn có thể bấm nút bên dưới để tải lại hoặc quay về trang chủ.
             </p>
-            {this.state.error?.message && (
-              <pre
-                style={{
-                  background: '#fef2f2',
-                  color: '#991b1b',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  textAlign: 'left',
-                  overflowX: 'auto',
-                  border: '1px solid #fecaca',
-                  marginBottom: '1.5rem',
-                }}
-              >
-                {this.state.error.message}
-              </pre>
-            )}
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button
                 type="button"

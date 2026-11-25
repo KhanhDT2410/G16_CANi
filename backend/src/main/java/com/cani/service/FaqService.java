@@ -405,7 +405,7 @@ public class FaqService {
             return "/api/v1/faqs/images/" + savedFilename;
         } catch (java.io.IOException e) {
             log.error("Lỗi khi lưu tệp ảnh FAQ: {}", e.getMessage(), e);
-            throw new BadRequestException("Không thể lưu tệp ảnh: " + e.getMessage());
+            throw new BadRequestException("Không thể lưu tệp ảnh. Vui lòng thử lại.");
         }
     }
 

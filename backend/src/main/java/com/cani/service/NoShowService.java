@@ -207,10 +207,10 @@ public class NoShowService {
         record.setEmergencyDispatched(emergencyDispatched);
         NoShowRecord savedRecord = noShowRecordRepository.save(record);
 
-        // Gửi thông báo đến Worker và Nhà tổ chức (EO)
+        // Gửi thông báo đến Nhân sự và Ban tổ chức (EO)
         if (workerUser != null) {
-            String wTitle = "Cảnh báo vi phạm: Đánh dấu vắng mặt (No-show)";
-            String wBody = String.format("Bạn bị đánh dấu vắng mặt (No-show) cho ca '%s' và bị trừ %d điểm uy tín (RS hiện tại: %d). Bạn có 7 ngày để nộp kháng cáo nếu có lý do bất khả kháng.",
+            String wTitle = "Cảnh báo vi phạm: Đánh dấu vắng mặt không báo trước";
+            String wBody = String.format("Bạn bị đánh dấu vắng mặt không báo trước cho ca '%s' và bị trừ %d điểm uy tín (điểm hiện tại: %d). Bạn có 7 ngày để nộp kháng cáo nếu có lý do bất khả kháng.",
                     shift != null && shift.getJobType() != null ? shift.getJobType() : "Sự kiện", NO_SHOW_PENALTY_POINTS, scoreAfter);
             notificationService.sendNotification(workerUser, wTitle, wBody, NotificationType.ASSIGNMENT, "NO_SHOW", assignmentId);
         }
@@ -218,15 +218,15 @@ public class NoShowService {
         if (shift != null && shift.getEvent() != null && shift.getEvent().getEventOrganizer() != null) {
             User eoUser = shift.getEvent().getEventOrganizer().getUser();
             if (eoUser != null) {
-                String eoTitle = "Nhân sự vắng mặt không báo trước (No-show)";
+                String eoTitle = "Nhân sự vắng mặt không báo trước";
                 String eoBody = autoEligibility.eligible()
-                        ? String.format("Nhân sự %s đã bị đánh dấu vắng mặt (No-show) cho ca '%s' (hiện %d/%d người). Hệ thống đã tự động kích hoạt điều phối khẩn cấp tìm người thay thế.",
-                                workerUser != null ? workerUser.getFullName() : "Worker",
+                        ? String.format("Nhân sự %s đã bị đánh dấu vắng mặt không báo trước cho ca '%s' (hiện %d/%d người). Hệ thống đã tự động kích hoạt điều phối khẩn cấp tìm người thay thế.",
+                                workerUser != null ? workerUser.getFullName() : "Nhân sự",
                                 shift.getJobType() != null ? shift.getJobType() : "Sự kiện",
                                 autoEligibility.confirmedWorkers(),
                                 autoEligibility.requiredWorkers())
-                        : String.format("Nhân sự %s đã bị đánh dấu vắng mặt (No-show) cho ca '%s'. (%s)",
-                                workerUser != null ? workerUser.getFullName() : "Worker",
+                        : String.format("Nhân sự %s đã bị đánh dấu vắng mặt không báo trước cho ca '%s'. (%s)",
+                                workerUser != null ? workerUser.getFullName() : "Nhân sự",
                                 shift.getJobType() != null ? shift.getJobType() : "Sự kiện",
                                 autoEligibility.blockReason());
                 if (eoUser.getUserId() != null && shift.getShiftId() != null && shift.getEvent().getEventId() != null) {

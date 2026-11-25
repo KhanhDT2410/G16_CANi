@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import '../widgets/cancel_assignment_dialog.dart';
@@ -99,7 +100,10 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
       } catch (err) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi: $err'), backgroundColor: t.danger),
+            SnackBar(
+              content: Text(AppErrorFormatter.format(err, fallback: 'Không thể tham gia ca làm.')),
+              backgroundColor: t.danger,
+            ),
           );
         }
       }

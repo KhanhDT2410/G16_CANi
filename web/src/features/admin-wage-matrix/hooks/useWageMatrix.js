@@ -50,9 +50,8 @@ export const useWageMatrix = () => {
         }
       } catch (error) {
         console.error('Lỗi khi tải danh sách ma trận lương:', error);
-        const status = error.response?.status;
-        const msg = error.response?.data?.message || error.message;
-        showToast(`Không thể tải danh sách [HTTP ${status || 'LỖI'}]: ${msg}`, 'error');
+        const msg = error.response?.data?.message || error.message || 'Vui lòng thử lại.';
+        showToast(`Không thể tải danh sách mức lương: ${msg}`, 'error');
       } finally {
         setLoading(false);
       }

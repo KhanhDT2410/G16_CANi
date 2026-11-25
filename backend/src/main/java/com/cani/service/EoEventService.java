@@ -1235,9 +1235,9 @@ public class EoEventService {
                         ? String.valueOf((long) effectiveRadiusKm) : String.valueOf(effectiveRadiusKm);
                 String notifTitle = "🚨 [ĐIỀU PHỐI KHẨN CẤP] Đã kích hoạt cho ca " + shift.getJobType();
                 String notifBody = dispatched > 0
-                        ? String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s) và gửi %d đề xuất khẩn cấp đến Worker phù hợp theo Preference.",
+                        ? String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s) và gửi %d đề xuất khẩn cấp đến nhân sự phù hợp theo tiêu chí đã cài đặt.",
                                 radiusLabel, shift.getJobType(), evName, dispatched)
-                        : String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s). Hệ thống đang tiếp tục quét Worker trực tuyến phù hợp.",
+                        : String.format("Đã mở rộng bán kính tìm kiếm %s km cho ca \"%s\" (%s). Hệ thống đang tiếp tục quét nhân sự trực tuyến phù hợp.",
                                 radiusLabel, shift.getJobType(), evName);
 
                 notificationService.createAndSend(
@@ -1517,6 +1517,9 @@ public class EoEventService {
                 Iterator<Map.Entry<String, JsonNode>> fields = root.fields();
                 while (fields.hasNext()) {
                     Map.Entry<String, JsonNode> field = fields.next();
+                    if (field.getKey() != null && field.getKey().startsWith("__META_")) {
+                        continue;
+                    }
                     JsonNode val = field.getValue();
                     if (val.isObject() && val.has("isCompleted") && val.get("isCompleted").asBoolean()) {
                         completed++;
@@ -1553,6 +1556,9 @@ public class EoEventService {
                 Iterator<Map.Entry<String, JsonNode>> fields = root.fields();
                 while (fields.hasNext()) {
                     Map.Entry<String, JsonNode> field = fields.next();
+                    if (field.getKey() != null && field.getKey().startsWith("__META_")) {
+                        continue;
+                    }
                     JsonNode val = field.getValue();
                     if (val.isObject() && val.has("isCompleted") && val.get("isCompleted").asBoolean()) {
                         completed++;
@@ -2070,7 +2076,7 @@ public class EoEventService {
             return "/api/v1/eo/events/images/" + savedFilename;
         } catch (java.io.IOException e) {
             log.error("Lỗi khi lưu tệp ảnh sự kiện: {}", e.getMessage(), e);
-            throw new BadRequestException("Không thể lưu tệp ảnh: " + e.getMessage());
+            throw new BadRequestException("Không thể lưu tệp ảnh sự kiện. Vui lòng thử lại.");
         }
     }
 

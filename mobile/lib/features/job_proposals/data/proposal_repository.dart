@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import '../models/dispute_models.dart';
 import '../models/proposal_models.dart';
 
@@ -15,7 +16,7 @@ class RepositoryException implements Exception {
   const RepositoryException(this.message, [this.originalError]);
 
   @override
-  String toString() => originalError != null ? '$message ($originalError)' : message;
+  String toString() => message;
 }
 
 final proposalRepositoryProvider = Provider<ProposalRepository>((ref) {
@@ -72,19 +73,7 @@ class ProposalRepository {
   static const bool demoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);
 
   String _extractErrorMessage(dynamic error, String fallback) {
-    if (error is DioException) {
-      final resData = error.response?.data;
-      if (resData is Map && resData['message'] != null) {
-        return resData['message'].toString();
-      }
-      if (error.type == DioExceptionType.connectionTimeout || error.type == DioExceptionType.receiveTimeout) {
-        return 'Hết thời gian chờ kết nối máy chủ.';
-      }
-      if (error.type == DioExceptionType.connectionError) {
-        return 'Không thể kết nối đến máy chủ CANi.';
-      }
-    }
-    return fallback;
+    return AppErrorFormatter.format(error, fallback: fallback);
   }
 
   // Lấy các đề xuất việc làm đang chờ Worker phản hồi

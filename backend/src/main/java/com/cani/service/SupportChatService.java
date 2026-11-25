@@ -575,7 +575,7 @@ public class SupportChatService {
                         return "/api/v1/support/chat/attachments/" + savedFilename;
                 } catch (IOException e) {
                         log.error("Lỗi khi lưu tệp đính kèm chat: {}", e.getMessage(), e);
-                        throw new BadRequestException("Không thể lưu tệp đính kèm: " + e.getMessage());
+                        throw new BadRequestException("Không thể lưu tệp đính kèm. Vui lòng thử lại.");
                 }
         }
 

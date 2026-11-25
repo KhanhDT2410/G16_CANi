@@ -1199,7 +1199,7 @@ public class WorkerJobService {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
         if (assignment.getStatus() != AssignmentStatus.CHECKED_IN) {
-            throw new BadRequestException("Bạn phải check-in vào ca trước khi tích chọn đầu việc (trạng thái hiện tại: " + assignment.getStatus() + ")");
+            throw new BadRequestException("Bạn phải check-in vào ca trước khi tích chọn đầu việc.");
         }
 
         Shift shift = assignment.getShift();
@@ -1249,7 +1249,7 @@ public class WorkerJobService {
             shiftAssignmentRepository.save(assignment);
         } catch (Exception e) {
             log.error("Không thể lưu checklist progress của Assignment {}: {}", assignmentId, e.getMessage());
-            throw new BadRequestException("Không thể lưu tiến độ checklist: " + e.getMessage());
+            throw new BadRequestException("Không thể lưu tiến độ công việc. Vui lòng thử lại.");
         }
 
         List<String> newlyCompletedLabels = new ArrayList<>();
@@ -1326,19 +1326,6 @@ public class WorkerJobService {
                     assignment.setChecklistProgress(objectMapper.writeValueAsString(progressMap));
                     shiftAssignmentRepository.save(assignment);
                 } catch (Exception ignored) {}
-            }
-            if (!newlyCompletedLabels.isEmpty() && shift != null) {
-                String evName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện";
-                String completedTasksText = String.join(", ", newlyCompletedLabels);
-                sendEoShiftNotification(
-                        shift,
-                        "Cập nhật tiến độ công việc",
-                        worker.getFullName() + " vừa hoàn thành đầu việc \"" + completedTasksText + "\" (" + completedCount + "/"
-                                + Math.max(1, templateItems.size()) + ") trong ca \"" + shift.getJobType() + "\" (" + evName + ").",
-                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
-                        assignmentId,
-                        worker.getWorkerId()
-                );
             }
         }
 
@@ -1686,7 +1673,7 @@ public class WorkerJobService {
             return "/api/v1/workers/proof/" + savedFilename;
         } catch (java.io.IOException e) {
             log.error("Lỗi khi lưu tệp ảnh bằng chứng nghiệm thu ca làm: {}", e.getMessage(), e);
-            throw new BadRequestException("Không thể lưu tệp ảnh: " + e.getMessage());
+            throw new BadRequestException("Không thể lưu tệp ảnh bằng chứng. Vui lòng thử lại.");
         }
     }
 

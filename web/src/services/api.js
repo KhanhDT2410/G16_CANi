@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizeAxiosError } from '../utils/errorFormatter';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
@@ -63,9 +64,9 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Nếu không phải lỗi 401 hoặc không có request config, reject bình thường
+    // Nếu không phải lỗi 401 hoặc không có request config, chuẩn hóa thông báo lỗi tiếng Việt
     if (error.response?.status !== 401 || !originalRequest) {
-      return Promise.reject(error);
+      return Promise.reject(normalizeAxiosError(error));
     }
 
     // Nếu chính endpoint auth hoặc request đã retry 1 lần mà vẫn 401 -> force logout
@@ -75,13 +76,13 @@ apiClient.interceptors.response.use(
       originalRequest._retry
     ) {
       handleForceLogout();
-      return Promise.reject(error);
+      return Promise.reject(normalizeAxiosError(error));
     }
 
     const refreshToken = localStorage.getItem('cani_refresh_token');
     if (!refreshToken) {
       handleForceLogout();
-      return Promise.reject(error);
+      return Promise.reject(normalizeAxiosError(error));
     }
 
     // Nếu đang có 1 request khác tiến hành refresh token, xếp request này vào hàng đợi
@@ -127,7 +128,7 @@ apiClient.interceptors.response.use(
     } catch (refreshErr) {
       processQueue(refreshErr, null);
       handleForceLogout();
-      return Promise.reject(refreshErr);
+      return Promise.reject(normalizeAxiosError(refreshErr));
     } finally {
       isRefreshing = false;
     }

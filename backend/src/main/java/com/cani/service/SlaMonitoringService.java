@@ -96,8 +96,8 @@ public class SlaMonitoringService {
             }
 
             String deadlineText = TIME_FORMATTER.format(ticket.getSlaDeadline());
-            String title = "Cảnh báo quá hạn SLA phiếu hỗ trợ";
-            String body = String.format("Phiếu hỗ trợ #%s ('%s') đã quá hạn xử lý (Hạn chót SLA: %s). Vui lòng tiếp nhận và xử lý ngay.",
+            String title = "Cảnh báo quá hạn xử lý phiếu hỗ trợ";
+            String body = String.format("Phiếu hỗ trợ #%s ('%s') đã quá hạn xử lý (Hạn chót: %s). Vui lòng tiếp nhận và xử lý ngay.",
                     ticket.getReferenceNo(), ticket.getSubject(), deadlineText);
 
             if (ticket.getAssignedTo() != null) {
@@ -141,8 +141,8 @@ public class SlaMonitoringService {
             }
 
             String deadlineText = dispute.getSlaDeadline() != null ? TIME_FORMATTER.format(dispute.getSlaDeadline()) : "Chưa xác định";
-            String title = "Cảnh báo quá hạn SLA tranh chấp";
-            String body = String.format("Tranh chấp '%s' (Mã: %s) đã quá hạn xử lý sơ bộ theo SLA (Hạn chót: %s). Yêu cầu Chăm sóc khách hàng ưu tiên thẩm định.",
+            String title = "Cảnh báo quá hạn xử lý tranh chấp";
+            String body = String.format("Tranh chấp '%s' (Mã: %s) đã quá hạn xử lý sơ bộ theo quy định (Hạn chót: %s). Yêu cầu Chăm sóc khách hàng ưu tiên thẩm định.",
                     dispute.getTitle(), dispute.getDisputeId(), deadlineText);
 
             if (dispute.getAssignedTo() != null) {

@@ -2302,4 +2302,49 @@ class WorkerJobServiceTest {
         verify(shiftRepository, never()).incrementConfirmedWorkersAtomic(any());
         verify(shiftAssignmentRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Checklist Notification - Chỉ thông báo cho EO khi Worker tích xong 100% đầu việc và đủ minh chứng")
+    void updateShiftChecklist_NotifiesEoOnlyWhenAllItemsCompleted() {
+        NotificationService mockNotificationService = mock(NotificationService.class);
+        ReflectionTestUtils.setField(workerJobService, "notificationService", mockNotificationService);
+        UUID eoUserId = mockEvent.getEventOrganizer().getUser().getUserId();
+
+        UUID assignmentId = UUID.randomUUID();
+        activeShift.setChecklist("[{\"id\":\"t1\",\"title\":\"Đầu việc 1\",\"isRequiredEvidence\":false},{\"id\":\"t2\",\"title\":\"Đầu việc 2\",\"isRequiredEvidence\":false}]");
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId)
+                .shift(activeShift)
+                .worker(worker)
+                .status(AssignmentStatus.CHECKED_IN)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        // 1. Tích mới 1/2 đầu việc -> KHÔNG gửi thông báo cho EO
+        UpdateChecklistRequestDto partialReq = UpdateChecklistRequestDto.builder()
+                .items(List.of(ShiftChecklistItemDto.builder().id("t1").isCompleted(true).build()))
+                .build();
+        workerJobService.updateShiftChecklist(userId, assignmentId, partialReq);
+        verify(mockNotificationService, never()).createAndSend(any(), any(), any(), any(), any(), any(), any());
+
+        // 2. Tích nốt đầu việc còn lại (2/2) -> Gửi 1 thông báo chờ nghiệm thu cho EO
+        UpdateChecklistRequestDto fullReq = UpdateChecklistRequestDto.builder()
+                .items(List.of(
+                        ShiftChecklistItemDto.builder().id("t1").isCompleted(true).build(),
+                        ShiftChecklistItemDto.builder().id("t2").isCompleted(true).build()
+                ))
+                .build();
+        workerJobService.updateShiftChecklist(userId, assignmentId, fullReq);
+        verify(mockNotificationService, times(1)).createAndSend(
+                eq(eoUserId),
+                eq("Nhân sự hoàn thành công việc · Chờ nghiệm thu"),
+                contains("100%"),
+                eq(NotificationType.ASSIGNMENT),
+                eq("SHIFT"),
+                eq(activeShift.getShiftId()),
+                any()
+        );
+    }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -213,7 +214,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     } catch (e) {
       if (mounted) {
         setState(() {
-          _gpsError = 'Không lấy được GPS ($e)';
+          _gpsError = 'Không lấy được vị trí GPS hiện tại. Vui lòng thử lại.';
           _isLoadingGps = false;
         });
       }
@@ -242,7 +243,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       if (mounted) {
         setState(() {
           _isLoadingChecklist = false;
-          _checklistError = e.toString().replaceFirst('Exception: ', '');
+          _checklistError = AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách đầu việc.');
         });
       }
     }
@@ -476,7 +477,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         _uploadingIndexNotifier.value = null;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Không thể tải ảnh nghiệm thu: $e'),
+            content: Text(AppErrorFormatter.format(e, fallback: 'Không thể tải ảnh nghiệm thu.')),
             backgroundColor: cani.danger,
           ),
         );
@@ -530,7 +531,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể mở Google Maps: $e')),
+          const SnackBar(content: Text('Không thể mở ứng dụng bản đồ.')),
         );
       }
     }

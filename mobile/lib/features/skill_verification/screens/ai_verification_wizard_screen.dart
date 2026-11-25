@@ -71,7 +71,7 @@ class _AiVerificationWizardScreenState extends ConsumerState<AiVerificationWizar
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to select file: $e')),
+          const SnackBar(content: Text('Không thể chọn tệp. Vui lòng thử lại.')),
         );
       }
     }

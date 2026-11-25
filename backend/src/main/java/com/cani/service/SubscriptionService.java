@@ -408,9 +408,16 @@ public class SubscriptionService {
 
         // Lưu đơn hàng bền vững vào DB trước khi gọi PayOS Gateway (Chặn mất mát order khi restart/multi-instance)
         if (payOSOrderRepository != null) {
+            UUID planId = null;
+            if (planRepository != null) {
+                planId = planRepository.findFirstByPlanType(plan.getPlanType())
+                        .map(Plan::getPlanId)
+                        .orElse(null);
+            }
             PayOSOrder payOSOrder = PayOSOrder.builder()
                     .orderCode(orderCode)
                     .eoId(eo.getEoId())
+                    .planId(planId)
                     .planType(plan.getPlanType())
                     .amount(plan.getPrice())
                     .status("PENDING")
@@ -694,7 +701,6 @@ public class SubscriptionService {
 
         subscription = subscriptionRepository.save(subscription);
 
-        eo.setSubscription(subscription);
         eo.setSubscriptionExpiresAt(expiresAt);
         eventOrganizerRepository.save(eo);
 

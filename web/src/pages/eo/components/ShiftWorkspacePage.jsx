@@ -1292,7 +1292,7 @@ export default function ShiftWorkspacePage({
                             type="button"
                             onClick={() => setPreviewImage({
                               url: workerQrUrl,
-                              title: `Mã VietQR nhận lương của ${item.workerName} (${item.bankCode || ''} ${item.bankAccountNumber || ''})`,
+                              title: `Mã VietQR nhận lương của ${item.workerName} (${item.bankCode || ''} ${item.bankAccountNumberMasked || item.bankAccountNumber || ''})`,
                             })}
                             style={{
                               background: '#f5f3ff',

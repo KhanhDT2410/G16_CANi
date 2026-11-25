@@ -34,11 +34,14 @@ public class SupportTicket {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "reference_no", nullable = false, unique = true, length = 30)
+    @Column(name = "reference_no", nullable = false, unique = true, length = 50)
     private String referenceNo;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
+
+    @Column(name = "conversation_id")
+    private UUID conversationId;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)

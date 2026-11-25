@@ -57,10 +57,6 @@ public class EventOrganizer {
     @Builder.Default
     private Integer totalEventsCompleted = 0;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "subscription_id")
-    private Subscription subscription;
-
     @Column(name = "subscription_expires_at")
     private Instant subscriptionExpiresAt;
 

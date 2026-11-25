@@ -104,6 +104,9 @@ public class WorkerJobService {
     private DisputeRepository disputeRepository;
 
     @Autowired(required = false)
+    private EkycConsentRecordRepository consentRecordRepository;
+
+    @Autowired(required = false)
     private WorkerShiftEligibilityService workerShiftEligibilityService;
 
     @Autowired(required = false)
@@ -939,6 +942,7 @@ public class WorkerJobService {
         return WorkerBankAccountDto.builder()
                 .bankCode(worker.getBankCode())
                 .bankAccountNumber(worker.getBankAccountNumber())
+                .bankAccountNumberMasked(worker.getBankAccountNumberMasked())
                 .bankAccountName(name)
                 .vietQrUrl(vietQr)
                 .build();
@@ -960,7 +964,20 @@ public class WorkerJobService {
 
         workerRepository.save(worker);
         log.info("Worker {} đã cập nhật tài khoản ngân hàng thụ hưởng: Bank={}, AccNum={}",
-                userId, worker.getBankCode(), worker.getBankAccountNumber());
+                userId, worker.getBankCode(), worker.getBankAccountNumberMasked());
+
+        if (consentRecordRepository != null) {
+            try {
+                consentRecordRepository.save(EkycConsentRecord.builder()
+                        .userId(userId)
+                        .targetRole("WORKER")
+                        .noticeVersion("PAYMENT_PAYOUT_CONSENT_V1")
+                        .consentedAt(Instant.now())
+                        .build());
+            } catch (Exception e) {
+                log.warn("Không thể lưu bản ghi đồng thuận thanh toán cho worker {}: {}", userId, e.getMessage());
+            }
+        }
 
         return getBankAccount(userId);
     }

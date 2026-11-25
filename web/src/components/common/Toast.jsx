@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './Toast.css';
 
 let toastHandler = null;
@@ -45,8 +46,10 @@ export const ToastContainer = () => {
     }
   };
 
-  return (
-    <div className="toast-container">
+  if (toasts.length === 0) return null;
+
+  return createPortal(
+    <div className="toast-container" role="region" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} className={`toast-item ${t.type}`}>
           <span className="toast-icon">{getIcon(t.type)}</span>
@@ -56,6 +59,7 @@ export const ToastContainer = () => {
           </button>
         </div>
       ))}
-    </div>
+    </div>,
+    document.body
   );
 };

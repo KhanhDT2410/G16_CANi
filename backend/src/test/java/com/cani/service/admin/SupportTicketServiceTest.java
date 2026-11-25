@@ -5,11 +5,14 @@ import com.cani.service.*;
 import com.cani.dto.support.AssignTicketRequestDto;
 import com.cani.dto.support.CloseTicketRequestDto;
 import com.cani.dto.support.CreateTicketRequestDto;
+import com.cani.dto.support.EscalateChatToTicketRequestDto;
 import com.cani.dto.support.ReplyTicketRequestDto;
 import com.cani.dto.support.SupportTicketQueueItemDto;
 import com.cani.dto.support.SupportTicketResponseDto;
 import com.cani.entity.AuditLog;
 import com.cani.entity.Notification;
+import com.cani.entity.SupportConversation;
+import com.cani.entity.SupportMessage;
 import com.cani.entity.SupportTicket;
 import com.cani.entity.SupportTicketMessage;
 import com.cani.entity.User;
@@ -19,6 +22,8 @@ import com.cani.entity.enums.TicketStatus;
 import com.cani.entity.enums.UserRole;
 import com.cani.exception.BadRequestException;
 import com.cani.repository.NotificationRepository;
+import com.cani.repository.SupportConversationRepository;
+import com.cani.repository.SupportMessageRepository;
 import com.cani.repository.SupportTicketMessageRepository;
 import com.cani.repository.SupportTicketRepository;
 import com.cani.repository.UserRepository;
@@ -54,6 +59,8 @@ class SupportTicketServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private NotificationRepository notificationRepository;
     @Mock private AuditLogService auditLogService;
+    @Mock private SupportConversationRepository supportConversationRepository;
+    @Mock private SupportMessageRepository supportMessageRepository;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
@@ -75,6 +82,9 @@ class SupportTicketServiceTest {
         normalUser = User.builder().userId(userId).role(UserRole.WORKER).build();
         ccUser = User.builder().userId(ccId).role(UserRole.CUSTOMER_CARE).build();
         strangerUser = User.builder().userId(strangerId).role(UserRole.WORKER).build();
+
+        org.springframework.test.util.ReflectionTestUtils.setField(supportTicketService, "supportConversationRepository", supportConversationRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(supportTicketService, "supportMessageRepository", supportMessageRepository);
     }
 
     @Test
@@ -508,5 +518,43 @@ class SupportTicketServiceTest {
         assertThatThrownBy(() -> supportTicketService.loadAttachment("../secret.txt"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Tên tệp không hợp lệ");
+    }
+
+    @Test
+    @DisplayName("Escalate chat sang ticket: liên kết conversationId, cập nhật activeTicketId và lưu tin nhắn hệ thống")
+    void testEscalateChatToTicket_Success() {
+        UUID conversationId = UUID.randomUUID();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(conversationId)
+                .userId(userId)
+                .build();
+
+        when(supportConversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(normalUser));
+        when(userRepository.findById(ccId)).thenReturn(Optional.of(ccUser));
+        when(supportTicketRepository.save(any(SupportTicket.class))).thenAnswer(invocation -> {
+            SupportTicket t = invocation.getArgument(0);
+            t.setId(UUID.randomUUID());
+            return t;
+        });
+
+        EscalateChatToTicketRequestDto request = EscalateChatToTicketRequestDto.builder()
+                .category(TicketCategory.BILLING)
+                .priority(TicketPriority.HIGH)
+                .subject("Khiếu nại đối soát thù lao từ Live Chat")
+                .customDescription("Khách hàng khiếu nại chưa nhận được tiền ca tối qua.")
+                .build();
+
+        SupportTicketResponseDto res = supportTicketService.escalateChatToTicket(conversationId, request, ccId);
+
+        assertThat(res).isNotNull();
+        assertThat(res.getCategory()).isEqualTo(TicketCategory.BILLING);
+        assertThat(res.getPriority()).isEqualTo(TicketPriority.HIGH);
+        assertThat(res.getConversationId()).isEqualTo(conversationId);
+        assertThat(conversation.getActiveTicketId()).isEqualTo(res.getId());
+
+        verify(supportConversationRepository).save(conversation);
+        verify(supportTicketMessageRepository).save(any(SupportTicketMessage.class));
+        verify(supportMessageRepository).save(any(SupportMessage.class));
     }
 }

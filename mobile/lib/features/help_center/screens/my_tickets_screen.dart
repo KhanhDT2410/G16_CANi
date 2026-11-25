@@ -9,8 +9,9 @@ import 'package:cani/features/help_center/screens/create_ticket_screen.dart';
 class MyTicketsScreen extends ConsumerWidget {
   const MyTicketsScreen({super.key});
 
-  static void showDetailModal(BuildContext context, String ticketId) {
-    showModalBottomSheet(
+  static Future<void> showDetailModal(BuildContext context, WidgetRef ref, String ticketId) async {
+    ref.invalidate(ticketDetailProvider(ticketId));
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
@@ -19,10 +20,11 @@ class MyTicketsScreen extends ConsumerWidget {
       ),
       builder: (_) => _TicketDetailModal(ticketId: ticketId),
     );
+    ref.invalidate(myTicketsProvider);
   }
 
-  void _showTicketDetail(BuildContext context, WidgetRef ref, SupportTicketModel ticket) {
-    showDetailModal(context, ticket.id);
+  void _showTicketDetail(BuildContext context, WidgetRef ref, SupportTicketModel ticket) async {
+    await showDetailModal(context, ref, ticket.id);
   }
 
   @override
@@ -94,7 +96,7 @@ class MyTicketsScreen extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(myTicketsProvider),
+            onRefresh: () => ref.refresh(myTicketsProvider.future),
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 80),
               itemCount: tickets.length,
@@ -241,10 +243,31 @@ class _TicketDetailModalState extends ConsumerState<_TicketDetailModal> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              ticket.referenceNo,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                            Row(
+                              children: [
+                                Text(
+                                  ticket.referenceNo,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: ticket.statusBgColor,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    ticket.statusLabel,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: ticket.statusColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                            const SizedBox(height: 2),
                             Text(
                               ticket.subject,
                               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
@@ -261,38 +284,60 @@ class _TicketDetailModalState extends ConsumerState<_TicketDetailModal> {
                 ),
                 const Divider(height: 1),
 
-                // Danh sách trao đổi
+                // Danh sách trao đổi (hỗ trợ kéo xuống để làm mới)
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      // Tin nhắn gốc của ticket
-                      _buildMessageBubble(
-                        author: 'Tôi (Người tạo yêu cầu)',
-                        role: ticket.categoryLabel,
-                        text: ticket.description,
-                        isStaff: false,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Tin nhắn phản hồi tiếp theo
-                      ...ticket.messages.map((m) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildMessageBubble(
-                            author: m.authorName,
-                            role: m.isStaffReply ? 'CSKH CANi' : 'Tôi',
-                            text: m.message,
-                            isStaff: m.isStaffReply,
-                          ),
-                        );
-                      }),
-                    ],
+                  child: RefreshIndicator(
+                    onRefresh: () => ref.refresh(ticketDetailProvider(widget.ticketId).future),
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        if (ticket.messages.isEmpty)
+                          _buildMessageBubble(
+                            author: 'Tôi',
+                            role: ticket.categoryLabel,
+                            text: ticket.description,
+                            isStaff: false,
+                          )
+                        else
+                          ...ticket.messages.map((m) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildMessageBubble(
+                                author: m.authorName,
+                                role: m.authorRole,
+                                text: m.message,
+                                isStaff: m.isStaffReply,
+                              ),
+                            );
+                          }),
+                      ],
+                    ),
                   ),
                 ),
 
-                // Thanh gửi phản hồi
-                if (ticket.status != 'CLOSED')
+                // Thanh trạng thái: Đã đóng hoặc Nhập tin nhắn phản hồi
+                if (ticket.status == 'CLOSED')
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF8FAFC),
+                      border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Phiếu hỗ trợ đã được đóng và xử lý hoàn tất',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  )
+                else
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: const BoxDecoration(

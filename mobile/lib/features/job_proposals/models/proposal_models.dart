@@ -149,6 +149,7 @@ class ShiftAssignmentItem {
   final bool? hasWorkerReviewed;
   final String? bankCode;
   final String? bankAccountNumber;
+  final String? bankAccountNumberMasked;
   final String? bankAccountName;
   final String? vietQrUrl;
 
@@ -197,6 +198,7 @@ class ShiftAssignmentItem {
     this.hasWorkerReviewed,
     this.bankCode,
     this.bankAccountNumber,
+    this.bankAccountNumberMasked,
     this.bankAccountName,
     this.vietQrUrl,
   });
@@ -263,6 +265,7 @@ class ShiftAssignmentItem {
       hasWorkerReviewed: json['hasWorkerReviewed'] as bool?,
       bankCode: json['bankCode'] as String?,
       bankAccountNumber: json['bankAccountNumber'] as String?,
+      bankAccountNumberMasked: json['bankAccountNumberMasked'] as String?,
       bankAccountName: json['bankAccountName'] as String?,
       vietQrUrl: json['vietQrUrl'] as String?,
     );

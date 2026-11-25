@@ -41,14 +41,14 @@ final filteredFaqsProvider = Provider<AsyncValue<List<FaqItemModel>>>((ref) {
   });
 });
 
-/// Provider danh sách yêu cầu hỗ trợ của tôi
-final myTicketsProvider = FutureProvider<List<SupportTicketModel>>((ref) async {
+/// Provider danh sách yêu cầu hỗ trợ của tôi (tự hủy cache khi thoát màn hình để luôn fetch mới)
+final myTicketsProvider = FutureProvider.autoDispose<List<SupportTicketModel>>((ref) async {
   final repo = ref.watch(helpCenterRepositoryProvider);
   return repo.fetchMyTickets();
 });
 
 /// Đếm số yêu cầu hỗ trợ đang chờ xử lý (OPEN hoặc IN_PROGRESS)
-final pendingTicketsCountProvider = Provider<int>((ref) {
+final pendingTicketsCountProvider = Provider.autoDispose<int>((ref) {
   final ticketsAsync = ref.watch(myTicketsProvider);
   return ticketsAsync.maybeWhen(
     data: (tickets) => tickets
@@ -58,9 +58,9 @@ final pendingTicketsCountProvider = Provider<int>((ref) {
   );
 });
 
-/// Provider chi tiết một yêu cầu hỗ trợ
+/// Provider chi tiết một yêu cầu hỗ trợ (tự hủy cache khi đóng modal)
 final ticketDetailProvider =
-    FutureProvider.family<SupportTicketModel, String>((ref, id) async {
+    FutureProvider.autoDispose.family<SupportTicketModel, String>((ref, id) async {
   final repo = ref.watch(helpCenterRepositoryProvider);
   return repo.fetchTicketDetail(id);
 });

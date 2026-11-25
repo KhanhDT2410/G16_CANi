@@ -8,7 +8,7 @@ export const TransferTicketModal = ({ isOpen, onClose, onConfirm, ticket, staff 
     if (isOpen) {
       setTargetCcUserId('');
       if (staff.length === 0) {
-        showToast('Không có nhân sự Chăm sóc khách hàng nào khả dụng', 'warning');
+        showToast('Không có nhân sự hỗ trợ nào khả dụng', 'warning');
       }
     }
   }, [isOpen, staff.length]);
@@ -18,7 +18,7 @@ export const TransferTicketModal = ({ isOpen, onClose, onConfirm, ticket, staff 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!targetCcUserId) {
-      showToast('Vui lòng chọn chuyên viên CSKH tiếp nhận phiếu', 'warning');
+      showToast('Vui lòng chọn chuyên viên tiếp nhận phiếu', 'warning');
       return;
     }
 
@@ -41,12 +41,12 @@ export const TransferTicketModal = ({ isOpen, onClose, onConfirm, ticket, staff 
         <form onSubmit={handleSubmit}>
           <div className="ticket-modal-body">
             <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-              Chuyển quyền tiếp nhận và xử lý phiếu hỗ trợ này cho chuyên viên khác trong đội Customer Care.
+              Chuyển quyền tiếp nhận và xử lý phiếu hỗ trợ này cho chuyên viên khác trong đội ngũ hỗ trợ.
             </p>
 
             <div className="ticket-form-group">
               <label className="ticket-form-label">
-                Chuyên Viên CSKH Tiếp Nhận *
+                Chuyên viên tiếp nhận *
               </label>
               <select
                 className="ticket-form-select"
@@ -54,7 +54,7 @@ export const TransferTicketModal = ({ isOpen, onClose, onConfirm, ticket, staff 
                 onChange={(e) => setTargetCcUserId(e.target.value)}
                 required
               >
-                <option value="">-- Chọn chuyên viên CSKH --</option>
+                <option value="">-- Chọn chuyên viên tiếp nhận --</option>
                 {staff.map((s) => (
                   <option key={s.userId} value={s.userId}>
                     {s.fullName || s.email || s.userId}

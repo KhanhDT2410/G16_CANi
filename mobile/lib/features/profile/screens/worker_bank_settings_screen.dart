@@ -23,6 +23,8 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
   final TextEditingController _accountNumberCtrl = TextEditingController();
   final TextEditingController _accountNameCtrl = TextEditingController();
 
+  bool _obscureAccount = false;
+  bool _consentAgreed = true;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -110,6 +112,15 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
 
   Future<void> _saveBankInfo() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_consentAgreed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng đồng ý điều khoản xử lý và bảo mật dữ liệu thanh toán trước khi lưu'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
     final userId = ref.read(authStateProvider).user?.id;
@@ -143,7 +154,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã lưu thông tin tài khoản ngân hàng thành công lên hệ thống'),
+          content: Text('Đã mã hóa (chuẩn FLE AES-256) và lưu thông tin tài khoản ngân hàng thành công'),
           backgroundColor: Color(0xFF059669),
         ),
       );
@@ -368,6 +379,7 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
                     TextFormField(
                       controller: _accountNumberCtrl,
                       keyboardType: TextInputType.number,
+                      obscureText: _obscureAccount,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: InputDecoration(
                         labelText: 'Số tài khoản ngân hàng *',
@@ -375,6 +387,14 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
                         filled: true,
                         fillColor: Colors.white,
                         prefixIcon: const Icon(Icons.credit_card, size: 20, color: Color(0xFF64748B)),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureAccount ? Icons.visibility_off : Icons.visibility,
+                            size: 20,
+                            color: const Color(0xFF64748B),
+                          ),
+                          onPressed: () => setState(() => _obscureAccount = !_obscureAccount),
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -476,6 +496,38 @@ class _WorkerBankSettingsScreenState extends ConsumerState<WorkerBankSettingsScr
                       ),
                       const SizedBox(height: 20),
                     ],
+
+                    // ĐỒNG THUẬN BẢO MẬT DỮ LIỆU CÁ NHÂN THEO NGHỊ ĐỊNH 13/2023/NĐ-CP
+                    InkWell(
+                      onTap: () => setState(() => _consentAgreed = !_consentAgreed),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                value: _consentAgreed,
+                                onChanged: (val) => setState(() => _consentAgreed = val ?? true),
+                                activeColor: const Color(0xFF0066FF),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Tôi đồng ý để CANi mã hóa bảo mật thông tin tài khoản (chuẩn FLE AES-256) và chia sẻ cho Ban tổ chức sự kiện để nhận thù lao ca làm việc theo Nghị định 13/2023/NĐ-CP.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
                     // NÚT LƯU THÔNG TIN
                     SizedBox(

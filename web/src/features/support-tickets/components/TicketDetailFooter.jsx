@@ -17,7 +17,7 @@ export const TicketDetailFooter = ({
           onClick={() => onAssign(ticket.id)}
           disabled={loading}
         >
-          Tiếp Nhận Phiếu (Tự Gán)
+          Tiếp nhận xử lý
         </button>
       )}
       {isStaff && ticket.status !== 'CLOSED' && onOpenTransferModal && (
@@ -27,7 +27,7 @@ export const TicketDetailFooter = ({
           onClick={() => onOpenTransferModal(ticket)}
           disabled={loading}
         >
-          Chuyển Phiếu Cho CC Khác
+          Chuyển chuyên viên khác
         </button>
       )}
       {isStaff && ticket.status !== 'CLOSED' && (
@@ -37,7 +37,7 @@ export const TicketDetailFooter = ({
           onClick={() => onOpenCloseModal(ticket)}
           disabled={loading}
         >
-          Đóng Phiếu Kèm Kết Luận
+          Đóng phiếu hỗ trợ
         </button>
       )}
       {!isStaff && ticket.status !== 'CLOSED' && (
@@ -47,11 +47,11 @@ export const TicketDetailFooter = ({
           onClick={() => onResolve(ticket.id)}
           disabled={loading}
         >
-          Vấn Đề Đã Được Giải Quyết
+          Xác nhận đã giải quyết
         </button>
       )}
       <button type="button" className="ticket-btn ticket-btn-secondary" onClick={onClose}>
-        Đóng Cửa Sổ
+        Đóng
       </button>
     </div>
   );

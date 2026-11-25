@@ -23,6 +23,7 @@ public class SupportTicketQueueItemDto {
 
     private UUID id;
     private String referenceNo;
+    private UUID conversationId;
     private TicketCategory category;
     private TicketPriority priority;
     private String subject;

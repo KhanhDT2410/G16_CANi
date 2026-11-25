@@ -39,7 +39,7 @@ export const CloseTicketModal = ({ isOpen, onClose, onConfirm, ticket, loading }
 
             <div className="ticket-form-group">
               <label className="ticket-form-label">
-                Kết Luận & Lý Do Đóng Phiếu * (Tối thiểu 30 ký tự)
+                Kết luận và lý do đóng phiếu *
               </label>
               <textarea
                 className="ticket-form-textarea"

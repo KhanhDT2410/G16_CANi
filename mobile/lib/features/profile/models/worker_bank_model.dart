@@ -1,12 +1,14 @@
 class WorkerBankModel {
   final String? bankCode;
   final String? bankAccountNumber;
+  final String? bankAccountNumberMasked;
   final String? bankAccountName;
   final String? vietQrUrl;
 
   const WorkerBankModel({
     this.bankCode,
     this.bankAccountNumber,
+    this.bankAccountNumberMasked,
     this.bankAccountName,
     this.vietQrUrl,
   });
@@ -21,6 +23,7 @@ class WorkerBankModel {
     return WorkerBankModel(
       bankCode: json['bankCode'] as String?,
       bankAccountNumber: json['bankAccountNumber'] as String?,
+      bankAccountNumberMasked: json['bankAccountNumberMasked'] as String?,
       bankAccountName: json['bankAccountName'] as String?,
       vietQrUrl: json['vietQrUrl'] as String?,
     );
@@ -30,6 +33,7 @@ class WorkerBankModel {
     return {
       'bankCode': bankCode,
       'bankAccountNumber': bankAccountNumber,
+      'bankAccountNumberMasked': bankAccountNumberMasked,
       'bankAccountName': bankAccountName,
       'vietQrUrl': vietQrUrl,
     };

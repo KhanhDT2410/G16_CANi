@@ -9,6 +9,7 @@ import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/screens/complete_profile_screen.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
+import 'package:cani/features/help_center/providers/help_center_providers.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
@@ -190,6 +191,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         }
         ref.invalidate(assignmentsListProvider);
         ref.invalidate(incomeSummaryProvider);
+        ref.invalidate(myTicketsProvider);
+        for (final n in visibleArrived) {
+          final refType = n['referenceType']?.toString();
+          final refId = n['referenceId']?.toString();
+          if (refType == 'SUPPORT_TICKET' && refId != null) {
+            ref.invalidate(ticketDetailProvider(refId));
+          }
+        }
         if (isOnline && ref.read(ekycProvider).result?.isApproved == true) {
           ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
         }

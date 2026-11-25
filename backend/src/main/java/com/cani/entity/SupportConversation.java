@@ -34,6 +34,9 @@ public class SupportConversation {
     @Column(name = "dispute_party", length = 20)
     private String disputeParty;
 
+    @Column(name = "active_ticket_id")
+    private UUID activeTicketId;
+
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = "ACTIVE";

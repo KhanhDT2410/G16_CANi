@@ -23,6 +23,7 @@ public class SupportTicketResponseDto {
 
     private UUID id;
     private String referenceNo;
+    private UUID conversationId;
     private UUID userId;
     private String userName;
     private String userPhone;
@@ -55,7 +56,11 @@ public class SupportTicketResponseDto {
         private UUID id;
         private UUID ticketId;
         private UUID senderId;
+        private String senderName;
+        private String senderRole;
+        private Boolean isStaffReply;
         private String body;
+        private String message;
         private Boolean isInternal;
         private String attachmentUrl;
         private Instant createdAt;

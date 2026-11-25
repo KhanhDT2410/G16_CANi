@@ -248,7 +248,7 @@ const PublishEventModal = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '1.25rem' }}>⚡</span>
+                <strong>Nhắc nhở:</strong>
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e40af' }}>
                   YÊU CẦU GÓI DỊCH VỤ MATCHING ENGINE
                 </span>

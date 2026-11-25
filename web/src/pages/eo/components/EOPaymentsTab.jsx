@@ -248,7 +248,7 @@ export default function EOPaymentsTab({
                             })}
                             style={{ background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
-                            📱 QR
+                            QR
                           </button>
                         )}
                       </div>

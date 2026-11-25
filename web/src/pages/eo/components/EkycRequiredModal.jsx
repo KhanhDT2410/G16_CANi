@@ -63,14 +63,6 @@ export default function EkycRequiredModal({ isOpen, onClose, onNavigateToEkyc, e
           </svg>
         </button>
 
-        <div className="ekyc-required-icon-wrapper">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>
-
         <h3 className="ekyc-required-title">Yêu Cầu Xác Thực Định Danh</h3>
         <p className="ekyc-required-desc">
           Để tạo sự kiện, điều phối ca làm và xuất bản tin tuyển dụng nhân sự trên CANi, bạn cần hoàn tất định danh eKYC điện tử.
@@ -110,9 +102,6 @@ export default function EkycRequiredModal({ isOpen, onClose, onNavigateToEkyc, e
             }}
           >
             <span>Xác Thực eKYC Ngay</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
           </button>
         </div>
       </div>

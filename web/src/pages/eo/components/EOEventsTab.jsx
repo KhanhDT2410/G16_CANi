@@ -424,18 +424,6 @@ export default function EOEventsTab({
 
               <div className="table-header-actions-group">
                 <div className="table-search-input-wrapper">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#94a3b8"
-                    strokeWidth="2.5"
-                    className="search-lens-icon"
-                  >
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
                   <input
                     type="text"
                     aria-label="Tìm theo tên hoặc địa điểm sự kiện"
@@ -483,14 +471,6 @@ export default function EOEventsTab({
             <div className="table-responsive-wrapper">
               {filteredEvents.length === 0 ? (
                 <div className="eo-empty-state-card">
-                  <div className="empty-calendar-icon">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                  </div>
                   <p className="empty-text">
                     {searchQuery || statusFilter !== 'ALL'
                       ? 'Không có sự kiện nào khớp với bộ lọc hiện tại.'
@@ -586,18 +566,6 @@ export default function EOEventsTab({
                           {/* Cột 2: Địa điểm */}
                           <td>
                             <div className="table-venue-cell" style={{ alignItems: 'flex-start' }}>
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="#64748b"
-                                strokeWidth="2"
-                                style={{ flexShrink: 0, marginTop: '2px' }}
-                              >
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                <circle cx="12" cy="10" r="3"></circle>
-                              </svg>
                               <span className="ev-venue-clamp" title={evt.venueAddress}>
                                 {evt.venueAddress || 'Chưa cập nhật địa chỉ'}
                               </span>

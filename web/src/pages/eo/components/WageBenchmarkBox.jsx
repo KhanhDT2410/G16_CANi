@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { eoService } from '../../../services/eoService';
 import {
+  MIN_LEGAL_HOURLY_WAGE,
   buildEvidenceWageBenchmark,
   detectCityFromAddress,
   validateJobType,
@@ -108,8 +109,8 @@ export default function WageBenchmarkBox({
   }
 
   const numericWage = Number(hourlyWage || 0);
-  const isBelowLegalFloor = numericWage > 0 && numericWage < benchmark.legalFloorWage;
-  const isBelowAdminFloor = numericWage > 0 && numericWage < benchmark.minWage;
+  const isAboveLegalFloor = numericWage >= MIN_LEGAL_HOURLY_WAGE;
+  const isBelowRecommendedHint = isAboveLegalFloor && numericWage < benchmark.minWage;
 
   return (
     <div className="ecw-wage-benchmark-container" style={{ margin: '0.25rem 0 0.75rem' }}>
@@ -183,16 +184,16 @@ export default function WageBenchmarkBox({
         </div>
       </div>
 
-      {isBelowAdminFloor && (
+      {isBelowRecommendedHint && (
         <div
           style={{
             fontSize: '0.76rem',
-            color: isBelowLegalFloor ? '#dc2626' : '#d97706',
+            color: '#d97706',
             fontWeight: 600,
             marginTop: '0.25rem',
           }}
         >
-          Gợi ý: Mức thù lao thấp hơn mức tham chiếu tối thiểu ({benchmark.minWage.toLocaleString('vi-VN')}đ/h) — giá ca vẫn do Ban tổ chức quyết định.{' '}
+          Nhắc nhở nhẹ: Mức thù lao đang thấp hơn mức gợi ý tham khảo ({benchmark.minWage.toLocaleString('vi-VN')} VNĐ/giờ) — giá ca vẫn do Ban tổ chức quyết định.{' '}
           <button
             type="button"
             onClick={() => onSelectWage?.(benchmark.minWage)}

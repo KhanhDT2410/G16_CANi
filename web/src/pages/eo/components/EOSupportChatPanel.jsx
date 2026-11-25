@@ -151,7 +151,7 @@ export default function EOSupportChatPanel() {
       <div className="eo-chat-panel-header">
         <div className="eo-chat-header-info">
           <div className="eo-chat-avatar-badge">
-            🎧
+            CSKH
             <span className="eo-chat-online-dot" />
           </div>
           <div className="eo-chat-header-text">
@@ -235,7 +235,7 @@ export default function EOSupportChatPanel() {
           onClick={() => handleSendMessage()}
           disabled={sending || !inputText.trim()}
         >
-          {sending ? 'Đang gửi...' : 'Gửi tin nhắn ✈'}
+          {sending ? 'Đang gửi...' : 'Gửi tin nhắn'}
         </button>
       </div>
     </div>

@@ -68,6 +68,9 @@ public class EoEventService {
     private static final double MIN_BILLABLE_HOURS = 0.5;
     private static final long DEFAULT_SHIFT_MINUTES = 240L;
     private static final BigDecimal DEFAULT_HOURLY_WAGE = BigDecimal.valueOf(50000);
+    public static final BigDecimal LEGAL_MIN_HOURLY_WAGE = new BigDecimal("25000");
+    public static final String LEGAL_MIN_HOURLY_WAGE_ERROR =
+            "Mức thù lao không được thấp hơn mức tối thiểu quy định: 25.000 VNĐ/giờ";
     private static final BigDecimal DEFAULT_RATING = BigDecimal.valueOf(5.0);
 
     private final EventOrganizerRepository eventOrganizerRepository;
@@ -291,7 +294,7 @@ public class EoEventService {
     @Transactional
     public ShiftResponseDto addShiftToEvent(UUID userId, UUID eventId, CreateShiftRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
-        Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
+        Event event = getOwnedEventForUpdateOrThrow(eventId, eo.getEoId());
         validateFutureStartTime(dto.getStartTime(), "Thời gian bắt đầu ca làm việc không được nằm trong quá khứ.");
         validateShiftWithinEvent(event, dto.getStartTime(), dto.getEndTime());
         validateShiftArrivalTime(dto.getStartTime(), dto.getArrivalTime());
@@ -342,6 +345,7 @@ public class EoEventService {
 
         shift = shiftRepository.save(shift);
         persistShiftSkillRequirements(shift, skillConfig, false);
+        shiftRepository.flush();
 
         event.setTotalShifts((event.getTotalShifts() != null ? event.getTotalShifts() : 0) + 1);
         event.setTotalRequiredWorkers((event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workers);
@@ -372,7 +376,7 @@ public class EoEventService {
     @Transactional
     public List<ShiftResponseDto> addBulkShifts(UUID userId, UUID eventId, CreateBulkShiftsRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
-        Event event = getOwnedEventOrThrow(eventId, eo.getEoId());
+        Event event = getOwnedEventForUpdateOrThrow(eventId, eo.getEoId());
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -433,6 +437,7 @@ public class EoEventService {
 
             shift = shiftRepository.save(shift);
             persistShiftSkillRequirements(shift, skillConfig, false);
+            shiftRepository.flush();
 
             event.setTotalShifts((event.getTotalShifts() != null ? event.getTotalShifts() : 0) + 1);
             event.setTotalRequiredWorkers((event.getTotalRequiredWorkers() != null ? event.getTotalRequiredWorkers() : 0) + workers);
@@ -460,7 +465,10 @@ public class EoEventService {
     @Transactional
     public ShiftResponseDto updateShift(UUID userId, UUID shiftId, UpdateShiftRequestDto dto) {
         EventOrganizer eo = getEoOrThrow(userId);
-        Shift shift = getOwnedShiftOrThrow(shiftId, eo.getEoId());
+        Shift shift = getOwnedShiftForUpdateOrThrow(shiftId, eo.getEoId());
+        if (shift.getEvent() != null && shift.getEvent().getEventId() != null) {
+            eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(shift.getEvent().getEventId(), eo.getEoId());
+        }
 
         int workers = dto.getRequiredWorkers();
         BigDecimal allowance = dto.getAllowance() != null ? dto.getAllowance() : BigDecimal.ZERO;
@@ -1322,8 +1330,22 @@ public class EoEventService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sự kiện ID: " + eventId + " thuộc nhà tổ chức này"));
     }
 
+    private Event getOwnedEventForUpdateOrThrow(UUID eventId, UUID eoId) {
+        return eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(eventId, eoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sự kiện ID: " + eventId + " thuộc nhà tổ chức này"));
+    }
+
     private Shift getOwnedShiftOrThrow(UUID shiftId, UUID eoId) {
         Shift shift = shiftRepository.findById(shiftId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ca làm việc ID: " + shiftId));
+        if (shift.getEvent() == null || !shift.getEvent().getEventOrganizer().getEoId().equals(eoId)) {
+            throw new BadRequestException("Bạn không sở hữu ca làm việc này.");
+        }
+        return shift;
+    }
+
+    private Shift getOwnedShiftForUpdateOrThrow(UUID shiftId, UUID eoId) {
+        Shift shift = shiftRepository.findByIdForUpdate(shiftId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ca làm việc ID: " + shiftId));
         if (shift.getEvent() == null || !shift.getEvent().getEventOrganizer().getEoId().equals(eoId)) {
             throw new BadRequestException("Bạn không sở hữu ca làm việc này.");
@@ -1448,8 +1470,8 @@ public class EoEventService {
     }
 
     private void validateShiftHourlyWage(Event event, BigDecimal hourlyWage) {
-        if (hourlyWage == null || hourlyWage.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Thù lao theo giờ phải lớn hơn 0!");
+        if (hourlyWage == null || hourlyWage.compareTo(LEGAL_MIN_HOURLY_WAGE) < 0) {
+            throw new BadRequestException(LEGAL_MIN_HOURLY_WAGE_ERROR);
         }
     }
 

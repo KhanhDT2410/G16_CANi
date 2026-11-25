@@ -66,6 +66,7 @@ const EventCreationWizardModal = ({
     onStepChange?.(nextStep);
   };
   const [submitting, setSubmitting] = useState(false);
+  const submitLockRef = React.useRef(false);
   const [createdEvent, setCreatedEvent] = useState(null);
   const [step1Errors, setStep1Errors] = useState({});
   const [shiftErrors, setShiftErrors] = useState({});
@@ -237,6 +238,7 @@ const EventCreationWizardModal = ({
   };
 
   const handleQuickSplit = async (splitCount) => {
+    if (submitting || submitLockRef.current) return;
     const evtStart = new Date(createdEvent?.startTime || newEvent.startTime);
     const evtEnd = new Date(createdEvent?.endTime || newEvent.endTime);
     if (isNaN(evtStart.getTime()) || isNaN(evtEnd.getTime()) || evtStart >= evtEnd) {
@@ -248,12 +250,29 @@ const EventCreationWizardModal = ({
       return;
     }
 
+    const rawWage = Number(currentShift.hourlyWage || 0);
+    const safeWage = rawWage > 0 ? rawWage : 50000;
+    const quickWageCheck = validateShiftWageAgainstFloor({
+      hourlyWage: safeWage,
+      benchmark: currentShiftBenchmark,
+      city: regionInfo.city,
+      venueAddress: activeAddress,
+      venueLat: activeLat,
+      venueLng: activeLng,
+    });
+    if (!quickWageCheck.isValid) {
+      setShiftErrors((prev) => ({ ...prev, hourlyWage: quickWageCheck.error }));
+      showToast(quickWageCheck.error, 'error');
+      return;
+    }
+
     const totalMs = evtEnd.getTime() - evtStart.getTime();
     const slotMs = totalMs / splitCount;
 
+    submitLockRef.current = true;
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
-      const safeWage = Number(currentShift.hourlyWage || 0) > 0 ? Number(currentShift.hourlyWage) : 50000;
       const safeAllowance = Math.max(0, Number(currentShift.allowance || 0));
       const safeWorkers = Math.max(1, Number(currentShift.requiredWorkers || 2));
 
@@ -305,6 +324,7 @@ const EventCreationWizardModal = ({
     } catch (err) {
       showToast('Lỗi khi chia ca nhanh: ' + (err.response?.data?.message || err.message), 'error');
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };
@@ -433,6 +453,7 @@ const EventCreationWizardModal = ({
     const evtStart = new Date(newEvent.startTime);
     const evtEnd = new Date(newEvent.endTime);
 
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
       const { venueCoordinatesConfirmed, ...eventDetails } = newEvent;
@@ -486,12 +507,14 @@ const EventCreationWizardModal = ({
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi khi lưu sự kiện', 'error');
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };
 
   const handleSaveShift = async (e) => {
     e?.preventDefault();
+    if (submitting || submitLockRef.current) return;
     if (!createdEvent?.eventId) {
       showToast('Không tìm thấy sự kiện. Vui lòng hoàn thành Bước 1 trước.', 'error');
       return;
@@ -570,6 +593,7 @@ const EventCreationWizardModal = ({
       return;
     }
 
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
       const normalizedChecklist = normalizeChecklistItems(currentShift.checklistItems);
@@ -688,6 +712,7 @@ const EventCreationWizardModal = ({
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi khi lưu ca làm', 'error');
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };
@@ -780,6 +805,7 @@ const EventCreationWizardModal = ({
 
   const handleActivateMatching = async () => {
     if (!createdEvent?.eventId) return;
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
       await eoService.publishEvent(createdEvent.eventId);
@@ -791,6 +817,7 @@ const EventCreationWizardModal = ({
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi khi kích hoạt tìm kiếm', 'error');
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };

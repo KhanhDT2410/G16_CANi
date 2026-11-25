@@ -79,8 +79,10 @@ export function useEvents() {
     setEvents((prev) => mergeEventsById([evt], Array.isArray(prev) ? prev : []));
   }, []);
 
-  const loadEvents = useCallback(async ({ page = 0, size = DEFAULT_API_PAGE_SIZE } = {}) => {
-    setLoading(true);
+  const loadEvents = useCallback(async ({ page = 0, size = DEFAULT_API_PAGE_SIZE, silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setLoadError(false);
     try {
       let rawEvents = null;
@@ -167,7 +169,9 @@ export function useEvents() {
       setLoadError(true);
       return [];
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 

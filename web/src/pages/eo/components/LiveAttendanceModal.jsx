@@ -128,12 +128,6 @@ const LiveAttendanceModal = ({
                   gap: 6,
                 }}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="14" width="7" height="7"></rect>
-                  <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
                 Mã QR Ca
               </button>
               <button
@@ -149,9 +143,6 @@ const LiveAttendanceModal = ({
                 }}
                 title="Làm mới dữ liệu"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-                </svg>
                 Làm mới
               </button>
               <button
@@ -326,7 +317,7 @@ const LiveAttendanceModal = ({
                                         cursor: 'pointer',
                                       }}
                                     >
-                                      📱 QR
+                                      QR
                                     </button>
                                   )}
                                   {(!item.paymentStatus || item.paymentStatus === 'NOT_DECLARED') && item.eoConfirmed && (

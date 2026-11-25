@@ -301,7 +301,7 @@ class _ShiftChatSheetState extends ConsumerState<ShiftChatSheet> {
 
                           final roleBadgeText = isMe
                               ? 'Bạn'
-                              : (isEo ? '🏢 Ban Tổ Chức • ${m.senderName}' : '🎧 CSKH CANi • ${m.senderName}');
+                              : (isEo ? 'Ban Tổ Chức • ${m.senderName}' : 'CSKH CANi • ${m.senderName}');
 
                           final bubbleBg = isMe
                               ? const Color(0xFF0066FF)

@@ -216,7 +216,7 @@ export default function CompleteProfilePage() {
               whiteSpace: 'nowrap',
             }}
           >
-            Đã liên kết ✓
+            Đã liên kết
           </span>
         </div>
 
@@ -243,7 +243,7 @@ export default function CompleteProfilePage() {
               required
             />
             {fieldErrors.fullName && (
-              <div className="field-error-text">⚠️ {fieldErrors.fullName}</div>
+              <div className="field-error-text">{fieldErrors.fullName}</div>
             )}
           </div>
 
@@ -269,7 +269,7 @@ export default function CompleteProfilePage() {
               required
             />
             {fieldErrors.phone && (
-              <div className="field-error-text">⚠️ {fieldErrors.phone}</div>
+              <div className="field-error-text">{fieldErrors.phone}</div>
             )}
           </div>
 
@@ -294,7 +294,7 @@ export default function CompleteProfilePage() {
               required
             />
             {fieldErrors.companyName && (
-              <div className="field-error-text">⚠️ {fieldErrors.companyName}</div>
+              <div className="field-error-text">{fieldErrors.companyName}</div>
             )}
           </div>
 
@@ -319,7 +319,7 @@ export default function CompleteProfilePage() {
               required
             />
             {fieldErrors.address && (
-              <div className="field-error-text">⚠️ {fieldErrors.address}</div>
+              <div className="field-error-text">{fieldErrors.address}</div>
             )}
           </div>
 

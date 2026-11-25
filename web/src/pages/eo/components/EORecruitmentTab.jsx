@@ -113,14 +113,6 @@ export default function EORecruitmentTab({
         {/* Card 1: Tổng ca đang tuyển */}
         <div className="eo-widget-card recruitment-shifts-summary-card">
           <div className="recruitment-card-top">
-            <div className="recruitment-icon-box blue">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-            </div>
             <div className="recruitment-meta-group">
               <span className="recruitment-meta-title">Tổng ca đang tuyển</span>
               <div className="recruitment-data-row">
@@ -139,12 +131,6 @@ export default function EORecruitmentTab({
         <div className="eo-widget-card recruitment-donut-card">
           <div className="recruitment-donut-header">
             <div className="recruitment-donut-title-group">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
               <h4 className="recruitment-donut-title">Tiến độ lấp đầy nhân sự</h4>
             </div>
             {totalMissing > 0 ? (

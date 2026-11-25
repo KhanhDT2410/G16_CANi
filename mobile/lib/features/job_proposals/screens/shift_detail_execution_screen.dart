@@ -418,7 +418,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Đã nộp ảnh nghiệm thu task #${index + 1}: ${item.title}'),
+            content: Text('Đã nộp ảnh nghiệm thu task #${index + 1}: ${item.title}'),
             backgroundColor: const Color(0xFF16A34A),
             duration: const Duration(seconds: 2),
           ),
@@ -453,7 +453,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Tiếp tục với đầu việc #${nextIndex + 1}! 🚀'),
+                content: Text('Tiếp tục với đầu việc #${nextIndex + 1}!'),
                 backgroundColor: const Color(0xFF0284C7),
                 duration: const Duration(seconds: 2),
               ),
@@ -463,7 +463,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('🎉 Xuất sắc! Bạn đã hoàn thành tất cả các đầu việc của ca làm.'),
+                content: Text('Xuất sắc! Bạn đã hoàn thành tất cả các đầu việc của ca làm.'),
                 backgroundColor: Color(0xFF16A34A),
               ),
             );

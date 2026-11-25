@@ -282,12 +282,6 @@ export default function LandingPage() {
             </div>
 
             <div className="product-card-header">
-              <div className="product-icon-box worker-gradient">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                  <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                </svg>
-              </div>
               <div>
                 <h3 className="product-card-title">CANi Partner Mobile App</h3>
                 <p className="product-card-role">Ứng dụng nhận việc & điểm danh linh hoạt</p>
@@ -300,25 +294,21 @@ export default function LandingPage() {
 
             <ul className="product-specs-list">
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Matching Radar AI 15km:</strong> Quét các ca làm việc gần vị trí nhất theo thời gian thực, chủ động ứng tuyển chỉ trong 15 phút.
                 </div>
               </li>
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Điểm danh Geofence GPS 200m:</strong> Quét mã QR động vào ca/tan ca chuẩn xác trong bán kính 200m bảo vệ quyền lợi công làm.
                 </div>
               </li>
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Nhận thù lao trực tiếp (Non-Escrow):</strong> Ban tổ chức chuyển khoản thẳng theo ca, ví công minh bạch, không giam cọc.
                 </div>
               </li>
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Định danh eKYC điện tử:</strong> Xác thực CCCD gắn chip & Face Match 1 lần duy nhất, xây dựng điểm tín nhiệm nhận ca VIP.
                 </div>
@@ -331,11 +321,6 @@ export default function LandingPage() {
                 download="cani-partner.apk"
                 className="btn-download-apk"
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
                 Tải bản Android APK (CANi Partner)
               </a>
               <div className="product-subtext">
@@ -352,13 +337,6 @@ export default function LandingPage() {
             </div>
 
             <div className="product-card-header">
-              <div className="product-icon-box eo-gradient">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                  <line x1="8" y1="21" x2="16" y2="21"></line>
-                  <line x1="12" y1="17" x2="12" y2="21"></line>
-                </svg>
-              </div>
               <div>
                 <h3 className="product-card-title">CANi Web Portal</h3>
                 <p className="product-card-role">Cổng điều phối & quản trị sự kiện đám mây</p>
@@ -371,25 +349,21 @@ export default function LandingPage() {
 
             <ul className="product-specs-list">
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Khởi tạo sự kiện đa ca (Multi-Shift):</strong> Lập lịch ca làm việc chi tiết, cấu hình thù lao, vai trò và vị trí định vị Geofence.
                 </div>
               </li>
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Radar AI tuyển dụng tự động:</strong> Ghép nối tức thì với nguồn nhân lực đạt chuẩn eKYC trong 15 phút, loại bỏ nỗi lo thiếu người giờ chót.
                 </div>
               </li>
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Live Attendance Dashboard:</strong> Giám sát trực tiếp trạng thái check-in, phát hiện ca muộn và tự động kích hoạt điều phối thay thế.
                 </div>
               </li>
               <li>
-                <span className="spec-bullet">✓</span>
                 <div>
                   <strong>Hạn ngạch Quota PayOS VietQR:</strong> Mua gói Quota sự kiện thanh toán tự động qua mã VietQR Napas247, xuất phiếu chi đối soát chuẩn xác.
                 </div>

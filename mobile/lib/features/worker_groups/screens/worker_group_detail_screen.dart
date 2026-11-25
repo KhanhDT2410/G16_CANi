@@ -396,8 +396,8 @@ class _WorkerGroupDetailScreenState
           Row(
             children: [
               if (p.emergency) ...[
-                const Text('🚨 GẤP ',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const Text('GẤP ',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
                 const SizedBox(width: 4),
               ],
               Expanded(

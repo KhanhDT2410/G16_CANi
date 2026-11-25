@@ -65,6 +65,7 @@ export default function EOModals({
             venueLat={activeEvent?.venueLat ?? null}
             venueLng={activeEvent?.venueLng ?? null}
             existingShifts={activeEvent?.shifts || []}
+            submitting={shifts.submittingAddShift}
             onSubmit={shifts.handleAddShift}
           />
         </Suspense>

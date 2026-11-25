@@ -624,44 +624,31 @@ class JobDetailBottomSheet extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.event_busy_rounded, size: 16, color: cani.warning),
-                                    const SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        'Bạn đã có ca nhận rồi',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 12,
-                                          color: cani.warning,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  'Bạn đã có ca nhận rồi',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                    color: cani.warning,
+                                  ),
                                 ),
                               )
                             : (shift.emergency
-                                ? FilledButton.icon(
+                                ? FilledButton(
                                     onPressed: onApply,
-                                    icon: const Icon(
-                                      Icons.flash_on_rounded,
-                                      size: 18,
-                                    ),
-                                    label: const Text(
-                                      'Nhận ca',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: cani.danger,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Nhận ca',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   )
@@ -856,33 +843,16 @@ class JobProposalDetailBottomSheet extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 if (p.venueAddress.trim().isNotEmpty) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.location_on, size: 18, color: theme.colorScheme.primary),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          p.venueAddress,
-                          style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    p.venueAddress,
+                    style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 8),
                 ],
 
-                Row(
-                  children: [
-                    Icon(Icons.access_time, size: 18, color: Colors.orange.shade700),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')} - ${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')} (${p.startTime.day}/${p.startTime.month}/${p.startTime.year})',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
+                Text(
+                  '${p.startTime.hour.toString().padLeft(2, '0')}:${p.startTime.minute.toString().padLeft(2, '0')} - ${p.endTime.hour.toString().padLeft(2, '0')}:${p.endTime.minute.toString().padLeft(2, '0')} (${p.startTime.day}/${p.startTime.month}/${p.startTime.year})',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 ),
 
                 if (p.recommendationReasonVi != null && p.recommendationReasonVi!.trim().isNotEmpty) ...[

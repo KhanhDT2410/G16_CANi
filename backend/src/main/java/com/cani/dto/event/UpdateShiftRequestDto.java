@@ -47,7 +47,7 @@ public class UpdateShiftRequestDto {
     private Integer requiredWorkers;
 
     @NotNull(message = "Mức lương theo giờ không được để trống")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Mức lương phải lớn hơn 0")
+    @DecimalMin(value = "25000", message = "Mức thù lao không được thấp hơn mức tối thiểu quy định: 25.000 VNĐ/giờ")
     private BigDecimal hourlyWage;
 
     private BigDecimal allowance;

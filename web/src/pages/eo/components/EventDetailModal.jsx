@@ -421,16 +421,7 @@ export default function EventDetailModal({
                 }}
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
-            ) : (
-              <div className="event-detail-icon-stage">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-              </div>
-            )}
+            ) : null}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 {asPage ? (
@@ -487,10 +478,6 @@ export default function EventDetailModal({
             <div className="info-item">
               <span className="info-label">Thời gian sự kiện</span>
               <span className="info-value">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
                 {formatDateTimeRange(event.startTime, event.endTime)}
               </span>
             </div>
@@ -1199,10 +1186,6 @@ export default function EventDetailModal({
                               }}
                               title="Chặn nhân sự này không cho nhận ca trong tương lai"
                             >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                              </svg>
                               Chặn
                             </button>
                           )}

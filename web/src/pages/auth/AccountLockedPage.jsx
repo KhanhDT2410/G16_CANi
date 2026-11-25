@@ -87,12 +87,6 @@ export default function AccountLockedPage() {
       <main className="locked-page-main">
         <div className="locked-card">
           <div className="locked-hero-banner">
-            <div className="locked-icon-wrapper">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-            </div>
             <div className="locked-hero-text">
               <h2>Tài Khoản Đang Bị Tạm Khóa Hoạt Động</h2>
               <p>
@@ -140,7 +134,6 @@ export default function AccountLockedPage() {
                 </div>
               ) : accountInfo && accountInfo.found === false ? (
                 <div className="appeal-status-notice-card card-warning">
-                  <div className="notice-icon">⚠️</div>
                   <div className="notice-body">
                     <h4>Không tìm thấy thông tin tài khoản</h4>
                     <p>Địa chỉ email <strong>{email}</strong> chưa được đăng ký trong hệ thống CANi.</p>
@@ -156,7 +149,6 @@ export default function AccountLockedPage() {
                 </div>
               ) : accountInfo && accountInfo.found === true && accountInfo.isLocked === false ? (
                 <div className="appeal-status-notice-card card-info">
-                  <div className="notice-icon">✓</div>
                   <div className="notice-body">
                     <h4>Tài khoản đang hoạt động bình thường</h4>
                     <p>

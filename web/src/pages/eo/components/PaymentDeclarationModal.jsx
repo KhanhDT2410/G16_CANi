@@ -246,7 +246,7 @@ const PaymentDeclarationModal = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 700, color: '#92400e' }}>
-                <span>💵</span> Nhận Tiền Mặt Trực Tiếp
+                Nhận Tiền Mặt Trực Tiếp
               </div>
               <div style={{ color: '#78350f', fontSize: '0.8rem' }}>
                 Số tiền cần trao: <strong style={{ color: '#b45309', fontSize: '0.92rem' }}>{new Intl.NumberFormat('vi-VN').format(amount)} đ</strong>

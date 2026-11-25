@@ -202,6 +202,7 @@ const EditShiftModal = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (submitting) return;
 
     const jErr =
       validateJobType(formData.jobType) ||

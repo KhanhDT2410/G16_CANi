@@ -211,7 +211,7 @@ class HistoryShiftCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (isDeclared) ...[
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: onConfirmPayment,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFFD97706),
@@ -219,13 +219,12 @@ class HistoryShiftCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           minimumSize: const Size(0, 32),
                         ),
-                        icon: const Icon(Icons.check_circle_outline, size: 14),
-                        label: const Text('Xác nhận tiền', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                        child: const Text('Xác nhận tiền', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                       ),
                       const SizedBox(width: 8),
                     ],
                     if (isCompleted && a.hasWorkerReviewed != true) ...[
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: onRateOrganizer,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: cani.brand,
@@ -233,8 +232,7 @@ class HistoryShiftCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           minimumSize: const Size(0, 32),
                         ),
-                        icon: const Icon(Icons.star_outline_rounded, size: 14),
-                        label: const Text('Đánh giá BTC', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        child: const Text('Đánh giá BTC', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
                       ),
                       const SizedBox(width: 8),
                     ],
@@ -244,14 +242,7 @@ class HistoryShiftCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         minimumSize: const Size(0, 32),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Chi tiết', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                          SizedBox(width: 2),
-                          Icon(Icons.chevron_right_rounded, size: 16),
-                        ],
-                      ),
+                      child: const Text('Chi tiết', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
@@ -267,53 +258,41 @@ class HistoryShiftCard extends StatelessWidget {
     Color bg;
     Color fg;
     String label;
-    IconData icon;
 
     if (isCompleted) {
       bg = const Color(0xFFECFDF5);
       fg = const Color(0xFF059669);
       label = 'Hoàn thành';
-      icon = Icons.check_circle_rounded;
     } else if (isCancelled) {
       bg = const Color(0xFFFEF2F2);
       fg = const Color(0xFFDC2626);
       label = 'Đã hủy';
-      icon = Icons.cancel_rounded;
     } else if (isNoShow) {
       bg = const Color(0xFFFEF2F2);
       fg = const Color(0xFFDC2626);
       label = 'Vắng mặt';
-      icon = Icons.error_rounded;
     } else {
       bg = const Color(0xFFF1F5F9);
       fg = const Color(0xFF64748B);
       label = 'Kết thúc';
-      icon = Icons.history_rounded;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: fg),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
-        ],
-      ),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
     );
   }
 
   Widget _buildPaymentBadge(ShiftAssignmentItem a, bool isFull, bool isDeclared, bool isDisputed) {
     if (isFull) {
-      return const Text('✓ Đã nhận đủ thù lao', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600));
+      return const Text('Đã nhận đủ thù lao', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600));
     }
     if (isDeclared) {
-      return const Text('⚡ Chờ bạn xác nhận nhận tiền', style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w600));
+      return const Text('Chờ bạn xác nhận nhận tiền', style: TextStyle(fontSize: 11, color: Color(0xFFD97706), fontWeight: FontWeight.w600));
     }
     if (isDisputed) {
-      return const Text('⚠️ Đang khiếu nại thù lao', style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.w600));
+      return const Text('Đang khiếu nại thù lao', style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.w600));
     }
     return const Text('Chờ ban tổ chức quyết toán', style: TextStyle(fontSize: 11, color: Color(0xFF64748B)));
   }

@@ -533,7 +533,6 @@ export default function EOPage() {
               {ekycStatus && ekycStatus !== 'APPROVED' && (
                 <div className="eo-ekyc-warning-banner">
                   <div className="warning-banner-left">
-                    <span className="warning-icon">⚠️</span>
                     <div>
                       <strong>Tài khoản chưa hoàn tất định danh eKYC</strong>
                       <p>
@@ -634,7 +633,7 @@ export default function EOPage() {
                   onEditShift={shifts.setEditingShift}
                   onCancelShift={shifts.handleCancelShift}
                   onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-                  onReloadEvents={events.loadEvents}
+                  onReloadEvents={(opts) => events.loadEvents({ silent: true, ...(opts || {}) })}
                   onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
                   skillTaxonomy={shifts.skillTaxonomy}
                 />

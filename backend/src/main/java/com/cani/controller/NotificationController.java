@@ -26,10 +26,11 @@ public class NotificationController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<NotificationResponseDto>>> getMyNotifications(
+            @RequestParam(value = "limit", required = false) Integer limit,
             Authentication authentication
     ) {
         UUID userId = SecurityUtils.getCurrentUserId(authentication);
-        List<NotificationResponseDto> list = notificationService.getMyNotifications(userId);
+        List<NotificationResponseDto> list = notificationService.getMyNotifications(userId, limit);
         return ResponseEntity.ok(ApiResponse.ok(list, "Lấy danh sách thông báo thành công"));
     }
 

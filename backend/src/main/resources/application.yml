@@ -30,6 +30,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         default_schema: public
+        default_batch_fetch_size: 32
         type:
           preferred_enum_jdbc_type: NAMED_ENUM
 

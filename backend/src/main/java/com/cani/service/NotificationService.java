@@ -192,9 +192,19 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponseDto> getMyNotifications(UUID userId) {
+        return getMyNotifications(userId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponseDto> getMyNotifications(UUID userId, Integer limit) {
         boolean hideProposals = isWorkerJobReceivingDisabled(userId);
-        return notificationRepository.findByUser_UserIdOrderByCreatedAtDesc(userId)
-                .stream()
+        List<Notification> rows = (limit != null && limit > 0)
+                ? notificationRepository.findByUser_UserIdOrderByCreatedAtDesc(
+                        userId,
+                        org.springframework.data.domain.PageRequest.of(0, Math.min(limit, 200))
+                ).getContent()
+                : notificationRepository.findByUser_UserIdOrderByCreatedAtDesc(userId);
+        return rows.stream()
                 .filter(n -> !hideProposals || n.getType() != NotificationType.PROPOSAL)
                 .map(this::toDto)
                 .toList();
@@ -203,10 +213,8 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public long getUnreadCount(UUID userId) {
         if (isWorkerJobReceivingDisabled(userId)) {
-            return notificationRepository.findByUser_UserIdOrderByCreatedAtDesc(userId)
-                    .stream()
-                    .filter(n -> !Boolean.TRUE.equals(n.getIsRead()) && n.getType() != NotificationType.PROPOSAL)
-                    .count();
+            return notificationRepository.countByUser_UserIdAndIsReadFalseAndTypeNot(
+                    userId, NotificationType.PROPOSAL);
         }
         return notificationRepository.countByUser_UserIdAndIsReadFalse(userId);
     }

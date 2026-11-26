@@ -3,6 +3,9 @@ package com.cani.repository;
 import com.cani.entity.Shift;
 import com.cani.entity.enums.ShiftStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -21,6 +24,18 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
         @Lock(LockModeType.PESSIMISTIC_WRITE)
         @Query("SELECT s FROM Shift s WHERE s.shiftId = :shiftId")
         Optional<Shift> findByIdForUpdate(@Param("shiftId") UUID shiftId);
+
+        @EntityGraph(attributePaths = {"event", "event.eventOrganizer", "event.eventOrganizer.user"})
+        Optional<Shift> findWithEventDetailsByShiftId(UUID shiftId);
+
+        @EntityGraph(attributePaths = {"event", "event.eventOrganizer", "event.eventOrganizer.user"})
+        @Query(value = "SELECT s FROM Shift s ORDER BY COALESCE(s.startTime, s.createdAt) DESC",
+               countQuery = "SELECT COUNT(s) FROM Shift s")
+        Page<Shift> findAllPageWithEventDetails(Pageable pageable);
+
+        @EntityGraph(attributePaths = {"event", "event.eventOrganizer", "event.eventOrganizer.user"})
+        @Query("SELECT s FROM Shift s ORDER BY COALESCE(s.startTime, s.createdAt) DESC")
+        List<Shift> findAllWithEventDetails();
 
         List<Shift> findByEvent_EventId(UUID eventId);
 

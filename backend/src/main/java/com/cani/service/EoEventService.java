@@ -1676,7 +1676,7 @@ public class EoEventService {
         boolean hasBatchAttendance = false;
         if (!assignmentIds.isEmpty() && attendanceLogRepository != null) {
             List<AttendanceLog> batchLogs = attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(assignmentIds);
-            if (batchLogs != null && !batchLogs.isEmpty()) {
+            if (batchLogs != null && (!batchLogs.isEmpty() || assignments.size() > 1)) {
                 hasBatchAttendance = true;
                 for (AttendanceLog att : batchLogs) {
                     if (att != null && att.getShiftAssignment() != null && att.getShiftAssignment().getAssignmentId() != null) {
@@ -1691,7 +1691,7 @@ public class EoEventService {
         boolean hasBatchPayments = false;
         if (!assignmentIds.isEmpty() && paymentRepository != null) {
             List<Payment> batchPayments = paymentRepository.findByAssignmentIdIn(assignmentIds);
-            if (batchPayments != null && !batchPayments.isEmpty()) {
+            if (batchPayments != null && (!batchPayments.isEmpty() || assignments.size() > 1)) {
                 hasBatchPayments = true;
                 for (Payment p : batchPayments) {
                     if (p != null && p.getAssignmentId() != null) {
@@ -1706,7 +1706,7 @@ public class EoEventService {
         boolean hasBatchReviews = false;
         if (!assignmentIds.isEmpty() && reviewRepository != null) {
             List<Review> batchReviews = reviewRepository.findByAssignmentIdIn(assignmentIds);
-            if (batchReviews != null && !batchReviews.isEmpty()) {
+            if (batchReviews != null && (!batchReviews.isEmpty() || assignments.size() > 1)) {
                 hasBatchReviews = true;
                 for (Review r : batchReviews) {
                     if (r != null && r.getAssignmentId() != null
@@ -1732,7 +1732,7 @@ public class EoEventService {
         if (!workerIds.isEmpty() && workerEkycVerificationRepository != null) {
             List<WorkerEkycVerification> batchEkycs =
                     workerEkycVerificationRepository.findByWorker_WorkerIdInOrderByCreatedAtDesc(workerIds);
-            if (batchEkycs != null && !batchEkycs.isEmpty()) {
+            if (batchEkycs != null && (!batchEkycs.isEmpty() || assignments.size() > 1)) {
                 hasBatchEkyc = true;
                 for (WorkerEkycVerification v : batchEkycs) {
                     if (v != null && v.getWorker() != null && v.getWorker().getWorkerId() != null) {
@@ -1745,6 +1745,11 @@ public class EoEventService {
                 }
             }
         }
+
+        Integer preloadedMinRegAge = latestAnyEkycByWorkerId.values().stream()
+                .anyMatch(v -> v != null && v.getMeetsMinimumAge() == null && v.getDob() != null)
+                ? EkycConsentAndAgeHelper.resolveMinRegistrationAge(systemConfigRepository)
+                : null;
 
         // 5. Batch Skill Names & Precomputed Shift wages
         Set<UUID> skillIds = new LinkedHashSet<>();
@@ -1852,7 +1857,8 @@ public class EoEventService {
                     payOpt,
                     reviewed,
                     ekycOpt,
-                    skillNamesById
+                    skillNamesById,
+                    preloadedMinRegAge
             );
             if (shift != null) {
                 dto.setShiftId(shift.getShiftId());
@@ -1908,6 +1914,24 @@ public class EoEventService {
             Optional<WorkerEkycVerification> ekycOpt,
             Map<UUID, String> preloadedSkillNames
     ) {
+        return buildShiftAttendanceDto(
+                sa, shift, agreedWage, checklistSummary, attOpt, payOpt,
+                reviewed, ekycOpt, preloadedSkillNames, null
+        );
+    }
+
+    private ShiftAttendanceDto buildShiftAttendanceDto(
+            ShiftAssignment sa,
+            Shift shift,
+            BigDecimal agreedWage,
+            String checklistSummary,
+            Optional<AttendanceLog> attOpt,
+            Optional<Payment> payOpt,
+            boolean reviewed,
+            Optional<WorkerEkycVerification> ekycOpt,
+            Map<UUID, String> preloadedSkillNames,
+            Integer preloadedMinRegAge
+    ) {
         Worker worker = sa.getWorker();
         User u = worker != null ? worker.getUser() : null;
         boolean checklistDone = isChecklistFullyCompleted(shift != null ? shift.getChecklist() : null, sa.getChecklistProgress());
@@ -1918,10 +1942,15 @@ public class EoEventService {
         Boolean meetsMinimumAge = null;
         if (ekycOpt != null && ekycOpt.isPresent()) {
             WorkerEkycVerification latestEkyc = ekycOpt.get();
-            meetsMinimumAge = latestEkyc.getMeetsMinimumAge() != null
-                    ? latestEkyc.getMeetsMinimumAge()
-                    : EkycConsentAndAgeHelper.evaluateMeetsMinimumAge(latestEkyc.getDob(), systemConfigRepository);
             workerAge = EkycConsentAndAgeHelper.calculateAgeFromDob(latestEkyc.getDob());
+            if (latestEkyc.getMeetsMinimumAge() != null) {
+                meetsMinimumAge = latestEkyc.getMeetsMinimumAge();
+            } else if (workerAge != null) {
+                int minAge = preloadedMinRegAge != null
+                        ? preloadedMinRegAge
+                        : EkycConsentAndAgeHelper.resolveMinRegistrationAge(systemConfigRepository);
+                meetsMinimumAge = workerAge >= minAge;
+            }
         }
 
         String bankCode = worker != null ? worker.getBankCode() : null;
@@ -2031,7 +2060,7 @@ public class EoEventService {
         List<ShiftAssignment> allAssignments = (!shiftIds.isEmpty() && shiftAssignmentRepository != null)
                 ? shiftAssignmentRepository.findByShift_ShiftIdIn(shiftIds)
                 : Collections.emptyList();
-        if ((allAssignments == null || allAssignments.isEmpty()) && shiftAssignmentRepository != null) {
+        if (allAssignments == null && shiftAssignmentRepository != null) {
             allAssignments = new ArrayList<>();
             for (Shift s : shifts) {
                 if (s != null && s.getShiftId() != null) {

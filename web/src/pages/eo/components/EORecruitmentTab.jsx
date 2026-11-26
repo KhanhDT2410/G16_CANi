@@ -160,14 +160,14 @@ export default function EORecruitmentTab({
                   strokeWidth="11"
                 />
 
-                {/* Cung tròn nhân sự còn thiếu (Đỏ cam #f43f5e) */}
+                {/* Cung tròn nhân sự còn thiếu */}
                 {missingLen > 0 && (
                   <circle
                     cx="50"
                     cy="50"
                     r={radius}
                     fill="none"
-                    stroke="#f43f5e"
+                    stroke="#f59e0b"
                     strokeWidth="11"
                     strokeDasharray={`${missingLen} ${circumference}`}
                     strokeDashoffset={-confirmedLen}
@@ -505,9 +505,9 @@ export default function EORecruitmentTab({
                     <button
                       type="button"
                       style={{
-                        background: '#7c3aed',
-                        color: '#ffffff',
-                        border: 'none',
+                        background: '#ffffff',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
                         borderRadius: 6,
                         padding: '0.45rem 0.85rem',
                         fontSize: '0.8rem',

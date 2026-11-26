@@ -3,7 +3,6 @@ import EOEventDataState from './EOEventDataState';
 import {
   getEventStatusPriority,
   getDynamicEventStatus,
-  getDynamicShiftStatus,
   getEventUnderstaffedSummary,
   resolveEventEstimatedCost,
 } from '../utils/eventHelpers';
@@ -572,9 +571,9 @@ export default function EOEventsTab({
                             </div>
                           </td>
 
-                          {/* Cột 3: Tiến độ nhân sự & từng ca */}
+                          {/* Cột 3: Tiến độ nhân sự (gọn, không nhồi hộp màu) */}
                           <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                               <div className="table-workers-cell" style={{ justifyContent: 'space-between' }}>
                                 <span className="workers-count" style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
                                   {confirmedTotal}/{requiredTotal} người
@@ -588,51 +587,24 @@ export default function EOEventsTab({
                                 <div className="ev-fill-bar-progress" style={{ width: `${fillPct}%` }} />
                               </div>
 
-                              {activeShifts.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                  {activeShifts.slice(0, 3).map((sh, sIdx) => {
-                                    const shStatus = getDynamicShiftStatus(sh, evt.status);
-                                    return (
-                                      <div
-                                        key={sh.shiftId || sIdx}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'space-between',
-                                          gap: '0.4rem',
-                                          fontSize: '0.72rem',
-                                          padding: '0.18rem 0.45rem',
-                                          borderRadius: '6px',
-                                          backgroundColor: shStatus.bg,
-                                          border: `1px solid ${shStatus.border}`,
-                                          color: shStatus.color,
-                                          fontWeight: 600,
-                                        }}
-                                      >
-                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          Ca {sIdx + 1} ({sh.jobType}): <strong>{sh.confirmedWorkers || 0}/{sh.requiredWorkers || 0}</strong>
-                                        </span>
-                                        <span style={{ fontSize: '0.68rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
-                                          • {shStatus.label}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                  {activeShifts.length > 3 && (
-                                    <span style={{ fontSize: '0.71rem', color: '#64748b', fontWeight: 600 }}>
-                                      +{activeShifts.length - 3} ca khác
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span style={{ fontSize: '0.73rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  {evt.totalShifts ? `${evt.totalShifts} ca làm việc` : 'Chưa thiết lập ca'}
+                              <div style={{ fontSize: '0.73rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                <span>
+                                  {activeShifts.length > 0
+                                    ? `${activeShifts.length} ca làm việc`
+                                    : evt.totalShifts
+                                      ? `${evt.totalShifts} ca làm việc`
+                                      : 'Chưa thiết lập ca'}
                                 </span>
-                              )}
+                                {understaffedSummary.count > 0 && (
+                                  <span style={{ color: '#dc2626', fontWeight: 700 }}>
+                                    • Thiếu sát giờ ({understaffedSummary.count} ca)
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
 
-                          {/* Cột 4: Dự toán thực tế (không hardcode 1020000) */}
+                          {/* Cột 4: Dự toán thực tế */}
                           <td>
                             <span className="table-cost-amount">
                               {estCost.toLocaleString('vi-VN')} đ
@@ -643,26 +615,6 @@ export default function EOEventsTab({
                           <td onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
                               {formatStatusBadge(evt)}
-                              {understaffedSummary.count > 0 && (
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.3rem',
-                                    backgroundColor: '#fff1f2',
-                                    color: '#be123c',
-                                    border: '1px solid #fda4af',
-                                    borderRadius: '999px',
-                                    padding: '0.18rem 0.55rem',
-                                    fontSize: '0.71rem',
-                                    fontWeight: 700,
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                  title={`Có ${understaffedSummary.count} ca đang thiếu nhân sự sát giờ`}
-                                >
-                                  Thiếu nhân sự sát giờ ({understaffedSummary.count} ca)
-                                </span>
-                              )}
                               {(() => {
                                 if (evt.status !== 'DRAFT') return null;
                                 const dyn = getDynamicEventStatus(evt);
@@ -676,9 +628,9 @@ export default function EOEventsTab({
                                         onOpenEditEvent?.(evt);
                                       }}
                                       style={{
-                                        background: '#fff7ed',
-                                        color: '#c2410c',
-                                        border: '1px solid #fed7aa',
+                                        background: '#ffffff',
+                                        color: '#b45309',
+                                        border: '1px solid #fde68a',
                                         borderRadius: '6px',
                                         padding: '0.28rem 0.65rem',
                                         fontSize: '0.73rem',
@@ -779,7 +731,6 @@ export default function EOEventsTab({
                                 <button
                                   type="button"
                                   className="dropdown-item"
-                                  style={{ color: '#0d9488', fontWeight: 700 }}
                                   onClick={() => {
                                     onOpenEventDetail?.(evt, 'QR_ATTENDANCE');
                                     closeMenu();

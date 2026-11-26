@@ -75,11 +75,21 @@ export default function EOModals({
         <Suspense fallback={null}>
           <PaymentDeclarationModal
             isOpen={payments.showPaymentModal}
-            onClose={() => payments.setShowPaymentModal(false)}
+            onClose={() => (payments.closePaymentModal ? payments.closePaymentModal() : payments.setShowPaymentModal(false))}
             selectedAssignment={payments.selectedAssignment}
             paymentForm={payments.paymentForm}
             setPaymentForm={payments.setPaymentForm}
             onSubmit={payments.handleDeclarePayment}
+            queueInfo={
+              Array.isArray(payments.paymentQueue) && payments.paymentQueue.length > 1
+                ? {
+                    currentIndex: payments.paymentQueueIndex || 0,
+                    total: payments.paymentQueue.length,
+                    hasNext: (payments.paymentQueueIndex || 0) < payments.paymentQueue.length - 1,
+                    onSkip: payments.skipPaymentQueueItem,
+                  }
+                : null
+            }
           />
         </Suspense>
       )}

@@ -259,19 +259,6 @@ export default function EOSubscriptionTab() {
                       )}
                     </div>
 
-                    <div className="pricing-quota-chips">
-                      <span className="quota-chip">{maxEvents} sự kiện</span>
-                      {plan.maxShifts ? (
-                        <span className="quota-chip">{plan.maxShifts} ca làm</span>
-                      ) : null}
-                      {plan.maxWorkers ? (
-                        <span className="quota-chip">{plan.maxWorkers} nhân sự</span>
-                      ) : null}
-                      {plan.durationDays ? (
-                        <span className="quota-chip">{plan.durationDays} ngày</span>
-                      ) : null}
-                    </div>
-
                     <ul className="pricing-features">
                       {(plan.features || []).map((feat, idx) => (
                         <li key={idx}>

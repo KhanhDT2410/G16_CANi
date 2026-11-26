@@ -73,6 +73,8 @@ const DEMO_PAYMENTS = [
 export function usePayments() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [paymentQueue, setPaymentQueue] = useState([]);
+  const [paymentQueueIndex, setPaymentQueueIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -138,6 +140,38 @@ export function usePayments() {
     }
   }, []);
 
+  const buildInitialFormForAssignment = useCallback((attendanceItem, preferredMethod = null) => {
+    const hasBank = Boolean(attendanceItem.bankCode && attendanceItem.bankAccountNumber);
+    const resolvedMethod =
+      preferredMethod === 'BANK_TRANSFER'
+        ? (hasBank ? 'BANK_TRANSFER' : 'CASH')
+        : preferredMethod || attendanceItem.paymentMethod || (hasBank ? 'BANK_TRANSFER' : 'CASH');
+    return {
+      assignmentId: attendanceItem.assignmentId,
+      declaredAmount: roundVndAmount(
+        attendanceItem.declaredAmount ?? attendanceItem.agreedWage ?? attendanceItem.agreedAmount ?? 200000
+      ),
+      paymentMethod: resolvedMethod,
+      externalRef: attendanceItem.externalRef || `VCB-${Date.now().toString().slice(-6)}`,
+      paymentProofUrl: attendanceItem.paymentProofUrl || '',
+    };
+  }, []);
+
+  const advanceOrClosePaymentQueue = useCallback((preferredMethod = null) => {
+    if (paymentQueue.length > 0 && paymentQueueIndex < paymentQueue.length - 1) {
+      const nextIdx = paymentQueueIndex + 1;
+      const nextItem = paymentQueue[nextIdx];
+      setPaymentQueueIndex(nextIdx);
+      setSelectedAssignment(nextItem);
+      setPaymentForm(buildInitialFormForAssignment(nextItem, preferredMethod));
+      return true;
+    }
+    setShowPaymentModal(false);
+    setPaymentQueue([]);
+    setPaymentQueueIndex(0);
+    return false;
+  }, [paymentQueue, paymentQueueIndex, buildInitialFormForAssignment]);
+
   const handleDeclarePayment = async (e) => {
     e.preventDefault();
     if (paymentForm.paymentMethod === 'BANK_TRANSFER' && !paymentForm.paymentProofUrl) {
@@ -146,7 +180,6 @@ export function usePayments() {
     }
     try {
       await eoService.declarePayment(paymentForm);
-      setShowPaymentModal(false);
       setPayments((prev) =>
         prev.map((p) =>
           p.assignmentId === paymentForm.assignmentId
@@ -166,7 +199,13 @@ export function usePayments() {
           detail: { assignmentId: paymentForm.assignmentId },
         })
       );
-      showToast('Khai báo thanh toán thành công! Hệ thống đã gửi thông báo & email chứng từ đến Worker.', 'success');
+      const movedNext = advanceOrClosePaymentQueue(paymentForm.paymentMethod);
+      showToast(
+        movedNext
+          ? 'Đã lưu! Đã chuyển sang nhân sự tiếp theo trong hàng đợi.'
+          : 'Khai báo thanh toán thành công! Hệ thống đã gửi thông báo & email chứng từ đến Worker.',
+        'success'
+      );
     } catch (error) {
       if (import.meta.env.VITE_DEMO === 'true') {
         setPayments((prev) =>
@@ -182,8 +221,13 @@ export function usePayments() {
               : p
           )
         );
-        setShowPaymentModal(false);
-        showToast('Khai báo thanh toán thành công (Chế độ Demo)! Đang chờ Worker xác nhận.', 'info');
+        const movedNext = advanceOrClosePaymentQueue(paymentForm.paymentMethod);
+        showToast(
+          movedNext
+            ? 'Đã lưu (Demo)! Chuyển sang nhân sự tiếp theo.'
+            : 'Khai báo thanh toán thành công (Chế độ Demo)! Đang chờ Worker xác nhận.',
+          'info'
+        );
       } else {
         showToast(error.response?.data?.message || 'Khai báo thanh toán thất bại. Vui lòng thử lại!', 'error');
       }
@@ -191,19 +235,32 @@ export function usePayments() {
   };
 
   const handleOpenPaymentDeclarationFromAttendance = useCallback((attendanceItem) => {
+    setPaymentQueue([]);
+    setPaymentQueueIndex(0);
     setSelectedAssignment(attendanceItem);
-    const hasBank = Boolean(attendanceItem.bankCode && attendanceItem.bankAccountNumber);
-    setPaymentForm({
-      assignmentId: attendanceItem.assignmentId,
-      declaredAmount: roundVndAmount(
-        attendanceItem.declaredAmount ?? attendanceItem.agreedWage ?? attendanceItem.agreedAmount ?? 200000
-      ),
-      paymentMethod: attendanceItem.paymentMethod || (hasBank ? 'BANK_TRANSFER' : 'CASH'),
-      externalRef: attendanceItem.externalRef || `VCB-${Date.now().toString().slice(-6)}`,
-      paymentProofUrl: attendanceItem.paymentProofUrl || '',
-    });
+    setPaymentForm(buildInitialFormForAssignment(attendanceItem));
     setShowPaymentModal(true);
+  }, [buildInitialFormForAssignment]);
+
+  const openPaymentQueue = useCallback((items = []) => {
+    const valid = (Array.isArray(items) ? items : []).filter(Boolean);
+    if (valid.length === 0) return;
+    setPaymentQueue(valid);
+    setPaymentQueueIndex(0);
+    setSelectedAssignment(valid[0]);
+    setPaymentForm(buildInitialFormForAssignment(valid[0]));
+    setShowPaymentModal(true);
+  }, [buildInitialFormForAssignment]);
+
+  const closePaymentModal = useCallback(() => {
+    setShowPaymentModal(false);
+    setPaymentQueue([]);
+    setPaymentQueueIndex(0);
   }, []);
+
+  const skipPaymentQueueItem = useCallback(() => {
+    advanceOrClosePaymentQueue(paymentForm.paymentMethod);
+  }, [advanceOrClosePaymentQueue, paymentForm.paymentMethod]);
 
   useEffect(() => {
     const handlePaymentUpdated = () => {
@@ -222,12 +279,17 @@ export function usePayments() {
     fetchShiftPayments,
     showPaymentModal,
     setShowPaymentModal,
+    closePaymentModal,
     selectedAssignment,
     setSelectedAssignment,
     paymentForm,
     setPaymentForm,
     handleDeclarePayment,
     handleOpenPaymentDeclarationFromAttendance,
+    openPaymentQueue,
+    skipPaymentQueueItem,
+    paymentQueue,
+    paymentQueueIndex,
   };
 }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 
@@ -34,8 +35,8 @@ export default function ReportNoShowModal({ isOpen, onClose, assignment, shift, 
     }
   };
 
-  return (
-    <div className="eo-modal-overlay">
+  return createPortal(
+    <div className="eo-modal-overlay" style={{ zIndex: 10050 }}>
       <div className="eo-modal-box" style={{ maxWidth: 520 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -109,6 +110,7 @@ export default function ReportNoShowModal({ isOpen, onClose, assignment, shift, 
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

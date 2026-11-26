@@ -288,9 +288,9 @@ const EventShiftsDrawer = ({
                 type="button"
                 onClick={() => onOpenInvite && onOpenInvite(shift, event)}
                 style={{
-                  background: '#7c3aed',
-                  color: '#ffffff',
-                  border: 'none',
+                  background: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
                   borderRadius: 6,
                   padding: '6px 12px',
                   fontSize: '0.8rem',

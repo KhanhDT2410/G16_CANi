@@ -121,37 +121,46 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
 }
 
 .detail-status-pill.green {
-  background: #dcfce7;
-  color: #15803d;
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
 }
 .detail-status-pill.yellow {
-  background: #fef3c7;
-  color: #b45309;
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
 }
 .detail-status-pill.blue {
-  background: #dbeafe;
+  background: #eff6ff;
   color: #1d4ed8;
+  border-color: #bfdbfe;
 }
 .detail-status-pill.purple {
-  background: #f3e8ff;
-  color: #7e22ce;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
 }
 .detail-status-pill.gray {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #475569;
+  border-color: #e2e8f0;
 }
 .detail-status-pill.red {
-  background: #fee2e2;
+  background: #fef2f2;
   color: #b91c1c;
+  border-color: #fecaca;
 }
 
 /* Info Grid */
@@ -464,15 +473,15 @@
 }
 
 .btn-shift-action.purple {
-  background: #f5f3ff;
-  color: #6d28d9;
-  border: 1px solid #ddd6fe;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
 }
 
 .btn-shift-action.emerald {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #2563eb;
 }
 
 /* Footer */

@@ -221,7 +221,7 @@ const LiveAttendanceModal = ({
                             </span>
                           )}
                           {isCompleted && (
-                            <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem' }}>
+                            <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: 999, fontWeight: 600, fontSize: '0.75rem' }}>
                               Đã Hoàn Thành
                             </span>
                           )}
@@ -307,9 +307,9 @@ const LiveAttendanceModal = ({
                                       type="button"
                                       onClick={() => setPreviewImage({ url: workerQrUrl, title: `Mã VietQR của ${item.workerName}` })}
                                       style={{
-                                        background: '#f5f3ff',
-                                        color: '#6d28d9',
-                                        border: '1px solid #ddd6fe',
+                                        background: '#f8fafc',
+                                        color: '#334155',
+                                        border: '1px solid #cbd5e1',
                                         borderRadius: 4,
                                         padding: '2px 6px',
                                         fontSize: '0.7rem',

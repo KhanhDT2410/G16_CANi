@@ -1457,9 +1457,9 @@
 }
 
 .payment-status-badge.badge-resolved {
-  background: #f5f3ff;
-  color: #6d28d9;
-  border: 1px solid #ddd6fe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .payment-status-badge.badge-partial {
@@ -1517,13 +1517,13 @@
 
 /* Action Buttons for Payments Tab */
 .btn-declare-payment {
-  background: #16a34a;
+  background: var(--cani-primary, #2563eb);
   color: #ffffff;
-  border: 1px solid #16a34a;
-  border-radius: 4px;
-  padding: 2px 8px;
+  border: 1px solid var(--cani-primary, #2563eb);
+  border-radius: 6px;
+  padding: 4px 10px;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
   display: inline-flex;
@@ -1534,18 +1534,18 @@
 }
 
 .btn-declare-payment:hover {
-  background: #15803d;
-  border-color: #15803d;
+  background: var(--cani-primary-hover, #1d4ed8);
+  border-color: var(--cani-primary-hover, #1d4ed8);
 }
 
 .btn-dispute-track {
-  background: #fffbeb;
+  background: #ffffff;
   color: #b45309;
   border: 1px solid #fde68a;
-  border-radius: 4px;
-  padding: 2px 8px;
+  border-radius: 6px;
+  padding: 4px 10px;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
   display: inline-flex;
@@ -1556,18 +1556,18 @@
 }
 
 .btn-dispute-track:hover {
-  background: #fef3c7;
+  background: #fffbeb;
   color: #92400e;
 }
 
 .btn-dispute-nav {
-  background: #eff6ff;
+  background: #ffffff;
   color: #1d4ed8;
   border: 1px solid #bfdbfe;
-  border-radius: 4px;
-  padding: 2px 8px;
+  border-radius: 6px;
+  padding: 4px 10px;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
   display: inline-flex;
@@ -1578,18 +1578,18 @@
 }
 
 .btn-dispute-nav:hover {
-  background: #dbeafe;
+  background: #eff6ff;
   color: #1e40af;
 }
 
 .btn-dispute-result {
-  background: #faf5ff;
-  color: #7e22ce;
-  border: 1px solid #e9d5ff;
-  border-radius: 4px;
-  padding: 2px 8px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 10px;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
   display: inline-flex;
@@ -1600,8 +1600,8 @@
 }
 
 .btn-dispute-result:hover {
-  background: #f3e8ff;
-  color: #6b21a8;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 /* ==========================================================================
@@ -2763,10 +2763,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.78rem;
-  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.77rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -2774,51 +2777,58 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .table-status-pill.yellow {
-  background: #fef3c7;
-  color: #b45309;
+  background: #f8fafc;
+  color: #92400e;
+  border-color: #fde68a;
 }
 .table-status-pill.yellow .status-dot-solid {
-  background: #d97706;
+  background: #f59e0b;
 }
 
 .table-status-pill.green {
-  background: #dcfce7;
-  color: #15803d;
+  background: #f8fafc;
+  color: #065f46;
+  border-color: #d1fae5;
 }
 .table-status-pill.green .status-dot-solid {
-  background: #16a34a;
+  background: #10b981;
 }
 
 .table-status-pill.blue {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #f8fafc;
+  color: #1e40af;
+  border-color: #dbeafe;
 }
 .table-status-pill.blue .status-dot-solid {
   background: #2563eb;
 }
 
 .table-status-pill.purple {
-  background: #f3e8ff;
-  color: #7e22ce;
+  background: #f8fafc;
+  color: #1e40af;
+  border-color: #dbeafe;
 }
 .table-status-pill.purple .status-dot-solid {
-  background: #9333ea;
+  background: #2563eb;
 }
 
 .table-status-pill.gray {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #475569;
+  border-color: #e2e8f0;
 }
 .table-status-pill.gray .status-dot-solid {
   background: #64748b;
 }
 
 .table-status-pill.red {
-  background: #fee2e2;
+  background: #fef2f2;
   color: #b91c1c;
+  border-color: #fecaca;
 }
 .table-status-pill.red .status-dot-solid {
   background: #dc2626;
@@ -3467,7 +3477,7 @@
 }
 
 .breakdown-dot.rose {
-  background-color: #f43f5e;
+  background-color: #ef4444;
 }
 
 .breakdown-val {
@@ -3482,7 +3492,7 @@
 }
 
 .breakdown-val.text-rose {
-  color: #e11d48;
+  color: #dc2626;
 }
 
 .breakdown-desc {
@@ -3737,6 +3747,23 @@
   display: flex;
   align-items: center;
   gap: 0.2rem;
+}
+
+.eo-sidebar-section-label {
+  padding: 0.65rem 0.65rem 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-subtle);
+}
+
+.eo-sidebar-section:first-of-type .eo-sidebar-section-label {
+  padding-top: 0.2rem;
+}
+
+.eo-sidebar.collapsed .eo-sidebar-section-label {
+  display: none;
 }
 
 .eo-sidebar-nav .eo-nav-item {

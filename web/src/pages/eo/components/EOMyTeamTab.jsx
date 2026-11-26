@@ -6,8 +6,10 @@ import { showConfirm, showPrompt } from '../../../components/common/PromptModal'
 import { WorkerProfileModal } from './worker-profile';
 import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import { formatDevelopmentAndRank } from '../utils/skillDisplayUtils';
+import EOWorkerReviewsTab from './EOWorkerReviewsTab';
 
-export default function EOMyTeamTab() {
+export default function EOMyTeamTab({ initialSubTab = 'team', onReloadEvents }) {
+  const [subTab, setSubTab] = useState(initialSubTab);
   const [team, setTeam] = useState([]);
   const [collaborators, setCollaborators] = useState([]);
   const [systemWorkers, setSystemWorkers] = useState([]);
@@ -47,6 +49,10 @@ export default function EOMyTeamTab() {
       setLoading(false);
     }
   }, [search, favoritedOnly]);
+
+  useEffect(() => {
+    setSubTab(initialSubTab);
+  }, [initialSubTab]);
 
   useEffect(() => {
     fetchAllData();
@@ -186,14 +192,14 @@ export default function EOMyTeamTab() {
   const formatTierLabel = (tier) => formatDevelopmentAndRank(tier);
 
   return (
-    <div className="eo-my-team-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="eo-my-team-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* 1. HEADER */}
       <div className="eo-widget-card" style={{ padding: '1.25rem 1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
-                Nhân Sự Quen Thuộc
+                Nhân Sự Quen Thuộc &amp; Đánh Giá
               </h3>
               <span
                 style={{
@@ -209,22 +215,46 @@ export default function EOMyTeamTab() {
               </span>
             </div>
             <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-              Tổng hợp toàn bộ nhân sự đã từng tham gia các sự kiện của bạn để lưu ghi chú đánh giá và ưu tiên mời cho các ca sau.
+              Quản lý đội ngũ quen thuộc, cộng tác viên cũ và chấm điểm nhân sự sau mỗi ca làm việc.
             </p>
           </div>
 
+          {subTab === 'team' && (
+            <button
+              type="button"
+              className="eo-btn-secondary"
+              style={{ fontSize: '0.84rem', padding: '0.5rem 1rem' }}
+              onClick={() => setShowAddModal(true)}
+            >
+              Thêm bằng số điện thoại
+            </button>
+          )}
+        </div>
+
+        <div className="ev-subnav-tabs" style={{ marginTop: '1rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
           <button
             type="button"
-            className="eo-btn-secondary"
-            style={{ fontSize: '0.84rem', padding: '0.5rem 1rem' }}
-            onClick={() => setShowAddModal(true)}
+            className={`ev-subnav-btn ${subTab === 'team' ? 'is-active' : ''}`}
+            onClick={() => setSubTab('team')}
           >
-            Thêm bằng số điện thoại
+            <span>Đội ngũ &amp; Cộng tác</span>
+            <span className="ev-subnav-count">{team.length}</span>
+          </button>
+          <button
+            type="button"
+            className={`ev-subnav-btn ${subTab === 'reviews' ? 'is-active' : ''}`}
+            onClick={() => setSubTab('reviews')}
+          >
+            <span>Đánh giá sau ca</span>
           </button>
         </div>
       </div>
 
-      {/* 2. THANH TÌM KIẾM & LỌC */}
+      {subTab === 'reviews' ? (
+        <EOWorkerReviewsTab embedded onReloadEvents={onReloadEvents} />
+      ) : (
+        <>
+          {/* 2. THANH TÌM KIẾM & LỌC */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem', flex: '1 1 300px', maxWidth: '420px' }}>
           <input
@@ -764,6 +794,8 @@ export default function EOMyTeamTab() {
               )}
             </div>
           )}
+        </>
+      )}
         </>
       )}
 

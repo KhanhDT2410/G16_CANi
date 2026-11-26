@@ -2666,7 +2666,16 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #64748b;
+  text-align: left;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.cani-modern-table tbody td {
+  padding: 0.9rem 1.25rem;
+  vertical-align: middle;
+  font-size: 0.875rem;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .event-table-row {

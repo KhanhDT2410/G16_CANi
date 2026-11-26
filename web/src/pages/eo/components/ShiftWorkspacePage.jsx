@@ -360,7 +360,14 @@ export default function ShiftWorkspacePage({
     );
   };
 
-  // Selection & Bulk Actions
+  // Selection & Bulk Actions (chỉ hiện checkbox khi có nhân sự đủ điều kiện duyệt công hoặc chờ khai báo lương)
+  const isWorkerBulkEligible = (w) =>
+    canEoConfirmWorker(w, shiftChecklistTasks) ||
+    (w.assignmentStatus !== 'NO_SHOW' && Boolean(w.eoConfirmed) && (!w.paymentStatus || w.paymentStatus === 'NOT_DECLARED'));
+
+  const bulkEligibleOnPage = paginatedWorkers.filter(isWorkerBulkEligible);
+  const showBulkCheckboxColumn = bulkEligibleOnPage.length > 0;
+
   const selectedWorkers = attendanceList.filter((w) => selectedIds.includes(w.assignmentId));
   const bulkVerifyCandidates = selectedWorkers.filter((w) => canEoConfirmWorker(w, shiftChecklistTasks));
   const bulkCashCandidates = selectedWorkers.filter(
@@ -368,10 +375,10 @@ export default function ShiftWorkspacePage({
   );
 
   const allVisibleSelected =
-    paginatedWorkers.length > 0 && paginatedWorkers.every((w) => selectedIds.includes(w.assignmentId));
+    bulkEligibleOnPage.length > 0 && bulkEligibleOnPage.every((w) => selectedIds.includes(w.assignmentId));
 
   const toggleSelectAllVisible = () => {
-    const visibleIds = paginatedWorkers.map((w) => w.assignmentId);
+    const visibleIds = bulkEligibleOnPage.map((w) => w.assignmentId);
     if (allVisibleSelected) {
       setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
     } else {
@@ -836,20 +843,23 @@ export default function ShiftWorkspacePage({
             <table className="cani-modern-table">
               <thead>
                 <tr>
-                  <th style={{ width: '40px', textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleSelectAllVisible}
-                      aria-label="Chọn tất cả nhân sự trên trang"
-                      style={{ width: 15, height: 15, cursor: 'pointer' }}
-                    />
-                  </th>
-                  <th style={{ width: '24%' }}>Nhân sự</th>
+                  {showBulkCheckboxColumn && (
+                    <th style={{ width: '44px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAllVisible}
+                        title="Chọn tất cả nhân sự có thể duyệt công / trả lương hàng loạt trên trang này"
+                        aria-label="Chọn tất cả nhân sự đủ điều kiện trên trang"
+                        style={{ width: 15, height: 15, cursor: 'pointer' }}
+                      />
+                    </th>
+                  )}
+                  <th style={{ width: showBulkCheckboxColumn ? '24%' : '26%' }}>Nhân sự</th>
                   <th style={{ width: '19%' }}>Điểm danh</th>
                   <th style={{ width: '19%' }}>Checklist &amp; Ảnh</th>
                   <th style={{ width: '18%' }}>Thanh toán</th>
-                  <th style={{ width: '16%', textAlign: 'right' }}>Thao tác</th>
+                  <th style={{ width: showBulkCheckboxColumn ? '16%' : '18%', textAlign: 'right' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -882,25 +892,33 @@ export default function ShiftWorkspacePage({
 
                   const verifyQueueIdx = verifyQueueWorkers.findIndex((w) => w.assignmentId === item.assignmentId);
 
+                  const isRowBulkEligible = isWorkerBulkEligible(item);
+
                   return (
                     <tr
                       key={item.assignmentId}
                       id={`assignment-row-${item.assignmentId}`}
+                      className="event-table-row"
                       style={{
                         backgroundColor: isHighlighted ? '#eff6ff' : isChecked ? '#f8fafc' : undefined,
                         cursor: 'pointer',
                       }}
                       onClick={() => setDrawerWorkerId(item.assignmentId)}
                     >
-                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleSelectOne(item.assignmentId)}
-                          aria-label={`Chọn ${item.workerName}`}
-                          style={{ width: 15, height: 15, cursor: 'pointer' }}
-                        />
-                      </td>
+                      {showBulkCheckboxColumn && (
+                        <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          {isRowBulkEligible && (
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSelectOne(item.assignmentId)}
+                              title="Chọn để duyệt công hoặc khai báo tiền mặt hàng loạt"
+                              aria-label={`Chọn ${item.workerName}`}
+                              style={{ width: 15, height: 15, cursor: 'pointer' }}
+                            />
+                          )}
+                        </td>
+                      )}
 
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

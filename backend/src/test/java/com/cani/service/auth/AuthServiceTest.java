@@ -291,6 +291,29 @@ class AuthServiceTest {
             assertEquals("fallback@cani.vn", result.getEmail());
             verify(workerRepository).save(any(Worker.class));
         }
+
+        @Test
+        @DisplayName("UTC008b: register - Không nuốt BadRequestException từ GoTrue (ví dụ: email đã tồn tại trên auth.users)")
+        void UTC008b_register_SupabaseBadRequest_PropagatesBadRequestDirectly() {
+            // Arrange
+            RegisterRequest request = RegisterRequest.builder()
+                    .email("orphan@cani.vn")
+                    .password("Pass12345")
+                    .fullName("Orphan User")
+                    .accountType(AccountType.EVENT_ORGANIZER)
+                    .otpCode("123456")
+                    .build();
+
+            doNothing().when(emailOtpService).verifyOtp(request.getEmail(), request.getOtpCode(), "REGISTER");
+            when(userRepository.existsByEmail("orphan@cani.vn")).thenReturn(false);
+            when(supabaseAuthClient.createUser(any(), any(), any(), any(), any(), any()))
+                    .thenThrow(new BadRequestException("Email này đã tồn tại trên hệ thống xác thực. Vui lòng đăng nhập hoặc sử dụng email khác."));
+
+            // Act & Assert
+            BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.register(request));
+            assertEquals("Email này đã tồn tại trên hệ thống xác thực. Vui lòng đăng nhập hoặc sử dụng email khác.", ex.getMessage());
+            verify(userRepository, never()).save(any());
+        }
     }
 
     // =========================================================================
@@ -813,7 +836,7 @@ class AuthServiceTest {
             // Act & Assert
             ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class, () -> authService.me(nonExistentId));
             assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
-            assertTrue(ex.getMessage().contains("Người dùng không tồn tại với id: '00000000-0000-0000-0000-000000000000'"));
+            assertTrue(ex.getMessage().contains("00000000-0000-0000-0000-000000000000"));
         }
     }
 

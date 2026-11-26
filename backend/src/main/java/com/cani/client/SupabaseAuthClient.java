@@ -68,9 +68,30 @@ public class SupabaseAuthClient {
                     .retrieve()
                     .body(SupabaseUser.class);
         } catch (HttpClientErrorException e) {
-            log.error("Lỗi khi gọi GoTrue Admin API createUser: {}", e.getStatusCode().value());
-            throw new BadRequestException("Không thể tạo tài khoản trên hệ thống xác thực");
+            String responseBody = e.getResponseBodyAsString();
+            log.error("Lỗi khi gọi GoTrue Admin API createUser: {} - {}", e.getStatusCode().value(), responseBody);
+            throw new BadRequestException(resolveCreateUserErrorMessage(e));
         }
+    }
+
+    String resolveCreateUserErrorMessage(HttpClientErrorException e) {
+        String body = e.getResponseBodyAsString();
+        String lowerBody = body != null ? body.toLowerCase() : "";
+        int status = e.getStatusCode().value();
+
+        if (lowerBody.contains("email_exists")
+                || lowerBody.contains("user_already_exists")
+                || lowerBody.contains("already been registered")
+                || (status == 422 && lowerBody.contains("already exists"))) {
+            return "Email này đã tồn tại trên hệ thống xác thực. Vui lòng đăng nhập hoặc sử dụng email khác.";
+        }
+        if (lowerBody.contains("weak_password") || lowerBody.contains("password")) {
+            return "Mật khẩu chưa đáp ứng yêu cầu bảo mật của hệ thống xác thực.";
+        }
+        if (status == 401 || status == 403) {
+            return "Cấu hình xác thực hệ thống không hợp lệ. Vui lòng liên hệ quản trị viên.";
+        }
+        return "Không thể tạo tài khoản trên hệ thống xác thực.";
     }
 
     /**

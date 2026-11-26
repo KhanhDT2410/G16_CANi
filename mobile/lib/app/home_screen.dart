@@ -5,11 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
 import 'package:cani/core/notifications/local_notification_service.dart';
+import 'package:cani/core/notifications/notification_sync_router.dart';
 import 'package:cani/features/auth/auth.dart';
 import 'package:cani/features/auth/screens/complete_profile_screen.dart';
 import 'package:cani/features/auth/widgets/terms_of_service_dialog.dart';
 import 'package:cani/features/ekyc/providers/ekyc_provider.dart';
-import 'package:cani/features/help_center/providers/help_center_providers.dart';
 import 'package:cani/features/job_proposals/data/proposal_repository.dart';
 import 'package:cani/features/job_proposals/models/proposal_models.dart';
 import 'package:cani/features/job_proposals/screens/my_assignments_screen.dart';
@@ -37,6 +37,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   bool _hasInitialNotifSync = false;
   bool _syncingNotifs = false;
   final Set<int> _visitedTabs = {0};
+  final Map<int, DateTime> _lastTabRefreshAt = {};
 
   void _rememberNotifiedId(String id) {
     _notifiedIds.remove(id);
@@ -95,8 +96,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         if (ref.read(authStateProvider).isAuthenticated) {
           ref.invalidate(proposalsListProvider);
           ref.invalidate(assignmentsListProvider);
+          ref.invalidate(incomeSummaryProvider);
           if (ref.read(ekycProvider).result?.isApproved == true) {
             ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
+          } else {
+            ref.read(ekycProvider.notifier).checkStatus();
           }
         }
         break;
@@ -121,7 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     _syncingNotifs = true;
     try {
       final dio = ref.read(dioProvider);
-      final res = await dio.get('/v1/notifications');
+      final res = await dio.get('/v1/notifications', queryParameters: {'limit': 25});
       final raw = res.data is Map ? res.data['data'] : null;
       if (raw is! List) return;
 
@@ -131,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       if (!_hasInitialNotifSync) {
         for (final entry in raw) {
           if (entry is! Map) continue;
-          if (entry['isRead'] == true || entry['notificationId'] == null) continue;
+          if (entry['notificationId'] == null) continue;
           final idStr = entry['notificationId'].toString();
           _rememberNotifiedId(idStr);
           final createdAt = DateTime.tryParse(entry['createdAt']?.toString() ?? '');
@@ -144,10 +148,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         return;
       }
 
-      final newlyArrived = <Map>[];
+      // Track mọi notification mới (cả trường hợp đã đọc ở chỗ khác / tổng unreadCount không đổi)
+      final newlyArrivedAll = <Map<String, dynamic>>[];
       for (final entry in raw) {
         if (entry is! Map) continue;
-        if (entry['isRead'] == true || entry['notificationId'] == null) continue;
+        if (entry['notificationId'] == null) continue;
 
         final idStr = entry['notificationId'].toString();
         final createdAt = DateTime.tryParse(entry['createdAt']?.toString() ?? '');
@@ -163,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           break;
         }
 
-        newlyArrived.add(entry);
+        newlyArrivedAll.add(Map<String, dynamic>.from(entry));
         _rememberNotifiedId(idStr);
         if (createdAt != null && (newestCreatedAt == null || createdAt.isAfter(newestCreatedAt))) {
           newestCreatedAt = createdAt;
@@ -172,9 +177,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
       _lastSyncedCreatedAt = newestCreatedAt;
 
-      if (newlyArrived.isNotEmpty) {
+      if (newlyArrivedAll.isNotEmpty) {
+        NotificationSyncRouter.syncFromRef(ref, newlyArrivedAll);
+
         final isOnline = ref.read(jobRadarProvider).isOnline;
-        final visibleArrived = newlyArrived.where((entry) {
+        final visibleUnread = newlyArrivedAll.where((entry) {
+          if (entry['isRead'] == true) return false;
           final typeStr = entry['type']?.toString().toUpperCase();
           if (!isOnline && typeStr == 'PROPOSAL') {
             return false;
@@ -182,27 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           return true;
         }).toList();
 
-        if (visibleArrived.isEmpty) {
-          return;
-        }
-
-        if (isOnline) {
-          ref.invalidate(proposalsListProvider);
-        }
-        ref.invalidate(assignmentsListProvider);
-        ref.invalidate(incomeSummaryProvider);
-        ref.invalidate(myTicketsProvider);
-        for (final n in visibleArrived) {
-          final refType = n['referenceType']?.toString();
-          final refId = n['referenceId']?.toString();
-          if (refType == 'SUPPORT_TICKET' && refId != null) {
-            ref.invalidate(ticketDetailProvider(refId));
-          }
-        }
-        if (isOnline && ref.read(ekycProvider).result?.isApproved == true) {
-          ref.read(jobRadarProvider.notifier).scanNearbyShifts(silent: true);
-        }
-        for (final n in visibleArrived.take(3)) {
+        for (final n in visibleUnread.take(3)) {
           final idStr = n['notificationId'].toString();
           final title = n['title']?.toString() ?? 'Thông báo mới từ CANi';
           final body = n['body']?.toString() ?? '';
@@ -284,10 +272,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         onTap: (index) {
           _visitedTabs.add(index);
           ref.read(homeTabIndexProvider.notifier).state = index;
+          final now = DateTime.now();
+          final lastAt = _lastTabRefreshAt[index];
+          if (lastAt != null && now.difference(lastAt) < const Duration(seconds: 8)) {
+            return;
+          }
+          _lastTabRefreshAt[index] = now;
           if (index == 0) {
             ref.invalidate(proposalsListProvider);
           } else if (index == 1) {
-            // Tự động làm mới danh sách ca làm để đồng bộ ngay ca vừa nhận
             ref.invalidate(assignmentsListProvider);
             ref.invalidate(incomeSummaryProvider);
           }

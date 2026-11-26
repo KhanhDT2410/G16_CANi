@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:io' show Socket;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/constants/api_constants.dart';
@@ -63,17 +66,44 @@ final dioProvider = Provider<Dio>((ref) {
             receiveTimeout: ApiConstants.receiveTimeout,
           );
 
-          for (final host in fallbackHosts) {
-            if (error.requestOptions.baseUrl.contains(host)) continue;
+          final candidates = fallbackHosts
+              .where((host) => !error.requestOptions.baseUrl.contains(host))
+              .toList();
+
+          String? reachableHost;
+          if (!kIsWeb && candidates.isNotEmpty) {
+            final completer = Completer<String?>();
+            var remaining = candidates.length;
+            for (final host in candidates) {
+              final parts = host.split(':');
+              final ip = parts[0];
+              final port = int.tryParse(parts.length > 1 ? parts[1] : '8080') ?? 8080;
+              Socket.connect(ip, port, timeout: const Duration(milliseconds: 900)).then((socket) {
+                socket.destroy();
+                if (!completer.isCompleted) {
+                  completer.complete(host);
+                }
+              }).catchError((_) {
+                remaining -= 1;
+                if (remaining == 0 && !completer.isCompleted) {
+                  completer.complete(null);
+                }
+              });
+            }
+            reachableHost = await completer.future;
+          }
+
+          if (reachableHost != null) {
             final fallbackBaseUrl = error.requestOptions.baseUrl.replaceAll(
               RegExp(r'(127\.0\.0\.1|localhost|192\.168\.\d+\.\d+|10\.0\.2\.2):8080'),
-              host,
+              reachableHost,
             );
             try {
               final retryData = rawData is FormData ? rawData.clone() : rawData;
               final fallbackDio = Dio(BaseOptions(
                 baseUrl: fallbackBaseUrl,
                 connectTimeout: const Duration(seconds: 3),
+                receiveTimeout: ApiConstants.receiveTimeout,
               ));
               final response = await fallbackDio.request(
                 error.requestOptions.path,
@@ -84,7 +114,7 @@ final dioProvider = Provider<Dio>((ref) {
               dio.options.baseUrl = fallbackBaseUrl;
               return handler.resolve(response);
             } catch (_) {
-              // Tiếp tục thử host kế tiếp
+              // Fall through to handler.next(error)
             }
           }
         }

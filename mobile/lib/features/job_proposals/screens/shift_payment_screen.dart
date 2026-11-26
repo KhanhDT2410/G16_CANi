@@ -57,14 +57,14 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
       setState(() => _isRefreshing = true);
     }
     try {
-      final list = await ref.read(proposalRepositoryProvider).fetchAssignments();
-      final updated = list.firstWhere(
-        (a) => a.assignmentId == _assignment.assignmentId,
-        orElse: () => _assignment,
-      );
+      ref.invalidate(assignmentsListProvider);
+      final list = await ref.read(assignmentsListProvider.future);
+      final idx = list.indexWhere((a) => a.assignmentId == _assignment.assignmentId);
       if (mounted) {
         setState(() {
-          _assignment = updated;
+          if (idx != -1) {
+            _assignment = list[idx];
+          }
           _isRefreshing = false;
         });
       }
@@ -185,6 +185,14 @@ class _ShiftPaymentScreenState extends ConsumerState<ShiftPaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final liveList = ref.watch(assignmentsListProvider).valueOrNull;
+    if (liveList != null) {
+      final liveIdx = liveList.indexWhere((item) => item.assignmentId == _assignment.assignmentId);
+      if (liveIdx != -1) {
+        _assignment = liveList[liveIdx];
+      }
+    }
+
     final cani = Theme.of(context).cani;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final a = _assignment;

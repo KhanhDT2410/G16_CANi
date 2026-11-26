@@ -90,8 +90,8 @@ export function usePayments() {
     import.meta.env.VITE_DEMO === 'true' ? DEMO_PAYMENTS : []
   );
 
-  const loadEoPayments = useCallback(async () => {
-    setLoading(true);
+  const loadEoPayments = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const data = await eoService.getEoPayments();
@@ -110,7 +110,7 @@ export function usePayments() {
         setError(msg);
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 

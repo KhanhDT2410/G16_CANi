@@ -8,8 +8,9 @@ export const notificationApi = {
   /**
    * Lấy danh sách thông báo của người dùng hiện tại (sắp xếp mới nhất trước)
    */
-  getMyNotifications: async () => {
-    const response = await apiClient.get('/v1/notifications');
+  getMyNotifications: async ({ limit } = {}) => {
+    const params = limit ? { limit } : undefined;
+    const response = await apiClient.get('/v1/notifications', { params });
     return response.data?.data || [];
   },
 

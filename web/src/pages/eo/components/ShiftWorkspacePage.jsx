@@ -99,15 +99,60 @@ export default function ShiftWorkspacePage({
   }, [shift?.shiftId, loadAttendance]);
 
   useEffect(() => {
-    const handlePaymentUpdated = () => {
+    const syncWorkspaceSilently = () => {
       loadAttendance({ silent: true });
       if (onReloadEvents) {
         Promise.resolve(onReloadEvents({ silent: true })).catch(() => {});
       }
     };
+
+    const handlePaymentUpdated = () => syncWorkspaceSilently();
+    const handleDomainEvent = (e) => {
+      const items = Array.isArray(e?.detail?.items) ? e.detail.items : [];
+      const reason = e?.detail?.reason;
+      if (reason === 'tab_focus' || items.length === 0) {
+        syncWorkspaceSilently();
+        return;
+      }
+      const relevant = items.some((n) => {
+        const t = String(n?.type || '').toUpperCase();
+        const refType = String(n?.referenceType || '').toUpperCase();
+        return (
+          t === 'SHIFT' ||
+          t === 'ATTENDANCE' ||
+          t === 'PAYMENT' ||
+          t === 'PROPOSAL' ||
+          t === 'GROUP' ||
+          t === 'DISPUTE' ||
+          refType === 'SHIFT' ||
+          refType === 'ASSIGNMENT' ||
+          refType === 'PAYMENT'
+        );
+      });
+      if (relevant) {
+        syncWorkspaceSilently();
+      }
+    };
+
     window.addEventListener('cani_payment_updated', handlePaymentUpdated);
-    return () => window.removeEventListener('cani_payment_updated', handlePaymentUpdated);
-  }, [loadAttendance, onReloadEvents]);
+    window.addEventListener('cani_domain_event', handleDomainEvent);
+
+    // Fallback nhẹ mỗi 15s khi tab đang hiển thị để cập nhật cả trường hợp action không tăng unreadCount
+    const pollId =
+      shift?.shiftId && shift?.status !== 'CANCELLED'
+        ? setInterval(() => {
+            if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+              loadAttendance({ silent: true });
+            }
+          }, 15000)
+        : null;
+
+    return () => {
+      window.removeEventListener('cani_payment_updated', handlePaymentUpdated);
+      window.removeEventListener('cani_domain_event', handleDomainEvent);
+      if (pollId) clearInterval(pollId);
+    };
+  }, [loadAttendance, onReloadEvents, shift?.shiftId, shift?.status]);
 
   useEffect(() => {
     if (targetAssignmentId && attendanceList.length > 0) {
@@ -415,19 +460,20 @@ export default function ShiftWorkspacePage({
     if (!ok) return;
 
     let successCount = 0;
-    for (let i = 0; i < readyList.length; i += 1) {
-      const target = readyList[i];
-      setBulkProgress({ label: 'Đang duyệt công', current: i + 1, total: readyList.length });
-      try {
-        const skillId = resolvePreassignedPerformedSkillId(target, shift);
-        await eoService.verifyAttendance(target.assignmentId, {
-          confirmedPerformedSkillId: skillId,
-          confirmPerformedSkill: true,
-        });
-        successCount += 1;
-      } catch {
-        // continue remaining items
-      }
+    const CONCURRENCY = 3;
+    for (let i = 0; i < readyList.length; i += CONCURRENCY) {
+      const batch = readyList.slice(i, i + CONCURRENCY);
+      setBulkProgress({ label: 'Đang duyệt công', current: Math.min(i + batch.length, readyList.length), total: readyList.length });
+      const results = await Promise.allSettled(
+        batch.map((target) => {
+          const skillId = resolvePreassignedPerformedSkillId(target, shift);
+          return eoService.verifyAttendance(target.assignmentId, {
+            confirmedPerformedSkillId: skillId,
+            confirmPerformedSkill: true,
+          });
+        })
+      );
+      successCount += results.filter((r) => r.status === 'fulfilled').length;
     }
     setBulkProgress(null);
     setSelectedIds([]);
@@ -451,21 +497,27 @@ export default function ShiftWorkspacePage({
     if (!ok) return;
 
     let successCount = 0;
-    for (let i = 0; i < bulkCashCandidates.length; i += 1) {
-      const target = bulkCashCandidates[i];
-      setBulkProgress({ label: 'Đang khai báo trả tiền mặt', current: i + 1, total: bulkCashCandidates.length });
-      try {
-        await eoService.declarePayment({
-          assignmentId: target.assignmentId,
-          declaredAmount: roundVndAmount(target.agreedWage ?? target.agreedAmount ?? shift.salary ?? 200000),
-          paymentMethod: 'CASH',
-          externalRef: `CASH-BULK-${Date.now().toString().slice(-5)}-${i + 1}`,
-          paymentProofUrl: '',
-        });
-        successCount += 1;
-      } catch {
-        // continue remaining items
-      }
+    const CONCURRENCY = 3;
+    const refBatchStamp = Date.now().toString().slice(-5);
+    for (let i = 0; i < bulkCashCandidates.length; i += CONCURRENCY) {
+      const batch = bulkCashCandidates.slice(i, i + CONCURRENCY);
+      setBulkProgress({
+        label: 'Đang khai báo trả tiền mặt',
+        current: Math.min(i + batch.length, bulkCashCandidates.length),
+        total: bulkCashCandidates.length,
+      });
+      const results = await Promise.allSettled(
+        batch.map((target, offset) =>
+          eoService.declarePayment({
+            assignmentId: target.assignmentId,
+            declaredAmount: roundVndAmount(target.agreedWage ?? target.agreedAmount ?? shift.salary ?? 200000),
+            paymentMethod: 'CASH',
+            externalRef: `CASH-BULK-${refBatchStamp}-${i + offset + 1}`,
+            paymentProofUrl: '',
+          })
+        )
+      );
+      successCount += results.filter((r) => r.status === 'fulfilled').length;
     }
     setBulkProgress(null);
     setSelectedIds([]);

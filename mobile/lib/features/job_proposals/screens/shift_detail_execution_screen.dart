@@ -707,12 +707,11 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
   Future<void> _refreshAssignment() async {
     try {
-      final list = await ref.read(proposalRepositoryProvider).fetchAssignments();
-      final updated = list.firstWhere(
-        (a) => a.assignmentId == _assignment.assignmentId,
-        orElse: () => _assignment,
-      );
-      if (mounted) {
+      ref.invalidate(assignmentsListProvider);
+      final list = await ref.read(assignmentsListProvider.future);
+      final idx = list.indexWhere((a) => a.assignmentId == _assignment.assignmentId);
+      if (idx != -1 && mounted) {
+        final updated = list[idx];
         setState(() {
           _assignment = updated;
           if (updated.proofImageUrl != null) {
@@ -725,6 +724,18 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
   @override
   Widget build(BuildContext context) {
+    // Đồng bộ trực tiếp với assignmentsListProvider khi FCM / polling / lifecycle cập nhật ngầm
+    final liveList = ref.watch(assignmentsListProvider).valueOrNull;
+    if (liveList != null) {
+      final liveIdx = liveList.indexWhere((a) => a.assignmentId == _assignment.assignmentId);
+      if (liveIdx != -1) {
+        _assignment = liveList[liveIdx];
+        if (_assignment.proofImageUrl != null && _uploadedProofUrl == null) {
+          _uploadedProofUrl = _assignment.proofImageUrl;
+        }
+      }
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cani = theme.cani;

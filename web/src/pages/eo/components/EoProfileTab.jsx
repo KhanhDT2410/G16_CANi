@@ -28,7 +28,7 @@ const maskPhone = (phone) => {
   return `${digits.slice(0, 3)}****${digits.slice(-3)}`;
 };
 
-export default function EoProfileTab() {
+export default function EoProfileTab({ events: preloadedEvents = null }) {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
 
@@ -110,14 +110,15 @@ export default function EoProfileTab() {
     selfieImage: null,
   });
 
-  // Tải dữ liệu từ Backend (kết hợp đối soát từ getMyEvents để chỉ số luôn chuẩn)
+  // Tải dữ liệu từ Backend (tái sử dụng events đã load ở EOPage để tránh gọi trùng getMyEvents)
   const loadData = async () => {
     setLoading(true);
     try {
+      const hasPreloadedEvents = Array.isArray(preloadedEvents) && preloadedEvents.length > 0;
       const [profileRes, ekycRes, eventsRes, consentRes] = await Promise.allSettled([
         eoService.getEoProfile(),
         eoService.getEkycStatus(),
-        eoService.getMyEvents(),
+        hasPreloadedEvents ? Promise.resolve(preloadedEvents) : eoService.getMyEvents(),
         eoService.getEkycConsentPolicy(),
       ]);
       if (consentRes.status === 'fulfilled' && consentRes.value) {

@@ -235,7 +235,7 @@ class _MyAssignmentsScreenState extends ConsumerState<MyAssignmentsScreen> {
     final summaryAsync = ref.watch(incomeSummaryProvider);
     final currentSubTab = ref.watch(assignmentsSubTabProvider);
 
-    final isLoading = data.isLoading;
+    final isLoading = data.isLoading && !data.hasValue;
     final allList = data.valueOrNull ?? const <ShiftAssignmentItem>[];
 
     // 1. Phân loại ca làm việc: Đang hoạt động vs Lịch sử quá khứ

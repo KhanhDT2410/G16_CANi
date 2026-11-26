@@ -210,11 +210,23 @@ export default function EOPage() {
   }, [setSearchQuery]);
 
   const { loadEoPayments } = payments;
+  const { loadEvents } = events;
   useEffect(() => {
     if (activeTab === 'payments') {
       loadEoPayments();
     }
   }, [activeTab, loadEoPayments]);
+
+  useEffect(() => {
+    const handleDomainEvent = () => {
+      loadEvents({ silent: true });
+      if (activeTab === 'payments') {
+        loadEoPayments({ silent: true });
+      }
+    };
+    window.addEventListener('cani_domain_event', handleDomainEvent);
+    return () => window.removeEventListener('cani_domain_event', handleDomainEvent);
+  }, [activeTab, loadEvents, loadEoPayments]);
 
   // Helper đẩy URL query params vào Browser History để nút Back quay lại đúng màn/bước trước
   const syncUrlRoute = (paramsObj, { replace = false } = {}) => {
@@ -813,7 +825,7 @@ export default function EOPage() {
 
           {(activeTab === 'profile' || activeTab === 'ekyc') && (
             <Suspense fallback={<EOTabFallback />}>
-              <EoProfileTab />
+              <EoProfileTab events={events.events} />
             </Suspense>
           )}
 

@@ -1,22 +1,62 @@
-import { useState, useMemo, useEffect } from 'react';
-import { UserManagementView } from '../../features/admin-users';
-import { AdminShiftView } from '../../features/admin-shifts';
-import { AdminDashboardView } from '../../features/admin-dashboard';
-import { DisputeCenterView } from '../../features/disputes';
-import { SupportTicketsCenterView } from '../../features/support-tickets';
-import { SystemConfigView } from '../../features/system-configs';
-import { FaqView } from '../../features/faqs';
-import { RevenueDashboardView } from '../../features/revenue-dashboard';
-import { RsAppealsView } from '../../features/rs-appeals';
-import { AdminAccountAppealsTable } from '../../features/account-appeals';
-import { NoShowView } from '../../features/no-shows';
-import { AdminPlansView } from '../../features/admin-plans';
-import { WageMatrixView } from '../../features/admin-wage-matrix';
-import { AdminSkillView } from '../../features/admin-skills';
-import { AdminReviewView } from '../../features/admin-reviews';
-import { AdminDisputeRulesView } from '../../features/admin-dispute-rules';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import AdminSidebar from './components/AdminSidebar';
 import './AdminPage.css';
+
+const UserManagementView = lazy(() =>
+  import('../../features/admin-users').then((m) => ({ default: m.UserManagementView }))
+);
+const AdminShiftView = lazy(() =>
+  import('../../features/admin-shifts').then((m) => ({ default: m.AdminShiftView }))
+);
+const AdminDashboardView = lazy(() =>
+  import('../../features/admin-dashboard').then((m) => ({ default: m.AdminDashboardView }))
+);
+const DisputeCenterView = lazy(() =>
+  import('../../features/disputes').then((m) => ({ default: m.DisputeCenterView }))
+);
+const SupportTicketsCenterView = lazy(() =>
+  import('../../features/support-tickets').then((m) => ({ default: m.SupportTicketsCenterView }))
+);
+const SystemConfigView = lazy(() =>
+  import('../../features/system-configs').then((m) => ({ default: m.SystemConfigView }))
+);
+const FaqView = lazy(() =>
+  import('../../features/faqs').then((m) => ({ default: m.FaqView }))
+);
+const RevenueDashboardView = lazy(() =>
+  import('../../features/revenue-dashboard').then((m) => ({ default: m.RevenueDashboardView }))
+);
+const RsAppealsView = lazy(() =>
+  import('../../features/rs-appeals').then((m) => ({ default: m.RsAppealsView }))
+);
+const AdminAccountAppealsTable = lazy(() =>
+  import('../../features/account-appeals').then((m) => ({ default: m.AdminAccountAppealsTable }))
+);
+const NoShowView = lazy(() =>
+  import('../../features/no-shows').then((m) => ({ default: m.NoShowView }))
+);
+const AdminPlansView = lazy(() =>
+  import('../../features/admin-plans').then((m) => ({ default: m.AdminPlansView }))
+);
+const WageMatrixView = lazy(() =>
+  import('../../features/admin-wage-matrix').then((m) => ({ default: m.WageMatrixView }))
+);
+const AdminSkillView = lazy(() =>
+  import('../../features/admin-skills').then((m) => ({ default: m.AdminSkillView }))
+);
+const AdminReviewView = lazy(() =>
+  import('../../features/admin-reviews').then((m) => ({ default: m.AdminReviewView }))
+);
+const AdminDisputeRulesView = lazy(() =>
+  import('../../features/admin-dispute-rules').then((m) => ({ default: m.AdminDisputeRulesView }))
+);
+
+const AdminTabFallback = () => (
+  <div className="page-loading-fallback">
+    <div className="cani-spinner" />
+    <span>Đang tải dữ liệu quản trị...</span>
+  </div>
+);
 
 const TAB_METADATA = {
   dashboard: {
@@ -208,6 +248,7 @@ const AdminPage = () => {
         </header>
 
         <section className="admin-content-card">
+          <Suspense fallback={<AdminTabFallback />}>
           {activeTab === 'dashboard' && <AdminDashboardView onNavigateTab={setActiveTab} />}
           {activeTab === 'revenue' && <RevenueDashboardView />}
           {activeTab === 'appeals' && <RsAppealsView />}
@@ -234,6 +275,7 @@ const AdminPage = () => {
           {activeTab === 'skills' && <AdminSkillView />}
           {activeTab === 'config_general' && <SystemConfigView activeCategory="GENERAL" />}
           {activeTab === 'configs' && <SystemConfigView activeCategory="ALL" />}
+          </Suspense>
         </section>
       </main>
     </div>

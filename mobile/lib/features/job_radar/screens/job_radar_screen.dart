@@ -24,7 +24,9 @@ class _JobRadarScreenState extends ConsumerState<JobRadarScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (!mounted) return;
+      final ekycState = ref.read(ekycProvider);
+      if (!ekycState.isLoading && ekycState.result == null) {
         ref.read(ekycProvider.notifier).checkStatus();
       }
     });
@@ -107,7 +109,7 @@ class _JobRadarMapSection extends ConsumerWidget {
         (proposalsAsync.asData?.value ?? const <JobProposalItem>[])
             .any((p) => p.isActiveAt(now));
 
-    final isLoadingAny = mapSlice.isLoading || proposalsAsync.isLoading;
+    final isLoadingAny = mapSlice.isLoading || (proposalsAsync.isLoading && !proposalsAsync.hasValue);
     final hasAnyError = mapSlice.radarLoadError != null;
     final hasAnyVisibleData = hasActiveProposals || mapSlice.nearbyShifts.isNotEmpty;
 

@@ -88,8 +88,10 @@ public class AuthService {
                     request.getPhone(),
                     assignedRole.name(),
                     request.getCompanyName());
+        } catch (AppException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("GoTrue registration failed [{}]", e.getClass().getSimpleName());
+            log.warn("GoTrue registration failed [{}]: {}", e.getClass().getSimpleName(), e.getMessage());
         }
 
         if ((supabaseUser == null || supabaseUser.getId() == null) && !environment.acceptsProfiles(Profiles.of("h2"))) {

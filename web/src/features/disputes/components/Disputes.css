@@ -812,6 +812,17 @@
   border: 1px solid #fde68a;
 }
 
+.workspace-parties-summary {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 .workspace-actions {
   display: flex;
   gap: 0.5rem;
@@ -868,12 +879,33 @@
   background: #fef3c7;
 }
 
-/* Layout 2 Columns */
+.btn-ws-info-toggle {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.btn-ws-info-toggle:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.btn-ws-info-toggle.active {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
+/* Layout 2 Columns (hoặc 1 cột mở rộng khi ẩn cột 3) */
 .dispute-workspace-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr 310px;
   gap: 1.25rem;
   align-items: start;
+}
+
+.dispute-workspace-layout.sidebar-hidden {
+  grid-template-columns: 1fr;
 }
 
 @media (max-width: 992px) {
@@ -1239,6 +1271,24 @@
   color: #1e293b;
 }
 
+.sidebar-rules-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rules-toggle-hint {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
 .sidebar-rules-list {
   padding-left: 1.15rem;
   margin: 0;
@@ -1292,7 +1342,7 @@
 
 .dispute-split-layout {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 320px 1fr;
   gap: 1.25rem;
   min-height: 720px;
   align-items: stretch;

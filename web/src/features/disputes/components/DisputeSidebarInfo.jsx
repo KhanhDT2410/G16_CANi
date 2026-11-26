@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 const formatShiftTime = (start, end) => {
   if (!start) return null;
   const startDate = new Date(start);
@@ -21,6 +23,8 @@ const formatRoleLabel = (role) => {
  * Tuân thủ < 200 dòng theo AGENTS.md.
  */
 export const DisputeSidebarInfo = ({ dispute, copiedCode, onCopyId }) => {
+  const [showRules, setShowRules] = useState(false);
+
   if (!dispute) return null;
 
   return (
@@ -111,15 +115,24 @@ export const DisputeSidebarInfo = ({ dispute, copiedCode, onCopyId }) => {
         )}
       </div>
 
-      {/* Quy tắc hòa giải */}
+      {/* Quy tắc hòa giải (thu gọn mặc định để cột 3 gọn gàng) */}
       <div className="sidebar-rules-card">
-        <h4 className="sidebar-card-title">Quy Tắc Hòa Giải</h4>
-        <ul className="sidebar-rules-list">
-          <li>Mỗi bên có quyền nộp tài liệu giải trình, hóa đơn và hình ảnh đối soát.</li>
-          <li>CSKH giữ vai trò trung gian xác minh chứng cứ và đưa ra phán quyết độc lập.</li>
-          <li>Trường hợp bên có lỗi là Nhân sự, hệ thống tự động khấu trừ điểm uy tín.</li>
-          <li>Nếu không đồng ý phán quyết, các bên có quyền kháng nghị trong vòng 7 ngày.</li>
-        </ul>
+        <button
+          type="button"
+          className="sidebar-rules-toggle"
+          onClick={() => setShowRules((prev) => !prev)}
+        >
+          <span className="sidebar-card-title">Quy Tắc Hòa Giải</span>
+          <span className="rules-toggle-hint">{showRules ? 'Thu gọn' : 'Xem'}</span>
+        </button>
+        {showRules && (
+          <ul className="sidebar-rules-list">
+            <li>Mỗi bên có quyền nộp tài liệu giải trình, hóa đơn và hình ảnh đối soát.</li>
+            <li>CSKH giữ vai trò trung gian xác minh chứng cứ và đưa ra phán quyết độc lập.</li>
+            <li>Trường hợp bên có lỗi là Nhân sự, hệ thống tự động khấu trừ điểm uy tín.</li>
+            <li>Nếu không đồng ý phán quyết, các bên có quyền kháng nghị trong vòng 7 ngày.</li>
+          </ul>
+        )}
       </div>
     </div>
   );

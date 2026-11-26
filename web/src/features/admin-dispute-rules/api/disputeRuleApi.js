@@ -9,11 +9,6 @@ export const disputeRuleApi = {
     return response.data?.data || [];
   },
 
-  getRuleById: async (id) => {
-    const response = await apiClient.get(`/v1/admin/dispute-rules/${id}`);
-    return response.data?.data;
-  },
-
   createRule: async (payload) => {
     const response = await apiClient.post('/v1/admin/dispute-rules', payload);
     return response.data?.data;

@@ -1376,10 +1376,6 @@ public class SkillVerificationService {
         return false;
     }
 
-    public static String removeDiacritics(String str) {
-        return normalizeName(str);
-    }
-
     public static String normalizeName(String raw) {
         if (raw == null) {
             return "";
@@ -1519,17 +1515,6 @@ public class SkillVerificationService {
         }
         worker.setSkillTier(highest);
         workerRepository.save(worker);
-    }
-
-    private List<Skill> resolveSkillsFromStoredRequest(SkillVerificationRequest req) {
-        List<Skill> skills = new ArrayList<>();
-        if (req.getSkill() != null) {
-            skills.add(req.getSkill());
-        } else if (req.getJobType() != null && !req.getJobType().isBlank()
-                && !DEFAULT_UNSPECIFIED_JOB_TYPE.equals(req.getJobType())) {
-            skillRepository.findByNameIgnoreCase(req.getJobType()).ifPresent(skills::add);
-        }
-        return skills;
     }
 
     private Optional<WorkerSkillPoint> findSkillPointForSkill(UUID workerId, Skill skill) {

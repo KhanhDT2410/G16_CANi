@@ -14,7 +14,5 @@ public interface SupportTicketMessageRepository extends JpaRepository<SupportTic
     List<SupportTicketMessage> findByTicketIdOrderByCreatedAtAsc(UUID ticketId);
 
     Optional<SupportTicketMessage> findFirstByTicketIdOrderByCreatedAtDesc(UUID ticketId);
-
-    long countByTicketId(UUID ticketId);
 }
 

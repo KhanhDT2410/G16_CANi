@@ -33,7 +33,6 @@ public class InviteService {
 
     private final InviteRepository inviteRepository;
     private final ShiftRepository shiftRepository;
-    private final EventRepository eventRepository;
     private final EventOrganizerRepository eventOrganizerRepository;
     private final WorkerRepository workerRepository;
     private final ShiftAssignmentRepository shiftAssignmentRepository;

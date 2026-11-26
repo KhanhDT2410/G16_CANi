@@ -34,8 +34,6 @@ export function createDefaultNewEvent() {
   };
 }
 
-export const DEFAULT_NEW_EVENT = createDefaultNewEvent();
-
 /**
  * Kiểm tra thời gian sự kiện (ngay khi chọn hoặc khi submit)
  */

@@ -19,9 +19,7 @@ class SkillHubColors {
   static const Color textSecondary = Color(0xFF64748B);
   static const Color ctaPrimary = Color(0xFF0284C7);
   static const Color ctaHover = Color(0xFF0369A1);
-  static const Color accentBright = Color(0xFF36D1DC);
   static const Color borderSoft = Color(0xFFE2E8F0);
-  static const Color borderSubtle = Color(0x66E2E8F0);
 
   // Semantic colors
   static const Color successText = Color(0xFF047857);
@@ -30,7 +28,6 @@ class SkillHubColors {
   static const Color warningBg = Color(0xFFFFFBEB);
   static const Color dangerText = Color(0xFFB91C1C);
   static const Color dangerBg = Color(0xFFFEF2F2);
-  static const Color infoText = Color(0xFF0369A1);
   static const Color infoBg = Color(0xFFE0F2FE);
 
   // 7 SkillTier Colors
@@ -69,16 +66,6 @@ class SkillHubColors {
       }
     }
     return highest;
-  }
-
-  static String tierFromSp(int totalSp) {
-    if (totalSp >= 900) return 'MASTER';
-    if (totalSp >= 700) return 'DIAMOND';
-    if (totalSp >= 500) return 'PLATINUM';
-    if (totalSp >= 350) return 'GOLD';
-    if (totalSp >= 200) return 'SILVER';
-    if (totalSp >= 100) return 'BRONZE';
-    return 'STARTER';
   }
 
   /// Quy đổi 7 hạng chi tiết trong DB -> 3 Mức phát triển dễ hiểu cho người dùng Việt Nam.
@@ -141,18 +128,6 @@ class SkillHubColors {
       case 'SELF_DECLARED':
       default:
         return 'Tự khai báo';
-    }
-  }
-
-  static String getVerificationTierDescription(String? verificationTier) {
-    switch ((verificationTier ?? 'SELF_DECLARED').toUpperCase()) {
-      case 'PLATFORM_PROVEN':
-        return 'Đạt từ tối thiểu 3 ca hoàn thành tốt (≥ 85%), đánh giá thật ≥ 4.5 sao & uy tín ≥ 70.';
-      case 'AI_DOCUMENT':
-        return 'Chứng chỉ/tài liệu đã được xác minh tự động từ nguồn tra cứu chính thức.';
-      case 'SELF_DECLARED':
-      default:
-        return 'Bạn tự thêm kỹ năng vào hồ sơ cá nhân.';
     }
   }
 

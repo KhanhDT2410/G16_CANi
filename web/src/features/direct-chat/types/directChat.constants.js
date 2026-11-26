@@ -2,11 +2,6 @@
  * Direct Chat Constants & Filter Types
  */
 
-export const CHAT_TYPES = {
-  DIRECT: 'DIRECT',
-  SHIFT: 'SHIFT',
-};
-
 export const CHAT_FILTER_TABS = [
   { id: 'ALL', label: 'Tất Cả' },
   { id: 'SHIFT', label: 'Theo Ca Làm Việc' },

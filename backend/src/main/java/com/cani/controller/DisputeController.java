@@ -2,7 +2,6 @@ package com.cani.controller;
 
 import com.cani.dto.dispute.*;
 import com.cani.dto.response.ApiResponse;
-import com.cani.entity.User;
 import com.cani.security.SecurityUtils;
 import com.cani.service.DisputeService;
 import jakarta.validation.Valid;
@@ -107,19 +106,5 @@ public class DisputeController {
         DisputeDetailResponseDto response = disputeService.escalateDispute(id, userId, request);
         return ResponseEntity.ok(ApiResponse.ok(response,
                 "Đã kháng nghị lên quản trị viên. Quyết định cuối sẽ được thông báo sớm"));
-    }
-
-    private UUID currentUserId(Authentication authentication) {
-        if (authentication == null) {
-            return null;
-        }
-        if (authentication.getPrincipal() instanceof User u) {
-            return u.getUserId();
-        }
-        try {
-            return com.cani.security.SecurityUtils.getCurrentUserId(authentication);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

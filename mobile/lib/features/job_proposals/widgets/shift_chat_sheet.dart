@@ -443,6 +443,4 @@ class _ShiftChatSheetState extends ConsumerState<ShiftChatSheet> {
       ),
     );
   }
-
-  BuildContext heightContext(BuildContext context) => context;
 }

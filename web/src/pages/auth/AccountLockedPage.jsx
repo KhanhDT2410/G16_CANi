@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import CaniLogo from '../../components/common/CaniLogo';
 import { accountAppealApi } from '../../features/account-appeals/api/accountAppealApi';
 import AppealSubmissionForm from '../../features/account-appeals/components/AppealSubmissionForm';
@@ -8,7 +8,6 @@ import './AccountLockedPage.css';
 
 export default function AccountLockedPage() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const stateEmail = location.state?.email || '';
   const stateLockReason = location.state?.lockReason || '';

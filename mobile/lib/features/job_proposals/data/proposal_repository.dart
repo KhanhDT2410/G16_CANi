@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -68,10 +67,6 @@ class ProposalRepository {
 
   ProposalRepository(this._dio);
 
-  /// Cờ bật/tắt dữ liệu giả lập (mock demo data).
-  /// Mặc định là false (OFF) trong production. Có thể bật qua `--dart-define=DEMO_MODE=true`.
-  static const bool demoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);
-
   String _extractErrorMessage(dynamic error, String fallback) {
     return AppErrorFormatter.format(error, fallback: fallback);
   }
@@ -87,42 +82,6 @@ class ProposalRepository {
       }
       return [];
     } catch (e) {
-      if (demoMode) {
-        return [
-          JobProposalItem(
-            proposalId: 'prop-m01',
-            shiftId: 'shift-m101',
-            eventId: 'evt-m01',
-            eventName: 'Lễ Khai Mạc Triển Lãm Công Nghệ Quốc Tế',
-            venueAddress: 'SECC, 799 Nguyễn Văn Linh, Quận 7, TP.HCM',
-            jobType: 'Lễ tân / Check-in',
-            description: 'Đón tiếp khách mời VIP, quét mã QR đại biểu vào hội trường.',
-            startTime: DateTime.now().add(const Duration(days: 1, hours: 2)),
-            endTime: DateTime.now().add(const Duration(days: 1, hours: 6)),
-            hourlyWage: 60000,
-            allowance: 30000,
-            totalEstimatedPay: 270000,
-            matchScore: 95.0,
-            status: 'PENDING',
-          ),
-          JobProposalItem(
-            proposalId: 'prop-m02',
-            shiftId: 'shift-m102',
-            eventId: 'evt-m02',
-            eventName: 'Gala Dinner Ra Mắt Sản Phẩm Mới',
-            venueAddress: 'Gem Center, Quận 1, TP.HCM',
-            jobType: 'Pha chế (Bartender/Barista)',
-            description: 'Phục vụ đồ uống tại sảnh tiệc chính cho 200 khách mời.',
-            startTime: DateTime.now().add(const Duration(days: 2, hours: 10)),
-            endTime: DateTime.now().add(const Duration(days: 2, hours: 15)),
-            hourlyWage: 75000,
-            allowance: 50000,
-            totalEstimatedPay: 425000,
-            matchScore: 89.0,
-            status: 'PENDING',
-          ),
-        ];
-      }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải danh sách lời mời việc làm.'), e);
     }
   }
@@ -164,26 +123,6 @@ class ProposalRepository {
       }
       return [];
     } catch (e) {
-      if (demoMode) {
-        return [
-          ShiftAssignmentItem(
-            assignmentId: 'assign-m01',
-            shiftId: 'shift-m100',
-            eventId: 'evt-m00',
-            eventName: 'Hội Thảo Chuyển Đổi Số Doanh Nghiệp',
-            venueAddress: 'Khách sạn Rex, 141 Nguyễn Huệ, Quận 1',
-            jobType: 'Điều phối sự kiện',
-            startTime: DateTime.now().subtract(const Duration(days: 1)),
-            endTime: DateTime.now().subtract(const Duration(days: 1, hours: -4)),
-            hourlyWage: 60000,
-            totalPay: 240000,
-            status: 'COMPLETED',
-            paymentStatus: 'DECLARED_PENDING_WORKER',
-            declaredAmount: 240000,
-            paymentMethod: 'BANK_TRANSFER',
-          ),
-        ];
-      }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải danh sách ca làm việc của bạn.'), e);
     }
   }
@@ -280,34 +219,6 @@ class ProposalRepository {
     }
   }
 
-  // Tải ảnh bằng chứng nghiệm thu hoàn thành ca làm
-  Future<String> uploadProofImage(String filePath, {String? token}) async {
-    try {
-      final fileName = filePath.split(RegExp(r'[\\/]')).last;
-      final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          filePath,
-          filename: fileName,
-          contentType: DioMediaType('image', 'jpeg'),
-        ),
-      });
-      final options = Options(
-        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
-      );
-      final response = await _dio.post(
-        '/v1/workers/upload-proof',
-        data: formData,
-        options: options,
-      );
-      if (response.data != null && response.data['data'] != null && response.data['data']['url'] != null) {
-        return response.data['data']['url'] as String;
-      }
-      throw RepositoryException('Không nhận được đường dẫn ảnh sau khi tải lên.');
-    } catch (e) {
-      throw RepositoryException(_extractErrorMessage(e, 'Tải ảnh bằng chứng thất bại. Vui lòng thử lại.'), e);
-    }
-  }
-
   // Tải ảnh bằng chứng trực tiếp từ bytes Camera
   Future<String> uploadProofBytes(Uint8List bytes, String fileName, {String? token}) async {
     try {
@@ -346,15 +257,6 @@ class ProposalRepository {
       }
       return [];
     } catch (e) {
-      if (demoMode) {
-        return const [
-          WorkerAvailabilitySlot(dayOfWeek: 1, startTime: '18:00', endTime: '23:00'),
-          WorkerAvailabilitySlot(dayOfWeek: 3, startTime: '18:00', endTime: '23:00'),
-          WorkerAvailabilitySlot(dayOfWeek: 5, startTime: '18:00', endTime: '23:00'),
-          WorkerAvailabilitySlot(dayOfWeek: 6, startTime: '08:00', endTime: '22:00'),
-          WorkerAvailabilitySlot(dayOfWeek: 0, startTime: '08:00', endTime: '22:00'),
-        ];
-      }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải lịch rảnh của bạn.'), e);
     }
   }
@@ -386,9 +288,6 @@ class ProposalRepository {
       }
       return const WorkerPreferencesModel();
     } catch (e) {
-      if (demoMode) {
-        return const WorkerPreferencesModel();
-      }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải cài đặt tiêu chí tìm việc.'), e);
     }
   }
@@ -434,19 +333,9 @@ class ProposalRepository {
       }
       return const [];
     } catch (e) {
-      if (demoMode) {
-        return _demoChecklist();
-      }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải checklist ca làm việc.'), e);
     }
   }
-
-  List<ShiftChecklistItem> _demoChecklist() => const [
-        ShiftChecklistItem(id: 'chk_1', title: 'Có mặt đúng giờ & kiểm tra trang phục sự kiện', isCompleted: false),
-        ShiftChecklistItem(id: 'chk_2', title: 'Nhận bàn giao khu vực phụ trách từ Quản lý ca', isCompleted: false),
-        ShiftChecklistItem(id: 'chk_3', title: 'Thực hiện nhiệm vụ theo phân công trong suốt ca', isCompleted: false),
-        ShiftChecklistItem(id: 'chk_4', title: 'Bàn giao trang thiết bị & dọn dẹp khu vực cuối ca', isCompleted: false),
-      ];
 
   // UC-45: Cập nhật tiến độ checklist đầu việc
   Future<bool> updateChecklist(String assignmentId, List<ShiftChecklistItem> items, {String? token}) async {
@@ -521,16 +410,6 @@ class ProposalRepository {
       }
       return const WorkerIncomeSummary();
     } catch (e) {
-      if (demoMode) {
-        return const WorkerIncomeSummary(
-          totalEarnings: 1450000,
-          pendingEarnings: 240000,
-          completedShiftsCount: 6,
-          totalHoursWorked: 24.5,
-          avgRating: 4.9,
-          reliabilityScore: 100,
-        );
-      }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tải thống kê thu nhập.'), e);
     }
   }
@@ -546,10 +425,6 @@ class ProposalRepository {
       );
       return response.statusCode == 200;
     } catch (e) {
-      if (demoMode) {
-        log('Demo Mode: Giả lập tham gia ca qua mã mời $code thành công');
-        return true;
-      }
       throw RepositoryException(_extractErrorMessage(e, 'Không thể tham gia ca qua mã mời này.'), e);
     }
   }

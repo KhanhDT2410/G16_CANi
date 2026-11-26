@@ -239,6 +239,4 @@ class FcmService {
       debugPrint('[FcmService] Failed to unregister FCM token: $e');
     }
   }
-
-  static String? get cachedToken => _cachedToken;
 }

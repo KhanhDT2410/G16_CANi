@@ -33,7 +33,6 @@ export default function EventDetailModal({
   onOpenEditEvent,
   onEditShift,
   onCancelShift,
-  onNavigateToRecruitment,
   onReloadEvents,
   onOpenPaymentDeclaration,
   onOpenShiftWorkspace,
@@ -50,7 +49,7 @@ export default function EventDetailModal({
   const workerProfile = useWorkerProfile();
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
-  const [dispatchResultsByShiftId, setDispatchResultsByShiftId] = useState({});
+  const [dispatchResultsByShiftId] = useState({});
 
   useEffect(() => {
     if (initialTab) {

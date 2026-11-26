@@ -1,6 +1,5 @@
 package com.cani.service;
 
-import com.cani.entity.AuditLog;
 import com.cani.entity.Shift;
 import com.cani.entity.ShiftAssignment;
 import com.cani.entity.Skill;
@@ -60,9 +59,6 @@ public class SkillProgressionService {
 
     @Autowired(required = false)
     private ShiftAssignmentRepository shiftAssignmentRepository;
-
-    @Autowired(required = false)
-    private AuditLogService auditLogService;
 
     @Autowired(required = false)
     private SystemConfigRepository systemConfigRepository;
@@ -231,24 +227,6 @@ public class SkillProgressionService {
             return;
         }
         applyRatingPoint(worker, target.skill(), target.canonicalJobType(), rating);
-    }
-
-    /**
-     * Ghi nhận lượt hủy ca theo kỹ năng thực hiện chính của Shift.
-     */
-    @Transactional
-    public void recordCancelledShift(Worker worker, Shift shift) {
-        if (worker == null || shift == null) {
-            return;
-        }
-        PrimarySkillTarget target = resolvePrimaryPerformedSkill(shift, null);
-        if (target == null) {
-            return;
-        }
-        WorkerSkillPoint wsp = findOrCreateSkillPoint(worker, target.skill(), target.canonicalJobType());
-        int cancelled = (wsp.getTotalShiftsCancelled() != null ? wsp.getTotalShiftsCancelled() : 0) + 1;
-        wsp.setTotalShiftsCancelled(cancelled);
-        workerSkillPointRepository.save(wsp);
     }
 
     /**

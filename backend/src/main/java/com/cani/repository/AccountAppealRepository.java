@@ -14,8 +14,6 @@ import java.util.UUID;
 @Repository
 public interface AccountAppealRepository extends JpaRepository<AccountAppeal, UUID> {
 
-    Optional<AccountAppeal> findTopByUser_UserIdOrderByCreatedAtDesc(UUID userId);
-
     Optional<AccountAppeal> findTopByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 
     boolean existsByUser_UserIdAndStatusIn(UUID userId, Collection<AccountAppealStatus> statuses);

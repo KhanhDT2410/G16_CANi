@@ -337,11 +337,6 @@ class EkycNotifier extends StateNotifier<EkycState> {
   void clearLocalForm() {
     state = const EkycState();
   }
-
-  /// Giữ tương thích cho luồng bắt đầu chụp lại cục bộ mà không hạ cấp tài khoản đã APPROVED.
-  void resetForm() {
-    clearLocalForm();
-  }
 }
 
 final ekycProvider = StateNotifierProvider<EkycNotifier, EkycState>((ref) {

@@ -64,27 +64,6 @@ class BlockListNotifier extends StateNotifier<BlockListState> {
     }
   }
 
-  Future<bool> blockUser({required String blockedId, String reason = ''}) async {
-    try {
-      final dio = _ref.read(dioProvider);
-      final response = await dio.post(
-        '/v1/blocks',
-        data: {
-          'blockedId': blockedId,
-          'reason': reason,
-        },
-      );
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        await loadBlockedList();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      debugPrint('Lỗi chặn người dùng: $e');
-      return false;
-    }
-  }
-
   Future<bool> unblockUser(String blockedUserId) async {
     try {
       final dio = _ref.read(dioProvider);

@@ -373,13 +373,6 @@ public class DisputeService {
         return toQueueItems(disputeRepository.findByStatusInAndAssignedTo(QUEUE_STATUSES, ccUserId));
     }
 
-    /**
-     * Đơn mở chưa ai nhận (assignedTo = null) — dùng để CC chọn "đơn chưa gán" khi tự nhận.
-     */
-    public List<DisputeQueueItemDto> getUnassignedQueue() {
-        return toQueueItems(disputeRepository.findByStatusInAndAssignedToIsNull(QUEUE_STATUSES));
-    }
-
     private List<DisputeQueueItemDto> toQueueItems(List<Dispute> disputes) {
         Instant slaRiskCutoff = Instant.now().plus(Duration.ofHours(24));
         List<DisputeQueueItemDto> items = disputes.stream()

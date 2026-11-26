@@ -1385,10 +1385,6 @@ public class EoEventService {
         }
     }
 
-    private void validateShiftTimeRange(Instant startTime, Instant endTime) {
-        validateShiftWithinEvent(null, startTime, endTime);
-    }
-
     private void validateShiftWithinEvent(Event event, Instant startTime, Instant endTime) {
         if (endTime.isBefore(startTime)) {
             throw new BadRequestException("Thời gian kết thúc ca làm việc phải sau thời gian bắt đầu ca.");
@@ -1644,13 +1640,6 @@ public class EoEventService {
             worker.setReliabilityScore(Math.max(MIN_RELIABILITY_SCORE, currentReliability - 2));
         }
         workerRepository.save(worker);
-    }
-
-    public List<ShiftAttendanceDto> mapAssignmentsToAttendanceDtos(
-            List<ShiftAssignment> assignments,
-            Map<UUID, Shift> shiftsById
-    ) {
-        return mapAssignmentsToAttendanceDtos(assignments, shiftsById, null);
     }
 
     public List<ShiftAttendanceDto> mapAssignmentsToAttendanceDtos(

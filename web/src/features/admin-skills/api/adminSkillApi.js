@@ -21,14 +21,6 @@ export const adminSkillApi = {
   },
 
   /**
-   * Xem chi tiết 1 kỹ năng theo ID
-   */
-  getSkillById: async (id) => {
-    const response = await apiClient.get(`/v1/admin/skills/${id}`);
-    return response.data?.data;
-  },
-
-  /**
    * Tạo kỹ năng mới
    */
   createSkill: async (payload) => {

@@ -13,13 +13,13 @@ import 'package:cani/features/auth/data/auth_api.dart';
 import 'package:cani/features/auth/models/auth_request.dart';
 import 'package:cani/features/auth/models/user_dto.dart';
 
-final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
+final _secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
   return const FlutterSecureStorage();
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final api = ref.watch(authApiProvider);
-  final storage = ref.watch(secureStorageProvider);
+  final storage = ref.watch(_secureStorageProvider);
   return AuthRepository(api, storage);
 });
 

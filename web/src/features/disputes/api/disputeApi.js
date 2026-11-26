@@ -134,17 +134,5 @@ export const disputeApi = {
     });
     return response.data?.data;
   },
-
-  /** Đếm strike của EO trong 90 ngày */
-  getEoStrikes: async (disputeId) => {
-    const response = await apiClient.get(`/v1/admin/disputes/${disputeId}/eo-strikes`);
-    return response.data?.data;
-  },
-
-  /** Admin điều chỉnh RS mức tùy ý */
-  adjustReliability: async (userId, payload) => {
-    const response = await apiClient.post(`/v1/admin/users/${userId}/reliability`, payload);
-    return response.data?.data;
-  },
 };
 

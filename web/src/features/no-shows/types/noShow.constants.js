@@ -2,13 +2,6 @@
  * Constants & Enums cho Module Quản lý Vi phạm No-show (UC-88)
  */
 
-export const NO_SHOW_DETECTED_BY = {
-  SYSTEM_CRON: 'SYSTEM_CRON',
-  ADMIN: 'ADMIN',
-  CUSTOMER_CARE: 'CUSTOMER_CARE',
-  EVENT_ORGANIZER: 'EVENT_ORGANIZER',
-};
-
 export const NO_SHOW_DETECTED_BY_LABELS = {
   SYSTEM_CRON: 'Hệ thống tự động',
   ADMIN: 'Quản trị viên',

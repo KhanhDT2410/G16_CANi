@@ -22,7 +22,6 @@ export default function WageBenchmarkBox({
   venueLng = null,
   onSelectWage,
   onBenchmarkLoaded,
-  onValidationChange,
 }) {
   const roleError = useMemo(
     () => jobTypeError || validateJobType(jobType),
@@ -30,7 +29,6 @@ export default function WageBenchmarkBox({
   );
 
   const [apiBenchmark, setApiBenchmark] = useState(null);
-  const [loadingApi, setLoadingApi] = useState(false);
   const cacheRef = useRef({});
 
   const trimmedRole = String(jobType || '').trim();
@@ -39,7 +37,6 @@ export default function WageBenchmarkBox({
   useEffect(() => {
     if (roleError || !trimmedRole || !startTime) {
       setApiBenchmark(null);
-      setLoadingApi(false);
       return;
     }
 
@@ -63,7 +60,6 @@ export default function WageBenchmarkBox({
 
     let cancelled = false;
     const timer = setTimeout(async () => {
-      setLoadingApi(true);
       try {
         const res = await eoService.getWageRecommendation({
           city,
@@ -77,8 +73,6 @@ export default function WageBenchmarkBox({
         }
       } catch {
         // Giữ fallback client-side theo cùng công thức & sàn pháp lý
-      } finally {
-        if (!cancelled) setLoadingApi(false);
       }
     }, 380);
 

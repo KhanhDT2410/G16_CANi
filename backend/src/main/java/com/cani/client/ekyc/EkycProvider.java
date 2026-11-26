@@ -4,7 +4,7 @@ import com.cani.dto.ekyc.EkycIdentityResultDto;
 
 /**
  * Interface trừu tượng hóa dịch vụ xác thực danh tính điện tử eKYC (Adapter Pattern).
- * Cho phép linh hoạt chuyển đổi giữa VNPT eKYC hoặc Mock Provider.
+ * Hỗ trợ cấu hình provider xác thực eKYC thực tế (như VNPT eKYC).
  */
 public interface EkycProvider {
 
@@ -25,7 +25,7 @@ public interface EkycProvider {
             byte[] selfieBytes, String selfieMime);
 
     /**
-     * Tên nhà cung cấp (VNPT_EKYC, MOCK_EKYC...)
+     * Tên nhà cung cấp (ví dụ: VNPT_EKYC)
      */
     String getProviderName();
 }

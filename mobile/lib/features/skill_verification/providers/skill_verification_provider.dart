@@ -202,8 +202,4 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
       mySkills: mySkills,
     );
   }
-
-  void clearLastResult() {
-    state = state.copyWith(clearResult: true);
-  }
 }

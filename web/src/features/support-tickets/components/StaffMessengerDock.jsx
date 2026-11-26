@@ -55,7 +55,7 @@ export const StaffMessengerDock = ({ activeChat, onClose, onOpenTicket, onOpenSh
           if (res?.messages) setMessages(res.messages.map(formatMessage));
         })
         .catch(() => { if (isMounted) setMessages(activeChat.chatHistory || []); });
-    } else if (activeChat.id && !String(activeChat.id).startsWith('demo-')) {
+    } else if (activeChat.id) {
       setConvId(activeChat.id);
       supportChatApi.getStaffConversationDetail(activeChat.id)
         .then((res) => {

@@ -91,18 +91,4 @@ class AuthApi {
     final data = (response.data?['data'] as Map<String, Object?>?) ?? <String, Object?>{};
     return UserDto.fromJson(data);
   }
-
-  Future<void> verifyOtp(String email, String token) async {
-    await _dio.post<void>(
-      '/auth/verify-otp',
-      data: {'email': email, 'token': token},
-    );
-  }
-
-  Future<void> resetPassword(String email) async {
-    await _dio.post<void>(
-      '/auth/reset-password',
-      data: {'email': email},
-    );
-  }
 }

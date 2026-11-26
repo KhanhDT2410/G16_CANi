@@ -30,7 +30,5 @@ public interface WorkerGroupMembershipRepository extends JpaRepository<WorkerGro
 
     Optional<WorkerGroupMembership> findByWorkerGroup_GroupIdAndWorker_WorkerId(UUID groupId, UUID workerId);
 
-    boolean existsByWorkerGroup_GroupIdAndWorker_WorkerId(UUID groupId, UUID workerId);
-
     int countByWorkerGroup_GroupIdAndStatus(UUID groupId, MembershipStatus status);
 }

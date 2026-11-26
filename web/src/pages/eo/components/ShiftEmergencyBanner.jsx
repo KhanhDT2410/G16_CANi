@@ -12,7 +12,6 @@ import EmergencyTriggerButton from './EmergencyTriggerButton';
 export default function ShiftEmergencyBanner({
   shift,
   event,
-  onOpenInvite,
   localDispatchResult = null,
 }) {
   const summary = getShiftStaffingSummary(shift, event);

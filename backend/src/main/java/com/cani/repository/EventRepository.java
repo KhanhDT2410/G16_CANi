@@ -1,7 +1,6 @@
 package com.cani.repository;
 
 import com.cani.entity.Event;
-import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -34,5 +33,4 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     long countByStatus(EventStatus status);
 
     List<Event> findByCreatedAtBetween(Instant from, Instant to);
-    long countByModeAndCreatedAtBetween(EventMode mode, Instant from, Instant to);
 }

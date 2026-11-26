@@ -173,7 +173,7 @@ export const useSystemConfigs = () => {
     });
   };
 
-  const handleModalSave = async (key, payload) => {
+  const handleModalSave = async (key) => {
     await handleSaveSingle(key);
     setEditingConfig(null);
   };

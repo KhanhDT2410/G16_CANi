@@ -40,6 +40,4 @@ export const RevenuePayOSSummary = ({ payosSummary, vnpaySummary }) => {
   );
 };
 
-export const RevenueVnPaySummary = RevenuePayOSSummary;
-
 

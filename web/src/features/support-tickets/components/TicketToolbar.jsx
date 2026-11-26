@@ -12,7 +12,7 @@ const FILTER_LABELS = {
  * Danh mục trạng thái đã được chuyển sang menu xổ xuống ở thanh Sidebar chính.
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
-export const TicketToolbar = ({ activeFilter = 'ALL', onFilterChange, searchTerm, onSearchChange, stats }) => {
+export const TicketToolbar = ({ activeFilter = 'ALL', searchTerm, onSearchChange, stats }) => {
   const currentCount =
     activeFilter === 'MINE'
       ? stats.myCount || 0

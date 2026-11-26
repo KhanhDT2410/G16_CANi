@@ -2,15 +2,6 @@
  * Enums and constants for Dispute & Resolution
  */
 
-export const DISPUTE_STATUS = {
-  OPEN: 'OPEN',
-  INVESTIGATING: 'INVESTIGATING',
-  RESOLVED: 'RESOLVED',
-  UNVERIFIED: 'UNVERIFIED',
-  ESCALATED: 'ESCALATED',
-  FINAL_RESOLVED: 'FINAL_RESOLVED',
-};
-
 export const DISPUTE_STATUS_CONFIG = {
   OPEN: { label: 'Mới tiếp nhận', badgeClass: 'badge-status-open' },
   INVESTIGATING: { label: 'Đang điều tra', badgeClass: 'badge-status-investigating' },

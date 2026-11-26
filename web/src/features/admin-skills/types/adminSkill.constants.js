@@ -13,12 +13,6 @@ export const DEFAULT_SKILL_CATEGORIES = [
   'Khác',
 ];
 
-export const SKILL_STATUS_FILTER = {
-  ALL: 'Tất cả trạng thái',
-  ACTIVE: 'Đang hoạt động',
-  INACTIVE: 'Tạm ẩn',
-};
-
 export const CATEGORY_COLOR_MAP = {
   'F&B': { bg: '#fffbeb', text: '#b45309', border: '#fde68a' },
   'Guest Services': { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },

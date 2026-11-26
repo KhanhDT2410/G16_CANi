@@ -21,7 +21,6 @@ export const DisputeSingleChatPane = ({
   placeholder,
 }) => {
   const [text, setText] = useState('');
-  const [showAttachInput, setShowAttachInput] = useState(false);
   const [attachmentUrl, setAttachmentUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -60,7 +59,6 @@ export const DisputeSingleChatPane = ({
       return;
     }
     setSelectedFile(file);
-    setShowAttachInput(false);
   };
 
   const handleSubmit = async (e) => {

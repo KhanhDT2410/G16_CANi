@@ -2,13 +2,6 @@
  * Constants & Helpers cho UC-94: RS Penalty & Appeals (Kháng cáo điểm uy tín)
  */
 
-export const RS_APPEAL_STATUS = {
-  SUBMITTED: 'SUBMITTED',
-  UNDER_REVIEW: 'UNDER_REVIEW',
-  APPROVED: 'APPROVED',
-  REJECTED: 'REJECTED',
-};
-
 export const RS_APPEAL_STATUS_CONFIG = {
   SUBMITTED: {
     label: 'Chờ duyệt',

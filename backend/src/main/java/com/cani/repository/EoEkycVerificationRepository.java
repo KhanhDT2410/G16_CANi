@@ -27,33 +27,16 @@ public interface EoEkycVerificationRepository extends JpaRepository<EoEkycVerifi
 
     Optional<EoEkycVerification> findTopByEventOrganizer_EoIdOrderByCreatedAtDesc(UUID eoId);
 
-    Optional<EoEkycVerification> findTopByEventOrganizer_EoIdAndStatusInOrderByCreatedAtDesc(
-            UUID eoId, Collection<String> statuses);
-
     /**
      * Kiểm tra xem số CCCD này đã được duyệt eKYC thành công cho tổ chức nào khác chưa (chống gian lận)
      */
-    boolean existsByCccdNumberHashAndStatus(String cccdNumberHash, String status);
-
     boolean existsByCccdNumberHashInAndStatus(Collection<String> cccdNumberHashes, String status);
-
-    boolean existsByCccdNumberHashAndStatusInAndEventOrganizer_EoIdNot(
-            String cccdNumberHash, Collection<String> statuses, UUID eoId);
 
     boolean existsByCccdNumberHashInAndStatusInAndEventOrganizer_EoIdNot(
             Collection<String> cccdNumberHashes, Collection<String> statuses, UUID eoId);
 
-    boolean existsByCccdNumberHashAndStatusInAndEventOrganizer_User_UserIdNot(
-            String cccdNumberHash, Collection<String> statuses, UUID userId);
-
     boolean existsByCccdNumberHashInAndStatusInAndEventOrganizer_User_UserIdNot(
             Collection<String> cccdNumberHashes, Collection<String> statuses, UUID userId);
-
-    /**
-     * Lấy danh sách hồ sơ eKYC chờ duyệt (PENDING_REVIEW) cho Admin thẩm định
-     */
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "eventOrganizer")
-    List<EoEkycVerification> findByStatusOrderByCreatedAtAsc(String status);
 
     List<EoEkycVerification> findByImagesPurgedAtIsNullAndImageRetentionUntilBefore(Instant cutoff);
 

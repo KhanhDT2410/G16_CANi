@@ -107,25 +107,6 @@ export function useSubscription() {
     loadSubscriptionData();
   }, [loadSubscriptionData]);
 
-  // UC-11: Khởi tạo thanh toán VNPay Sandbox
-  const handlePurchaseVNPay = async (planType) => {
-    setPurchasingPlan(planType);
-    try {
-      const result = await eoService.purchaseSubscription({ planType });
-      if (result && result.paymentUrl) {
-        showToast('Đang chuyển hướng sang cổng thanh toán VNPay Sandbox...', 'info');
-        // Chuyển hướng trình duyệt sang cổng thanh toán VNPay
-        window.location.href = result.paymentUrl;
-      } else {
-        showToast('Không nhận được liên kết thanh toán từ máy chủ.', 'error');
-      }
-    } catch (err) {
-      showToast('Lỗi khởi tạo thanh toán: ' + (err.response?.data?.message || err.message), 'error');
-    } finally {
-      setPurchasingPlan(null);
-    }
-  };
-
   // Khởi tạo thanh toán VietQR qua PayOS Gateway (Thanh toán thật - Redirect trực tiếp)
   const handlePurchasePayOS = async (planType) => {
     setPurchasingPlan(planType);
@@ -166,21 +147,6 @@ export function useSubscription() {
     }
   };
 
-  // UC-11 (Demo Sandbox): Giả lập thanh toán thành công tức thì phục vụ demo hội đồng
-  const handleSimulateDemo = async (planType = 'MATCHING_PLUS') => {
-    setPurchasingPlan(planType);
-    try {
-      const result = await eoService.simulateSubscriptionDemo(planType);
-      showToast('⚡ [DEMO] Giả lập thanh toán thành công! Gói dịch vụ đã được kích hoạt tức thì.', 'success');
-      setCurrentSubscription(result);
-      loadSubscriptionData();
-    } catch (err) {
-      showToast('Lỗi giả lập thanh toán: ' + (err.response?.data?.message || err.message), 'error');
-    } finally {
-      setPurchasingPlan(null);
-    }
-  };
-
   return {
     plans,
     currentSubscription,
@@ -192,10 +158,8 @@ export function useSubscription() {
     payOSModalData,
     setPayOSModalData,
     loadSubscriptionData,
-    handlePurchaseVNPay,
     handlePurchasePayOS,
     handleConfirmPayOS,
-    handleSimulateDemo,
   };
 }
 

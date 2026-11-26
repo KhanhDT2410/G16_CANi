@@ -15,7 +15,6 @@ import {
   validateDuplicateShift,
   resolveWageRegionInfo,
   validateShiftWageAgainstFloor,
-  detectCityFromAddress,
   STATUTORY_HOURLY_FLOORS,
 } from '../utils/shiftValidation';
 import {

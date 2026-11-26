@@ -41,7 +41,7 @@ export const showPrompt = (optionsOrMessage, defaultValue = '') => {
  * PromptModal - Modal xác nhận hoặc nhập liệu thay thế cho window.confirm() và window.prompt()
  * Mang lại trải nghiệm mượt mà, không block Event Loop của trình duyệt, hỗ trợ phím Escape và Enter.
  */
-export const PromptModal = ({
+const PromptModal = ({
   isOpen,
   title,
   description,
@@ -213,5 +213,3 @@ export const PromptDialogHost = () => {
     />
   );
 };
-
-export default PromptModal;

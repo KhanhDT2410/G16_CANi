@@ -9,7 +9,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -18,8 +17,6 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, UU
     List<SupportTicket> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
     List<SupportTicket> findByStatusInOrderBySlaDeadlineAsc(Collection<TicketStatus> statuses);
-
-    Optional<SupportTicket> findByReferenceNo(String referenceNo);
 
     List<SupportTicket> findByStatusInAndAssignedTo(Collection<TicketStatus> statuses, UUID assignedTo);
 

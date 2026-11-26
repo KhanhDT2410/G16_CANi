@@ -18,7 +18,6 @@ import { formatVndWhole } from '../utils/eventHelpers';
 export default function ShiftQrAndAttendancePanel({
   shift,
   event,
-  allEvents = [],
   skillTaxonomy = [],
   onSelectShift,
   onClose,

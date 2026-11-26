@@ -134,5 +134,3 @@ apiClient.interceptors.response.use(
     }
   }
 );
-
-export const healthCheck = () => apiClient.get('/health');

@@ -245,7 +245,6 @@ class WorkerSkillItem {
     );
   }
 
-  bool get isTier1SelfDeclared => verificationTier == 'SELF_DECLARED';
   bool get isTier2AiVerified => verificationTier == 'AI_DOCUMENT';
   bool get isTier3PlatformProven => verificationTier == 'PLATFORM_PROVEN';
 
@@ -275,20 +274,6 @@ class WorkerSkillItem {
       case 'BEGINNER':
       default:
         return 'Cơ bản';
-    }
-  }
-
-  String get proficiencyLabelEn {
-    switch (proficiency.toUpperCase()) {
-      case 'EXPERT':
-        return 'Expert';
-      case 'ADVANCED':
-        return 'Advanced';
-      case 'INTERMEDIATE':
-        return 'Intermediate';
-      case 'BEGINNER':
-      default:
-        return 'Beginner';
     }
   }
 }

@@ -17,11 +17,6 @@ public interface SystemConfigRepository extends JpaRepository<SystemConfig, UUID
     Optional<SystemConfig> findByKey(String key);
 
     /**
-     * Kiểm tra xem cấu hình có tồn tại theo khóa định danh hay không.
-     */
-    boolean existsByKey(String key);
-
-    /**
      * Lấy toàn bộ danh sách cấu hình sắp xếp theo key theo thứ tự bảng chữ cái.
      */
     List<SystemConfig> findAllByOrderByKeyAsc();

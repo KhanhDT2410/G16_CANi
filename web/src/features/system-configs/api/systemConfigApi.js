@@ -13,14 +13,6 @@ export const systemConfigApi = {
   },
 
   /**
-   * Lấy chi tiết thông tin một tham số cấu hình theo key
-   */
-  getConfigByKey: async (key) => {
-    const response = await apiClient.get(`/v1/admin/configs/${encodeURIComponent(key)}`);
-    return response.data?.data;
-  },
-
-  /**
    * Cập nhật giá trị một tham số cấu hình đơn lẻ
    * @param {string} key
    * @param {{ value: string, description?: string }} payload

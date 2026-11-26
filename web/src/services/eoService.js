@@ -54,12 +54,6 @@ export const eoService = {
     return response.data?.data;
   },
 
-  // Kích hoạt tìm ứng viên cho 1 ca cụ thể
-  publishShift: async (shiftId) => {
-    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`);
-    return response.data?.data;
-  },
-
   // Lấy toàn bộ danh sách khoản thanh toán của EO (Khai báo lương & Quyết toán)
   getEoPayments: async () => {
     const response = await apiClient.get('/v1/payments/eo/history');
@@ -301,23 +295,9 @@ export const eoService = {
     }
   },
 
-  // UC-11: Khởi tạo phiên thanh toán VNPay Sandbox
-  purchaseSubscription: async (purchaseData) => {
-    const response = await apiClient.post('/v1/eo/subscriptions/purchase', purchaseData);
-    return response.data?.data;
-  },
-
   // UC-11: Nhận kết quả callback từ VNPay
   processVNPayCallback: async (queryParams) => {
     const response = await apiClient.get('/v1/eo/subscriptions/vnpay-callback', { params: queryParams });
-    return response.data?.data;
-  },
-
-  // UC-11 (Demo Sandbox): Giả lập thanh toán thành công tức thì phục vụ demo hội đồng
-  simulateSubscriptionDemo: async (planType = 'MATCHING_PLUS') => {
-    const response = await apiClient.post('/v1/eo/subscriptions/demo-simulate', null, {
-      params: { planType },
-    });
     return response.data?.data;
   },
 
@@ -339,18 +319,6 @@ export const eoService = {
     } catch {
       return null;
     }
-  },
-
-  // Xem chi tiết lời mời qua mã code (Công khai cho Worker)
-  getInviteDetails: async (code) => {
-    const response = await apiClient.get(`/v1/invites/${code}`);
-    return response.data?.data;
-  },
-
-  // UC-73: Worker tham gia ca làm việc qua mã mời
-  joinShiftViaInvite: async (code) => {
-    const response = await apiClient.post('/v1/workers/invites/join', { code });
-    return response.data?.data;
   },
 
   // ==========================================
@@ -396,32 +364,15 @@ export const eoService = {
     return response.data?.data;
   },
 
-  // Kích hoạt tự động tìm kiếm Worker cho một ca làm việc (Publish shift)
-  dispatchForShift: async (shiftId) => {
-    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/publish`);
-    return response.data?.data;
-  },
-
   // ==========================================
   // ĐIỀU PHỐI KHẨN CẤP (EMERGENCY DISPATCH - UC-59)
   // ==========================================
-  triggerEmergencyBroadcast: async (shiftId, emergencyData = {}) => {
-    const radiusKm = emergencyData?.radiusKm ?? emergencyData?.expandedRadiusKm;
-    return eoService.enableEmergencyDispatch(shiftId, radiusKm);
-  },
-
   // Bật điều phối khẩn cấp (Emergency Dispatch) cho ca làm việc
   enableEmergencyDispatch: async (shiftId, radiusKm = 25) => {
     const params = radiusKm != null && Number(radiusKm) > 0 ? { radiusKm: Number(radiusKm) } : undefined;
     const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch`, null, {
       params,
     });
-    return response.data?.data;
-  },
-
-  // Tắt điều phối khẩn cấp cho ca làm việc
-  disableEmergencyDispatch: async (shiftId) => {
-    const response = await apiClient.post(`/v1/eo/events/shifts/${shiftId}/emergency-dispatch/off`);
     return response.data?.data;
   },
 
@@ -451,12 +402,6 @@ export const eoService = {
   // Lấy hồ sơ nghề nghiệp chi tiết của Worker cho EO (trực tiếp từ Database)
   getWorkerProfile: async (workerId) => {
     const response = await apiClient.get(`/v1/eo/workers/${workerId}/profile`);
-    return response.data?.data;
-  },
-
-  // Lấy hồ sơ công khai của Nhà tổ chức sự kiện (EO)
-  getEoPublicProfile: async (eoId) => {
-    const response = await apiClient.get(`/v1/eo/${eoId}/public-profile`);
     return response.data?.data;
   },
 

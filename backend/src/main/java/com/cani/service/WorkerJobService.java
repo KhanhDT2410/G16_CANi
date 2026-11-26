@@ -1660,10 +1660,6 @@ public class WorkerJobService {
         return names;
     }
 
-    private JobProposalResponseDto mapToProposalDto(DispatchProposal p) {
-        return mapToProposalDto(p, Collections.emptyList(), getEligibilityService(), null, null, null);
-    }
-
     private JobProposalResponseDto mapToProposalDto(
             DispatchProposal p,
             List<ShiftAssignment> activeAssignments,

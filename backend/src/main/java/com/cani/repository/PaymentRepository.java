@@ -26,8 +26,6 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     List<Payment> findByCreatedAtBetween(Instant from, Instant to);
     Page<Payment> findByCreatedAtBetween(Instant from, Instant to, Pageable pageable);
-    Page<Payment> findByStatusAndCreatedAtBetween(PaymentStatus status, Instant from, Instant to, Pageable pageable);
     List<Payment> findByStatusInAndCreatedAtBetween(Collection<PaymentStatus> statuses, Instant from, Instant to);
-    long countByCreatedAtBetween(Instant from, Instant to);
 }
 

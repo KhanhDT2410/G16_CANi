@@ -16,7 +16,6 @@ export const TicketQueueTable = ({
   onOpenDetail,
   onOpenChat,
   onAssign,
-  onOpenTransferModal,
   loading,
 }) => {
   const formatDateTime = (isoStr) => {

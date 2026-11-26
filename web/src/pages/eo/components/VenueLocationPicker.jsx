@@ -357,7 +357,14 @@ export const VenueLocationPicker = ({
     try {
       coords = await requestVenuePosition(navigator.geolocation, controller.signal);
     } catch (error) {
-      if (!controller.signal.aborted) setLocationError(error.message);
+      if (!controller.signal.aborted) {
+        const msg = error?.code === 1
+          ? 'Bạn chưa cấp quyền truy cập vị trí cho trình duyệt.'
+          : error?.code === 3
+            ? 'Không thể lấy vị trí do quá thời gian chờ. Vui lòng thử lại.'
+            : 'Không thể xác định vị trí hiện tại. Vui lòng tìm địa chỉ hoặc chọn ghim trên bản đồ.';
+        setLocationError(msg);
+      }
       return;
     } finally {
       if (locationControllerRef.current === controller && !controller.signal.aborted) {

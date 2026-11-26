@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/help_center/models/help_center_models.dart';
 
 final helpCenterRepositoryProvider = Provider<HelpCenterRepository>((ref) {
@@ -34,7 +35,7 @@ class HelpCenterRepository {
       }
       return const [];
     } catch (e) {
-      throw Exception('Không thể tải danh sách câu hỏi thường gặp: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách câu hỏi thường gặp.'));
     }
   }
 
@@ -48,7 +49,7 @@ class HelpCenterRepository {
       }
       throw Exception('Không tìm thấy dữ liệu câu hỏi');
     } catch (e) {
-      throw Exception('Lỗi khi tải chi tiết câu hỏi: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải chi tiết câu hỏi.'));
     }
   }
 
@@ -63,7 +64,7 @@ class HelpCenterRepository {
       }
       return const [];
     } catch (e) {
-      throw Exception('Không thể tải danh sách yêu cầu hỗ trợ: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách yêu cầu hỗ trợ.'));
     }
   }
 
@@ -77,7 +78,7 @@ class HelpCenterRepository {
       }
       throw Exception('Không tìm thấy phiếu hỗ trợ');
     } catch (e) {
-      throw Exception('Lỗi khi tải chi tiết phiếu hỗ trợ: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải chi tiết phiếu hỗ trợ.'));
     }
   }
 
@@ -104,13 +105,7 @@ class HelpCenterRepository {
       }
       throw Exception('Phản hồi không hợp lệ từ máy chủ');
     } catch (e) {
-      if (e is DioException && e.response?.data != null) {
-        final errData = e.response!.data;
-        if (errData is Map && errData['message'] != null) {
-          throw Exception(errData['message']);
-        }
-      }
-      throw Exception('Không thể tạo yêu cầu hỗ trợ: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tạo yêu cầu hỗ trợ.'));
     }
   }
 
@@ -134,13 +129,7 @@ class HelpCenterRepository {
       }
       throw Exception('Phản hồi không hợp lệ từ máy chủ');
     } catch (e) {
-      if (e is DioException && e.response?.data != null) {
-        final errData = e.response!.data;
-        if (errData is Map && errData['message'] != null) {
-          throw Exception(errData['message']);
-        }
-      }
-      throw Exception('Không thể gửi phản hồi: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể gửi phản hồi.'));
     }
   }
 
@@ -198,13 +187,7 @@ class HelpCenterRepository {
       }
       throw Exception('Phản hồi không hợp lệ từ máy chủ');
     } catch (e) {
-      if (e is DioException && e.response?.data != null) {
-        final errData = e.response!.data;
-        if (errData is Map && errData['message'] != null) {
-          throw Exception(errData['message']);
-        }
-      }
-      throw Exception('Không thể gửi tin nhắn hỗ trợ: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể gửi tin nhắn hỗ trợ.'));
     }
   }
 }

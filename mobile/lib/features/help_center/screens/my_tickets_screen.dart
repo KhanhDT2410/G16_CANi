@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/help_center/data/help_center_repository.dart';
 import 'package:cani/features/help_center/models/help_center_models.dart';
 import 'package:cani/features/help_center/providers/help_center_providers.dart';
@@ -176,7 +177,7 @@ class MyTicketsScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Lỗi: $e')),
+        error: (e, _) => Center(child: Text(AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách yêu cầu hỗ trợ.'))),
       ),
     );
   }
@@ -215,7 +216,9 @@ class _TicketDetailModalState extends ConsumerState<_TicketDetailModal> {
       ref.invalidate(myTicketsProvider);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppErrorFormatter.format(e, fallback: 'Không thể gửi phản hồi.'))),
+        );
       }
     } finally {
       if (mounted) setState(() => _isReplying = false);
@@ -375,7 +378,7 @@ class _TicketDetailModalState extends ConsumerState<_TicketDetailModal> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Lỗi: $e')),
+          error: (e, _) => Center(child: Text(AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách yêu cầu hỗ trợ.'))),
         ),
       ),
     );

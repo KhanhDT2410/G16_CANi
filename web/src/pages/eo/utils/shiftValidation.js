@@ -399,8 +399,16 @@ export function buildEvidenceWageBenchmark({
   };
 }
 
+export const MIN_LEGAL_HOURLY_WAGE = 25000;
+export const MIN_LEGAL_HOURLY_WAGE_ERROR =
+  'Mức thù lao không được thấp hơn mức tối thiểu quy định: 25.000 VNĐ/giờ';
+
 /**
- * Kiểm tra mức thù lao ca làm việc đối chiếu với Biểu lương sàn của Admin và Sàn pháp lý.
+ * Kiểm tra mức thù lao so với mức lương tối thiểu pháp định (25.000 VNĐ/giờ).
+ * Tách biệt hoàn toàn logic mức gợi ý (recommendation) khỏi mức tối thiểu bắt buộc:
+ * - Chặn lưu khi < 25.000 VNĐ/giờ với thông báo quy định.
+ * - Cho phép lưu nếu >= 25.000 VNĐ/giờ, và chỉ hiển thị nhắc nhở nhẹ nếu thấp hơn gợi ý.
+ *
  * @param {Object} params
  * @param {number|string} params.hourlyWage Mức thù lao mỗi giờ
  * @param {Object} [params.benchmark] Kết quả tra cứu khung thù lao từ API/Client
@@ -408,7 +416,7 @@ export function buildEvidenceWageBenchmark({
  * @param {string} [params.venueAddress] Địa chỉ tổ chức sự kiện
  * @param {number} [params.venueLat] Vĩ độ
  * @param {number} [params.venueLng] Kinh độ
- * @returns {{ isValid: boolean, error: string|null, floorWage: number }}
+ * @returns {{ isValid: boolean, error: string|null, warning: string|null, floorWage: number }}
  */
 export function validateShiftWageAgainstFloor({
   hourlyWage,
@@ -422,37 +430,26 @@ export function validateShiftWageAgainstFloor({
   const statutoryFloor = STATUTORY_HOURLY_FLOORS[resolvedCity] || STATUTORY_HOURLY_FLOORS.TP_HCM;
   const numWage = Math.round(Number(hourlyWage || 0));
 
-  const minFloor = Number(benchmark?.minWage || statutoryFloor.wage);
-  const legalFloor = Number(benchmark?.legalFloorWage || statutoryFloor.wage);
-  const regionLabel = benchmark?.legalRegionLabel || statutoryFloor.regionLabel;
-  const legalReference = benchmark?.legalReference || statutoryFloor.decree;
+  const minFloor = Number(benchmark?.minWage || benchmark?.suggestedWage || statutoryFloor.wage);
 
-  if (numWage <= 0) {
+  if (!Number.isFinite(numWage) || numWage < MIN_LEGAL_HOURLY_WAGE) {
     return {
       isValid: false,
-      error: 'Vui lòng nhập mức thù lao lớn hơn 0 cho ca làm việc.',
+      error: MIN_LEGAL_HOURLY_WAGE_ERROR,
       warning: null,
-      floorWage: minFloor,
+      floorWage: MIN_LEGAL_HOURLY_WAGE,
+      recommendedMinWage: minFloor,
     };
   }
 
-  // Mức tối thiểu chỉ là gợi ý tham khảo; không chặn EO tự quyết định mức thù lao > 0
-  if (numWage < legalFloor) {
-    return {
-      isValid: true,
-      error: null,
-      warning: `Gợi ý: Mức lương này đang thấp hơn mức tham chiếu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h) và sàn tham khảo ${regionLabel} (${legalFloor.toLocaleString('vi-VN')}đ/h theo ${legalReference}).`,
-      floorWage: minFloor,
-      isBelowLegal: true,
-    };
-  }
-
+  // Mức gợi ý từ checklist/benchmark chỉ mang tính tham khảo; cho phép EO lưu nếu >= 25.000 VNĐ/giờ
   if (numWage < minFloor) {
     return {
       isValid: true,
       error: null,
-      warning: `Gợi ý: Mức lương này đang thấp hơn mức tham chiếu tối thiểu của CANi (${minFloor.toLocaleString('vi-VN')}đ/h).`,
-      floorWage: minFloor,
+      warning: `Gợi ý: Mức thù lao thấp hơn mức tham chiếu (${minFloor.toLocaleString('vi-VN')} VNĐ/giờ), có thể ảnh hưởng tốc độ nhận ca.`,
+      floorWage: MIN_LEGAL_HOURLY_WAGE,
+      recommendedMinWage: minFloor,
       isBelowAdmin: true,
     };
   }
@@ -461,7 +458,8 @@ export function validateShiftWageAgainstFloor({
     isValid: true,
     error: null,
     warning: null,
-    floorWage: minFloor,
+    floorWage: MIN_LEGAL_HOURLY_WAGE,
+    recommendedMinWage: minFloor,
   };
 }
 

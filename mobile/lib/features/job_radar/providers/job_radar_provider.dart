@@ -19,9 +19,7 @@ class JobRadarState {
   final String? errorMessage;
   final String? radarLoadError;
   final bool isRadarView;
-  final bool isLocationPermissionGranted;
   final bool isRealLocation;
-  final String? locationName;
   final bool usingPreferenceLocation;
   final double? preferredLat;
   final double? preferredLng;
@@ -41,9 +39,7 @@ class JobRadarState {
     this.errorMessage,
     this.radarLoadError,
     this.isRadarView = true,
-    this.isLocationPermissionGranted = false,
     this.isRealLocation = false,
-    this.locationName,
     this.usingPreferenceLocation = false,
     this.preferredLat,
     this.preferredLng,
@@ -68,9 +64,7 @@ class JobRadarState {
     String? radarLoadError,
     bool clearRadarLoadError = false,
     bool? isRadarView,
-    bool? isLocationPermissionGranted,
     bool? isRealLocation,
-    String? locationName,
     bool? usingPreferenceLocation,
     double? preferredLat,
     double? preferredLng,
@@ -90,9 +84,7 @@ class JobRadarState {
       errorMessage: errorMessage,
       radarLoadError: clearRadarLoadError ? null : (radarLoadError ?? this.radarLoadError),
       isRadarView: isRadarView ?? this.isRadarView,
-      isLocationPermissionGranted: isLocationPermissionGranted ?? this.isLocationPermissionGranted,
       isRealLocation: isRealLocation ?? this.isRealLocation,
-      locationName: locationName ?? this.locationName,
       usingPreferenceLocation: usingPreferenceLocation ?? this.usingPreferenceLocation,
       preferredLat: preferredLat ?? this.preferredLat,
       preferredLng: preferredLng ?? this.preferredLng,
@@ -157,7 +149,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         userLat: prefs!.baseLat!,
         userLng: prefs.baseLng!,
         usingPreferenceLocation: true,
-        locationName: prefs.baseAddress.trim().isNotEmpty ? prefs.baseAddress.trim() : 'Khu vực ưu tiên',
       );
       _invalidateInFlightScans();
       // Quét ca ngay lập tức theo tọa độ ưu tiên thay vì chờ GPS timeout 10 giây
@@ -185,7 +176,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
           if (mounted) {
             state = state.copyWith(
               errorMessage: 'GPS trên điện thoại đang tắt. Vui lòng bật Định vị vị trí.',
-              isLocationPermissionGranted: false,
             );
           }
         }
@@ -203,7 +193,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
             if (mounted) {
               state = state.copyWith(
                 errorMessage: 'Ứng dụng cần quyền vị trí để quét các việc làm quanh bạn.',
-                isLocationPermissionGranted: false,
               );
             }
           }
@@ -216,7 +205,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
           if (mounted) {
             state = state.copyWith(
               errorMessage: 'Quyền vị trí bị từ chối vĩnh viễn. Vui lòng cấp quyền trong Cài đặt.',
-              isLocationPermissionGranted: false,
             );
           }
         }
@@ -234,7 +222,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
       state = state.copyWith(
         gpsLat: position.latitude,
         gpsLng: position.longitude,
-        isLocationPermissionGranted: true,
         isRealLocation: true,
       );
 
@@ -246,7 +233,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
           userLat: position.latitude,
           userLng: position.longitude,
           usingPreferenceLocation: false,
-          locationName: 'Vị trí hiện tại (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})',
         );
         if (centerChanged) {
           _invalidateInFlightScans();
@@ -255,7 +241,7 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     } catch (e) {
       if ((updateSearchCenter || !hasPrefCenter) && mounted) {
         state = state.copyWith(
-          errorMessage: 'Không lấy được GPS chính xác ($e).',
+          errorMessage: 'Không lấy được vị trí GPS chính xác. Vui lòng thử lại.',
         );
       }
     }
@@ -269,9 +255,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         userLng: state.preferredLng!,
         usingPreferenceLocation: true,
         clearSelectedShift: true,
-        locationName: (state.preferredAddress != null && state.preferredAddress!.trim().isNotEmpty)
-            ? state.preferredAddress!.trim()
-            : 'Khu vực ưu tiên',
       );
       _invalidateInFlightScans();
       await scanNearbyShifts(force: true);
@@ -295,9 +278,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
         userLat: hasPrefCenter ? prefs.baseLat! : state.userLat,
         userLng: hasPrefCenter ? prefs.baseLng! : state.userLng,
         usingPreferenceLocation: hasPrefCenter ? true : state.usingPreferenceLocation,
-        locationName: hasPrefCenter && prefs.baseAddress.trim().isNotEmpty
-            ? prefs.baseAddress.trim()
-            : state.locationName,
         clearSelectedShift: true,
       );
       _invalidateInFlightScans();
@@ -358,10 +338,6 @@ class JobRadarNotifier extends StateNotifier<JobRadarState> {
     state = state.copyWith(searchRadiusKm: radiusKm);
     _invalidateInFlightScans();
     await scanNearbyShifts(force: true);
-  }
-
-  void toggleViewMode(bool isRadar) {
-    state = state.copyWith(isRadarView: isRadar);
   }
 
   void toggleRadarView() {

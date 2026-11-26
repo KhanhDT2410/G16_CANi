@@ -22,11 +22,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, JpaSpecif
 
     List<Review> findByRevieweeIdOrderByCreatedAtDesc(UUID revieweeId);
 
-    List<Review> findByRevieweeIdAndIsHiddenFalseOrderByCreatedAtDesc(UUID revieweeId);
-
     List<Review> findByRevieweeIdAndIsHiddenFalse(UUID revieweeId);
-
-    long countByRevieweeIdAndIsHiddenFalse(UUID revieweeId);
 
     List<Review> findByReviewerIdOrderByCreatedAtDesc(UUID reviewerId);
 

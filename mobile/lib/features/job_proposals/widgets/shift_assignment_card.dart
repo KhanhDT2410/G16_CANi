@@ -201,23 +201,15 @@ class ShiftAssignmentCard extends StatelessWidget {
                 const SizedBox(height: 4),
 
                 // Thời gian & Địa điểm
-                Row(
-                  children: [
-                    Icon(Icons.access_time_rounded, size: 14, color: cani.brand),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.startTime.day.toString().padLeft(2, '0')}/${a.startTime.month.toString().padLeft(2, '0')} · ${a.venueAddress}',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: cani.textMuted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                Text(
+                  '${a.startTime.hour.toString().padLeft(2, '0')}:${a.startTime.minute.toString().padLeft(2, '0')} - ${a.endTime.hour.toString().padLeft(2, '0')}:${a.endTime.minute.toString().padLeft(2, '0')} · ${a.startTime.day.toString().padLeft(2, '0')}/${a.startTime.month.toString().padLeft(2, '0')} · ${a.venueAddress}',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: cani.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
 
                 // Giờ yêu cầu có mặt / mở điểm danh (nếu khác giờ bắt đầu)
@@ -225,21 +217,13 @@ class ShiftAssignmentCard extends StatelessWidget {
                     a.startTime.difference(a.arrivalTime!).inMinutes.abs() >= 1)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Icon(Icons.fact_check_rounded, size: 14, color: isDark ? Colors.amberAccent : Colors.amber.shade800),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            a.arrivalTime!.isBefore(a.startTime)
-                                ? 'Có mặt từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')} (trước ca ${a.startTime.difference(a.arrivalTime!).inMinutes}p)'
-                                : 'Mở điểm danh từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')}',
-                            style: TextStyle(fontSize: 11, color: isDark ? Colors.amberAccent : Colors.amber.shade800, fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      a.arrivalTime!.isBefore(a.startTime)
+                          ? 'Có mặt từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')} (trước ca ${a.startTime.difference(a.arrivalTime!).inMinutes}p)'
+                          : 'Mở điểm danh từ ${a.arrivalTime!.hour.toString().padLeft(2, '0')}:${a.arrivalTime!.minute.toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.amberAccent : Colors.amber.shade800, fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
 
@@ -303,25 +287,20 @@ class ShiftAssignmentCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: ElevatedButton.icon(
+                      child: ElevatedButton(
                         onPressed: onOpenChecklist ?? onTap,
-                        icon: const Icon(
-                          Icons.fact_check_rounded,
-                          size: 19,
-                          color: Colors.white,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        label: const Text(
+                        child: const Text(
                           'Chi tiết & Checklist công việc',
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
                     ),
@@ -338,20 +317,18 @@ class ShiftAssignmentCard extends StatelessWidget {
                     children: [
                       if (!isCompleted && !isExpired)
                         Expanded(
-                          child: TextButton.icon(
+                          child: TextButton(
                             onPressed: !isCheckedIn
                                 ? onQrScan
                                 : (!a.eoConfirmed
                                     ? (onOpenChecklist ?? onTap)
                                     : (!isPaymentConfirmed ? onConfirmPayment : onQrScan)),
-                            icon: Icon(
-                              !isCheckedIn || (a.eoConfirmed && isPaymentConfirmed)
-                                  ? Icons.qr_code_scanner_rounded
-                                  : (!a.eoConfirmed ? Icons.hourglass_top_rounded : Icons.payments_outlined),
-                              size: 16,
-                              color: cani.brand,
+                            style: TextButton.styleFrom(
+                              backgroundColor: cani.brandSoft,
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
-                            label: Text(
+                            child: Text(
                               !isCheckedIn
                                   ? 'Quét QR Check-in'
                                   : (!a.eoConfirmed
@@ -363,28 +340,22 @@ class ShiftAssignmentCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.brand),
                             ),
-                            style: TextButton.styleFrom(
-                              backgroundColor: cani.brandSoft,
-                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
                           ),
                         )
                       else if (onOpenChecklist != null)
                         Expanded(
-                          child: TextButton.icon(
+                          child: TextButton(
                             onPressed: onOpenChecklist,
-                            icon: Icon(Icons.fact_check_outlined, size: 16, color: cani.brand),
-                            label: Text(
-                              'Chi tiết & Đầu việc',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.brand),
-                            ),
                             style: TextButton.styleFrom(
                               backgroundColor: cani.brandSoft,
                               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Text(
+                              'Chi tiết & Đầu việc',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.brand),
                             ),
                           ),
                         ),
@@ -394,13 +365,8 @@ class ShiftAssignmentCard extends StatelessWidget {
                         const SizedBox(width: 8),
                       if (isNotStarted && onCancelAssignment != null)
                         Expanded(
-                          child: TextButton.icon(
+                          child: TextButton(
                             onPressed: onCancelAssignment,
-                            icon: Icon(Icons.cancel_outlined, size: 16, color: cani.danger),
-                            label: Text(
-                              'Hủy nhận ca',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.danger),
-                            ),
                             style: TextButton.styleFrom(
                               backgroundColor: isDark
                                   ? const Color(0xFF7F1D1D).withValues(alpha: 0.35)
@@ -408,23 +374,26 @@ class ShiftAssignmentCard extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
+                            child: Text(
+                              'Hủy nhận ca',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cani.danger),
+                            ),
                           ),
                         ),
                       if (isCompleted && onRateOrganizer != null && a.hasWorkerReviewed != true)
                         Expanded(
-                          child: TextButton.icon(
+                          child: TextButton(
                             onPressed: onRateOrganizer,
-                            icon: const Icon(Icons.star_rounded, size: 17, color: Color(0xFFD97706)),
-                            label: const Text(
-                              'Đánh giá BTC',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
-                            ),
                             style: TextButton.styleFrom(
                               backgroundColor: isDark
                                   ? const Color(0xFF78350F).withValues(alpha: 0.35)
                                   : const Color(0xFFFEF3C7),
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text(
+                              'Đánh giá BTC',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
                             ),
                           ),
                         ),

@@ -22,6 +22,7 @@ class FcmService {
   static String? _cachedToken;
   static Map<String, dynamic>? _pendingNavigationData;
   static void Function(Map<String, dynamic> data)? _onNotificationNavigate;
+  static void Function(Map<String, dynamic> data)? _onForegroundMessage;
   static void Function(String newToken)? _onTokenRefresh;
   static bool Function()? _canNavigate;
   static bool Function(Map<String, dynamic> data)? _shouldSuppressForegroundNotification;
@@ -37,6 +38,7 @@ class FcmService {
     bool Function(Map<String, dynamic> data)? shouldSuppressForegroundNotification,
   }) async {
     _onNotificationNavigate = onNotificationNavigate;
+    _onForegroundMessage = onForegroundMessage;
     _onTokenRefresh = onTokenRefresh;
     _canNavigate = canNavigate;
     _shouldSuppressForegroundNotification = shouldSuppressForegroundNotification;
@@ -89,7 +91,7 @@ class FcmService {
             payload: jsonEncode(message.data),
           );
         }
-        onForegroundMessage?.call(message.data);
+        _onForegroundMessage?.call(message.data);
       });
 
       // Đồng bộ lại token nếu FCM tự xoay vòng token mới
@@ -124,8 +126,10 @@ class FcmService {
       if (!_isCoreInitialized) {
         await initialize(
           onNotificationNavigate: _onNotificationNavigate,
+          onForegroundMessage: _onForegroundMessage,
           onTokenRefresh: _onTokenRefresh,
           canNavigate: _canNavigate,
+          shouldSuppressForegroundNotification: _shouldSuppressForegroundNotification,
         );
       }
       if (!_isCoreInitialized) return;
@@ -235,6 +239,4 @@ class FcmService {
       debugPrint('[FcmService] Failed to unregister FCM token: $e');
     }
   }
-
-  static String? get cachedToken => _cachedToken;
 }

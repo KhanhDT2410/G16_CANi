@@ -34,18 +34,8 @@ public interface WorkerEkycVerificationRepository extends JpaRepository<WorkerEk
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "worker")
     List<WorkerEkycVerification> findByStatusOrderByCreatedAtDesc(String status);
 
-    boolean existsByCccdNumberHashAndStatus(String cccdNumberHash, String status);
-
-    boolean existsByCccdNumberHashAndStatusAndWorker_WorkerIdNot(String cccdNumberHash, String status, UUID workerId);
-
-    boolean existsByCccdNumberHashAndStatusInAndWorker_WorkerIdNot(
-            String cccdNumberHash, Collection<String> statuses, UUID workerId);
-
     boolean existsByCccdNumberHashInAndStatusInAndWorker_WorkerIdNot(
             Collection<String> cccdNumberHashes, Collection<String> statuses, UUID workerId);
-
-    boolean existsByCccdNumberHashAndStatusInAndWorker_User_UserIdNot(
-            String cccdNumberHash, Collection<String> statuses, UUID userId);
 
     boolean existsByCccdNumberHashInAndStatusInAndWorker_User_UserIdNot(
             Collection<String> cccdNumberHashes, Collection<String> statuses, UUID userId);

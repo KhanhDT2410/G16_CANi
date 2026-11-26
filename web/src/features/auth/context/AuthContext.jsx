@@ -10,7 +10,10 @@ const AuthContext = createContext(null);
  */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => authApi.getCurrentUser());
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('cani_token') : null;
+    return Boolean(token && !authApi.getCurrentUser());
+  });
 
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem('cani_token');

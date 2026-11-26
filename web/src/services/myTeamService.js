@@ -28,12 +28,6 @@ export const myTeamService = {
     return response.data?.data || [];
   },
 
-  // Chi tiết một thợ trong My Team
-  getMyTeamMemberDetail: async (workerId) => {
-    const response = await apiClient.get(`/v1/eo/my-team/${workerId}`);
-    return response.data?.data;
-  },
-
   // Thêm thợ vào My Team (qua workerId hoặc phone)
   addWorkerToMyTeam: async ({ workerId, phone, internalNote = '', isFavorited = false }) => {
     const response = await apiClient.post('/v1/eo/my-team', {

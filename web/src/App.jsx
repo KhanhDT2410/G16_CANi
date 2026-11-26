@@ -53,51 +53,48 @@ function App() {
         <AuthProvider>
           <Suspense fallback={<PageFallback />}>
             <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/account-locked" element={<AccountLockedPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/auth/callback" element={<AuthCallbackPage />} />
-            <Route path="/complete-profile" element={<CompleteProfilePage />} />
-            <Route element={<MainLayout />}>
-              <Route
-                path="eo"
-                element={
-                  <RequireRole allowedRoles={['EVENT_ORGANIZER']}>
-                    <EOPage />
-                  </RequireRole>
-                }
-              />
-              {/* Direct routes to EO Profile */}
-              <Route path="profile" element={<Navigate to="/eo?tab=profile" replace />} />
-              <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
-              {/* Worker chỉ hoạt động trên Mobile App, chuyển hướng về Login nếu truy cập trên Web */}
-              <Route path="worker" element={<Navigate to="/login" replace />} />
-              <Route path="mobile-preview" element={<Navigate to="/" replace />} />
-              <Route
-                path="customer-care"
-                element={
-                  <RequireRole allowedRoles={['CUSTOMER_CARE', 'ADMIN']}>
-                    <CustomerCarePage />
-                  </RequireRole>
-                }
-              />
-              <Route
-                path="admin"
-                element={
-                  <RequireRole allowedRoles={['ADMIN']}>
-                    <AdminPage />
-                  </RequireRole>
-                }
-              />
-              <Route path="support" element={<SupportPage />} />
-              {/* Fallback route cho duong dan cu /cskh */}
-              <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
-            </Route>
-            {/* Catch-all fallback về Landing Page */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/account-locked" element={<AccountLockedPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
+              <Route path="/complete-profile" element={<CompleteProfilePage />} />
+              <Route element={<MainLayout />}>
+                <Route
+                  path="eo"
+                  element={
+                    <RequireRole allowedRoles={['EVENT_ORGANIZER']}>
+                      <EOPage />
+                    </RequireRole>
+                  }
+                />
+                {/* Direct routes to EO Profile */}
+                <Route path="profile" element={<Navigate to="/eo?tab=profile" replace />} />
+                <Route path="eo/profile" element={<Navigate to="/eo?tab=profile" replace />} />
+                <Route
+                  path="customer-care"
+                  element={
+                    <RequireRole allowedRoles={['CUSTOMER_CARE', 'ADMIN']}>
+                      <CustomerCarePage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="admin"
+                  element={
+                    <RequireRole allowedRoles={['ADMIN']}>
+                      <AdminPage />
+                    </RequireRole>
+                  }
+                />
+                <Route path="support" element={<SupportPage />} />
+                {/* Fallback route cho duong dan cu /cskh */}
+                <Route path="cskh" element={<Navigate to="/customer-care" replace />} />
+              </Route>
+              {/* Catch-all fallback về Landing Page */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
       <PromptDialogHost />

@@ -30,13 +30,6 @@ export const APPEAL_REASON_CATEGORIES = [
   },
 ];
 
-export const ACCOUNT_APPEAL_STATUS = {
-  SUBMITTED: 'SUBMITTED',
-  UNDER_REVIEW: 'UNDER_REVIEW',
-  APPROVED: 'APPROVED',
-  REJECTED: 'REJECTED',
-};
-
 export const ACCOUNT_APPEAL_STATUS_CONFIG = {
   SUBMITTED: {
     label: 'Chờ Tiếp Nhận',

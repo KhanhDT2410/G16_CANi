@@ -215,10 +215,53 @@ public class WorkerJobService {
         WorkerShiftEligibilityService eligibilityService = getEligibilityService();
 
         Instant now = Instant.now();
-        return proposals.stream()
+        List<DispatchProposal> filteredProposals = proposals.stream()
                 .filter(p -> p.getExpiresAt() == null || p.getExpiresAt().isAfter(now))
                 .filter(p -> isProposalStillMatchingWorkerPreferences(p, worker, availabilitySlots, eligibilityService, now))
-                .map(p -> mapToProposalDto(p, activeAssignments, eligibilityService))
+                .toList();
+        if (filteredProposals.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> shiftIds = filteredProposals.stream()
+                .map(DispatchProposal::getShift)
+                .filter(Objects::nonNull)
+                .map(Shift::getShiftId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<UUID, List<ShiftSkillRequirement>> reqsByShiftId = null;
+        if (shiftSkillRequirementRepository != null && !shiftIds.isEmpty()) {
+            List<ShiftSkillRequirement> allReqs = shiftSkillRequirementRepository.findByShiftIdsWithSkill(shiftIds);
+            if (allReqs != null) {
+                reqsByShiftId = allReqs.stream()
+                        .filter(r -> r.getShift() != null && r.getShift().getShiftId() != null)
+                        .collect(Collectors.groupingBy(r -> r.getShift().getShiftId()));
+            }
+        }
+
+        Set<UUID> neededSkillIds = new java.util.HashSet<>();
+        for (DispatchProposal dp : filteredProposals) {
+            Shift s = dp.getShift();
+            if (s == null) continue;
+            if (s.getPerformedSkillId() != null) {
+                neededSkillIds.add(s.getPerformedSkillId());
+            }
+            if (s.getRequiredSkills() != null) {
+                for (UUID skId : s.getRequiredSkills()) {
+                    if (skId != null) neededSkillIds.add(skId);
+                }
+            }
+        }
+        Map<UUID, String> skillNamesById = preloadSkillNames(neededSkillIds);
+        List<WorkerSkill> workerSkills = (workerSkillRepository != null && worker.getWorkerId() != null)
+                ? workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId())
+                : null;
+
+        final Map<UUID, List<ShiftSkillRequirement>> finalReqsByShiftId = reqsByShiftId;
+        return filteredProposals.stream()
+                .map(p -> mapToProposalDto(p, activeAssignments, eligibilityService, workerSkills, finalReqsByShiftId, skillNamesById))
                 .collect(Collectors.toList());
     }
 
@@ -470,6 +513,27 @@ public class WorkerJobService {
                         .collect(Collectors.groupingBy(Review::getAssignmentId))
                 : Collections.emptyMap();
 
+        // 4. Batch Fetching: Tên kỹ năng (O(1) thay vì N query trong stream)
+        Set<UUID> skillIds = new java.util.HashSet<>();
+        for (ShiftAssignment a : assignments) {
+            if (a == null) continue;
+            if (a.getConfirmedPerformedSkillId() != null) {
+                skillIds.add(a.getConfirmedPerformedSkillId());
+            }
+            Shift s = a.getShift();
+            if (s != null) {
+                if (s.getPerformedSkillId() != null) {
+                    skillIds.add(s.getPerformedSkillId());
+                }
+                if (s.getRequiredSkills() != null) {
+                    for (UUID skId : s.getRequiredSkills()) {
+                        if (skId != null) skillIds.add(skId);
+                    }
+                }
+            }
+        }
+        Map<UUID, String> skillNamesById = preloadSkillNames(skillIds);
+
         UUID workerUserId = (worker != null && worker.getUser() != null) ? worker.getUser().getUserId() : null;
 
         return assignments.stream()
@@ -478,7 +542,8 @@ public class WorkerJobService {
                         attendanceMap.get(a.getAssignmentId()),
                         paymentMap.get(a.getAssignmentId()),
                         reviewMap.get(a.getAssignmentId()),
-                        workerUserId
+                        workerUserId,
+                        skillNamesById
                 ))
                 .collect(Collectors.toList());
     }
@@ -1199,7 +1264,7 @@ public class WorkerJobService {
         Worker worker = getWorkerOrThrow(userId);
         ShiftAssignment assignment = getWorkerAssignmentOrThrow(assignmentId, worker);
         if (assignment.getStatus() != AssignmentStatus.CHECKED_IN) {
-            throw new BadRequestException("Bạn phải check-in vào ca trước khi tích chọn đầu việc (trạng thái hiện tại: " + assignment.getStatus() + ")");
+            throw new BadRequestException("Bạn phải check-in vào ca trước khi tích chọn đầu việc.");
         }
 
         Shift shift = assignment.getShift();
@@ -1249,7 +1314,7 @@ public class WorkerJobService {
             shiftAssignmentRepository.save(assignment);
         } catch (Exception e) {
             log.error("Không thể lưu checklist progress của Assignment {}: {}", assignmentId, e.getMessage());
-            throw new BadRequestException("Không thể lưu tiến độ checklist: " + e.getMessage());
+            throw new BadRequestException("Không thể lưu tiến độ công việc. Vui lòng thử lại.");
         }
 
         List<String> newlyCompletedLabels = new ArrayList<>();
@@ -1326,19 +1391,6 @@ public class WorkerJobService {
                     assignment.setChecklistProgress(objectMapper.writeValueAsString(progressMap));
                     shiftAssignmentRepository.save(assignment);
                 } catch (Exception ignored) {}
-            }
-            if (!newlyCompletedLabels.isEmpty() && shift != null) {
-                String evName = shift.getEvent() != null ? shift.getEvent().getName() : "Sự kiện";
-                String completedTasksText = String.join(", ", newlyCompletedLabels);
-                sendEoShiftNotification(
-                        shift,
-                        "Cập nhật tiến độ công việc",
-                        worker.getFullName() + " vừa hoàn thành đầu việc \"" + completedTasksText + "\" (" + completedCount + "/"
-                                + Math.max(1, templateItems.size()) + ") trong ca \"" + shift.getJobType() + "\" (" + evName + ").",
-                        com.cani.entity.enums.NotificationType.ASSIGNMENT,
-                        assignmentId,
-                        worker.getWorkerId()
-                );
             }
         }
 
@@ -1595,14 +1647,26 @@ public class WorkerJobService {
                 .build();
     }
 
-    private JobProposalResponseDto mapToProposalDto(DispatchProposal p) {
-        return mapToProposalDto(p, Collections.emptyList(), getEligibilityService());
+    private Map<UUID, String> preloadSkillNames(Set<UUID> skillIds) {
+        if (skillIds == null || skillIds.isEmpty() || skillRepository == null) {
+            return Collections.emptyMap();
+        }
+        Map<UUID, String> names = new HashMap<>();
+        for (Skill sk : skillRepository.findAllById(skillIds)) {
+            if (sk != null && sk.getSkillId() != null && sk.getName() != null) {
+                names.put(sk.getSkillId(), sk.getName());
+            }
+        }
+        return names;
     }
 
     private JobProposalResponseDto mapToProposalDto(
             DispatchProposal p,
             List<ShiftAssignment> activeAssignments,
-            WorkerShiftEligibilityService eligibilityService) {
+            WorkerShiftEligibilityService eligibilityService,
+            List<WorkerSkill> preloadedWorkerSkills,
+            Map<UUID, List<ShiftSkillRequirement>> preloadedReqsByShiftId,
+            Map<UUID, String> preloadedSkillNames) {
         Shift s = p.getShift();
         Event e = s != null ? s.getEvent() : null;
         EventOrganizer eo = e != null ? e.getEventOrganizer() : null;
@@ -1610,15 +1674,36 @@ public class WorkerJobService {
                 ? eo.getCompanyName()
                 : (eo != null && eo.getUser() != null ? eo.getUser().getFullName() : "Ban tổ chức");
 
-        WorkerShiftEligibilityService.SkillFitResult skillFit = (s != null)
-                ? eligibilityService.evaluateSkillFit(p.getWorker(), s)
-                : WorkerShiftEligibilityService.SkillFitResult.empty();
-        List<WorkerShiftEligibilityService.EffectiveRequirement> reqEntries = (s != null)
-                ? eligibilityService.resolveEffectiveRequirements(s)
-                : Collections.emptyList();
+        boolean hasPreloadedReqs = preloadedReqsByShiftId != null && s != null && s.getShiftId() != null;
+        List<ShiftSkillRequirement> preloadedReqs = hasPreloadedReqs
+                ? preloadedReqsByShiftId.getOrDefault(s.getShiftId(), Collections.emptyList())
+                : null;
+
+        WorkerShiftEligibilityService.SkillFitResult skillFit;
+        List<WorkerShiftEligibilityService.EffectiveRequirement> reqEntries;
+        if (s != null) {
+            if (hasPreloadedReqs || preloadedWorkerSkills != null || preloadedSkillNames != null) {
+                skillFit = eligibilityService.evaluateSkillFit(
+                        p.getWorker(), s, preloadedWorkerSkills, preloadedReqs, preloadedSkillNames);
+                reqEntries = eligibilityService.resolveEffectiveRequirements(s, preloadedReqs, preloadedSkillNames);
+            } else {
+                skillFit = eligibilityService.evaluateSkillFit(p.getWorker(), s);
+                reqEntries = eligibilityService.resolveEffectiveRequirements(s);
+            }
+        } else {
+            skillFit = WorkerShiftEligibilityService.SkillFitResult.empty();
+            reqEntries = Collections.emptyList();
+        }
         List<String> requiredNames = !skillFit.requiredSkillNames().isEmpty()
                 ? skillFit.requiredSkillNames()
-                : (s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList());
+                : (s != null ? (preloadedSkillNames != null
+                        ? resolveSkillNamesFromMap(s.getRequiredSkills(), preloadedSkillNames)
+                        : resolveSkillNames(s.getRequiredSkills())) : Collections.emptyList());
+        String performedSkillName = (s != null && s.getPerformedSkillId() != null)
+                ? (preloadedSkillNames != null
+                        ? preloadedSkillNames.get(s.getPerformedSkillId())
+                        : resolveSingleSkillName(s.getPerformedSkillId()))
+                : null;
         WorkerShiftEligibilityService.ScheduleConflictInfo conflictInfo = (s != null && eligibilityService != null)
                 ? eligibilityService.findScheduleConflict(s, activeAssignments)
                 : WorkerShiftEligibilityService.ScheduleConflictInfo.none();
@@ -1642,7 +1727,7 @@ public class WorkerJobService {
                 .preferredSkillNames(skillFit.preferredSkillNames())
                 .matchedSkillNames(skillFit.matchedSkillNames())
                 .performedSkillId(s != null ? s.getPerformedSkillId() : null)
-                .performedSkillName(s != null ? resolveSingleSkillName(s.getPerformedSkillId()) : null)
+                .performedSkillName(performedSkillName)
                 .recommendationReasonVi(buildProposalRecommendationReason(skillFit, s, p))
                 .skillRequirements(reqEntries.stream().map(WorkerShiftEligibilityService.EffectiveRequirement::toDto).toList())
                 .hourlyWage(s != null ? s.getHourlyWage() : BigDecimal.ZERO)
@@ -1686,7 +1771,7 @@ public class WorkerJobService {
             return "/api/v1/workers/proof/" + savedFilename;
         } catch (java.io.IOException e) {
             log.error("Lỗi khi lưu tệp ảnh bằng chứng nghiệm thu ca làm: {}", e.getMessage(), e);
-            throw new BadRequestException("Không thể lưu tệp ảnh: " + e.getMessage());
+            throw new BadRequestException("Không thể lưu tệp ảnh bằng chứng. Vui lòng thử lại.");
         }
     }
 
@@ -1816,12 +1901,35 @@ public class WorkerJobService {
         return mapToEnrichedAssignmentDto(a, att, payment, reviews, workerUserId);
     }
 
+    private List<String> resolveSkillNamesFromMap(UUID[] skillIds, Map<UUID, String> skillNamesById) {
+        if (skillIds == null || skillIds.length == 0 || skillNamesById == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(skillIds)
+                .filter(Objects::nonNull)
+                .map(skillNamesById::get)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
     private ShiftAssignmentResponseDto mapToEnrichedAssignmentDto(
             ShiftAssignment a,
             AttendanceLog att,
             Payment p,
             List<Review> reviews,
             UUID workerUserId
+    ) {
+        return mapToEnrichedAssignmentDto(a, att, p, reviews, workerUserId, null);
+    }
+
+    private ShiftAssignmentResponseDto mapToEnrichedAssignmentDto(
+            ShiftAssignment a,
+            AttendanceLog att,
+            Payment p,
+            List<Review> reviews,
+            UUID workerUserId,
+            Map<UUID, String> preloadedSkillNames
     ) {
         Shift s = a.getShift();
         Event e = s != null ? s.getEvent() : null;
@@ -1879,11 +1987,19 @@ public class WorkerJobService {
                 .startTime(s != null ? s.getStartTime() : null)
                 .endTime(s != null ? s.getEndTime() : null)
                 .arrivalTime(s != null ? (s.getArrivalTime() != null ? s.getArrivalTime() : s.getStartTime()) : null)
-                .requiredSkillNames(s != null ? resolveSkillNames(s.getRequiredSkills()) : Collections.emptyList())
+                .requiredSkillNames(s != null
+                        ? (preloadedSkillNames != null
+                                ? resolveSkillNamesFromMap(s.getRequiredSkills(), preloadedSkillNames)
+                                : resolveSkillNames(s.getRequiredSkills()))
+                        : Collections.emptyList())
                 .performedSkillId(s != null ? s.getPerformedSkillId() : null)
-                .performedSkillName(s != null ? resolveSingleSkillName(s.getPerformedSkillId()) : null)
+                .performedSkillName(s != null && s.getPerformedSkillId() != null
+                        ? (preloadedSkillNames != null ? preloadedSkillNames.get(s.getPerformedSkillId()) : resolveSingleSkillName(s.getPerformedSkillId()))
+                        : null)
                 .confirmedPerformedSkillId(a.getConfirmedPerformedSkillId())
-                .confirmedPerformedSkillName(resolveSingleSkillName(a.getConfirmedPerformedSkillId()))
+                .confirmedPerformedSkillName(a.getConfirmedPerformedSkillId() != null
+                        ? (preloadedSkillNames != null ? preloadedSkillNames.get(a.getConfirmedPerformedSkillId()) : resolveSingleSkillName(a.getConfirmedPerformedSkillId()))
+                        : null)
                 .spExperienceAwarded(Boolean.TRUE.equals(a.getSpExperienceAwarded()))
                 .spExperienceAwardedAt(a.getSpExperienceAwardedAt())
                 .spRatingAwarded(Boolean.TRUE.equals(a.getSpRatingAwarded()))

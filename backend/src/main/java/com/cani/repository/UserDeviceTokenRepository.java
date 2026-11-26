@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,10 +20,12 @@ public interface UserDeviceTokenRepository extends JpaRepository<UserDeviceToken
     List<UserDeviceToken> findByUser_UserIdAndIsActiveTrue(UUID userId);
 
     @Modifying
+    @Transactional
     @Query("UPDATE UserDeviceToken t SET t.isActive = false, t.updatedAt = CURRENT_INSTANT WHERE t.fcmToken = :token")
     void deactivateToken(@Param("token") String token);
 
     @Modifying
+    @Transactional
     @Query("UPDATE UserDeviceToken t SET t.isActive = false, t.updatedAt = CURRENT_INSTANT WHERE t.user.userId = :userId AND t.fcmToken = :token")
     void deactivateTokenForUser(@Param("userId") UUID userId, @Param("token") String token);
 }

@@ -32,9 +32,9 @@ const OUTCOME_CONFIG = {
   },
   UPHOLD: {
     label: 'Giữ nguyên phán quyết sơ bộ',
-    color: '#4338ca',
-    bg: '#eef2ff',
-    border: '#c7d2fe',
+    color: '#1d4ed8',
+    bg: '#eff6ff',
+    border: '#bfdbfe',
     instruction: 'Quản trị viên đã thẩm tra lại và giữ nguyên phán quyết trước đó của bộ phận CSKH.',
   },
 };

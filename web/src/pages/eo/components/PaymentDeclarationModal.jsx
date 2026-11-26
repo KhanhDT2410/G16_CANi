@@ -16,6 +16,7 @@ const PaymentDeclarationModal = ({
   paymentForm,
   setPaymentForm,
   selectedAssignment,
+  queueInfo = null,
 }) => {
   const [copied, setCopied] = useState(false);
   const [uploadingProof, setUploadingProof] = useState(false);
@@ -76,6 +77,44 @@ const PaymentDeclarationModal = ({
         }}
       >
         <h3>Khai Báo Đã Trả Lương Trực Tiếp</h3>
+        {queueInfo && queueInfo.total > 1 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.55rem 0.85rem',
+              marginBottom: '0.85rem',
+              borderRadius: '8px',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              fontSize: '0.8rem',
+              color: '#1d4ed8',
+              fontWeight: 700,
+            }}
+          >
+            <span>Thanh toán nối tiếp: Người {queueInfo.currentIndex + 1} / {queueInfo.total}</span>
+            {queueInfo.hasNext && (
+              <button
+                type="button"
+                onClick={queueInfo.onSkip}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '6px',
+                  padding: '2px 8px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#1d4ed8',
+                  cursor: 'pointer',
+                }}
+              >
+                Bỏ qua →
+              </button>
+            )}
+          </div>
+        )}
         <p style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1.25rem' }}>
           Sau khi chuyển khoản hoặc chi trả thù lao cho nhân sự, vui lòng khai báo để hệ thống ghi nhận đối soát và gửi thông báo xác nhận đến nhân sự.
         </p>
@@ -172,12 +211,12 @@ const PaymentDeclarationModal = ({
                           <strong style={{ color: '#0f172a' }}>{bankCode}</strong>
                         </div>
                         <span style={{ fontSize: '0.68rem', color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
-                          🔒 Mã hóa FLE
+                          Mã hóa FLE
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '2px 0' }}>
                         <span style={{ color: '#64748b' }}>Số tài khoản: </span>
-                        <strong style={{ color: '#4338ca', fontSize: '0.92rem' }}>{accountNumber}</strong>
+                        <strong style={{ color: '#1d4ed8', fontSize: '0.92rem' }}>{accountNumber}</strong>
                         <button
                           type="button"
                           onClick={() => {
@@ -186,9 +225,9 @@ const PaymentDeclarationModal = ({
                             setTimeout(() => setCopied(false), 2000);
                           }}
                           style={{
-                            background: '#e0e7ff',
-                            color: '#4338ca',
-                            border: 'none',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
                             borderRadius: '4px',
                             padding: '1px 6px',
                             fontSize: '0.7rem',
@@ -251,7 +290,7 @@ const PaymentDeclarationModal = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 700, color: '#92400e' }}>
-                <span>💵</span> Nhận Tiền Mặt Trực Tiếp
+                Nhận Tiền Mặt Trực Tiếp
               </div>
               <div style={{ color: '#78350f', fontSize: '0.8rem' }}>
                 Số tiền cần trao: <strong style={{ color: '#b45309', fontSize: '0.92rem' }}>{new Intl.NumberFormat('vi-VN').format(amount)} đ</strong>
@@ -370,12 +409,16 @@ const PaymentDeclarationModal = ({
               style={{
                 background: (uploadingProof || (paymentForm.paymentMethod === 'BANK_TRANSFER' && !paymentForm.paymentProofUrl))
                   ? '#94a3b8'
-                  : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  : '#2563eb',
                 border: 'none',
                 cursor: (uploadingProof || (paymentForm.paymentMethod === 'BANK_TRANSFER' && !paymentForm.paymentProofUrl)) ? 'not-allowed' : 'pointer',
               }}
             >
-              {paymentForm.paymentMethod === 'BANK_TRANSFER' ? 'Xác Nhận Đã Thanh Toán' : 'Xác Nhận Đã Trả Tiền Mặt'}
+              {queueInfo?.hasNext
+                ? 'Xác Nhận & Sang Người Tiếp Theo →'
+                : paymentForm.paymentMethod === 'BANK_TRANSFER'
+                  ? 'Xác Nhận Đã Thanh Toán'
+                  : 'Xác Nhận Đã Trả Tiền Mặt'}
             </button>
           </div>
         </form>

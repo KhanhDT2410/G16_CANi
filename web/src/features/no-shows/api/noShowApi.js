@@ -28,14 +28,6 @@ export const noShowApi = {
   },
 
   /**
-   * Lấy chi tiết một ca No-show
-   */
-  getDetail: async (id) => {
-    const response = await apiClient.get(`/v1/admin/no-shows/${id}`);
-    return response.data?.data;
-  },
-
-  /**
    * Đánh dấu No-show thủ công cho một ca làm việc
    */
   markNoShow: async (assignmentId, { notes } = {}) => {

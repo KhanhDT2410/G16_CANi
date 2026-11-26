@@ -65,5 +65,4 @@ class ProfileTokens {
   /// Comfortable density: card radius + shared paddings/gaps.
   double get radius => 18;
   double get cardPadding => 20;
-  double get blockGap => 24;
 }

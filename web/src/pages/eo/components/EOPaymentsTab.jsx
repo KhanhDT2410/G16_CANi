@@ -1,6 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import DisputeResolutionDetailModal from './DisputeResolutionDetailModal';
 import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
+import { eoService } from '../../../services/eoService';
+import { showToast } from '../../../components/common/Toast';
+import { showConfirm } from '../../../components/common/PromptModal';
+import { roundVndAmount } from '../utils/eventHelpers';
 
 export default function EOPaymentsTab({
   payments = [],
@@ -17,6 +22,15 @@ export default function EOPaymentsTab({
   const [previewImage, setPreviewImage] = useState(null);
   const [eventFilter, setEventFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkPaying, setBulkPaying] = useState(null);
+  const pageSize = 15;
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds([]);
+  }, [eventFilter, statusFilter]);
 
   const filteredPayments = useMemo(() => {
     return payments.filter((p) => {
@@ -28,6 +42,54 @@ export default function EOPaymentsTab({
       return p.status === statusFilter;
     });
   }, [payments, eventFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedPayments = filteredPayments.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const selectableOnPage = paginatedPayments.filter((p) => {
+    const isDisputeActive =
+      p.status === 'DISPUTED' ||
+      (p.disputeStatus && p.disputeStatus !== 'RESOLVED' && p.disputeStatus !== 'FINAL_RESOLVED');
+    return !isDisputeActive && p.status !== 'CONFIRMED_FULL';
+  });
+
+  const allSelectableChecked =
+    selectableOnPage.length > 0 && selectableOnPage.every((p) => selectedIds.includes(p.assignmentId));
+
+  const selectedCashItems = filteredPayments.filter((p) => selectedIds.includes(p.assignmentId));
+
+  const handleBulkCashDeclare = async () => {
+    if (selectedCashItems.length === 0) return;
+    const ok = await showConfirm({
+      title: `Khai báo tiền mặt hàng loạt (${selectedCashItems.length} khoản)`,
+      description: `Hệ thống sẽ khai báo chi trả bằng tiền mặt theo đúng thù lao thỏa thuận cho ${selectedCashItems.length} nhân sự đã chọn.`,
+      confirmText: `Xác nhận ${selectedCashItems.length} khoản`,
+    });
+    if (!ok) return;
+
+    let successCount = 0;
+    for (let i = 0; i < selectedCashItems.length; i += 1) {
+      const target = selectedCashItems[i];
+      setBulkPaying({ current: i + 1, total: selectedCashItems.length });
+      try {
+        await eoService.declarePayment({
+          assignmentId: target.assignmentId,
+          declaredAmount: roundVndAmount(target.agreedAmount ?? 200000),
+          paymentMethod: 'CASH',
+          externalRef: `CASH-BULK-${Date.now().toString().slice(-5)}-${i + 1}`,
+          paymentProofUrl: '',
+        });
+        successCount += 1;
+      } catch {
+        // continue
+      }
+    }
+    setBulkPaying(null);
+    setSelectedIds([]);
+    showToast(`Đã khai báo tiền mặt ${successCount}/${selectedCashItems.length} khoản.`, successCount > 0 ? 'success' : 'error');
+    onRefresh?.();
+  };
 
   const renderStatusBadge = (p) => {
     const isDisputeResolved = p.disputeStatus === 'RESOLVED' || p.disputeStatus === 'FINAL_RESOLVED';
@@ -151,17 +213,69 @@ export default function EOPaymentsTab({
             onClick={onOpenVoucherModal}
             disabled={filteredPayments.length === 0}
             title={filteredPayments.length === 0 ? 'Cần có ít nhất 1 khoản thanh toán để xuất phiếu chi' : 'Xuất Phiếu Chi Thù Lao (PDF / In)'}
-            style={{ backgroundColor: filteredPayments.length === 0 ? '#94a3b8' : '#059669', color: '#ffffff', border: 'none', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: filteredPayments.length === 0 ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', boxShadow: filteredPayments.length === 0 ? 'none' : '0 2px 8px rgba(5, 150, 105, 0.25)' }}
+            style={{ backgroundColor: filteredPayments.length === 0 ? '#cbd5e1' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: filteredPayments.length === 0 ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', boxShadow: filteredPayments.length === 0 ? 'none' : '0 2px 6px rgba(37, 99, 235, 0.2)' }}
           >
             Xuất Phiếu Chi Thù Lao (PDF / In)
           </button>
         </div>
       </div>
 
+      {(selectedIds.length > 0 || bulkPaying) && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.65rem',
+            padding: '0.7rem 1rem',
+            marginBottom: '0.75rem',
+            borderRadius: 10,
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            fontSize: '0.84rem',
+          }}
+        >
+          {bulkPaying ? (
+            <strong style={{ color: '#1d4ed8' }}>
+              Đang khai báo tiền mặt: {bulkPaying.current}/{bulkPaying.total}...
+            </strong>
+          ) : (
+            <>
+              <span style={{ color: '#1e40af', fontWeight: 700 }}>Đã chọn {selectedIds.length} khoản thanh toán</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className="eo-btn-primary" style={{ fontSize: '0.8rem', padding: '0.38rem 0.85rem' }} onClick={handleBulkCashDeclare}>
+                  Khai báo tiền mặt ({selectedCashItems.length})
+                </button>
+                <button type="button" className="eo-btn-secondary" style={{ fontSize: '0.8rem', padding: '0.38rem 0.75rem' }} onClick={() => setSelectedIds([])}>
+                  Bỏ chọn
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="eo-table-container">
         <table className="eo-table">
           <thead>
             <tr>
+              <th style={{ width: '36px', textAlign: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={allSelectableChecked}
+                  onChange={() => {
+                    const pageIds = selectableOnPage.map((p) => p.assignmentId);
+                    if (allSelectableChecked) {
+                      setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+                    } else {
+                      setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+                    }
+                  }}
+                  aria-label="Chọn các khoản có thể khai báo trên trang"
+                  style={{ width: 15, height: 15, cursor: 'pointer' }}
+                />
+              </th>
               <th>Mã Phân Công</th>
               <th>Nhân Sự</th>
               <th>Vị Trí / Ca</th>
@@ -175,10 +289,10 @@ export default function EOPaymentsTab({
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>Đang tải dữ liệu thanh toán...</td></tr>
+              <tr><td colSpan={10} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b' }}>Đang tải dữ liệu thanh toán...</td></tr>
             ) : error ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#dc2626', fontWeight: 600 }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#dc2626', fontWeight: 600 }}>
                   <div>{error}</div>
                   {onRefresh && (
                     <button type="button" onClick={onRefresh} style={{ marginTop: '0.6rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 6, padding: '0.35rem 0.9rem', fontWeight: 700, cursor: 'pointer' }}>
@@ -189,7 +303,7 @@ export default function EOPaymentsTab({
               </tr>
             ) : filteredPayments.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '2.75rem 1rem', color: '#64748b' }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '2.75rem 1rem', color: '#64748b' }}>
                   <div style={{ fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
                     {payments.length === 0
                       ? 'Chưa có khoản thanh toán nào được ghi nhận'
@@ -203,12 +317,31 @@ export default function EOPaymentsTab({
                 </td>
               </tr>
             ) : (
-              filteredPayments.map((p) => {
+              paginatedPayments.map((p) => {
                 const isDisputeResolved = p.disputeStatus === 'RESOLVED' || p.disputeStatus === 'FINAL_RESOLVED';
                 const isDisputeActive = p.status === 'DISPUTED' ||
                   (p.disputeStatus && p.disputeStatus !== 'RESOLVED' && p.disputeStatus !== 'FINAL_RESOLVED');
+                const canBulkSelect = !isDisputeActive && p.status !== 'CONFIRMED_FULL';
+                const isRowSelected = selectedIds.includes(p.assignmentId);
                 return (
                   <tr key={p.paymentId}>
+                    <td style={{ textAlign: 'center' }}>
+                      {canBulkSelect && (
+                        <input
+                          type="checkbox"
+                          checked={isRowSelected}
+                          onChange={() =>
+                            setSelectedIds((prev) =>
+                              prev.includes(p.assignmentId)
+                                ? prev.filter((id) => id !== p.assignmentId)
+                                : [...prev, p.assignmentId]
+                            )
+                          }
+                          aria-label={`Chọn khoản thanh toán của ${p.workerName}`}
+                          style={{ width: 15, height: 15, cursor: 'pointer' }}
+                        />
+                      )}
+                    </td>
                     <td style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }} title={p.assignmentId}>
                       {p.assignmentId?.length > 14 ? `${p.assignmentId.substring(0, 8)}...` : p.assignmentId}
                     </td>
@@ -246,9 +379,9 @@ export default function EOPaymentsTab({
                               url: buildWorkerVietQrUrl(p),
                               title: `Mã VietQR nhận lương của ${p.workerName}`,
                             })}
-                            style={{ background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ background: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: 4, padding: '2px 6px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
-                            📱 QR
+                            QR
                           </button>
                         )}
                       </div>
@@ -263,6 +396,25 @@ export default function EOPaymentsTab({
         </table>
       </div>
 
+      {filteredPayments.length > pageSize && (
+        <div className="ev-pagination-bar" style={{ marginTop: '0.75rem', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+          <span className="ev-pagination-summary">
+            Hiển thị <strong>{(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredPayments.length)}</strong> / <strong>{filteredPayments.length}</strong> khoản thanh toán
+          </span>
+          <div className="ev-pagination-controls">
+            <button type="button" className="ev-page-btn" disabled={safePage <= 1} onClick={() => setCurrentPage(safePage - 1)}>
+              ← Trước
+            </button>
+            <span style={{ fontSize: '0.8rem', color: '#475569', padding: '0 0.5rem', fontWeight: 600 }}>
+              Trang {safePage} / {totalPages}
+            </span>
+            <button type="button" className="ev-page-btn" disabled={safePage >= totalPages} onClick={() => setCurrentPage(safePage + 1)}>
+              Sau →
+            </button>
+          </div>
+        </div>
+      )}
+
       <DisputeResolutionDetailModal
         isOpen={Boolean(selectedDisputePayment)}
         payment={selectedDisputePayment}
@@ -271,13 +423,14 @@ export default function EOPaymentsTab({
         onOpenPaymentDeclaration={onOpenPaymentModal}
       />
 
-      {previewImage && (
+      {previewImage && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            zIndex: 10000,
+            backdropFilter: 'blur(4px)',
+            zIndex: 10060,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -302,7 +455,8 @@ export default function EOPaymentsTab({
           >
             Đóng ảnh
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

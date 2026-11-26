@@ -122,11 +122,11 @@ public class DirectPaymentService {
                 });
 
         if (payment == null || payment.getEventOrganizer() == null) {
-            throw new IllegalArgumentException("Không đủ thông tin sự kiện/ca làm hoặc Worker để khởi tạo thanh toán cho phân công: " + dto.getAssignmentId());
+            throw new com.cani.exception.BadRequestException("Không đủ thông tin sự kiện/ca làm hoặc nhân sự để khởi tạo thanh toán.");
         }
 
         if (!payment.getEventOrganizer().getEoId().equals(eoId)) {
-            throw new IllegalStateException("Bạn không có quyền khai báo thanh toán cho phân công này");
+            throw new com.cani.exception.AppException("Bạn không có quyền khai báo thanh toán cho phân công này.", org.springframework.http.HttpStatus.FORBIDDEN);
         }
 
         if (assignment.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN
@@ -262,10 +262,10 @@ public class DirectPaymentService {
     @Transactional
     public PaymentResponseDto confirmPayment(UUID workerId, UUID assignmentId, ConfirmPaymentRequestDto dto) {
         Payment payment = paymentRepository.findByAssignmentId(assignmentId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bản ghi thanh toán cho assignment: " + assignmentId));
+                .orElseThrow(() -> new com.cani.exception.ResourceNotFoundException("Không tìm thấy thông tin thanh toán cho ca làm này."));
 
         if (!payment.getWorker().getWorkerId().equals(workerId)) {
-            throw new IllegalStateException("Bạn không có quyền xác nhận thanh toán này");
+            throw new com.cani.exception.AppException("Bạn không có quyền xác nhận thanh toán này.", org.springframework.http.HttpStatus.FORBIDDEN);
         }
 
         if (payment.getStatus() == PaymentStatus.NOT_DECLARED) {
@@ -279,7 +279,7 @@ public class DirectPaymentService {
                 if (assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.CHECKED_IN
                         && assignment.getStatus() != com.cani.entity.enums.AssignmentStatus.COMPLETED) {
                     throw new com.cani.exception.BadRequestException(
-                            "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca (trạng thái hiện tại: " + assignment.getStatus() + ")");
+                            "Xác nhận thanh toán chỉ mở sau khi đã check-in vào ca.");
                 }
                 if (assignment.getStatus() == com.cani.entity.enums.AssignmentStatus.CHECKED_IN
                         && !Boolean.TRUE.equals(assignment.getEoConfirmed())) {
@@ -301,7 +301,7 @@ public class DirectPaymentService {
             payment.setStatus(PaymentStatus.DISPUTED);
             normalizedConfirmStatus = "NOT_RECEIVED";
         } else {
-            throw new IllegalArgumentException("Trạng thái xác nhận không hợp lệ. Chỉ chấp nhận: RECEIVED_FULL (hoặc CONFIRMED_FULL), RECEIVED_PARTIAL, NOT_RECEIVED");
+            throw new com.cani.exception.BadRequestException("Trạng thái xác nhận thanh toán không hợp lệ.");
         }
 
         payment.setWorkerConfirmedAt(Instant.now());

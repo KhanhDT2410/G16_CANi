@@ -4,7 +4,9 @@ import { showToast } from '../../../components/common/Toast';
 
 /**
  * Hook quản lý nghiệp vụ và trạng thái thông báo In-App (SRS UC-117)
- * Kết hợp Web Browser Notification API để hiện thông báo trên máy ngay khi có cập nhật mới.
+ * Đồng bộ real-time qua polling 15s + visibility/focus và phát `cani_domain_event`
+ * để các màn hình đang mở (EO ShiftWorkspace, Events, Payments, Admin) tự cập nhật
+ * không cần F5, kể cả khi tổng số chưa đọc (unreadCount) không thay đổi.
  */
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState([]);
@@ -13,7 +15,14 @@ export const useNotifications = () => {
   const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'UNREAD'
-  const seenUnreadIdsRef = useRef(null);
+
+  const seenNotificationIdsRef = useRef(null);
+  const isOpenRef = useRef(false);
+  const lastFocusDispatchAtRef = useRef(0);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
 
   const notifyDesktop = useCallback((item) => {
     const title = item?.title || 'Thông báo mới từ CANi';
@@ -31,52 +40,74 @@ export const useNotifications = () => {
     }
   }, []);
 
-  // 1. Tải số lượng thông báo chưa đọc & thông báo mới từ server
+  const syncDomainFromLatestNotifications = useCallback(
+    (arr, { suppressToast = false } = {}) => {
+      if (!Array.isArray(arr)) return;
+      if (seenNotificationIdsRef.current === null) {
+        seenNotificationIdsRef.current = new Set(
+          arr.map((n) => n?.notificationId).filter(Boolean)
+        );
+        return;
+      }
+
+      const newlyArrived = arr.filter(
+        (n) => n?.notificationId && !seenNotificationIdsRef.current.has(n.notificationId)
+      );
+      if (newlyArrived.length === 0) return;
+
+      newlyArrived.forEach((n) => {
+        seenNotificationIdsRef.current.add(n.notificationId);
+        if (!suppressToast && !n.isRead) {
+          notifyDesktop(n);
+        }
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('cani_domain_event', {
+            detail: {
+              reason: 'notification',
+              items: newlyArrived,
+            },
+          })
+        );
+      }
+    },
+    [notifyDesktop]
+  );
+
+  // 1. Tải unread count + top 15 thông báo gần nhất để phát hiện mọi thay đổi kể cả khi unreadCount không đổi
   const fetchUnreadCount = useCallback(async () => {
     try {
-      const count = await notificationApi.getUnreadCount();
-      const numericCount = Number(count) || 0;
-      setUnreadCount((prev) => {
-        if (numericCount > prev || (numericCount > 0 && seenUnreadIdsRef.current === null)) {
-          notificationApi.getMyNotifications().then((list) => {
-            const arr = Array.isArray(list) ? list : [];
-            setNotifications(arr);
-            const unreadItems = arr.filter((n) => !n.isRead);
-            if (seenUnreadIdsRef.current === null) {
-              seenUnreadIdsRef.current = new Set(unreadItems.map((n) => n.notificationId));
-            } else {
-              const newItems = unreadItems.filter((n) => !seenUnreadIdsRef.current.has(n.notificationId));
-              newItems.forEach((n) => {
-                seenUnreadIdsRef.current.add(n.notificationId);
-                notifyDesktop(n);
-              });
-            }
-          }).catch(() => {});
-        }
-        return numericCount;
-      });
-    } catch (err) {
-      // Khi chưa đăng nhập hoặc lỗi kết nối, giữ count = 0
-      console.warn('[useNotifications] Không thể tải unread count:', err?.message);
-    }
-  }, [notifyDesktop]);
+      const [countRes, latestRes] = await Promise.allSettled([
+        notificationApi.getUnreadCount(),
+        notificationApi.getMyNotifications({ limit: isOpenRef.current ? 50 : 15 }),
+      ]);
 
-  // 2. Tải toàn bộ danh sách thông báo từ DB
+      if (countRes.status === 'fulfilled') {
+        setUnreadCount(Number(countRes.value) || 0);
+      }
+      if (latestRes.status === 'fulfilled') {
+        const arr = Array.isArray(latestRes.value) ? latestRes.value : [];
+        setNotifications(arr);
+        syncDomainFromLatestNotifications(arr);
+      }
+    } catch (err) {
+      console.warn('[useNotifications] Không thể đồng bộ thông báo:', err?.message);
+    }
+  }, [syncDomainFromLatestNotifications]);
+
+  // 2. Tải danh sách thông báo đầy đủ từ DB (khi mở chuông)
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await notificationApi.getMyNotifications();
+      const data = await notificationApi.getMyNotifications({ limit: 50 });
       const arr = Array.isArray(data) ? data : [];
       setNotifications(arr);
-      // Cập nhật lại unread count dựa trên dữ liệu thật
       const unreadItems = arr.filter((n) => !n.isRead);
       setUnreadCount(unreadItems.length);
-      if (seenUnreadIdsRef.current === null) {
-        seenUnreadIdsRef.current = new Set(unreadItems.map((n) => n.notificationId));
-      } else {
-        unreadItems.forEach((n) => seenUnreadIdsRef.current.add(n.notificationId));
-      }
+      syncDomainFromLatestNotifications(arr, { suppressToast: true });
     } catch (err) {
       console.error('[useNotifications] Lỗi khi tải thông báo:', err);
       setError(err?.response?.data?.message || 'Không thể tải danh sách thông báo');
@@ -84,13 +115,12 @@ export const useNotifications = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [syncDomainFromLatestNotifications]);
 
   // 3. Đánh dấu 1 thông báo là đã đọc
   const markAsRead = useCallback(async (notificationId) => {
     if (!notificationId) return;
 
-    // Cập nhật lạc quan (Optimistic Update) trên giao diện trước
     setNotifications((prev) =>
       prev.map((item) =>
         item.notificationId === notificationId ? { ...item, isRead: true } : item
@@ -102,7 +132,6 @@ export const useNotifications = () => {
       await notificationApi.markAsRead(notificationId);
     } catch (err) {
       console.warn('[useNotifications] Lỗi khi gọi markAsRead:', err);
-      // Đồng bộ lại dữ liệu thật nếu API lỗi
       fetchNotifications();
     }
   }, [fetchNotifications]);
@@ -142,7 +171,7 @@ export const useNotifications = () => {
     setIsOpen(false);
   }, []);
 
-  // 6. Tự động kiểm tra unread count định kỳ (mỗi 15s khi tab đang hiển thị) và lắng nghe sự kiện
+  // 6. Tự động kiểm tra định kỳ (mỗi 15s khi tab hiển thị) + phản hồi ngay khi quay lại tab/cửa sổ
   useEffect(() => {
     const isTabVisible = () =>
       typeof document === 'undefined' || document.visibilityState === 'visible';
@@ -160,29 +189,32 @@ export const useNotifications = () => {
     const handleRefresh = () => {
       if (!isTabVisible()) return;
       fetchUnreadCount();
-      if (isOpen) {
-        fetchNotifications();
-      }
     };
 
-    const handleVisibilityChange = () => {
-      if (isTabVisible()) {
-        fetchUnreadCount();
-        if (isOpen) {
-          fetchNotifications();
-        }
-      }
+    const handleTabReturn = () => {
+      if (!isTabVisible()) return;
+      const now = Date.now();
+      if (now - lastFocusDispatchAtRef.current < 2000) return;
+      lastFocusDispatchAtRef.current = now;
+      fetchUnreadCount();
+      window.dispatchEvent(
+        new CustomEvent('cani_domain_event', {
+          detail: { reason: 'tab_focus', items: [] },
+        })
+      );
     };
 
     window.addEventListener('cani_notification_refresh', handleRefresh);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleTabReturn);
+    window.addEventListener('focus', handleTabReturn);
 
     return () => {
       clearInterval(intervalId);
       window.removeEventListener('cani_notification_refresh', handleRefresh);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleTabReturn);
+      window.removeEventListener('focus', handleTabReturn);
     };
-  }, [fetchUnreadCount, fetchNotifications, isOpen]);
+  }, [fetchUnreadCount]);
 
   // Danh sách thông báo sau khi lọc tab
   const filteredNotifications = useMemo(() => {
@@ -208,4 +240,3 @@ export const useNotifications = () => {
     refresh: fetchNotifications,
   };
 };
-

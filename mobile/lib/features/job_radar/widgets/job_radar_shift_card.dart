@@ -437,8 +437,6 @@ class JobRadarShiftListView extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.cloud_off_rounded, size: 42, color: cani.danger),
-              const SizedBox(height: 10),
               Text(
                 'Tải dữ liệu thất bại',
                 style: TextStyle(fontWeight: FontWeight.w800, color: cani.textMain),
@@ -462,12 +460,6 @@ class JobRadarShiftListView extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                listSlice.isOnline ? Icons.radar_rounded : Icons.pause_circle_outline_rounded,
-                size: 44,
-                color: (listSlice.isOnline ? cani.brand : cani.textMuted).withValues(alpha: 0.75),
-              ),
-              const SizedBox(height: 10),
               Text(
                 listSlice.isOnline
                     ? 'Đang tìm ca quanh bạn'

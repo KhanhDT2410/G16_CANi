@@ -334,7 +334,7 @@ public class SupportTicketService {
     @Transactional
     public SupportTicketResponseDto escalateChatToTicket(UUID conversationId, EscalateChatToTicketRequestDto req, UUID staffId) {
         if (supportConversationRepository == null) {
-            throw new IllegalStateException("Hệ thống hội thoại chưa được cấu hình");
+            throw new BadRequestException("Hệ thống hội thoại hiện chưa sẵn sàng.");
         }
         com.cani.entity.SupportConversation conv = supportConversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Hội thoại", "id", conversationId));
@@ -798,7 +798,7 @@ public class SupportTicketService {
             return "/api/v1/support/tickets/attachments/" + savedFilename;
         } catch (IOException e) {
             log.error("Lỗi khi lưu tệp đính kèm ticket: {}", e.getMessage(), e);
-            throw new BadRequestException("Không thể lưu tệp đính kèm: " + e.getMessage());
+            throw new BadRequestException("Không thể lưu tệp đính kèm. Vui lòng thử lại.");
         }
     }
 

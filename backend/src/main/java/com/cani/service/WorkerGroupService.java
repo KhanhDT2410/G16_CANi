@@ -807,22 +807,40 @@ public class WorkerGroupService {
             throw new AppException("Trùng lịch với ca khác, vui lòng thử lại", HttpStatus.CONFLICT);
         }
 
-        // Notifications: FCM gửi SAU KHI commit DB thành công
+        // Notifications: trích xuất toàn bộ scalar UUID/String trong transaction trước khi afterCommit (an toàn với open-in-view: false)
         String arriveHint = shift.getArrivalTime() != null
                 ? " — có mặt trước " + shift.getArrivalTime()
                         .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
                         .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
                 : "";
+        final String groupName = group.getName();
+        final String shiftJobType = shift.getJobType();
+        final String leaderName = leader.getFullName();
+        final UUID eoUserId = (event != null && event.getEventOrganizer() != null && event.getEventOrganizer().getUser() != null)
+                ? event.getEventOrganizer().getUser().getUserId()
+                : null;
+        final UUID leaderUserId = leader.getUser() != null ? leader.getUser().getUserId() : null;
+        final List<UUID> memberUserIds = new ArrayList<>(snapshotWorkerIds.size());
+        for (UUID workerId : snapshotWorkerIds) {
+            WorkerGroupMembership m = activeByWorker.get(workerId);
+            Worker member = m != null ? m.getWorker() : null;
+            if (member != null && member.getUser() != null && member.getUser().getUserId() != null) {
+                memberUserIds.add(member.getUser().getUserId());
+            }
+        }
+        final int memberCount = selectedIds.size();
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    safeNotify(event, shift, leader, group, selectedIds, eventName, arriveHint);
+                    safeNotify(eoUserId, leaderUserId, leaderName, groupName, shiftJobType,
+                            memberUserIds, memberCount, eventName, arriveHint);
                 }
             });
         } else {
-            safeNotify(event, shift, leader, group, selectedIds, eventName, arriveHint);
+            safeNotify(eoUserId, leaderUserId, leaderName, groupName, shiftJobType,
+                    memberUserIds, memberCount, eventName, arriveHint);
         }
 
         log.info("Leader {} đã nhận ca {} cho nhóm {} với {} thành viên",
@@ -934,34 +952,30 @@ public class WorkerGroupService {
                 .build();
     }
 
-    private void safeNotify(Event event, Shift shift, Worker leader, WorkerGroup group,
-            List<UUID> selectedWorkerIds, String eventName, String arriveHint) {
-        String groupName = group.getName();
+    private void safeNotify(UUID eoUserId, UUID leaderUserId, String leaderName, String groupName,
+            String shiftJobType, List<UUID> memberUserIds, int memberCount, String eventName, String arriveHint) {
         // 1. EO
-        if (event != null && event.getEventOrganizer() != null && event.getEventOrganizer().getUser() != null) {
-            sendSafe(event.getEventOrganizer().getUser().getUserId(),
-                    "Đội " + groupName + " nhận ca " + shift.getJobType(),
-                    "Đội " + groupName + " đã nhận ca \"" + shift.getJobType() + "\" với " + selectedWorkerIds.size()
+        if (eoUserId != null) {
+            sendSafe(eoUserId,
+                    "Đội " + groupName + " nhận ca " + shiftJobType,
+                    "Đội " + groupName + " đã nhận ca \"" + shiftJobType + "\" với " + memberCount
                             + " thành viên (sự kiện \"" + eventName + "\").");
         }
         // 2. Từng member đã chọn
-        Map<UUID, Worker> workersById = workerRepository.findAllById(selectedWorkerIds).stream()
-                .collect(Collectors.toMap(Worker::getWorkerId, Function.identity(), (a, b) -> a));
-        for (UUID workerId : selectedWorkerIds) {
-            Worker member = workersById.get(workerId);
-            if (member == null || member.getUser() == null)
-                continue;
-            sendSafe(member.getUser().getUserId(),
-                    "Bạn được phân công ca làm việc [NHÓM]",
-                    "Trưởng nhóm " + leader.getFullName() + " đã phân công bạn ca \"" + shift.getJobType()
-                            + "\" (" + eventName + ")" + arriveHint + ".");
+        if (memberUserIds != null) {
+            for (UUID memberUserId : memberUserIds) {
+                sendSafe(memberUserId,
+                        "Bạn được phân công ca làm việc [NHÓM]",
+                        "Trưởng nhóm " + leaderName + " đã phân công bạn ca \"" + shiftJobType
+                                + "\" (" + eventName + ")" + arriveHint + ".");
+            }
         }
         // 3. Leader
-        if (leader.getUser() != null) {
-            sendSafe(leader.getUser().getUserId(),
+        if (leaderUserId != null) {
+            sendSafe(leaderUserId,
                     "Đã nhận ca cho đội",
-                    "Đội " + groupName + " đã nhận ca \"" + shift.getJobType() + "\" với "
-                            + selectedWorkerIds.size() + " thành viên.");
+                    "Đội " + groupName + " đã nhận ca \"" + shiftJobType + "\" với "
+                            + memberCount + " thành viên.");
         }
     }
 

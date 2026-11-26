@@ -162,7 +162,7 @@ const ShiftQrModal = ({
                 }}
                 title="Đổi mã QR ngay lập tức"
               >
-                🔄 Đổi mã ngay
+                Đổi mã ngay
               </button>
             </div>
 
@@ -223,7 +223,7 @@ const ShiftQrModal = ({
               lineHeight: 1.5,
             }}>
               <div style={{ fontWeight: 700, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span>🚫 Không hỗ trợ in ra giấy & chống chụp ảnh:</span>
+                <span>Không hỗ trợ in ra giấy & chống chụp ảnh:</span>
               </div>
               <div>
                 Để triệt tiêu gian lận check-in hộ từ xa, mã QR này <strong>chỉ có hiệu lực quét trực tiếp trên màn hình thiết bị điều phối</strong> tại sự kiện kết hợp bán kính định vị Geofence GPS 200m. Mã sẽ tự vô hiệu hóa sau thời gian làm mới.

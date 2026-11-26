@@ -14,6 +14,4 @@ public interface DisputeEvidenceRepository extends JpaRepository<DisputeEvidence
     List<DisputeEvidence> findByDisputeIdOrderByCreatedAtAsc(UUID disputeId);
 
     List<DisputeEvidence> findByDisputeIdInOrderByCreatedAtAsc(Collection<UUID> disputeIds);
-
-    long countByDisputeId(UUID disputeId);
 }

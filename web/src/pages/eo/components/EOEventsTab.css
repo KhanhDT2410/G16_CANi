@@ -324,7 +324,7 @@
 .ev-fill-bar-progress {
   height: 100%;
   border-radius: 9999px;
-  background: linear-gradient(90deg, #2563eb 0%, #10b981 100%);
+  background: #2563eb;
   transition: width 0.25s ease;
 }
 

@@ -54,12 +54,6 @@ export const accountAppealApi = {
     return response.data?.data;
   },
 
-  // Admin: Lấy chi tiết một đơn giải trình
-  getAppealDetail: async (id) => {
-    const response = await apiClient.get(`/v1/admin/account-appeals/${id}`);
-    return response.data?.data;
-  },
-
   // Admin: Thẩm định phê duyệt mở khóa hoặc từ chối đơn
   reviewAppeal: async (id, { decision, adminNotes }) => {
     const response = await apiClient.put(`/v1/admin/account-appeals/${id}/review`, {

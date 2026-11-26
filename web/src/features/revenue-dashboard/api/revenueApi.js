@@ -27,16 +27,5 @@ export const revenueApi = {
     const response = await apiClient.get('/v1/admin/revenue/transactions', { params });
     return response.data?.data;
   },
-
-  /**
-   * Lấy dữ liệu phân tích xu hướng theo chu kỳ (day, week, month)
-   */
-  getRevenueAnalytics: async ({ period = 'day', from, to } = {}) => {
-    const params = { period };
-    if (from) params.from = from;
-    if (to) params.to = to;
-    const response = await apiClient.get('/v1/admin/revenue/analytics', { params });
-    return response.data?.data;
-  },
 };
 

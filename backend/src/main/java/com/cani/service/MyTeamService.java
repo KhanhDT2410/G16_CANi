@@ -385,7 +385,7 @@ public class MyTeamService {
                             : "Ban tổ chức quen thuộc vừa gửi lời mời ưu tiên cho bạn tham gia ca làm: " + shift.getJobType();
                     notificationService.createAndSend(
                             worker.getUser().getUserId(),
-                            "Lời mời làm việc từ My Team: " + shift.getJobType(),
+                            "Lời mời làm việc từ đội ngũ quen thuộc: " + shift.getJobType(),
                             msg,
                             com.cani.entity.enums.NotificationType.PROPOSAL,
                             "PROPOSAL",

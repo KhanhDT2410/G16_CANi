@@ -1,6 +1,7 @@
 package com.cani.repository;
 
 import com.cani.entity.Notification;
+import com.cani.entity.enums.NotificationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,6 +21,8 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     Page<Notification> findByUser_UserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
 
     long countByUser_UserIdAndIsReadFalse(UUID userId);
+
+    long countByUser_UserIdAndIsReadFalseAndTypeNot(UUID userId, NotificationType excludedType);
 
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.user.userId = :userId")

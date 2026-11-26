@@ -1,5 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 /// DTO representing an authenticated user in CANi system.
 class UserDto {
   const UserDto({
@@ -23,24 +21,6 @@ class UserDto {
   final String? avatarUrl;
   final bool emailVerified;
   final String? authProvider;
-
-  /// Kiểm tra xem tài khoản có đang liên kết với Google hay không
-  bool get isGoogleLinked {
-    if (authProvider == 'google') return true;
-    if (avatarUrl?.contains('googleusercontent.com') ?? false) return true;
-    try {
-      final supaUser = Supabase.instance.client.auth.currentUser;
-      if (supaUser != null) {
-        if (supaUser.appMetadata['provider'] == 'google') return true;
-        final providers = supaUser.appMetadata['providers'];
-        if (providers is List && providers.contains('google')) return true;
-        if (supaUser.identities?.any((i) => i.provider.toLowerCase() == 'google') ?? false) {
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  }
 
   factory UserDto.fromJson(Map<String, Object?> json) {
     return UserDto(

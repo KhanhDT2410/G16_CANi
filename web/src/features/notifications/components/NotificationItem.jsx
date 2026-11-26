@@ -5,7 +5,7 @@ import { NOTIFICATION_TYPE_CONFIG, formatRelativeTime, isEmergencyNotification }
  * Tiêu chuẩn < 200 dòng theo AGENTS.md.
  */
 export const NotificationItem = ({ notification, onSelect }) => {
-  const { notificationId, title, body, type, isRead, createdAt } = notification;
+  const { title, body, type, isRead, createdAt } = notification;
 
   const isEmergency = isEmergencyNotification(notification);
   const typeConfig = isEmergency

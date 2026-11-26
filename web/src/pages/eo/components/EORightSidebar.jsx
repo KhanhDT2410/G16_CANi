@@ -17,15 +17,11 @@ const toDateKey = (dateInput) => {
 
 /**
  * EORightSidebar
- * Cột tiện ích bên phải tích hợp:
- * 1. Lịch Hoạt Động & Sự Kiện Hợp Nhất (Monthly Calendar + Upcoming Schedule)
- *    - Tông màu Indigo / Violet hoàng gia sang trọng (var(--color-primary-active) / var(--color-primary-active))
- *    - Điểm nhấn chấm tròn Coral (#f43f5e) cho ngày có lịch sự kiện
- *    - Đồng bộ chọn ngày và hiển thị sự kiện tương ứng, nút thao tác tinh gọn duy nhất.
- * 2. Biểu Đồ Tròn Tỷ Lệ Lấp Đầy Nhân Sự (Donut Chart)
+ * Cột tiện ích bên phải tích hợp Lịch Hoạt Động & Sự Kiện Hợp Nhất
+ * - Bảng màu chuẩn Ocean Blue + Neutral Slate (loại bỏ tím/coral)
+ * - Đồng bộ chọn ngày và hiển thị sự kiện tương ứng
  */
 export default function EORightSidebar({
-  metrics,
   events = [],
   onOpenQr,
   onSelectEvent,
@@ -158,19 +154,6 @@ export default function EORightSidebar({
     }
   };
 
-  // 4. Số liệu tỷ lệ lấp đầy nhân sự (Donut Chart)
-  const confirmed = metrics?.totalConfirmedWorkers ?? 0;
-  const required = metrics?.totalRequiredWorkers ?? 0;
-  const pending = Math.max(0, required - confirmed);
-  const total = confirmed + pending;
-  const fillRate = required > 0 ? (metrics?.fillRate ?? Math.round((confirmed / required) * 100)) : 0;
-
-  const radius = 38;
-  const circumference = 2 * Math.PI * radius;
-  const safeTotal = total > 0 ? total : 1;
-  const confirmedLen = (confirmed / safeTotal) * circumference;
-  const pendingLen = (pending / safeTotal) * circumference;
-
   // Format ngày để hiển thị tiêu đề
   const formatDisplayDate = (key) => {
     if (!key) return '';
@@ -188,8 +171,7 @@ export default function EORightSidebar({
   return (
     <aside className="eo-right-sidebar eo-widget-panel">
       {/* =========================================================================
-          WIDGET 1: LỊCH HOẠT ĐỘNG & SỰ KIỆN HỢP NHẤT (CALENDAR + UPCOMING SCHEDULE)
-          Bảng màu: Indigo / Violet hoàng gia (var(--color-primary-active)) + Coral Accent (#f43f5e)
+          WIDGET: LỊCH HOẠT ĐỘNG & SỰ KIỆN HỢP NHẤT (CALENDAR + UPCOMING SCHEDULE)
           ========================================================================= */}
       <div className="eo-widget-card" style={{ padding: '1.15rem' }}>
         {/* Header Lịch & Nút Điều Hướng Tháng */}
@@ -302,24 +284,24 @@ export default function EORightSidebar({
                   justifyContent: 'center',
                   minHeight: '34px',
                   backgroundColor: isSelected
-                    ? 'var(--color-primary-active)'
+                    ? '#2563eb'
                     : isToday
-                    ? '#eef2ff'
+                    ? '#eff6ff'
                     : 'transparent',
                   border: isToday && !isSelected
-                    ? '1px solid #c7d2fe'
+                    ? '1px solid #bfdbfe'
                     : isSelected
-                    ? '1px solid var(--color-primary-active)'
+                    ? '1px solid #2563eb'
                     : '1px solid transparent',
                   color: isSelected
                     ? '#ffffff'
                     : !cell.isCurrentMonth
                     ? '#cbd5e1'
                     : isToday
-                    ? '#4338ca'
+                    ? '#1d4ed8'
                     : '#1e293b',
                   transition: 'all 0.15s ease',
-                  boxShadow: isSelected ? '0 2px 6px rgba(99, 102, 241, 0.35)' : 'none',
+                  boxShadow: isSelected ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none',
                 }}
                 title={hasEvents ? `${cell.dateKey}: Có sự kiện` : cell.dateKey}
               >
@@ -327,7 +309,7 @@ export default function EORightSidebar({
                   {cell.dayNumber}
                 </span>
 
-                {/* Dấu chấm chỉ báo ngày có sự kiện (Coral Dot) */}
+                {/* Dấu chấm chỉ báo ngày có sự kiện */}
                 <div style={{ height: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
                   {hasEvents && (
                     <span
@@ -335,7 +317,7 @@ export default function EORightSidebar({
                         width: '4px',
                         height: '4px',
                         borderRadius: '50%',
-                        backgroundColor: isSelected ? '#ffffff' : '#f43f5e',
+                        backgroundColor: isSelected ? '#ffffff' : '#2563eb',
                         display: 'inline-block',
                       }}
                     />
@@ -373,8 +355,8 @@ export default function EORightSidebar({
                     justifyContent: 'space-between',
                     padding: '0.45rem 0.6rem',
                     borderRadius: 8,
-                    backgroundColor: '#faf5ff',
-                    border: '1px solid #ede9fe',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #dbeafe',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                   }}
@@ -466,100 +448,6 @@ export default function EORightSidebar({
               Chưa có lịch sự kiện sắp tới
             </div>
           )}
-        </div>
-      </div>
-
-      {/* =========================================================================
-          WIDGET 2: TỶ LỆ LẤP ĐẦY NHÂN SỰ (DONUT CHART)
-          ========================================================================= */}
-      <div className="eo-widget-card fill-rate-donut-widget">
-        <div className="widget-header">
-          <div className="widget-title-with-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" style={{ flexShrink: 0 }}>
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            <h4 className="widget-title">Tỷ lệ lấp đầy nhân sự</h4>
-          </div>
-        </div>
-
-        <div className="donut-widget-body">
-          {/* SVG Donut Chart */}
-          <div className="donut-chart-box">
-            <svg viewBox="0 0 100 100" className="donut-svg">
-              {/* Vòng nền xám nhạt */}
-              <circle
-                cx="50"
-                cy="50"
-                r={radius}
-                fill="none"
-                stroke="#f1f5f9"
-                strokeWidth="11"
-              />
-
-              {/* Lát 1: Đang tuyển / xử lý (Xanh dương nhạt) */}
-              {total > 0 && pendingLen > 0 && (
-                <circle
-                  cx="50"
-                  cy="50"
-                  r={radius}
-                  fill="none"
-                  stroke="#60a5fa"
-                  strokeWidth="11"
-                  strokeDasharray={`${pendingLen} ${circumference}`}
-                  strokeDashoffset={-confirmedLen}
-                  transform="rotate(-90 50 50)"
-                  strokeLinecap={confirmed === 0 ? 'butt' : 'round'}
-                />
-              )}
-
-              {/* Lát 2: Đã chốt ca (Xanh dương đậm CANi) */}
-              {total > 0 && confirmedLen > 0 && (
-                <circle
-                  cx="50"
-                  cy="50"
-                  r={radius}
-                  fill="none"
-                  stroke="#2563eb"
-                  strokeWidth="11"
-                  strokeDasharray={`${confirmedLen} ${circumference}`}
-                  strokeDashoffset="0"
-                  transform="rotate(-90 50 50)"
-                  strokeLinecap="round"
-                />
-              )}
-
-              {/* Văn bản trung tâm vòng Donut */}
-              <text x="50" y="47" textAnchor="middle" dominantBaseline="middle" className="donut-center-num">
-                {fillRate}%
-              </text>
-              <text x="50" y="63" textAnchor="middle" dominantBaseline="middle" className="donut-center-sub">
-                Lấp đầy
-              </text>
-            </svg>
-          </div>
-
-          {/* Legend chú thích */}
-          <div className="donut-legend-col">
-            <div className="donut-legend-item">
-              <span className="legend-bullet confirmed" />
-              <span className="legend-label">Đã chốt ca:</span>
-              <span className="legend-value">{confirmed}</span>
-            </div>
-
-            <div className="donut-legend-item">
-              <span className="legend-bullet pending" />
-              <span className="legend-label">Còn thiếu:</span>
-              <span className="legend-value">{pending}</span>
-            </div>
-
-          </div>
-        </div>
-
-        <div className="donut-widget-footer">
-          <span>Tổng nhu cầu: <strong>{required}</strong> nhân sự</span>
         </div>
       </div>
     </aside>

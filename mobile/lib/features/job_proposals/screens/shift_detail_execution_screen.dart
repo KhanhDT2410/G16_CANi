@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:cani/app/cani_tokens.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -213,7 +214,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     } catch (e) {
       if (mounted) {
         setState(() {
-          _gpsError = 'Không lấy được GPS ($e)';
+          _gpsError = 'Không lấy được vị trí GPS hiện tại. Vui lòng thử lại.';
           _isLoadingGps = false;
         });
       }
@@ -242,7 +243,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
       if (mounted) {
         setState(() {
           _isLoadingChecklist = false;
-          _checklistError = e.toString().replaceFirst('Exception: ', '');
+          _checklistError = AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách đầu việc.');
         });
       }
     }
@@ -418,7 +419,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Đã nộp ảnh nghiệm thu task #${index + 1}: ${item.title}'),
+            content: Text('Đã nộp ảnh nghiệm thu task #${index + 1}: ${item.title}'),
             backgroundColor: const Color(0xFF16A34A),
             duration: const Duration(seconds: 2),
           ),
@@ -453,7 +454,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Tiếp tục với đầu việc #${nextIndex + 1}! 🚀'),
+                content: Text('Tiếp tục với đầu việc #${nextIndex + 1}!'),
                 backgroundColor: const Color(0xFF0284C7),
                 duration: const Duration(seconds: 2),
               ),
@@ -463,7 +464,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('🎉 Xuất sắc! Bạn đã hoàn thành tất cả các đầu việc của ca làm.'),
+                content: Text('Xuất sắc! Bạn đã hoàn thành tất cả các đầu việc của ca làm.'),
                 backgroundColor: Color(0xFF16A34A),
               ),
             );
@@ -476,7 +477,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
         _uploadingIndexNotifier.value = null;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Không thể tải ảnh nghiệm thu: $e'),
+            content: Text(AppErrorFormatter.format(e, fallback: 'Không thể tải ảnh nghiệm thu.')),
             backgroundColor: cani.danger,
           ),
         );
@@ -530,7 +531,7 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể mở Google Maps: $e')),
+          const SnackBar(content: Text('Không thể mở ứng dụng bản đồ.')),
         );
       }
     }
@@ -706,12 +707,11 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
   Future<void> _refreshAssignment() async {
     try {
-      final list = await ref.read(proposalRepositoryProvider).fetchAssignments();
-      final updated = list.firstWhere(
-        (a) => a.assignmentId == _assignment.assignmentId,
-        orElse: () => _assignment,
-      );
-      if (mounted) {
+      ref.invalidate(assignmentsListProvider);
+      final list = await ref.read(assignmentsListProvider.future);
+      final idx = list.indexWhere((a) => a.assignmentId == _assignment.assignmentId);
+      if (idx != -1 && mounted) {
+        final updated = list[idx];
         setState(() {
           _assignment = updated;
           if (updated.proofImageUrl != null) {
@@ -724,6 +724,18 @@ class _ShiftDetailExecutionScreenState extends ConsumerState<ShiftDetailExecutio
 
   @override
   Widget build(BuildContext context) {
+    // Đồng bộ trực tiếp với assignmentsListProvider khi FCM / polling / lifecycle cập nhật ngầm
+    final liveList = ref.watch(assignmentsListProvider).valueOrNull;
+    if (liveList != null) {
+      final liveIdx = liveList.indexWhere((a) => a.assignmentId == _assignment.assignmentId);
+      if (liveIdx != -1) {
+        _assignment = liveList[liveIdx];
+        if (_assignment.proofImageUrl != null && _uploadedProofUrl == null) {
+          _uploadedProofUrl = _assignment.proofImageUrl;
+        }
+      }
+    }
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cani = theme.cani;

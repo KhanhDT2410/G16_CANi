@@ -128,7 +128,8 @@ const AuthCallbackPage = () => {
     // 2. Kiểm tra session hiện có
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
-        setErrorMessage('Lỗi xác thực Supabase: ' + error.message);
+        console.error('[AuthCallback] Lỗi xác thực Supabase:', error);
+        setErrorMessage('Xác thực tài khoản Google thất bại. Vui lòng thử lại.');
         setIsProcessing(false);
         return;
       }

@@ -10,7 +10,7 @@ import {
 } from '../utils/eventHelpers';
 
 const DEFAULT_UI_PAGE_SIZE = 10;
-const DEFAULT_API_PAGE_SIZE = 20;
+const DEFAULT_API_PAGE_SIZE = 50;
 
 function getDeletedEventIds() {
   try {
@@ -79,8 +79,10 @@ export function useEvents() {
     setEvents((prev) => mergeEventsById([evt], Array.isArray(prev) ? prev : []));
   }, []);
 
-  const loadEvents = useCallback(async ({ page = 0, size = DEFAULT_API_PAGE_SIZE } = {}) => {
-    setLoading(true);
+  const loadEvents = useCallback(async ({ page = 0, size = DEFAULT_API_PAGE_SIZE, silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setLoadError(false);
     try {
       let rawEvents = null;
@@ -122,7 +124,7 @@ export function useEvents() {
       const visible = filterVisibleEvents(rawEvents);
       setServerPagination({
         ...pageMeta,
-        loadingMore: page === 0 && pageMeta.totalPages > 1,
+        loadingMore: false,
       });
 
       let mergedResult = visible;
@@ -131,43 +133,15 @@ export function useEvents() {
         return mergedResult;
       });
 
-      // Tải nối tiếp các trang còn lại ở nền để đảm bảo tìm kiếm, bộ lọc và metrics đầy đủ
-      if (page === 0 && pageMeta.totalPages > 1) {
-        const maxExtraPages = Math.min(pageMeta.totalPages - 1, 9);
-        Promise.all(
-          Array.from({ length: maxExtraPages }, (_, idx) =>
-            eoService.getMyEventsPage({ page: idx + 1, size }).catch(() => null)
-          )
-        )
-          .then((extraPages) => {
-            const extraItems = [];
-            extraPages.forEach((p) => {
-              const arr = Array.isArray(p?.content)
-                ? p.content
-                : Array.isArray(p?.items)
-                  ? p.items
-                  : Array.isArray(p)
-                    ? p
-                    : [];
-              extraItems.push(...arr);
-            });
-            if (extraItems.length > 0) {
-              const visibleExtra = filterVisibleEvents(extraItems);
-              setEvents((prev) => mergeEventsById(prev, visibleExtra));
-            }
-          })
-          .finally(() => {
-            setServerPagination((prev) => ({ ...prev, loadingMore: false }));
-          });
-      }
-
       return mergedResult;
     } catch (e) {
       console.error(e);
       setLoadError(true);
       return [];
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 

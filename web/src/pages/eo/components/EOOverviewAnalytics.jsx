@@ -107,7 +107,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
     }
 
     const totalCalculatedCost = list.reduce((sum, item) => sum + item.totalCost, 0) || 1;
-    const colors = ['var(--color-primary-active)', '#0ea5e9', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'];
+    const colors = ['#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa', '#0284c7', '#64748b'];
 
     return list.map((item, idx) => ({
       ...item,
@@ -154,14 +154,13 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
   return (
     <section aria-labelledby="eo-analytics-title" className="eo-overview-analytics-container" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      <h2 id="eo-analytics-title" className="eo-overview-section-title">Ngân sách và tiến độ theo sự kiện</h2>
+      <h2 id="eo-analytics-title" className="eo-overview-section-title">Tình hình ngân sách &amp; chi trả</h2>
       {/* =========================================================================
-          KHỐI 1: BÁO CÁO NGÂN SÁCH & VẬN HÀNH THỰC TẾ (REAL OPERATIONAL METRICS)
+          KHỐI 1: BÁO CÁO NGÂN SÁCH THỰC TẾ (3 THẺ ĐỒNG NHẤT, KHÔNG VIỀN CẦU VỒNG)
           ========================================================================= */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        
         {/* Thẻ 1: Dự Toán Ngân Sách Nhân Sự */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid var(--color-primary-active)' }}>
+        <div className="eo-widget-card" style={{ padding: '1.15rem' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Dự Toán Ngân Sách
           </div>
@@ -174,7 +173,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
         </div>
 
         {/* Thẻ 2: Đã Quyết Toán Chi Trả */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #10b981' }}>
+        <div className="eo-widget-card" style={{ padding: '1.15rem' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Đã Quyết Toán Chi Trả
           </div>
@@ -187,31 +186,17 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
         </div>
 
         {/* Thẻ 3: Cần Chi Trả Còn Lại */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #f59e0b' }}>
+        <div className="eo-widget-card" style={{ padding: '1.15rem' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Dự toán còn lại
           </div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#c2410c', margin: '0.35rem 0 0.2rem' }}>
+          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: totalSummary.totalRemainingAmount > 0 ? '#b45309' : '#0f172a', margin: '0.35rem 0 0.2rem' }}>
             {formatCurrency(totalSummary.totalRemainingAmount)} đ
           </div>
           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
             Dự toán trừ tiền đã quyết toán
           </div>
         </div>
-
-        {/* Thẻ 4: Tiến Độ Tuyển Dụng Tổng Thể */}
-        <div className="eo-widget-card" style={{ padding: '1.15rem', borderLeft: '4px solid #0ea5e9' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Tiến Độ Tuyển Dụng
-          </div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0369a1', margin: '0.35rem 0 0.2rem' }}>
-            {totalSummary.overallFillRate}%
-          </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            {totalSummary.totalConfirmed}/{totalSummary.totalRequired} nhân sự đã xác nhận
-          </div>
-        </div>
-
       </div>
 
       {/* =========================================================================
@@ -420,7 +405,7 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                 Phân bổ quỹ lương theo từng nhóm chuyên môn ca làm
               </p>
             </div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary-active)', backgroundColor: '#f5f3ff', padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d4ed8', backgroundColor: '#eff6ff', padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap', flexShrink: 0 }}>
               {roleCostBreakdown.length} vị trí
             </span>
           </div>
@@ -527,13 +512,13 @@ export default function EOOverviewAnalytics({ events = [], onSelectEvent }) {
                         />
                       </div>
                     </td>
-                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#4338ca' }}>
+                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                       {formatCurrency(item.estimatedBudget)} đ
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#047857' }}>
                       {formatCurrency(item.paidAmount)} đ
                     </td>
-                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#c2410c' }}>
+                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: item.remainingAmount > 0 ? '#b45309' : '#64748b' }}>
                       {formatCurrency(item.remainingAmount)} đ
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>

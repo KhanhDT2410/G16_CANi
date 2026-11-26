@@ -28,7 +28,7 @@ const maskPhone = (phone) => {
   return `${digits.slice(0, 3)}****${digits.slice(-3)}`;
 };
 
-export default function EoProfileTab() {
+export default function EoProfileTab({ events: preloadedEvents = null }) {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
 
@@ -110,14 +110,15 @@ export default function EoProfileTab() {
     selfieImage: null,
   });
 
-  // Tải dữ liệu từ Backend (kết hợp đối soát từ getMyEvents để chỉ số luôn chuẩn)
+  // Tải dữ liệu từ Backend (tái sử dụng events đã load ở EOPage để tránh gọi trùng getMyEvents)
   const loadData = async () => {
     setLoading(true);
     try {
+      const hasPreloadedEvents = Array.isArray(preloadedEvents) && preloadedEvents.length > 0;
       const [profileRes, ekycRes, eventsRes, consentRes] = await Promise.allSettled([
         eoService.getEoProfile(),
         eoService.getEkycStatus(),
-        eoService.getMyEvents(),
+        hasPreloadedEvents ? Promise.resolve(preloadedEvents) : eoService.getMyEvents(),
         eoService.getEkycConsentPolicy(),
       ]);
       if (consentRes.status === 'fulfilled' && consentRes.value) {
@@ -402,10 +403,7 @@ export default function EoProfileTab() {
                 title="Thay đổi ảnh đại diện"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                  <circle cx="12" cy="13" r="4"></circle>
-                </svg>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>Ảnh</span>
               </button>
             </div>
             {avatarUrl && (
@@ -425,9 +423,6 @@ export default function EoProfileTab() {
               <span className="profile-role-pill">Ban Tổ Chức Sự Kiện</span>
               {ekycStatus === 'APPROVED' ? (
                 <span className="status-pill approved" title="Nhà tổ chức đã được xác thực eKYC">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                  </svg>
                   Đã Xác Thực eKYC
                 </span>
               ) : ekycStatus === 'PENDING_REVIEW' ? (
@@ -439,18 +434,10 @@ export default function EoProfileTab() {
 
             <div className="profile-meta-row">
               <span className="profile-meta-item">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
                 Người đại diện: <strong>{profile.fullName || 'Chưa cập nhật'}</strong>
               </span>
               <span className="profile-meta-item">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                  <polyline points="22,6 12,13 2,6"></polyline>
-                </svg>
-                <span className="sensitive-masked">
+                Email: <span className="sensitive-masked">
                   {profile.email
                     ? (showSensitive.email ? profile.email : maskEmail(profile.email))
                     : 'Chưa có email'}
@@ -477,10 +464,7 @@ export default function EoProfileTab() {
                 )}
               </span>
               <span className="profile-meta-item">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                </svg>
-                <span className="sensitive-masked">
+                SĐT: <span className="sensitive-masked">
                   {profile.phone
                     ? (showSensitive.phone ? profile.phone : maskPhone(profile.phone))
                     : 'Chưa cập nhật SĐT'}
@@ -561,11 +545,6 @@ export default function EoProfileTab() {
           className={`profile-subnav-btn ${activeSection === 'PROFILE' ? 'active' : ''}`}
           onClick={() => setActiveSection('PROFILE')}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="3" y1="9" x2="21" y2="9"></line>
-            <line x1="9" y1="21" x2="9" y2="9"></line>
-          </svg>
           1. Thông Tin Nhà Tổ Chức
         </button>
 
@@ -574,9 +553,6 @@ export default function EoProfileTab() {
           className={`profile-subnav-btn ${activeSection === 'EKYC' ? 'active' : ''}`}
           onClick={() => setActiveSection('EKYC')}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          </svg>
           2. Xác Thực Định Danh eKYC
         </button>
 
@@ -585,9 +561,6 @@ export default function EoProfileTab() {
           className={`profile-subnav-btn ${activeSection === 'REVIEWS' ? 'active' : ''}`}
           onClick={() => setActiveSection('REVIEWS')}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-          </svg>
           3. Đánh Giá Từ Nhân Sự {profile.ratingCount > 0 ? `(${profile.ratingCount})` : ''}
         </button>
 
@@ -596,10 +569,6 @@ export default function EoProfileTab() {
           className={`profile-subnav-btn ${activeSection === 'SECURITY' ? 'active' : ''}`}
           onClick={() => setActiveSection('SECURITY')}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
           4. Bảo Mật & Mật Khẩu
         </button>
 
@@ -608,10 +577,6 @@ export default function EoProfileTab() {
           className={`profile-subnav-btn ${activeSection === 'BLOCKLIST' ? 'active' : ''}`}
           onClick={() => setActiveSection('BLOCKLIST')}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-          </svg>
           5. Danh Sách Chặn
         </button>
       </nav>
@@ -631,10 +596,8 @@ export default function EoProfileTab() {
         const pct = Math.round((doneCount / checks.length) * 100);
 
         const GreenTick = () => (
-          <span className="profile-field-check" title="Đã hoàn thiện">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
+          <span className="profile-field-check" title="Đã hoàn thiện" style={{ fontSize: '0.7rem', fontWeight: 700 }}>
+            Đủ
           </span>
         );
 
@@ -660,11 +623,6 @@ export default function EoProfileTab() {
             <div className="profile-completeness-tags">
               {checks.map((item, idx) => (
                 <span key={idx} className={`profile-status-tag ${item.done ? 'is-done' : ''}`}>
-                  {item.done && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
                   <span>{item.label}</span>
                 </span>
               ))}
@@ -754,11 +712,6 @@ export default function EoProfileTab() {
                   disabled={savingProfile}
                   className="profile-btn-primary"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                    <polyline points="7 3 7 8 15 8"></polyline>
-                  </svg>
                   {savingProfile ? 'Đang lưu...' : 'Lưu Thay Đổi Hồ Sơ'}
                 </button>
               </div>
@@ -804,10 +757,7 @@ export default function EoProfileTab() {
 
           {ekycStatus === 'APPROVED' ? (
             <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.875rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
-              <div style={{ fontWeight: 700, color: '#166534', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
+              <div style={{ fontWeight: 700, color: '#166534', marginBottom: '0.4rem' }}>
                 Nhà tổ chức đã hoàn tất thẩm định định danh eKYC điện tử.
               </div>
               <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
@@ -914,13 +864,8 @@ export default function EoProfileTab() {
                       onChange={(e) => handleEkycFileChange('frontImage', e)}
                       disabled={submittingEkyc}
                     />
-                    {previews.frontImage ? (
+                    {previews.frontImage && (
                       <img src={previews.frontImage} alt="Mặt trước CCCD" className="upload-preview-img" />
-                    ) : (
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.75">
-                        <rect x="3" y="4" width="18" height="16" rx="2" ry="2"></rect>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                      </svg>
                     )}
                     <div className="upload-label">Mặt trước CCCD *</div>
                     <div className="upload-hint">Chụp rõ nét, không lóa góc</div>
@@ -934,13 +879,8 @@ export default function EoProfileTab() {
                       onChange={(e) => handleEkycFileChange('backImage', e)}
                       disabled={submittingEkyc}
                     />
-                    {previews.backImage ? (
+                    {previews.backImage && (
                       <img src={previews.backImage} alt="Mặt sau CCCD" className="upload-preview-img" />
-                    ) : (
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.75">
-                        <rect x="3" y="4" width="18" height="16" rx="2" ry="2"></rect>
-                        <circle cx="9" cy="14" r="2"></circle>
-                      </svg>
                     )}
                     <div className="upload-label">Mặt sau CCCD *</div>
                     <div className="upload-hint">Rõ chip điện tử & mã vạch QR</div>
@@ -954,13 +894,8 @@ export default function EoProfileTab() {
                       onChange={(e) => handleEkycFileChange('selfieImage', e)}
                       disabled={submittingEkyc}
                     />
-                    {previews.selfieImage ? (
+                    {previews.selfieImage && (
                       <img src={previews.selfieImage} alt="Selfie" className="upload-preview-img" />
-                    ) : (
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.75">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
                     )}
                     <div className="upload-label">Ảnh chân dung đại diện *</div>
                     <div className="upload-hint">Nhìn thẳng, đủ ánh sáng</div>
@@ -1002,11 +937,6 @@ export default function EoProfileTab() {
                     disabled={submittingEkyc || (consentPolicy?.required !== false && !consentAccepted)}
                     className="profile-btn-primary"
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="16 16 12 12 8 16"></polyline>
-                      <line x1="12" y1="12" x2="12" y2="21"></line>
-                      <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
-                    </svg>
                     {submittingEkyc ? 'Đang thẩm định eKYC...' : 'Nộp Hồ Sơ Xác Thực eKYC'}
                   </button>
                 </div>
@@ -1140,9 +1070,6 @@ export default function EoProfileTab() {
                         disabled={isResettingPassword}
                         className="profile-btn-primary"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
                         {isResettingPassword ? 'Đang xác thực & cập nhật...' : 'Xác Nhận & Cập Nhật Mật Khẩu'}
                       </button>
                     </div>

@@ -29,12 +29,6 @@ export const faqApi = {
     return response.data?.data;
   },
 
-  /** UC-110a: Chi tiết FAQ quản trị */
-  getFaqById: async (id) => {
-    const response = await apiClient.get(`/v1/admin/faqs/${id}`);
-    return response.data?.data;
-  },
-
   /** UC-110a: Tạo câu hỏi thường gặp mới */
   createFaq: async (payload) => {
     const response = await apiClient.post('/v1/admin/faqs', payload);

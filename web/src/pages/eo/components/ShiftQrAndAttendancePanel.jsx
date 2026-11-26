@@ -18,7 +18,6 @@ import { formatVndWhole } from '../utils/eventHelpers';
 export default function ShiftQrAndAttendancePanel({
   shift,
   event,
-  allEvents = [],
   skillTaxonomy = [],
   onSelectShift,
   onClose,
@@ -608,7 +607,7 @@ export default function ShiftQrAndAttendancePanel({
                             </span>
                           )}
                           {!isNoShow && isCompleted && (
-                            <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
+                            <span style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '3px 8px', borderRadius: 12, fontWeight: 600, fontSize: '0.75rem' }}>
                               Đã Hoàn Thành
                             </span>
                           )}
@@ -774,9 +773,9 @@ export default function ShiftQrAndAttendancePanel({
                                         title: `Mã VietQR nhận lương của ${item.workerName}`,
                                       })}
                                       style={{
-                                        background: '#f5f3ff',
-                                        color: '#6d28d9',
-                                        border: '1px solid #ddd6fe',
+                                        background: '#f8fafc',
+                                        color: '#334155',
+                                        border: '1px solid #cbd5e1',
                                         borderRadius: 5,
                                         padding: '2px 6px',
                                         fontSize: '0.68rem',
@@ -794,7 +793,7 @@ export default function ShiftQrAndAttendancePanel({
                                         type="button"
                                         onClick={() => onOpenPaymentDeclaration?.(item)}
                                         style={{
-                                          background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                                          background: '#2563eb',
                                           color: '#ffffff',
                                           border: 'none',
                                           borderRadius: 6,
@@ -802,7 +801,6 @@ export default function ShiftQrAndAttendancePanel({
                                           fontSize: '0.75rem',
                                           fontWeight: 700,
                                           cursor: 'pointer',
-                                          boxShadow: '0 1px 3px rgba(16, 185, 129, 0.25)',
                                         }}
                                       >
                                         Trả lương & QR

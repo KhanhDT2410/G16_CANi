@@ -1,24 +1,36 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { eoService } from '../../../services/eoService';
 import { blockListService } from '../../../services/blockListService';
 import { showToast } from '../../../components/common/Toast';
 import { showConfirm, showPrompt } from '../../../components/common/PromptModal';
-import { getDynamicShiftStatus, getShiftStaffingSummary, formatVndWhole } from '../utils/eventHelpers';
-import WorkerReviewForm from './WorkerReviewForm';
+import { getDynamicShiftStatus, getShiftStaffingSummary, formatVndWhole, roundVndAmount } from '../utils/eventHelpers';
 import ConfirmVerifySkillModal, { resolvePreassignedPerformedSkillId } from './ConfirmVerifySkillModal';
 import ReportNoShowModal from './ReportNoShowModal';
 import ShiftEmergencyBanner from './ShiftEmergencyBanner';
 import EmergencyTriggerButton from './EmergencyTriggerButton';
-import { WorkerProfileModal } from './worker-profile';
-import { useWorkerProfile } from '../hooks/useWorkerProfile';
-import { resolveAssetUrl, buildWorkerVietQrUrl } from '../utils/resolveAssetUrl';
+import { resolveAssetUrl } from '../utils/resolveAssetUrl';
+import WorkerDetailDrawer from './shift-workspace/WorkerDetailDrawer';
+import QuickEvidenceReviewModal from './shift-workspace/QuickEvidenceReviewModal';
+import {
+  canEoConfirmWorker,
+  formatTimeShort,
+  getSourceLabel,
+  getWorkerAttentionFlags,
+  getWorkerChecklistSummary,
+  getWorkerPriorityRank,
+  maskPhoneNumber,
+  parseShiftChecklistTasks,
+} from './shift-workspace/shiftWorkspaceHelpers';
+import './EOEventsTab.css';
 
 /**
- * ShiftWorkspacePage
- * Trang quản lý độc lập cho một ca làm việc cụ thể.
- * - Dành toàn bộ chiều rộng màn hình cho quản lý nhân sự, tiến độ từng đầu việc và thanh toán.
- * - Mã QR điểm danh được tách thành hộp thoại chiếu riêng cho đầu ca và cuối ca.
+ * ShiftWorkspacePage (Master-Detail + Bulk Operations for 40+ Workers)
+ * - Compact 6-column table with pagination & smart exception-first sorting
+ * - Slide-over WorkerDetailDrawer for full checklist, payment, review, and moderation
+ * - QuickEvidenceReviewModal for rapid photo inspection + approve-and-next
+ * - Bulk verify + Speed Pay Queue + Bulk Cash declaration (100% Frontend-only over existing APIs)
  */
 export default function ShiftWorkspacePage({
   shift,
@@ -29,80 +41,137 @@ export default function ShiftWorkspacePage({
   onOpenInvite,
   onReloadEvents,
   onOpenPaymentDeclaration,
+  onOpenPaymentQueue,
   skillTaxonomy = [],
   targetAssignmentId = null,
 }) {
   const [attendanceList, setAttendanceList] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [refreshingAttendance, setRefreshingAttendance] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
-  const [emergencyDispatchResult, setEmergencyDispatchResult] = useState(null);
   const [selectedForVerify, setSelectedForVerify] = useState(null);
-  const [selectedForReview, setSelectedForReview] = useState(null);
   const [selectedForNoShow, setSelectedForNoShow] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
+
   const [searchWorker, setSearchWorker] = useState('');
+  const [workerFilter, setWorkerFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkProgress, setBulkProgress] = useState(null);
+
+  const [drawerWorkerId, setDrawerWorkerId] = useState(null);
+  const [evidenceQueueState, setEvidenceQueueState] = useState({ isOpen: false, initialIndex: 0 });
   const [highlightedAssignmentId, setHighlightedAssignmentId] = useState(null);
-  const workerProfile = useWorkerProfile();
 
-  // Highlight và tự động cuộn đến hàng Worker khi deep link từ thông báo
-  useEffect(() => {
-    const idToFocus = targetAssignmentId;
-    if (idToFocus && attendanceList.length > 0) {
-      setHighlightedAssignmentId(idToFocus);
-      setTimeout(() => {
-        const el = document.getElementById(`assignment-row-${idToFocus}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 200);
-      const timer = setTimeout(() => {
-        setHighlightedAssignmentId(null);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [targetAssignmentId, attendanceList]);
-
-  // Trạng thái hộp thoại Mã QR Điểm Danh (chỉ bật đầu ca hoặc cuối ca)
+  // QR Attendance Modal
   const [showQrModal, setShowQrModal] = useState(false);
-  const [qrMode, setQrMode] = useState('CHECKIN'); // 'CHECKIN' | 'CHECKOUT'
+  const [qrMode, setQrMode] = useState('CHECKIN');
   const ROTATE_INTERVAL = 20;
   const [countdown, setCountdown] = useState(ROTATE_INTERVAL);
   const [refreshNonce, setRefreshNonce] = useState(Date.now());
   const [serverQrData, setServerQrData] = useState(null);
-
-  // Xem ảnh biên lai hoặc minh chứng công việc
   const [previewImage, setPreviewImage] = useState(null);
 
-  const loadAttendance = useCallback(async () => {
+  const loadAttendance = useCallback(async ({ silent = false } = {}) => {
     if (!shift?.shiftId) return;
-    setLoadingAttendance(true);
+    if (silent) setRefreshingAttendance(true);
+    else setLoadingAttendance(true);
     try {
       const data = await eoService.getShiftAttendance(shift.shiftId);
       setAttendanceList(Array.isArray(data) ? data : []);
     } catch (e) {
       console.warn('Lỗi khi tải danh sách điểm danh ca:', e);
-      setAttendanceList([]);
+      if (!silent) setAttendanceList([]);
     } finally {
-      setLoadingAttendance(false);
+      if (silent) setRefreshingAttendance(false);
+      else setLoadingAttendance(false);
     }
   }, [shift?.shiftId]);
 
   useEffect(() => {
     if (shift?.shiftId) {
-      loadAttendance();
+      setSelectedIds([]);
+      setDrawerWorkerId(null);
+      setCurrentPage(1);
+      loadAttendance({ silent: false });
     }
   }, [shift?.shiftId, loadAttendance]);
 
   useEffect(() => {
-    const handlePaymentUpdated = () => {
-      loadAttendance();
+    const syncWorkspaceSilently = () => {
+      loadAttendance({ silent: true });
       if (onReloadEvents) {
-        Promise.resolve(onReloadEvents()).catch(() => { });
+        Promise.resolve(onReloadEvents({ silent: true })).catch(() => {});
       }
     };
+
+    const handlePaymentUpdated = () => syncWorkspaceSilently();
+    const handleDomainEvent = (e) => {
+      const items = Array.isArray(e?.detail?.items) ? e.detail.items : [];
+      const reason = e?.detail?.reason;
+      if (reason === 'tab_focus' || items.length === 0) {
+        syncWorkspaceSilently();
+        return;
+      }
+      const relevant = items.some((n) => {
+        const t = String(n?.type || '').toUpperCase();
+        const refType = String(n?.referenceType || '').toUpperCase();
+        return (
+          t === 'SHIFT' ||
+          t === 'ATTENDANCE' ||
+          t === 'PAYMENT' ||
+          t === 'PROPOSAL' ||
+          t === 'GROUP' ||
+          t === 'DISPUTE' ||
+          refType === 'SHIFT' ||
+          refType === 'ASSIGNMENT' ||
+          refType === 'PAYMENT'
+        );
+      });
+      if (relevant) {
+        syncWorkspaceSilently();
+      }
+    };
+
     window.addEventListener('cani_payment_updated', handlePaymentUpdated);
-    return () => window.removeEventListener('cani_payment_updated', handlePaymentUpdated);
-  }, [loadAttendance, onReloadEvents]);
+    window.addEventListener('cani_domain_event', handleDomainEvent);
+
+    // Fallback nhẹ mỗi 15s khi tab đang hiển thị để cập nhật cả trường hợp action không tăng unreadCount
+    const pollId =
+      shift?.shiftId && shift?.status !== 'CANCELLED'
+        ? setInterval(() => {
+            if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+              loadAttendance({ silent: true });
+            }
+          }, 15000)
+        : null;
+
+    return () => {
+      window.removeEventListener('cani_payment_updated', handlePaymentUpdated);
+      window.removeEventListener('cani_domain_event', handleDomainEvent);
+      if (pollId) clearInterval(pollId);
+    };
+  }, [loadAttendance, onReloadEvents, shift?.shiftId, shift?.status]);
+
+  useEffect(() => {
+    if (targetAssignmentId && attendanceList.length > 0) {
+      setHighlightedAssignmentId(targetAssignmentId);
+      setWorkerFilter('ALL');
+      setDrawerWorkerId(targetAssignmentId);
+      setTimeout(() => {
+        document.getElementById(`assignment-row-${targetAssignmentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 200);
+      const timer = setTimeout(() => setHighlightedAssignmentId(null), 4000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [targetAssignmentId, attendanceList]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds([]);
+  }, [workerFilter, searchWorker, pageSize]);
 
   const fetchLiveQr = useCallback(async () => {
     if (!shift?.shiftId || !showQrModal) return;
@@ -115,13 +184,11 @@ export default function ShiftWorkspacePage({
   }, [shift?.shiftId, showQrModal]);
 
   useEffect(() => {
-    if (showQrModal && shift?.shiftId) {
-      fetchLiveQr();
-    }
+    if (showQrModal && shift?.shiftId) fetchLiveQr();
   }, [showQrModal, shift?.shiftId, refreshNonce, fetchLiveQr]);
 
   useEffect(() => {
-    if (!showQrModal || !shift?.shiftId) return;
+    if (!showQrModal || !shift?.shiftId) return undefined;
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -134,84 +201,7 @@ export default function ShiftWorkspacePage({
     return () => clearInterval(timer);
   }, [showQrModal, shift?.shiftId]);
 
-  const shiftChecklistTasks = useMemo(() => {
-    if (!shift?.checklist) return [];
-    try {
-      const parsed = typeof shift.checklist === 'string' ? JSON.parse(shift.checklist) : shift.checklist;
-      if (Array.isArray(parsed)) {
-        return parsed.map((t, idx) => {
-          if (typeof t === 'string') {
-            return {
-              id: `task_${idx}`,
-              label: t,
-              isRequiredEvidence: false,
-              instruction: null,
-            };
-          }
-          const id = String(t.id ?? t.taskId ?? `chk_${idx + 1}`);
-          const label = String(t.title ?? t.label ?? t.name ?? `Nhiệm vụ ${idx + 1}`);
-          const isRequiredEvidence = Boolean(t.isRequiredEvidence ?? t.requiresEvidence ?? false);
-          const instruction = t.instruction || null;
-          return { id, label, isRequiredEvidence, instruction };
-        });
-      }
-    } catch {
-      // ignore invalid json
-    }
-    return [];
-  }, [shift?.checklist]);
-
-  const parseWorkerChecklistProgressMap = (rawProgress) => {
-    if (!rawProgress) return {};
-    try {
-      const parsed = typeof rawProgress === 'string' ? JSON.parse(rawProgress) : rawProgress;
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        return parsed;
-      }
-      if (Array.isArray(parsed)) {
-        const map = {};
-        parsed.forEach((item, idx) => {
-          if (typeof item === 'string') {
-            map[item] = { isCompleted: true };
-          } else if (item && typeof item === 'object') {
-            const key = String(item.id ?? item.taskId ?? item.title ?? `chk_${idx + 1}`);
-            map[key] = {
-              isCompleted: Boolean(item.isCompleted ?? item.completed ?? item.done ?? item.checked ?? false),
-              evidenceImageUrl: item.evidenceImageUrl || item.proofUrl || null,
-              evidenceSubmittedAt: item.evidenceSubmittedAt || null,
-              completedAt: item.completedAt || null,
-            };
-          }
-        });
-        return map;
-      }
-    } catch {
-      // ignore
-    }
-    return {};
-  };
-
-  const canEoConfirmWorker = (workerItem) => {
-    const isCheckedIn = workerItem.assignmentStatus === 'CHECKED_IN' || Boolean(workerItem.checkinTime);
-    if (!isCheckedIn) return false;
-    if (workerItem.eoConfirmed) return false;
-
-    if (!shiftChecklistTasks || shiftChecklistTasks.length === 0) {
-      return true;
-    }
-
-    const progressMap = parseWorkerChecklistProgressMap(workerItem.checklistRawProgress);
-    for (const task of shiftChecklistTasks) {
-      const prog = progressMap[task.id] || progressMap[task.label];
-      const isDone = Boolean(prog?.isCompleted || workerItem.isChecklistCompleted);
-      if (!isDone) return false;
-      if (task.isRequiredEvidence) {
-        const hasProof = Boolean(prog?.evidenceImageUrl && String(prog.evidenceImageUrl).trim().length > 0);
-        if (!hasProof) return false;
-      }
-    }
-    return true;
-  };
+  const shiftChecklistTasks = useMemo(() => parseShiftChecklistTasks(shift?.checklist), [shift?.checklist]);
 
   const skillNames = useMemo(() => {
     if (!Array.isArray(shift?.requiredSkills) || shift.requiredSkills.length === 0) return [];
@@ -221,6 +211,76 @@ export default function ShiftWorkspacePage({
     });
     return shift.requiredSkills.map((id) => m[id]).filter(Boolean);
   }, [shift?.requiredSkills, skillTaxonomy]);
+
+  const drawerItem = useMemo(
+    () => attendanceList.find((w) => w.assignmentId === drawerWorkerId) || null,
+    [attendanceList, drawerWorkerId]
+  );
+
+  const workerFilterCounts = useMemo(() => {
+    let NEED_ATTENTION = 0;
+    let NEED_VERIFY = 0;
+    let NEED_PAYMENT = 0;
+    let SETTLED = 0;
+    attendanceList.forEach((w) => {
+      const flags = getWorkerAttentionFlags(w);
+      if (flags.needsAttention) NEED_ATTENTION += 1;
+      if (!flags.isNoShow && (flags.isCheckedIn || flags.isCompleted) && !w.eoConfirmed) NEED_VERIFY += 1;
+      if (!flags.isNoShow && Boolean(w.eoConfirmed) && w.paymentStatus !== 'CONFIRMED_FULL') NEED_PAYMENT += 1;
+      if (w.paymentStatus === 'CONFIRMED_FULL') SETTLED += 1;
+    });
+    return {
+      ALL: attendanceList.length,
+      NEED_ATTENTION,
+      NEED_VERIFY,
+      NEED_PAYMENT,
+      SETTLED,
+    };
+  }, [attendanceList]);
+
+  const filteredWorkers = useMemo(() => {
+    const q = searchWorker.trim().toLowerCase();
+    return attendanceList
+      .filter((w) => {
+        const flags = getWorkerAttentionFlags(w);
+        if (workerFilter === 'NEED_ATTENTION' && !flags.needsAttention) return false;
+        if (workerFilter === 'NEED_VERIFY' && (flags.isNoShow || (!flags.isCheckedIn && !flags.isCompleted) || w.eoConfirmed)) return false;
+        if (workerFilter === 'NEED_PAYMENT' && (flags.isNoShow || !w.eoConfirmed || w.paymentStatus === 'CONFIRMED_FULL')) return false;
+        if (workerFilter === 'SETTLED' && w.paymentStatus !== 'CONFIRMED_FULL') return false;
+        if (!q) return true;
+        return (
+          (w.workerName || '').toLowerCase().includes(q) ||
+          (w.workerPhone || '').toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => getWorkerPriorityRank(a, shiftChecklistTasks) - getWorkerPriorityRank(b, shiftChecklistTasks));
+  }, [attendanceList, workerFilter, searchWorker, shiftChecklistTasks]);
+
+  const effectivePageSize = pageSize === 'ALL' ? Math.max(1, filteredWorkers.length) : Number(pageSize) || 15;
+  const totalPages = Math.max(1, Math.ceil(filteredWorkers.length / effectivePageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIdx = (safePage - 1) * effectivePageSize;
+  const paginatedWorkers = filteredWorkers.slice(startIdx, startIdx + effectivePageSize);
+
+  const verifyQueueWorkers = useMemo(
+    () =>
+      filteredWorkers.filter((w) => {
+        const flags = getWorkerAttentionFlags(w);
+        return !flags.isNoShow && (flags.isCheckedIn || flags.isCompleted) && !w.eoConfirmed;
+      }),
+    [filteredWorkers]
+  );
+
+  const unpaidQueueWorkers = useMemo(
+    () =>
+      filteredWorkers.filter(
+        (w) =>
+          w.assignmentStatus !== 'NO_SHOW' &&
+          Boolean(w.eoConfirmed) &&
+          (!w.paymentStatus || w.paymentStatus === 'NOT_DECLARED')
+      ),
+    [filteredWorkers]
+  );
 
   if (!shift || !event) return null;
 
@@ -233,47 +293,47 @@ export default function ShiftWorkspacePage({
 
   const checkedInCount = attendanceList.filter((a) => a.assignmentStatus === 'CHECKED_IN' || a.checkinTime != null).length;
   const completedCount = attendanceList.filter((a) => a.assignmentStatus === 'COMPLETED' || a.checkoutTime != null).length;
-  const checklistDoneCount = attendanceList.filter((a) => Boolean(a.isChecklistCompleted)).length;
   const paidCount = attendanceList.filter((a) => a.paymentStatus === 'CONFIRMED_FULL').length;
   const pendingPayCount = attendanceList.filter((a) => a.paymentStatus === 'DECLARED_PENDING_WORKER').length;
-
   const allShifts = (event.shifts || []).filter((s) => s.status !== 'CANCELLED');
-
-  const filteredWorkers = attendanceList.filter((w) => {
-    if (!searchWorker.trim()) return true;
-    const q = searchWorker.toLowerCase();
-    return (
-      (w.workerName || '').toLowerCase().includes(q) ||
-      (w.workerPhone || '').toLowerCase().includes(q)
-    );
-  });
-
-  const formatTime = (timeStr, fallback = '--:--') => {
-    if (!timeStr) return fallback;
-    try {
-      return new Date(timeStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      return fallback;
-    }
-  };
 
   const handleVerify = async (assignmentId, verifyPayload = null) => {
     setVerifyingId(assignmentId);
     try {
       await eoService.verifyAttendance(assignmentId, verifyPayload);
+      setAttendanceList((prev) =>
+        prev.map((w) => (w.assignmentId === assignmentId ? { ...w, eoConfirmed: true } : w))
+      );
       setSelectedForVerify(null);
       showToast('Đã xác nhận hoàn thành ca và duyệt công cho nhân sự.', 'success');
-      await Promise.allSettled([loadAttendance(), onReloadEvents ? Promise.resolve(onReloadEvents()) : Promise.resolve()]);
+      await Promise.allSettled([
+        loadAttendance({ silent: true }),
+        onReloadEvents ? Promise.resolve(onReloadEvents({ silent: true })) : Promise.resolve(),
+      ]);
+      return true;
     } catch (e) {
       showToast('Không thể duyệt công: ' + (e.response?.data?.message || e.message), 'error');
+      return false;
     } finally {
       setVerifyingId(null);
     }
   };
 
+  const triggerSingleVerify = (item) => {
+    const preassignedSkillId = resolvePreassignedPerformedSkillId(item, shift);
+    if (preassignedSkillId) {
+      return handleVerify(item.assignmentId, {
+        confirmedPerformedSkillId: preassignedSkillId,
+        confirmPerformedSkill: true,
+      });
+    }
+    setSelectedForVerify(item);
+    return false;
+  };
+
   const handleReportIncomplete = async (item) => {
     const reason = await showPrompt({
-      title: `Báo cáo chưa hoàn thành công việc`,
+      title: 'Báo cáo chưa hoàn thành công việc',
       description: `Nhân sự: ${item.workerName}. Vui lòng mô tả chi tiết (tối thiểu 20 ký tự) để CSKH đối soát và xử lý.`,
       type: 'warning',
       confirmText: 'Gửi báo cáo',
@@ -284,11 +344,9 @@ export default function ShiftWorkspacePage({
     });
     if (reason === null) return;
     try {
-      await eoService.reportIncompleteWork(item.assignmentId, {
-        reason: reason.trim(),
-      });
+      await eoService.reportIncompleteWork(item.assignmentId, { reason: reason.trim() });
       showToast(`Đã gửi báo cáo đối với "${item.workerName}".`, 'success');
-      loadAttendance();
+      loadAttendance({ silent: true });
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi gửi báo cáo', 'error');
     }
@@ -313,7 +371,8 @@ export default function ShiftWorkspacePage({
     try {
       await blockListService.blockUser(worker.userId, reason);
       showToast(`Đã chặn "${worker.workerName}" thành công.`, 'success');
-      loadAttendance();
+      setDrawerWorkerId(null);
+      loadAttendance({ silent: true });
     } catch (err) {
       showToast(err.response?.data?.message || err.message || 'Lỗi khi chặn nhân sự', 'error');
     }
@@ -323,14 +382,148 @@ export default function ShiftWorkspacePage({
     setSubmittingReview(true);
     try {
       await eoService.rateWorker(reviewData.assignmentId, reviewData);
+      setAttendanceList((prev) =>
+        prev.map((w) => (w.assignmentId === reviewData.assignmentId ? { ...w, hasReviewedWorker: true } : w))
+      );
       showToast('Đã gửi đánh giá nhân sự thành công.', 'success');
-      setSelectedForReview(null);
-      loadAttendance();
+      loadAttendance({ silent: true });
     } catch (e) {
       showToast('Không thể gửi đánh giá: ' + (e.response?.data?.message || e.message), 'error');
     } finally {
       setSubmittingReview(false);
     }
+  };
+
+  const handleMessageWorker = (item) => {
+    const targetUserId = item.userId || item.workerId;
+    window.dispatchEvent(
+      new CustomEvent('cani_open_direct_chat', {
+        detail: targetUserId ? { targetUserId, shiftId: shift.shiftId } : { shiftId: shift.shiftId },
+      })
+    );
+  };
+
+  // Selection & Bulk Actions (chỉ hiện checkbox khi có nhân sự đủ điều kiện duyệt công hoặc chờ khai báo lương)
+  const isWorkerBulkEligible = (w) =>
+    canEoConfirmWorker(w, shiftChecklistTasks) ||
+    (w.assignmentStatus !== 'NO_SHOW' && Boolean(w.eoConfirmed) && (!w.paymentStatus || w.paymentStatus === 'NOT_DECLARED'));
+
+  const bulkEligibleOnPage = paginatedWorkers.filter(isWorkerBulkEligible);
+  const showBulkCheckboxColumn = bulkEligibleOnPage.length > 0;
+
+  const selectedWorkers = attendanceList.filter((w) => selectedIds.includes(w.assignmentId));
+  const bulkVerifyCandidates = selectedWorkers.filter((w) => canEoConfirmWorker(w, shiftChecklistTasks));
+  const bulkCashCandidates = selectedWorkers.filter(
+    (w) => w.assignmentStatus !== 'NO_SHOW' && Boolean(w.eoConfirmed) && (!w.paymentStatus || w.paymentStatus === 'NOT_DECLARED')
+  );
+
+  const allVisibleSelected =
+    bulkEligibleOnPage.length > 0 && bulkEligibleOnPage.every((w) => selectedIds.includes(w.assignmentId));
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = bulkEligibleOnPage.map((w) => w.assignmentId);
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const toggleSelectOne = (assignmentId) => {
+    setSelectedIds((prev) =>
+      prev.includes(assignmentId) ? prev.filter((id) => id !== assignmentId) : [...prev, assignmentId]
+    );
+  };
+
+  const handleBulkVerify = async () => {
+    if (bulkVerifyCandidates.length === 0) {
+      showToast('Không có nhân sự nào trong nhóm đã chọn đủ điều kiện duyệt công.', 'warning');
+      return;
+    }
+    const readyList = bulkVerifyCandidates.filter((w) => Boolean(resolvePreassignedPerformedSkillId(w, shift)));
+    const missingSkillCount = bulkVerifyCandidates.length - readyList.length;
+
+    if (readyList.length === 0) {
+      showToast('Ca này chưa cấu hình kỹ năng mặc định; vui lòng duyệt từng người để chọn kỹ năng thực hiện.', 'warning');
+      setSelectedForVerify(bulkVerifyCandidates[0]);
+      return;
+    }
+
+    const ok = await showConfirm({
+      title: `Duyệt công hàng loạt (${readyList.length} nhân sự)`,
+      description:
+        missingSkillCount > 0
+          ? `Xác nhận duyệt công cho ${readyList.length} nhân sự đủ điều kiện (${missingSkillCount} người chưa có kỹ năng mặc định sẽ được bỏ qua).`
+          : `Xác nhận duyệt hoàn thành đầu việc cho ${readyList.length} nhân sự đã chọn?`,
+      confirmText: `Duyệt ${readyList.length} người`,
+    });
+    if (!ok) return;
+
+    let successCount = 0;
+    const CONCURRENCY = 3;
+    for (let i = 0; i < readyList.length; i += CONCURRENCY) {
+      const batch = readyList.slice(i, i + CONCURRENCY);
+      setBulkProgress({ label: 'Đang duyệt công', current: Math.min(i + batch.length, readyList.length), total: readyList.length });
+      const results = await Promise.allSettled(
+        batch.map((target) => {
+          const skillId = resolvePreassignedPerformedSkillId(target, shift);
+          return eoService.verifyAttendance(target.assignmentId, {
+            confirmedPerformedSkillId: skillId,
+            confirmPerformedSkill: true,
+          });
+        })
+      );
+      successCount += results.filter((r) => r.status === 'fulfilled').length;
+    }
+    setBulkProgress(null);
+    setSelectedIds([]);
+    showToast(`Đã duyệt công thành công ${successCount}/${readyList.length} nhân sự.`, successCount > 0 ? 'success' : 'error');
+    await Promise.allSettled([
+      loadAttendance({ silent: true }),
+      onReloadEvents ? Promise.resolve(onReloadEvents({ silent: true })) : Promise.resolve(),
+    ]);
+  };
+
+  const handleBulkCashPayment = async () => {
+    if (bulkCashCandidates.length === 0) {
+      showToast('Không có nhân sự nào đã duyệt công và chưa khai báo lương trong nhóm đã chọn.', 'warning');
+      return;
+    }
+    const ok = await showConfirm({
+      title: `Khai báo trả tiền mặt hàng loạt (${bulkCashCandidates.length} người)`,
+      description: `Hệ thống sẽ ghi nhận đã trả tiền mặt đúng mức thù lao thỏa thuận cho ${bulkCashCandidates.length} nhân sự và gửi thông báo xác nhận tới họ.`,
+      confirmText: `Xác nhận trả ${bulkCashCandidates.length} người`,
+    });
+    if (!ok) return;
+
+    let successCount = 0;
+    const CONCURRENCY = 3;
+    const refBatchStamp = Date.now().toString().slice(-5);
+    for (let i = 0; i < bulkCashCandidates.length; i += CONCURRENCY) {
+      const batch = bulkCashCandidates.slice(i, i + CONCURRENCY);
+      setBulkProgress({
+        label: 'Đang khai báo trả tiền mặt',
+        current: Math.min(i + batch.length, bulkCashCandidates.length),
+        total: bulkCashCandidates.length,
+      });
+      const results = await Promise.allSettled(
+        batch.map((target, offset) =>
+          eoService.declarePayment({
+            assignmentId: target.assignmentId,
+            declaredAmount: roundVndAmount(target.agreedWage ?? target.agreedAmount ?? shift.salary ?? 200000),
+            paymentMethod: 'CASH',
+            externalRef: `CASH-BULK-${refBatchStamp}-${i + offset + 1}`,
+            paymentProofUrl: '',
+          })
+        )
+      );
+      successCount += results.filter((r) => r.status === 'fulfilled').length;
+    }
+    setBulkProgress(null);
+    setSelectedIds([]);
+    window.dispatchEvent(new CustomEvent('cani_payment_updated', { detail: { bulk: true } }));
+    showToast(`Đã khai báo tiền mặt ${successCount}/${bulkCashCandidates.length} nhân sự.`, successCount > 0 ? 'success' : 'error');
+    await loadAttendance({ silent: true });
   };
 
   const isCheckin = qrMode === 'CHECKIN';
@@ -344,8 +537,7 @@ export default function ShiftWorkspacePage({
     : (serverQrData?.checkoutQrContent || fallbackPayload);
 
   return (
-    <div className="shift-workspace-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
+    <div className="shift-workspace-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {/* 1. THANH ĐIỀU HƯỚNG & CÔNG CỤ CA */}
       <div
         style={{
@@ -358,136 +550,66 @@ export default function ShiftWorkspacePage({
           padding: '0.85rem 1.25rem',
           borderRadius: '14px',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={onBackToEvent}
-            style={{
-              background: '#f1f5f9',
-              color: '#0f172a',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              padding: '0.45rem 0.9rem',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
+            className="eo-btn-secondary"
+            style={{ padding: '0.45rem 0.9rem', fontSize: '0.84rem' }}
           >
-            Quay lại sự kiện "{event.name}"
+            ← Quay lại "{event.name}"
           </button>
 
           {allShifts.length > 1 && onSelectShift && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Chuyển ca:</span>
-              <select
-                value={shift.shiftId}
-                onChange={(e) => {
-                  const found = allShifts.find((s) => s.shiftId === e.target.value);
-                  if (found) onSelectShift(found);
-                }}
-                style={{
-                  padding: '0.4rem 0.75rem',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  background: '#f8fafc',
-                  cursor: 'pointer',
-                }}
-              >
-                {allShifts.map((s) => (
-                  <option key={s.shiftId} value={s.shiftId}>
-                    {s.jobType} ({formatTime(s.startTime)} - {formatTime(s.endTime)})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={shift.shiftId}
+              onChange={(e) => {
+                const found = allShifts.find((s) => s.shiftId === e.target.value);
+                if (found) onSelectShift(found);
+              }}
+              className="table-filter-select"
+              aria-label="Chuyển ca làm việc"
+            >
+              {allShifts.map((s) => (
+                <option key={s.shiftId} value={s.shiftId}>
+                  {s.jobType} ({formatTimeShort(s.startTime)} - {formatTimeShort(s.endTime)})
+                </option>
+              ))}
+            </select>
           )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             type="button"
+            className="eo-btn-primary"
+            style={{ padding: '0.48rem 1rem', fontSize: '0.84rem' }}
             onClick={() => {
               setQrMode('CHECKIN');
               setShowQrModal(true);
             }}
-            style={{
-              minHeight: '38px',
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '0.45rem 1rem',
-              fontSize: '0.84rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
-              transition: 'all 0.15s ease',
-            }}
-            title="Mở mã QR điểm danh Vào ca cho nhân sự"
           >
-            Mở QR Check-in (Vào ca)
+            Mở QR Check-in
           </button>
 
           <button
             type="button"
+            className="eo-btn-secondary"
+            style={{ padding: '0.48rem 0.95rem', fontSize: '0.84rem', color: '#1d4ed8', borderColor: '#bfdbfe' }}
             onClick={() => {
               setQrMode('CHECKOUT');
               setShowQrModal(true);
             }}
-            style={{
-              minHeight: '38px',
-              background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '0.45rem 1rem',
-              fontSize: '0.84rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              boxShadow: '0 2px 6px rgba(13, 148, 136, 0.25)',
-              transition: 'all 0.15s ease',
-            }}
-            title="Mở mã QR điểm danh Kết ca cho nhân sự"
           >
-            Mở QR Check-out (Kết ca)
+            Mở QR Check-out
           </button>
 
           {shift.emergency && staffingSummary.missing > 0 ? (
-            <span
-              style={{
-                minHeight: '38px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#fff1f2',
-                color: '#e11d48',
-                border: '1.5px solid #fecdd3',
-                borderRadius: '8px',
-                padding: '0.45rem 0.95rem',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-              }}
-              title="Trạng thái điều phối khẩn cấp hiện tại"
-            >
-              {(emergencyDispatchResult && typeof emergencyDispatchResult.hasCandidates === 'boolean'
-                ? emergencyDispatchResult.hasCandidates
-                : staffingSummary.hasCandidates)
-                ? 'Đang điều phối khẩn cấp'
-                : 'Đã bật điều phối · Chưa tìm được Worker phù hợp'}
+            <span className="table-status-pill red">
+              <span className="status-dot-solid" />
+              {staffingSummary.hasCandidates ? 'Đang điều phối khẩn cấp' : 'Đã bật điều phối'}
             </span>
           ) : (
             <EmergencyTriggerButton shift={shift} event={event} />
@@ -496,22 +618,9 @@ export default function ShiftWorkspacePage({
           {onOpenInvite && (
             <button
               type="button"
+              className="eo-btn-secondary"
+              style={{ padding: '0.48rem 0.9rem', fontSize: '0.82rem' }}
               onClick={() => onOpenInvite(shift, event)}
-              style={{
-                minHeight: '38px',
-                background: '#f5f3ff',
-                color: '#6d28d9',
-                border: '1px solid #ddd6fe',
-                borderRadius: '8px',
-                padding: '0.45rem 0.95rem',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
             >
               Mã Mời
             </button>
@@ -520,22 +629,9 @@ export default function ShiftWorkspacePage({
           {onEditShift && (
             <button
               type="button"
+              className="eo-btn-secondary"
+              style={{ padding: '0.48rem 0.9rem', fontSize: '0.82rem' }}
               onClick={() => onEditShift(shift)}
-              style={{
-                minHeight: '38px',
-                background: '#ffffff',
-                color: '#334155',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                padding: '0.45rem 0.95rem',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
             >
               Sửa Ca
             </button>
@@ -543,853 +639,590 @@ export default function ShiftWorkspacePage({
         </div>
       </div>
 
-      {/* Cảnh báo thiếu nhân sự sát giờ hoặc đã bật khẩn cấp */}
-      <ShiftEmergencyBanner
-        shift={shift}
-        event={event}
-        localDispatchResult={emergencyDispatchResult}
-        onOpenInvite={onOpenInvite}
-      />
+      <ShiftEmergencyBanner shift={shift} event={event} onOpenInvite={onOpenInvite} />
 
-      {/* 2. THÔNG TIN CHUNG CỦA CA */}
-      <div
-        className="eo-widget-card"
-        style={{
-          padding: '1.35rem 1.5rem',
-          borderLeft: `5px solid ${dynStatus.color}`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: '1rem',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: '280px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>
-              Ca: {shift.jobType}
-            </h2>
-            <span
-              style={{
-                backgroundColor: dynStatus.bg,
-                color: dynStatus.color,
-                border: `1px solid ${dynStatus.border}`,
-                padding: '0.25rem 0.75rem',
-                borderRadius: '999px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-              }}
-            >
-              {dynStatus.label}
-            </span>
+      {/* 2. TỔNG QUAN CA + THANH TIẾN ĐỘ PHÂN ĐOẠN */}
+      <div className="eo-widget-card" style={{ padding: '1.15rem 1.35rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+                Ca: {shift.jobType}
+              </h2>
+              <span className={`table-status-pill ${dynStatus.colorClass || 'blue'}`}>
+                <span className="status-dot-solid" />
+                {dynStatus.label}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.82rem', color: '#475569', marginTop: '0.35rem' }}>
+              <span>Giờ: <strong>{formatTimeShort(shift.startTime)} – {formatTimeShort(shift.endTime)}</strong></span>
+              <span>
+                Thù lao: <strong style={{ color: '#0f172a' }}>{new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/giờ</strong>
+                {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)} đ)`}
+              </span>
+              <span>
+                Chốt ca: <strong style={{ color: isShortage ? '#dc2626' : '#0f172a' }}>{shiftConfirmed}/{shiftRequired} ({fillRate}%)</strong>
+              </span>
+              {skillNames.length > 0 && <span>Kỹ năng: <strong>{skillNames.join(', ')}</strong></span>}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', fontSize: '0.85rem', color: '#475569', marginBottom: '0.5rem' }}>
-            <span>
-              Khung giờ: <strong>{formatTime(shift.startTime)} - {formatTime(shift.endTime)}</strong>
+          <button
+            type="button"
+            className="eo-btn-secondary"
+            style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+            disabled={refreshingAttendance}
+            onClick={() => {
+              loadAttendance({ silent: true });
+              onReloadEvents?.({ silent: true });
+            }}
+          >
+            {refreshingAttendance ? 'Đang đồng bộ...' : 'Làm mới số liệu'}
+          </button>
+        </div>
+
+        {/* Dải tóm tắt tiến độ vận hành trên số nhân sự đã nhận ca */}
+        {attendanceList.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '0.6rem 1.15rem',
+              paddingTop: '0.65rem',
+              borderTop: '1px solid #f1f5f9',
+              fontSize: '0.78rem',
+              color: '#475569',
+            }}
+          >
+            <span style={{ fontWeight: 700, color: '#0f172a' }}>
+              Vận hành ({attendanceList.length} người đã nhận):
             </span>
-            <span>
-              Thù lao: <strong style={{ color: '#059669' }}>{new Intl.NumberFormat('vi-VN').format(shift.hourlyWage || 50000)} đ/giờ</strong>
-              {shift.allowance > 0 && ` (+${new Intl.NumberFormat('vi-VN').format(shift.allowance)} đ phụ cấp)`}
+            <span>Đã vào ca: <strong>{checkedInCount}</strong> ({completedCount} kết ca)</span>
+            <span style={{ color: workerFilterCounts.NEED_ATTENTION > 0 ? '#b45309' : '#64748b' }}>
+              Cần chú ý đầu ca: <strong>{workerFilterCounts.NEED_ATTENTION}</strong>
             </span>
-            {shift.dressCode && (
-              <span>Đồng phục: <strong>{shift.dressCode}</strong></span>
+            <span>Chờ duyệt công: <strong>{workerFilterCounts.NEED_VERIFY}</strong></span>
+            <span>Chờ thanh toán: <strong>{workerFilterCounts.NEED_PAYMENT}</strong> ({pendingPayCount} chờ xác nhận)</span>
+            <span style={{ color: '#059669', fontWeight: 600 }}>Đã trả đủ: <strong>{paidCount}</strong></span>
+          </div>
+        )}
+      </div>
+
+      {/* 3. BẢNG QUẢN LÝ NHÂN SỰ GỌN (TỐI ƯU CHO 40+ WORKER) */}
+      <section className="eo-events-section-card">
+        <div className="table-card-header-bar">
+          <div className="table-header-title-group">
+            <h3 className="table-card-heading">Danh sách nhân sự ca ({filteredWorkers.length})</h3>
+            <span className="ev-result-count">Tổng {attendanceList.length} người</span>
+          </div>
+
+          <div className="table-header-actions-group" style={{ gap: '0.5rem' }}>
+            {verifyQueueWorkers.length > 0 && (
+              <button
+                type="button"
+                className="eo-btn-secondary"
+                style={{ minHeight: '38px', fontSize: '0.8rem', padding: '0 0.85rem', borderRadius: 8, borderColor: '#bfdbfe', color: '#1d4ed8' }}
+                onClick={() => setEvidenceQueueState({ isOpen: true, initialIndex: 0 })}
+              >
+                Rà minh chứng nhanh ({verifyQueueWorkers.length})
+              </button>
+            )}
+
+            {unpaidQueueWorkers.length > 0 && onOpenPaymentQueue && (
+              <button
+                type="button"
+                className="eo-btn-primary"
+                style={{ minHeight: '38px', fontSize: '0.8rem', padding: '0 0.9rem', borderRadius: 8 }}
+                onClick={() => onOpenPaymentQueue(unpaidQueueWorkers)}
+              >
+                Thanh toán nối tiếp ({unpaidQueueWorkers.length})
+              </button>
+            )}
+
+            <input
+              type="text"
+              value={searchWorker}
+              onChange={(e) => setSearchWorker(e.target.value)}
+              placeholder="Tìm tên hoặc SĐT..."
+              className="table-search-input"
+              style={{ minHeight: '38px', height: '38px' }}
+              aria-label="Tìm nhân sự trong ca"
+            />
+
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+              className="table-filter-select"
+              style={{ minHeight: '38px', height: '38px' }}
+              aria-label="Số dòng mỗi trang"
+            >
+              <option value={15}>15 / trang</option>
+              <option value={30}>30 / trang</option>
+              <option value="ALL">Tất cả</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Bộ lọc trạng thái */}
+        {attendanceList.length > 0 && (
+          <div className="ev-filter-chips-bar" role="tablist" aria-label="Lọc nhân sự theo tiến độ">
+            {[
+              { key: 'ALL', label: `Tất cả (${workerFilterCounts.ALL})` },
+              { key: 'NEED_ATTENTION', label: `Cần chú ý / Đầu ca (${workerFilterCounts.NEED_ATTENTION})` },
+              { key: 'NEED_VERIFY', label: `Chờ duyệt công (${workerFilterCounts.NEED_VERIFY})` },
+              { key: 'NEED_PAYMENT', label: `Chờ thanh toán (${workerFilterCounts.NEED_PAYMENT})` },
+              { key: 'SETTLED', label: `Đã quyết toán (${workerFilterCounts.SETTLED})` },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={workerFilter === tab.key}
+                className={`ev-filter-chip ${workerFilter === tab.key ? 'is-active' : ''}`}
+                onClick={() => setWorkerFilter(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Thanh Thao Tác Hàng Loạt khi đã tích Checkbox */}
+        {(selectedIds.length > 0 || bulkProgress) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.65rem',
+              padding: '0.7rem 1.25rem',
+              background: '#eff6ff',
+              borderBottom: '1px solid #bfdbfe',
+              fontSize: '0.82rem',
+            }}
+          >
+            {bulkProgress ? (
+              <strong style={{ color: '#1d4ed8' }}>
+                {bulkProgress.label}: {bulkProgress.current}/{bulkProgress.total}...
+              </strong>
+            ) : (
+              <>
+                <span style={{ color: '#1e40af', fontWeight: 700 }}>
+                  Đã chọn {selectedIds.length} nhân sự
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {bulkVerifyCandidates.length > 0 && (
+                    <button
+                      type="button"
+                      className="eo-btn-primary"
+                      style={{ fontSize: '0.78rem', padding: '0.38rem 0.85rem' }}
+                      onClick={handleBulkVerify}
+                    >
+                      Duyệt công đã chọn ({bulkVerifyCandidates.length})
+                    </button>
+                  )}
+                  {bulkCashCandidates.length > 0 && (
+                    <button
+                      type="button"
+                      className="eo-btn-secondary"
+                      style={{ fontSize: '0.78rem', padding: '0.38rem 0.85rem', borderColor: '#bfdbfe', color: '#1d4ed8' }}
+                      onClick={handleBulkCashPayment}
+                    >
+                      Khai báo tiền mặt ({bulkCashCandidates.length})
+                    </button>
+                  )}
+                  {bulkCashCandidates.length > 1 && onOpenPaymentQueue && (
+                    <button
+                      type="button"
+                      className="eo-btn-secondary"
+                      style={{ fontSize: '0.78rem', padding: '0.38rem 0.85rem' }}
+                      onClick={() => onOpenPaymentQueue(bulkCashCandidates)}
+                    >
+                      Trả nối tiếp VietQR ({bulkCashCandidates.length})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="eo-btn-secondary"
+                    style={{ fontSize: '0.78rem', padding: '0.38rem 0.75rem' }}
+                    onClick={() => setSelectedIds([])}
+                  >
+                    Bỏ chọn
+                  </button>
+                </div>
+              </>
             )}
           </div>
+        )}
 
-          {skillNames.length > 0 && (
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Kỹ năng yêu cầu:</span>
-              {skillNames.map((name, i) => (
-                <span
-                  key={i}
-                  style={{
-                    background: '#eff6ff',
-                    color: '#1d4ed8',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '6px',
-                    padding: '1px 8px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                  }}
-                >
-                  {name}
-                </span>
-              ))}
+        <div className="table-responsive-wrapper">
+          {loadingAttendance && attendanceList.length === 0 ? (
+            <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#64748b' }}>
+              Đang tải dữ liệu nhân sự và tiến độ ca làm việc...
             </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            loadAttendance();
-            onReloadEvents?.();
-          }}
-          style={{
-            background: '#f8fafc',
-            border: '1px solid #cbd5e1',
-            borderRadius: '8px',
-            padding: '0.45rem 0.85rem',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-            color: '#334155',
-            cursor: 'pointer',
-          }}
-        >
-          Cập nhật số liệu
-        </button>
-      </div>
-
-      {/* 3. CHỈ SỐ TIẾN ĐỘ CỦA RIÊNG CA */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>
-        <div
-          className="eo-widget-card"
-          style={{
-            padding: '1rem 1.25rem',
-            backgroundColor: isShortage ? '#fff1f2' : '#f0fdf4',
-            borderColor: isShortage ? '#fecdd3' : '#bbf7d0',
-          }}
-        >
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: isShortage ? '#be123c' : '#15803d', textTransform: 'uppercase' }}>
-            {isShortage ? 'Tuyển Dụng (Thiếu người)' : 'Tuyển Dụng Ca'}
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: isShortage ? '#e11d48' : '#166534', margin: '0.25rem 0' }}>
-            {shiftConfirmed} / {shiftRequired} <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>người ({fillRate}%)</span>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: isShortage ? '#9f1239' : '#15803d' }}>
-            {shiftConfirmed < shiftRequired ? `Còn thiếu ${shiftRequired - shiftConfirmed} vị trí` : 'Đã chốt đủ nhân sự'}
-          </div>
-        </div>
-
-        <div className="eo-widget-card" style={{ padding: '1rem 1.25rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-            Điểm Danh Thực Tế
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', margin: '0.25rem 0' }}>
-            {checkedInCount} <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>vào ca</span>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#0ea5e9', fontWeight: 600 }}>
-            {completedCount} nhân sự đã kết ca
-          </div>
-        </div>
-
-        <div className="eo-widget-card" style={{ padding: '1rem 1.25rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-            Hoàn Thành Đầu Việc ({shiftChecklistTasks.length} việc)
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4f46e5', margin: '0.25rem 0' }}>
-            {checklistDoneCount} / {attendanceList.length}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            Nhân sự đã hoàn thành toàn bộ công việc
-          </div>
-        </div>
-
-        <div className="eo-widget-card" style={{ padding: '1rem 1.25rem' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-            Quyết Toán Thù Lao
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#059669', margin: '0.25rem 0' }}>
-            {paidCount} <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 600 }}>đã trả đủ</span>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: pendingPayCount > 0 ? '#d97706' : '#64748b', fontWeight: 600 }}>
-            {pendingPayCount} chờ nhân sự xác nhận
-          </div>
-        </div>
-      </div>
-
-      {/* 4. BẢNG QUẢN LÝ NHÂN SỰ TRONG CA */}
-      <div className="eo-widget-card" style={{ padding: '1.35rem 1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-              Nhân Sự & Tiến Độ Công Việc Trong Ca ({attendanceList.length})
-            </h3>
-            <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-              Theo dõi thời gian vào/ra, tiến độ từng đầu việc và thanh toán của riêng ca làm việc này
-            </p>
-          </div>
-
-          <input
-            type="text"
-            value={searchWorker}
-            onChange={(e) => setSearchWorker(e.target.value)}
-            placeholder="Tìm theo tên hoặc số điện thoại..."
-            style={{
-              padding: '0.45rem 0.85rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              fontSize: '0.85rem',
-              minWidth: '240px',
-            }}
-          />
-        </div>
-
-        {loadingAttendance ? (
-          <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: '10px' }}>
-            Đang tải dữ liệu nhân sự và tiến độ ca làm việc...
-          </div>
-        ) : filteredWorkers.length === 0 ? (
-          <div style={{ padding: '3rem 1.5rem', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-            <h4 style={{ margin: '0 0 0.5rem', color: '#334155', fontSize: '1rem' }}>
-              Chưa có nhân sự nào trong ca "{shift.jobType}"
-            </h4>
-            <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#64748b' }}>
-              Bạn có thể gửi mã mời trực tiếp để nhanh chóng lấp đầy ca làm việc này.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {onOpenInvite && (
+          ) : filteredWorkers.length === 0 ? (
+            <div className="eo-empty-state-card">
+              <p className="empty-text">
+                {attendanceList.length === 0
+                  ? `Chưa có nhân sự nào trong ca "${shift.jobType}".`
+                  : 'Không có nhân sự phù hợp bộ lọc hiện tại.'}
+              </p>
+              {attendanceList.length > 0 ? (
                 <button
                   type="button"
-                  onClick={() => onOpenInvite(shift, event)}
-                  style={{
-                    background: '#7c3aed',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.55rem 1.15rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
+                  className="eo-btn-secondary"
+                  onClick={() => {
+                    setWorkerFilter('ALL');
+                    setSearchWorker('');
                   }}
                 >
-                  Lấy Liên Kết / Mã Mời
+                  Xem tất cả nhân sự
                 </button>
+              ) : (
+                onOpenInvite && (
+                  <button type="button" className="eo-btn-primary" onClick={() => onOpenInvite(shift, event)}>
+                    Lấy Liên Kết / Mã Mời
+                  </button>
+                )
               )}
             </div>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '880px' }}>
+          ) : (
+            <table className="cani-modern-table">
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '12px 14px' }}>Nhân Sự & Uy Tín</th>
-                  <th style={{ padding: '12px 14px' }}>Trạng Thái Điểm Danh</th>
-                  <th style={{ padding: '12px 14px' }}>Thời Gian Vào / Ra</th>
-                  <th style={{ padding: '12px 14px', minWidth: '220px' }}>Tiến Độ Đầu Việc</th>
-                  <th style={{ padding: '12px 14px' }}>Thanh Toán & Bằng Chứng</th>
-                  <th style={{ padding: '12px 14px', textAlign: 'right' }}>Thao Tác</th>
+                <tr>
+                  {showBulkCheckboxColumn && (
+                    <th style={{ width: '44px', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAllVisible}
+                        title="Chọn tất cả nhân sự có thể duyệt công / trả lương hàng loạt trên trang này"
+                        aria-label="Chọn tất cả nhân sự đủ điều kiện trên trang"
+                        style={{ width: 15, height: 15, cursor: 'pointer' }}
+                      />
+                    </th>
+                  )}
+                  <th style={{ width: showBulkCheckboxColumn ? '24%' : '26%' }}>Nhân sự</th>
+                  <th style={{ width: '19%' }}>Điểm danh</th>
+                  <th style={{ width: '19%' }}>Checklist &amp; Ảnh</th>
+                  <th style={{ width: '18%' }}>Thanh toán</th>
+                  <th style={{ width: showBulkCheckboxColumn ? '16%' : '18%', textAlign: 'right' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredWorkers.map((item) => {
-                  const isNoShow = item.assignmentStatus === 'NO_SHOW';
-                  const isCheckedIn = item.assignmentStatus === 'CHECKED_IN' || Boolean(item.checkinTime);
-                  const isCompleted = item.assignmentStatus === 'COMPLETED' || item.checkoutTime != null;
-                  const workerProgressMap = parseWorkerChecklistProgressMap(item.checklistRawProgress);
-                  const isTargetHighlighted = highlightedAssignmentId === item.assignmentId;
-                  const canVerify = canEoConfirmWorker(item);
-                  const isReviewExpanded = selectedForReview?.assignmentId === item.assignmentId;
+                {paginatedWorkers.map((item) => {
+                  const flags = getWorkerAttentionFlags(item);
+                  const canVerify = canEoConfirmWorker(item, shiftChecklistTasks);
+                  const chkSummary = getWorkerChecklistSummary(item, shiftChecklistTasks);
+                  const sourceLabel = getSourceLabel(item.source);
+                  const isChecked = selectedIds.includes(item.assignmentId);
+                  const isHighlighted = highlightedAssignmentId === item.assignmentId;
+
+                  const attendanceStatus = flags.isNoShow
+                    ? { pill: 'red', text: 'Vắng mặt' }
+                    : flags.isCompleted
+                      ? { pill: 'green', text: 'Đã kết ca' }
+                      : flags.isCheckedIn
+                        ? { pill: flags.isLate ? 'yellow' : 'blue', text: flags.isLate ? 'Trễ giờ' : 'Đúng giờ' }
+                        : { pill: 'yellow', text: 'Chưa vào ca' };
+
+                  const paymentStatusInfo =
+                    item.workerConfirmStatus === 'RECEIVED_FULL' || item.paymentStatus === 'CONFIRMED_FULL'
+                      ? { pill: 'green', text: 'Đã trả đủ' }
+                      : flags.hasPaymentIssue
+                        ? { pill: 'red', text: 'Cần đối soát' }
+                        : item.paymentStatus === 'DECLARED_PENDING_WORKER'
+                          ? { pill: 'blue', text: 'Chờ xác nhận' }
+                          : item.eoConfirmed
+                            ? { pill: 'yellow', text: 'Chờ trả lương' }
+                            : { pill: 'gray', text: 'Chờ duyệt công' };
+
+                  const verifyQueueIdx = verifyQueueWorkers.findIndex((w) => w.assignmentId === item.assignmentId);
+
+                  const isRowBulkEligible = isWorkerBulkEligible(item);
 
                   return (
-                    <React.Fragment key={item.assignmentId}>
                     <tr
+                      key={item.assignmentId}
                       id={`assignment-row-${item.assignmentId}`}
+                      className="event-table-row"
                       style={{
-                        borderBottom: '1px solid #f1f5f9',
-                        verticalAlign: 'top',
-                        backgroundColor: isTargetHighlighted ? '#fefce8' : 'transparent',
-                        outline: isTargetHighlighted ? '2px solid #eab308' : 'none',
-                        transition: 'background-color 0.5s ease',
+                        backgroundColor: isHighlighted ? '#eff6ff' : isChecked ? '#f8fafc' : undefined,
+                        cursor: 'pointer',
                       }}
+                      onClick={() => setDrawerWorkerId(item.assignmentId)}
                     >
-                      {/* 1. Nhân sự */}
-                      <td style={{ padding: '14px' }}>
-                        <button
-                          type="button"
-                          onClick={() => item.workerId && workerProfile.openProfile(item.workerId)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: 0,
-                            margin: 0,
-                            fontWeight: 800,
-                            color: '#1d4ed8',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            fontSize: '0.9rem',
-                          }}
-                        >
-                          {item.workerName}
-                        </button>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>{item.workerPhone}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: 4, fontWeight: 600 }}>
-                          Đánh giá: {item.workerRatingAvg || 5.0} • Uy tín: {item.workerReliabilityScore || 100}
-                        </div>
-                        {item.source && (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              marginTop: 6,
-                              padding: '2px 8px',
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              borderRadius: '999px',
-                              backgroundColor: '#F0FDFA',
-                              border: '1px solid #CCFBF1',
-                              color: '#0D9488',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.3px',
-                            }}
-                          >
-                            {(() => {
-                              switch (item.source) {
-                                case 'GROUP': return 'Nhóm';
-                                case 'MATCHING': return 'Hệ thống';
-                                case 'DIRECT': return 'Trực tiếp';
-                                case 'BULK': return 'Hàng loạt';
-                                default: return item.source;
-                              }
-                            })()}
-                          </span>
-                        )}
-                      </td>
+                      {showBulkCheckboxColumn && (
+                        <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          {isRowBulkEligible && (
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSelectOne(item.assignmentId)}
+                              title="Chọn để duyệt công hoặc khai báo tiền mặt hàng loạt"
+                              aria-label={`Chọn ${item.workerName}`}
+                              style={{ width: 15, height: 15, cursor: 'pointer' }}
+                            />
+                          )}
+                        </td>
+                      )}
 
-                      {/* 2. Trạng thái */}
-                      <td style={{ padding: '14px' }}>
-                        {isNoShow && (
-                          <span style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            ✕ Vắng mặt
-                          </span>
-                        )}
-                        {!isNoShow && isCheckedIn && (
-                          <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            Đã vào ca {item.isOnTime ? '(Đúng giờ)' : '(Trễ giờ)'}
-                          </span>
-                        )}
-                        {!isNoShow && isCompleted && (
-                          <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            Đã hoàn thành
-                          </span>
-                        )}
-                        {!isNoShow && !isCheckedIn && !isCompleted && (
-                          <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: 12, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                            Chờ đến ca
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 3. Thời gian */}
-                      <td style={{ padding: '14px', color: '#334155', fontSize: '0.8rem' }}>
-                        <div>Vào: <strong>{item.checkinTime ? formatTime(item.checkinTime) : '—'}</strong></div>
-                        <div style={{ marginTop: 2 }}>Ra: <strong>{item.checkoutTime ? formatTime(item.checkoutTime) : '—'}</strong></div>
-                        {item.hoursWorked != null && (
-                          <div style={{ color: '#0d9488', fontWeight: 700, marginTop: 3 }}>
-                            {item.hoursWorked} giờ làm
-                          </div>
-                        )}
-                      </td>
-
-                      {/* 4. Tiến độ đầu việc & Minh chứng */}
-                      <td style={{ padding: '14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                          <span
-                            style={{
-                              background: item.isChecklistCompleted ? '#dcfce7' : '#f1f5f9',
-                              color: item.isChecklistCompleted ? '#15803d' : '#334155',
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                              fontWeight: 700,
-                              fontSize: '0.75rem',
-                            }}
-                          >
-                            {item.isChecklistCompleted ? 'Đã xong 100%' : (item.checklistProgress || 'Chưa cập nhật')}
-                          </span>
-                        </div>
-                        {shiftChecklistTasks.length > 0 ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {shiftChecklistTasks.map((t) => {
-                              const prog = workerProgressMap[t.id] || workerProgressMap[t.label] || {};
-                              const isTaskDone = Boolean(prog.isCompleted || item.isChecklistCompleted);
-                              const hasEvidence = Boolean(prog.evidenceImageUrl && String(prog.evidenceImageUrl).trim().length > 0);
-
-                              return (
-                                <div
-                                  key={t.id}
-                                  style={{
-                                    fontSize: '0.75rem',
-                                    padding: '4px 8px',
-                                    borderRadius: 6,
-                                    background: isTaskDone ? '#f0fdf4' : '#f8fafc',
-                                    border: `1px solid ${isTaskDone ? '#bbf7d0' : '#e2e8f0'}`,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 2,
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                                      <span style={{ fontWeight: 700, color: isTaskDone ? '#15803d' : '#94a3b8' }}>
-                                        {isTaskDone ? '✓' : '○'}
-                                      </span>
-                                      <span style={{ fontWeight: 600, color: isTaskDone ? '#1e293b' : '#64748b', textDecoration: isTaskDone ? 'none' : 'none' }}>
-                                        {t.label}
-                                      </span>
-                                    </div>
-                                    <span style={{ fontSize: '0.7rem', color: isTaskDone ? '#15803d' : '#94a3b8', fontWeight: 600 }}>
-                                      {isTaskDone ? 'Đã làm' : 'Chưa'}
-                                    </span>
-                                  </div>
-
-                                  {/* Minh chứng ảnh của mục này */}
-                                  <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                                    {t.isRequiredEvidence ? (
-                                      hasEvidence ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                          <button
-                                            type="button"
-                                            onClick={() => setPreviewImage({
-                                              url: prog.evidenceImageUrl,
-                                              title: `Minh chứng việc "${t.label}" - Nhân sự ${item.workerName}`
-                                            })}
-                                            style={{
-                                              background: '#eff6ff',
-                                              color: '#1d4ed8',
-                                              border: '1px solid #bfdbfe',
-                                              borderRadius: 4,
-                                              padding: '2px 6px',
-                                              fontSize: '0.7rem',
-                                              fontWeight: 700,
-                                              cursor: 'pointer',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: 3,
-                                            }}
-                                          >
-                                            Xem minh chứng
-                                          </button>
-                                          {(prog.evidenceSubmittedAt || prog.completedAt) && (
-                                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                                              {formatTime(prog.evidenceSubmittedAt || prog.completedAt)}
-                                            </span>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <span style={{ color: '#dc2626', fontSize: '0.7rem', fontWeight: 700 }}>
-                                          Chưa nộp minh chứng
-                                        </span>
-                                      )
-                                    ) : (
-                                      <span style={{ color: '#94a3b8', fontSize: '0.68rem', fontStyle: 'italic' }}>
-                                        Không yêu cầu ảnh
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                            Ca không có danh mục đầu việc mẫu
-                          </div>
-                        )}
-
-                        {item.proofImageUrl && (
-                          <div style={{ marginTop: 6 }}>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <button
                               type="button"
-                              onClick={() => setPreviewImage({ url: item.proofImageUrl, title: `Ảnh hoàn thành ca chung - ${item.workerName}` })}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDrawerWorkerId(item.assignmentId);
+                              }}
                               style={{
-                                background: '#f8fafc',
-                                color: '#475569',
-                                border: '1px dashed #cbd5e1',
-                                borderRadius: 4,
-                                padding: '2px 6px',
-                                fontSize: '0.7rem',
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                fontWeight: 700,
+                                color: '#0f172a',
                                 cursor: 'pointer',
+                                fontSize: '0.88rem',
+                                textAlign: 'left',
                               }}
                             >
-                              Xem ảnh nộp ca chung
+                              {item.workerName}
                             </button>
+                            {sourceLabel && (
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>
+                                {sourceLabel}
+                              </span>
+                            )}
                           </div>
-                        )}
+                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            {maskPhoneNumber(item.workerPhone)} • {item.workerReliabilityScore || 100} uy tín
+                          </span>
+                        </div>
                       </td>
 
-                      {/* 5. Thanh toán & Bằng chứng */}
-                      <td style={{ padding: '14px' }}>
-                        {(() => {
-                          const workerQrUrl = buildWorkerVietQrUrl(item);
-                          const hasDeclared = Boolean(
-                            item.paymentStatus && item.paymentStatus !== 'NOT_DECLARED'
-                          ) || item.declaredAmount != null;
-                          const isTransfer = item.paymentMethod === 'BANK_TRANSFER';
-                          const isCash = item.paymentMethod === 'CASH';
-
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
-                              {/* Số tiền thỏa thuận */}
-                              <div style={{ fontSize: '0.76rem', color: '#475569' }}>
-                                Thỏa thuận: <strong>{formatVndWhole(item.agreedWage || shift.salary)}</strong>
-                              </div>
-
-                              {/* Số tiền EO khai + Phương thức + Mã GD */}
-                              {item.declaredAmount != null && (
-                                <div style={{ fontSize: '0.76rem', color: '#0369a1' }}>
-                                  Đã khai: <strong>{formatVndWhole(item.declaredAmount)}</strong>
-                                  {(isTransfer || isCash) && (
-                                    <span style={{
-                                      marginLeft: 6,
-                                      padding: '1px 6px',
-                                      borderRadius: 4,
-                                      fontSize: '0.68rem',
-                                      fontWeight: 700,
-                                      background: isTransfer ? '#e0e7ff' : '#fef3c7',
-                                      color: isTransfer ? '#3730a3' : '#92400e',
-                                    }}>
-                                      {isTransfer ? 'Chuyển khoản' : 'Tiền mặt'}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              {item.externalRef && (
-                                <div style={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>
-                                  Mã GD: <strong>{item.externalRef}</strong>
-                                </div>
-                              )}
-
-                              {item.declaredAt && (
-                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                                  Khai lúc: {formatTime(item.declaredAt)}
-                                </div>
-                              )}
-
-                              {/* Bằng chứng đã chuyển tiền — LUÔN hiển thị khi đã khai báo */}
-                              {item.paymentProofUrl ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setPreviewImage({
-                                      url: resolveAssetUrl(item.paymentProofUrl),
-                                      title: `Chứng từ thanh toán cho ${item.workerName}${item.externalRef ? ' (' + item.externalRef + ')' : ''}`,
-                                    })}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                      background: '#eff6ff',
-                                      color: '#1d4ed8',
-                                      border: '1px solid #bfdbfe',
-                                      borderRadius: 6,
-                                      padding: '3px 8px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    <img
-                                      src={resolveAssetUrl(item.paymentProofUrl)}
-                                      alt="Biên lai"
-                                      style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: 4 }}
-                                    />
-                                    <span>Xem chứng từ đã chuyển</span>
-                                  </button>
-                                </div>
-                              ) : hasDeclared && isCash ? (
-                                <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
-                                  Tiền mặt (xác nhận trên hệ thống)
-                                </span>
-                              ) : null}
-
-                              {/* Trạng thái xác nhận của Worker */}
-                              {item.workerConfirmStatus === 'RECEIVED_FULL' && (
-                                <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 4, fontWeight: 500, fontSize: '0.78rem', display: 'inline-block' }}>
-                                  Worker đã nhận đủ
-                                </span>
-                              )}
-
-                              {item.workerConfirmStatus === 'RECEIVED_PARTIAL' && (
-                                <div style={{ background: '#fef3c7', color: '#b45309', padding: '4px 8px', borderRadius: 4, fontSize: '0.72rem' }}>
-                                  <div style={{ fontWeight: 700 }}>Worker nhận thiếu:</div>
-                                  <div>{item.workerComment || 'Chưa ghi chú'}</div>
-                                </div>
-                              )}
-
-                              {item.workerConfirmStatus === 'NOT_RECEIVED' && (
-                                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 8px', borderRadius: 4, fontSize: '0.72rem' }}>
-                                  <div style={{ fontWeight: 700 }}>Worker chưa nhận được:</div>
-                                  <div>{item.workerComment || 'Chưa ghi chú'}</div>
-                                </div>
-                              )}
-
-                              {item.paymentStatus === 'CONFIRMED_FULL' && !item.workerConfirmStatus && (
-                                <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: 8, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                                  Đã quyết toán
-                                </span>
-                              )}
-
-                              {item.paymentStatus === 'DECLARED_PENDING_WORKER' && !item.workerConfirmStatus && (
-                                <span style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 6, fontWeight: 700, fontSize: '0.74rem' }}>
-                                  Chờ Worker xác nhận
-                                </span>
-                              )}
-
-                              {item.paymentStatus === 'DISPUTED' && !item.workerConfirmStatus && (
-                                <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', borderRadius: 8, fontWeight: 700, fontSize: '0.75rem', display: 'inline-block' }}>
-                                  Đang tranh chấp
-                                </span>
-                              )}
-
-                              {/* Các nút thao tác thanh toán & QR */}
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                                {workerQrUrl && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setPreviewImage({
-                                      url: workerQrUrl,
-                                      title: `Mã VietQR nhận lương của ${item.workerName} (${item.bankCode || ''} ${item.bankAccountNumberMasked || item.bankAccountNumber || ''})`,
-                                    })}
-                                    style={{
-                                      background: '#f5f3ff',
-                                      color: '#6d28d9',
-                                      border: '1px solid #ddd6fe',
-                                      borderRadius: 6,
-                                      padding: '4px 8px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    Mã QR
-                                  </button>
-                                )}
-
-                                {(!item.paymentStatus || item.paymentStatus === 'NOT_DECLARED') ? (
-                                  item.eoConfirmed ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => onOpenPaymentDeclaration?.(item)}
-                                      style={{
-                                        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        borderRadius: 8,
-                                        padding: '6px 12px',
-                                        fontSize: '0.78rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                      }}
-                                    >
-                                      Thanh toán & QR
-                                    </button>
-                                  ) : (
-                                    <span
-                                      title="Nhân sự cần được duyệt công trước khi tiến hành thanh toán"
-                                      style={{
-                                        background: '#f8fafc',
-                                        color: '#64748b',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: 6,
-                                        padding: '4px 8px',
-                                        fontSize: '0.73rem',
-                                        fontWeight: 700,
-                                        display: 'inline-block',
-                                      }}
-                                    >
-                                      Chờ duyệt công
-                                    </span>
-                                  )
-                                ) : (
-                                  item.eoConfirmed && item.paymentStatus !== 'CONFIRMED_FULL' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => onOpenPaymentDeclaration?.(item)}
-                                      style={{
-                                        background: '#f8fafc',
-                                        color: '#0f172a',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: 6,
-                                        padding: '4px 8px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                      }}
-                                    >
-                                      Cập nhật chứng từ
-                                    </button>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                          <span className={`table-status-pill ${attendanceStatus.pill}`}>
+                            <span className="status-dot-solid" />
+                            {attendanceStatus.text}
+                          </span>
+                          <span style={{ fontSize: '0.73rem', color: '#64748b' }}>
+                            {formatTimeShort(item.checkinTime)} – {formatTimeShort(item.checkoutTime)}
+                          </span>
+                        </div>
                       </td>
 
-                      {/* 6. Thao tác */}
-                      <td style={{ padding: '14px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                          {!item.eoConfirmed && (
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>
+                            {shiftChecklistTasks.length > 0
+                              ? `${chkSummary.done}/${chkSummary.total} đầu việc`
+                              : item.isChecklistCompleted
+                                ? 'Đã xong'
+                                : 'Không có mẫu'}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {chkSummary.evidenceItems.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (verifyQueueIdx >= 0) {
+                                    setEvidenceQueueState({ isOpen: true, initialIndex: verifyQueueIdx });
+                                  } else {
+                                    setPreviewImage({
+                                      url: chkSummary.evidenceItems[0].url,
+                                      title: `${chkSummary.evidenceItems[0].label} - ${item.workerName}`,
+                                    });
+                                  }
+                                }}
+                                style={{
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: 4,
+                                  padding: '1px 6px',
+                                  fontSize: '0.71rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Xem {chkSummary.evidenceItems.length} ảnh
+                              </button>
+                            )}
+                            {chkSummary.missingEvidence > 0 && !flags.isNoShow && (
+                              <span style={{ fontSize: '0.71rem', color: '#dc2626', fontWeight: 600 }}>
+                                Thiếu {chkSummary.missingEvidence} ảnh
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                          <span className={`table-status-pill ${paymentStatusInfo.pill}`}>
+                            <span className="status-dot-solid" />
+                            {paymentStatusInfo.text}
+                          </span>
+                          <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>
+                            {formatVndWhole(item.declaredAmount ?? item.agreedWage ?? shift.salary)}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {flags.isWaiting && (
+                            <>
+                              <button
+                                type="button"
+                                className="eo-btn-secondary"
+                                style={{ fontSize: '0.74rem', padding: '0.3rem 0.6rem' }}
+                                onClick={() => handleMessageWorker(item)}
+                              >
+                                Nhắn tin
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedForNoShow(item)}
+                                style={{
+                                  background: '#fef2f2',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fecaca',
+                                  borderRadius: 6,
+                                  padding: '0.3rem 0.6rem',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Báo vắng
+                              </button>
+                            </>
+                          )}
+
+                          {!flags.isWaiting && !flags.isNoShow && !item.eoConfirmed && (
                             <button
                               type="button"
                               disabled={!canVerify || verifyingId === item.assignmentId}
-                              onClick={() => {
-                                const preassignedSkillId = resolvePreassignedPerformedSkillId(item, shift);
-                                if (preassignedSkillId) {
-                                  handleVerify(item.assignmentId, {
-                                    confirmedPerformedSkillId: preassignedSkillId,
-                                    confirmPerformedSkill: true,
-                                  });
-                                } else {
-                                  setSelectedForVerify(item);
-                                }
-                              }}
-                              title={
-                                !isCheckedIn
-                                  ? 'Nhân sự chưa check-in vào ca'
-                                  : !canVerify
-                                    ? 'Chưa hoàn tất các đầu việc bắt buộc hoặc còn thiếu minh chứng ảnh'
-                                    : 'Xác nhận hoàn thành công việc và duyệt công'
-                              }
+                              onClick={() => triggerSingleVerify(item)}
+                              className="eo-btn-primary"
                               style={{
-                                background: !canVerify ? '#94a3b8' : (verifyingId === item.assignmentId ? '#94a3b8' : '#2563eb'),
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: 6,
-                                padding: '5px 10px',
-                                fontSize: '0.76rem',
-                                fontWeight: 700,
+                                fontSize: '0.74rem',
+                                padding: '0.32rem 0.7rem',
+                                opacity: !canVerify || verifyingId === item.assignmentId ? 0.45 : 1,
                                 cursor: !canVerify || verifyingId === item.assignmentId ? 'not-allowed' : 'pointer',
                               }}
+                              title={canVerify ? 'Duyệt công nhân sự' : 'Cần đủ check-in, đầu việc và ảnh minh chứng'}
                             >
                               {verifyingId === item.assignmentId ? 'Đang duyệt...' : 'Duyệt công'}
                             </button>
                           )}
 
-                          {item.eoConfirmed && !isCompleted && (
-                            <span style={{ color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: '0.73rem', fontWeight: 700, padding: '4px 8px' }}>
-                              Đã duyệt • Chờ kết ca
-                            </span>
-                          )}
-
-                          {isCompleted && !item.hasReviewedWorker && (
+                          {!flags.isNoShow && item.eoConfirmed && (!item.paymentStatus || item.paymentStatus === 'NOT_DECLARED') && (
                             <button
                               type="button"
-                              onClick={() =>
-                                setSelectedForReview((prev) =>
-                                  prev?.assignmentId === item.assignmentId ? null : item
-                                )
-                              }
-                              style={{
-                                background: isReviewExpanded ? '#f1f5f9' : '#fffbeb',
-                                color: isReviewExpanded ? '#334155' : '#b45309',
-                                border: isReviewExpanded ? '1px solid #cbd5e1' : '1px solid #fcd34d',
-                                borderRadius: 6,
-                                padding: '4px 9px',
-                                fontSize: '0.76rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                              }}
+                              className="eo-btn-primary"
+                              style={{ fontSize: '0.74rem', padding: '0.32rem 0.7rem' }}
+                              onClick={() => onOpenPaymentDeclaration?.(item)}
                             >
-                              {isReviewExpanded ? 'Thu gọn' : 'Đánh giá'}
+                              Thanh toán
                             </button>
-                          )}
-
-                          {isCompleted && item.hasReviewedWorker && (
-                            <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: 600, padding: '4px' }}>
-                              Đã đánh giá
-                            </span>
                           )}
 
                           <button
                             type="button"
-                            onClick={() => {
-                              const shiftCode = 'SH-' + (shift.shiftId ? String(shift.shiftId).replace(/-/g, '').substring(0, 6).toUpperCase() : '0000');
-                              window.dispatchEvent(
-                                new CustomEvent('cani_open_chat_shift', {
-                                  detail: { shiftId: shift.shiftId, shiftCode, shiftName: `${event.name} - ${shift.jobType}` },
-                                })
-                              );
-                            }}
-                            style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                            className="eo-btn-secondary"
+                            style={{ fontSize: '0.74rem', padding: '0.3rem 0.6rem' }}
+                            onClick={() => setDrawerWorkerId(item.assignmentId)}
                           >
-                            Nhắn tin
-                          </button>
-
-                          {!item.eoConfirmed && (isCheckedIn || isCompleted) && (
-                            <button
-                              type="button"
-                              onClick={() => handleReportIncomplete(item)}
-                              style={{ background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                            >
-                              Báo lỗi
-                            </button>
-                          )}
-
-                          {!isCheckedIn && !isCompleted && !isNoShow && item.assignmentStatus !== 'CANCELLED' && (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedForNoShow(item)}
-                              style={{
-                                background: '#fff1f2',
-                                color: '#e11d48',
-                                border: '1px solid #fecdd3',
-                                borderRadius: 6,
-                                padding: '4px 9px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 3,
-                              }}
-                              title="Báo cáo nhân sự không đến & Tự động tìm người thay thế"
-                            >
-                              Báo vắng
-                            </button>
-                          )}
-
-                          {isNoShow && (
-                            <span style={{ color: '#e11d48', fontSize: '0.75rem', fontWeight: 700, padding: '4px' }}>
-                              Đã phạt No-Show
-                            </span>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleBlockWorker(item)}
-                            style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 6, padding: '4px 8px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                          >
-                            Chặn
+                            Chi tiết
                           </button>
                         </div>
                       </td>
                     </tr>
-                    {isReviewExpanded && (
-                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #cbd5e1' }}>
-                        <td colSpan={6} style={{ padding: '0.95rem 1.1rem' }}>
-                          <div style={{ marginBottom: '0.65rem', fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
-                            Đánh giá nhân sự: {item.workerName}
-                          </div>
-                          <WorkerReviewForm
-                            assignment={selectedForReview}
-                            submitting={submittingReview}
-                            onCancel={() => setSelectedForReview(null)}
-                            onSubmitReview={handleSubmitReview}
-                            layout="inline"
-                          />
-                        </td>
-                      </tr>
-                    )}
-                    </React.Fragment>
                   );
                 })}
               </tbody>
             </table>
+          )}
+        </div>
+
+        {/* Pagination Bar */}
+        {filteredWorkers.length > effectivePageSize && (
+          <div className="ev-pagination-bar" role="navigation" aria-label="Phân trang danh sách nhân sự">
+            <span className="ev-pagination-summary">
+              Hiển thị <strong>{startIdx + 1}–{Math.min(startIdx + effectivePageSize, filteredWorkers.length)}</strong> trên{' '}
+              <strong>{filteredWorkers.length}</strong> nhân sự
+            </span>
+            <div className="ev-pagination-controls">
+              <button
+                type="button"
+                className="ev-page-btn"
+                disabled={safePage <= 1}
+                onClick={() => setCurrentPage(safePage - 1)}
+              >
+                ← Trước
+              </button>
+              <span style={{ fontSize: '0.8rem', color: '#475569', padding: '0 0.5rem', fontWeight: 600 }}>
+                Trang {safePage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                className="ev-page-btn"
+                disabled={safePage >= totalPages}
+                onClick={() => setCurrentPage(safePage + 1)}
+              >
+                Sau →
+              </button>
+            </div>
           </div>
         )}
-      </div>
+      </section>
+
+      {/* Slide-over Worker Detail Drawer */}
+      <WorkerDetailDrawer
+        item={drawerItem}
+        shift={shift}
+        event={event}
+        shiftChecklistTasks={shiftChecklistTasks}
+        verifyingId={verifyingId}
+        submittingReview={submittingReview}
+        onClose={() => setDrawerWorkerId(null)}
+        onPreviewImage={(img) => setPreviewImage(img)}
+        onVerify={(item) => triggerSingleVerify(item)}
+        onOpenPayment={(item) => onOpenPaymentDeclaration?.(item)}
+        onReportIncomplete={handleReportIncomplete}
+        onReportNoShow={(item) => setSelectedForNoShow(item)}
+        onBlockWorker={handleBlockWorker}
+        onSubmitReview={handleSubmitReview}
+        onMessageWorker={handleMessageWorker}
+      />
+
+      {/* Quick Evidence Lightbox Queue */}
+      <QuickEvidenceReviewModal
+        isOpen={evidenceQueueState.isOpen}
+        queue={verifyQueueWorkers}
+        initialIndex={evidenceQueueState.initialIndex}
+        shiftChecklistTasks={shiftChecklistTasks}
+        verifyingId={verifyingId}
+        onClose={() => setEvidenceQueueState({ isOpen: false, initialIndex: 0 })}
+        onVerify={(item) => triggerSingleVerify(item)}
+        onReportIncomplete={handleReportIncomplete}
+      />
 
       {/* HỘP THOẠI MÃ QR ĐIỂM DANH */}
-      {showQrModal && (
+      {showQrModal && typeof document !== 'undefined' && createPortal(
         <div
           className="eo-modal-overlay"
           style={{
             position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(15, 23, 42, 0.72)',
-            zIndex: 9999,
+            zIndex: 10040,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1414,13 +1247,13 @@ export default function ShiftWorkspacePage({
                   {isCheckin ? 'Mã QR Check-in (Vào ca)' : 'Mã QR Check-out (Kết ca)'} — {shift.jobType}
                 </h3>
                 <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
-                  Khung giờ: {formatTime(shift.startTime)} - {formatTime(shift.endTime)} • Đã vào ca: {checkedInCount}/{shiftConfirmed}
+                  Khung giờ: {formatTimeShort(shift.startTime)} - {formatTimeShort(shift.endTime)} • Đã vào ca: {checkedInCount}/{shiftConfirmed}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: '1rem', cursor: 'pointer', color: '#475569', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: '1rem', cursor: 'pointer', color: '#475569' }}
               >
                 ✕
               </button>
@@ -1435,14 +1268,14 @@ export default function ShiftWorkspacePage({
                   padding: '0.55rem',
                   border: 'none',
                   borderRadius: 8,
-                  fontWeight: 800,
+                  fontWeight: 700,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
                   background: isCheckin ? '#2563eb' : 'transparent',
                   color: isCheckin ? '#ffffff' : '#475569',
                 }}
               >
-                Điểm danh vào ca (Đầu ca)
+                Điểm danh vào ca
               </button>
               <button
                 type="button"
@@ -1452,14 +1285,14 @@ export default function ShiftWorkspacePage({
                   padding: '0.55rem',
                   border: 'none',
                   borderRadius: 8,
-                  fontWeight: 800,
+                  fontWeight: 700,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
-                  background: !isCheckin ? '#0d9488' : 'transparent',
+                  background: !isCheckin ? '#2563eb' : 'transparent',
                   color: !isCheckin ? '#ffffff' : '#475569',
                 }}
               >
-                Điểm danh kết ca (Cuối ca)
+                Điểm danh kết ca
               </button>
             </div>
 
@@ -1473,7 +1306,7 @@ export default function ShiftWorkspacePage({
                   setRefreshNonce(Date.now());
                   setCountdown(ROTATE_INTERVAL);
                 }}
-                style={{ background: 'none', border: 'none', color: qrAccent, fontWeight: 700, cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}
               >
                 Đổi mã ngay
               </button>
@@ -1483,7 +1316,7 @@ export default function ShiftWorkspacePage({
               style={{
                 padding: '1.25rem',
                 background: '#ffffff',
-                border: `2px solid ${qrAccent}`,
+                border: '2px solid #2563eb',
                 borderRadius: '16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1495,22 +1328,20 @@ export default function ShiftWorkspacePage({
                 {currentPayload}
               </div>
             </div>
-
-            <div style={{ marginTop: '1rem', padding: '0.65rem', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', fontSize: '0.76rem', color: '#166534' }}>
-              <strong>Bảo mật:</strong> Mã QR xoay vòng mỗi 20 giây để chống gian lận điểm danh từ xa hoặc chụp ảnh gửi lại.
-            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* HỘP THOẠI XEM ẢNH PHÓNG TO */}
-      {previewImage && (
+      {/* HỘP THOẠI XEM ẢNH PHÓNG TO (Portal trên document.body để luôn nổi trên Drawer/Modal) */}
+      {previewImage && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            zIndex: 10000,
+            backdropFilter: 'blur(4px)',
+            zIndex: 10060,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -1519,11 +1350,11 @@ export default function ShiftWorkspacePage({
           }}
           onClick={() => setPreviewImage(null)}
         >
-          <div style={{ color: '#ffffff', fontWeight: 700, marginBottom: '1rem', fontSize: '1.05rem' }}>{previewImage.title}</div>
+          <div style={{ color: '#ffffff', fontWeight: 700, marginBottom: '1rem', fontSize: '1.05rem', textAlign: 'center' }}>{previewImage.title}</div>
           <img
             src={resolveAssetUrl(previewImage.url)}
             alt={previewImage.title}
-            style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)', backgroundColor: '#ffffff' }}
+            style={{ maxWidth: '90vw', maxHeight: '78vh', borderRadius: '12px', backgroundColor: '#ffffff', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)' }}
             onClick={(e) => e.stopPropagation()}
           />
           <button
@@ -1533,7 +1364,8 @@ export default function ShiftWorkspacePage({
           >
             Đóng ảnh
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       <ConfirmVerifySkillModal
@@ -1554,20 +1386,17 @@ export default function ShiftWorkspacePage({
         assignment={selectedForNoShow}
         shift={shift}
         onSuccess={async () => {
+          const targetId = selectedForNoShow?.assignmentId;
+          if (targetId) {
+            setAttendanceList((prev) =>
+              prev.map((w) => (w.assignmentId === targetId ? { ...w, assignmentStatus: 'NO_SHOW' } : w))
+            );
+          }
           await Promise.allSettled([
-            loadAttendance(),
-            onReloadEvents ? Promise.resolve(onReloadEvents()) : Promise.resolve(),
+            loadAttendance({ silent: true }),
+            onReloadEvents ? Promise.resolve(onReloadEvents({ silent: true })) : Promise.resolve(),
           ]);
         }}
-      />
-
-      <WorkerProfileModal
-        isOpen={workerProfile.isOpen}
-        loading={workerProfile.loading}
-        error={workerProfile.error}
-        profile={workerProfile.profile}
-        onClose={workerProfile.closeProfile}
-        onRetry={workerProfile.retry}
       />
     </div>
   );

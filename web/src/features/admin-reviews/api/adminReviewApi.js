@@ -13,14 +13,6 @@ export const adminReviewApi = {
   },
 
   /**
-   * Lấy thông tin chi tiết một đánh giá theo ID
-   */
-  getReviewDetail: async (id) => {
-    const response = await apiClient.get(`/v1/admin/reviews/${id}`);
-    return response.data?.data;
-  },
-
-  /**
    * Ẩn/gỡ bỏ đánh giá sai lệch kèm lý do
    */
   hideReview: async (id, reason) => {

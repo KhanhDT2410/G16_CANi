@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { eoService } from '../../../services/eoService';
 import { showToast } from '../../../components/common/Toast';
 import { showConfirm } from '../../../components/common/PromptModal';
@@ -6,6 +6,7 @@ import {
   ROLES,
   WAGE_RECOMMENDATIONS_MAP,
   validateJobType,
+  validateShiftWageAgainstFloor,
   buildEvidenceWageBenchmark,
 } from '../utils/shiftValidation';
 import {
@@ -171,7 +172,10 @@ export function useShifts({ onReloadEvents }) {
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [editingShift, setEditingShift] = useState(null);
+  const [submittingAddShift, setSubmittingAddShift] = useState(false);
   const [submittingEditShift, setSubmittingEditShift] = useState(false);
+  const addShiftLockRef = useRef(false);
+  const editShiftLockRef = useRef(false);
   const [expandedEventId, setExpandedEventId] = useState(null);
 
   const [selectedShiftForQr, setSelectedShiftForQr] = useState(null);
@@ -285,7 +289,7 @@ export function useShifts({ onReloadEvents }) {
 
   const handleAddShift = async (e) => {
     e.preventDefault();
-    if (!selectedEventId) return;
+    if (!selectedEventId || submittingAddShift || addShiftLockRef.current) return;
     const roleErr = validateJobType(newShift.jobType);
     if (roleErr) {
       showToast(roleErr, 'error');
@@ -295,8 +299,9 @@ export function useShifts({ onReloadEvents }) {
       showToast('Phụ cấp thêm không được là số âm!', 'error');
       return;
     }
-    if (Number(newShift.hourlyWage || 0) <= 0) {
-      showToast('Vui lòng nhập mức thù lao theo giờ lớn hơn 0!', 'error');
+    const wageCheck = validateShiftWageAgainstFloor({ hourlyWage: newShift.hourlyWage });
+    if (!wageCheck.isValid) {
+      showToast(wageCheck.error, 'error');
       return;
     }
     if (Number(newShift.requiredWorkers || 0) < 1) {
@@ -315,6 +320,8 @@ export function useShifts({ onReloadEvents }) {
       showToast(arrivalErr, 'error');
       return;
     }
+    addShiftLockRef.current = true;
+    setSubmittingAddShift(true);
     try {
       const checklistStr = Array.isArray(newShift.checklistItems)
         ? serializeChecklistItems(newShift.checklistItems)
@@ -336,18 +343,28 @@ export function useShifts({ onReloadEvents }) {
         endTime: new Date(newShift.endTime).toISOString(),
       });
       setShowShiftModal(false);
-      onReloadEvents?.();
+      await Promise.resolve(onReloadEvents?.({ silent: true }));
       showToast('Thêm ca làm việc thành công!', 'success');
     } catch (err) {
       showToast('Không thể thêm ca làm việc: ' + (err.response?.data?.message || err.message), 'error');
+    } finally {
+      addShiftLockRef.current = false;
+      setSubmittingAddShift(false);
     }
   };
 
   const handleUpdateShift = async (shiftId, shiftData) => {
+    if (submittingEditShift || editShiftLockRef.current) return;
     if (Number(shiftData.allowance || 0) < 0) {
       showToast('Phụ cấp thêm không được là số âm!', 'error');
       return;
     }
+    const wageCheck = validateShiftWageAgainstFloor({ hourlyWage: shiftData.hourlyWage });
+    if (!wageCheck.isValid) {
+      showToast(wageCheck.error, 'error');
+      return;
+    }
+    editShiftLockRef.current = true;
     setSubmittingEditShift(true);
     try {
       const checklistStr = Array.isArray(shiftData.checklistItems)
@@ -363,10 +380,11 @@ export function useShifts({ onReloadEvents }) {
       });
       showToast('Cập nhật ca làm việc thành công!', 'success');
       setEditingShift(null);
-      onReloadEvents?.();
+      await Promise.resolve(onReloadEvents?.({ silent: true }));
     } catch (err) {
       showToast('Lỗi cập nhật ca: ' + (err.response?.data?.message || err.message), 'error');
     } finally {
+      editShiftLockRef.current = false;
       setSubmittingEditShift(false);
     }
   };
@@ -384,7 +402,7 @@ export function useShifts({ onReloadEvents }) {
     try {
       await eoService.cancelShift(shift.shiftId, 'Ban tổ chức hủy ca');
       showToast('Đã hủy ca làm việc thành công!', 'success');
-      onReloadEvents?.();
+      await Promise.resolve(onReloadEvents?.({ silent: true }));
     } catch (err) {
       showToast('Lỗi hủy ca: ' + (err.response?.data?.message || err.message), 'error');
     }
@@ -433,6 +451,7 @@ export function useShifts({ onReloadEvents }) {
     setNewShift,
     editingShift,
     setEditingShift,
+    submittingAddShift,
     submittingEditShift,
     expandedEventId,
     setExpandedEventId,

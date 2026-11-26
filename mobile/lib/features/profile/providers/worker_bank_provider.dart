@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/auth/providers/auth_provider.dart';
 import 'package:cani/features/profile/models/worker_bank_model.dart';
 
@@ -98,7 +99,10 @@ class WorkerBankNotifier extends StateNotifier<WorkerBankState> {
       state = state.copyWith(isLoading: false);
     } catch (e) {
       debugPrint('Lỗi tải thông tin tài khoản ngân hàng: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể tải thông tin tài khoản ngân hàng.'),
+      );
     }
   }
 }

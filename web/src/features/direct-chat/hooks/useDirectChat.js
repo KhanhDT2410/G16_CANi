@@ -132,10 +132,10 @@ export const useDirectChat = (optionsOrInterval = {}) => {
       if (!detail) return;
       try {
         let res;
-        if (detail.shiftId) {
-          res = await directChatApi.openShiftConversation(detail.shiftId);
-        } else if (detail.targetUserId) {
+        if (detail.targetUserId) {
           res = await directChatApi.openDirectConversation(detail.targetUserId);
+        } else if (detail.shiftId) {
+          res = await directChatApi.openShiftConversation(detail.shiftId);
         }
         if (res?.conversation) {
           setActiveChat(res.conversation);

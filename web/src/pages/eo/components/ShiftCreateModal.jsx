@@ -33,6 +33,7 @@ const ShiftCreateModal = ({
   venueLat = null,
   venueLng = null,
   existingShifts = [],
+  submitting = false,
 }) => {
   const [uploadingImg, setUploadingImg] = useState(false);
   const [jobTypeError, setJobTypeError] = useState(null);
@@ -43,6 +44,7 @@ const ShiftCreateModal = ({
     Math.round(Number(newShift?.hourlyWage || 50000) * Math.max(0.5, Number(shiftDurationHours || 4)))
   );
   const fileInputRef = useRef(null);
+  const submitLockRef = useRef(false);
 
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -99,17 +101,19 @@ const ShiftCreateModal = ({
   });
   const liveArrivalError = validateShiftArrivalTime(newShift.arrivalTime, newShift.startTime);
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting || submitLockRef.current) {
+      return;
+    }
     const err = validateJobType(newShift.jobType);
     if (err) {
-      e.preventDefault();
       setJobTypeError(err);
       showToast(err, 'error');
       return;
     }
     const dupErr = validateDuplicateShift(newShift, existingShifts);
     if (dupErr) {
-      e.preventDefault();
       setJobTypeError(dupErr);
       showToast(dupErr, 'error');
       return;
@@ -122,24 +126,26 @@ const ShiftCreateModal = ({
       venueLng,
     });
     if (!wageCheck.isValid) {
-      e.preventDefault();
       setWageError(wageCheck.error);
       showToast(wageCheck.error, 'error');
       return;
     }
     if (liveTimeError) {
-      e.preventDefault();
       showToast(liveTimeError, 'error');
       return;
     }
     if (liveArrivalError) {
-      e.preventDefault();
       showToast(liveArrivalError, 'error');
       return;
     }
     setJobTypeError(null);
     setWageError(null);
-    onSubmit?.(e);
+    submitLockRef.current = true;
+    try {
+      await onSubmit?.(e);
+    } finally {
+      submitLockRef.current = false;
+    }
   };
 
   return (
@@ -484,12 +490,27 @@ const ShiftCreateModal = ({
                       const val = raw === '' ? '' : Math.max(0, parseFloat(raw));
                       setNewShift({ ...newShift, hourlyWage: val });
                       setShiftPackageWage(Math.round((Number(val) || 0) * safeHours));
-                      if (wageError) setWageError(null);
+                      const wageCheck = validateShiftWageAgainstFloor({
+                        hourlyWage: Number(val) || 0,
+                        benchmark: wageBenchmark,
+                        venueAddress,
+                        venueLat,
+                        venueLng,
+                      });
+                      setWageError(wageCheck.isValid ? null : wageCheck.error);
                     }}
                     onBlur={() => {
                       if (newShift.hourlyWage === '' || isNaN(newShift.hourlyWage)) {
                         setNewShift((prev) => ({ ...prev, hourlyWage: 0 }));
                       }
+                      const wageCheck = validateShiftWageAgainstFloor({
+                        hourlyWage: Number(newShift.hourlyWage) || 0,
+                        benchmark: wageBenchmark,
+                        venueAddress,
+                        venueLat,
+                        venueLng,
+                      });
+                      setWageError(wageCheck.isValid ? null : wageCheck.error);
                     }}
                   />
                   {wageError ? (
@@ -731,11 +752,12 @@ const ShiftCreateModal = ({
               type="button"
               className="eo-btn-secondary"
               onClick={onClose}
+              disabled={submitting}
             >
               Hủy Bỏ
             </button>
-            <button type="submit" className="eo-btn-primary">
-              Lưu Ca Làm Việc
+            <button type="submit" className="eo-btn-primary" disabled={submitting}>
+              {submitting ? 'Đang lưu...' : 'Lưu Ca Làm Việc'}
             </button>
           </div>
         </form>

@@ -3,7 +3,6 @@ import EOEventDataState from './EOEventDataState';
 import {
   getEventStatusPriority,
   getDynamicEventStatus,
-  getDynamicShiftStatus,
   getEventUnderstaffedSummary,
   resolveEventEstimatedCost,
 } from '../utils/eventHelpers';
@@ -87,25 +86,16 @@ export default function EOEventsTab({
   setStatusFilter,
   sortBy,
   setSortBy,
-  expandedEventId,
-  setExpandedEventId,
   activeSubTab = 'list',
   onSubTabChange,
   onOpenEventDetail,
-  onOpenShiftWorkspace,
   onDeleteEvent,
   onOpenCreateEvent,
   onOpenAddShift,
   onOpenEditEvent,
   onCancelEvent,
   onOpenConfirmPublish,
-  onOpenQr,
-  onOpenInvite,
-  onOpenAttendance,
-  onEditShift,
-  onCancelShift,
   onReloadEvents,
-  onOpenPaymentDeclaration,
 }) {
   const [activeMenuEventId, setActiveMenuEventId] = useState(null);
   const [internalPage, setInternalPage] = useState(1);
@@ -424,18 +414,6 @@ export default function EOEventsTab({
 
               <div className="table-header-actions-group">
                 <div className="table-search-input-wrapper">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#94a3b8"
-                    strokeWidth="2.5"
-                    className="search-lens-icon"
-                  >
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
                   <input
                     type="text"
                     aria-label="Tìm theo tên hoặc địa điểm sự kiện"
@@ -483,14 +461,6 @@ export default function EOEventsTab({
             <div className="table-responsive-wrapper">
               {filteredEvents.length === 0 ? (
                 <div className="eo-empty-state-card">
-                  <div className="empty-calendar-icon">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                  </div>
                   <p className="empty-text">
                     {searchQuery || statusFilter !== 'ALL'
                       ? 'Không có sự kiện nào khớp với bộ lọc hiện tại.'
@@ -586,27 +556,15 @@ export default function EOEventsTab({
                           {/* Cột 2: Địa điểm */}
                           <td>
                             <div className="table-venue-cell" style={{ alignItems: 'flex-start' }}>
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="#64748b"
-                                strokeWidth="2"
-                                style={{ flexShrink: 0, marginTop: '2px' }}
-                              >
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                <circle cx="12" cy="10" r="3"></circle>
-                              </svg>
                               <span className="ev-venue-clamp" title={evt.venueAddress}>
                                 {evt.venueAddress || 'Chưa cập nhật địa chỉ'}
                               </span>
                             </div>
                           </td>
 
-                          {/* Cột 3: Tiến độ nhân sự & từng ca */}
+                          {/* Cột 3: Tiến độ nhân sự (gọn, không nhồi hộp màu) */}
                           <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                               <div className="table-workers-cell" style={{ justifyContent: 'space-between' }}>
                                 <span className="workers-count" style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
                                   {confirmedTotal}/{requiredTotal} người
@@ -620,51 +578,24 @@ export default function EOEventsTab({
                                 <div className="ev-fill-bar-progress" style={{ width: `${fillPct}%` }} />
                               </div>
 
-                              {activeShifts.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                  {activeShifts.slice(0, 3).map((sh, sIdx) => {
-                                    const shStatus = getDynamicShiftStatus(sh, evt.status);
-                                    return (
-                                      <div
-                                        key={sh.shiftId || sIdx}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'space-between',
-                                          gap: '0.4rem',
-                                          fontSize: '0.72rem',
-                                          padding: '0.18rem 0.45rem',
-                                          borderRadius: '6px',
-                                          backgroundColor: shStatus.bg,
-                                          border: `1px solid ${shStatus.border}`,
-                                          color: shStatus.color,
-                                          fontWeight: 600,
-                                        }}
-                                      >
-                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          Ca {sIdx + 1} ({sh.jobType}): <strong>{sh.confirmedWorkers || 0}/{sh.requiredWorkers || 0}</strong>
-                                        </span>
-                                        <span style={{ fontSize: '0.68rem', opacity: 0.9, whiteSpace: 'nowrap' }}>
-                                          • {shStatus.label}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                  {activeShifts.length > 3 && (
-                                    <span style={{ fontSize: '0.71rem', color: '#64748b', fontWeight: 600 }}>
-                                      +{activeShifts.length - 3} ca khác
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span style={{ fontSize: '0.73rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  {evt.totalShifts ? `${evt.totalShifts} ca làm việc` : 'Chưa thiết lập ca'}
+                              <div style={{ fontSize: '0.73rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                <span>
+                                  {activeShifts.length > 0
+                                    ? `${activeShifts.length} ca làm việc`
+                                    : evt.totalShifts
+                                      ? `${evt.totalShifts} ca làm việc`
+                                      : 'Chưa thiết lập ca'}
                                 </span>
-                              )}
+                                {understaffedSummary.count > 0 && (
+                                  <span style={{ color: '#dc2626', fontWeight: 700 }}>
+                                    • Thiếu sát giờ ({understaffedSummary.count} ca)
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
 
-                          {/* Cột 4: Dự toán thực tế (không hardcode 1020000) */}
+                          {/* Cột 4: Dự toán thực tế */}
                           <td>
                             <span className="table-cost-amount">
                               {estCost.toLocaleString('vi-VN')} đ
@@ -675,26 +606,6 @@ export default function EOEventsTab({
                           <td onClick={(e) => e.stopPropagation()}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
                               {formatStatusBadge(evt)}
-                              {understaffedSummary.count > 0 && (
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.3rem',
-                                    backgroundColor: '#fff1f2',
-                                    color: '#be123c',
-                                    border: '1px solid #fda4af',
-                                    borderRadius: '999px',
-                                    padding: '0.18rem 0.55rem',
-                                    fontSize: '0.71rem',
-                                    fontWeight: 700,
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                  title={`Có ${understaffedSummary.count} ca đang thiếu nhân sự sát giờ`}
-                                >
-                                  Thiếu nhân sự sát giờ ({understaffedSummary.count} ca)
-                                </span>
-                              )}
                               {(() => {
                                 if (evt.status !== 'DRAFT') return null;
                                 const dyn = getDynamicEventStatus(evt);
@@ -708,9 +619,9 @@ export default function EOEventsTab({
                                         onOpenEditEvent?.(evt);
                                       }}
                                       style={{
-                                        background: '#fff7ed',
-                                        color: '#c2410c',
-                                        border: '1px solid #fed7aa',
+                                        background: '#ffffff',
+                                        color: '#b45309',
+                                        border: '1px solid #fde68a',
                                         borderRadius: '6px',
                                         padding: '0.28rem 0.65rem',
                                         fontSize: '0.73rem',
@@ -811,7 +722,6 @@ export default function EOEventsTab({
                                 <button
                                   type="button"
                                   className="dropdown-item"
-                                  style={{ color: '#0d9488', fontWeight: 700 }}
                                   onClick={() => {
                                     onOpenEventDetail?.(evt, 'QR_ATTENDANCE');
                                     closeMenu();

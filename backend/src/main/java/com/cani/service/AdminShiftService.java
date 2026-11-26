@@ -45,9 +45,18 @@ public class AdminShiftService {
      * Lấy danh sách ca làm việc cho Admin & CSKH (hỗ trợ lọc từ khóa và trạng thái, có phân trang).
      */
     public Page<AdminShiftSummaryDto> getShifts(String query, ShiftStatus status, Pageable pageable) {
-        List<Shift> allShifts = shiftRepository.findAll();
-
         String q = query != null ? query.trim().toLowerCase() : "";
+
+        // Đường nhanh: phân trang trực tiếp trên DB kèm JOIN FETCH khi không có bộ lọc chuỗi/trạng thái
+        if (q.isEmpty() && status == null && pageable != null) {
+            Page<Shift> page = shiftRepository.findAllPageWithEventDetails(pageable);
+            List<AdminShiftSummaryDto> content = page.getContent().stream()
+                    .map(this::toSummaryDto)
+                    .collect(Collectors.toList());
+            return new PageImpl<>(content, pageable, page.getTotalElements());
+        }
+
+        List<Shift> allShifts = shiftRepository.findAllWithEventDetails();
 
         List<Shift> filtered = allShifts.stream()
                 .filter(s -> {
@@ -73,16 +82,6 @@ public class AdminShiftService {
                     return code.contains(q) || jobType.contains(q) || eventName.contains(q)
                             || eoName.contains(q) || eoPhone.contains(q);
                 })
-                .sorted((a, b) -> {
-                    // Sắp xếp ca mới nhất lên đầu
-                    if (a.getStartTime() != null && b.getStartTime() != null) {
-                        return b.getStartTime().compareTo(a.getStartTime());
-                    }
-                    if (a.getCreatedAt() != null && b.getCreatedAt() != null) {
-                        return b.getCreatedAt().compareTo(a.getCreatedAt());
-                    }
-                    return 0;
-                })
                 .collect(Collectors.toList());
 
         int start = (int) pageable.getOffset();
@@ -102,18 +101,39 @@ public class AdminShiftService {
      * Xem chi tiết ca làm việc kèm danh sách Worker tham gia.
      */
     public AdminShiftDetailDto getShiftDetail(UUID shiftId) {
-        Shift shift = shiftRepository.findById(shiftId)
+        Shift shift = shiftRepository.findWithEventDetailsByShiftId(shiftId)
+                .or(() -> shiftRepository.findById(shiftId))
                 .orElseThrow(() -> new ResourceNotFoundException("Ca làm việc", "id", shiftId));
 
         List<ShiftAssignment> assignments = shiftAssignmentRepository.findByShift_ShiftId(shiftId);
+
+        List<UUID> assignmentIds = assignments.stream()
+                .map(ShiftAssignment::getAssignmentId)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<UUID, AttendanceLog> attByAssignmentId = new HashMap<>();
+        boolean hasBatchAtt = false;
+        if (!assignmentIds.isEmpty()) {
+            List<AttendanceLog> batchLogs = attendanceLogRepository.findByShiftAssignment_AssignmentIdIn(assignmentIds);
+            if (batchLogs != null && (!batchLogs.isEmpty() || assignmentIds.size() > 1)) {
+                hasBatchAtt = true;
+                for (AttendanceLog al : batchLogs) {
+                    if (al != null && al.getShiftAssignment() != null && al.getShiftAssignment().getAssignmentId() != null) {
+                        attByAssignmentId.putIfAbsent(al.getShiftAssignment().getAssignmentId(), al);
+                    }
+                }
+            }
+        }
+        final boolean useBatchAtt = hasBatchAtt;
 
         List<AdminShiftWorkerDto> workers = assignments.stream()
                 .map(sa -> {
                     Worker w = sa.getWorker();
                     User u = w != null ? w.getUser() : null;
 
-                    Optional<AttendanceLog> attLog = attendanceLogRepository
-                            .findByShiftAssignment_AssignmentId(sa.getAssignmentId());
+                    Optional<AttendanceLog> attLog = useBatchAtt
+                            ? Optional.ofNullable(attByAssignmentId.get(sa.getAssignmentId()))
+                            : attendanceLogRepository.findByShiftAssignment_AssignmentId(sa.getAssignmentId());
 
                     return AdminShiftWorkerDto.builder()
                             .assignmentId(sa.getAssignmentId())

@@ -33,7 +33,6 @@ export default function EventDetailModal({
   onOpenEditEvent,
   onEditShift,
   onCancelShift,
-  onNavigateToRecruitment,
   onReloadEvents,
   onOpenPaymentDeclaration,
   onOpenShiftWorkspace,
@@ -43,10 +42,14 @@ export default function EventDetailModal({
   const [eventWorkers, setEventWorkers] = useState([]);
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [searchWorker, setSearchWorker] = useState('');
+  const [workerShiftFilter, setWorkerShiftFilter] = useState('ALL');
+  const [workerStatusFilter, setWorkerStatusFilter] = useState('ALL');
+  const [workerPage, setWorkerPage] = useState(1);
+  const workerPageSize = 15;
   const workerProfile = useWorkerProfile();
   const [activeWorkspaceShiftId, setActiveWorkspaceShiftId] = useState(null);
   const [showCancelledShifts, setShowCancelledShifts] = useState(false);
-  const [dispatchResultsByShiftId, setDispatchResultsByShiftId] = useState({});
+  const [dispatchResultsByShiftId] = useState({});
 
   useEffect(() => {
     if (initialTab) {
@@ -224,6 +227,12 @@ export default function EventDetailModal({
   };
 
   const filteredWorkers = eventWorkers.filter((w) => {
+    if (workerShiftFilter !== 'ALL' && String(w.shiftId || w.jobType || '') !== workerShiftFilter) {
+      return false;
+    }
+    if (workerStatusFilter === 'CHECKED_IN' && !w.checkinTime) return false;
+    if (workerStatusFilter === 'WAITING' && (w.checkinTime || w.assignmentStatus === 'NO_SHOW')) return false;
+    if (workerStatusFilter === 'NO_SHOW' && w.assignmentStatus !== 'NO_SHOW') return false;
     if (!searchWorker.trim()) return true;
     const q = searchWorker.toLowerCase();
     return (
@@ -232,6 +241,13 @@ export default function EventDetailModal({
       (w.workerPhone && w.workerPhone.includes(q))
     );
   });
+
+  const workerTotalPages = Math.max(1, Math.ceil(filteredWorkers.length / workerPageSize));
+  const safeWorkerPage = Math.min(Math.max(1, workerPage), workerTotalPages);
+  const paginatedEventWorkers = filteredWorkers.slice(
+    (safeWorkerPage - 1) * workerPageSize,
+    safeWorkerPage * workerPageSize
+  );
 
   const selectedQrShift = shifts.find((s) => s.shiftId === activeWorkspaceShiftId) || shifts[0] || null;
 
@@ -421,16 +437,7 @@ export default function EventDetailModal({
                 }}
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
-            ) : (
-              <div className="event-detail-icon-stage">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-              </div>
-            )}
+            ) : null}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 {asPage ? (
@@ -487,10 +494,6 @@ export default function EventDetailModal({
             <div className="info-item">
               <span className="info-label">Thời gian sự kiện</span>
               <span className="info-value">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
                 {formatDateTimeRange(event.startTime, event.endTime)}
               </span>
             </div>
@@ -999,16 +1002,53 @@ export default function EventDetailModal({
             <div className="event-detail-workers-section">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>
-                  Danh Sách Nhân Sự Tham Gia Sự Kiện ({eventWorkers.length})
+                  Danh Sách Nhân Sự Tham Gia Sự Kiện ({filteredWorkers.length}/{eventWorkers.length})
                 </h4>
-                <input
-                  type="text"
-                  placeholder="Tìm theo tên, vị trí ca, SĐT..."
-                  className="eo-form-input"
-                  style={{ width: '240px', padding: '0.4rem 0.75rem', fontSize: '0.825rem' }}
-                  value={searchWorker}
-                  onChange={(e) => setSearchWorker(e.target.value)}
-                />
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <select
+                    className="eo-form-input"
+                    style={{ width: 'auto', minWidth: '160px', padding: '0.4rem 0.65rem', fontSize: '0.82rem' }}
+                    value={workerShiftFilter}
+                    onChange={(e) => {
+                      setWorkerShiftFilter(e.target.value);
+                      setWorkerPage(1);
+                    }}
+                    aria-label="Lọc nhân sự theo ca"
+                  >
+                    <option value="ALL">Tất cả các ca</option>
+                    {shifts.map((sh) => (
+                      <option key={sh.shiftId} value={String(sh.shiftId)}>
+                        {sh.jobType} ({formatTime(sh.startTime)})
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="eo-form-input"
+                    style={{ width: 'auto', minWidth: '150px', padding: '0.4rem 0.65rem', fontSize: '0.82rem' }}
+                    value={workerStatusFilter}
+                    onChange={(e) => {
+                      setWorkerStatusFilter(e.target.value);
+                      setWorkerPage(1);
+                    }}
+                    aria-label="Lọc theo trạng thái điểm danh"
+                  >
+                    <option value="ALL">Mọi trạng thái</option>
+                    <option value="CHECKED_IN">Đã vào ca</option>
+                    <option value="WAITING">Chưa vào ca</option>
+                    <option value="NO_SHOW">Vắng mặt</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Tìm theo tên, vị trí ca, SĐT..."
+                    className="eo-form-input"
+                    style={{ width: '220px', padding: '0.4rem 0.75rem', fontSize: '0.825rem' }}
+                    value={searchWorker}
+                    onChange={(e) => {
+                      setSearchWorker(e.target.value);
+                      setWorkerPage(1);
+                    }}
+                  />
+                </div>
               </div>
 
               {loadingWorkers ? (
@@ -1032,8 +1072,9 @@ export default function EventDetailModal({
                   </p>
                 </div>
               ) : (
-                <div className="event-workers-list">
-                  {filteredWorkers.map((w, idx) => {
+                <>
+                  <div className="event-workers-list">
+                    {paginatedEventWorkers.map((w, idx) => {
                     const isReliableHigh = (w.workerReliabilityScore || 100) >= 90;
                     return (
                       <div key={w.assignmentId || idx} className="event-worker-card">
@@ -1199,10 +1240,6 @@ export default function EventDetailModal({
                               }}
                               title="Chặn nhân sự này không cho nhận ca trong tương lai"
                             >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                              </svg>
                               Chặn
                             </button>
                           )}
@@ -1210,7 +1247,26 @@ export default function EventDetailModal({
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                  {filteredWorkers.length > workerPageSize && (
+                    <div className="ev-pagination-bar" style={{ marginTop: '0.85rem', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                      <span className="ev-pagination-summary">
+                        Hiển thị <strong>{(safeWorkerPage - 1) * workerPageSize + 1}–{Math.min(safeWorkerPage * workerPageSize, filteredWorkers.length)}</strong> / <strong>{filteredWorkers.length}</strong> nhân sự
+                      </span>
+                      <div className="ev-pagination-controls">
+                        <button type="button" className="ev-page-btn" disabled={safeWorkerPage <= 1} onClick={() => setWorkerPage(safeWorkerPage - 1)}>
+                          ← Trước
+                        </button>
+                        <span style={{ fontSize: '0.8rem', color: '#475569', padding: '0 0.5rem', fontWeight: 600 }}>
+                          Trang {safeWorkerPage} / {workerTotalPages}
+                        </span>
+                        <button type="button" className="ev-page-btn" disabled={safeWorkerPage >= workerTotalPages} onClick={() => setWorkerPage(safeWorkerPage + 1)}>
+                          Sau →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

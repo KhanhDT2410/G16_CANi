@@ -30,9 +30,15 @@ public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment
     @Query("SELECT sa FROM ShiftAssignment sa WHERE sa.assignmentId = :assignmentId")
     Optional<ShiftAssignment> findByIdForUpdate(@Param("assignmentId") UUID assignmentId);
 
+    @EntityGraph(attributePaths = {"worker", "worker.user", "shift"})
     List<ShiftAssignment> findByShift_ShiftId(UUID shiftId);
+
+    @EntityGraph(attributePaths = {"worker", "worker.user", "shift"})
     List<ShiftAssignment> findByShift_ShiftIdIn(Collection<UUID> shiftIds);
+
     List<ShiftAssignment> findByGroupId(UUID groupId);
+
+    @EntityGraph(attributePaths = {"worker", "worker.user", "shift", "shift.event", "shift.event.eventOrganizer", "shift.event.eventOrganizer.user"})
     List<ShiftAssignment> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
 
     @EntityGraph(attributePaths = {"shift", "shift.event"})

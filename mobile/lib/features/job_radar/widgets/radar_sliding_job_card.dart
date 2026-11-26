@@ -359,23 +359,15 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
             ),
-            child: Row(
-              children: [
-                Icon(Icons.event_busy_rounded, size: 15, color: cani.warning),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    s.conflictReason ?? 'Bạn đã có ca nhận rồi',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: cani.warning,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+            child: Text(
+              s.conflictReason ?? 'Bạn đã có ca nhận rồi',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: cani.warning,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -414,7 +406,7 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
             Expanded(
               child: SizedBox(
                 height: 40,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: s.isConflicting
                       ? () {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -435,25 +427,6 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                                 ),
                               );
                             }),
-                  icon: Icon(
-                    s.isConflicting
-                        ? Icons.event_busy_rounded
-                        : (s.emergency ? Icons.flash_on_rounded : Icons.schedule_send_rounded),
-                    size: 15,
-                    color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
-                  ),
-                  label: Text(
-                    s.isConflicting
-                        ? 'Bạn đã có ca nhận rồi'
-                        : (s.emergency ? 'Nhận ca' : 'Chờ lời mời'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
-                    ),
-                  ),
                   style: ElevatedButton.styleFrom(
                     elevation: 0,
                     backgroundColor: (s.isConflicting || !s.emergency)
@@ -465,6 +438,18 @@ class _RadarSlidingJobCardState extends State<RadarSlidingJobCard> {
                       side: (s.isConflicting || !s.emergency)
                           ? BorderSide(color: cani.borderStrong)
                           : BorderSide.none,
+                    ),
+                  ),
+                  child: Text(
+                    s.isConflicting
+                        ? 'Bạn đã có ca nhận rồi'
+                        : (s.emergency ? 'Nhận ca' : 'Chờ lời mời'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: (s.isConflicting || !s.emergency) ? cani.textMuted : Colors.white,
                     ),
                   ),
                 ),

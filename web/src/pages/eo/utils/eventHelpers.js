@@ -34,8 +34,6 @@ export function createDefaultNewEvent() {
   };
 }
 
-export const DEFAULT_NEW_EVENT = createDefaultNewEvent();
-
 /**
  * Kiểm tra thời gian sự kiện (ngay khi chọn hoặc khi submit)
  */
@@ -228,7 +226,7 @@ export function getDynamicShiftStatus(shift = {}, eventStatus = 'ACTIVE') {
     return {
       code: 'FULL_WAITING',
       label: 'Đủ nhân sự - Chờ diễn ra',
-      colorClass: 'purple',
+      colorClass: 'green',
       bg: '#f0fdf4',
       color: '#15803d',
       border: '#bbf7d0',
@@ -555,7 +553,7 @@ export function getDynamicEventStatus(evt = {}) {
     return {
       code: 'READY',
       label: 'Đủ nhân sự • Chờ diễn ra',
-      colorClass: 'purple',
+      colorClass: 'green',
       subText: `Đã chốt đủ ${confirmed}/${required} nhân sự`,
     };
   }

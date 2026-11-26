@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'package:cani/core/utils/app_error_formatter.dart';
 import '../data/proposal_repository.dart';
 
 /// Chuẩn hóa mã mời từ chuỗi QR do Ban tổ chức phát hành.
@@ -96,7 +97,7 @@ class _InviteQrScannerScreenState extends ConsumerState<InviteQrScannerScreen> {
       if (!mounted) return;
       await _showRetryDialog(
         title: 'Tham Gia Ca Thất Bại',
-        message: e.toString().replaceFirst('RepositoryException: ', ''),
+        message: AppErrorFormatter.format(e, fallback: 'Không thể tham gia ca làm bằng mã mời này.'),
       );
     }
   }

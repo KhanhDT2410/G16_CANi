@@ -16,10 +16,6 @@ public interface SupportConversationRepository extends JpaRepository<SupportConv
     Optional<SupportConversation> findFirstByUserIdAndDisputeIdIsNullOrderByCreatedAtAsc(UUID userId);
     List<SupportConversation> findByDisputeIdIsNullOrderByCreatedAtAsc();
     Optional<SupportConversation> findByUserId(UUID userId);
-    Optional<SupportConversation> findByUserIdAndDisputeIdIsNull(UUID userId);
-    List<SupportConversation> findByDisputeIdIsNull();
-    List<SupportConversation> findByDisputeIdIsNullOrderByLastMessageAtDesc();
-    List<SupportConversation> findAllByOrderByLastMessageAtDesc();
     List<SupportConversation> findByDisputeId(UUID disputeId);
     Optional<SupportConversation> findByDisputeIdAndDisputeParty(UUID disputeId, String disputeParty);
     List<SupportConversation> findByDisputeIdIsNotNull();

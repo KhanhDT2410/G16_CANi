@@ -93,8 +93,8 @@ public class SupabaseAuthClient {
             log.warn("Đăng nhập thất bại cho email {}: {}", email, e.getStatusCode().value());
             throw new BadRequestException("Email hoặc mật khẩu không chính xác");
         } catch (HttpClientErrorException e) {
-            log.error("Lỗi xác thực GoTrue signInWithPassword: {}", e.getStatusCode().value());
-            throw new BadRequestException("Lỗi xác thực: " + e.getMessage());
+            log.error("Lỗi xác thực GoTrue signInWithPassword: {} - {}", e.getStatusCode().value(), e.getMessage());
+            throw new BadRequestException("Xác thực tài khoản thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.");
         }
     }
 

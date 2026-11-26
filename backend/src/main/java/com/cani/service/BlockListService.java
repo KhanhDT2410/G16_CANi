@@ -13,7 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -90,6 +92,18 @@ public class BlockListService {
     public boolean isEitherBlocked(UUID userAId, UUID userBId) {
         return blockListRepository.existsByBlocker_UserIdAndBlocked_UserId(userAId, userBId)
                 || blockListRepository.existsByBlocker_UserIdAndBlocked_UserId(userBId, userAId);
+    }
+
+    /**
+     * Lấy tập userId bị chặn hai chiều của một người dùng trong 1 câu truy vấn (tránh N+1 khi lọc nhiều ca)
+     */
+    @Transactional(readOnly = true)
+    public Set<UUID> getMutuallyBlockedUserIds(UUID userId) {
+        if (userId == null) {
+            return Collections.emptySet();
+        }
+        Set<UUID> ids = blockListRepository.findMutuallyBlockedUserIds(userId);
+        return ids != null ? ids : Collections.emptySet();
     }
 
     private BlockedUserResponseDto mapToResponseDto(BlockList blockList) {

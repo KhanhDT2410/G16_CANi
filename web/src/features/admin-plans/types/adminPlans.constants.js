@@ -10,13 +10,6 @@ export const CORE_PLAN_FEATURES = [
   'Tự động kích hoạt hỗ trợ khi có biến động ca làm',
 ];
 
-export const RECOMMENDED_EXTENDED_FEATURES = [
-  'Mở khóa tính năng Điều động nhân sự khẩn cấp',
-  'Kênh chăm sóc & hỗ trợ kỹ thuật riêng 24/7',
-  'Báo cáo số liệu chuyên sâu & đối soát đa chiều',
-  'Huy hiệu Nhà tổ chức xác thực uy tín cao',
-];
-
 export const PLAN_TYPE_OPTIONS = [
   { value: 'MATCHING_PLUS', label: 'Gói Tiêu Chuẩn', badgeClass: 'badge-matching' },
   { value: 'ENTERPRISE', label: 'Gói Doanh Nghiệp', badgeClass: 'badge-enterprise' },

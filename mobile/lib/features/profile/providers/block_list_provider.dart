@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/profile/models/blocked_user_model.dart';
 
 class BlockListState {
@@ -58,29 +59,8 @@ class BlockListNotifier extends StateNotifier<BlockListState> {
       debugPrint('Lỗi tải danh sách chặn: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Không thể tải danh sách chặn: $e',
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách chặn.'),
       );
-    }
-  }
-
-  Future<bool> blockUser({required String blockedId, String reason = ''}) async {
-    try {
-      final dio = _ref.read(dioProvider);
-      final response = await dio.post(
-        '/v1/blocks',
-        data: {
-          'blockedId': blockedId,
-          'reason': reason,
-        },
-      );
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        await loadBlockedList();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      debugPrint('Lỗi chặn người dùng: $e');
-      return false;
     }
   }
 

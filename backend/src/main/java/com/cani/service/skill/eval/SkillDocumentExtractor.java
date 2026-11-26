@@ -60,14 +60,6 @@ public class SkillDocumentExtractor {
         this.aiDocumentProvider = aiDocumentProvider;
     }
 
-    public void setAiEnabled(boolean aiEnabled) {
-        this.aiEnabled = aiEnabled;
-    }
-
-    public void setConfiguredModelName(String modelName) {
-        this.configuredModelName = modelName;
-    }
-
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
     }
@@ -302,15 +294,6 @@ public class SkillDocumentExtractor {
                     .failureMessage("Không thể giải mã phản hồi JSON synthetic: " + e.getMessage())
                     .build();
         }
-    }
-
-    /**
-     * @deprecated Chỉ giữ tương thích cho test cũ; dùng {@link #extractSyntheticBenchmarkOnly}
-     * để thể hiện rõ đây là bộ parser tổng hợp dành riêng cho benchmark offline.
-     */
-    @Deprecated
-    public DocumentExtractionResult parseExtractionOutput(String documentText, String promptVersion, String modelName) {
-        return extractSyntheticBenchmarkOnly(documentText, promptVersion, modelName);
     }
 
     private DocumentExtractionResult mapJsonNodeToResult(JsonNode root, String promptVersion, String modelName, String raw) {

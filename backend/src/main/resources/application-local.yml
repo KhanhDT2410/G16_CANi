@@ -20,8 +20,9 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
         default_schema: public
+        default_batch_fetch_size: 32
         type:
           preferred_enum_jdbc_type: NAMED_ENUM
 
@@ -42,8 +43,8 @@ server:
 
 logging:
   level:
-    com.cani: DEBUG
-    org.springframework.security: DEBUG
+    com.cani: ${APP_LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:WARN}
     org.hibernate.SQL: ${HIBERNATE_SQL_LOG:WARN}
     org.hibernate.orm.jdbc.bind: ${HIBERNATE_BIND_LOG:WARN}
     org.hibernate.type.descriptor.sql.BasicBinder: ${HIBERNATE_BIND_LOG:WARN}

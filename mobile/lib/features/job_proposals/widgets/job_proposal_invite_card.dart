@@ -155,24 +155,15 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                         color: cani.brandSoft,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.notifications_active_rounded, size: 12.5, color: cani.brand),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              'Lời mời làm việc',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: cani.brand,
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        'Lời mời làm việc',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: cani.brand,
+                        ),
                       ),
                     ),
                     Container(
@@ -278,19 +269,11 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
           const SizedBox(height: 6),
 
           // Giờ làm & Địa điểm
-          Row(
-            children: [
-              Icon(Icons.access_time_rounded, size: 13.5, color: cani.textMuted),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  '${_formatTimeRange(p)}${p.venueAddress.trim().isNotEmpty ? ' · ${p.venueAddress}' : ''}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: cani.textBody),
-                ),
-              ),
-            ],
+          Text(
+            '${_formatTimeRange(p)}${p.venueAddress.trim().isNotEmpty ? ' · ${p.venueAddress}' : ''}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: cani.textBody),
           ),
           if (p.isConflicting) ...[
             const SizedBox(height: 8),
@@ -301,23 +284,15 @@ class _JobProposalInviteCardState extends State<JobProposalInviteCard> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: cani.warning.withValues(alpha: 0.45)),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.event_busy_rounded, size: 14.5, color: cani.warning),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      p.conflictReason ?? 'Bạn đã có ca nhận rồi',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: cani.warning,
-                      ),
-                    ),
-                  ),
-                ],
+              child: Text(
+                p.conflictReason ?? 'Bạn đã có ca nhận rồi',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: cani.warning,
+                ),
               ),
             ),
           ],

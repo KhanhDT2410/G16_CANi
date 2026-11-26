@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/skill_verification/data/skill_verification_repository.dart';
 import 'package:cani/features/skill_verification/models/skill_models.dart';
 
@@ -80,7 +81,7 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
         mySkills: results[3] as List<WorkerSkillItem>,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể tải dữ liệu kỹ năng.'));
     }
   }
 
@@ -102,7 +103,7 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể khai báo kỹ năng.'),
       );
       return false;
     }
@@ -137,7 +138,7 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể gửi tài liệu thẩm định.'),
       );
       return false;
     }
@@ -164,7 +165,7 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể gửi lại tài liệu thẩm định.'),
       );
       return false;
     }
@@ -179,7 +180,7 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể thử lại xác minh chứng chỉ.'),
       );
       return false;
     }
@@ -200,9 +201,5 @@ class SkillVerificationNotifier extends StateNotifier<SkillVerificationState> {
       history: history,
       mySkills: mySkills,
     );
-  }
-
-  void clearLastResult() {
-    state = state.copyWith(clearResult: true);
   }
 }

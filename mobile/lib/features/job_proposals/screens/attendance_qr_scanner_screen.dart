@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'package:cani/core/utils/app_error_formatter.dart';
 import '../data/proposal_repository.dart';
 import '../models/proposal_models.dart';
 import 'rate_eo_screen.dart';
@@ -263,6 +264,10 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
       }
     } catch (e) {
       if (!mounted) return;
+      final errorMsg = AppErrorFormatter.format(
+        e,
+        fallback: 'Không thể xác thực điểm danh. Vui lòng thử lại.',
+      );
       await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -273,7 +278,7 @@ class _AttendanceQrScannerScreenState extends ConsumerState<AttendanceQrScannerS
               Text('Lỗi điểm danh'),
             ],
           ),
-          content: Text('Không thể xác thực điểm danh: $e'),
+          content: Text(errorMsg),
           actions: [
             TextButton(
               onPressed: () {

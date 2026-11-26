@@ -163,12 +163,30 @@ public class WorkerShiftEligibilityService {
         return evaluate(worker, shift, channel, inviteOverrideReason, false);
     }
 
+    public record WorkerEligibilityContext(
+            List<WorkerAvailability> availabilitySlots,
+            List<WorkerSkill> workerSkills,
+            Set<UUID> blockedUserIds,
+            Map<UUID, List<ShiftSkillRequirement>> skillReqsByShiftId,
+            Map<UUID, String> skillNamesById
+    ) {}
+
     public EligibilityResult evaluate(
             Worker worker,
             Shift shift,
             MatchingChannel channel,
             String inviteOverrideReason,
             boolean ignoreScheduleConflict) {
+        return evaluate(worker, shift, channel, inviteOverrideReason, ignoreScheduleConflict, null);
+    }
+
+    public EligibilityResult evaluate(
+            Worker worker,
+            Shift shift,
+            MatchingChannel channel,
+            String inviteOverrideReason,
+            boolean ignoreScheduleConflict,
+            WorkerEligibilityContext context) {
         if (worker == null || shift == null || channel == null) {
             return EligibilityResult.fail("INVALID_INPUT", "Thông tin nhân sự hoặc ca làm việc không hợp lệ.");
         }
@@ -237,10 +255,15 @@ public class WorkerShiftEligibilityService {
         }
 
         // 3. Danh sách chặn hai chiều (không bao giờ bypass)
-        if (blockListService != null && shiftEvent != null && shiftEvent.getEventOrganizer() != null) {
+        if (shiftEvent != null && shiftEvent.getEventOrganizer() != null) {
             EventOrganizer eo = shiftEvent.getEventOrganizer();
-            if (eo.getUser() != null && eo.getUser().getUserId() != null && worker.getUser().getUserId() != null) {
-                if (blockListService.isEitherBlocked(eo.getUser().getUserId(), worker.getUser().getUserId())) {
+            UUID eoUserId = eo.getUser() != null ? eo.getUser().getUserId() : null;
+            UUID workerUserId = worker.getUser().getUserId();
+            if (eoUserId != null && workerUserId != null) {
+                boolean isBlocked = (context != null && context.blockedUserIds() != null)
+                        ? context.blockedUserIds().contains(eoUserId)
+                        : (blockListService != null && blockListService.isEitherBlocked(eoUserId, workerUserId));
+                if (isBlocked) {
                     return EligibilityResult.fail("BLOCKED",
                             "Không thể nhận ca do tồn tại hạn chế tương tác với Ban tổ chức sự kiện.");
                 }
@@ -272,7 +295,10 @@ public class WorkerShiftEligibilityService {
                             "Mức lương của ca thấp hơn mức mong muốn tối thiểu của nhân sự.");
                 }
             }
-            if (!isShiftCoveredByAvailability(worker, shift)) {
+            boolean covered = (context != null && context.availabilitySlots() != null)
+                    ? isShiftCoveredByAvailability(context.availabilitySlots(), shift)
+                    : isShiftCoveredByAvailability(worker, shift);
+            if (!covered) {
                 return EligibilityResult.fail("AVAILABILITY_MISMATCH",
                         "Khung giờ ca làm không nằm trong lịch rảnh hàng tuần của nhân sự.");
             }
@@ -280,7 +306,12 @@ public class WorkerShiftEligibilityService {
 
         // 6. Điều kiện Kỹ năng Bắt buộc, Mức Xác Minh tối thiểu & Chứng chỉ an toàn còn
         // hiệu lực
-        List<EffectiveRequirement> allReqs = resolveEffectiveRequirements(shift);
+        List<EffectiveRequirement> allReqs = (context != null && context.skillReqsByShiftId() != null && shift.getShiftId() != null)
+                ? resolveEffectiveRequirements(
+                        shift,
+                        context.skillReqsByShiftId().getOrDefault(shift.getShiftId(), Collections.emptyList()),
+                        context.skillNamesById())
+                : resolveEffectiveRequirements(shift);
         List<EffectiveRequirement> requiredReqs = allReqs.stream()
                 .filter(r -> r.requirementType() == SkillRequirementType.REQUIRED)
                 .toList();
@@ -289,13 +320,18 @@ public class WorkerShiftEligibilityService {
         boolean usedOverride = false;
 
         if (!requiredReqs.isEmpty()) {
-            if (workerSkillRepository == null) {
-                log.error("Fail-closed eligibility check: thiếu WorkerSkillRepository khi kiểm tra ca {}",
-                        shift.getShiftId());
-                return EligibilityResult.fail("SKILL_DATA_UNAVAILABLE",
-                        "Hệ thống tạm thời chưa xác minh được hồ sơ kỹ năng của bạn.");
+            List<WorkerSkill> workerSkills;
+            if (context != null && context.workerSkills() != null) {
+                workerSkills = context.workerSkills();
+            } else {
+                if (workerSkillRepository == null) {
+                    log.error("Fail-closed eligibility check: thiếu WorkerSkillRepository khi kiểm tra ca {}",
+                            shift.getShiftId());
+                    return EligibilityResult.fail("SKILL_DATA_UNAVAILABLE",
+                            "Hệ thống tạm thời chưa xác minh được hồ sơ kỹ năng của bạn.");
+                }
+                workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
             }
-            List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
             if (workerSkills == null) {
                 return EligibilityResult.fail("SKILL_DATA_UNAVAILABLE",
                         "Không thể truy xuất dữ liệu kỹ năng của nhân sự.");
@@ -367,10 +403,31 @@ public class WorkerShiftEligibilityService {
      * hai lần.
      */
     public SkillFitResult evaluateSkillFit(Worker worker, Shift shift) {
+        return evaluateSkillFit(worker, shift, null, null, null, false);
+    }
+
+    public SkillFitResult evaluateSkillFit(
+            Worker worker,
+            Shift shift,
+            List<WorkerSkill> preloadedWorkerSkills,
+            List<ShiftSkillRequirement> preloadedReqs,
+            Map<UUID, String> preloadedSkillNames) {
+        return evaluateSkillFit(worker, shift, preloadedWorkerSkills, preloadedReqs, preloadedSkillNames, true);
+    }
+
+    private SkillFitResult evaluateSkillFit(
+            Worker worker,
+            Shift shift,
+            List<WorkerSkill> preloadedWorkerSkills,
+            List<ShiftSkillRequirement> preloadedReqs,
+            Map<UUID, String> preloadedSkillNames,
+            boolean usePreloadedReqs) {
         if (shift == null) {
             return SkillFitResult.empty();
         }
-        List<EffectiveRequirement> allReqs = resolveEffectiveRequirements(shift);
+        List<EffectiveRequirement> allReqs = usePreloadedReqs
+                ? resolveEffectiveRequirements(shift, preloadedReqs, preloadedSkillNames)
+                : resolveEffectiveRequirements(shift);
         if (allReqs.isEmpty()) {
             return SkillFitResult.empty();
         }
@@ -385,11 +442,13 @@ public class WorkerShiftEligibilityService {
         List<String> requiredNames = requiredReqs.stream().map(this::resolveDisplaySkillName).toList();
         List<String> preferredNames = preferredReqs.stream().map(this::resolveDisplaySkillName).toList();
 
-        if (worker == null || workerSkillRepository == null) {
+        if (worker == null || (preloadedWorkerSkills == null && workerSkillRepository == null)) {
             return new SkillFitResult(0.0, 0.0, 0.0, List.of(), List.of(), requiredNames, preferredNames);
         }
 
-        List<WorkerSkill> workerSkills = workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
+        List<WorkerSkill> workerSkills = preloadedWorkerSkills != null
+                ? preloadedWorkerSkills
+                : workerSkillRepository.findByWorker_WorkerId(worker.getWorkerId());
         if (workerSkills == null || workerSkills.isEmpty()) {
             return new SkillFitResult(0.0, 0.0, 0.0, List.of(), List.of(), requiredNames, preferredNames);
         }

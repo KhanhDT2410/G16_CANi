@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/skill_verification/models/skill_models.dart';
 
 final skillVerificationRepositoryProvider = Provider<SkillVerificationRepository>((ref) {
@@ -21,7 +22,7 @@ class SkillVerificationRepository {
       final data = response.data['data'] as List<dynamic>? ?? [];
       return data.map((e) => SkillModel.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      throw Exception('Không thể tải danh mục kỹ năng: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải danh mục kỹ năng.'));
     }
   }
 
@@ -31,7 +32,7 @@ class SkillVerificationRepository {
       final data = response.data['data'] as List<dynamic>? ?? [];
       return data.map((e) => WorkerSkillPointModel.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      throw Exception('Không thể tải bảng điểm kỹ năng: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải bảng điểm kỹ năng.'));
     }
   }
 
@@ -41,7 +42,7 @@ class SkillVerificationRepository {
       final data = response.data['data'] as List<dynamic>? ?? [];
       return data.map((e) => SkillVerificationResult.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      throw Exception('Không thể tải lịch sử thẩm định: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải lịch sử thẩm định.'));
     }
   }
 
@@ -113,10 +114,9 @@ class SkillVerificationRepository {
       final data = response.data['data'] as Map<String, dynamic>;
       return SkillVerificationResult.fromJson(data);
     } on DioException catch (e) {
-      final errorMsg = e.response?.data?['message'] ?? e.message ?? 'Lỗi không xác định khi gửi tài liệu';
-      throw Exception(errorMsg);
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Lỗi không xác định khi gửi tài liệu.'));
     } catch (e) {
-      throw Exception('Không thể gửi tài liệu thẩm định: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể gửi tài liệu thẩm định.'));
     }
   }
 
@@ -126,10 +126,9 @@ class SkillVerificationRepository {
       final data = response.data['data'] as Map<String, dynamic>;
       return SkillVerificationResult.fromJson(data);
     } on DioException catch (e) {
-      final errorMsg = e.response?.data?['message'] ?? e.message ?? 'Lỗi khi thử lại xác minh chứng chỉ';
-      throw Exception(errorMsg);
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Lỗi khi thử lại xác minh chứng chỉ.'));
     } catch (e) {
-      throw Exception('Không thể thử lại xác minh chứng chỉ: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể thử lại xác minh chứng chỉ.'));
     }
   }
 
@@ -139,7 +138,7 @@ class SkillVerificationRepository {
       final data = response.data['data'] as List<dynamic>? ?? [];
       return data.map((e) => WorkerSkillItem.fromJson(e as Map<String, dynamic>)).toList();
     } catch (e) {
-      throw Exception('Không thể tải danh sách kỹ năng đã kích hoạt: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách kỹ năng đã kích hoạt.'));
     }
   }
 
@@ -152,10 +151,9 @@ class SkillVerificationRepository {
       final data = response.data['data'] as List<dynamic>? ?? [];
       return data.map((e) => WorkerSkillItem.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
-      final errorMsg = e.response?.data?['message'] ?? e.message ?? 'Lỗi khi khai báo kỹ năng';
-      throw Exception(errorMsg);
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Lỗi khi khai báo kỹ năng.'));
     } catch (e) {
-      throw Exception('Không thể khai báo kỹ năng: $e');
+      throw Exception(AppErrorFormatter.format(e, fallback: 'Không thể khai báo kỹ năng.'));
     }
   }
 }

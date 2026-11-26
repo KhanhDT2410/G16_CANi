@@ -17,8 +17,6 @@ public interface EoWorkerRepository extends JpaRepository<EoWorker, UUID> {
 
     boolean existsByEventOrganizer_EoIdAndWorker_WorkerId(UUID eoId, UUID workerId);
 
-    void deleteByEventOrganizer_EoIdAndWorker_WorkerId(UUID eoId, UUID workerId);
-
     @Query("SELECT ew FROM EoWorker ew " +
            "JOIN FETCH ew.worker w " +
            "JOIN FETCH w.user u " +

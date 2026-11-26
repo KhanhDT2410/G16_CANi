@@ -2,16 +2,6 @@
  * Constants & Helpers cho UC-108: Revenue Dashboard
  */
 
-export const PLAN_TYPE_LABELS = {
-  INVITE_ONLY: 'Gói Giới Hạn Mời',
-  MATCHING_PLUS: 'Gói Đối Soát & Ghép Nâng Cao',
-};
-
-export const TRANSACTION_TYPE_LABELS = {
-  PACKAGE_SALE: 'Mua gói dịch vụ',
-  DIRECT_PAYMENT: 'Chi trả thù lao ca',
-};
-
 export const TRANSACTION_STATUS_LABELS = {
   ACTIVE: 'Hoạt động',
   CONFIRMED_FULL: 'Xác nhận đủ',
@@ -21,18 +11,6 @@ export const TRANSACTION_STATUS_LABELS = {
   UNVERIFIED: 'Chưa xác minh',
   CANCELLED: 'Đã hủy',
   EXPIRED: 'Hết hạn',
-};
-
-export const PAYMENT_STATUS_COLORS = {
-  CONFIRMED_FULL: '#10b981', // green
-  CONFIRMED_PARTIAL: '#3b82f6', // blue
-  DECLARED_PENDING_WORKER: '#f59e0b', // amber
-  NOT_DECLARED: '#9ca3af', // gray
-  DISPUTED: '#ef4444', // red
-  UNVERIFIED: '#ec4899', // pink
-  ACTIVE: '#10b981',
-  EXPIRED: '#6b7280',
-  CANCELLED: '#ef4444',
 };
 
 /**

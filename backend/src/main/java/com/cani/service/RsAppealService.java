@@ -108,7 +108,7 @@ public class RsAppealService {
         notificationService.sendNotification(
                 worker.getUser(),
                 "Nộp kháng cáo điểm uy tín thành công",
-                String.format("Đơn kháng cáo cho lần trừ -%d điểm RS của bạn đã được ghi nhận và đang chờ xử lý.", penaltyAmount),
+                String.format("Đơn kháng cáo cho lần trừ -%d điểm uy tín của bạn đã được ghi nhận và đang chờ xử lý.", penaltyAmount),
                 NotificationType.RS_APPEAL,
                 "RS_APPEAL",
                 saved.getId()
@@ -118,7 +118,7 @@ public class RsAppealService {
         notificationService.notifyRole(
                 UserRole.CUSTOMER_CARE,
                 "Có đơn kháng cáo điểm uy tín mới",
-                String.format("Worker %s vừa nộp kháng cáo cho lần trừ %d điểm RS.", worker.getUser().getFullName(), penaltyAmount),
+                String.format("Nhân sự %s vừa nộp kháng cáo cho lần trừ %d điểm uy tín.", worker.getUser().getFullName(), penaltyAmount),
                 NotificationType.RS_APPEAL,
                 "RS_APPEAL",
                 saved.getId()

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cani/core/network/dio_client.dart';
+import 'package:cani/core/utils/app_error_formatter.dart';
 import 'package:cani/features/worker_groups/models/group_proposal_models.dart';
 import 'package:cani/features/worker_groups/models/worker_group_models.dart';
 
@@ -158,7 +159,7 @@ class WorkerGroupsNotifier extends StateNotifier<WorkerGroupsState> {
       debugPrint('Lỗi tải danh sách đội: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Không thể tải danh sách đội: $e',
+        errorMessage: AppErrorFormatter.format(e, fallback: 'Không thể tải danh sách đội.'),
       );
     }
   }
@@ -282,7 +283,7 @@ class WorkerGroupsNotifier extends StateNotifier<WorkerGroupsState> {
       return (success: false, message: msg);
     } catch (e) {
       debugPrint('Lỗi giải tán đội: $e');
-      return (success: false, message: e.toString());
+      return (success: false, message: AppErrorFormatter.format(e, fallback: 'Giải tán đội thất bại.'));
     }
   }
 
@@ -374,17 +375,16 @@ class WorkerGroupsNotifier extends StateNotifier<WorkerGroupsState> {
     } catch (e) {
       debugPrint('Lỗi xác nhận đề xuất ca cho đội: $e');
       if (e is DioException) {
-        final statusCode = e.response?.statusCode;
-        final msg = e.response?.data is Map<String, dynamic>
-            ? (e.response?.data as Map<String, dynamic>)['message']?.toString()
-            : null;
         return AcceptProposalResult(
           success: false,
-          statusCode: statusCode,
-          message: msg,
+          statusCode: e.response?.statusCode,
+          message: AppErrorFormatter.format(e, fallback: 'Không thể xác nhận đề xuất ca cho đội.'),
         );
       }
-      return AcceptProposalResult(success: false, message: e.toString());
+      return AcceptProposalResult(
+        success: false,
+        message: AppErrorFormatter.format(e, fallback: 'Không thể xác nhận đề xuất ca cho đội.'),
+      );
     }
   }
 

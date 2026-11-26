@@ -3,7 +3,6 @@ package com.cani.service;
 import com.cani.entity.*;
 import com.cani.entity.enums.*;
 import com.cani.repository.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -73,9 +72,6 @@ public class MatchingDispatchService {
 
     @Autowired(required = false)
     private WorkerGroupMembershipRepository workerGroupMembershipRepository;
-
-    @Autowired(required = false)
-    private ObjectMapper objectMapper;
 
     @Autowired(required = false)
     private com.cani.repository.ShiftSkillRequirementRepository shiftSkillRequirementRepository;
@@ -641,7 +637,8 @@ public class MatchingDispatchService {
     }
 
     /**
-     * UC-59: Kích hoạt điều phối khẩn cấp thủ công (EO bấm trước giờ bắt đầu hoặc trong ca khi còn >= 30 phút)
+     * UC-59: Kích hoạt điều phối khẩn cấp thủ công (EO bấm trước giờ bắt đầu hoặc
+     * trong ca khi còn >= 30 phút)
      */
     @Transactional
     public int triggerEmergencyDispatch(UUID shiftId, Double customRadiusKm) {

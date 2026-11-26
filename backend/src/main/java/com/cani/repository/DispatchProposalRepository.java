@@ -2,6 +2,7 @@ package com.cani.repository;
 
 import com.cani.entity.DispatchProposal;
 import com.cani.entity.enums.ProposalStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,6 +22,8 @@ public interface DispatchProposalRepository extends JpaRepository<DispatchPropos
     }
 
     List<DispatchProposal> findByShift_ShiftId(UUID shiftId);
+
+    @EntityGraph(attributePaths = {"shift", "shift.event", "shift.event.eventOrganizer", "shift.event.eventOrganizer.user", "worker"})
     List<DispatchProposal> findByWorker_WorkerIdAndStatusOrderByCreatedAtDesc(UUID workerId, ProposalStatus status);
     List<DispatchProposal> findByWorker_WorkerIdOrderByCreatedAtDesc(UUID workerId);
     Optional<DispatchProposal> findByShift_ShiftIdAndWorker_WorkerId(UUID shiftId, UUID workerId);

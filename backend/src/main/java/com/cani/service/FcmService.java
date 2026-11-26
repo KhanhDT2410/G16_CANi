@@ -9,6 +9,7 @@ import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,8 +75,9 @@ public class FcmService {
     }
 
     /**
-     * Gửi Push Notification thời gian thực đến tất cả các thiết bị hoạt động của User
+     * Gửi Push Notification thời gian thực đến tất cả các thiết bị hoạt động của User (chạy bất đồng bộ ngoài luồng HTTP chính)
      */
+    @Async("fcmTaskExecutor")
     public void sendPushToUser(UUID userId, String title, String body, Map<String, String> dataPayload) {
         if (firebaseMessaging == null) {
             log.warn("[FcmService] FirebaseMessaging is null. Skipping push for user: {}", userId);

@@ -15,14 +15,6 @@ export const rsAppealApi = {
   },
 
   /**
-   * Xem chi tiết một đơn kháng cáo
-   */
-  getAppealById: async (id) => {
-    const response = await apiClient.get(`/v1/admin/appeals/${id}`);
-    return response.data?.data;
-  },
-
-  /**
    * Phê duyệt hoặc từ chối kháng cáo (Admin & Customer Care)
    */
   reviewAppeal: async (id, { approved, decisionNote }) => {
@@ -39,14 +31,6 @@ export const rsAppealApi = {
   submitAppeal: async (payload) => {
     const response = await apiClient.post('/v1/workers/appeals', payload);
     return response.data?.data;
-  },
-
-  /**
-   * Worker xem các đơn của mình
-   */
-  getWorkerAppeals: async () => {
-    const response = await apiClient.get('/v1/workers/appeals');
-    return response.data?.data || [];
   },
 };
 

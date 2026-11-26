@@ -14,14 +14,6 @@ export const wageMatrixApi = {
   },
 
   /**
-   * Xem chi tiết một bản ghi cấu hình thù lao
-   */
-  getWageMatrixById: async (matrixId) => {
-    const response = await apiClient.get(`/v1/admin/wage-matrix/${matrixId}`);
-    return response.data?.data;
-  },
-
-  /**
    * Tạo mới một mức thù lao chuẩn cho tổ hợp City, JobType, TimeSlot, LeadTime
    */
   createWageMatrix: async (payload) => {

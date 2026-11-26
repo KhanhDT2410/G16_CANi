@@ -26,7 +26,6 @@ const EOPaymentsTab = lazy(() => import('./components/EOPaymentsTab'));
 const EOSubscriptionTab = lazy(() => import('./components/EOSubscriptionTab'));
 const EoProfileTab = lazy(() => import('./components/EoProfileTab'));
 const EOMyTeamTab = lazy(() => import('./components/EOMyTeamTab'));
-const EOWorkerReviewsTab = lazy(() => import('./components/EOWorkerReviewsTab'));
 const EventCreationWizardModal = lazy(() => import('./components/EventCreationWizardModal'));
 const EventDetailModal = lazy(() => import('./components/EventDetailModal'));
 const ShiftWorkspacePage = lazy(() => import('./components/ShiftWorkspacePage'));
@@ -211,11 +210,23 @@ export default function EOPage() {
   }, [setSearchQuery]);
 
   const { loadEoPayments } = payments;
+  const { loadEvents } = events;
   useEffect(() => {
     if (activeTab === 'payments') {
       loadEoPayments();
     }
   }, [activeTab, loadEoPayments]);
+
+  useEffect(() => {
+    const handleDomainEvent = () => {
+      loadEvents({ silent: true });
+      if (activeTab === 'payments') {
+        loadEoPayments({ silent: true });
+      }
+    };
+    window.addEventListener('cani_domain_event', handleDomainEvent);
+    return () => window.removeEventListener('cani_domain_event', handleDomainEvent);
+  }, [activeTab, loadEvents, loadEoPayments]);
 
   // Helper đẩy URL query params vào Browser History để nút Back quay lại đúng màn/bước trước
   const syncUrlRoute = (paramsObj, { replace = false } = {}) => {
@@ -258,7 +269,10 @@ export default function EOPage() {
     } else if (tabParam === 'analytics' || tabParam === 'overview') {
       setActiveTab('overview');
       setActiveNav('overview');
-    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'worker-reviews', 'messages', 'settings', 'support'].includes(tabParam)) {
+    } else if (tabParam === 'worker-reviews') {
+      setActiveTab('my-team');
+      setActiveNav('my-team');
+    } else if (tabParam && ['events', 'payments', 'disputes', 'subscription', 'profile', 'my-team', 'messages', 'settings', 'support'].includes(tabParam)) {
       setActiveTab(tabParam);
       setActiveNav(tabParam);
     } else if (!tabParam) {
@@ -448,7 +462,7 @@ export default function EOPage() {
     } else if (navKey === 'my-team') {
       target = 'my-team';
     } else if (navKey === 'worker-reviews') {
-      target = 'worker-reviews';
+      target = 'my-team';
     } else if (navKey === 'messages') {
       target = 'messages';
     } else if (navKey === 'support') {
@@ -533,7 +547,6 @@ export default function EOPage() {
               {ekycStatus && ekycStatus !== 'APPROVED' && (
                 <div className="eo-ekyc-warning-banner">
                   <div className="warning-banner-left">
-                    <span className="warning-icon">⚠️</span>
                     <div>
                       <strong>Tài khoản chưa hoàn tất định danh eKYC</strong>
                       <p>
@@ -634,8 +647,9 @@ export default function EOPage() {
                   onEditShift={shifts.setEditingShift}
                   onCancelShift={shifts.handleCancelShift}
                   onOpenInvite={(shift, event) => setInviteModal({ isOpen: true, shift, event })}
-                  onReloadEvents={events.loadEvents}
+                  onReloadEvents={(opts) => events.loadEvents({ silent: true, ...(opts || {}) })}
                   onOpenPaymentDeclaration={payments.handleOpenPaymentDeclarationFromAttendance}
+                  onOpenPaymentQueue={payments.openPaymentQueue}
                   skillTaxonomy={shifts.skillTaxonomy}
                 />
               );
@@ -786,13 +800,10 @@ export default function EOPage() {
 
           {activeTab === 'my-team' && (
             <Suspense fallback={<EOTabFallback />}>
-              <EOMyTeamTab />
-            </Suspense>
-          )}
-
-          {activeTab === 'worker-reviews' && (
-            <Suspense fallback={<EOTabFallback />}>
-              <EOWorkerReviewsTab onReloadEvents={events.loadEvents} />
+              <EOMyTeamTab
+                initialSubTab={searchParams.get('tab') === 'worker-reviews' || searchParams.get('view') === 'reviews' ? 'reviews' : 'team'}
+                onReloadEvents={events.loadEvents}
+              />
             </Suspense>
           )}
 
@@ -814,7 +825,7 @@ export default function EOPage() {
 
           {(activeTab === 'profile' || activeTab === 'ekyc') && (
             <Suspense fallback={<EOTabFallback />}>
-              <EoProfileTab />
+              <EoProfileTab events={events.events} />
             </Suspense>
           )}
 

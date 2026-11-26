@@ -313,6 +313,29 @@ public class WorkerNearbyShiftQueryService {
         List<NearbyShiftResponseDto> nearbyList = new ArrayList<>(matchedCandidates.size());
         WorkerShiftEligibilityService eligibilityService = getEligibilityService();
 
+        WorkerShiftEligibilityService.WorkerEligibilityContext eligibilityContext = null;
+        if (currentWorker != null) {
+            List<com.cani.entity.WorkerAvailability> preloadedAvailability =
+                    workerAvailabilityRepository != null && currentWorker.getWorkerId() != null
+                            ? workerAvailabilityRepository.findByWorker_WorkerIdOrderByDayOfWeekAscStartTimeAsc(currentWorker.getWorkerId())
+                            : null;
+            List<com.cani.entity.WorkerSkill> preloadedSkills =
+                    workerSkillRepository != null && currentWorker.getWorkerId() != null
+                            ? workerSkillRepository.findByWorker_WorkerId(currentWorker.getWorkerId())
+                            : null;
+            Set<UUID> blockedUserIds =
+                    blockListService != null && currentWorker.getUser() != null && currentWorker.getUser().getUserId() != null
+                            ? blockListService.getMutuallyBlockedUserIds(currentWorker.getUser().getUserId())
+                            : null;
+            eligibilityContext = new WorkerShiftEligibilityService.WorkerEligibilityContext(
+                    preloadedAvailability,
+                    preloadedSkills,
+                    blockedUserIds,
+                    shiftSkillRequirementRepository != null ? skillReqsByShiftId : null,
+                    skillNamesById
+            );
+        }
+
         for (NearbyShiftCandidate candidate : matchedCandidates) {
             Shift s = candidate.shift();
             if (currentWorker != null) {
@@ -320,7 +343,7 @@ public class WorkerNearbyShiftQueryService {
                         ? WorkerShiftEligibilityService.MatchingChannel.EMERGENCY_DISPATCH
                         : WorkerShiftEligibilityService.MatchingChannel.REVERSE_MATCHING;
                 WorkerShiftEligibilityService.EligibilityResult eligibility = eligibilityService.evaluate(
-                        currentWorker, s, channel, null, true);
+                        currentWorker, s, channel, null, true, eligibilityContext);
                 if (!eligibility.eligible()) {
                     continue;
                 }

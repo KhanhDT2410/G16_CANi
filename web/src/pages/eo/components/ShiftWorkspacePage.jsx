@@ -10,8 +10,6 @@ import ConfirmVerifySkillModal, { resolvePreassignedPerformedSkillId } from './C
 import ReportNoShowModal from './ReportNoShowModal';
 import ShiftEmergencyBanner from './ShiftEmergencyBanner';
 import EmergencyTriggerButton from './EmergencyTriggerButton';
-import { WorkerProfileModal } from './worker-profile';
-import { useWorkerProfile } from '../hooks/useWorkerProfile';
 import { resolveAssetUrl } from '../utils/resolveAssetUrl';
 import WorkerDetailDrawer from './shift-workspace/WorkerDetailDrawer';
 import QuickEvidenceReviewModal from './shift-workspace/QuickEvidenceReviewModal';
@@ -22,6 +20,7 @@ import {
   getWorkerAttentionFlags,
   getWorkerChecklistSummary,
   getWorkerPriorityRank,
+  maskPhoneNumber,
   parseShiftChecklistTasks,
 } from './shift-workspace/shiftWorkspaceHelpers';
 import './EOEventsTab.css';
@@ -64,7 +63,6 @@ export default function ShiftWorkspacePage({
   const [drawerWorkerId, setDrawerWorkerId] = useState(null);
   const [evidenceQueueState, setEvidenceQueueState] = useState({ isOpen: false, initialIndex: 0 });
   const [highlightedAssignmentId, setHighlightedAssignmentId] = useState(null);
-  const workerProfile = useWorkerProfile();
 
   // QR Attendance Modal
   const [showQrModal, setShowQrModal] = useState(false);
@@ -486,13 +484,6 @@ export default function ShiftWorkspacePage({
     ? (serverQrData?.checkinQrContent || fallbackPayload)
     : (serverQrData?.checkoutQrContent || fallbackPayload);
 
-  // Stacked progress bar percentages
-  const safeTotalWorkers = Math.max(1, attendanceList.length);
-  const pctSettled = Math.round((paidCount / safeTotalWorkers) * 100);
-  const pctWaitPay = Math.round((workerFilterCounts.NEED_PAYMENT / safeTotalWorkers) * 100);
-  const pctWaitVerify = Math.round((workerFilterCounts.NEED_VERIFY / safeTotalWorkers) * 100);
-  const pctAttention = Math.max(0, 100 - pctSettled - pctWaitPay - pctWaitVerify);
-
   return (
     <div className="shift-workspace-container animate-fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {/* 1. THANH ĐIỀU HƯỚNG & CÔNG CỤ CA */}
@@ -638,24 +629,30 @@ export default function ShiftWorkspacePage({
           </button>
         </div>
 
-        {/* Stacked Progress Bar (Clickable filters for 40+ workers) */}
+        {/* Dải tóm tắt tiến độ vận hành trên số nhân sự đã nhận ca */}
         {attendanceList.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <div style={{ display: 'flex', height: 8, borderRadius: 999, overflow: 'hidden', background: '#f1f5f9', gap: 1 }}>
-              {pctSettled > 0 && <div style={{ width: `${pctSettled}%`, background: '#10b981' }} title="Đã quyết toán" />}
-              {pctWaitPay > 0 && <div style={{ width: `${pctWaitPay}%`, background: '#2563eb' }} title="Chờ thanh toán" />}
-              {pctWaitVerify > 0 && <div style={{ width: `${pctWaitVerify}%`, background: '#f59e0b' }} title="Chờ duyệt công" />}
-              {pctAttention > 0 && <div style={{ width: `${pctAttention}%`, background: '#cbd5e1' }} title="Chưa vào ca / Vắng" />}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.9rem', fontSize: '0.76rem', color: '#475569' }}>
-              <span>● Đã vào ca: <strong>{checkedInCount}</strong> ({completedCount} kết ca)</span>
-              <span style={{ color: workerFilterCounts.NEED_ATTENTION > 0 ? '#b45309' : '#64748b' }}>
-                ● Cần chú ý đầu ca: <strong>{workerFilterCounts.NEED_ATTENTION}</strong>
-              </span>
-              <span>● Chờ duyệt công: <strong>{workerFilterCounts.NEED_VERIFY}</strong></span>
-              <span>● Chờ thanh toán: <strong>{workerFilterCounts.NEED_PAYMENT}</strong> ({pendingPayCount} chờ xác nhận)</span>
-              <span style={{ color: '#059669' }}>● Đã trả đủ: <strong>{paidCount}</strong></span>
-            </div>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '0.6rem 1.15rem',
+              paddingTop: '0.65rem',
+              borderTop: '1px solid #f1f5f9',
+              fontSize: '0.78rem',
+              color: '#475569',
+            }}
+          >
+            <span style={{ fontWeight: 700, color: '#0f172a' }}>
+              Vận hành ({attendanceList.length} người đã nhận):
+            </span>
+            <span>Đã vào ca: <strong>{checkedInCount}</strong> ({completedCount} kết ca)</span>
+            <span style={{ color: workerFilterCounts.NEED_ATTENTION > 0 ? '#b45309' : '#64748b' }}>
+              Cần chú ý đầu ca: <strong>{workerFilterCounts.NEED_ATTENTION}</strong>
+            </span>
+            <span>Chờ duyệt công: <strong>{workerFilterCounts.NEED_VERIFY}</strong></span>
+            <span>Chờ thanh toán: <strong>{workerFilterCounts.NEED_PAYMENT}</strong> ({pendingPayCount} chờ xác nhận)</span>
+            <span style={{ color: '#059669', fontWeight: 600 }}>Đã trả đủ: <strong>{paidCount}</strong></span>
           </div>
         )}
       </div>
@@ -949,7 +946,7 @@ export default function ShiftWorkspacePage({
                             )}
                           </div>
                           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            {item.workerPhone || 'Chưa có SĐT'} • {item.workerReliabilityScore || 100} uy tín
+                            {maskPhoneNumber(item.workerPhone)} • {item.workerReliabilityScore || 100} uy tín
                           </span>
                         </div>
                       </td>
@@ -1143,7 +1140,6 @@ export default function ShiftWorkspacePage({
         verifyingId={verifyingId}
         submittingReview={submittingReview}
         onClose={() => setDrawerWorkerId(null)}
-        onOpenProfile={(id) => workerProfile.openProfile(id)}
         onPreviewImage={(img) => setPreviewImage(img)}
         onVerify={(item) => triggerSingleVerify(item)}
         onOpenPayment={(item) => onOpenPaymentDeclaration?.(item)}
@@ -1349,15 +1345,6 @@ export default function ShiftWorkspacePage({
             onReloadEvents ? Promise.resolve(onReloadEvents({ silent: true })) : Promise.resolve(),
           ]);
         }}
-      />
-
-      <WorkerProfileModal
-        isOpen={workerProfile.isOpen}
-        loading={workerProfile.loading}
-        error={workerProfile.error}
-        profile={workerProfile.profile}
-        onClose={workerProfile.closeProfile}
-        onRetry={workerProfile.retry}
       />
     </div>
   );

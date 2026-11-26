@@ -176,3 +176,11 @@ export function getSourceLabel(source) {
       return source || '';
   }
 }
+
+export function maskPhoneNumber(phone) {
+  if (!phone) return 'Chưa có SĐT';
+  const trimmed = String(phone).trim();
+  if (!trimmed) return 'Chưa có SĐT';
+  if (trimmed.length <= 5) return '***';
+  return `${trimmed.slice(0, 3)}***${trimmed.slice(-3)}`;
+}

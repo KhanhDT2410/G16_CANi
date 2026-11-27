@@ -1513,6 +1513,93 @@ class WorkerJobServiceTest {
         workerJobService.cancelAssignment(userId, assignmentId, "Bệnh đột xuất");
 
         assertThat(worker.getReliabilityScore()).isEqualTo(0); // Không âm
+        assertThat(workerUser.getStatus()).isEqualTo(UserStatus.LOCKED);
+        verify(userRepository).save(workerUser);
+    }
+
+    @Test
+    @DisplayName("UTC043b - cancelAssignment() - BR-49 Regression: Mốc ranh giới cố định 24h, 12h, đúng giờ và sau giờ bắt đầu")
+    void cancelAssignment_Br49Boundaries_FixedClock_DeductsExpectedPenalty() {
+        Instant fixedNow = Instant.parse("2026-06-01T10:00:00Z");
+
+        try (org.mockito.MockedStatic<Instant> instantMock = mockStatic(Instant.class, CALLS_REAL_METHODS)) {
+            instantMock.when(Instant::now).thenReturn(fixedNow);
+
+            // 1. Đúng 24 giờ trước ca -> trừ 5 điểm
+            assertCancellationPenaltyAtBoundary(fixedNow.plus(24, ChronoUnit.HOURS), 90, 85, UserStatus.ACTIVE);
+
+            // 2. Dưới 24 giờ (23h59m) -> trừ 10 điểm
+            assertCancellationPenaltyAtBoundary(
+                    fixedNow.plus(23, ChronoUnit.HOURS).plus(59, ChronoUnit.MINUTES), 90, 80, UserStatus.ACTIVE);
+
+            // 3. Đúng 12 giờ trước ca -> trừ 10 điểm
+            assertCancellationPenaltyAtBoundary(fixedNow.plus(12, ChronoUnit.HOURS), 90, 80, UserStatus.ACTIVE);
+
+            // 4. Dưới 12 giờ (11h59m) -> trừ 20 điểm
+            assertCancellationPenaltyAtBoundary(
+                    fixedNow.plus(11, ChronoUnit.HOURS).plus(59, ChronoUnit.MINUTES), 90, 70, UserStatus.ACTIVE);
+
+            // 5. Đúng giờ bắt đầu ca (0h) -> trừ 20 điểm
+            assertCancellationPenaltyAtBoundary(fixedNow, 90, 70, UserStatus.ACTIVE);
+
+            // 6. Sau giờ bắt đầu ca (-30m và -2h) -> trừ 20 điểm
+            assertCancellationPenaltyAtBoundary(fixedNow.minus(30, ChronoUnit.MINUTES), 90, 70, UserStatus.ACTIVE);
+            assertCancellationPenaltyAtBoundary(fixedNow.minus(2, ChronoUnit.HOURS), 90, 70, UserStatus.ACTIVE);
+        }
+    }
+
+    @Test
+    @DisplayName("UTC043c - cancelAssignment() - BR-49 Regression: Hủy đúng/sau giờ bắt đầu không âm điểm và tự động khóa tài khoản khi RS < 20")
+    void cancelAssignment_AtOrAfterStart_ScoreFloorZeroAndAutoLockThreshold() {
+        Instant fixedNow = Instant.parse("2026-06-01T10:00:00Z");
+
+        try (org.mockito.MockedStatic<Instant> instantMock = mockStatic(Instant.class, CALLS_REAL_METHODS)) {
+            instantMock.when(Instant::now).thenReturn(fixedNow);
+
+            // RS = 40 - 20 = 20 -> chưa dưới 20 nên KHÔNG khóa
+            assertCancellationPenaltyAtBoundary(fixedNow, 40, 20, UserStatus.ACTIVE);
+            verify(userRepository, never()).save(workerUser);
+
+            // RS = 39 - 20 = 19 (< 20) -> tự động khóa LOCKED
+            assertCancellationPenaltyAtBoundary(fixedNow, 39, 19, UserStatus.LOCKED);
+            verify(userRepository, times(1)).save(workerUser);
+
+            // RS = 10 - 20 -> sàn 0 (không âm) và khóa LOCKED
+            assertCancellationPenaltyAtBoundary(fixedNow.minus(1, ChronoUnit.HOURS), 10, 0, UserStatus.LOCKED);
+            verify(userRepository, times(2)).save(workerUser);
+        }
+    }
+
+    private void assertCancellationPenaltyAtBoundary(
+            Instant startTime,
+            int initialScore,
+            int expectedScore,
+            UserStatus expectedUserStatus
+    ) {
+        UUID assignmentId = UUID.randomUUID();
+        worker.setReliabilityScore(initialScore);
+        workerUser.setStatus(UserStatus.ACTIVE);
+        activeShift.setStartTime(startTime);
+        activeShift.setEndTime(startTime.plus(4, ChronoUnit.HOURS));
+        activeShift.setConfirmedWorkers(1);
+        activeShift.setRemainingWorkers(3);
+        activeShift.setEmergency(false);
+
+        ShiftAssignment sa = ShiftAssignment.builder()
+                .assignmentId(assignmentId)
+                .shift(activeShift)
+                .worker(worker)
+                .status(AssignmentStatus.CONFIRMED)
+                .build();
+
+        when(workerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(worker));
+        when(shiftAssignmentRepository.findById(assignmentId)).thenReturn(Optional.of(sa));
+
+        workerJobService.cancelAssignment(userId, assignmentId, "Hủy ca kiểm thử ranh giới");
+
+        assertThat(sa.getStatus()).isEqualTo(AssignmentStatus.CANCELLED);
+        assertThat(worker.getReliabilityScore()).isEqualTo(expectedScore);
+        assertThat(workerUser.getStatus()).isEqualTo(expectedUserStatus);
     }
 
     // =========================================================================

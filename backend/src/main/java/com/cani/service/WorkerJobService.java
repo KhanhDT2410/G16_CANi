@@ -1597,7 +1597,7 @@ public class WorkerJobService {
     }
 
     private int calculateCancellationPenalty(Instant now, Instant startTime) {
-        if (startTime != null && startTime.isAfter(now)) {
+        if (startTime != null) {
             long hoursUntilStart = Duration.between(now, startTime).toHours();
             if (hoursUntilStart < 12) return 20;
             if (hoursUntilStart < 24) return 10;

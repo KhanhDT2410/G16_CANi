@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CITY_OPTIONS } from '../types/wageMatrix.constants';
+import React, { useState, useEffect } from 'react';
+import { REGION_OPTIONS, JOB_TIER_OPTIONS } from '../types/wageMatrix.constants';
 
 export const WageMatrixFilter = ({
   filters,
@@ -9,6 +9,10 @@ export const WageMatrixFilter = ({
   loading,
 }) => {
   const [localFilters, setLocalFilters] = useState(filters);
+
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -21,7 +25,8 @@ export const WageMatrixFilter = ({
   };
 
   const handleReset = () => {
-    setLocalFilters({ city: '', jobType: '', isActive: '' });
+    const empty = { regionCode: '', jobTier: '', isActive: '' };
+    setLocalFilters(empty);
     onResetFilters();
   };
 
@@ -29,34 +34,39 @@ export const WageMatrixFilter = ({
     <div className="wage-matrix-filter-card">
       <form onSubmit={handleSubmit} className="wage-matrix-filter-form">
         <div className="filter-group">
-          <label htmlFor="filter-city">Khu Vực / Thành Phố</label>
+          <label htmlFor="filter-region">Vùng Lương (NĐ 293/2025)</label>
           <select
-            id="filter-city"
-            name="city"
-            value={localFilters.city}
+            id="filter-region"
+            name="regionCode"
+            value={localFilters.regionCode}
             onChange={handleChange}
             className="filter-select"
           >
-            <option value="">Tất cả thành phố</option>
-            {CITY_OPTIONS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
+            <option value="">Tất cả 4 vùng</option>
+            {REGION_OPTIONS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
               </option>
             ))}
           </select>
         </div>
 
         <div className="filter-group">
-          <label htmlFor="filter-job-type">Vị Trí Công Việc</label>
-          <input
-            id="filter-job-type"
-            type="text"
-            name="jobType"
-            placeholder="VD: Phục vụ bàn, Lễ tân..."
-            value={localFilters.jobType}
+          <label htmlFor="filter-job-tier">Nhóm Công Việc (Job Tier)</label>
+          <select
+            id="filter-job-tier"
+            name="jobTier"
+            value={localFilters.jobTier}
             onChange={handleChange}
-            className="filter-input"
-          />
+            className="filter-select"
+          >
+            <option value="">Tất cả 6 nhóm bậc</option>
+            {JOB_TIER_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="filter-group">
@@ -76,7 +86,7 @@ export const WageMatrixFilter = ({
 
         <div className="filter-buttons">
           <button type="submit" className="btn-filter-submit" disabled={loading}>
-            Tìm Kiếm
+            Lọc Dữ Liệu
           </button>
           <button
             type="button"
@@ -95,7 +105,7 @@ export const WageMatrixFilter = ({
           onClick={onOpenCreate}
           className="btn-create-wage"
         >
-          Thêm Mức Lương Mới
+          Thêm Cấu Hình Mới
         </button>
       </div>
     </div>

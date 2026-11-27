@@ -1,5 +1,7 @@
 /**
- * Shared validation & evidence-based wage benchmark helpers for EO shift creation/editing.
+ * Shared validation & Region × JobTier wage benchmark helpers (Bảng A - NĐ 293/2025/NĐ-CP).
+ * Backend (/api/v1/wage-recommendations) là Single Source of Truth; helper client-side chỉ dùng
+ * để kiểm tra sàn pháp lý và hiển thị tạm khi offline/đang chờ API.
  */
 
 export const ROLES = [
@@ -14,54 +16,161 @@ export const ROLES = [
   'PG / PB',
 ];
 
+export const JOB_TIER_BENCHMARKS = [
+  {
+    code: 'TIER_1_GENERAL',
+    label: 'Phổ thông',
+    description: 'Phát tờ rơi, hậu cần nhẹ, trực khu vực',
+    minMult: 1.0,
+    recMult: 1.15,
+    maxMult: 1.3,
+  },
+  {
+    code: 'TIER_2_SERVICE',
+    label: 'Giao tiếp & Dịch vụ',
+    description: 'Lễ tân, check-in, hướng dẫn khách, phục vụ bàn, thu ngân',
+    minMult: 1.3,
+    recMult: 1.55,
+    maxMult: 1.8,
+  },
+  {
+    code: 'TIER_3_PHYSICAL',
+    label: 'Thể lực / An ninh',
+    description: 'Bốc xếp, setup sân khấu, bảo vệ, an ninh',
+    minMult: 1.5,
+    recMult: 1.85,
+    maxMult: 2.2,
+  },
+  {
+    code: 'TIER_4_PROMOTION',
+    label: 'PG / PB bán hàng & Pha chế',
+    description: 'PG/PB bán hàng, sampling, roadshow, pha chế',
+    minMult: 2.0,
+    recMult: 2.8,
+    maxMult: 4.0,
+  },
+  {
+    code: 'TIER_5_TECHNICAL',
+    label: 'Điều phối & Kỹ thuật',
+    description: 'Điều phối sự kiện, kỹ thuật âm thanh - ánh sáng',
+    minMult: 2.5,
+    recMult: 3.75,
+    maxMult: 5.0,
+  },
+  {
+    code: 'TIER_6_SPECIALIST',
+    label: 'Chuyên nghiệp / Ngoại ngữ',
+    description: 'PG/PB chuyên nghiệp, ngoại ngữ, MC song ngữ',
+    minMult: 4.5,
+    recMult: 6.5,
+    maxMult: 10.0,
+  },
+];
+
+const TIER_MAP = Object.fromEntries(JOB_TIER_BENCHMARKS.map((t) => [t.code, t]));
+
+function normalizeAscii(str) {
+  return String(str || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/\s+/g, ' ');
+}
+
+export function classifyJobTier(jobType, explicitTier = null) {
+  if (explicitTier && TIER_MAP[explicitTier]) return explicitTier;
+  const norm = normalizeAscii(jobType);
+  if (!norm) return 'TIER_1_GENERAL';
+
+  const exactMap = {
+    'phat to roi': 'TIER_1_GENERAL',
+    'hau can / setup su kien': 'TIER_3_PHYSICAL',
+    'phuc vu ban': 'TIER_2_SERVICE',
+    'phu bep': 'TIER_2_SERVICE',
+    'thu ngan': 'TIER_2_SERVICE',
+    'le tan / check-in': 'TIER_2_SERVICE',
+    'bao ve / an ninh': 'TIER_3_PHYSICAL',
+    'pha che': 'TIER_4_PROMOTION',
+    'pha che (bartender/barista)': 'TIER_4_PROMOTION',
+    'pg / pb': 'TIER_4_PROMOTION',
+    'dieu phoi su kien': 'TIER_5_TECHNICAL',
+    'ky thuat am thanh - anh sang': 'TIER_5_TECHNICAL',
+  };
+  if (exactMap[norm]) return exactMap[norm];
+
+  const padded = ` ${norm.replace(/[^a-z0-9]+/g, ' ')} `;
+  const hasAny = (kws) =>
+    kws.some((kw) =>
+      kw.length <= 3 && !kw.includes(' ') ? padded.includes(` ${kw} `) : norm.includes(kw)
+    );
+
+  if (hasAny(['mc', 'song ngu', 'ngoai ngu', 'phien dich', 'bilingual', 'english', 'chuyen nghiep'])) {
+    return 'TIER_6_SPECIALIST';
+  }
+  if (hasAny(['dieu phoi', 'coordinator', 'ky thuat', 'am thanh', 'anh sang', 'led', 'av', 'quay phim', 'chup anh'])) {
+    return 'TIER_5_TECHNICAL';
+  }
+  if (hasAny(['pg', 'pb', 'pha che', 'bartender', 'barista', 'sampling', 'roadshow', 'ban hang', 'sales'])) {
+    return 'TIER_4_PROMOTION';
+  }
+  if (hasAny(['boc xep', 'setup', 'san khau', 'bao ve', 'an ninh', 'security', 'van chuyen', 'khuon vac'])) {
+    return 'TIER_3_PHYSICAL';
+  }
+  if (hasAny(['le tan', 'check-in', 'checkin', 'phuc vu', 'thu ngan', 'cashier', 'phu bep', 'huong dan', 'chay ban'])) {
+    return 'TIER_2_SERVICE';
+  }
+  return 'TIER_1_GENERAL';
+}
+
+function buildRoleDefaultFromTier(tierCode, note) {
+  const tier = TIER_MAP[tierCode] || TIER_MAP.TIER_1_GENERAL;
+  const floor = 25500;
+  const round1000 = (v) => Math.round(v / 1000) * 1000;
+  const rec = round1000(floor * tier.recMult);
+  return {
+    min: round1000(floor * tier.minMult),
+    max: round1000(floor * tier.maxMult),
+    defaultWage: rec,
+    recommended: rec,
+    note,
+  };
+}
+
 export const WAGE_RECOMMENDATIONS_MAP = {
-  'Lễ tân / Check-in': { min: 45000, max: 60000, defaultWage: 50000, recommended: 50000, note: 'Giao tiếp tốt, ngoại hình sáng' },
-  'Phục vụ bàn': { min: 35000, max: 50000, defaultWage: 40000, recommended: 40000, note: 'Nhanh nhẹn, cẩn thận' },
-  'Pha chế': { min: 60000, max: 85000, defaultWage: 70000, recommended: 70000, note: 'Có tay nghề pha chế' },
-  'Pha chế (Bartender/Barista)': { min: 60000, max: 85000, defaultWage: 70000, recommended: 70000, note: 'Có tay nghề pha chế' },
-  'Thu ngân': { min: 40000, max: 55000, defaultWage: 45000, recommended: 45000, note: 'Trung thực, tính toán chuẩn xác' },
-  'Điều phối sự kiện': { min: 70000, max: 100000, defaultWage: 80000, recommended: 80000, note: 'Kinh nghiệm quản lý nhóm' },
-  'Kỹ thuật âm thanh - ánh sáng': { min: 80000, max: 120000, defaultWage: 95000, recommended: 95000, note: 'Chuyên môn thiết bị sự kiện' },
-  'Bảo vệ / An ninh': { min: 40000, max: 55000, defaultWage: 45000, recommended: 45000, note: 'Thể lực tốt, giữ trật tự' },
-  'Hậu cần / Setup sự kiện': { min: 50000, max: 70000, defaultWage: 55000, recommended: 55000, note: 'Sức khỏe tốt, khuân vác, setup' },
-  'PG / PB': { min: 70000, max: 110000, defaultWage: 85000, recommended: 85000, note: 'Ngoại hình, giới thiệu sản phẩm' },
+  'Lễ tân / Check-in': buildRoleDefaultFromTier('TIER_2_SERVICE', 'Giao tiếp tốt, ngoại hình sáng'),
+  'Phục vụ bàn': buildRoleDefaultFromTier('TIER_2_SERVICE', 'Nhanh nhẹn, cẩn thận'),
+  'Pha chế': buildRoleDefaultFromTier('TIER_4_PROMOTION', 'Có tay nghề pha chế'),
+  'Pha chế (Bartender/Barista)': buildRoleDefaultFromTier('TIER_4_PROMOTION', 'Có tay nghề pha chế'),
+  'Thu ngân': buildRoleDefaultFromTier('TIER_2_SERVICE', 'Trung thực, tính toán chuẩn xác'),
+  'Điều phối sự kiện': buildRoleDefaultFromTier('TIER_5_TECHNICAL', 'Kinh nghiệm quản lý nhóm'),
+  'Kỹ thuật âm thanh - ánh sáng': buildRoleDefaultFromTier('TIER_5_TECHNICAL', 'Chuyên môn thiết bị sự kiện'),
+  'Bảo vệ / An ninh': buildRoleDefaultFromTier('TIER_3_PHYSICAL', 'Thể lực tốt, giữ trật tự'),
+  'Hậu cần / Setup sự kiện': buildRoleDefaultFromTier('TIER_3_PHYSICAL', 'Sức khỏe tốt, khuân vác, setup'),
+  'PG / PB': buildRoleDefaultFromTier('TIER_4_PROMOTION', 'Ngoại hình, giới thiệu sản phẩm'),
 };
 
-// Các viết tắt phổ biến và hợp lệ trong ngành tổ chức sự kiện
 export const VALID_EVENT_ROLE_ACRONYMS = new Set([
-  'mc',
-  'pg',
-  'pb',
-  'dj',
-  'pr',
-  'it',
-  'av',
-  'led',
-  'vip',
-  'f&b',
-  'fnb',
-  'qc',
-  'qa',
-  'cskh',
-  'ctv',
-  'hr',
-  'pa',
-  'pm',
+  'mc', 'pg', 'pb', 'dj', 'pr', 'it', 'av', 'led', 'vip',
+  'f&b', 'fnb', 'qc', 'qa', 'cskh', 'ctv', 'hr', 'pa', 'pm',
 ]);
 
-// Sàn lương tối thiểu giờ theo Nghị định 293/2025/NĐ-CP (áp dụng từ 01/01/2026)
+// Sàn lương tối thiểu giờ 4 vùng theo Nghị định 293/2025/NĐ-CP (áp dụng từ 01/01/2026)
 export const STATUTORY_HOURLY_FLOORS = {
+  REGION_1: { wage: 25500, regionLabel: 'Vùng I', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
+  REGION_2: { wage: 22700, regionLabel: 'Vùng II', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
+  REGION_3: { wage: 20000, regionLabel: 'Vùng III', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
+  REGION_4: { wage: 17800, regionLabel: 'Vùng IV', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
+  // Legacy keys cho tương thích ngược
   HANOI: { wage: 25500, regionLabel: 'Vùng I (Hà Nội)', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
   TP_HCM: { wage: 25500, regionLabel: 'Vùng I (TP.HCM)', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
-  DANANG: { wage: 22700, regionLabel: 'Vùng II (Đà Nẵng nội thành)', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
+  DANANG: { wage: 22700, regionLabel: 'Vùng II (Đà Nẵng)', decree: 'Nghị định 293/2025/NĐ-CP (từ 01/01/2026)' },
 };
 
 const VOWELS_REGEX = /[aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/i;
 const VOWELLESS_CONSONANT_RUN_REGEX = /[^aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ\s\d,.\-_/()&+]{5,}/i;
 
-/**
- * Kiểm tra chuỗi nhập liệu có phải spam / cào phím / ký tự vô nghĩa không.
- */
 export function isGibberishOrSpam(text, { allowShortEventAcronyms = false } = {}) {
   if (!text) return false;
   const str = String(text).trim().toLowerCase();
@@ -71,15 +180,10 @@ export function isGibberishOrSpam(text, { allowShortEventAcronyms = false } = {}
     return false;
   }
 
-  // 1. Ký tự đơn lặp liên tiếp >= 4 lần (aaaa, 1111)
   if (/(.)\1{3,}/.test(str)) return true;
-
-  // 2. Cặp ký tự lặp liên tiếp >= 3 lần (ababab)
   if (/(.{2})\1{2,}/.test(str)) return true;
 
   const words = str.split(/[\s,./()&+-]+/).filter(Boolean);
-
-  // 3. Từ lặp liên tiếp >= 3 lần
   let prevWord = null;
   let repeatCount = 0;
   for (const w of words) {
@@ -92,30 +196,26 @@ export function isGibberishOrSpam(text, { allowShortEventAcronyms = false } = {}
     }
   }
 
-  // 4. Mẫu cào phím phổ biến
   if (/(asdasd|sdasd|ádasd|sdada|adasd|sdfsdf|dfghj|fghjk|ghjkl|qwerty|zxcvb|sdfh|asdf)/i.test(str)) {
     return true;
   }
 
-  // 5. Độ lặp từ chiếm ưu thế bất thường
   if (words.length >= 4) {
     const counts = {};
     for (const w of words) counts[w] = (counts[w] || 0) + 1;
     if (Math.max(...Object.values(counts)) / words.length >= 0.45) return true;
   }
 
-  // 6. Độ đa dạng ký tự quá thấp trên chuỗi (chỉ áp dụng tỷ lệ 0.3 cho chuỗi ngắn <= 30 ký tự)
   const cleanLetters = str.replace(/[^a-zàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩịoòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ]/gi, '');
   if (cleanLetters.length >= 10) {
     const uniqueChars = new Set(cleanLetters.split('')).size;
     if (cleanLetters.length <= 30) {
       if (uniqueChars <= 4 || uniqueChars / cleanLetters.length < 0.3) return true;
-    } else {
-      if (uniqueChars <= 5) return true;
+    } else if (uniqueChars <= 5) {
+      return true;
     }
   }
 
-  // 7. Từ >= 3 chữ cái nhưng không có bất kỳ nguyên âm nào (vd: sdfh, zxc, dfg) trừ viết tắt hợp lệ
   const minVowellessLen = allowShortEventAcronyms ? 3 : 4;
   for (const w of words) {
     if (/^\d+$/.test(w)) continue;
@@ -126,10 +226,8 @@ export function isGibberishOrSpam(text, { allowShortEventAcronyms = false } = {}
     }
   }
 
-  // 8. Chuỗi phụ âm liên tiếp >= 4 ký tự không ngắt quãng
   if (VOWELLESS_CONSONANT_RUN_REGEX.test(str)) return true;
 
-  // 9. Chuỗi tổng thể >= 5 ký tự không chứa nguyên âm
   const nonSpace = str.replace(/\s+/g, '');
   if (nonSpace.length >= 5 && !VOWELS_REGEX.test(nonSpace) && !/^\d+$/.test(nonSpace)) {
     if (!(allowShortEventAcronyms && VALID_EVENT_ROLE_ACRONYMS.has(nonSpace))) {
@@ -140,27 +238,17 @@ export function isGibberishOrSpam(text, { allowShortEventAcronyms = false } = {}
   return false;
 }
 
-/**
- * Kiểm tra tính hợp lệ của tên Vị trí / Vai trò cần tuyển ở Bước 2 & Form thêm ca.
- * Trả về chuỗi thông báo lỗi nếu không hợp lệ, hoặc null nếu hợp lệ.
- */
 export function validateJobType(rawJobType) {
   const trimmed = String(rawJobType || '').trim();
-  if (!trimmed) {
-    return 'Vui lòng nhập hoặc chọn tên vị trí / vai trò cần tuyển.';
-  }
-  if (trimmed.length > 80) {
-    return 'Tên vị trí công việc không được vượt quá 80 ký tự.';
-  }
+  if (!trimmed) return 'Vui lòng nhập hoặc chọn tên vị trí / vai trò cần tuyển.';
+  if (trimmed.length > 80) return 'Tên vị trí công việc không được vượt quá 80 ký tự.';
   if (!/^[\p{L}\p{N}\s,./()&+-]+$/u.test(trimmed)) {
     return 'Tên vị trí chỉ được chứa chữ cái, số, khoảng trắng và các dấu , . - / ( ) & +.';
   }
-
   const lower = trimmed.toLowerCase();
   if (trimmed.length < 3 && !VALID_EVENT_ROLE_ACRONYMS.has(lower)) {
     return 'Tên vị trí quá ngắn (tối thiểu 3 ký tự, trừ viết tắt hợp lệ như MC, PG, PB, DJ).';
   }
-
   const tokens = trimmed.split(/[\s,./()&+-]+/).filter(Boolean);
   const hasLetterWord = tokens.some((tok) => {
     const letters = tok.replace(/[^\p{L}]/gu, '');
@@ -169,62 +257,66 @@ export function validateJobType(rawJobType) {
   if (!hasLetterWord) {
     return 'Tên vị trí phải chứa ít nhất một từ khóa mô tả công việc hợp lệ (không thể chỉ nhập số hoặc ký tự đơn).';
   }
-
   if (isGibberishOrSpam(trimmed, { allowShortEventAcronyms: true })) {
     return 'Tên vị trí chứa chuỗi ký tự vô nghĩa. Vui lòng chọn gợi ý có sẵn hoặc nhập chức danh thực tế (VD: MC song ngữ, Barista, Kỹ thuật LED).';
   }
-
   return null;
 }
 
 /**
- * Suy luận mã Thành phố (City enum của backend) từ địa chỉ hoặc tọa độ GPS sự kiện.
+ * Phân giải địa bàn sự kiện toàn quốc về 4 Vùng lương tối thiểu theo NĐ 293/2025/NĐ-CP.
  */
-export function detectCityFromAddress(address = '', lat = null, lng = null) {
-  const norm = String(address || '').toLowerCase();
-  if (
-    /(hà nội|ha noi|hoàn kiếm|đống đa|cầu giấy|ba đình|hai bà trưng|thanh xuân|tây hồ|nam từ liêm|bắc từ liêm|long biên|hà đông|hoàng mai|hòa lạc|thạch thất|cầu diễn|phú diễn|hồ tùng mậu|xuân thủy|mỹ đình|sư phạm|goldmark|đông anh|gia lâm|thanh trì|sóc sơn)/.test(
-      norm
-    )
-  ) {
-    return 'HANOI';
-  }
-  if (
-    /(đà nẵng|da nang|hải châu|sơn trà|thanh khê|ngũ hành sơn|liên chiểu|cẩm lệ|hòa vang)/.test(
-      norm
-    )
-  ) {
-    return 'DANANG';
-  }
-  if (
-    /(tp\.?\s*hcm|hồ chí minh|ho chi minh|sài gòn|sai gon|secc|quận 1\b|quận 3\b|quận 4\b|quận 5\b|quận 7\b|quận 10\b|quận 11\b|quận 12\b|thủ đức|bình thạnh|phú nhuận|tân bình|gò vấp|tân phú|bình tân|nhà bè|bình chánh)/.test(
-      norm
-    )
-  ) {
-    return 'TP_HCM';
-  }
-
-  // Nếu text chưa ghi tên tỉnh/quận, suy luận từ tọa độ GPS đã ghim trên bản đồ
+export function detectRegionFromAddress(address = '', lat = null, lng = null) {
   const nLat = Number(lat);
   const nLng = Number(lng);
   if (Number.isFinite(nLat) && Number.isFinite(nLng) && (nLat !== 0 || nLng !== 0)) {
     if (nLat >= 20.5 && nLat <= 21.45 && nLng >= 105.2 && nLng <= 106.1) {
-      return 'HANOI';
+      return { regionCode: 'REGION_1', city: 'HANOI', regionLabel: 'Vùng I (Hà Nội)', wage: 25500 };
     }
     if (nLat >= 15.8 && nLat <= 16.35 && nLng >= 107.8 && nLng <= 108.4) {
-      return 'DANANG';
+      return { regionCode: 'REGION_2', city: 'DANANG', regionLabel: 'Vùng II (Đà Nẵng)', wage: 22700 };
     }
     if (nLat >= 10.3 && nLat <= 11.2 && nLng >= 106.3 && nLng <= 107.15) {
-      return 'TP_HCM';
+      return { regionCode: 'REGION_1', city: 'TP_HCM', regionLabel: 'Vùng I (TP. Hồ Chí Minh)', wage: 25500 };
     }
   }
 
-  return 'TP_HCM';
+  const norm = normalizeAscii(address);
+  if (norm) {
+    const padded = ` ${norm.replace(/[^a-z0-9]+/g, ' ')} `;
+    const matchAny = (kws) =>
+      kws.some((kw) => padded.includes(` ${kw.replace(/[^a-z0-9]+/g, ' ').trim()} `));
+
+    if (matchAny(['da nang', 'danang', 'hai chau', 'son tra', 'thanh khe', 'ngu hanh son', 'lien chieu', 'cam le', 'hoa vang'])) {
+      return { regionCode: 'REGION_2', city: 'DANANG', regionLabel: 'Vùng II (Đà Nẵng)', wage: 22700 };
+    }
+    if (matchAny(['ha noi', 'hanoi', 'ba dinh', 'cau giay', 'hoan kiem', 'dong da', 'tay ho', 'hai ba trung', 'nam tu liem', 'bac tu liem', 'thanh xuan', 'ha dong', 'long bien', 'hoang mai', 'hoa lac', 'thach that', 'gia lam', 'dong anh', 'soc son'])) {
+      return { regionCode: 'REGION_1', city: 'HANOI', regionLabel: 'Vùng I (Hà Nội)', wage: 25500 };
+    }
+    if (matchAny(['ho chi minh', 'tp hcm', 'tphcm', 'sai gon', 'saigon', 'secc', 'thu duc', 'binh thanh', 'phu nhuan', 'tan binh', 'go vap', 'tan phu', 'binh tan', 'nha be', 'binh chanh'])) {
+      return { regionCode: 'REGION_1', city: 'TP_HCM', regionLabel: 'Vùng I (TP. Hồ Chí Minh)', wage: 25500 };
+    }
+    if (matchAny(['ha giang', 'cao bang', 'bac kan', 'dien bien', 'lai chau', 'son la', 'dak nong', 'gia nghia', 'hau giang', 'vi thanh'])) {
+      return { regionCode: 'REGION_4', city: null, regionLabel: 'Vùng IV', wage: 17800 };
+    }
+    if (matchAny(['ha nam', 'phu ly', 'ninh thuan', 'phan rang', 'binh thuan', 'phan thiet', 'quang ngai', 'phu yen', 'tuy hoa', 'quang binh', 'dong hoi', 'quang tri', 'dong ha', 'ha tinh', 'lao cai', 'sapa', 'sa pa', 'hoa binh', 'tuyen quang', 'lang son', 'yen bai', 'gia lai', 'pleiku', 'kon tum', 'binh phuoc', 'dong xoai', 'ben tre', 'tra vinh', 'vinh long', 'dong thap', 'cao lanh', 'sa dec', 'bac lieu', 'ca mau', 'soc trang'])) {
+      return { regionCode: 'REGION_3', city: null, regionLabel: 'Vùng III', wage: 20000 };
+    }
+    if (matchAny(['can tho', 'thai nguyen', 'bac ninh', 'bac giang', 'hai duong', 'hung yen', 'vinh phuc', 'viet tri', 'phu tho', 'ninh binh', 'thanh hoa', 'vinh', 'nghe an', 'hue', 'thua thien hue', 'nha trang', 'khanh hoa', 'da lat', 'lam dong', 'quy nhon', 'binh dinh', 'buon ma thuot', 'dak lak', 'long an', 'tan an', 'tien giang', 'my tho', 'tay ninh', 'long xuyen', 'an giang', 'kien giang', 'phu quoc', 'rach gia', 'thai binh', 'nam dinh', 'quang nam', 'tam ky', 'hoi an'])) {
+      return { regionCode: 'REGION_2', city: 'DANANG', regionLabel: 'Vùng II', wage: 22700 };
+    }
+    if (matchAny(['hai phong', 'binh duong', 'thu dau mot', 'di an', 'thuan an', 'dong nai', 'bien hoa', 'ba ria', 'vung tau', 'quang ninh', 'ha long'])) {
+      return { regionCode: 'REGION_1', city: 'TP_HCM', regionLabel: 'Vùng I', wage: 25500 };
+    }
+  }
+
+  return { regionCode: 'REGION_1', city: 'TP_HCM', regionLabel: 'Vùng I (TP. Hồ Chí Minh)', wage: 25500 };
 }
 
-/**
- * Trả về thông tin vùng lương cho Sidebar: tránh hiển thị cứng TP.HCM khi EO chưa chọn địa chỉ hoặc chưa ghim vị trí mới.
- */
+export function detectCityFromAddress(address = '', lat = null, lng = null) {
+  return detectRegionFromAddress(address, lat, lng).city || 'TP_HCM';
+}
+
 export function resolveWageRegionInfo(address = '', lat = null, lng = null, hasPickedLocation = false) {
   const hasAddress = Boolean(String(address || '').trim());
   const isDefaultSeccPin =
@@ -236,6 +328,7 @@ export function resolveWageRegionInfo(address = '', lat = null, lng = null, hasP
   if (!hasAddress && (!hasPickedLocation || isDefaultSeccPin)) {
     return {
       isResolved: false,
+      regionCode: null,
       city: null,
       regionLabel: 'Chưa xác định khu vực',
       wage: null,
@@ -243,13 +336,14 @@ export function resolveWageRegionInfo(address = '', lat = null, lng = null, hasP
     };
   }
 
-  const city = detectCityFromAddress(address, lat, lng);
-  const floorInfo = STATUTORY_HOURLY_FLOORS[city] || STATUTORY_HOURLY_FLOORS.TP_HCM;
+  const detected = detectRegionFromAddress(address, lat, lng);
+  const floorInfo = STATUTORY_HOURLY_FLOORS[detected.regionCode] || STATUTORY_HOURLY_FLOORS.REGION_1;
   return {
     isResolved: true,
-    city,
-    regionLabel: floorInfo.regionLabel,
-    wage: floorInfo.wage,
+    regionCode: detected.regionCode,
+    city: detected.city,
+    regionLabel: detected.regionLabel || floorInfo.regionLabel,
+    wage: detected.wage || floorInfo.wage,
     decree: floorInfo.decree,
   };
 }
@@ -268,27 +362,24 @@ function computeClientTimeAndLeadAdjustments(startTime) {
       leadFactorText: null,
     };
   }
-
   const hour = d.getHours();
   const day = d.getDay();
   const isWeekend = day === 0 || day === 6;
 
   let timeMultiplier = 1;
   let timeFactorText = 'Khung giờ ban ngày ngày thường (06h–18h): áp dụng hệ số chuẩn 100%.';
-
   if (isWeekend && (hour < 6 || hour >= 18)) {
-    timeMultiplier = 1.15;
-    timeFactorText = 'Khung giờ tối cuối tuần: điều chỉnh +15% theo nhu cầu nhân sự sự kiện cao điểm.';
+    timeMultiplier = hour >= 22 || hour < 6 ? 1.35 : 1.15;
+    timeFactorText = 'Khung giờ tối/đêm cuối tuần: điều chỉnh theo nhu cầu cao điểm.';
   } else if (isWeekend) {
     timeMultiplier = 1.1;
-    timeFactorText = 'Khung giờ ban ngày cuối tuần: điều chỉnh +10% theo nhu cầu thị trường cuối tuần.';
+    timeFactorText = 'Khung giờ ban ngày cuối tuần: điều chỉnh +10%.';
   } else if (hour >= 22 || hour < 6) {
     timeMultiplier = 1.3;
-    timeFactorText =
-      'Khung giờ ban đêm (22h–06h): cộng tối thiểu +30% theo nguyên tắc làm việc ban đêm (Điều 98 Bộ luật Lao động 2019).';
+    timeFactorText = 'Khung giờ ban đêm (22h–06h): cộng tối thiểu +30% (Điều 98 BLLĐ 2019).';
   } else if (hour >= 18) {
     timeMultiplier = 1.1;
-    timeFactorText = 'Khung giờ buổi tối (18h–22h): điều chỉnh +10% cho ca tối.';
+    timeFactorText = 'Khung giờ buổi tối (18h–22h): điều chỉnh +10%.';
   }
 
   const hoursUntilStart = (d.getTime() - Date.now()) / (1000 * 60 * 60);
@@ -296,130 +387,103 @@ function computeClientTimeAndLeadAdjustments(startTime) {
   let leadFactorText = null;
   if (hoursUntilStart < 24) {
     leadMultiplier = 1.2;
-    leadFactorText = 'Độ gấp tuyển dụng [Khẩn cấp < 24h]: cộng +20% để tăng tỷ lệ Worker nhận ca kịp giờ.';
+    leadFactorText = 'Độ gấp tuyển dụng [Khẩn cấp < 24h]: cộng +20%.';
   } else if (hoursUntilStart < 72) {
     leadMultiplier = 1.1;
-    leadFactorText = 'Độ gấp tuyển dụng [Cận ngày 24h–72h]: cộng +10% để thu hút ứng viên sớm.';
+    leadFactorText = 'Độ gấp tuyển dụng [Cận ngày 24h–72h]: cộng +10%.';
   }
 
   return { timeMultiplier, timeFactorText, leadMultiplier, leadFactorText };
 }
 
 /**
- * Tổng hợp khung thù lao tham chiếu kèm dẫn chứng pháp lý & dữ liệu CANi (dùng chung cho Wizard Step 2 & ShiftCreateModal).
+ * Tổng hợp khung thù lao tham chiếu Region × JobTier (ưu tiên tuyệt đối kết quả Backend API).
  */
 export function buildEvidenceWageBenchmark({
   jobType,
+  jobTier = null,
   startTime,
   venueAddress,
   venueLat = null,
   venueLng = null,
   apiBenchmark,
 }) {
-  const city = detectCityFromAddress(venueAddress, venueLat, venueLng);
-  const floorInfo = STATUTORY_HOURLY_FLOORS[city] || STATUTORY_HOURLY_FLOORS.TP_HCM;
+  const detectedRegion = detectRegionFromAddress(venueAddress, venueLat, venueLng);
+  const decree = STATUTORY_HOURLY_FLOORS[detectedRegion.regionCode]?.decree || STATUTORY_HOURLY_FLOORS.REGION_1.decree;
   const trimmedRole = String(jobType || '').trim();
 
   if (apiBenchmark && Number(apiBenchmark.suggestedWage) > 0) {
     const sampleCount = Number(apiBenchmark.platformSampleCount || 0);
     const catalogMatched = Boolean(apiBenchmark.catalogMatched);
-    const sourceLabel =
-      apiBenchmark.benchmarkSource === 'CANI_WAGE_MATRIX'
-        ? 'Biểu Ma trận Thù lao CANi'
-        : sampleCount >= 3
-        ? `Dữ liệu thực tế CANi (${sampleCount} ca)`
-        : catalogMatched
-        ? 'Biểu chuẩn ngành Sự kiện CANi'
-        : 'Khung tham chiếu chung (Vị trí tùy chỉnh)';
-
     return {
-      city,
-      minWage: Number(apiBenchmark.minWage || floorInfo.wage),
+      city: apiBenchmark.city || detectedRegion.city,
+      regionCode: apiBenchmark.regionCode || detectedRegion.regionCode,
+      regionName: apiBenchmark.regionName || detectedRegion.regionLabel,
+      jobTier: apiBenchmark.jobTier || classifyJobTier(trimmedRole, jobTier),
+      jobTierLabel: apiBenchmark.jobTierLabel || TIER_MAP[classifyJobTier(trimmedRole, jobTier)]?.label,
+      minWage: Number(apiBenchmark.minWage || detectedRegion.wage),
       suggestedWage: Number(apiBenchmark.suggestedWage),
       maxWage: Number(apiBenchmark.maxWage || Number(apiBenchmark.suggestedWage) + 15000),
-      legalFloorWage: Number(apiBenchmark.legalFloorWage || floorInfo.wage),
-      legalRegionLabel: apiBenchmark.legalRegionLabel || floorInfo.regionLabel,
-      legalReference: apiBenchmark.legalReference || floorInfo.decree,
+      legalFloorWage: Number(apiBenchmark.legalFloorWage || detectedRegion.wage),
+      legalRegionLabel: apiBenchmark.legalRegionLabel || detectedRegion.regionLabel,
+      legalReference: apiBenchmark.legalReference || decree,
+      nightHourRatio: Number(apiBenchmark.nightHourRatio || 0),
       platformSampleCount: sampleCount,
       platformAvgWage: apiBenchmark.platformAvgWage ? Number(apiBenchmark.platformAvgWage) : null,
       catalogMatched,
-      sourceLabel,
+      sourceLabel: apiBenchmark.jobTierLabel
+        ? `Bảng A (${apiBenchmark.regionName || detectedRegion.regionLabel} · ${apiBenchmark.jobTierLabel})`
+        : 'Biểu Ma trận Region × JobTier',
       evidenceFactors: Array.isArray(apiBenchmark.evidenceFactors) ? apiBenchmark.evidenceFactors : [],
       explanation: apiBenchmark.explanation || '',
     };
   }
 
-  // Fallback client-side cùng công thức khi API chưa phản hồi hoặc offline
-  const catalogRec = WAGE_RECOMMENDATIONS_MAP[trimmedRole];
-  const catalogMatched = Boolean(catalogRec);
+  // Fallback tạm khi offline hoặc đang chờ phản hồi API
+  const resolvedTierCode = classifyJobTier(trimmedRole, jobTier);
+  const tierMeta = TIER_MAP[resolvedTierCode] || TIER_MAP.TIER_1_GENERAL;
   const { timeMultiplier, timeFactorText, leadMultiplier, leadFactorText } =
     computeClientTimeAndLeadAdjustments(startTime);
 
-  const baseWage = catalogRec ? catalogRec.defaultWage : 45000;
-  const suggestedWage = Math.max(
-    floorInfo.wage,
-    roundToThousand(baseWage * timeMultiplier * leadMultiplier)
-  );
-  const minWage = Math.max(
-    floorInfo.wage,
-    roundToThousand(
-      (catalogRec ? catalogRec.min * timeMultiplier : suggestedWage * 0.85)
-    )
-  );
-  const maxWage = Math.max(
-    suggestedWage + 5000,
-    roundToThousand(
-      (catalogRec ? catalogRec.max * timeMultiplier * leadMultiplier : suggestedWage * 1.25)
-    )
-  );
+  const combined = timeMultiplier * leadMultiplier;
+  const floorWage = detectedRegion.wage;
+  const suggestedWage = Math.max(floorWage, roundToThousand(floorWage * tierMeta.recMult * combined));
+  const minWage = Math.max(floorWage, roundToThousand(floorWage * tierMeta.minMult * combined));
+  const maxWage = Math.max(suggestedWage + 5000, roundToThousand(floorWage * tierMeta.maxMult * combined));
 
   const evidenceFactors = [
-    `Sàn pháp lý ${floorInfo.regionLabel}: ${floorInfo.wage.toLocaleString('vi-VN')} đ/giờ theo ${floorInfo.decree}.`,
-    catalogMatched
-      ? `Mức chuẩn ngành sự kiện cho "${trimmedRole}" (${catalogRec.note}).`
-      : `Vị trí tùy chỉnh "${trimmedRole}" chưa có trong danh mục chuẩn — đang áp dụng khung tham chiếu chung ngành Sự kiện.`,
+    `Sàn pháp lý ${detectedRegion.regionLabel}: ${floorWage.toLocaleString('vi-VN')} đ/giờ theo ${decree}.`,
+    `Nhóm công việc [${tierMeta.label}]: hệ số Bảng A ${tierMeta.minMult.toFixed(2)}x – ${tierMeta.maxMult.toFixed(2)}x.`,
     timeFactorText,
   ];
   if (leadFactorText) evidenceFactors.push(leadFactorText);
 
   return {
-    city,
+    city: detectedRegion.city,
+    regionCode: detectedRegion.regionCode,
+    regionName: detectedRegion.regionLabel,
+    jobTier: resolvedTierCode,
+    jobTierLabel: tierMeta.label,
     minWage,
     suggestedWage,
     maxWage,
-    legalFloorWage: floorInfo.wage,
-    legalRegionLabel: floorInfo.regionLabel,
-    legalReference: floorInfo.decree,
+    legalFloorWage: floorWage,
+    legalRegionLabel: detectedRegion.regionLabel,
+    legalReference: decree,
+    nightHourRatio: 0,
     platformSampleCount: 0,
     platformAvgWage: null,
-    catalogMatched,
-    sourceLabel: catalogMatched ? 'Biểu chuẩn ngành Sự kiện CANi' : 'Khung tham chiếu chung (Vị trí tùy chỉnh)',
+    catalogMatched: true,
+    sourceLabel: `Bảng A (${detectedRegion.regionLabel} · ${tierMeta.label})`,
     evidenceFactors,
     explanation: '',
   };
 }
 
-export const MIN_LEGAL_HOURLY_WAGE = 22700;
+export const MIN_LEGAL_HOURLY_WAGE = 17800;
 export const MIN_LEGAL_HOURLY_WAGE_ERROR =
   'Mức thù lao không được thấp hơn mức tối thiểu quy định theo Nghị định 293/2025/NĐ-CP';
 
-/**
- * Kiểm tra mức thù lao so với mức lương tối thiểu pháp định theo vùng (Nghị định 293/2025/NĐ-CP).
- * - Vùng I (Hà Nội, TP.HCM): 25.500 VNĐ/giờ.
- * - Vùng II (Đà Nẵng): 22.700 VNĐ/giờ.
- * Tách biệt hoàn toàn logic mức gợi ý (recommendation) khỏi mức tối thiểu bắt buộc:
- * - Chặn lưu khi < sàn tối thiểu của vùng với thông báo quy định.
- * - Cho phép lưu nếu >= sàn tối thiểu vùng, và chỉ hiển thị nhắc nhở nhẹ nếu thấp hơn gợi ý thị trường.
- *
- * @param {Object} params
- * @param {number|string} params.hourlyWage Mức thù lao mỗi giờ
- * @param {Object} [params.benchmark] Kết quả tra cứu khung thù lao từ API/Client
- * @param {string} [params.city] Mã thành phố (HANOI, TP_HCM, DANANG)
- * @param {string} [params.venueAddress] Địa chỉ tổ chức sự kiện
- * @param {number} [params.venueLat] Vĩ độ
- * @param {number} [params.venueLng] Kinh độ
- * @returns {{ isValid: boolean, error: string|null, warning: string|null, floorWage: number }}
- */
 export function validateShiftWageAgainstFloor({
   hourlyWage,
   benchmark = null,
@@ -428,24 +492,27 @@ export function validateShiftWageAgainstFloor({
   venueLat = null,
   venueLng = null,
 } = {}) {
-  const resolvedCity = city || detectCityFromAddress(venueAddress, venueLat, venueLng);
-  const statutoryFloor = STATUTORY_HOURLY_FLOORS[resolvedCity] || STATUTORY_HOURLY_FLOORS.TP_HCM;
-  const numWage = Math.round(Number(hourlyWage || 0));
+  const detected = detectRegionFromAddress(venueAddress, venueLat, venueLng);
+  const statutoryFloor =
+    (city && STATUTORY_HOURLY_FLOORS[city]) ||
+    STATUTORY_HOURLY_FLOORS[detected.regionCode] ||
+    STATUTORY_HOURLY_FLOORS.REGION_1;
 
-  const targetFloorWage = statutoryFloor.wage;
+  const targetFloorWage = Number(benchmark?.legalFloorWage || statutoryFloor.wage);
+  const regionLabel = benchmark?.legalRegionLabel || detected.regionLabel || statutoryFloor.regionLabel;
+  const numWage = Math.round(Number(hourlyWage || 0));
   const minFloor = Number(benchmark?.minWage || benchmark?.suggestedWage || targetFloorWage);
 
   if (!Number.isFinite(numWage) || numWage < targetFloorWage) {
     return {
       isValid: false,
-      error: `Mức thù lao không được thấp hơn mức tối thiểu quy định của ${statutoryFloor.regionLabel}: ${targetFloorWage.toLocaleString('vi-VN')} VNĐ/giờ (theo ${statutoryFloor.decree})`,
+      error: `Mức thù lao không được thấp hơn mức tối thiểu quy định của ${regionLabel}: ${targetFloorWage.toLocaleString('vi-VN')} VNĐ/giờ (theo ${statutoryFloor.decree})`,
       warning: null,
       floorWage: targetFloorWage,
       recommendedMinWage: minFloor,
     };
   }
 
-  // Mức gợi ý từ checklist/benchmark chỉ mang tính tham khảo; cho phép EO lưu nếu >= sàn tối thiểu pháp định vùng
   if (numWage < minFloor) {
     return {
       isValid: true,
@@ -466,9 +533,6 @@ export function validateShiftWageAgainstFloor({
   };
 }
 
-/**
- * Chuẩn hóa tên vị trí công việc để so sánh trùng lặp (không phân biệt hoa/thường & khoảng trắng dư).
- */
 export function normalizeShiftJobType(jobType) {
   return String(jobType || '')
     .trim()
@@ -483,10 +547,6 @@ function toMinuteEpoch(dateInput) {
   return Math.floor(ms / 60000);
 }
 
-/**
- * Kiểm tra ca làm việc có bị trùng vị trí + khung giờ với một ca khác trong cùng sự kiện không.
- * Trả về thông báo lỗi nếu trùng, hoặc null nếu hợp lệ.
- */
 export function validateDuplicateShift(
   candidate,
   existingShifts = [],

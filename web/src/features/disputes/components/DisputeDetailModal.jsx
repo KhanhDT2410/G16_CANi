@@ -166,7 +166,7 @@ const DisputeDetailModal = ({
               Ra phán quyết
             </button>
           )}
-          {canEscalate && (
+          {canEscalate && onEscalate && (
             <button type="button" className="btn-quick-fill" style={{ color: '#86198f', borderColor: '#86198f', padding: '0.5rem 1rem' }} onClick={() => onEscalate(dispute)}>
               Kháng nghị lên Admin
             </button>

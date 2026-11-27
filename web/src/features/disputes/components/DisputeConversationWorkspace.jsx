@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import DisputeChatThread from './DisputeChatThread';
 import DisputeDualChatModal from './DisputeDualChatModal';
 import DisputeSidebarInfo from './DisputeSidebarInfo';
-import { disputeApi } from '../api/disputeApi';
+import { useDisputeChat } from '../hooks/useDisputeChat';
 import { DISPUTE_STATUS_CONFIG, DISPUTE_TYPE_LABELS } from '../types/dispute.constants';
+
+const CASE_INFO_STORAGE_KEY = 'cani_dispute_show_case_info';
 
 /**
  * Không gian xử lý tranh chấp dạng hội thoại tương tác đa bên (ADM-03 / FE-11).
- * Tự động polling thời gian thực (2.5s) và cập nhật tin nhắn tức thì (Optimistic UI).
+ * Hỗ trợ ẩn/hiện cột 3 (Hồ sơ vụ việc) để tập trung vào hàng đợi và hội thoại.
  * Tuân thủ < 200 dòng theo AGENTS.md.
  */
 export const DisputeConversationWorkspace = ({
@@ -21,85 +23,26 @@ export const DisputeConversationWorkspace = ({
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [isDualModalOpen, setIsDualModalOpen] = useState(false);
-  const [chatData, setChatData] = useState(null);
-  const [isSending, setIsSending] = useState(false);
-
-  const fetchChat = useCallback(async (isSilent = false) => {
-    if (!dispute?.id) return;
+  const [showCaseInfo, setShowCaseInfo] = useState(() => {
     try {
-      const data = await disputeApi.getDisputeChat(dispute.id);
-      if (data) {
-        setChatData((prev) => {
-          if (!prev) return data;
-          const oldW = prev.workerConversation?.messages?.length || 0;
-          const newW = data.workerConversation?.messages?.length || 0;
-          const oldE = prev.eoConversation?.messages?.length || 0;
-          const newE = data.eoConversation?.messages?.length || 0;
-          if (oldW === newW && oldE === newE) return prev;
-          return data;
-        });
-      }
-    } catch (err) {
-      if (!isSilent) console.error('Lỗi tải dữ liệu chat:', err);
+      return localStorage.getItem(CASE_INFO_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
     }
-  }, [dispute?.id]);
+  });
 
-  useEffect(() => {
-    fetchChat(false);
-    const interval = setInterval(() => {
-      fetchChat(true);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [fetchChat]);
+  const { chatData, isSending, sendMessage } = useDisputeChat(dispute?.id, isArbitrator);
 
-  const handleSendMessage = async (payload) => {
-    if (!dispute?.id) return;
-    const target = payload.targetParty || 'WORKER';
-    const tempId = `temp-${Date.now()}`;
-    const optimisticMsg = {
-      id: tempId,
-      conversationId: target === 'WORKER'
-        ? chatData?.workerConversation?.conversationId
-        : chatData?.eoConversation?.conversationId,
-      senderId: 'me',
-      senderName: isArbitrator ? 'Quản trị viên' : 'Tôi',
-      senderRole: isArbitrator ? 'ADMIN' : 'USER',
-      messageText: payload.messageText,
-      attachmentUrl: payload.attachmentUrl,
-      isMe: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    setChatData((prev) => {
-      if (!prev) return prev;
-      const key = target === 'WORKER' ? 'workerConversation' : 'eoConversation';
-      const conv = prev[key] || { party: target, messages: [] };
-      return { ...prev, [key]: { ...conv, messages: [...(conv.messages || []), optimisticMsg] } };
+  const toggleCaseInfo = () => {
+    setShowCaseInfo((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(CASE_INFO_STORAGE_KEY, String(next));
+      } catch {
+        // Bỏ qua nếu trình duyệt chặn storage
+      }
+      return next;
     });
-
-    setIsSending(true);
-    try {
-      const sentMsg = await disputeApi.sendDisputeChatMessage(dispute.id, payload);
-      if (sentMsg) {
-        setChatData((prev) => {
-          if (!prev) return prev;
-          const key = target === 'WORKER' ? 'workerConversation' : 'eoConversation';
-          const conv = prev[key];
-          if (!conv) return prev;
-          return {
-            ...prev,
-            [key]: {
-              ...conv,
-              messages: (conv.messages || []).map((m) => (m.id === tempId ? sentMsg : m)),
-            },
-          };
-        });
-      }
-    } catch (err) {
-      console.error('Lỗi gửi tin nhắn phân xử:', err);
-    } finally {
-      setIsSending(false);
-    }
   };
 
   const handleCopyId = () => {
@@ -119,7 +62,7 @@ export const DisputeConversationWorkspace = ({
 
   const canAssign = isArbitrator && dispute.status === 'OPEN';
   const canDecide = isArbitrator && (dispute.status === 'INVESTIGATING' || dispute.status === 'ESCALATED');
-  const canEscalate = dispute.status === 'RESOLVED' || dispute.status === 'UNVERIFIED';
+  const canEscalate = !isArbitrator && (dispute.status === 'RESOLVED' || dispute.status === 'UNVERIFIED');
   const canTransfer = isArbitrator && (dispute.status === 'OPEN' || dispute.status === 'INVESTIGATING');
 
   return (
@@ -140,12 +83,24 @@ export const DisputeConversationWorkspace = ({
                   Hạn SLA: {new Date(dispute.slaDeadline).toLocaleString('vi-VN')}
                 </span>
               )}
+              {!showCaseInfo && (dispute.complainantName || dispute.respondentName) && (
+                <span className="workspace-parties-summary">
+                  {dispute.complainantName || 'Người gửi'} · {dispute.respondentName || 'Đối tác'}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Action buttons */}
         <div className="workspace-actions">
+          <button
+            type="button"
+            className={`btn-ws-action btn-ws-info-toggle ${showCaseInfo ? 'active' : ''}`}
+            onClick={toggleCaseInfo}
+          >
+            {showCaseInfo ? 'Ẩn hồ sơ' : 'Xem hồ sơ'}
+          </button>
           {canAssign && (
             <button type="button" className="btn-ws-action btn-ws-assign" onClick={() => onAssign(dispute.id)}>
               Nhận xử lý ca này
@@ -169,24 +124,26 @@ export const DisputeConversationWorkspace = ({
         </div>
       </div>
 
-      {/* Main 2-column Body */}
-      <div className="dispute-workspace-layout">
+      {/* Main Body: 1 cột (Chat mở rộng) hoặc 2 cột (Chat + Hồ sơ vụ việc) */}
+      <div className={`dispute-workspace-layout ${showCaseInfo ? '' : 'sidebar-hidden'}`}>
         <div className="dispute-workspace-chat">
           <DisputeChatThread
             dispute={dispute}
             chatData={chatData}
-            onSendMessage={handleSendMessage}
+            onSendMessage={sendMessage}
             isSending={isSending}
             isArbitrator={isArbitrator}
             onOpenDualModal={() => setIsDualModalOpen(true)}
           />
         </div>
 
-        <DisputeSidebarInfo
-          dispute={dispute}
-          copiedCode={copiedCode}
-          onCopyId={handleCopyId}
-        />
+        {showCaseInfo && (
+          <DisputeSidebarInfo
+            dispute={dispute}
+            copiedCode={copiedCode}
+            onCopyId={handleCopyId}
+          />
+        )}
       </div>
 
       {/* Modal Kẹp Đôi Song Song Toàn Màn Hình */}
@@ -195,7 +152,7 @@ export const DisputeConversationWorkspace = ({
         onClose={() => setIsDualModalOpen(false)}
         dispute={dispute}
         chatData={chatData}
-        onSendMessage={handleSendMessage}
+        onSendMessage={sendMessage}
         isSending={isSending}
         isArbitrator={isArbitrator}
       />

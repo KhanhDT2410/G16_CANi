@@ -36,12 +36,28 @@ export const eoService = {
     return response.data?.data;
   },
 
-  // UC-14: Đề xuất mức thù lao thị trường kèm dẫn chứng pháp lý & dữ liệu nội bộ CANi
-  getWageRecommendation: async ({ shiftId = null, city, jobType, startTime, endTime }) => {
+  // UC-28: Đề xuất mức thù lao theo mô hình Region × JobTier (Bảng A - NĐ 293/2025/NĐ-CP)
+  getWageRecommendation: async ({
+    shiftId = null,
+    regionCode = null,
+    city = null,
+    venueAddress = '',
+    venueLat = null,
+    venueLng = null,
+    jobType,
+    jobTier = null,
+    startTime,
+    endTime,
+  }) => {
     const response = await apiClient.post('/v1/wage-recommendations', {
       shiftId,
+      regionCode,
       city,
+      venueAddress,
+      venueLat,
+      venueLng,
       jobType,
+      jobTier,
       startTime,
       endTime,
     });

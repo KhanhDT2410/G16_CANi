@@ -1,8 +1,7 @@
 import React from 'react';
 import {
-  CITY_LABELS,
-  TIME_SLOT_CONFIG,
-  LEAD_TIME_CONFIG,
+  REGION_CONFIG,
+  JOB_TIER_CONFIG,
 } from '../types/wageMatrix.constants';
 
 export const WageMatrixTable = ({
@@ -18,14 +17,14 @@ export const WageMatrixTable = ({
   togglingId,
 }) => {
   const formatWage = (val) => {
-    if (val === null || val === undefined) return '0 đ/h';
-    return `${Number(val).toLocaleString('vi-VN')} đ/h`;
+    if (val === null || val === undefined) return '—';
+    return `${Number(val).toLocaleString('vi-VN')}đ`;
   };
 
   return (
     <div className="wage-matrix-table-wrapper">
       {loading && items.length === 0 ? (
-        <div className="wage-matrix-empty">Đang tải dữ liệu biểu thù lao...</div>
+        <div className="wage-matrix-empty">Đang tải dữ liệu ma trận Region × JobTier...</div>
       ) : items.length === 0 ? (
         <div className="wage-matrix-empty">
           Không tìm thấy cấu hình thù lao nào phù hợp với bộ lọc.
@@ -34,66 +33,92 @@ export const WageMatrixTable = ({
         <table className="wage-matrix-table">
           <thead>
             <tr>
-              <th style={{ minWidth: '180px' }}>Vị Trí Công Việc</th>
-              <th style={{ width: '150px' }}>Khu Vực</th>
-              <th style={{ minWidth: '220px' }}>Khung Giờ Áp Dụng</th>
-              <th style={{ width: '180px' }}>Độ Khẩn Cấp</th>
-              <th style={{ width: '160px' }}>Mức Thù Lao Chuẩn</th>
-              <th style={{ width: '130px', textAlign: 'center' }}>Trạng Thái</th>
-              <th style={{ width: '140px', textAlign: 'center' }}>Thao Tác</th>
+              <th style={{ width: '130px' }}>Vùng</th>
+              <th style={{ minWidth: '220px' }}>Nhóm Công Việc (Job Tier)</th>
+              <th style={{ width: '190px' }}>Hệ Số Bảng A (Min · ĐX · Max)</th>
+              <th style={{ width: '210px' }}>Khung Lương Giờ Tham Chiếu</th>
+              <th style={{ width: '140px' }}>Giá Ghim Cố Định</th>
+              <th style={{ width: '125px', textAlign: 'center' }}>Trạng Thái</th>
+              <th style={{ width: '135px', textAlign: 'center' }}>Thao Tác</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item) => {
-              const slotCfg = TIME_SLOT_CONFIG[item.timeSlot] || {
-                label: item.timeSlot,
+              const regionCfg = REGION_CONFIG[item.regionCode] || {
+                label: item.regionName || item.regionCode,
                 color: '#475569',
                 bg: '#f1f5f9',
                 border: '#cbd5e1',
               };
-              const leadCfg = LEAD_TIME_CONFIG[item.leadTime] || {
-                label: item.leadTime,
+              const tierCfg = JOB_TIER_CONFIG[item.jobTier] || {
+                label: item.tierLabel || item.jobTier,
                 color: '#475569',
                 bg: '#f1f5f9',
                 border: '#cbd5e1',
               };
-
               const isToggling = togglingId === item.matrixId;
 
               return (
                 <tr key={item.matrixId}>
                   <td>
-                    <span className="wage-job-badge">{item.jobType}</span>
-                  </td>
-                  <td>
-                    <span className="wage-city-text">{CITY_LABELS[item.city] || item.city}</span>
-                  </td>
-                  <td>
                     <span
                       className="wage-slot-badge"
                       style={{
-                        color: slotCfg.color,
-                        backgroundColor: slotCfg.bg,
-                        borderColor: slotCfg.border,
+                        color: regionCfg.color,
+                        backgroundColor: regionCfg.bg,
+                        borderColor: regionCfg.border,
                       }}
                     >
-                      {slotCfg.label}
+                      {item.regionName || regionCfg.label}
                     </span>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
+                      Sàn: {formatWage(item.legalFloorHourly)}
+                    </div>
                   </td>
                   <td>
                     <span
                       className="wage-lead-badge"
                       style={{
-                        color: leadCfg.color,
-                        backgroundColor: leadCfg.bg,
-                        borderColor: leadCfg.border,
+                        color: tierCfg.color,
+                        backgroundColor: tierCfg.bg,
+                        borderColor: tierCfg.border,
+                        marginBottom: '0.25rem',
                       }}
                     >
-                      {leadCfg.label}
+                      {tierCfg.label}
                     </span>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                      {item.tierLabel}
+                    </div>
+                    {item.description && (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                        {item.description}
+                      </div>
+                    )}
                   </td>
                   <td>
-                    <strong className="wage-rate-text">{formatWage(item.wagePerHour)}</strong>
+                    <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.85rem' }}>
+                      {Number(item.minMultiplier).toFixed(2)}x ·{' '}
+                      <span style={{ color: '#2563eb' }}>{Number(item.recommendedMultiplier).toFixed(2)}x</span> ·{' '}
+                      {Number(item.maxMultiplier).toFixed(2)}x
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontSize: '0.83rem', color: '#334155' }}>
+                      {formatWage(item.computedMinWage)} – {formatWage(item.computedMaxWage)}/h
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#2563eb', fontWeight: 700, marginTop: '0.15rem' }}>
+                      Đề xuất: {formatWage(item.computedSuggestedWage)}/h
+                    </div>
+                  </td>
+                  <td>
+                    {item.overrideBaseWage ? (
+                      <strong className="wage-rate-text" style={{ color: '#b45309' }}>
+                        {formatWage(item.overrideBaseWage)}/h
+                      </strong>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Theo hệ số</span>
+                    )}
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <button
@@ -134,7 +159,6 @@ export const WageMatrixTable = ({
         </table>
       )}
 
-      {/* Phân trang */}
       {totalPages > 1 && (
         <div className="wage-matrix-pagination">
           <span className="pagination-info">

@@ -39,6 +39,8 @@ public class H2DataSeeder implements CommandLineRunner {
         private final WorkerSkillRepository workerSkillRepository;
         private final WorkerSkillPointRepository workerSkillPointRepository;
         private final SkillVerificationRequestRepository skillVerificationRequestRepository;
+        private final WageRegionRepository wageRegionRepository;
+        private final WageMatrixRepository wageMatrixRepository;
 
         @Override
         public void run(String... args) {
@@ -726,6 +728,64 @@ public class H2DataSeeder implements CommandLineRunner {
                                 faqRepository.saveAll(faqs);
                                 log.info("==> [H2 Profile] Seeded {} standard business FAQs successfully.",
                                                 faqs.size());
+                        }
+
+                        if (wageRegionRepository.count() == 0) {
+                                List<WageRegion> regions = List.of(
+                                                WageRegion.builder()
+                                                                .code(WageRegionCode.REGION_1)
+                                                                .name("Vùng I")
+                                                                .legalFloorHourly(new BigDecimal("25500.00"))
+                                                                .marketMultiplier(BigDecimal.ONE)
+                                                                .description("Hà Nội, TP.HCM, Hải Phòng, Bình Dương, Đồng Nai theo NĐ 293/2025/NĐ-CP")
+                                                                .isActive(true)
+                                                                .build(),
+                                                WageRegion.builder()
+                                                                .code(WageRegionCode.REGION_2)
+                                                                .name("Vùng II")
+                                                                .legalFloorHourly(new BigDecimal("22700.00"))
+                                                                .marketMultiplier(BigDecimal.ONE)
+                                                                .description("Đà Nẵng, Cần Thơ và các đô thị Vùng II theo NĐ 293/2025/NĐ-CP")
+                                                                .isActive(true)
+                                                                .build(),
+                                                WageRegion.builder()
+                                                                .code(WageRegionCode.REGION_3)
+                                                                .name("Vùng III")
+                                                                .legalFloorHourly(new BigDecimal("20000.00"))
+                                                                .marketMultiplier(BigDecimal.ONE)
+                                                                .description("Thành phố trực thuộc tỉnh và khu vực Vùng III theo NĐ 293/2025/NĐ-CP")
+                                                                .isActive(true)
+                                                                .build(),
+                                                WageRegion.builder()
+                                                                .code(WageRegionCode.REGION_4)
+                                                                .name("Vùng IV")
+                                                                .legalFloorHourly(new BigDecimal("17800.00"))
+                                                                .marketMultiplier(BigDecimal.ONE)
+                                                                .description("Các địa bàn còn lại thuộc Vùng IV theo NĐ 293/2025/NĐ-CP")
+                                                                .isActive(true)
+                                                                .build());
+                                wageRegionRepository.saveAll(regions);
+                        }
+
+                        if (wageMatrixRepository.count() == 0) {
+                                List<WageMatrix> matrixRows = new java.util.ArrayList<>();
+                                for (WageRegionCode regionCode : WageRegionCode.values()) {
+                                        for (JobTier tier : JobTier.values()) {
+                                                matrixRows.add(WageMatrix.builder()
+                                                                .regionCode(regionCode)
+                                                                .jobTier(tier)
+                                                                .tierLabel(tier.getLabel())
+                                                                .description(tier.getDefaultDescription())
+                                                                .minMultiplier(tier.getDefaultMinMultiplier())
+                                                                .recommendedMultiplier(tier.getDefaultRecommendedMultiplier())
+                                                                .maxMultiplier(tier.getDefaultMaxMultiplier())
+                                                                .isActive(true)
+                                                                .build());
+                                        }
+                                }
+                                wageMatrixRepository.saveAll(matrixRows);
+                                log.info("==> [H2 Profile] Seeded 4 WageRegions and {} WageMatrix Region x JobTier rows.",
+                                                matrixRows.size());
                         }
                 }
         }

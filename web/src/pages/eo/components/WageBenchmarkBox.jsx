@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { eoService } from '../../../services/eoService';
 import {
+  JOB_TIER_BENCHMARKS,
   MIN_LEGAL_HOURLY_WAGE,
   buildEvidenceWageBenchmark,
-  detectCityFromAddress,
+  classifyJobTier,
+  detectRegionFromAddress,
   validateJobType,
 } from '../utils/shiftValidation';
 
 /**
- * Shared component hiển thị Khung thù lao tham chiếu kèm dẫn chứng pháp lý & dữ liệu nội bộ CANi (UC-14).
- * Dùng chung cho Bước 2 Tạo Sự Kiện và Modal Thêm Ca Làm Việc.
+ * Shared component hiển thị Khung thù lao tham chiếu Region × JobTier (Bảng A - NĐ 293/2025/NĐ-CP).
+ * Hỗ trợ EO đổi Nhóm công việc (JobTier) khi nhập vị trí tự do ngoài danh mục chuẩn.
  */
 export default function WageBenchmarkBox({
   jobType,
@@ -29,10 +31,21 @@ export default function WageBenchmarkBox({
   );
 
   const [apiBenchmark, setApiBenchmark] = useState(null);
+  const [selectedTierOverride, setSelectedTierOverride] = useState(null);
   const cacheRef = useRef({});
 
   const trimmedRole = String(jobType || '').trim();
-  const city = detectCityFromAddress(venueAddress, venueLat, venueLng);
+  const detectedRegion = detectRegionFromAddress(venueAddress, venueLat, venueLng);
+
+  // Khi EO đổi tên vị trí, reset override để tự phân loại lại theo từ khóa mới
+  useEffect(() => {
+    setSelectedTierOverride(null);
+  }, [trimmedRole]);
+
+  const effectiveTier = useMemo(
+    () => selectedTierOverride || classifyJobTier(trimmedRole),
+    [selectedTierOverride, trimmedRole]
+  );
 
   useEffect(() => {
     if (roleError || !trimmedRole || !startTime) {
@@ -51,7 +64,7 @@ export default function WageBenchmarkBox({
 
     const startIso = parsedStart.toISOString();
     const endIso = safeEnd.toISOString();
-    const cacheKey = `${city}|${trimmedRole.toLowerCase()}|${startIso.slice(0, 16)}`;
+    const cacheKey = `${detectedRegion.regionCode}|${trimmedRole.toLowerCase()}|${selectedTierOverride || 'AUTO'}|${startIso.slice(0, 16)}|${endIso.slice(0, 16)}`;
 
     if (cacheRef.current[cacheKey]) {
       setApiBenchmark(cacheRef.current[cacheKey]);
@@ -62,8 +75,13 @@ export default function WageBenchmarkBox({
     const timer = setTimeout(async () => {
       try {
         const res = await eoService.getWageRecommendation({
-          city,
+          regionCode: detectedRegion.regionCode,
+          city: detectedRegion.city,
+          venueAddress,
+          venueLat,
+          venueLng,
           jobType: trimmedRole,
+          jobTier: selectedTierOverride || null,
           startTime: startIso,
           endTime: endIso,
         });
@@ -72,27 +90,39 @@ export default function WageBenchmarkBox({
           setApiBenchmark(res);
         }
       } catch {
-        // Giữ fallback client-side theo cùng công thức & sàn pháp lý
+        // Fallback client-side cùng mô hình Region × JobTier khi offline
       }
-    }, 380);
+    }, 320);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [roleError, trimmedRole, city, startTime, endTime]);
+  }, [
+    roleError,
+    trimmedRole,
+    detectedRegion.regionCode,
+    detectedRegion.city,
+    venueAddress,
+    venueLat,
+    venueLng,
+    selectedTierOverride,
+    startTime,
+    endTime,
+  ]);
 
   const benchmark = useMemo(() => {
     if (roleError) return null;
     return buildEvidenceWageBenchmark({
       jobType: trimmedRole,
+      jobTier: selectedTierOverride,
       startTime,
       venueAddress,
       venueLat,
       venueLng,
       apiBenchmark,
     });
-  }, [roleError, trimmedRole, startTime, venueAddress, venueLat, venueLng, apiBenchmark]);
+  }, [roleError, trimmedRole, selectedTierOverride, startTime, venueAddress, venueLat, venueLng, apiBenchmark]);
 
   useEffect(() => {
     onBenchmarkLoaded?.(benchmark);
@@ -109,6 +139,46 @@ export default function WageBenchmarkBox({
 
   return (
     <div className="ecw-wage-benchmark-container" style={{ margin: '0.25rem 0 0.75rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.4rem',
+          marginBottom: '0.4rem',
+        }}
+      >
+        <span style={{ fontSize: '0.75rem', color: '#475569' }}>
+          Chuẩn <strong>{benchmark.legalRegionLabel}</strong> (sàn {legalFloor.toLocaleString('vi-VN')}đ/h)
+          {benchmark.nightHourRatio > 0 && ' · gồm phụ phí làm đêm'}
+        </span>
+
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#475569' }}>
+          <span>Nhóm công việc:</span>
+          <select
+            value={effectiveTier}
+            onChange={(e) => setSelectedTierOverride(e.target.value)}
+            style={{
+              fontSize: '0.75rem',
+              padding: '0.18rem 0.45rem',
+              borderRadius: '6px',
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#f8fafc',
+              color: '#0f172a',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {JOB_TIER_BENCHMARKS.map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.label} ({t.minMult.toFixed(1)}x–{t.maxMult.toFixed(1)}x)
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <div
         className="ecw-wage-benchmark-line"
         style={{

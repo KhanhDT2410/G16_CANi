@@ -1,9 +1,8 @@
 package com.cani.repository;
 
 import com.cani.entity.WageMatrix;
-import com.cani.entity.enums.City;
-import com.cani.entity.enums.LeadTime;
-import com.cani.entity.enums.TimeSlot;
+import com.cani.entity.enums.JobTier;
+import com.cani.entity.enums.WageRegionCode;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -15,11 +14,9 @@ import java.util.UUID;
 @Repository
 public interface WageMatrixRepository extends JpaRepository<WageMatrix, UUID>, JpaSpecificationExecutor<WageMatrix> {
 
-    Optional<WageMatrix> findByCityAndJobTypeIgnoreCaseAndTimeSlotAndLeadTime(
-            City city, String jobType, TimeSlot timeSlot, LeadTime leadTime
-    );
+    Optional<WageMatrix> findByRegionCodeAndJobTier(WageRegionCode regionCode, JobTier jobTier);
 
-    List<WageMatrix> findByCityAndJobTypeIgnoreCase(City city, String jobType);
+    List<WageMatrix> findByJobTierAndIsActiveTrue(JobTier jobTier);
 
-    List<WageMatrix> findByJobTypeIgnoreCase(String jobType);
+    List<WageMatrix> findByRegionCodeAndIsActiveTrue(WageRegionCode regionCode);
 }

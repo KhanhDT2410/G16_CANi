@@ -103,7 +103,8 @@ export default function WageBenchmarkBox({
   }
 
   const numericWage = Number(hourlyWage || 0);
-  const isAboveLegalFloor = numericWage >= MIN_LEGAL_HOURLY_WAGE;
+  const legalFloor = Number(benchmark.legalFloorWage || MIN_LEGAL_HOURLY_WAGE);
+  const isAboveLegalFloor = numericWage >= legalFloor;
   const isBelowRecommendedHint = isAboveLegalFloor && numericWage < benchmark.minWage;
 
   return (

@@ -6,6 +6,7 @@ import com.cani.dto.event.*;
 import com.cani.dto.worker.ShiftChecklistItemDto;
 import com.cani.entity.*;
 import com.cani.entity.enums.AssignmentStatus;
+import com.cani.entity.enums.City;
 import com.cani.entity.enums.DisputeStatus;
 import com.cani.entity.enums.EventMode;
 import com.cani.entity.enums.EventStatus;
@@ -68,9 +69,12 @@ public class EoEventService {
     private static final double MIN_BILLABLE_HOURS = 0.5;
     private static final long DEFAULT_SHIFT_MINUTES = 240L;
     private static final BigDecimal DEFAULT_HOURLY_WAGE = BigDecimal.valueOf(50000);
-    public static final BigDecimal LEGAL_MIN_HOURLY_WAGE = new BigDecimal("25000");
+    // Sàn lương tối thiểu vùng theo Nghị định 293/2025/NĐ-CP (hiệu lực từ 01/01/2026)
+    public static final BigDecimal REGION_1_STATUTORY_FLOOR = new BigDecimal("25500"); // Hà Nội, TP.HCM
+    public static final BigDecimal REGION_2_STATUTORY_FLOOR = new BigDecimal("22700"); // Đà Nẵng
+    public static final BigDecimal LEGAL_MIN_HOURLY_WAGE = REGION_2_STATUTORY_FLOOR;
     public static final String LEGAL_MIN_HOURLY_WAGE_ERROR =
-            "Mức thù lao không được thấp hơn mức tối thiểu quy định: 25.000 VNĐ/giờ";
+            "Mức thù lao không được thấp hơn mức tối thiểu quy định theo Nghị định 293/2025/NĐ-CP";
     private static final BigDecimal DEFAULT_RATING = BigDecimal.valueOf(5.0);
 
     private final EventOrganizerRepository eventOrganizerRepository;
@@ -1465,9 +1469,70 @@ public class EoEventService {
         }
     }
 
+    public static City resolveEventCity(Event event) {
+        if (event == null) return City.TP_HCM;
+        return resolveCityFromLocation(event.getVenueAddress(), event.getVenueLat(), event.getVenueLng());
+    }
+
+    public static City resolveCityFromLocation(String address, Double lat, Double lng) {
+        if (lat != null && lng != null && (lat != 0 || lng != 0)) {
+            if (lat >= 20.5 && lat <= 21.45 && lng >= 105.2 && lng <= 106.1) {
+                return City.HANOI;
+            }
+            if (lat >= 15.8 && lat <= 16.35 && lng >= 107.8 && lng <= 108.4) {
+                return City.DANANG;
+            }
+            if (lat >= 10.3 && lat <= 11.2 && lng >= 106.3 && lng <= 107.15) {
+                return City.TP_HCM;
+            }
+        }
+        if (address != null && !address.isBlank()) {
+            String lower = address.toLowerCase(Locale.ROOT);
+            if (lower.contains("đà nẵng") || lower.contains("da nang") || lower.contains("danang")
+                    || lower.contains("hải châu") || lower.contains("ngũ hành sơn") || lower.contains("sơn trà")
+                    || lower.contains("thanh khê") || lower.contains("liên chiểu") || lower.contains("cẩm lệ")) {
+                return City.DANANG;
+            }
+            if (lower.contains("hà nội") || lower.contains("ha noi") || lower.contains("hanoi")
+                    || lower.contains("ba đình") || lower.contains("cầu giấy") || lower.contains("hoàn kiếm")
+                    || lower.contains("đống đa") || lower.contains("tây hồ") || lower.contains("hai bà trưng")
+                    || lower.contains("nam từ liêm") || lower.contains("bắc từ liêm") || lower.contains("thanh xuân")
+                    || lower.contains("hà đông") || lower.contains("long biên") || lower.contains("hoàng mai")) {
+                return City.HANOI;
+            }
+        }
+        return City.TP_HCM;
+    }
+
+    public static BigDecimal resolveLegalFloorWage(City city) {
+        if (city == City.DANANG) {
+            return REGION_2_STATUTORY_FLOOR;
+        }
+        return REGION_1_STATUTORY_FLOOR;
+    }
+
+    public static String resolveLegalRegionLabel(City city) {
+        if (city == City.DANANG) {
+            return "Vùng II (Đà Nẵng)";
+        }
+        if (city == City.HANOI) {
+            return "Vùng I (Hà Nội)";
+        }
+        return "Vùng I (TP. Hồ Chí Minh)";
+    }
+
     private void validateShiftHourlyWage(Event event, BigDecimal hourlyWage) {
-        if (hourlyWage == null || hourlyWage.compareTo(LEGAL_MIN_HOURLY_WAGE) < 0) {
-            throw new BadRequestException(LEGAL_MIN_HOURLY_WAGE_ERROR);
+        if (hourlyWage == null || hourlyWage.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Mức thù lao theo giờ phải lớn hơn 0");
+        }
+        City city = resolveEventCity(event);
+        BigDecimal legalFloor = resolveLegalFloorWage(city);
+        if (hourlyWage.compareTo(legalFloor) < 0) {
+            String regionLabel = resolveLegalRegionLabel(city);
+            String formattedFloor = legalFloor.compareTo(REGION_2_STATUTORY_FLOOR) == 0 ? "22.700" : "25.500";
+            throw new BadRequestException(String.format(
+                    "Mức thù lao không được thấp hơn mức tối thiểu quy định của %s: %s VNĐ/giờ (theo Nghị định 293/2025/NĐ-CP)",
+                    regionLabel, formattedFloor));
         }
     }
 

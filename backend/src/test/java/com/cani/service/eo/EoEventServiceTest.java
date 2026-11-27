@@ -866,7 +866,7 @@ class EoEventServiceTest {
     }
 
     @Test
-    @DisplayName("UTC023c - addShiftToEvent() - Abnormal (EO-004): Chặn lưu khi mức thù lao thấp hơn 25.000 VNĐ/giờ")
+    @DisplayName("UTC023c - addShiftToEvent() - Abnormal (EO-004): Chặn lưu khi mức thù lao thấp hơn mức tối thiểu vùng theo Nghị định 293/2025/NĐ-CP (Vùng I: 25.500 VNĐ/giờ)")
     void addShiftToEvent_ThrowsBadRequest_WhenHourlyWageBelowStatutoryFloor25k() {
         UUID eventId = UUID.randomUUID();
         Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.DRAFT).build();
@@ -880,7 +880,92 @@ class EoEventServiceTest {
                 .requiredWorkers(1).hourlyWage(BigDecimal.valueOf(24000)).build();
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.addShiftToEvent(userId, eventId, shiftDto));
-        assertEquals("Mức thù lao không được thấp hơn mức tối thiểu quy định: 25.000 VNĐ/giờ", ex.getMessage());
+        assertEquals("Mức thù lao không được thấp hơn mức tối thiểu quy định của Vùng I (TP. Hồ Chí Minh): 25.500 VNĐ/giờ (theo Nghị định 293/2025/NĐ-CP)", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("UTC023e - addShiftToEvent() - Normal: Cho phép mức thù lao 23.000 VNĐ/giờ tại Đà Nẵng (Vùng II: sàn tối thiểu 22.700 VNĐ/giờ theo Nghị định 293)")
+    void addShiftToEvent_Success_AllowsDaNangHourlyWageAboveRegion2StatutoryFloor() {
+        UUID eventId = UUID.randomUUID();
+        Event mockDaNangEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.DRAFT)
+                .venueAddress("Trung tâm Hội chợ Triển lãm Đà Nẵng, Cách Mạng Tháng 8, Cẩm Lệ, Đà Nẵng")
+                .venueLat(16.0321)
+                .venueLng(108.2154)
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(eventId, eoId)).thenReturn(Optional.of(mockDaNangEvent));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(i -> {
+            Shift s = i.getArgument(0);
+            s.setShiftId(UUID.randomUUID());
+            return s;
+        });
+
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        CreateShiftRequestDto shiftDto = CreateShiftRequestDto.builder()
+                .jobType("Phục vụ")
+                .startTime(start)
+                .endTime(start.plus(3, ChronoUnit.HOURS))
+                .requiredWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(23000))
+                .build();
+
+        ShiftResponseDto result = eoEventService.addShiftToEvent(userId, eventId, shiftDto);
+
+        assertNotNull(result);
+        assertEquals(0, BigDecimal.valueOf(23000).compareTo(result.getHourlyWage()));
+    }
+
+    @Test
+    @DisplayName("UTC023f - addShiftToEvent() - Abnormal: Chặn lưu khi mức thù lao tại Đà Nẵng thấp hơn sàn Vùng II (22.700 VNĐ/giờ)")
+    void addShiftToEvent_ThrowsBadRequest_WhenDaNangHourlyWageBelowRegion2StatutoryFloor() {
+        UUID eventId = UUID.randomUUID();
+        Event mockDaNangEvent = Event.builder()
+                .eventId(eventId)
+                .eventOrganizer(mockEo)
+                .status(EventStatus.DRAFT)
+                .venueAddress("Đà Nẵng, Việt Nam")
+                .build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(eventId, eoId)).thenReturn(Optional.of(mockDaNangEvent));
+
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        CreateShiftRequestDto shiftDto = CreateShiftRequestDto.builder()
+                .jobType("Phục vụ")
+                .startTime(start)
+                .endTime(start.plus(3, ChronoUnit.HOURS))
+                .requiredWorkers(2)
+                .hourlyWage(BigDecimal.valueOf(22000))
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.addShiftToEvent(userId, eventId, shiftDto));
+        assertEquals("Mức thù lao không được thấp hơn mức tối thiểu quy định của Vùng II (Đà Nẵng): 22.700 VNĐ/giờ (theo Nghị định 293/2025/NĐ-CP)", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("UTC023g - addShiftToEvent() - Abnormal: Chặn lưu khi mức thù lao <= 0")
+    void addShiftToEvent_ThrowsBadRequest_WhenHourlyWageZeroOrNegative() {
+        UUID eventId = UUID.randomUUID();
+        Event mockEvent = Event.builder().eventId(eventId).eventOrganizer(mockEo).status(EventStatus.DRAFT).build();
+
+        when(eventOrganizerRepository.findByUser_UserId(userId)).thenReturn(Optional.of(mockEo));
+        when(eventRepository.findByEventIdAndEventOrganizer_EoIdForUpdate(eventId, eoId)).thenReturn(Optional.of(mockEvent));
+
+        Instant start = Instant.now().plus(1, ChronoUnit.DAYS);
+        CreateShiftRequestDto shiftDto = CreateShiftRequestDto.builder()
+                .jobType("Phục vụ")
+                .startTime(start)
+                .endTime(start.plus(3, ChronoUnit.HOURS))
+                .requiredWorkers(2)
+                .hourlyWage(BigDecimal.ZERO)
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> eoEventService.addShiftToEvent(userId, eventId, shiftDto));
+        assertEquals("Mức thù lao theo giờ phải lớn hơn 0", ex.getMessage());
     }
 
     @Test
